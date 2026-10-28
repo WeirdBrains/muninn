@@ -1,6 +1,7 @@
+# Source build (needs Rust). Most users want muninn-bin/PKGBUILD instead.
 # Maintainer: Michael Christenson II <m3talsmith@gmail.com>
 pkgname=muninn
-pkgver=1.1.0
+pkgver=1.4.0
 pkgrel=1
 pkgdesc="Local, encrypted store for OHLCV market bars (mnnn)"
 arch=('x86_64' 'aarch64')

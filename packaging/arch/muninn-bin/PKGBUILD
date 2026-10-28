@@ -1,0 +1,27 @@
+# Maintainer: Michael Christenson II <m3talsmith@gmail.com>
+# Binary package: installs the prebuilt release binary. No Rust needed.
+pkgname=muninn-bin
+pkgver=1.4.0
+pkgrel=1
+pkgdesc="Local, encrypted store for OHLCV market bars (mnnn), prebuilt"
+arch=('x86_64' 'aarch64')
+url="https://github.com/kommandosaldat/muninn"
+license=('MIT')
+depends=('gcc-libs' 'glibc')
+provides=('muninn')
+conflicts=('muninn')
+options=('!strip' '!debug')
+source_x86_64=("$url/releases/download/v$pkgver/muninn-$pkgver-x86_64-unknown-linux-gnu.tar.gz")
+source_aarch64=("$url/releases/download/v$pkgver/muninn-$pkgver-aarch64-unknown-linux-gnu.tar.gz")
+# Filled from the release's SHA256SUMS when published (updpkgsums).
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+  cd "muninn-$pkgver-$CARCH-unknown-linux-gnu"
+  install -Dm755 mnnn "$pkgdir/usr/bin/mnnn"
+  install -Dm644 -t "$pkgdir/usr/share/man/man1" man/*.1
+  install -Dm644 -t "$pkgdir/usr/share/doc/muninn" README.md CHANGELOG.md
+  cp -r docs "$pkgdir/usr/share/doc/muninn/"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
