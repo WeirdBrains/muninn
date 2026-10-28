@@ -1,6 +1,6 @@
 [package]
 name = "muninn"
-version = "0.6.2"
+version = "0.7.0"
 edition = "2024"
 rust-version = "1.99"
 description = "The data ingestor for the Kommandosaldat project. It ingests data from various sources and normalizes it into a common format."
