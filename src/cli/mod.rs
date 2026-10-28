@@ -1,6 +1,7 @@
 //! CLI layer: thin handlers over the library.
 mod args;
 mod catalog;
+mod export;
 mod ingest;
 pub use args::*;
 
@@ -56,7 +57,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
     ctx.prefs()?;
     match cli.command {
         Command::Ingest(c) => ingest::run(&ctx, c),
-        Command::Export(_) => Err(crate::Error::NotImplemented("export").into()),
+        Command::Export(a) => export::run(&ctx, a),
         Command::Sources(c) => catalog::sources(&ctx, c),
         Command::Symbols(c) => catalog::symbols(&ctx, c),
         Command::Keys(_) => Err(crate::Error::NotImplemented("keys").into()),

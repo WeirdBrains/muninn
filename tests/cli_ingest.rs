@@ -134,3 +134,25 @@ fn full_file_btc_ingest() {
     let out = e.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
     assert!(out.contains("skipped"));
 }
+
+#[test]
+fn export_formats_round_trip() {
+    let e = Env::new();
+    let f = fixture("ETHUSDT_5m.csv");
+    e.ok(&["ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
+    let csv = e.ok(&["export", "--format", "csv", "--out", "-", "--symbol", "ETH/USDT"]);
+    assert_eq!(csv.lines().count(), 301);
+    assert!(csv.starts_with("timestamp,datetime_utc,source,symbol"));
+    let json = e.ok(&["export", "--format", "json", "--out", "-", "--from", "2017-08-17 04:00:00", "--to", "2017-08-17 04:10:00"]);
+    let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v.as_array().unwrap().len(), 3);
+    let pq = e.dir.path().join("out/eth.parquet");
+    e.ok(&["export", "--format", "parquet", "--out", pq.to_str().unwrap()]);
+    assert!(std::fs::metadata(&pq).unwrap().len() > 100);
+    assert!(!e.run(&["export", "--format", "parquet", "--out", "-"]).status.success());
+    // re-ingest the exported CSV under another source: same bars, new ids
+    let back = e.dir.path().join("ETHUSDT_5m_export.csv");
+    e.ok(&["export", "--format", "csv", "--out", back.to_str().unwrap()]);
+    let out = e.ok(&["ingest", "csv", "--path", back.to_str().unwrap(), "--source", "roundtrip"]);
+    assert!(out.contains("inserted   300"), "{out}");
+}
