@@ -15,7 +15,8 @@
 ## Safety
 - Never touch the real `~/.muninn`. Tests, examples and manual runs use a temp dir via
   `MUNINN_HOME` / `--home`.
-- Never modify or move the raw data in `~/Projects/kommandosaldat/raw/data`.
+- `~/Projects/kommandosaldat/raw/data` is read-only: never modify, move or write into raw/data.
+  Reading it for tests, examples and sanity runs is expected.
   Cut small fixtures into `tests/fixtures/`; full-file tests are `#[ignore]` and read
   `MUNINN_RAW_DATA`.
 - Never edit files outside this project folder (cargo caches excepted).
