@@ -573,6 +573,9 @@ list/chart tiles, v0.5.0 sidebar, v0.6.0 import popup.
   read and validated; cancel takes effect between 50k-bar chunks.
 - TUI v2: the sidebar price filter compares each series' min/max of the chosen metric
   (within the year scope) against the range; the year filter also scopes tiles.
+- TUI v2 (v0.6.1): tiles load whole series into memory in a background thread and
+  sort/aggregate there (SQLite on ~1M encrypted rows took ~16 s per sorted page);
+  series listing reads a `series_stats` table (schema migration 2).
 - TUI v2: the import preview shows raw head lines (fast), not parsed bars.
 - TUI v2: rows failing validation are dropped without a prompt in the TUI import.
 - Prompts are a small custom implementation, not `dialoguer`.

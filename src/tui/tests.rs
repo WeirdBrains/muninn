@@ -29,7 +29,8 @@ pub fn app() -> (tempfile::TempDir, App) {
         crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &root.join(f), &Default::default()).unwrap();
     }
     let prefs = Preferences::load_or_create(&paths).unwrap();
-    let a = App::new(paths, store, dek, prefs, Some(ThemeMode::Dark)).unwrap();
+    let mut a = App::new(paths, store, dek, prefs, Some(ThemeMode::Dark)).unwrap();
+    a.data.sync = true;
     (t, a)
 }
 
@@ -577,4 +578,149 @@ fn ingest_progress_counts_and_cancel_aborts() {
     p.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
     let o2 = crate::ingest::IngestOptions { force: true, ..opts };
     assert!(crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), o2, &fx, &Default::default()).is_err());
+}
+
+/// Full-scale timings on the real raw data (read-only). Needs MUNINN_RAW_DATA.
+/// MUNINN_PERF_HOME reuses an already ingested temp home between runs.
+/// Run: MUNINN_RAW_DATA=... cargo test --release --lib fullscale -- --ignored --nocapture
+#[test]
+#[ignore]
+fn fullscale() {
+    use std::time::{Duration, Instant};
+    let Ok(raw) = std::env::var("MUNINN_RAW_DATA") else { return };
+    let raw = std::path::PathBuf::from(raw);
+    let keep = std::env::var("MUNINN_PERF_HOME").ok().map(std::path::PathBuf::from);
+    let tmp = tempfile::tempdir().unwrap();
+    let home = keep.clone().unwrap_or_else(|| tmp.path().to_path_buf());
+    let paths = Paths::resolve(Some(home.join("h")), None).unwrap();
+    paths.ensure().unwrap();
+    let kf = home.join("perf.key");
+    let dek = match std::fs::read(&kf) {
+        Ok(b) if b.len() == 32 => crate::crypto::Key32(b.try_into().unwrap()),
+        _ => {
+            let k = crate::crypto::Key32::random().unwrap();
+            std::fs::write(&kf, k.0).unwrap();
+            k
+        }
+    };
+    let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
+    if store.series().unwrap().len() < 2 {
+        for f in ["BTCUSDT_5m.csv", "ETHUSDT_5m.csv"] {
+            let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
+            let t = Instant::now();
+            let r = crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &raw.join(f), &Default::default()).unwrap();
+            println!("ingest {f}: {} rows in {:?}", r[0].rows, t.elapsed());
+        }
+    }
+    let prefs = Preferences::load_or_create(&paths).unwrap();
+    let t0 = Instant::now();
+    let mut a = App::new(paths, store, dek, prefs, Some(ThemeMode::Dark)).unwrap();
+    println!("{:<40} {:>10.1?}", "App::new (series listing)", t0.elapsed());
+    a.prefs.tui = Default::default();
+    a.layout = layout::TileLayout::single(Some(layout::SeriesKey::of(&a.series[0])));
+    a.caches.clear();
+    a.refresh_rows();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/tui-snapshots/fullscale");
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut worst: Vec<(String, Duration)> = vec![];
+    let mut step = |a: &mut App, name: &str, f: &mut dyn FnMut(&mut App)| {
+        let t = Instant::now();
+        f(a);
+        let s = render(a, 160, 48);
+        let d = t.elapsed();
+        println!("{name:<40} {d:>10.1?}");
+        std::fs::write(dir.join(format!("{}.txt", name.replace([' ', '/'], "_"))), s).unwrap();
+        worst.push((name.to_string(), d));
+    };
+    let t0 = Instant::now();
+    render(&mut a, 160, 48);
+    let mut slow = Duration::ZERO;
+    while a.caches.values().any(|c| c.list.loading) && t0.elapsed().as_secs() < 120 {
+        std::thread::sleep(Duration::from_millis(20));
+        let f0 = Instant::now();
+        render(&mut a, 160, 48);
+        slow = slow.max(f0.elapsed());
+    }
+    println!("{:<40} {:>10.1?} (background; slowest frame meanwhile {slow:?})", "initial series load", t0.elapsed());
+    step(&mut a, "list first render", &mut |_| {});
+    for i in 0..super::super::store::BarSort::ALL.len() {
+        let label = format!("list sort {}", a.layout.focused().list.sort.label());
+        let _ = i;
+        step(&mut a, &format!("{label} (asc)"), &mut |_| {});
+        step(&mut a, &format!("{label} desc"), &mut |a| a.on_key(key(KeyCode::Char('r'))));
+        step(&mut a, &format!("{label} PgDn"), &mut |a| a.on_key(key(KeyCode::PageDown)));
+        step(&mut a, &format!("{label} End"), &mut |a| a.on_key(key(KeyCode::End)));
+        a.on_key(key(KeyCode::Char('r')));
+        a.on_key(key(KeyCode::Char('s')));
+    }
+    step(&mut a, "preset main-stack (list+charts)", &mut |a| a.dispatch(Action::Preset(action::Preset::MainStack)));
+    let t0 = Instant::now();
+    while a.data.loading() > 0 && t0.elapsed().as_secs() < 120 {
+        std::thread::sleep(Duration::from_millis(20));
+        render(&mut a, 160, 48);
+    }
+    println!("{:<40} {:>10.1?}", "second series load (background)", t0.elapsed());
+    let chart = a.layout.tiles().iter().find(|t| t.view == layout::View::Chart).map(|t| t.id).unwrap();
+    a.layout.set_focus(chart);
+    for k in ['m', 'e', 'w', 'z', 'b', 'n'] {
+        step(&mut a, &format!("chart layer {k}"), &mut |a| a.on_key(key(KeyCode::Char(k))));
+    }
+    for i in 0..16 {
+        step(&mut a, &format!("chart zoom out {i}"), &mut |a| a.on_key(key(KeyCode::Char('-'))));
+    }
+    step(&mut a, "chart pan PgUp", &mut |a| a.on_key(key(KeyCode::PageUp)));
+    step(&mut a, "chart Home", &mut |a| a.on_key(key(KeyCode::Home)));
+    step(&mut a, "chart End", &mut |a| a.on_key(key(KeyCode::End)));
+    step(&mut a, "chart zoom in", &mut |a| a.on_key(key(KeyCode::Char('+'))));
+    step(&mut a, "sidebar search", &mut |a| {
+        a.on_key(key(KeyCode::Char('/')));
+        a.on_key(key(KeyCode::Char('e')));
+        a.on_key(key(KeyCode::Esc));
+    });
+    step(&mut a, "sidebar sort name", &mut |a| a.dispatch(Action::SortName));
+    step(&mut a, "sidebar toggle order", &mut |a| a.on_key(key(KeyCode::Char('o'))));
+    step(&mut a, "sidebar year filter 2021", &mut |a| {
+        a.prefs.tui.sidebar.filters.years.insert(2021);
+        a.filters_changed();
+    });
+    step(&mut a, "sidebar price filter max 3000", &mut |a| {
+        a.prefs.tui.sidebar.filters.price.max = Some(3000.0);
+        a.filters_changed();
+    });
+    step(&mut a, "sidebar price metric cycle", &mut |a| {
+        a.prefs.tui.sidebar.filters.price.metric = a.prefs.tui.sidebar.filters.price.metric.next();
+        a.filters_changed();
+    });
+    step(&mut a, "sidebar clear filters", &mut |a| a.on_key(key(KeyCode::Char('X'))));
+    step(&mut a, "refresh (F5)", &mut |a| a.on_key(key(KeyCode::F(5))));
+    // import via the TUI path
+    a.sidebar.focused = false;
+    step(&mut a, "import open", &mut |a| a.on_key(key(KeyCode::Char('i'))));
+    step(&mut a, "import cd raw/data", &mut |a| a.import.cd(raw.clone()));
+    let pos = a.import.entries.iter().position(|e| e.name == "ETHUSD_5m.csv").unwrap();
+    step(&mut a, "import preview highlight", &mut |a| a.import.sel = pos);
+    a.import.fields[0] = format!("perf{}", std::process::id());
+    let t = Instant::now();
+    a.on_key(key(KeyCode::Char('i')));
+    let mut samples = vec![];
+    let mut slow_frame = Duration::ZERO;
+    while a.import.running() && t.elapsed().as_secs() < 300 {
+        let f0 = Instant::now();
+        render(&mut a, 160, 48);
+        slow_frame = slow_frame.max(f0.elapsed());
+        if let import::Phase::Running(r) = &a.import.phase {
+            samples.push(r.progress.get());
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let s = render(&mut a, 160, 48);
+    std::fs::write(dir.join("import_done.txt"), &s).unwrap();
+    let distinct: std::collections::BTreeSet<_> = samples.iter().map(|x| x.0).collect();
+    println!("import ETHUSD_5m.csv: {:?}, {} progress values seen, slowest frame during import {slow_frame:?}", t.elapsed(), distinct.len());
+    assert!(s.contains("Import finished"), "{s}");
+    worst.sort_by_key(|x| std::cmp::Reverse(x.1));
+    println!("--- slowest");
+    for (n, d) in worst.iter().take(8) {
+        println!("{n:<40} {d:>10.1?}");
+    }
 }

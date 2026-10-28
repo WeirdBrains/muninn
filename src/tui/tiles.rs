@@ -4,7 +4,8 @@ use super::layout::{SeriesKey, Tile, View};
 use super::{App, Hit};
 use crate::ingest::time::fmt_ts;
 use crate::model::{Bar, FLAG_ZERO_VOLUME};
-use crate::store::{BarSort, Store};
+use super::data::SeriesData;
+use crate::store::BarSort;
 use crate::theme::Theme;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
@@ -13,39 +14,59 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 use ratatui::Frame;
 
+type Data = Option<std::sync::Arc<SeriesData>>;
+
+fn ptr(d: &Data) -> usize {
+    d.as_ref().map(|d| std::sync::Arc::as_ptr(d) as usize).unwrap_or(0)
+}
+
 /// Runtime state of one list tile (not persisted).
 #[derive(Debug, Clone, Default)]
 pub struct ListCache {
-    key: Option<(SeriesKey, BarSort, bool, Option<(i64, i64)>)>,
+    key: Option<(SeriesKey, BarSort, Option<(i64, i64)>, usize)>,
     pub total: i64,
     pub sel: i64,
     pub top: i64,
-    rows: Vec<Bar>,
-    rows_at: i64,
     pub height: i64,
+    /// Series not loaded yet.
+    pub loading: bool,
+    data: Data,
+    /// First bar index of the scope.
+    lo: usize,
+    /// Sorted bar indices (None = time order).
+    perm: Option<std::sync::Arc<Vec<u32>>>,
+    desc: bool,
 }
 
 impl ListCache {
-    /// Load what the visible window needs (at most three screens of rows).
-    pub fn ensure(&mut self, store: &Store, tile: &Tile, scope: Option<(i64, i64)>, height: i64) {
+    /// Point the list at the series data; sorts in memory when the sort or scope changes.
+    pub fn ensure(&mut self, data: Data, tile: &Tile, scope: Option<(i64, i64)>, height: i64) {
         self.height = height.max(1);
         let Some(series) = &tile.series else {
             self.total = 0;
-            self.rows.clear();
+            self.data = None;
+            self.loading = false;
             return;
         };
-        let key = (series.clone(), tile.list.sort, tile.list.desc, scope);
-        let mut f = series.filter();
-        if let Some((a, b)) = scope {
-            f.from = Some(a);
-            f.to = Some(b);
-        }
+        self.loading = data.is_none();
+        let key = (series.clone(), tile.list.sort, scope, ptr(&data));
         if self.key.as_ref() != Some(&key) {
-            self.total = store.count_filtered(&f).unwrap_or(0);
-            self.rows.clear();
-            self.rows_at = 0;
+            self.perm = None;
+            match &data {
+                Some(d) => {
+                    let r = d.range(scope);
+                    self.lo = r.start;
+                    self.total = r.len() as i64;
+                    if tile.list.sort != BarSort::Time {
+                        self.perm = Some(std::sync::Arc::new(d.sorted(r, tile.list.sort)));
+                    }
+                }
+                None => self.total = 0,
+            }
+            self.data = data;
             self.key = Some(key);
         }
+        self.desc = tile.list.desc;
         self.sel = self.sel.clamp(0, (self.total - 1).max(0));
         if self.sel < self.top {
             self.top = self.sel;
@@ -54,19 +75,18 @@ impl ListCache {
             self.top = self.sel - self.height + 1;
         }
         self.top = self.top.clamp(0, (self.total - self.height).max(0));
-        let need_end = (self.top + self.height).min(self.total);
-        if self.top < self.rows_at || need_end > self.rows_at + self.rows.len() as i64 {
-            let start = (self.top - self.height).max(0);
-            self.rows = store.page_bars(&f, tile.list.sort, tile.list.desc, self.height * 3, start).unwrap_or_default();
-            self.rows_at = start;
-        }
     }
 
     pub fn row(&self, i: i64) -> Option<&Bar> {
-        if i < self.rows_at {
+        if i < 0 || i >= self.total {
             return None;
         }
-        self.rows.get((i - self.rows_at) as usize)
+        let j = if self.desc { self.total - 1 - i } else { i } as usize;
+        let idx = match &self.perm {
+            Some(p) => *p.get(j)? as usize,
+            None => self.lo + j,
+        };
+        self.data.as_ref()?.bars.get(idx)
     }
 
     pub fn selected(&self) -> Option<&Bar> {
@@ -81,7 +101,7 @@ impl ListCache {
 /// Runtime state of one chart tile.
 #[derive(Debug, Clone, Default)]
 pub struct ChartCache {
-    key: Option<(SeriesKey, u16, i64, i64, Option<(i64, i64)>, usize)>,
+    key: Option<(SeriesKey, u16, i64, i64, Option<(i64, i64)>, usize, usize)>,
     pub bars: Vec<Bar>,
     pub first: usize,
     /// Plot width in columns and bucket size from the last draw.
@@ -96,10 +116,12 @@ pub struct ChartCache {
     pub data_last: i64,
     /// Crosshair bar time.
     pub cursor: Option<i64>,
+    pub loading: bool,
 }
 
 impl ChartCache {
-    pub fn ensure(&mut self, store: &Store, tile: &Tile, scope: Option<(i64, i64)>, width: u16, bounds: Option<(i64, i64)>) {
+    pub fn ensure(&mut self, data: Data, tile: &Tile, scope: Option<(i64, i64)>, width: u16, bounds: Option<(i64, i64)>) {
+        self.loading = tile.series.is_some() && data.is_none();
         let Some(series) = &tile.series else {
             self.bars.clear();
             return;
@@ -126,17 +148,16 @@ impl ChartCache {
         self.end = end;
         self.data_first = lo;
         self.data_last = hi;
-        let key = (series.clone(), width, bucket, end, scope, warm);
+        let key = (series.clone(), width, bucket, end, scope, warm, ptr(&data));
         if self.key.as_ref() == Some(&key) {
             return;
         }
-        let mut f = series.filter();
-        f.from = Some((start - warm as i64 * bucket).max(lo));
-        f.to = Some(end + bucket - 1);
+        let from = (start - warm as i64 * bucket).max(lo);
+        let mut to = end + bucket - 1;
         if let Some((_, b)) = scope {
-            f.to = Some(f.to.unwrap().min(b));
+            to = to.min(b);
         }
-        self.bars = store.bucketed(&f, bucket).unwrap_or_default();
+        self.bars = data.as_ref().map(|d| d.bucketed(from, to, bucket, dur)).unwrap_or_default();
         let aligned = start - start.rem_euclid(bucket);
         self.first = self.bars.iter().position(|b| b.ts >= aligned).unwrap_or(self.bars.len());
         self.key = Some(key);
@@ -229,21 +250,21 @@ pub fn title(t: &Tile, cache: &TileCache) -> String {
     let link = t.link.map(|l| format!(" ⛓{l}")).unwrap_or_default();
     match t.view {
         View::List => format!(
-            "[{}] list · {series} · {} {} · {} bars{link}",
+            "[{}] list · {series} · {} {} · {}{link}",
             t.id,
             t.list.sort.label(),
             if t.list.desc { "▼" } else { "▲" },
-            cache.list.total
+            if cache.list.loading { "loading…".to_string() } else { format!("{} bars", cache.list.total) }
         ),
         View::Chart => format!("[{}] chart · {series}{link}", t.id),
     }
 }
 
-pub fn draw_list(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ListCache, store: &Store, scope: Option<(i64, i64)>, focused: bool, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+pub fn draw_list(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ListCache, data: Data, scope: Option<(i64, i64)>, focused: bool, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
     if area.height < 2 {
         return;
     }
-    cache.ensure(store, t, scope, area.height as i64 - 1);
+    cache.ensure(data, t, scope, area.height as i64 - 1);
     let mut x = area.x;
     let mut header = vec![];
     let mut cols = vec![];
@@ -289,7 +310,7 @@ pub fn draw_list(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ListCache, sto
     }
 }
 
-pub fn draw_chart(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ChartCache, store: &Store, scope: Option<(i64, i64)>, bounds: Option<(i64, i64)>, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+pub fn draw_chart(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ChartCache, data: Data, scope: Option<(i64, i64)>, bounds: Option<(i64, i64)>, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
     if area.height < 3 || area.width < 10 {
         return;
     }
@@ -297,7 +318,11 @@ pub fn draw_chart(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ChartCache, s
     let head_h = if l.crosshair { 2 } else { 1 };
     let body = Rect { y: area.y + head_h, height: area.height - head_h, ..area };
     let plot_w = super::chart::areas(body, l).plot.width;
-    cache.ensure(store, t, scope, plot_w, bounds);
+    cache.ensure(data, t, scope, plot_w, bounds);
+    if cache.loading {
+        f.render_widget(Paragraph::new(" loading series…").style(Style::new().fg(th.muted)), area);
+        return;
+    }
     if t.series.is_none() || cache.bars.is_empty() {
         f.render_widget(Paragraph::new(" no bars · pick a series with `,` / `.` or the sidebar").style(Style::new().fg(th.muted)), area);
         return;
@@ -346,10 +371,10 @@ pub fn draw_chart(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ChartCache, s
 
 /// Draw one tile with its border.
 #[allow(clippy::too_many_arguments)]
-pub fn draw_tile(f: &mut Frame, area: Rect, t: &Tile, cache: &mut TileCache, store: &Store, scope: Option<(i64, i64)>, bounds: Option<(i64, i64)>, focused: bool, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+pub fn draw_tile(f: &mut Frame, area: Rect, t: &Tile, cache: &mut TileCache, data: Data, scope: Option<(i64, i64)>, bounds: Option<(i64, i64)>, focused: bool, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
     if t.view == View::List {
         let inner = Block::bordered().inner(area);
-        cache.list.ensure(store, t, scope, inner.height as i64 - 1);
+        cache.list.ensure(data.clone(), t, scope, inner.height as i64 - 1);
     }
     let title = title(t, cache);
     let block = Block::bordered()
@@ -360,8 +385,8 @@ pub fn draw_tile(f: &mut Frame, area: Rect, t: &Tile, cache: &mut TileCache, sto
     f.render_widget(block, area);
     hits.push((area, Hit::Tile(t.id)));
     match t.view {
-        View::List => draw_list(f, inner, t, &mut cache.list, store, scope, focused, th, hits),
-        View::Chart => draw_chart(f, inner, t, &mut cache.chart, store, scope, bounds, th, hits),
+        View::List => draw_list(f, inner, t, &mut cache.list, data, scope, focused, th, hits),
+        View::Chart => draw_chart(f, inner, t, &mut cache.chart, data, scope, bounds, th, hits),
     }
 }
 

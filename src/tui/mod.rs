@@ -12,6 +12,7 @@ pub mod layout;
 pub mod modal;
 pub mod sidebar;
 pub mod import;
+pub mod data;
 pub mod themes;
 pub mod tiles;
 pub mod widgets;
@@ -68,6 +69,7 @@ pub struct App {
     pub series: Vec<crate::store::SeriesInfo>,
     pub sidebar: sidebar::Sidebar,
     pub import: import::ImportState,
+    pub data: data::DataCache,
     /// `Ctrl-w` was pressed; the next key is a window command.
     pub pending_w: bool,
     /// Content area from the last draw (split geometry, min sizes).
@@ -94,6 +96,7 @@ impl App {
             pending_w: false,
             sidebar: Default::default(),
             import: Default::default(),
+            data: data::DataCache::new(paths.db.clone(), dek.0),
             content: Rect::new(0, 0, 120, 30),
             export: forms::ExportForm::default(),
             keys: forms::KeysForm::default(),
@@ -251,6 +254,7 @@ impl App {
             Refresh => {
                 self.series = self.store.series().unwrap_or_default();
                 self.caches.clear();
+                self.data.clear();
                 self.sidebar.price_cache.clear();
                 self.refresh_rows();
                 self.set_status(format!("refreshed: {} series", self.series.len()));
@@ -437,15 +441,16 @@ impl App {
         if p.filters.price.active() {
             for s in &self.series {
                 let k = (layout::SeriesKey::of(s), metric, scope);
-                if !self.sidebar.price_cache.contains_key(&k) {
-                    let mut f = k.0.filter();
-                    if let Some((a, b)) = scope {
-                        f.from = Some(a);
-                        f.to = Some(b);
-                    }
-                    let r = self.store.metric_range(&f, metric).ok().flatten();
+                if !self.sidebar.price_cache.contains_key(&k)
+                    && let Some(d) = self.data.get(&k.0, &self.store)
+                {
+                    let r = d.metric_range(d.range(scope), metric);
                     self.sidebar.price_cache.insert(k, r);
                 }
+            }
+            let n = self.data.loading();
+            if n > 0 {
+                self.set_status(format!("loading {n} series for the price filter…"));
             }
         }
         let cache = &self.sidebar.price_cache;
@@ -634,6 +639,9 @@ impl App {
         let t = self.theme.clone();
         self.hits.clear();
         import::poll(self);
+        if self.data.poll() && self.prefs.tui.sidebar.filters.price.active() {
+            self.refresh_rows();
+        }
         f.render_widget(Block::new().style(Style::new().bg(t.bg).fg(t.fg)), area);
         let hh = header::height(self.prefs.tui.header, area);
         let [head, bar, body, bottom] =
@@ -675,8 +683,9 @@ impl App {
                 layout::Placed::Tile(id, r) => {
                     let Some(tile) = self.layout.tile(id).cloned() else { continue };
                     let bounds = self.bounds(tile.series.as_ref());
+                    let d = tile.series.as_ref().and_then(|k| self.data.get(k, &self.store));
                     let cache = self.caches.entry(id).or_default();
-                    tiles::draw_tile(f, r, &tile, cache, &self.store, scope, bounds, id == self.layout.focus, &t, hits);
+                    tiles::draw_tile(f, r, &tile, cache, d, scope, bounds, id == self.layout.focus, &t, hits);
                 }
                 layout::Placed::Bar { rect, mode, titles, active, first_ids } => {
                     let mut spans = vec![];

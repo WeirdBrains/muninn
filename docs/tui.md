@@ -34,6 +34,13 @@ Always a [tiling layout](tiling.md): one list tile to start, split and rearrange
 with `Ctrl-w` commands or the **View** menu. Each tile shows a list or a chart of
 its own series.
 
+## Performance
+
+A tile's series is loaded into memory once, in the background (a tile shows
+`loading…` meanwhile; about 5 s for a million 5m bars). After that sorting, zooming,
+panning and filtering run in memory, typically 1–30 ms on a million bars. Memory is
+about 56 bytes per bar per loaded series.
+
 ## Import
 
 `i` or **File ▸ Import…** opens a file browser with path completion, multi-select,

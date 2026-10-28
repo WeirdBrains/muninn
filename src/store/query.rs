@@ -299,3 +299,4 @@ mod tests {
         assert_eq!(b[0].high, raw[..3].iter().map(|x| x.high).fold(f64::MIN, f64::max));
     }
 }
+

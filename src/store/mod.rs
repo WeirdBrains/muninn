@@ -60,6 +60,21 @@ CREATE TABLE ingest_runs (
     rejected INTEGER NOT NULL
 );
 CREATE INDEX ingest_runs_hash ON ingest_runs(content_hash, source_id, base, quote, duration_s);
+"#, r#"
+-- Per-series bar count and time range, kept up to date by upsert_bars (listing
+-- series by GROUP BY over millions of encrypted rows takes seconds).
+CREATE TABLE series_stats (
+    source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+    base TEXT NOT NULL,
+    quote TEXT NOT NULL,
+    duration_s INTEGER NOT NULL,
+    count INTEGER NOT NULL,
+    first INTEGER NOT NULL,
+    last INTEGER NOT NULL,
+    PRIMARY KEY (source_id, base, quote, duration_s)
+);
+INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MIN(timestamp), MAX(timestamp)
+    FROM bars GROUP BY source_id, base, quote, duration_s;
 "#];
 
 pub fn now_ms() -> i64 {
@@ -127,6 +142,11 @@ impl Store {
         let mut s = Self { conn };
         s.migrate()?;
         Ok(s)
+    }
+
+    /// Bigger page cache for bulk reads (TUI loader connection).
+    pub fn tune_for_reads(&self) {
+        let _ = self.conn.execute_batch("PRAGMA cache_size = -262144; PRAGMA temp_store = MEMORY;");
     }
 
     pub fn open_in_memory() -> Result<Self> {
@@ -293,6 +313,7 @@ impl Store {
         let src = self.source_by_name(name)?.ok_or_else(|| Error::invalid("source", format!("`{name}` not found")))?;
         let n = self.conn.execute("DELETE FROM bars WHERE source_id = ?1", [&src.id])?;
         self.conn.execute("DELETE FROM ingest_runs WHERE source_id = ?1", [&src.id])?;
+        self.conn.execute("DELETE FROM series_stats WHERE source_id = ?1", [&src.id])?;
         self.conn.execute("DELETE FROM sources WHERE id = ?1", [&src.id])?;
         Ok(n as u64)
     }
@@ -392,6 +413,15 @@ impl Store {
                     c.duplicate += 1;
                 }
             }
+            if c.inserted > 0 {
+                let lo = bars.iter().map(|b| b.ts).min().unwrap_or(0);
+                let hi = bars.iter().map(|b| b.ts).max().unwrap_or(0);
+                tx.execute(
+                    "INSERT INTO series_stats(source_id, base, quote, duration_s, count, first, last) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                     ON CONFLICT DO UPDATE SET count = count + excluded.count, first = min(first, excluded.first), last = max(last, excluded.last)",
+                    params![source.id, symbol.base, symbol.quote, duration.0, c.inserted as i64, lo, hi],
+                )?;
+            }
         }
         tx.commit()?;
         Ok(c)
@@ -399,9 +429,9 @@ impl Store {
 
     pub fn series(&self) -> Result<Vec<SeriesInfo>> {
         let mut st = self.conn.prepare(
-            "SELECT s.name, b.base, b.quote, b.duration_s, COUNT(*), MIN(b.timestamp), MAX(b.timestamp)
-             FROM bars b JOIN sources s ON s.id = b.source_id
-             GROUP BY s.name, b.base, b.quote, b.duration_s ORDER BY s.name, b.base, b.quote, b.duration_s",
+            "SELECT s.name, b.base, b.quote, b.duration_s, b.count, b.first, b.last
+             FROM series_stats b JOIN sources s ON s.id = b.source_id
+             WHERE b.count > 0 ORDER BY s.name, b.base, b.quote, b.duration_s",
         )?;
         let v = st
             .query_map([], |r| {
@@ -564,6 +594,25 @@ mod tests {
         let series = s.series().unwrap();
         assert_eq!(series.len(), 2);
         assert_eq!(series[0].missing(), 0);
+    }
+
+    #[test]
+    fn series_stats_track_upserts_and_removal() {
+        let mut s = Store::open_in_memory().unwrap();
+        let src = s.add_source("binance", "file", Some("/x")).unwrap();
+        let sym = Symbol::new("BTC", "USDT");
+        let bars: Vec<Bar> = (0..10).map(|i| bar(i * 300_000)).collect();
+        s.upsert_bars(&src, &sym, Duration(300), &bars[3..8]).unwrap();
+        s.upsert_bars(&src, &sym, Duration(300), &bars).unwrap();
+        s.upsert_bars(&src, &sym, Duration(300), &bars[..2]).unwrap();
+        let group: (i64, i64, i64) = s
+            .conn
+            .query_row("SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM bars", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap();
+        let v = s.series().unwrap();
+        assert_eq!((v[0].count, v[0].first, v[0].last), group);
+        s.remove_source("binance").unwrap();
+        assert!(s.series().unwrap().is_empty());
     }
 
     #[test]

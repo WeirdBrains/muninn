@@ -167,12 +167,12 @@ impl App {
                 continue;
             }
             let Some(s) = &lt.series else { continue };
-            let mut f = s.filter();
-            if let Some((a, b)) = self.scope() {
-                f.from = Some(a);
-                f.to = Some(b);
-            }
-            if let Ok(i) = self.store.time_index(&f, target, lt.list.desc) {
+            let Some(d) = self.data.get(s, &self.store) else { continue };
+            let r = d.range(self.scope());
+            let sl = &d.bars[r];
+            // Same as Store::time_index: bars before the target in the list's order.
+            let i = if lt.list.desc { (sl.len() - sl.partition_point(|b| b.ts <= target)) as i64 } else { sl.partition_point(|b| b.ts < target) as i64 };
+            {
                 let lc = &mut self.caches.entry(other).or_default().list;
                 lc.sel = i;
                 lc.top = i;
