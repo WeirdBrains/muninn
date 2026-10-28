@@ -97,3 +97,8 @@ temporary homes and never touch `~/.muninn`. The full-file ingest test:
 ```sh
 MUNINN_RAW_DATA=~/Projects/kommandosaldat/raw/data cargo test --release --test cli_ingest -- --ignored
 ```
+
+## Versioning
+
+Semantic versioning with annotated git tags (`v0.1.0`, ...). Pre-1.0, each new feature
+bumps the minor version and fixes/docs bump the patch version. See `CHANGELOG.md`.

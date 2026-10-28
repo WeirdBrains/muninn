@@ -574,6 +574,14 @@ re-run is skipped by content hash.
 - Redis/Postgres have unit tests plus live tests that are `#[ignore]`d and need
   `MUNINN_TEST_REDIS` / `MUNINN_TEST_POSTGRES`.
 
+## 10.2 Versioning and releases
+
+Semantic versioning; pre-1.0 a new feature bumps MINOR, fixes/docs bump PATCH. Each
+release bumps `Cargo.toml`/`Cargo.lock`, regenerates man pages, adds a summary-level
+`CHANGELOG.md` entry, is committed as `release: vX.Y.Z` and gets an annotated local tag
+`vX.Y.Z`. v0.1.0 = milestones 1–9. TUI v2 lands as 0.2.0 (header + menus), 0.3.0
+(tiling + list tiles), 0.4.0 (chart layers), 0.5.0 (sidebar), 0.6.0 (import popup).
+
 ## 11. Documentation (docs/)
 
 One Markdown file per feature under `docs/` (cli, ingest-csv, ingest-json,
