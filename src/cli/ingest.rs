@@ -1,5 +1,8 @@
 //! `mnnn ingest ...`
 use super::{CommonIngestArgs, Ctx, IngestCommand};
+use crate::cli::args::{DataFormat, Paginate, PasswordArgs, RedisType, ServiceCommand, ValueFormat};
+use crate::ingest::service::{self as svc, Secret};
+use crate::store::Store;
 use crate::ingest::{self, IngestOptions, IngestReport};
 
 pub fn options(ctx: &Ctx, c: &CommonIngestArgs) -> anyhow::Result<IngestOptions> {
@@ -37,9 +40,114 @@ pub fn run(ctx: &Ctx, cmd: IngestCommand) -> anyhow::Result<()> {
             };
             ingest::ingest_csv(&mut store, ctx.io, opts, &a.path, &csv)?
         }
-        IngestCommand::Json(_) => return Err(crate::Error::NotImplemented("ingest json").into()),
-        IngestCommand::Service(_) => return Err(crate::Error::NotImplemented("ingest service").into()),
+        IngestCommand::Json(a) => {
+            let opts = options(ctx, &a.common)?;
+            ingest::json::ingest_json(&mut store, ctx.io, opts, &a.path, a.records.as_deref())?
+        }
+        IngestCommand::Service(s) => service(ctx, &mut store, s)?,
     };
     report(ctx, &reports);
     Ok(())
+}
+
+fn secret(p: &PasswordArgs) -> Secret {
+    Secret { literal: p.password.clone(), env: p.password_env.clone(), stdin: p.password_stdin }
+}
+
+fn service(ctx: &Ctx, store: &mut Store, cmd: ServiceCommand) -> anyhow::Result<Vec<IngestReport>> {
+    Ok(match cmd {
+        ServiceCommand::Http(a) => {
+            let req = svc::http::HttpRequest {
+                url: a.url.clone(),
+                method: a.method.as_str().to_string(),
+                body: a.body.as_deref().map(svc::sql_or_file).transpose()?,
+                params: a.params.clone(),
+                headers: a.headers.clone(),
+                format: a.format.map(|f| match f {
+                    DataFormat::Json => svc::http::Format::Json,
+                    DataFormat::Csv => svc::http::Format::Csv,
+                    DataFormat::Ndjson => svc::http::Format::Ndjson,
+                }),
+                records: a.records.clone(),
+                paging: match a.paginate {
+                    Paginate::None => svc::http::Paging::None,
+                    Paginate::Cursor => svc::http::Paging::Cursor,
+                    Paginate::Time => svc::http::Paging::Time,
+                },
+                cursor_path: a.cursor_path.clone(),
+                cursor_param: a.cursor_param.clone(),
+                start_param: a.start_param.clone(),
+                from: a.from.clone(),
+                to: a.to.clone(),
+                max_pages: a.max_pages,
+                rate_limit: a.rate_limit,
+                retries: a.retries,
+                insecure: a.insecure,
+                timeout: a.common.timeout,
+            };
+            req.validate()?;
+            let host = url::Url::parse(&a.url).ok().and_then(|u| u.host_str().map(str::to_string));
+            let input = req.fetch()?;
+            let loc = input.locator.clone();
+            svc::run_inputs(store, ctx.io, options(ctx, &a.common.ingest)?, &loc, host, vec![input])?
+        }
+        ServiceCommand::Redis(a) => {
+            let src = svc::redis::RedisSource {
+                uri: a.uri.clone(),
+                port: a.port,
+                username: a.username.clone(),
+                password: secret(&a.password).resolve(&ctx.io, None)?,
+                db: a.db_index,
+                tls: a.tls,
+                key: a.key.clone(),
+                pattern: a.pattern.clone(),
+                kind: match a.kind {
+                    RedisType::Auto => svc::redis::Kind::Auto,
+                    RedisType::Stream => svc::redis::Kind::Stream,
+                    RedisType::List => svc::redis::Kind::List,
+                    RedisType::Zset => svc::redis::Kind::Zset,
+                    RedisType::Hash => svc::redis::Kind::Hash,
+                    RedisType::String => svc::redis::Kind::String,
+                },
+                value_format: match a.value_format {
+                    ValueFormat::Json => svc::redis::ValueFormat::Json,
+                    ValueFormat::Csv => svc::redis::ValueFormat::Csv,
+                    ValueFormat::Fields => svc::redis::ValueFormat::Fields,
+                },
+                from: a.from.clone(),
+                to: a.to.clone(),
+                batch: a.batch.max(1),
+                timeout: a.common.timeout,
+            };
+            let inputs = src.read()?;
+            svc::run_inputs(store, ctx.io, options(ctx, &a.common.ingest)?, &src.display_url(), Some(src.host()), inputs)?
+        }
+        ServiceCommand::Sqlite(a) => {
+            let src = svc::sqlite::SqliteSource { path: &a.path, table: a.table.as_deref(), query: a.query.as_deref(), key: a.key.as_deref() };
+            let input = src.read()?;
+            let loc = input.locator.clone();
+            let stem = a.path.file_stem().map(|s| s.to_string_lossy().to_string());
+            svc::run_inputs(store, ctx.io, options(ctx, &a.common.ingest)?, &loc, stem, vec![input])?
+        }
+        ServiceCommand::Postgres(a) => {
+            let src = svc::postgres::PgSource {
+                url: a.url.clone(),
+                username: a.username.clone(),
+                password: secret(&a.password).resolve(&ctx.io, if a.url.is_none() { Some("Postgres password") } else { None })?,
+                host: a.host.clone(),
+                port: a.port,
+                database: a.database.clone(),
+                secure: a.secure,
+                ca_cert: a.ca_cert.clone(),
+                schema: a.schema.clone(),
+                table: a.table.clone(),
+                query: a.query.clone(),
+                batch: a.batch,
+                timeout: a.common.timeout,
+            };
+            let input = src.read()?;
+            let loc = input.locator.clone();
+            svc::run_inputs(store, ctx.io, options(ctx, &a.common.ingest)?, &loc, Some(src.host_label()), vec![input])?
+        }
+    })
 }

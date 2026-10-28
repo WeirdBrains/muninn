@@ -2,6 +2,7 @@
 pub mod csv;
 pub mod frame;
 pub mod json;
+pub mod service;
 pub mod time;
 
 use crate::error::{Error, Result};
@@ -98,12 +99,24 @@ pub fn hash_bytes(b: &[u8]) -> String {
     blake3::hash(b).to_hex().to_string()
 }
 
+/// The last path segment without a known data-file extension (`a/b/BTCUSDT_5m.csv` -> `BTCUSDT_5m`).
+fn name_stem(name: &str) -> String {
+    let last = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    let lower = last.to_ascii_lowercase();
+    for ext in [".csv", ".tsv", ".txt", ".json", ".ndjson", ".jsonl", ".db", ".sqlite", ".sqlite3", ".gz"] {
+        if lower.ends_with(ext) {
+            return last[..last.len() - ext.len()].to_string();
+        }
+    }
+    last.to_string()
+}
+
 /// Derive a symbol from a file name against the known symbol list.
 pub fn symbol_from_name(store: &Store, name: &str) -> Result<Option<Symbol>> {
-    let stem = Path::new(name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string());
+    let stem = name_stem(name);
     let quotes = store.known_quotes()?;
     let qrefs: Vec<&str> = quotes.iter().map(String::as_str).collect();
-    let tokens: Vec<&str> = stem.split(['_', '.', ' ']).collect();
+    let tokens: Vec<&str> = stem.split(['_', '.', ' ', ':', '/']).collect();
     // Try separator-joined pairs first (BTC-USD), then concatenated (BTCUSDT), across tokens and adjacent token pairs.
     let mut candidates: Vec<String> = tokens.iter().map(|t| t.to_string()).collect();
     for w in tokens.windows(2) {
@@ -131,8 +144,8 @@ pub fn symbol_from_name_static(name: &str) -> Option<Symbol> {
 
 /// Derive a duration from a file name token such as `5m`, `1h`, `15min`.
 pub fn duration_from_name(name: &str) -> Option<Duration> {
-    let stem = Path::new(name).file_stem()?.to_string_lossy().to_string();
-    stem.split(['_', '.', '-', ' '])
+    let stem = name_stem(name);
+    stem.split(['_', '.', '-', ' ', ':', '/'])
         .filter(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit()))
         .find_map(|t| Duration::parse(t).ok())
 }
@@ -148,6 +161,8 @@ pub struct Session<'a> {
     prompted_symbol: Option<Symbol>,
     prompted_duration: Option<Duration>,
     rejects_started: bool,
+    /// Source name used when none is given and the locator is unknown (services).
+    pub default_source: Option<String>,
 }
 
 impl<'a> Session<'a> {
@@ -162,6 +177,7 @@ impl<'a> Session<'a> {
             prompted_symbol: None,
             prompted_duration: None,
             rejects_started: false,
+            default_source: None,
         }
     }
 
@@ -173,6 +189,8 @@ impl<'a> Session<'a> {
             self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
         } else if let Some(s) = self.store.source_by_locator(&self.source_locator)? {
             s
+        } else if let Some(name) = self.default_source.clone() {
+            self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
         } else {
             let name = self.io.prompt(
                 "source",

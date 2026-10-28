@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 pub const FIELDS: [&str; 6] = ["timestamp", "open", "high", "low", "close", "volume"];
 
-fn aliases(field: &str) -> &'static [&'static str] {
+pub fn aliases(field: &str) -> &'static [&'static str] {
     match field {
         "timestamp" => &["timestamp_utc", "timestamp", "open_time", "opentime", "time", "date", "datetime", "ts", "t", "start", "time_period_start"],
         "open" => &["open", "o", "open_price", "price_open"],
@@ -17,6 +17,11 @@ fn aliases(field: &str) -> &'static [&'static str] {
         "volume" => &["volume", "vol", "v", "base_volume", "volume_base", "volume_traded"],
         _ => &[],
     }
+}
+
+/// Whether a column name is a known timestamp alias.
+pub fn is_timestamp_alias(name: &str) -> bool {
+    aliases("timestamp").iter().any(|a| a.eq_ignore_ascii_case(name.trim()))
 }
 
 /// Parse `--map col=field` values.
