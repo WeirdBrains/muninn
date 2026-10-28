@@ -22,6 +22,7 @@ cd dist
 if [[ "$target" == *windows* ]]; then
   rm -f "$name.zip"; zip -qr "$name.zip" "$name"; echo "dist/$name.zip"
 else
-  tar -czf "$name.tar.gz" --owner=0 --group=0 "$name"; echo "dist/$name.tar.gz"
+  if tar --version 2>/dev/null | grep -q GNU; then own=(--owner=0 --group=0); else own=(--uid 0 --gid 0); fi
+  tar -czf "$name.tar.gz" "${own[@]}" "$name"; echo "dist/$name.tar.gz"
 fi
 rm -rf "$name"

@@ -60,6 +60,20 @@ brew install ./packaging/homebrew/muninn.rb     # or from a tap: brew install mu
 
 Uninstall: `brew uninstall muninn`.
 
+## Windows (winget)
+
+Release zips hold a portable `mnnn.exe` for x64 and arm64
+(`muninn-<ver>-<arch>-pc-windows-gnullvm.zip`). Manifests (schema 1.9) are in
+`packaging/winget/manifests/`:
+
+```powershell
+winget install Kommandosaldat.Muninn              # once accepted into winget-pkgs
+winget install --manifest packaging\winget\manifests\k\Kommandosaldat\Muninn\<ver>
+```
+
+Or unzip anywhere and put `mnnn.exe` on `PATH`. Uninstall: `winget uninstall
+Kommandosaldat.Muninn` (or delete the folder). Data lives in `%USERPROFILE%\.muninn`.
+
 ## From source (any platform)
 
 Needs Rust >= 1.99, a C compiler, `perl` and `make`:

@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+PackageIdentifier: Kommandosaldat.Muninn
+PackageVersion: 1.5.0
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: muninn-1.5.0-x86_64-pc-windows-gnullvm\mnnn.exe
+    PortableCommandAlias: mnnn
+Commands:
+  - mnnn
+ReleaseDate: "2026-10-28"
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/kommandosaldat/muninn/releases/download/v1.5.0/muninn-1.5.0-x86_64-pc-windows-gnullvm.zip
+    InstallerSha256: "0000000000000000000000000000000000000000000000000000000000000000"
+  - Architecture: arm64
+    NestedInstallerFiles:
+      - RelativeFilePath: muninn-1.5.0-aarch64-pc-windows-gnullvm\mnnn.exe
+        PortableCommandAlias: mnnn
+    InstallerUrl: https://github.com/kommandosaldat/muninn/releases/download/v1.5.0/muninn-1.5.0-aarch64-pc-windows-gnullvm.zip
+    InstallerSha256: "0000000000000000000000000000000000000000000000000000000000000000"
+ManifestType: installer
+ManifestVersion: 1.9.0
