@@ -7,7 +7,8 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 ## Using Muninn
 
 - [Command line](cli.md): global flags, environment, exit codes, man pages
-- [Terminal UI](tui.md): screens and keys
+- [Terminal UI](tui.md): header, menus, content area
+- [Menus](menus.md) and [keybindings](keybindings.md)
 - [In-app help](help.md): searching and following links
 
 ## Getting data in and out

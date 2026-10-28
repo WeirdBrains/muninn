@@ -1,5 +1,12 @@
 //! Terminal UI (ratatui + crossterm). Thin layer over the library.
+//!
+//! Layout (PLAN.md 1.3): header, menu bar, content area, status line. Menus, keys and
+//! help all dispatch the same [`action::Action`]s through [`App::dispatch`].
+pub mod action;
 pub mod forms;
+pub mod header;
+pub mod menu;
+pub mod modal;
 pub mod nav;
 pub mod themes;
 pub mod widgets;
@@ -9,43 +16,20 @@ use crate::paths::Paths;
 use crate::prefs::Preferences;
 use crate::store::Store;
 use crate::theme::{self, Theme, ThemeFile, Variant};
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use action::Action;
+use modal::Modal;
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph, Tabs};
+use ratatui::widgets::{Block, Paragraph};
 use ratatui::Frame;
 
+/// Clickable regions recorded while drawing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Screen {
-    Navigator,
-    Ingest,
-    Export,
-    Keys,
-    Themes,
-}
-
-impl Screen {
-    pub const ALL: [Screen; 5] = [Screen::Navigator, Screen::Ingest, Screen::Export, Screen::Keys, Screen::Themes];
-    pub fn title(self) -> &'static str {
-        match self {
-            Screen::Navigator => "Navigator",
-            Screen::Ingest => "Ingest",
-            Screen::Export => "Export",
-            Screen::Keys => "Keys & Backup",
-            Screen::Themes => "Themes",
-        }
-    }
-    /// Help topic for context-sensitive help.
-    pub fn help_topic(self) -> &'static str {
-        match self {
-            Screen::Navigator => "tui",
-            Screen::Ingest => "ingest-csv",
-            Screen::Export => "export",
-            Screen::Keys => "keys",
-            Screen::Themes => "themes",
-        }
-    }
+pub enum Hit {
+    MenuTop(usize),
+    MenuItem(usize, usize),
 }
 
 pub struct App {
@@ -56,15 +40,18 @@ pub struct App {
     pub theme_file: ThemeFile,
     pub variant: Variant,
     pub theme: Theme,
-    pub screen: Screen,
     pub status: String,
     pub quit: bool,
+    pub menu: menu::MenuState,
+    pub modal: Option<Modal>,
     pub nav: nav::NavState,
-    pub ingest: forms::IngestForm,
     pub export: forms::ExportForm,
     pub keys: forms::KeysForm,
     pub themes: themes::ThemeState,
-    pub help: Option<crate::help::HelpView>,
+    /// Regions from the last draw, for mouse hit-testing.
+    pub hits: Vec<(Rect, Hit)>,
+    /// Last dispatched action (tests and the status line).
+    pub last_action: Option<Action>,
 }
 
 impl App {
@@ -75,11 +62,13 @@ impl App {
         let theme = theme_file.resolved(variant);
         let mut app = App {
             nav: nav::NavState::default(),
-            ingest: forms::IngestForm::default(),
             export: forms::ExportForm::default(),
             keys: forms::KeysForm::default(),
             themes: themes::ThemeState::new(&paths, &prefs.theme.name),
-            help: None,
+            menu: menu::MenuState::default(),
+            modal: None,
+            hits: vec![],
+            last_action: None,
             paths,
             store,
             dek,
@@ -87,8 +76,7 @@ impl App {
             theme_file,
             variant,
             theme,
-            screen: Screen::Navigator,
-            status: warn.map(|w| format!("theme error, using default: {w}")).unwrap_or_else(|| "? or F1 for help, Tab to switch screens, Ctrl-C to quit".into()),
+            status: warn.map(|w| format!("theme error, using default: {w}")).unwrap_or_else(|| "F10 menu · ? help · q quit".into()),
             quit: false,
         };
         app.nav.reload(&app.store, &mut app.status);
@@ -105,22 +93,124 @@ impl App {
         self.variant = variant;
     }
 
-    /// Whether a text field currently has focus (so letters are typed, not commands).
-    fn typing(&self) -> bool {
-        if let Some(h) = &self.help {
-            return h.searching;
-        }
-        match self.screen {
-            Screen::Navigator => false,
-            Screen::Ingest => self.ingest.typing(),
-            Screen::Export => self.export.typing(),
-            Screen::Keys => self.keys.typing(),
-            Screen::Themes => self.themes.typing(),
+    pub fn save_prefs(&mut self) {
+        if let Err(e) = self.prefs.save(&self.paths) {
+            self.set_status(format!("could not save preferences: {e}"));
         }
     }
 
     pub fn open_help(&mut self, topic: &str) {
-        self.help = Some(crate::help::HelpView::open(topic));
+        self.modal = Some(Modal::Help(crate::help::HelpView::open(topic)));
+    }
+
+    /// Help topic for the current context.
+    pub fn help_topic(&self) -> &'static str {
+        match &self.modal {
+            Some(m) => m.help_topic(),
+            None if self.menu.is_open() => "menus",
+            None => "tui",
+        }
+    }
+
+    /// Whether an action is available right now (disabled items are greyed out).
+    pub fn enabled(&self, a: Action) -> bool {
+        use Action::*;
+        !matches!(a, KeysInit | RecoverWords | RecoverShards)
+    }
+
+    /// Whether a text field has focus (letters are typed, not commands).
+    fn typing(&self) -> bool {
+        self.modal.as_ref().is_some_and(|m| m.typing(self))
+    }
+
+    /// Map a key to a global action.
+    pub fn key_action(&self, k: KeyEvent) -> Option<Action> {
+        let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+        let alt = k.modifiers.contains(KeyModifiers::ALT);
+        match k.code {
+            KeyCode::F(10) => Some(Action::OpenMenu),
+            KeyCode::F(1) => Some(Action::Help),
+            KeyCode::F(5) => Some(Action::Refresh),
+            KeyCode::Char('?') if !self.typing() => Some(Action::Help),
+            KeyCode::Char('q') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Quit),
+            _ => None,
+        }
+    }
+
+    /// Run a named action. Menus, keys and help all end up here.
+    pub fn dispatch(&mut self, a: Action) {
+        self.last_action = Some(a);
+        if !self.enabled(a) {
+            self.set_status(format!("{} is not available here", a.name()));
+            return;
+        }
+        use Action::*;
+        match a {
+            Quit => self.quit = true,
+            OpenMenu => self.menu.open_top(0),
+            Help => {
+                let t = self.help_topic();
+                self.open_help(t)
+            }
+            HelpSearch => {
+                let mut h = crate::help::HelpView::open("help");
+                h.searching = true;
+                h.update_search();
+                self.modal = Some(Modal::Help(h));
+            }
+            Keybindings => self.open_help("keybindings"),
+            About => self.modal = Some(Modal::info("About Muninn", modal::about_lines())),
+            Export => self.modal = Some(Modal::Export),
+            BackupCreate | RotateKey | ReissueShards => {
+                self.keys.form.sel = match a {
+                    BackupCreate => 0,
+                    RotateKey => self.keys.form.fields.len() + 1,
+                    _ => self.keys.form.fields.len() + 2,
+                };
+                self.modal = Some(Modal::Keys);
+            }
+            BackupRestore => self.modal = Some(Modal::info("Restore", modal::cli_hint("backup restore --from <archive or dir>", "Restoring replaces the open database, so it runs from the command line with the TUI closed."))),
+            Rekey => self.modal = Some(Modal::info("Rekey", modal::cli_hint("keys rekey --words-file <words>", "Rekeying rewrites the whole database; run it with the TUI closed."))),
+            KeysExport => self.modal = Some(Modal::info("Export keys", modal::cli_hint("keys export --out <dir> --words-file <words>", "Exports age-encrypted key files; the words never pass through the TUI."))),
+            KeysInit | RecoverWords | RecoverShards => {}
+            Lock => {
+                self.set_status("locked");
+                self.quit = true;
+            }
+            Preferences => self.modal = Some(Modal::Prefs { sel: 0 }),
+            ThemeSelect => self.modal = Some(Modal::Themes),
+            ThemeMode(m) => self.set_theme_mode(m),
+            ThemeEdit | ThemeNew => {
+                let name = self.prefs.theme.name.clone();
+                if let Some(i) = self.themes.names.iter().position(|n| *n == name) {
+                    self.themes.list.select(Some(i));
+                }
+                self.modal = Some(Modal::Themes);
+                themes::on_key(self, KeyEvent::from(KeyCode::Char('e')));
+                if a == ThemeNew {
+                    themes::on_key(self, KeyEvent::from(KeyCode::Char('s')));
+                }
+            }
+            ThemeImport => self.modal = Some(Modal::prompt("Import theme from file", modal::PromptKind::ThemeImport)),
+            ThemeExport => self.modal = Some(Modal::prompt("Export current theme to file", modal::PromptKind::ThemeExport)),
+            Sources => self.modal = Some(Modal::info("Sources", modal::sources_lines(&self.store))),
+            Symbols => self.modal = Some(Modal::info("Symbols", modal::symbols_lines(&self.store))),
+            Coverage => self.modal = Some(Modal::info("Coverage & gaps", modal::coverage_lines(&self.store))),
+            Refresh => {
+                self.nav.reload(&self.store, &mut self.status);
+                self.set_status("refreshed");
+            }
+            _ => self.set_status(format!("{} is not available yet", a.name())),
+        }
+    }
+
+    pub fn set_theme_mode(&mut self, m: crate::prefs::ThemeMode) {
+        self.prefs.theme.mode = m;
+        self.save_prefs();
+        let v = theme::resolve_variant(m);
+        let t = self.theme_file.clone();
+        self.apply_theme(t, v);
+        self.set_status(format!("mode {m} (showing {})", v.name()));
     }
 
     pub fn on_key(&mut self, k: KeyEvent) {
@@ -131,76 +221,76 @@ impl App {
             self.quit = true;
             return;
         }
-        if let Some(h) = &mut self.help {
-            if h.on_key(k) {
-                self.help = None;
+        if self.menu.is_open() {
+            let en = |a| self.enabled(a);
+            let out = { self.menu.clone() }.on_key_with(k, &en);
+            self.menu = out.0;
+            if let menu::Outcome::Dispatch(a) = out.1 {
+                self.dispatch(a);
             }
             return;
         }
-        if k.code == KeyCode::F(1) || (k.code == KeyCode::Char('?') && !self.typing()) {
-            let topic = if self.screen == Screen::Themes && self.themes.editing() { "themes" } else { self.screen.help_topic() };
-            self.open_help(topic);
-            return;
-        }
-        match k.code {
-            KeyCode::Tab => {
-                let i = Screen::ALL.iter().position(|s| *s == self.screen).unwrap_or(0);
-                self.screen = Screen::ALL[(i + 1) % Screen::ALL.len()];
-                return;
-            }
-            KeyCode::BackTab => {
-                let i = Screen::ALL.iter().position(|s| *s == self.screen).unwrap_or(0);
-                self.screen = Screen::ALL[(i + Screen::ALL.len() - 1) % Screen::ALL.len()];
-                return;
-            }
-            KeyCode::Char('q') if !self.typing() => {
-                self.quit = true;
-                return;
-            }
-            KeyCode::Char(c @ '1'..='6') if !self.typing() => {
-                let i = c as usize - '1' as usize;
-                if i < Screen::ALL.len() {
-                    self.screen = Screen::ALL[i];
-                } else {
-                    self.open_help("help");
+        // Alt+letter opens a menu from anywhere.
+        if k.modifiers.contains(KeyModifiers::ALT)
+            && let KeyCode::Char(c) = k.code
+                && let Some(i) = menu::menus().iter().position(|m| m.mnemonic == c.to_ascii_lowercase()) {
+                    self.menu.open_top(i);
+                    return;
                 }
-                return;
+        if let Some(a) = self.key_action(k)
+            && !(a == Action::Help && matches!(self.modal, Some(Modal::Help(_)))) {
+                return self.dispatch(a);
             }
-            _ => {}
+        if self.modal.is_some() {
+            return modal::on_key(self, k);
         }
-        match self.screen {
-            Screen::Navigator => nav::on_key(self, k),
-            Screen::Ingest => forms::ingest_key(self, k),
-            Screen::Export => forms::export_key(self, k),
-            Screen::Keys => forms::keys_key(self, k),
-            Screen::Themes => themes::on_key(self, k),
+        nav::on_key(self, k);
+    }
+
+    pub fn on_mouse(&mut self, m: MouseEvent) {
+        if m.kind != MouseEventKind::Down(MouseButton::Left) {
+            return;
         }
+        let hit = self.hits.iter().rev().find(|(r, _)| r.contains((m.column, m.row).into())).map(|(_, h)| *h);
+        match hit {
+            Some(Hit::MenuTop(i)) => {
+                if self.menu.open == Some(i) {
+                    self.menu.close();
+                } else {
+                    self.menu.open_top(i);
+                }
+            }
+            Some(Hit::MenuItem(d, i)) => {
+                let en = |a| self.enabled(a);
+                let mut st = self.menu.clone();
+                let out = st.click(d, i, &en);
+                self.menu = st;
+                if let menu::Outcome::Dispatch(a) = out {
+                    self.dispatch(a);
+                }
+            }
+            None => self.menu.close(),
+        }
+    }
+
+    pub fn status_items(&self) -> Vec<String> {
+        vec![format!("● unlocked · {} ({})", self.prefs.theme.mode, self.variant.name()), self.paths.home.display().to_string()]
     }
 
     pub fn draw(&mut self, f: &mut Frame) {
         let area = f.area();
         let t = self.theme.clone();
+        self.hits.clear();
         f.render_widget(Block::new().style(Style::new().bg(t.bg).fg(t.fg)), area);
-        let [top, body, bottom] = Layout::vertical([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)]).areas(area);
-        let mut titles: Vec<Line> = Screen::ALL.iter().enumerate().map(|(i, s)| Line::from(format!("{} {}", i + 1, s.title()))).collect();
-        titles.push(Line::from("6 Help"));
-        let sel = Screen::ALL.iter().position(|s| *s == self.screen).unwrap_or(0);
-        let tabs = Tabs::new(titles)
-            .select(if self.help.is_some() { Screen::ALL.len() } else { sel })
-            .style(Style::new().fg(t.muted).bg(t.bg))
-            .highlight_style(Style::new().fg(t.accent).add_modifier(Modifier::BOLD))
-            .divider(Span::styled("│", Style::new().fg(t.border)));
-        f.render_widget(tabs, top);
-        if let Some(h) = &mut self.help {
-            h.draw(f, body, &t);
-        } else {
-            match self.screen {
-                Screen::Navigator => nav::draw(self, f, body),
-                Screen::Ingest => forms::draw_ingest(self, f, body),
-                Screen::Export => forms::draw_export(self, f, body),
-                Screen::Keys => forms::draw_keys(self, f, body),
-                Screen::Themes => themes::draw(self, f, body),
-            }
+        let hh = header::height(self.prefs.tui.header, area);
+        let [head, bar, body, bottom] =
+            Layout::vertical([Constraint::Length(hh), Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)]).areas(area);
+        header::draw(f, head, &t, &self.status_items());
+        let mut hits = std::mem::take(&mut self.hits);
+        let xs = menu::draw_bar(&self.menu, f, bar, &t, &mut hits);
+        self.draw_content(f, body);
+        if self.modal.is_some() {
+            modal::draw(self, f, body);
         }
         let status = Paragraph::new(Line::from(vec![
             Span::styled(format!(" {} ", self.theme_file.display_name()), Style::new().fg(t.bg).bg(t.accent)),
@@ -208,6 +298,13 @@ impl App {
             Span::styled(format!(" {}", self.status), Style::new().fg(t.muted)),
         ]));
         f.render_widget(status, bottom);
+        let en = |a| self.enabled(a);
+        menu::draw_dropdowns(&self.menu, f, area, bar, &xs, &t, &en, &mut hits);
+        self.hits = hits;
+    }
+
+    fn draw_content(&mut self, f: &mut Frame, area: Rect) {
+        nav::draw(self, f, area);
     }
 }
 
@@ -227,13 +324,17 @@ pub fn centered(area: Rect, w: u16, h: u16) -> Rect {
 
 /// Run the TUI until quit.
 pub fn run(mut app: App) -> crate::Result<()> {
+    use ratatui::crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, execute};
     let mut terminal = ratatui::init();
+    let _ = execute!(std::io::stdout(), EnableMouseCapture);
     let res = (|| -> crate::Result<()> {
         while !app.quit {
+            app.tick();
             terminal.draw(|f| app.draw(f))?;
-            if event::poll(std::time::Duration::from_millis(250))? {
+            if event::poll(std::time::Duration::from_millis(100))? {
                 match event::read()? {
                     Event::Key(k) => app.on_key(k),
+                    Event::Mouse(m) => app.on_mouse(m),
                     Event::FocusGained if app.prefs.theme.mode == crate::prefs::ThemeMode::System => {
                         let v = theme::resolve_variant(crate::prefs::ThemeMode::System);
                         let tf = app.theme_file.clone();
@@ -245,8 +346,14 @@ pub fn run(mut app: App) -> crate::Result<()> {
         }
         Ok(())
     })();
+    let _ = execute!(std::io::stdout(), DisableMouseCapture);
     ratatui::restore();
     res
+}
+
+impl App {
+    /// Periodic work between frames (background tasks).
+    pub fn tick(&mut self) {}
 }
 
 #[cfg(test)]

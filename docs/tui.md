@@ -4,50 +4,43 @@
 mnnn tui
 ```
 
-The TUI asks for the password first (or uses `MUNINN_PASSWORD`), then opens the
-navigator. It uses the same library calls as the CLI.
+The TUI asks for the password first (or uses `MUNINN_PASSWORD`), then opens. It uses
+the same library calls as the CLI. Mouse clicks work on the menu bar and dropdowns
+(mouse capture is on while the TUI runs; hold Shift to select text in most terminals).
 
-## Global keys
+## Screen layout
 
-| key | action |
-|-----|--------|
-| Tab / Shift-Tab | next / previous screen |
-| 1-5 | Navigator, Ingest, Export, Keys & Backup, Themes |
-| 6, `?`, F1 | help for the current screen ([in-app help](help.md)) |
-| q | quit (when not typing in a field) |
-| Ctrl-C | quit |
+```
+┌ header: MUNINN banner · version · lock state · theme mode · home ┐
+├ menu bar: File  View  Data  Keys  Theme  Help ───────────────────┤
+│ content area                                                      │
+├ status line: theme · variant · last message ─────────────────────┘
+```
 
-## Navigator (1)
+- **Header**: MUNINN in block letters with the version and status (unlocked, theme
+  mode and resolved variant, home folder). On terminals with fewer than 30 rows (or
+  fewer than 80 columns) it collapses to one line, `Muninn v0.x.y`. Force compact or
+  large in **File ▸ Preferences…** (`[tui] header` in [preferences](preferences.md)).
+- **Menu bar**: categorized menus with submenus, mouse and keyboard ([menus](menus.md)).
+- **Content area**: series and bars (see below).
+- **Dialogs** (export, keys, themes, preferences, help, info) open over the content
+  area; Esc closes them.
 
-Left: every series as `source symbol duration bars`. Right: coverage (first/last bar,
-missing bars), a candle chart of the visible page, and the bar table.
+All keys: [keybindings](keybindings.md).
 
-↑/↓ select a series, Enter (or →) focuses the table, Esc (or ←) goes back,
-PgUp/PgDn page through bars (200 per page, loaded on demand), Home/End jump, `r`
-reloads. Zero-volume bars are marked `∅`.
+## Content area
 
-## Ingest (2)
+Left: every series as `source symbol duration bars`. Right: coverage, a candle chart
+of the visible page and the bar table. ↑/↓ select a series, Enter focuses the table,
+Esc goes back, PgUp/PgDn page through bars, `r` reloads.
 
-Fields: path (file or directory, `~` allowed), source, symbol, duration. ↑/↓ select,
-Enter edits a field (Enter or Esc to finish). **Preview** shows the first parsed rows
-and what would be derived from the file name. **Ingest** runs the import; if the source,
-symbol or duration can't be derived, the cursor jumps to that field so you can type it
-and run again. Rejected rows are dropped (the TUI runs with "yes"). The result panel
-shows the report. See [CSV ingest](ingest-csv.md) and [JSON ingest](ingest-json.md).
+## Dialogs
 
-## Export (3)
-
-Fields: out, symbol, source, duration, from, to. **Format** cycles csv → parquet → json;
-**Export** writes the file. See [export](export.md).
-
-## Keys & Backup (4)
-
-Shows the database id and service-key version. Actions: **Create backup** into the
-given directory, **Rotate service key** (needs the 24 words and the password that wraps
-the new key), **Re-issue shards** (needs the words; the new shards stay hidden until
-you select **Reveal/Hide**, and are cleared when hidden). Word and password fields are
-masked. See [keys](keys.md) and [backup and recovery](backup-recovery.md).
-
-## Themes (5)
-
-Theme selector with live dark/light preview, mode toggle and editor. See [themes](themes.md).
+- **Export** (File ▸ Export…): out, symbol, source, duration, from, to; **Format**
+  cycles csv → parquet → json. See [export](export.md).
+- **Keys** (File ▸ Backup ▸ Create, Keys ▸ Rotate / Re-issue shards): create a backup
+  into a directory, rotate the service key (needs the 24 words and the new password),
+  re-issue shards (hidden until **Reveal/Hide**, cleared when the dialog closes). See
+  [keys](keys.md) and [backup and recovery](backup-recovery.md).
+- **Themes** (Theme ▸ Select…/Edit current…/New from current…): selector with live
+  dark/light preview and editor. See [themes](themes.md).

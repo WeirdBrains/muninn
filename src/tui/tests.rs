@@ -1,30 +1,40 @@
 //! TUI tests on ratatui's TestBackend (no real terminal).
+use super::action::Action;
+use super::modal::Modal;
 use super::*;
-use crate::prefs::ThemeMode;
+use crate::prefs::{HeaderMode, ThemeMode};
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyEventState, KeyModifiers};
 use ratatui::Terminal;
 
-fn key(c: KeyCode) -> KeyEvent {
+pub fn key(c: KeyCode) -> KeyEvent {
     KeyEvent { code: c, modifiers: KeyModifiers::NONE, kind: KeyEventKind::Press, state: KeyEventState::NONE }
 }
+pub fn mkey(c: KeyCode, m: KeyModifiers) -> KeyEvent {
+    KeyEvent { code: c, modifiers: m, kind: KeyEventKind::Press, state: KeyEventState::NONE }
+}
+pub fn click(x: u16, y: u16) -> MouseEvent {
+    MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column: x, row: y, modifiers: KeyModifiers::NONE }
+}
 
-fn app() -> (tempfile::TempDir, App) {
+pub fn app() -> (tempfile::TempDir, App) {
     let t = tempfile::tempdir().unwrap();
     let paths = Paths::resolve(Some(t.path().join("h")), None).unwrap();
     paths.ensure().unwrap();
     let dek = crate::crypto::Key32::random().unwrap();
     let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
-    let csv = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ETHUSDT_5m.csv");
-    let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
-    crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &csv, &Default::default()).unwrap();
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    for f in ["ETHUSDT_5m.csv", "BTCUSDT_5m.csv"] {
+        let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
+        crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &root.join(f), &Default::default()).unwrap();
+    }
     let prefs = Preferences::load_or_create(&paths).unwrap();
     let a = App::new(paths, store, dek, prefs, Some(ThemeMode::Dark)).unwrap();
     (t, a)
 }
 
-fn screen_text(a: &mut App) -> String {
-    let mut term = Terminal::new(TestBackend::new(140, 45)).unwrap();
+pub fn render(a: &mut App, w: u16, h: u16) -> String {
+    let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
     term.draw(|f| a.draw(f)).unwrap();
     let buf = term.backend().buffer().clone();
     let mut s = String::new();
@@ -37,126 +47,167 @@ fn screen_text(a: &mut App) -> String {
     s
 }
 
+pub fn screen_text(a: &mut App) -> String {
+    render(a, 140, 45)
+}
+
 #[test]
-fn navigator_shows_series_and_pages() {
+fn header_large_and_compact() {
+    let (_t, mut a) = app();
+    let s = render(&mut a, 140, 45);
+    assert!(s.contains("███╗   ███╗"), "{s}");
+    assert!(s.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
+    assert!(s.contains("unlocked"));
+    let s = render(&mut a, 140, 24);
+    assert!(!s.contains("███╗   ███╗"));
+    assert!(s.lines().next().unwrap().contains("Muninn v"), "{s}");
+    a.prefs.tui.header = HeaderMode::Large;
+    assert!(render(&mut a, 140, 24).contains("███╗   ███╗"));
+    a.prefs.tui.header = HeaderMode::Compact;
+    assert!(!render(&mut a, 140, 45).contains("███╗   ███╗"));
+}
+
+#[test]
+fn menu_opens_with_f10_alt_and_mouse() {
     let (_t, mut a) = app();
     let s = screen_text(&mut a);
-    assert!(s.contains("ETH/USDT"), "{s}");
-    assert!(s.contains("300"));
-    assert!(s.contains("2017-08-17 04:00:00"));
-    a.on_key(key(KeyCode::Enter));
-    a.on_key(key(KeyCode::PageDown));
-    assert_eq!(a.nav.page, 1);
-    assert_eq!(a.nav.bars.len(), 100);
+    for m in ["File", "View", "Data", "Keys", "Theme", "Help"] {
+        assert!(s.contains(m), "{m}");
+    }
+    a.on_key(key(KeyCode::F(10)));
+    assert_eq!(a.menu.open, Some(0));
+    let s = screen_text(&mut a);
+    assert!(s.contains("Import…") && s.contains("Preferences…"), "{s}");
+    a.on_key(key(KeyCode::Right));
+    assert_eq!(a.menu.open, Some(1));
+    a.on_key(key(KeyCode::Esc));
+    assert!(!a.menu.is_open());
+    a.on_key(mkey(KeyCode::Char('t'), KeyModifiers::ALT));
+    assert_eq!(a.menu.open, Some(4));
+    a.on_key(key(KeyCode::Esc));
+    // mouse: click "Help" in the menu bar, then "About Muninn"
+    screen_text(&mut a);
+    let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuTop(5)).unwrap();
+    a.on_mouse(click(r.x + 1, r.y));
+    assert_eq!(a.menu.open, Some(5));
+    screen_text(&mut a);
+    let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuItem(0, 3)).unwrap();
+    a.on_mouse(click(r.x + 2, r.y));
+    assert_eq!(a.last_action, Some(Action::About));
+    assert!(screen_text(&mut a).contains("Local, encrypted store"));
 }
 
 #[test]
-fn every_screen_renders_and_tab_cycles() {
+fn submenus_and_mnemonics() {
     let (_t, mut a) = app();
-    for s in Screen::ALL {
-        assert_eq!(a.screen, s);
-        let txt = screen_text(&mut a);
-        assert!(!txt.trim().is_empty());
-        a.on_key(key(KeyCode::Tab));
-    }
-    assert_eq!(a.screen, Screen::Navigator);
+    a.on_key(mkey(KeyCode::Char('t'), KeyModifiers::ALT));
+    a.on_key(key(KeyCode::Char('m'))); // Mode ▸
+    assert_eq!(a.menu.path.len(), 2);
+    let s = screen_text(&mut a);
+    assert!(s.contains("System") && s.contains("Light"), "{s}");
+    a.on_key(key(KeyCode::Char('l')));
+    assert_eq!(a.last_action, Some(Action::ThemeMode(ThemeMode::Light)));
+    assert_eq!(a.prefs.theme.mode, ThemeMode::Light);
+    assert_eq!(a.variant, Variant::Light);
 }
 
 #[test]
-fn ingest_form_prompts_inline_for_missing_values() {
-    let (t, mut a) = app();
-    a.on_key(key(KeyCode::Char('2')));
-    let p = t.path().join("unnamed.csv");
-    std::fs::copy(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/unnamed.csv"), &p).unwrap();
-    a.ingest.form.fields[0].value = p.display().to_string();
-    a.ingest.form.fields[1].value = "local".into();
-    forms::run_ingest(&mut a);
-    assert!(a.status.contains("missing symbol"), "{}", a.status);
-    assert!(a.ingest.form.editing);
-    for c in "BTC/USDT".chars() {
-        a.on_key(key(KeyCode::Char(c)));
-    }
-    a.on_key(key(KeyCode::Enter));
-    forms::run_ingest(&mut a);
-    assert!(a.status.contains("ingested 1"), "{}", a.status);
-    assert!(a.nav.series.iter().any(|s| s.source == "local"));
+fn menu_and_key_dispatch_the_same_action() {
+    let (_t, mut a) = app();
+    a.on_key(key(KeyCode::Char('?')));
+    let by_key = a.last_action;
+    a.modal = None;
+    a.last_action = None;
+    a.on_key(mkey(KeyCode::Char('h'), KeyModifiers::ALT));
+    a.on_key(key(KeyCode::Enter)); // Help topics
+    assert_eq!(a.last_action, by_key);
+    assert!(matches!(a.modal, Some(Modal::Help(_))));
+    // Every menu action has a unique name.
+    let names: Vec<String> = menu::all_actions().iter().map(|a| a.name()).collect();
+    let mut d = names.clone();
+    d.sort();
+    d.dedup();
+    assert_eq!(d.len(), names.len());
 }
 
 #[test]
-fn export_from_tui() {
+fn disabled_items_do_not_dispatch() {
+    let (_t, mut a) = app();
+    assert!(!a.enabled(Action::KeysInit));
+    a.on_key(mkey(KeyCode::Char('k'), KeyModifiers::ALT));
+    a.on_key(key(KeyCode::Enter)); // Initialize… (disabled)
+    assert!(a.menu.is_open());
+    assert_eq!(a.last_action, None);
+}
+
+#[test]
+fn export_from_menu() {
     let (t, mut a) = app();
-    a.on_key(key(KeyCode::Char('3')));
+    a.dispatch(Action::Export);
     let out = t.path().join("x.csv");
     a.export.form.fields[0].value = out.display().to_string();
+    a.export.form.fields[1].value = "ETH/USDT".into();
     a.export.form.sel = a.export.form.fields.len() + 1;
     a.on_key(key(KeyCode::Enter));
     assert!(a.status.contains("wrote 300"), "{}", a.status);
     assert_eq!(std::fs::read_to_string(out).unwrap().lines().count(), 301);
+    a.on_key(key(KeyCode::Esc));
+    assert!(a.modal.is_none());
 }
 
 #[test]
-fn theme_selector_mode_and_editor() {
+fn theme_editor_new_from_current() {
     let (_t, mut a) = app();
-    a.on_key(key(KeyCode::Char('5')));
-    let s = screen_text(&mut a);
-    assert!(s.contains("Tokyo Night · dark"), "{s}");
-    assert!(s.contains("Tokyo Night · light"));
-    a.on_key(key(KeyCode::Down)); // catppuccin
+    a.dispatch(Action::ThemeNew);
+    assert!(a.themes.editor.is_some());
     a.on_key(key(KeyCode::Enter));
-    assert_eq!(a.prefs.theme.name, "catppuccin");
-    a.on_key(key(KeyCode::Char('m')));
-    assert_eq!(a.prefs.theme.mode, ThemeMode::Dark);
-    a.on_key(key(KeyCode::Char('m')));
-    assert_eq!(a.prefs.theme.mode, ThemeMode::Light);
-    assert_eq!(a.variant, Variant::Light);
-    let saved = Preferences::load_or_create(&a.paths).unwrap();
-    assert_eq!(saved.theme.name, "catppuccin");
-    // editor: set fg to a low-contrast hex, see a warning, save as new theme
-    a.on_key(key(KeyCode::Char('e')));
-    a.on_key(key(KeyCode::Down)); // fg
-    a.on_key(key(KeyCode::Enter));
-    for c in "eff1f5".chars() {
-        a.on_key(key(KeyCode::Char(c)));
-    }
-    a.on_key(key(KeyCode::Enter));
-    let s = screen_text(&mut a);
-    assert!(s.contains("contrast"), "{s}");
-    a.on_key(key(KeyCode::Char('s')));
-    a.on_key(key(KeyCode::Enter));
-    assert!(a.status.contains("saved theme catppuccin-custom"), "{}", a.status);
-    assert!(a.paths.theme_dir("catppuccin-custom").join("interface.toml").exists());
+    assert!(a.status.contains("saved theme tokyo-night-custom"), "{}", a.status);
     a.on_key(key(KeyCode::Esc));
     assert!(a.themes.editor.is_none());
+    a.on_key(key(KeyCode::Esc));
+    assert!(a.modal.is_none());
 }
 
 #[test]
 fn help_is_context_sensitive() {
     let (_t, mut a) = app();
-    a.on_key(key(KeyCode::Char('4')));
-    a.on_key(key(KeyCode::Char('?')));
-    assert_eq!(a.help.as_ref().unwrap().current.id, "keys");
-    let s = screen_text(&mut a);
-    assert!(s.contains("Help: Keys"), "{s}");
-    a.on_key(key(KeyCode::Esc));
-    assert!(a.help.is_none());
-    a.on_key(key(KeyCode::Char('5')));
+    a.dispatch(Action::BackupCreate);
     a.on_key(key(KeyCode::F(1)));
-    assert_eq!(a.help.as_ref().unwrap().current.id, "themes");
+    match &a.modal {
+        Some(Modal::Help(h)) => assert_eq!(h.current.id, "keys"),
+        _ => panic!("help not open"),
+    }
     a.on_key(key(KeyCode::Esc));
-    a.on_key(key(KeyCode::Char('6')));
-    assert_eq!(a.help.as_ref().unwrap().current.id, "help");
+    a.dispatch(Action::Keybindings);
+    match &a.modal {
+        Some(Modal::Help(h)) => assert_eq!(h.current.id, "keybindings"),
+        _ => panic!(),
+    }
 }
 
 #[test]
-fn keys_screen_hides_secrets_until_revealed() {
+fn keys_dialog_hides_secrets_until_revealed() {
     let (_t, mut a) = app();
-    a.on_key(key(KeyCode::Char('4')));
+    a.dispatch(Action::ReissueShards);
     a.keys.secret_lines = vec!["muninn-shard-v1:secret".into()];
     let s = screen_text(&mut a);
     assert!(!s.contains("muninn-shard-v1:secret"));
     a.keys.form.sel = a.keys.form.fields.len() + 3;
     a.on_key(key(KeyCode::Enter));
     assert!(screen_text(&mut a).contains("muninn-shard-v1:secret"));
-    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Esc));
     assert!(a.keys.secret_lines.is_empty());
+}
+
+#[test]
+fn data_dialogs_and_prefs() {
+    let (_t, mut a) = app();
+    a.dispatch(Action::Coverage);
+    assert!(screen_text(&mut a).contains("ETH/USDT"));
+    a.on_key(key(KeyCode::Esc));
+    a.dispatch(Action::Preferences);
+    a.on_key(key(KeyCode::Enter));
+    assert_eq!(a.prefs.tui.header, HeaderMode::Compact);
+    let saved = Preferences::load_or_create(&a.paths).unwrap();
+    assert_eq!(saved.tui.header, HeaderMode::Compact);
 }

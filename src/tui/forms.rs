@@ -1,13 +1,12 @@
-//! Ingest, Export and Keys & Backup screens.
+//! Export and Keys & Backup dialogs, plus file preview helpers.
 use super::{block, widgets::Input, App};
 use crate::export::{self, Format};
-use crate::ingest::{self, frame::Columns, time::fmt_ts, IngestOptions};
-use crate::interact::Interact;
+use crate::ingest::{self, frame::Columns, time::fmt_ts};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Gauge, Paragraph, Wrap};
+use ratatui::widgets::{Paragraph, Wrap};
 use ratatui::Frame;
 use std::path::PathBuf;
 
@@ -106,34 +105,7 @@ impl Form {
 
 // ---------------- Ingest ----------------
 
-pub struct IngestForm {
-    pub form: Form,
-    pub preview: Vec<String>,
-    pub result: Vec<String>,
-    pub done: bool,
-}
-
-impl Default for IngestForm {
-    fn default() -> Self {
-        Self {
-            form: Form::new(
-                vec![Input::new("path"), Input::new("source"), Input::new("symbol"), Input::new("duration")],
-                vec!["Preview", "Ingest"],
-            ),
-            preview: vec![],
-            result: vec![],
-            done: false,
-        }
-    }
-}
-
-impl IngestForm {
-    pub fn typing(&self) -> bool {
-        self.form.editing
-    }
-}
-
-fn expand(p: &str) -> PathBuf {
+pub fn expand(p: &str) -> PathBuf {
     if let Some(rest) = p.strip_prefix("~/")
         && let Some(h) = dirs::home_dir() {
             return h.join(rest);
@@ -141,7 +113,7 @@ fn expand(p: &str) -> PathBuf {
     PathBuf::from(p)
 }
 
-fn is_json(p: &std::path::Path) -> bool {
+pub fn is_json(p: &std::path::Path) -> bool {
     p.extension().is_some_and(|e| matches!(e.to_string_lossy().to_ascii_lowercase().as_str(), "json" | "ndjson" | "jsonl"))
 }
 
@@ -173,77 +145,6 @@ pub fn preview(path: &std::path::Path, n: usize) -> crate::Result<Vec<String>> {
     Ok(out)
 }
 
-pub fn ingest_key(app: &mut App, k: KeyEvent) {
-    match app.ingest.form.key(k) {
-        FormEvent::Action(0) => {
-            let Some(p) = app.ingest.form.get("path") else {
-                app.ingest.form.focus("path");
-                app.set_status("enter a file or directory path");
-                return;
-            };
-            match preview(&expand(&p), 15) {
-                Ok(v) => app.ingest.preview = v,
-                Err(e) => app.set_status(format!("preview failed: {e}")),
-            }
-        }
-        FormEvent::Action(1) => run_ingest(app),
-        _ => {}
-    }
-}
-
-pub fn run_ingest(app: &mut App) {
-    let f = &app.ingest.form;
-    let Some(p) = f.get("path") else {
-        app.ingest.form.focus("path");
-        app.set_status("enter a file or directory path");
-        return;
-    };
-    let opts = IngestOptions {
-        source: f.get("source"),
-        symbol: f.get("symbol"),
-        duration: f.get("duration"),
-        drop_zero_volume: app.prefs.ingest.drop_zero_volume,
-        ..Default::default()
-    };
-    let path = expand(&p);
-    let io = Interact::batch(true);
-    let r = if is_json(&path) {
-        ingest::json::ingest_json(&mut app.store, io, opts, &path, None)
-    } else {
-        ingest::ingest_csv(&mut app.store, io, opts, &path, &Default::default())
-    };
-    match r {
-        Ok(reps) => {
-            app.ingest.result = reps.iter().flat_map(|r| r.summary().lines().map(str::to_string).collect::<Vec<_>>()).collect();
-            app.ingest.done = true;
-            app.set_status(format!("ingested {} input(s)", reps.len()));
-            app.nav.reload(&app.store, &mut app.status);
-        }
-        Err(crate::Error::Missing { what, hint }) => {
-            // Inline prompt: jump to the missing field.
-            app.ingest.form.focus(what);
-            app.set_status(format!("missing {what}: type it and press Enter, then Ingest ({hint})"));
-        }
-        Err(e) => app.set_status(format!("ingest failed: {e}")),
-    }
-}
-
-pub fn draw_ingest(app: &mut App, f: &mut Frame, area: Rect) {
-    let t = app.theme.clone();
-    let [form, gauge, rest] = Layout::vertical([Constraint::Length(9), Constraint::Length(3), Constraint::Min(0)]).areas(area);
-    f.render_widget(Paragraph::new(app.ingest.form.lines(&t)).block(block("Ingest (Enter: edit/run, Esc: stop editing)", true, &t)), form);
-    let g = Gauge::default()
-        .block(block("Progress", false, &t))
-        .gauge_style(Style::new().fg(t.success).bg(t.selection_bg))
-        .ratio(if app.ingest.done { 1.0 } else { 0.0 })
-        .label(if app.ingest.done { "done" } else { "idle" });
-    f.render_widget(g, gauge);
-    let [pv, res] = Layout::horizontal([Constraint::Percentage(55), Constraint::Percentage(45)]).areas(rest);
-    let lines: Vec<Line> = app.ingest.preview.iter().map(|s| Line::from(s.clone())).collect();
-    f.render_widget(Paragraph::new(lines).block(block("Preview (parsed rows)", false, &t)), pv);
-    let lines: Vec<Line> = app.ingest.result.iter().map(|s| Line::from(s.clone())).collect();
-    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).block(block("Result", false, &t)), res);
-}
 
 // ---------------- Export ----------------
 

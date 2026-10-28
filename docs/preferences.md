@@ -10,6 +10,10 @@ mode = "system"
 
 [ingest]
 drop_zero_volume = false
+
+[tui]
+header = "auto"
+sidebar_collapsed = false
 ```
 
 | key | default | meaning |
@@ -17,8 +21,10 @@ drop_zero_volume = false
 | `theme.name` | `tokyo-night` | active theme folder under `themes/` |
 | `theme.mode` | `system` | `light`, `dark` or `system` (see [themes](themes.md)) |
 | `ingest.drop_zero_volume` | `false` | drop zero-volume bars instead of keeping them flagged |
+| `tui.header` | `auto` | `auto` (large when the terminal has ≥ 30 rows), `compact` or `large` ([TUI](tui.md)) |
+| `tui.sidebar_collapsed` | `false` | start with the sidebar hidden |
 
-`mnnn theme set <name>` and `mnnn theme mode <mode>` edit the file for you.
+`mnnn theme set <name>`, `mnnn theme mode <mode>` and **File ▸ Preferences…** in the TUI edit the file for you.
 Preferences are part of every backup ([backup and recovery](backup-recovery.md)).
 
 Failure modes: invalid TOML makes every command fail with a `toml:` error naming

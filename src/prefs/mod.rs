@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::paths::{write_private, Paths};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, clap::ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum ThemeMode {
     Light,
@@ -41,12 +41,44 @@ pub struct IngestPrefs {
     pub drop_zero_volume: bool,
 }
 
+/// TUI header size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum HeaderMode {
+    /// Large when the terminal has at least 30 rows.
+    #[default]
+    Auto,
+    Compact,
+    Large,
+}
+
+impl HeaderMode {
+    pub fn next(self) -> Self {
+        match self {
+            HeaderMode::Auto => HeaderMode::Compact,
+            HeaderMode::Compact => HeaderMode::Large,
+            HeaderMode::Large => HeaderMode::Auto,
+        }
+    }
+}
+
+/// TUI state remembered between sessions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct TuiPrefs {
+    #[serde(default)]
+    pub header: HeaderMode,
+    #[serde(default)]
+    pub sidebar_collapsed: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Preferences {
     #[serde(default)]
     pub theme: ThemePrefs,
     #[serde(default)]
     pub ingest: IngestPrefs,
+    #[serde(default)]
+    pub tui: TuiPrefs,
 }
 
 impl Preferences {

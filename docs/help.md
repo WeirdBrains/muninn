@@ -5,9 +5,11 @@ build time, so the TUI help, `mnnn help` and the Markdown files never diverge.
 
 ## In the TUI
 
-Open with `?`, F1, or the `6 Help` tab. Help opens on the topic for the screen you are
-on (Navigator → [TUI](tui.md), Ingest → [CSV ingest](ingest-csv.md), Export →
-[export](export.md), Keys → [keys](keys.md), Themes → [themes](themes.md)).
+Open with `?`, F1 or **Help ▸ Help topics**; **Help ▸ Search help…** opens straight
+into search and **Help ▸ Keybindings** shows the [key reference](keybindings.md).
+Help opens on the topic for what you are doing: the export dialog opens
+[export](export.md), the keys dialog [keys](keys.md), the theme dialog
+[themes](themes.md), an open menu [menus](menus.md), otherwise [TUI](tui.md).
 
 | key | action |
 |-----|--------|
