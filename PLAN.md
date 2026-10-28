@@ -134,6 +134,142 @@ on `username`/`host`, and a custom check that `--body` is only used with a body 
   behind an explicit reveal, never logged.
 - **Theme selector and editor** (see section 5).
 
+### 1.3 TUI layout and navigation (v2 — supersedes the drill-down navigator)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ ███╗   ███╗██╗   ██╗███╗   ██╗██╗███╗   ██╗███╗   ██╗                  v0.1.0   │
+│ ████╗ ████║██║   ██║████╗  ██║██║████╗  ██║████╗  ██║                           │
+│ ██╔████╔██║██║   ██║██╔██╗ ██║██║██╔██╗ ██║██╔██╗ ██║       🔓 unlocked · system │
+│ ██║╚██╔╝██║╚██████╔╝██║ ╚████║██║██║ ╚████║██║ ╚████║                           │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ File  View  Data  Keys  Theme  Help                                             │
+├──────────────────────────────── content ─────────────────────────┬── sidebar ──┐
+│ layout: 2-up ▾                                BTC/USDT · binance · 5m │ / search    │
+│ ┌───────────── panel A ──────────────┬────────── panel B ────────┐ │ sort: year ▾│
+│ │ list view (sortable columns)       │ candle chart              │ │ source  [ ] │
+│ │                                    │ start ◂ 2025-10-01 ▸      │ │ price   [ ] │
+│ │                                    │ end   ◂ 2025-10-31 ▸      │ │ period  [ ] │
+│ └────────────────────────────────────┴───────────────────────────┘ │ year    [ ] │
+│                                                                    │ ─────────── │
+│                                                                    │ BTC/USDT    │
+│                                                                    │ ETH/USDT    │
+└────────────────────────────────────────────────────────────────────┴─────────────┘
+```
+
+**Header (top, full width)**
+- Large banner with the app name **MUNINN** rendered in big block letters
+  (`tui-big-text` or a built-in figlet-style font) and the version (`v{CARGO_PKG_VERSION}`)
+  beside or under it, in the theme's `header`/`accent` colours.
+- Right side (optional): active home dir, unlocked/locked key status, theme mode.
+- Responsive: on short terminals (< ~30 rows) it collapses to a one-line title
+  `Muninn v0.x.y`; a preference can force compact or large.
+
+**Menu bar (under the header, full width)**
+- Categorized, clickable (mouse capture on) and keyboard driven: `F10` or `Alt+<letter>`
+  opens a menu, arrows/`h j k l` move, Enter activates, Esc closes. Underlined
+  mnemonic letters; each item shows its shortcut on the right.
+- Dropdowns with sub-items; items can open nested submenus (`▸`). Disabled items greyed
+  out (e.g. Data actions before `keys init`).
+- Categories (initial):
+  - **File** — Import… · Export… · Backup ▸ (Create, Restore) · Preferences… · Quit
+  - **View** — New tile ▸ (List, Chart) · Split ▸ (Right, Below) · Close tile · Zoom tile ·
+    Equalize · Container ▸ (Split, Tabbed, Stacked) · Layouts ▸ (2-up, 3-column,
+    Main + stack, 2×2, Saved…, Save current…) · Toggle sidebar
+  - **Data** — Sources… · Symbols… · Filters ▸ (Source, Price, Period, Year, Clear all) ·
+    Sort ▸ (Year, Name, Asc/Desc) · Coverage & gaps · Refresh
+  - **Keys** — Initialize… · Unlock/Lock · Rotate service key · Rekey database ·
+    Export… · Recover ▸ (From words, From shards) · Re-issue shards
+  - **Theme** — Select… · Mode ▸ (Light, Dark, System) · Edit current… · New from current… ·
+    Import… · Export…
+  - **Help** — Help topics (`?`/F1) · Search help… · Keybindings · About Muninn
+- Every menu item maps to a named action, shared with keybindings and the command
+  palette, so menus, keys and help all stay consistent.
+
+**Content area (left, main)** holds the results. **Tiling is built in:** the content
+area is always a tiling layout (one tile by default). There are no List/Split/Chart
+modes or tabs; every view is a tile, and any tile can be split, closed, swapped or
+retyped at any time.
+
+**Sidebar (right, collapsible)**
+- Toggle with a key (default `Ctrl-b`); collapsed state remembered in `preferences.toml`.
+- Lists symbols (one row per series: symbol + source + duration, or grouped by symbol).
+- Search box at the top: as-you-type fuzzy match on symbol/source.
+- Sort: by year — chronological by the series' data years (first year of data, then
+  last year as tiebreak), with an **asc/desc toggle button** (oldest→newest or
+  newest→oldest; key `o`). Also sortable by name, same toggle.
+- Filters (combinable, shown as chips when active, one key clears all):
+  - **source** — multi-select of known sources
+  - **price** — pick the metric (open, high, low, close, typical (H+L+C)/3,
+    median (H+L)/2, OHLC average, VWAP where volume allows) and a min/max range;
+    a series matches when that metric falls in range within the active period/year filters
+  - **time period** — bar duration (5m, 1h, 1d, ...)
+  - **year** — one or more years with data
+- Filters also scope what the content views show (e.g. year filter limits the chart/list range).
+
+**Tile views** (what a tile can show)
+1. **List view** — bar table, sortable by every column: timestamp, open, high, low, close,
+   volume, plus derived columns (change, change %, range, body, upper/lower wick,
+   body/range, flags). Click/keys to sort asc/desc; virtualized paging for ~1M rows.
+2. **Chart view** — full-area candle chart with volume bars underneath, over a time range;
+   period start/end selectors, zoom (`+`/`-`), pan (`h`/`l`), jump to date.
+   - **Toggleable chart elements (per chart tile):** every element is a layer that can be
+     switched on/off independently and combined freely. Toggle via the tile's layer
+     menu (`L`), View ▸ Chart layers, or direct keys; state saved with the layout.
+     | layer | key | default |
+     |-------|-----|---------|
+     | Candles | `c` | on |
+     | OHLC bars | `b` | off |
+     | Line (close; metric selectable: open/high/low/close/typical/median) | `n` | off |
+     | Area under line | `a` | off |
+     | High/low envelope lines | `e` | off |
+     | Volume bars (sub-pane) | `v` | on |
+     | Moving averages (SMA/EMA, periods configurable, multiple) | `m` | off |
+     | Wick markers (upper-wick highlight, shooting-star flags) | `w` | off |
+     | Gap markers (missing bars) | `g` | on |
+     | Zero-volume / padding markers | `z` | off |
+     | Grid | `#` | on |
+     | Crosshair + value readout | `x` | on |
+     | Price axis / time axis | `y` / `t` | on |
+     Layers draw in a fixed z-order (grid < area < volume < candles/bars < lines <
+     markers < crosshair) using theme roles (`up`, `down`, `chart_1..6`).
+3. **Tiling (built in, always on)** — tiles arranged as a recursive tree (i3 style):
+   any panel can itself be split again, horizontally or vertically, to any depth.
+   **Each leaf panel can be any view** (list | chart), so list+chart, chart+chart
+   (e.g. two symbols or two ranges), list+list, and nested mixes all work.
+   - **Any single pane is splittable** — including a full-screen List or Chart view
+     (splitting it just turns it into a tiled layout with that pane as the first leaf),
+     a pane inside an existing split, or a pane inside a tabbed/stacked container.
+     A fresh session starts with one list tile; "full-screen chart" is just a single
+     chart tile (or `Ctrl-w z` to zoom one tile).
+   - Layout model: a binary tree; internal nodes = `Split { dir: Horizontal|Vertical,
+     ratio }`, leaves = `Panel { view, series, range, link }`.
+   - Keys (defaults, rebindable): split right `Ctrl-w v`, split below `Ctrl-w s`,
+     close panel `Ctrl-w q`, focus `Ctrl-w h/j/k/l` (and `Tab` to cycle), resize
+     `Ctrl-w </>/+/-`, equalize `Ctrl-w =`, swap with neighbour `Ctrl-w x`,
+     zoom/maximize focused panel toggle `Ctrl-w z`, change view of panel `Ctrl-w t`.
+   - Minimum panel size enforced (e.g. 20×6 cells); splits that would go below it are refused.
+   - i3 behaviour: new splits follow the focused panel's split direction (toggle with
+     `Ctrl-w e`), and a container can switch between split / tabbed / stacked.
+   - Layout presets, including the **2×2 grid (i3 style)**, plus two-up,
+     three-column, main + stack.
+   - Each panel has its own series and range, or is **linked** to another panel
+     (linked: selecting a row in the list centers the chart on that bar; changing the
+     chart range scrolls the list).
+   - Layout tree (splits, ratios, views, series, link state) saved in `preferences.toml`;
+     named layouts can be saved and recalled.
+
+**Import (popup)**
+- Opens as a modal popup over the content area (key `i`, or from the menu).
+- Built-in file browser: navigate folders (`j/k`, Enter to open, Backspace/`h` to go up),
+  `~` home, `.` toggle hidden files, `/` filter the current folder, type or paste a path
+  directly into a path bar with Tab completion, bookmarks (e.g. `raw/data`) and recent paths.
+- Select a single file, several files (Space to mark), or a whole folder.
+- Shows file size and a guessed symbol/duration per file (from the file name) before import.
+- Then: preview first rows -> resolve missing source/symbol/duration inline -> live
+  progress bar -> summary (inserted / duplicate / rejected / gaps). Esc cancels before
+  commit; the ingest runs in a background task so the TUI stays responsive.
+
 CLI and TUI are thin layers over one library crate; no business logic in either.
 
 ## 2. Data model
