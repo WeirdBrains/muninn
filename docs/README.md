@@ -7,6 +7,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 ## Using Muninn
 
 - [Install](install.md): packages per platform, building from source, uninstalling
+- [Releasing](release.md): release script and the GitHub Actions release workflow
 - [Command line](cli.md): global flags, environment, exit codes, man pages
 - [Terminal UI](tui.md): header, menus, content area
 - [Menus](menus.md) and [keybindings](keybindings.md)

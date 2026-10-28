@@ -1,0 +1,128 @@
+# Build release binaries and packages for a pushed tag v*, then publish a GitHub Release.
+# See docs/release.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  LLVM_MINGW: llvm-mingw-20261020-ucrt-ubuntu-22.04-x86_64
+
+jobs:
+  unix:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04, linux: true }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm, linux: true }
+          - { target: x86_64-apple-darwin, os: macos-15-intel, linux: false }
+          - { target: aarch64-apple-darwin, os: macos-15, linux: false }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --locked --release --target ${{ matrix.target }}
+      - name: Tarball
+        run: scripts/dist.sh ${{ matrix.target }}
+      - name: Install cargo-deb and cargo-generate-rpm
+        if: matrix.linux
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb,cargo-generate-rpm
+      - name: .deb and .rpm
+        if: matrix.linux
+        run: |
+          strip target/${{ matrix.target }}/release/mnnn
+          cargo deb --no-build --no-strip --target ${{ matrix.target }} --output dist/
+          cargo generate-rpm --target ${{ matrix.target }} --output dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  windows:
+    name: windows (x86_64, aarch64)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnullvm,aarch64-pc-windows-gnullvm
+      - name: llvm-mingw
+        run: |
+          curl -sSfL "https://github.com/mstorsjo/llvm-mingw/releases/download/20261020/$LLVM_MINGW.tar.xz" | tar -xJ -C "$RUNNER_TEMP"
+      - name: Build
+        run: LLVM_MINGW="$RUNNER_TEMP/$LLVM_MINGW" scripts/cross-windows.sh x86_64 aarch64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: dist/*.zip
+          if-no-files-found: error
+
+  arch:
+    name: arch package (x86_64)
+    needs: unix
+    runs-on: ubuntu-22.04
+    container: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist-x86_64-unknown-linux-gnu
+          path: dist
+      - name: makepkg
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          useradd -m builder
+          mkdir -p /tmp/pkg && cp dist/muninn-"$ver"-x86_64-unknown-linux-gnu.tar.gz /tmp/pkg/
+          sed "s/^pkgver=.*/pkgver=$ver/" packaging/arch/muninn-bin/PKGBUILD > /tmp/pkg/PKGBUILD
+          chown -R builder /tmp/pkg
+          su builder -c "cd /tmp/pkg && makepkg -f --noconfirm"
+          mkdir -p out && cp /tmp/pkg/*.pkg.tar.zst out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-arch
+          path: out/*.pkg.tar.zst
+          if-no-files-found: error
+
+  release:
+    needs: [unix, windows, arch]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums, filled-in packaging, notes
+        run: |
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"  # tag annotation
+          ver="${GITHUB_REF_NAME#v}"
+          cd dist && sha256sum -- * > SHA256SUMS && cd ..
+          python3 scripts/fill-sums.py "$ver" dist
+          tar -czf "dist/muninn-$ver-packaging.tar.gz" -C dist packaging
+          rm -rf dist/packaging
+          cd dist && sha256sum -- muninn-"$ver"-packaging.tar.gz >> SHA256SUMS && cd ..
+          {
+            git for-each-ref "refs/tags/$GITHUB_REF_NAME" --format='%(contents)'
+            echo
+            scripts/release-notes.sh "$ver"
+          } > notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Muninn ${{ github.ref_name }}
+          body_path: notes.md
+          files: dist/*
+          fail_on_unmatched_files: true

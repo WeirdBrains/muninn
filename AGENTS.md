@@ -66,5 +66,11 @@
   tile is splittable, collapsible right sidebar with search/sort/filters, toggleable
   chart layers, import as a popup with a folder browser.
 
+## Releases
+- Cut releases locally with `scripts/release.sh` (commit + annotated tag); never push.
+  Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds all platform
+  binaries and packages and publishes the GitHub Release. See `docs/release.md`.
+- Packages always ship prebuilt binaries; installing must never need Rust.
+
 ## Communication style
 - Keep summaries, changelog entries and commit messages concise.
