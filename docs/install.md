@@ -6,6 +6,10 @@ dependencies are the C runtime: glibc and libgcc (Linux), the system libraries (
 nothing extra (Windows). Downloads are on the GitHub Releases page with a `SHA256SUMS`
 file. Packaging files live in `packaging/`.
 
+> The prebuilt downloads (release tarballs, `muninn-bin`, Homebrew, winget) only work
+> after a release has been published by the release workflow and is publicly
+> downloadable. Until then use the Arch checkout build below or *From source*.
+
 Installing or uninstalling never touches your data in `~/.muninn` (or `MUNINN_HOME`);
 delete that folder yourself to remove it.
 
@@ -21,15 +25,25 @@ Uninstall: remove `~/.local/bin/mnnn` and `~/.local/share/man/man1/mnnn*.1`.
 
 ## Arch Linux
 
-`packaging/arch/muninn-bin/PKGBUILD` repackages the release tarball (AUR-style
-`muninn-bin`, conflicts with a source build):
+**From a checkout (works today, needs Rust):**
 
 ```sh
-makepkg -si                                # in a copy of packaging/arch/muninn-bin/
+git clone git@github.com:kommandosaldat/muninn.git && cd muninn/packaging/arch
+makepkg -si            # builds the committed checkout, installs package "muninn"
 ```
 
-Uninstall: `sudo pacman -R muninn-bin`. For a source build use `packaging/arch/PKGBUILD`
-(needs Rust); `packaging/arch/build-local.sh [--source]` builds either from a checkout.
+**Prebuilt (`muninn-bin`, no Rust):** only once a GitHub release with assets exists
+and can be downloaded without logging in (public repo):
+
+```sh
+cd packaging/arch/muninn-bin && makepkg -si
+```
+
+Both install `/usr/bin/mnnn`, man pages and `/usr/share/doc/muninn`. Uninstall:
+`sudo pacman -R muninn` (or `muninn-bin`). Remove an earlier `cargo install` first
+(`cargo uninstall muninn`), or `~/.cargo/bin/mnnn` may shadow the package, depending on
+your `PATH`. `packaging/arch/build-local.sh [--source]` builds the package into
+`target/pkg/arch/` without installing (`sudo pacman -U target/pkg/arch/muninn*.pkg.tar.zst`).
 
 ## Debian / Ubuntu
 
