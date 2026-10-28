@@ -751,3 +751,214 @@ fn ingest_timing() {
         println!("TIMING {f}: {:?}", s.elapsed());
     }
 }
+
+/// A synthetic 5m CSV with `n` valid rows.
+fn big_csv(path: &std::path::Path, n: usize) {
+    use std::io::Write;
+    let mut w = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
+    writeln!(w, "timestamp,open,high,low,close,volume").unwrap();
+    let t0 = 1_577_836_800_000i64;
+    for i in 0..n as i64 {
+        writeln!(w, "{},10,12,9,11,1", t0 + i * 300_000).unwrap();
+    }
+}
+
+#[test]
+fn cancel_mid_file_rolls_back_the_whole_file() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let f = d.path().join("SOLUSDT_5m.csv");
+    big_csv(&f, 300_000);
+    let before = a.store.count_bars().unwrap();
+    let series_before = a.store.series().unwrap();
+    let p = std::sync::Arc::new(crate::ingest::Progress::default());
+    let watcher = {
+        let p = p.clone();
+        std::thread::spawn(move || {
+            while p.file_bars_done.load(std::sync::atomic::Ordering::Relaxed) < 20_000 {
+                std::thread::yield_now();
+            }
+            p.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+        })
+    };
+    let opts = crate::ingest::IngestOptions { source: Some("c".into()), progress: Some(p.clone()), ..Default::default() };
+    let r = crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts, &f, &Default::default());
+    watcher.join().unwrap();
+    assert!(matches!(r, Err(crate::Error::Aborted)), "{r:?}");
+    assert!(p.file_bars_done.load(std::sync::atomic::Ordering::Relaxed) >= 20_000);
+    assert_eq!(a.store.count_bars().unwrap(), before, "partial file must be rolled back");
+    assert_eq!(a.store.series().unwrap(), series_before, "series_stats unchanged");
+    // not recorded as ingested: the same file imports fully afterwards
+    let opts = crate::ingest::IngestOptions { source: Some("c".into()), ..Default::default() };
+    let r = crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts, &f, &Default::default()).unwrap();
+    assert!(!r[0].skipped && r[0].inserted == 300_000);
+    assert_eq!(a.store.count_bars().unwrap(), before + 300_000);
+}
+
+#[test]
+fn tui_cancel_keeps_finished_files_and_discards_current() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
+    big_csv(&d.path().join("SOLUSDT_5m.csv"), 400_000);
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.on_key(key(KeyCode::Char('a')));
+    a.import.fields[0] = "cx".into();
+    a.on_key(key(KeyCode::Char('i')));
+    assert!(a.import.running());
+    let t0 = std::time::Instant::now();
+    // wait until the big file is being stored
+    loop {
+        screen_text(&mut a);
+        if let import::Phase::Running(r) = &a.import.phase
+            && r.progress.file_index.load(std::sync::atomic::Ordering::Relaxed) == 1
+            && r.progress.file_bars_done.load(std::sync::atomic::Ordering::Relaxed) > 0
+        {
+            break;
+        }
+        assert!(t0.elapsed().as_secs() < 60);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(screen_text(&mut a).contains("[Cancel]"));
+    a.on_key(key(KeyCode::Esc)); // asks first
+    let s = screen_text(&mut a);
+    assert!(s.contains("Cancel the import?") && s.contains("[Yes, cancel]"), "{s}");
+    a.on_key(key(KeyCode::Char('n')));
+    assert!(screen_text(&mut a).contains("[Cancel]"));
+    a.on_key(key(KeyCode::Char('c')));
+    a.on_key(key(KeyCode::Char('y')));
+    assert!(screen_text(&mut a).contains("Cancelling"));
+    while a.import.running() && t0.elapsed().as_secs() < 60 {
+        screen_text(&mut a);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let s = screen_text(&mut a);
+    assert!(s.contains("Import cancelled") && s.contains("kept 1 complete file(s), discarded 1"), "{s}");
+    let src: Vec<String> = a.series.iter().filter(|x| x.source == "cx").map(|x| x.symbol.to_string()).collect();
+    assert_eq!(src, ["ADA/USDT"], "only the finished file stays");
+    a.on_key(key(KeyCode::Esc));
+    assert!(a.modal.is_none());
+}
+
+#[test]
+fn every_popup_has_a_clickable_close_button() {
+    let (_t, mut a) = app();
+    let opens: Vec<Action> = vec![
+        Action::Help,
+        Action::Export,
+        Action::Import,
+        Action::BackupCreate,
+        Action::BackupRestore,
+        Action::ThemeSelect,
+        Action::ThemeEdit,
+        Action::ThemeImport,
+        Action::Preferences,
+        Action::RotateKey,
+        Action::KeysExport,
+        Action::ReissueShards,
+        Action::Sources,
+        Action::Symbols,
+        Action::Coverage,
+        Action::Keybindings,
+        Action::LayoutsSaved,
+        Action::LayoutSave,
+        Action::ChartLayers,
+        Action::Filter(action::FilterKind::Source),
+    ];
+    for act in opens {
+        a.dispatch(act);
+        if a.modal.is_none() {
+            continue; // not a popup in this state
+        }
+        let s = screen_text(&mut a);
+        assert!(s.contains("[X]"), "{act:?}: {s}");
+        let (r, _) = *a.modal_hits.iter().find(|(_, h)| *h == Hit::CloseModal).unwrap();
+        a.on_mouse(click(r.x + 2, r.y));
+        assert!(a.modal.is_none(), "{act:?} not closed by [X]");
+    }
+}
+
+#[test]
+fn x_during_import_asks_to_cancel() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    big_csv(&d.path().join("SOLUSDT_5m.csv"), 300_000);
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.import.fields[0] = "xx".into();
+    a.on_key(key(KeyCode::Char('a')));
+    a.on_key(key(KeyCode::Char('i')));
+    screen_text(&mut a);
+    let (r, _) = *a.modal_hits.iter().find(|(_, h)| *h == Hit::CloseModal).unwrap();
+    a.on_mouse(click(r.x + 2, r.y));
+    assert!(matches!(a.modal, Some(Modal::Import)));
+    screen_text(&mut a);
+    let (r, _) = *a.modal_hits.iter().find(|(_, h)| *h == Hit::ImportConfirm(true)).expect("confirm buttons");
+    a.on_mouse(click(r.x + 1, r.y));
+    let t0 = std::time::Instant::now();
+    while a.import.running() && t0.elapsed().as_secs() < 60 {
+        screen_text(&mut a);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert!(a.series.iter().all(|x| x.source != "xx"));
+}
+
+#[test]
+fn places_are_visible_clickable_and_bookmarkable() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    std::fs::create_dir(d.path().join("sub")).unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    let s = screen_text(&mut a);
+    assert!(s.contains("Places (p)") && s.contains("Home") && s.contains("p places") && s.contains("b bookmarks this"), "{s}");
+    a.import.cd(d.path().join("sub"));
+    a.on_key(key(KeyCode::Char('b')));
+    let sub = std::fs::canonicalize(d.path().join("sub")).unwrap().display().to_string();
+    assert_eq!(a.prefs.tui.import_bookmarks, std::slice::from_ref(&sub));
+    a.import.cd(d.path().to_path_buf());
+    let s = screen_text(&mut a);
+    assert!(s.contains("Bookmarks"), "{s}");
+    let i = import::places(&a).iter().position(|p| p.kind == import::PlaceKind::Bookmark).unwrap();
+    let (r, _) = *a.modal_hits.iter().find(|(_, h)| *h == Hit::ImportPlace(i)).unwrap();
+    a.on_mouse(click(r.x + 1, r.y));
+    assert_eq!(a.import.dir.display().to_string(), sub);
+    // keyboard: p focuses places, x removes the bookmark
+    a.import.pane = import::Pane::Files;
+    a.on_key(key(KeyCode::Char('p')));
+    assert_eq!(a.import.pane, import::Pane::Places);
+    a.import.place_sel = i;
+    a.on_key(key(KeyCode::Char('x')));
+    assert!(a.prefs.tui.import_bookmarks.is_empty());
+    a.on_key(key(KeyCode::Char('x'))); // on a built-in or recent: never removes built-ins
+    assert!(import::places(&a).iter().any(|p| p.label == "Home") || dirs::home_dir().is_none());
+}
+
+/// Cancel half-way through the real BTCUSDT_5m.csv: nothing stays, cancel is quick.
+#[test]
+#[ignore]
+fn cancel_fullsize() {
+    use std::sync::atomic::Ordering::Relaxed;
+    let Ok(raw) = std::env::var("MUNINN_RAW_DATA") else { return };
+    let (_t, mut a) = app();
+    let before = a.store.count_bars().unwrap();
+    let p = std::sync::Arc::new(crate::ingest::Progress::default());
+    let w = {
+        let p = p.clone();
+        std::thread::spawn(move || {
+            while p.file_bars_done.load(Relaxed) < 480_000 {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            p.cancel.store(true, Relaxed);
+            std::time::Instant::now()
+        })
+    };
+    let opts = crate::ingest::IngestOptions { source: Some("big".into()), progress: Some(p.clone()), ..Default::default() };
+    let r = crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts, &std::path::Path::new(&raw).join("BTCUSDT_5m.csv"), &Default::default());
+    let asked = w.join().unwrap();
+    println!("CANCEL stopped {:?} after the request, at {} bars stored", asked.elapsed(), p.file_bars_done.load(Relaxed));
+    assert!(matches!(r, Err(crate::Error::Aborted)));
+    assert_eq!(a.store.count_bars().unwrap(), before);
+    assert!(a.store.series().unwrap().iter().all(|s| s.source != "big"));
+}

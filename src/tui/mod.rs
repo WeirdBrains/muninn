@@ -50,6 +50,11 @@ pub enum Hit {
     SidebarRow(usize),
     Chip(usize),
     ClearFilters,
+    /// The [X] of the open popup.
+    CloseModal,
+    ImportCancel,
+    ImportConfirm(bool),
+    ImportPlace(usize),
 }
 
 pub struct App {
@@ -70,6 +75,8 @@ pub struct App {
     pub sidebar: sidebar::Sidebar,
     pub import: import::ImportState,
     pub data: data::DataCache,
+    /// Click targets inside the open popup (checked before anything else).
+    pub modal_hits: Vec<(Rect, Hit)>,
     /// `Ctrl-w` was pressed; the next key is a window command.
     pub pending_w: bool,
     /// Content area from the last draw (split geometry, min sizes).
@@ -97,6 +104,7 @@ impl App {
             sidebar: Default::default(),
             import: Default::default(),
             data: data::DataCache::new(paths.db.clone(), dek.0),
+            modal_hits: vec![],
             content: Rect::new(0, 0, 120, 30),
             export: forms::ExportForm::default(),
             keys: forms::KeysForm::default(),
@@ -433,6 +441,15 @@ impl App {
         tiles::on_key(self, k);
     }
 
+    /// Close the open popup like Esc ([X] button). An import in progress asks to cancel.
+    pub fn close_modal(&mut self) {
+        match self.modal {
+            Some(Modal::Import) => import::close(self),
+            Some(_) => self.modal = None,
+            None => {}
+        }
+    }
+
     /// Recompute the sidebar rows (search, filters, sort).
     pub fn refresh_rows(&mut self) {
         let p = self.prefs.tui.sidebar.clone();
@@ -529,6 +546,18 @@ impl App {
     }
 
     pub fn on_mouse(&mut self, m: MouseEvent) {
+        if self.modal.is_some() {
+            // A popup takes every click; clicks outside it do nothing.
+            if m.kind == MouseEventKind::Down(MouseButton::Left) {
+                let h = self.modal_hits.iter().rev().find(|(r, _)| r.contains((m.column, m.row).into())).map(|(_, h)| *h);
+                match h {
+                    Some(Hit::CloseModal) => self.close_modal(),
+                    Some(h) => import::on_click(self, h),
+                    None => {}
+                }
+            }
+            return;
+        }
         let found = self.hits.iter().rev().find(|(r, _)| r.contains((m.column, m.row).into())).copied();
         let hit = found.map(|(_, h)| h);
         if matches!(m.kind, MouseEventKind::ScrollUp | MouseEventKind::ScrollDown) && self.modal.is_none() && !self.menu.is_open() {
@@ -593,6 +622,7 @@ impl App {
                 }
             }
             Some(Hit::ClearFilters) => self.dispatch(Action::ClearFilters),
+            Some(Hit::CloseModal | Hit::ImportCancel | Hit::ImportConfirm(_) | Hit::ImportPlace(_)) => {}
             Some(Hit::SidebarRow(r)) => {
                 self.sidebar.focused = true;
                 self.sidebar.searching = false;

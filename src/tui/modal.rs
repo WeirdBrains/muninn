@@ -439,6 +439,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     };
     let r = centered(area, w, h);
     f.render_widget(Clear, r);
+    app.modal_hits.clear();
     match app.modal.as_mut().unwrap() {
         Modal::Help(hv) => hv.draw(f, r, &t),
         Modal::Export => forms::draw_export(app, f, r),
@@ -517,4 +518,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
             f.render_widget(Paragraph::new(lines).block(block(&title, true, &t)), r);
         }
     }
+    // Every popup gets the same close control in its title bar.
+    let x = super::widgets::close_button(f, r, &t);
+    app.modal_hits.push((x, super::Hit::CloseModal));
 }

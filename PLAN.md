@@ -269,8 +269,13 @@ retyped at any time.
 - Then: preview the first 10 lines parsed as bars with the ingest parser (invalid lines
   marked; reads at most 64 KiB) -> resolve missing source/symbol/duration inline -> live
   byte-based progress (per file and overall, bytes and ETA; reading counted as it
-  happens, then parse and store phases weighted into each file's bytes) -> summary (inserted / duplicate / rejected / gaps). Esc cancels before
-  commit; the ingest runs in a background task so the TUI stays responsive.
+  happens, then parse and store phases weighted into each file's bytes) -> summary (inserted / duplicate / rejected / gaps). The ingest runs in a background
+  task so the TUI stays responsive. [Cancel] / Esc / c (with confirm) stops it
+  cooperatively: finished files stay, the current file is rolled back (each file is one
+  all-or-nothing transaction), the rest are not started.
+- Places column (Places (p)): built-ins (Home, Projects, raw/data, working folder),
+  bookmarks (`b` toggles, `x` removes) and recent folders; clickable, `1`–`9`, `p` focuses.
+- Every popup draws the shared [X] close control in its title bar (same as Esc).
 
 CLI and TUI are thin layers over one library crate; no business logic in either.
 

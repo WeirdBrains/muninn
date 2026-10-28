@@ -69,6 +69,9 @@ pub struct TuiPrefs {
     pub header: HeaderMode,
     #[serde(default)]
     pub sidebar_collapsed: bool,
+    /// Bookmarked import folders (Places).
+    #[serde(default)]
+    pub import_bookmarks: Vec<String>,
     /// Recently imported folders (newest first).
     #[serde(default)]
     pub import_recent: Vec<String>,

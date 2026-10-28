@@ -2,7 +2,7 @@
 use super::{block, App};
 use crate::ingest::{self, IngestOptions, Progress};
 use crate::theme::Theme;
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -196,12 +196,15 @@ pub enum Pane {
     Path,
     Filter,
     Field(usize),
+    Places,
 }
 
 pub enum Msg {
     File(usize),
     Report(String, Vec<String>),
     Failed(String, String),
+    /// Cancelled while importing this file; it was rolled back.
+    Cancelled(String),
     Done,
 }
 
@@ -212,6 +215,10 @@ pub struct Running {
     pub current: usize,
     pub log: Vec<String>,
     pub started: std::time::Instant,
+    /// Asking "cancel the import?".
+    pub confirm: bool,
+    /// Files fully imported (kept).
+    pub kept: usize,
 }
 
 pub enum Phase {
@@ -237,6 +244,8 @@ pub struct ImportState {
     pub phase: Phase,
     pub preview: Option<(PathBuf, Vec<PreviewRow>)>,
     pub message: Option<String>,
+    /// Highlighted entry in the Places column.
+    pub place_sel: usize,
 }
 
 pub const FIELDS: [&str; 3] = ["source", "symbol", "duration"];
@@ -264,13 +273,14 @@ impl ImportState {
             phase: Phase::Browse,
             preview: None,
             message: None,
+            place_sel: 0,
         };
         s.reload();
         s
     }
 
     pub fn typing(&self) -> bool {
-        matches!(self.phase, Phase::Browse) && self.pane != Pane::Files
+        matches!(self.phase, Phase::Browse) && !matches!(self.pane, Pane::Files | Pane::Places)
     }
 
     pub fn running(&self) -> bool {
@@ -335,28 +345,96 @@ impl ImportState {
     }
 }
 
-/// Bookmarks: home, the raw data folder (MUNINN_RAW_DATA or ~/Projects/kommandosaldat/raw/data), cwd.
-pub fn bookmarks() -> Vec<(String, PathBuf)> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlaceKind {
+    Builtin,
+    Bookmark,
+    Recent,
+}
+
+/// One entry of the Places column.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Place {
+    pub label: String,
+    pub path: PathBuf,
+    pub kind: PlaceKind,
+}
+
+/// Built-in places: home, ~/Projects, the raw data folder (MUNINN_RAW_DATA or
+/// ~/Projects/kommandosaldat/raw/data), the working folder. Missing folders are left out.
+pub fn builtin_places() -> Vec<Place> {
     let mut v = vec![];
-    if let Some(h) = dirs::home_dir() {
-        v.push(("home".into(), h.clone()));
-        let raw = std::env::var_os("MUNINN_RAW_DATA").map(PathBuf::from).unwrap_or_else(|| h.join("Projects/kommandosaldat/raw/data"));
-        if raw.is_dir() {
-            v.push(("raw/data".into(), raw));
+    let mut add = |label: &str, path: PathBuf| {
+        if path.is_dir() && !v.iter().any(|p: &Place| p.path == path) {
+            v.push(Place { label: label.into(), path, kind: PlaceKind::Builtin });
         }
+    };
+    if let Some(h) = dirs::home_dir() {
+        add("Home", h.clone());
+        add("Projects", h.join("Projects"));
+        add("raw/data", std::env::var_os("MUNINN_RAW_DATA").map(PathBuf::from).unwrap_or_else(|| h.join("Projects/kommandosaldat/raw/data")));
     }
     if let Ok(c) = std::env::current_dir() {
-        v.push(("cwd".into(), c));
+        add("Working folder", c);
     }
     v
 }
 
-fn places(app: &App) -> Vec<(String, PathBuf)> {
-    let mut v = bookmarks();
+fn short(p: &str) -> String {
+    Path::new(p).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| p.to_string())
+}
+
+/// Places in display order: built-ins, then bookmarks, then recent folders.
+pub fn places(app: &App) -> Vec<Place> {
+    let mut v = builtin_places();
+    for b in &app.prefs.tui.import_bookmarks {
+        v.push(Place { label: short(b), path: PathBuf::from(b), kind: PlaceKind::Bookmark });
+    }
     for r in &app.prefs.tui.import_recent {
-        v.push((format!("recent: {}", Path::new(r).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()), PathBuf::from(r)));
+        v.push(Place { label: short(r), path: PathBuf::from(r), kind: PlaceKind::Recent });
     }
     v
+}
+
+/// Bookmark the current folder (toggle: removes it when already bookmarked).
+pub fn toggle_bookmark(app: &mut App) {
+    let d = app.import.dir.display().to_string();
+    let b = &mut app.prefs.tui.import_bookmarks;
+    if let Some(i) = b.iter().position(|x| *x == d) {
+        b.remove(i);
+        app.import.message = Some(format!("removed bookmark {d}"));
+    } else {
+        b.push(d.clone());
+        app.import.message = Some(format!("bookmarked {d}"));
+    }
+    app.save_prefs();
+}
+
+/// Remove a bookmark or recent entry; built-ins cannot be removed.
+pub fn remove_place(app: &mut App, i: usize) {
+    let Some(p) = places(app).get(i).cloned() else { return };
+    let s = p.path.display().to_string();
+    match p.kind {
+        PlaceKind::Builtin => {
+            app.import.message = Some("built-in places can't be removed".into());
+            return;
+        }
+        PlaceKind::Bookmark => app.prefs.tui.import_bookmarks.retain(|x| *x != s),
+        PlaceKind::Recent => app.prefs.tui.import_recent.retain(|x| *x != s),
+    }
+    app.import.message = Some(format!("removed {}", p.label));
+    app.save_prefs();
+}
+
+pub fn go_place(app: &mut App, i: usize) {
+    if let Some(p) = places(app).get(i).cloned() {
+        if p.path.is_dir() {
+            app.import.cd(p.path);
+            app.import.place_sel = i;
+        } else {
+            app.import.message = Some(format!("{} no longer exists (x removes it)", p.path.display()));
+        }
+    }
 }
 
 pub fn open(app: &mut App) {
@@ -422,6 +500,7 @@ pub fn start(app: &mut App, files: Vec<PathBuf>) {
             let name = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
             let _ = match r {
                 Ok(reps) => tx.send(Msg::Report(name, reps.iter().map(line_of).collect())),
+                Err(_) if opts.progress.as_ref().is_some_and(|p| p.cancelled()) => tx.send(Msg::Cancelled(name)),
                 Err(e) => tx.send(Msg::Failed(name, e.to_string())),
             };
         }
@@ -434,7 +513,7 @@ pub fn start(app: &mut App, files: Vec<PathBuf>) {
     r.insert(0, d);
     r.truncate(RECENT_MAX);
     app.save_prefs();
-    app.import.phase = Phase::Running(Running { progress, rx, files, current: 0, log: vec![], started: std::time::Instant::now() });
+    app.import.phase = Phase::Running(Running { progress, rx, files, current: 0, log: vec![], started: std::time::Instant::now(), confirm: false, kept: 0 });
 }
 
 fn line_of(r: &ingest::IngestReport) -> String {
@@ -453,10 +532,12 @@ pub fn poll(app: &mut App) -> bool {
         match m {
             Msg::File(i) => run.current = i,
             Msg::Report(n, lines) => {
+                run.kept += 1;
                 run.log.push(format!("✓ {n}"));
                 run.log.extend(lines.into_iter().map(|l| format!("    {l}")));
             }
-            Msg::Failed(n, e) => run.log.push(format!("✗ {n}: {e}")),
+            Msg::Failed(n, e) => run.log.push(format!("✗ {n}: {e} (rolled back)")),
+            Msg::Cancelled(n) => run.log.push(format!("✗ {n}: cancelled, rolled back (nothing of it stored)")),
             Msg::Done => done = true,
         }
     }
@@ -464,9 +545,19 @@ pub fn poll(app: &mut App) -> bool {
         let cancelled = run.progress.cancelled();
         let (d, _) = run.progress.get();
         let mb = run.progress.bytes_before.load(Ordering::Relaxed) as f64 / 1e6;
+        let d = if cancelled { d.min(run.progress.done.load(Ordering::Relaxed)) } else { d };
         let secs = run.started.elapsed().as_secs_f64();
         let mut lines = std::mem::take(&mut run.log);
         lines.push(String::new());
+        if cancelled {
+            let started = (run.current + 1).min(run.files.len());
+            let discarded = started - run.kept.min(started);
+            lines.push(format!(
+                "Cancelled: kept {} complete file(s), discarded {discarded} partly imported, {} not started.",
+                run.kept,
+                run.files.len() - started
+            ));
+        }
         lines.push(format!(
             "{} file(s), {mb:.1} MB, {d} bars stored in {secs:.1} s{}",
             run.files.len(),
@@ -478,12 +569,64 @@ pub fn poll(app: &mut App) -> bool {
     done
 }
 
+/// Ask to cancel the running import (Esc, c, [Cancel], [X]).
+pub fn request_cancel(app: &mut App) {
+    if let Phase::Running(r) = &mut app.import.phase
+        && !r.progress.cancelled()
+    {
+        r.confirm = true;
+    }
+}
+
+/// Answer the cancel question. Yes signals the background thread, which stops at the
+/// next read or row batch and rolls back the current file.
+pub fn confirm_cancel(app: &mut App, yes: bool) {
+    if let Phase::Running(r) = &mut app.import.phase {
+        r.confirm = false;
+        if yes {
+            r.progress.cancel.store(true, Ordering::Relaxed);
+            app.import.message = Some("Cancelling… rolling back the current file".into());
+        }
+    }
+}
+
+/// Close the popup ([X] or Esc); during an import this asks to cancel instead.
+pub fn close(app: &mut App) {
+    match app.import.phase {
+        Phase::Running(_) => request_cancel(app),
+        Phase::Done { .. } => {
+            app.import.phase = Phase::Browse;
+            app.import.chosen.clear();
+            app.modal = None;
+        }
+        Phase::Browse => app.modal = None,
+    }
+}
+
+pub fn on_click(app: &mut App, h: super::Hit) {
+    use super::Hit;
+    match h {
+        Hit::ImportCancel => request_cancel(app),
+        Hit::ImportConfirm(yes) => confirm_cancel(app, yes),
+        Hit::ImportPlace(i) => {
+            app.import.pane = Pane::Places;
+            go_place(app, i);
+        }
+        _ => {}
+    }
+}
+
 pub fn on_key(app: &mut App, k: KeyEvent) {
     match &app.import.phase {
         Phase::Running(r) => {
-            if matches!(k.code, KeyCode::Esc) || (k.code == KeyCode::Char('c') && k.modifiers.contains(KeyModifiers::CONTROL)) {
-                r.progress.cancel.store(true, Ordering::Relaxed);
-                app.import.message = Some("cancelling after the current chunk…".into());
+            if r.confirm {
+                match k.code {
+                    KeyCode::Char('y') | KeyCode::Enter => confirm_cancel(app, true),
+                    KeyCode::Char('n') | KeyCode::Esc => confirm_cancel(app, false),
+                    _ => {}
+                }
+            } else if matches!(k.code, KeyCode::Esc | KeyCode::Char('c')) {
+                request_cancel(app);
             }
             return;
         }
@@ -557,6 +700,28 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             KeyCode::Char(c) => st.fields[i].push(c),
             _ => {}
         },
+        Pane::Places => {
+            let n = places(app).len();
+            let st = &mut app.import;
+            match k.code {
+                KeyCode::Down | KeyCode::Char('j') => st.place_sel = (st.place_sel + 1).min(n.saturating_sub(1)),
+                KeyCode::Up | KeyCode::Char('k') => st.place_sel = st.place_sel.saturating_sub(1),
+                KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                    let i = st.place_sel;
+                    go_place(app, i);
+                    app.import.pane = Pane::Files;
+                }
+                KeyCode::Char('x') | KeyCode::Delete => {
+                    let i = st.place_sel;
+                    remove_place(app, i);
+                    app.import.place_sel = i.min(places(app).len().saturating_sub(1));
+                }
+                KeyCode::Char('b') => toggle_bookmark(app),
+                KeyCode::Esc | KeyCode::Tab | KeyCode::Char('p') => st.pane = Pane::Files,
+                KeyCode::Char(c @ '1'..='9') => go_place(app, c as usize - '1' as usize),
+                _ => {}
+            }
+        }
         Pane::Files => {
             let n = st.entries.len();
             match k.code {
@@ -612,12 +777,9 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                     let t = st.targets();
                     start(app, t);
                 }
-                KeyCode::Char(c @ '1'..='9') => {
-                    let i = c as usize - '1' as usize;
-                    if let Some((_, p)) = places(app).get(i).cloned() {
-                        app.import.cd(p);
-                    }
-                }
+                KeyCode::Char(c @ '1'..='9') => go_place(app, c as usize - '1' as usize),
+                KeyCode::Char('p') => st.pane = Pane::Places,
+                KeyCode::Char('b') => toggle_bookmark(app),
                 _ => {}
             }
         }
@@ -625,6 +787,12 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
 }
 
 pub fn draw(app: &mut App, f: &mut Frame, r: Rect) {
+    let mut hits = std::mem::take(&mut app.modal_hits);
+    draw_body(app, f, r, &mut hits);
+    app.modal_hits = hits;
+}
+
+fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, super::Hit)>) {
     let t = app.theme.clone();
     let places = places(app);
     let st = &mut app.import;
@@ -638,7 +806,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect) {
     let inner = outer.inner(r);
     f.render_widget(outer, r);
     match &st.phase {
-        Phase::Running(run) => return draw_running(run, st.message.as_deref(), f, inner, &t),
+        Phase::Running(run) => return draw_running(run, st.message.as_deref(), f, inner, &t, app_hits),
         Phase::Done { lines, .. } => {
             let mut v: Vec<Line> = lines.iter().map(|l| Line::styled(l.clone(), style_of(l, &t))).collect();
             v.push(Line::styled("Enter / Esc closes", Style::new().fg(t.muted)));
@@ -667,12 +835,50 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect) {
     let [places_r, files_r, prev_r] =
         Layout::horizontal([Constraint::Length(22), Constraint::Percentage(45), Constraint::Min(20)]).areas(body);
     // places
-    let pv: Vec<Line> = places
-        .iter()
-        .enumerate()
-        .map(|(i, (n, _))| Line::styled(format!("{} {}", i + 1, n).chars().take(21).collect::<String>(), Style::new().fg(if i < 9 { t.fg } else { t.muted })))
-        .collect();
-    f.render_widget(Paragraph::new(pv).block(block("Places", false, &t)), places_r);
+    let pb = block("Places (p)", st.pane == Pane::Places, &t);
+    let pi = pb.inner(places_r);
+    f.render_widget(pb, places_r);
+    let mut pv: Vec<Line> = vec![];
+    let mut y = pi.y;
+    let mut last: Option<PlaceKind> = None;
+    let w = pi.width as usize;
+    for (i, p) in places.iter().enumerate() {
+        if last != Some(p.kind) {
+            if last.is_some() {
+                pv.push(Line::raw(""));
+                y += 1;
+            }
+            let head = match p.kind {
+                PlaceKind::Builtin => "Places",
+                PlaceKind::Bookmark => "Bookmarks",
+                PlaceKind::Recent => "Recent",
+            };
+            pv.push(Line::styled(head, Style::new().fg(t.header).add_modifier(Modifier::BOLD)));
+            y += 1;
+            last = Some(p.kind);
+        }
+        let key = if i < 9 { format!("{} ", i + 1) } else { "  ".into() };
+        let sel = st.pane == Pane::Places && i == st.place_sel;
+        let here = p.path == st.dir;
+        let style = if sel {
+            Style::new().bg(t.selection_bg).fg(t.selection_fg)
+        } else if here {
+            Style::new().fg(t.accent)
+        } else {
+            Style::new().fg(t.fg)
+        };
+        pv.push(Line::styled(format!("{key}{}", p.label).chars().take(w).collect::<String>(), style));
+        if y < pi.bottom() {
+            app_hits.push((Rect { x: pi.x, y, width: pi.width, height: 1 }, super::Hit::ImportPlace(i)));
+        }
+        y += 1;
+    }
+    if !places.iter().any(|p| p.kind == PlaceKind::Bookmark) {
+        pv.push(Line::raw(""));
+        pv.push(Line::styled("b bookmarks this", Style::new().fg(t.muted)));
+        pv.push(Line::styled("folder", Style::new().fg(t.muted)));
+    }
+    f.render_widget(Paragraph::new(pv), pi);
     // files
     let fb = block("Files", st.pane == Pane::Files, &t);
     let fi = fb.inner(files_r);
@@ -737,7 +943,8 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect) {
     let help = match st.pane {
         Pane::Path => "Tab complete · Enter go/import · Esc back",
         Pane::Filter | Pane::Field(_) => "type · Enter done · Esc back",
-        Pane::Files => "Enter open/import · Space select · a folder · . hidden · / filter · Tab path · 1-9 places · s/y/d fields · i import · Esc",
+        Pane::Files => "Enter open/import · Space select · a folder · . hidden · / filter · Tab path · p places · 1-9 jump · b bookmark · s/y/d fields · i import",
+        Pane::Places => "j/k move · Enter go · x remove bookmark/recent · b bookmark current folder · 1-9 jump · Esc/p back",
     };
     f.render_widget(Paragraph::new(Line::styled(help, Style::new().fg(t.muted))), help_r);
 }
@@ -780,7 +987,7 @@ fn fmt_secs(s: f64) -> String {
     if s >= 3600 { format!("{}h{:02}m", s / 3600, s / 60 % 60) } else if s >= 60 { format!("{}m{:02}s", s / 60, s % 60) } else { format!("{s}s") }
 }
 
-fn draw_running(run: &Running, msg: Option<&str>, f: &mut Frame, r: Rect, t: &Theme) {
+fn draw_running(run: &Running, msg: Option<&str>, f: &mut Frame, r: Rect, t: &Theme, hits: &mut Vec<(Rect, super::Hit)>) {
     let [info, file_g, all_g, stats, log, help] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(1),
@@ -813,7 +1020,31 @@ fn draw_running(run: &Running, msg: Option<&str>, f: &mut Frame, r: Rect, t: &Th
     let v: Vec<Line> = run.log.iter().map(|l| Line::styled(l.clone(), style_of(l, t))).collect();
     let skip = v.len().saturating_sub(log.height as usize);
     f.render_widget(Paragraph::new(v).scroll((skip as u16, 0)), log);
-    f.render_widget(Paragraph::new(Line::styled("Esc cancels (stops after the current chunk; stored bars stay)", Style::new().fg(t.muted))), help);
+    // [Cancel] button, or the confirm question
+    let btn = |label: &str, fg, bg| Span::styled(format!(" {label} "), Style::new().fg(fg).bg(bg).add_modifier(Modifier::BOLD));
+    let mut x = help.x;
+    let mut put = |spans: &mut Vec<Span<'static>>, s: Span<'static>, hit: Option<super::Hit>| {
+        let w = s.content.chars().count() as u16;
+        if let Some(h) = hit {
+            hits.push((Rect { x, y: help.y, width: w, height: 1 }, h));
+        }
+        x += w;
+        spans.push(s);
+    };
+    let mut spans: Vec<Span<'static>> = vec![];
+    if run.progress.cancelled() {
+        put(&mut spans, Span::styled("Cancelling… the current file is being rolled back", Style::new().fg(t.warning)), None);
+    } else if run.confirm {
+        put(&mut spans, Span::styled("Cancel the import? Completed files stay; the current file is rolled back.  ", Style::new().fg(t.warning)), None);
+        put(&mut spans, btn("[Yes, cancel]", t.bg, t.error), Some(super::Hit::ImportConfirm(true)));
+        put(&mut spans, Span::raw("  "), None);
+        put(&mut spans, btn("[No, continue]", t.bg, t.accent), Some(super::Hit::ImportConfirm(false)));
+        put(&mut spans, Span::styled("  y / n", Style::new().fg(t.muted)), None);
+    } else {
+        put(&mut spans, btn("[Cancel]", t.bg, t.warning), Some(super::Hit::ImportCancel));
+        put(&mut spans, Span::styled("  Esc or c cancels (asks first)", Style::new().fg(t.muted)), None);
+    }
+    f.render_widget(Paragraph::new(Line::from(spans)), help);
 }
 
 #[cfg(test)]

@@ -98,3 +98,22 @@ pub fn sample_bars(n: usize) -> Vec<Bar> {
     }
     v
 }
+
+/// Draw the shared popup close control `[X]` on the top border of `r` (right side)
+/// and return its rectangle for click handling.
+pub fn close_button(f: &mut ratatui::Frame, r: ratatui::layout::Rect, t: &crate::theme::Theme) -> ratatui::layout::Rect {
+    use ratatui::style::{Modifier, Style};
+    let w = 5u16;
+    if r.width < w + 4 || r.height == 0 {
+        return ratatui::layout::Rect::default();
+    }
+    let x = ratatui::layout::Rect { x: r.right() - w - 2, y: r.y, width: w, height: 1 };
+    f.render_widget(
+        ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
+            " [X] ".to_string(),
+            Style::new().fg(t.error).add_modifier(Modifier::BOLD),
+        )),
+        x,
+    );
+    x
+}

@@ -33,7 +33,9 @@ Only folders and data files (`csv tsv txt json ndjson jsonl`) are listed.
 | `.` | show / hide hidden files |
 | `/` | filter the listing (substring) |
 | Tab, `g` | type a path; Tab completes it like a shell, listing candidates when ambiguous; Enter goes there (or imports a file) |
-| `1`–`9` | jump to a place: home, `raw/data` (or `$MUNINN_RAW_DATA`), the working folder, then recent folders |
+| `p` | focus the Places column (see below) |
+| `1`–`9` | jump to the numbered place |
+| `b` | bookmark the current folder (again: remove the bookmark) |
 | `s` `y` `d` | edit source, symbol, duration |
 | `i` | import the selection |
 | Esc | close |
@@ -67,7 +69,44 @@ Bytes are counted as the file is read (published every 64 KiB), so the bar moves
 the first read. Reading is fast compared with storing, so each file's bytes are split
 into phases: reading 10 %, parsing and validating 5 %, storing 85 % (scaled by bars
 stored, reported every 4096 rows). The estimate is therefore linear in bytes across
-files and roughly linear in time within a file. **Esc cancels** after the current chunk (50 000 bars); bars
-already stored stay. The summary lists inserted, duplicate, rejected rows and gaps per
+files and roughly linear in time within a file. The summary lists inserted, duplicate, rejected rows and gaps per
 series; identical files already imported are skipped. Rows failing validation are
 dropped (see the CLI `--rejects` option to keep a report).
+
+## Cancelling
+
+The progress popup has a **[Cancel]** button; `Esc`, `c` and the popup's **[X]** do the
+same. Cancelling always asks first (**[Yes, cancel]** / **[No, continue]**, or `y` /
+`n`). After yes the popup shows *Cancelling…*: the background import stops at its next
+read (every 64 KiB) or row batch (every 4096 rows), usually within a fraction of a
+second.
+
+What stays and what goes:
+
+- **Files that finished** before the cancel stay imported.
+- **The file being imported** is rolled back entirely: each file is imported in one
+  all-or-nothing transaction, so none of its bars, its series totals or its import
+  record remain. Importing it again later works normally (it is not skipped as
+  "already imported").
+- **Files not started** are not touched.
+
+The summary says how many files were kept, discarded and not started. The same
+all-or-nothing rule applies to the CLI: a file that fails part-way leaves nothing behind.
+
+## Places
+
+The left column of the browser, titled **Places (p)**, lists folders you can jump to.
+It has up to three sections:
+
+- **Places**: built-in shortcuts: Home, `~/Projects`, `raw/data` (the kommandosaldat
+  raw data folder, or `$MUNINN_RAW_DATA`) and the folder Muninn was started from. Ones
+  that don't exist on this machine are left out.
+- **Bookmarks**: folders you bookmarked with `b` (while browsing, `b` bookmarks the
+  folder you are in; pressing it again removes the bookmark).
+- **Recent**: the last 10 folders you imported from (newest first).
+
+To use a place: click it, press its number `1`–`9`, or press `p` to move into the
+column, pick one with `j`/`k` and press Enter. In the column, `x` removes a bookmark or
+recent entry (built-ins stay). Bookmarks and recents are saved in
+[preferences](preferences.md) (`tui.import_bookmarks`, `tui.import_recent`). The
+popup opens in the most recent folder.

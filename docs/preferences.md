@@ -25,6 +25,7 @@ sidebar_collapsed = false
 | `tui.sidebar_collapsed` | `false` | start with the sidebar hidden |
 | `tui.sidebar` | | [sidebar](sidebar.md) sort (`sort`, `desc`) and `filters` (sources, durations, years, price metric/min/max) |
 | `tui.import_recent` | `[]` | recently imported folders ([import](import.md)) |
+| `tui.import_bookmarks` | `[]` | bookmarked import folders (Places) |
 | `tui.layout` | one list tile | the current [tiling layout](tiling.md), saved on every change |
 | `tui.layouts.<name>` | none | named layouts |
 

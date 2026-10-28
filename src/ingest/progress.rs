@@ -135,6 +135,9 @@ impl<R: Read> CountingReader<R> {
 
 impl<R: Read> Read for CountingReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.progress.as_ref().is_some_and(|p| p.cancelled()) {
+            return Err(std::io::Error::other("cancelled"));
+        }
         let n = self.inner.read(buf)?;
         self.count += n as u64;
         self.pending += n as u64;
@@ -191,6 +194,16 @@ mod tests {
         // published only at 64 KiB steps plus the final flush: 0, 65_000, 131_000, 197_000, 200_000
         assert!(seen.len() <= 6, "{seen:?}");
         assert!(seen.iter().all(|v| *v == 200_000 || *v % 1000 == 0));
+    }
+
+    #[test]
+    fn reader_stops_when_cancelled() {
+        let p = Arc::new(Progress::default());
+        let mut r = CountingReader::new(&[1u8; 10][..], Some(p.clone()));
+        let mut b = [0u8; 4];
+        assert_eq!(r.read(&mut b).unwrap(), 4);
+        p.cancel.store(true, Relaxed);
+        assert!(r.read(&mut b).is_err());
     }
 
     #[test]

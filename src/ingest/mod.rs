@@ -283,7 +283,25 @@ impl<'a> Session<'a> {
     }
 
     /// Normalize, validate and store one input.
+    /// Normalize, validate and store one input, all or nothing: on any error or cancel
+    /// nothing of this input stays (bars, series stats, ingest run).
     pub fn ingest(&mut self, input: Input) -> Result<IngestReport> {
+        self.store.begin_atomic()?;
+        match self.ingest_inner(input) {
+            Ok(r) => {
+                self.store.commit_atomic()?;
+                Ok(r)
+            }
+            Err(e) => {
+                let _ = self.store.rollback_atomic();
+                // A source created inside the rolled-back unit no longer exists.
+                self.source = None;
+                Err(e)
+            }
+        }
+    }
+
+    fn ingest_inner(&mut self, input: Input) -> Result<IngestReport> {
         let started = std::time::Instant::now();
         let started_ms = now_ms();
         let mut rep = IngestReport { locator: input.locator.clone(), ..Default::default() };
@@ -342,6 +360,7 @@ impl<'a> Session<'a> {
                 Some(p) => self.store.upsert_bars_with(&source, &symbol, duration, chunk, &mut |n| {
                     reported += n;
                     p.stored(n);
+                    !p.cancelled()
                 })?,
                 None => self.store.upsert_bars(&source, &symbol, duration, chunk)?,
             };

@@ -384,19 +384,33 @@ impl Store {
 
     /// Insert bars, ignoring ids that already exist. Batched in one transaction.
     pub fn upsert_bars(&mut self, source: &Source, symbol: &Symbol, duration: Duration, bars: &[Bar]) -> Result<UpsertCounts> {
-        self.upsert_bars_with(source, symbol, duration, bars, &mut |_| {})
+        self.upsert_bars_with(source, symbol, duration, bars, &mut |_| true)
+    }
+
+    /// Start an all-or-nothing unit (one input file). Nests with `upsert_bars`.
+    pub fn begin_atomic(&self) -> Result<()> {
+        Ok(self.conn.execute_batch("SAVEPOINT muninn_file")?)
+    }
+    pub fn commit_atomic(&self) -> Result<()> {
+        Ok(self.conn.execute_batch("RELEASE muninn_file")?)
+    }
+    /// Undo everything since `begin_atomic` (bars, series_stats, ingest run).
+    pub fn rollback_atomic(&self) -> Result<()> {
+        Ok(self.conn.execute_batch("ROLLBACK TO muninn_file; RELEASE muninn_file")?)
     }
 
     /// Like `upsert_bars`; calls `on_rows(n)` every 4096 rows written (progress).
+    /// `on_rows` returning false aborts: the batch is rolled back and `Error::Aborted` returned.
     pub fn upsert_bars_with(
         &mut self,
         source: &Source,
         symbol: &Symbol,
         duration: Duration,
         bars: &[Bar],
-        on_rows: &mut dyn FnMut(u64),
+        on_rows: &mut dyn FnMut(u64) -> bool,
     ) -> Result<UpsertCounts> {
-        let tx = self.conn.transaction()?;
+        // A savepoint: a transaction on its own, nested inside `begin_atomic` when used.
+        let tx = self.conn.savepoint()?;
         let mut c = UpsertCounts::default();
         {
             let mut st = tx.prepare_cached(
@@ -404,8 +418,8 @@ impl Store {
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) ON CONFLICT(id) DO NOTHING",
             )?;
             for (i, b) in bars.iter().enumerate() {
-                if i % 4096 == 4095 {
-                    on_rows(4096);
+                if i % 4096 == 4095 && !on_rows(4096) {
+                    return Err(Error::Aborted);
                 }
                 let id = BarId::compute(b.ts, &source.name, symbol, duration);
                 let n = st.execute(params![

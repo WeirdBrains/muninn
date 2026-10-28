@@ -64,4 +64,6 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 |-----|--------|
 | `i` | open the [import](import.md) popup |
 | Space, `a`, `.`, `/`, Tab | select, whole folder, hidden, filter, path completion (in the popup) |
-| Esc | cancel a running import |
+| Esc, `c`, [Cancel] | cancel a running import (asks first; `y`/`n`) |
+| `p`, `1`–`9`, `b` | places column, jump to a place, bookmark the folder (in the popup) |
+| click [X] | close any popup (during an import: asks to cancel) |
