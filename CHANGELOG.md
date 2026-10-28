@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-10-28
+
+### Added
+- Fixed: Arch install — packaging/arch/PKGBUILD now builds from the git checkout (makepkg -si), since the GitHub tarball and release assets it downloaded don't exist publicly; pkgver kept in step by release.sh
+
 ## [1.6.0] - 2026-10-28
 
 ### Added
@@ -117,7 +122,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/kommandosaldat/muninn/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/kommandosaldat/muninn/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/kommandosaldat/muninn/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/kommandosaldat/muninn/compare/v1.3.0...v1.4.0
