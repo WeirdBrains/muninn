@@ -6,6 +6,11 @@ Redis, SQLite and Postgres; export to CSV, Parquet or JSON; browse it in a TUI.
 Data lives in `~/.muninn` (override with `MUNINN_HOME` or `--home`), in a
 SQLCipher database protected by an envelope key scheme (see `docs/encryption.md`).
 
+## Install
+
+Packages for Arch, Debian/Ubuntu, Fedora, Homebrew and winget, plus uninstall steps:
+see [docs/install.md](docs/install.md) (also `mnnn help install`).
+
 ## Build
 
 ```sh

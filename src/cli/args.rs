@@ -4,7 +4,8 @@ use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
-#[command(name = "mnnn", version, about = "Muninn: ingest and normalize crypto market data into bars", disable_help_subcommand = true)]
+#[command(name = "mnnn", version, about = "Muninn: ingest and normalize crypto market data into bars", disable_help_subcommand = true,
+    after_help = "Docs: `mnnn help` (topics), `mnnn help install` (install and uninstall per platform).")]
 pub struct Cli {
     #[command(flatten)]
     pub global: GlobalArgs,

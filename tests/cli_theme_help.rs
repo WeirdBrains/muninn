@@ -44,6 +44,10 @@ fn help_command() {
     let out = e.ok(&["help", "--search", "shard"]);
     assert!(out.lines().next().unwrap().starts_with("keys"));
     assert!(!e.run(&["help", "nope"]).status.success());
+    assert!(e.ok(&["help", "install"]).starts_with("# Install"));
+    assert!(e.ok(&["--help"]).contains("mnnn help install"));
+    // archived snapshots are not help topics
+    assert!(!e.run(&["help", "historical/1.0/PLAN"]).status.success());
     // help never creates a home
     assert!(!e.home().exists());
 }
