@@ -780,7 +780,9 @@ impl App {
                     let Some(tile) = self.layout.tile(id).cloned() else { continue };
                     let bounds = self.bounds(tile.series.as_ref());
                     let d = tile.series.as_ref().and_then(|k| self.data.get(k, &self.store));
+                    let pending = tile.series.as_ref().and_then(|k| self.data.pending(k));
                     let cache = self.caches.entry(id).or_default();
+                    cache.pending = pending;
                     tiles::draw_tile(f, r, &tile, cache, d, scope, bounds, id == self.layout.focus, &t, hits);
                 }
                 layout::Placed::Bar { rect, mode, titles, active, first_ids } => {

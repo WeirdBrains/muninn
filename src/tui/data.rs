@@ -100,10 +100,25 @@ impl SeriesData {
     }
 }
 
-type Loaded = (SeriesKey, Result<Vec<Bar>, String>);
+/// What the loader thread reports.
+enum Msg {
+    /// Bars read so far, and the total once counted.
+    Progress(SeriesKey, u64, Option<u64>),
+    Done(SeriesKey, Result<Vec<Bar>, String>),
+}
+
+/// Bars per read; the loader reports progress after each chunk.
+pub const CHUNK: i64 = 50_000;
+
+/// A series that is not ready: still loading (bars read, total if known) or failed.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Pending {
+    Loading { done: u64, total: Option<u64> },
+    Failed(String),
+}
 
 pub enum Slot {
-    Loading,
+    Loading { done: u64, total: Option<u64> },
     Ready(Arc<SeriesData>),
     Failed(String),
 }
@@ -118,11 +133,32 @@ pub struct DataCache {
     db: std::path::PathBuf,
     key: [u8; 32],
     req: Option<mpsc::Sender<SeriesKey>>,
-    rx: Option<mpsc::Receiver<Loaded>>,
+    rx: Option<mpsc::Receiver<Msg>>,
 }
 
 fn load(store: &Store, k: &SeriesKey) -> Result<Vec<Bar>, String> {
-    store.bucketed(&k.filter(), 0).map_err(|e| e.to_string())
+    load_chunked(store, k, &mut |_, _| {})
+}
+
+/// Read a series in time order, CHUNK bars at a time (keyset paging), calling
+/// `progress(done, total)` once the total is counted and after every chunk.
+pub fn load_chunked(store: &Store, k: &SeriesKey, progress: &mut dyn FnMut(u64, Option<u64>)) -> Result<Vec<Bar>, String> {
+    let mut f = k.filter();
+    let total = store.count_filtered(&f).ok().map(|n| n.max(0) as u64);
+    progress(0, total);
+    let mut bars: Vec<Bar> = Vec::with_capacity(total.unwrap_or(0) as usize);
+    loop {
+        let page = store.page_bars(&f, BarSort::Time, false, CHUNK, 0).map_err(|e| e.to_string())?;
+        let n = page.len() as i64;
+        if let Some(last) = page.last() {
+            f.from = Some(last.ts + 1);
+        }
+        bars.extend(page);
+        progress(bars.len() as u64, total);
+        if n < CHUNK {
+            return Ok(bars);
+        }
+    }
 }
 
 impl DataCache {
@@ -140,14 +176,19 @@ impl DataCache {
                     Ok(s) => s,
                     Err(e) => {
                         while let Ok(k) = qrx.recv() {
-                            let _ = rtx.send((k, Err(e.to_string())));
+                            let _ = rtx.send(Msg::Done(k, Err(e.to_string())));
                         }
                         return;
                     }
                 };
                 store.tune_for_reads();
                 while let Ok(k) = qrx.recv() {
-                    if rtx.send((k.clone(), load(&store, &k))).is_err() {
+                    let tx = rtx.clone();
+                    let key = k.clone();
+                    let r = load_chunked(&store, &k, &mut |done, total| {
+                        let _ = tx.send(Msg::Progress(key.clone(), done, total));
+                    });
+                    if rtx.send(Msg::Done(k, r)).is_err() {
                         return;
                     }
                 }
@@ -174,7 +215,7 @@ impl DataCache {
             self.generation += 1;
             return self.get(k, store);
         }
-        self.slots.insert(k.clone(), Slot::Loading);
+        self.slots.insert(k.clone(), Slot::Loading { done: 0, total: None });
         let _ = self.worker().send(k.clone());
         None
     }
@@ -184,20 +225,40 @@ impl DataCache {
     }
 
     pub fn loading(&self) -> usize {
-        self.slots.values().filter(|s| matches!(s, Slot::Loading)).count()
+        self.slots.values().filter(|s| matches!(s, Slot::Loading { .. })).count()
+    }
+
+    /// Why a series has no data yet (None when ready or never requested).
+    pub fn pending(&self, k: &SeriesKey) -> Option<Pending> {
+        match self.slots.get(k)? {
+            Slot::Loading { done, total } => Some(Pending::Loading { done: *done, total: *total }),
+            Slot::Failed(e) => Some(Pending::Failed(e.clone())),
+            Slot::Ready(_) => None,
+        }
     }
 
     /// Take finished loads. Returns true when something arrived.
     pub fn poll(&mut self) -> bool {
         let Some(rx) = &self.rx else { return false };
         let mut got = false;
-        while let Ok((k, r)) = rx.try_recv() {
-            let s = match r {
-                Ok(b) => Slot::Ready(Arc::new(SeriesData::new(b))),
-                Err(e) => Slot::Failed(e),
-            };
-            self.slots.insert(k, s);
-            got = true;
+        while let Ok(m) = rx.try_recv() {
+            match m {
+                Msg::Progress(k, done, total) => {
+                    // ignore stale progress for a series that was cleared meanwhile
+                    if let Some(Slot::Loading { done: d, total: t }) = self.slots.get_mut(&k) {
+                        *d = done;
+                        *t = total;
+                    }
+                }
+                Msg::Done(k, r) => {
+                    let s = match r {
+                        Ok(b) => Slot::Ready(Arc::new(SeriesData::new(b))),
+                        Err(e) => Slot::Failed(e),
+                    };
+                    self.slots.insert(k, s);
+                    got = true;
+                }
+            }
         }
         if got {
             self.generation += 1;
@@ -207,7 +268,7 @@ impl DataCache {
 
     /// Drop everything (after an import or refresh); reloads on demand.
     pub fn clear(&mut self) {
-        self.slots.retain(|_, s| matches!(s, Slot::Loading));
+        self.slots.retain(|_, s| matches!(s, Slot::Loading { .. }));
         self.generation += 1;
     }
 }
@@ -272,6 +333,46 @@ mod tests {
             assert!((a.0 - b.0).abs() < 1e-9 && (a.1 - b.1).abs() < 1e-9, "{m:?} {a:?} {b:?}");
         }
         assert_eq!(d.range(Some((300_000, 900_000))), 1..4);
+    }
+
+    #[test]
+    fn chunked_load_reports_progress_and_matches_a_single_read() {
+        let mut s = Store::open_in_memory().unwrap();
+        let src = s.get_or_create_source("t", "file", None).unwrap();
+        let n = CHUNK as usize * 2 + 7;
+        let bars: Vec<Bar> =
+            (0..n as i64).map(|i| Bar { ts: i * 60_000, open: 1.0, high: 2.0, low: 0.5, close: 1.5, volume: i as f64, flags: 0 }).collect();
+        s.upsert_bars(&src, &crate::model::Symbol::new("BTC", "USDT"), crate::model::Duration(60), &bars).unwrap();
+        let k = SeriesKey { source: "t".into(), symbol: "BTC/USDT".into(), duration: "1m".into() };
+        let mut seen = vec![];
+        let got = load_chunked(&s, &k, &mut |d, t| seen.push((d, t))).unwrap();
+        assert_eq!(got, s.bucketed(&k.filter(), 0).unwrap());
+        let t = Some(n as u64);
+        assert_eq!(seen, vec![(0, t), (CHUNK as u64, t), (2 * CHUNK as u64, t), (n as u64, t)]);
+    }
+
+    #[test]
+    fn background_load_goes_through_loading_to_ready() {
+        let d = tempfile::tempdir().unwrap();
+        let db = d.path().join("m.db");
+        let key = [7u8; 32];
+        {
+            let mut s = Store::open(&db, Some(&key)).unwrap();
+            let src = s.get_or_create_source("t", "file", None).unwrap();
+            s.upsert_bars(&src, &crate::model::Symbol::new("BTC", "USDT"), crate::model::Duration(300), &data().bars).unwrap();
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        let mut c = DataCache::new(db, key);
+        let k = SeriesKey { source: "t".into(), symbol: "BTC/USDT".into(), duration: "5m".into() };
+        assert!(c.get(&k, &s).is_none());
+        assert!(matches!(c.pending(&k), Some(Pending::Loading { .. })));
+        let t0 = std::time::Instant::now();
+        while c.get(&k, &s).is_none() && t0.elapsed().as_secs() < 30 {
+            c.poll();
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert_eq!(c.get(&k, &s).unwrap().bars.len(), 10);
+        assert_eq!(c.pending(&k), None);
     }
 
     #[test]

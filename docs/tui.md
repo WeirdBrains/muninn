@@ -56,6 +56,19 @@ filters that also scope the tiles. See [sidebar](sidebar.md).
 Every popup has a red **[X]** at the right of its title bar: click it to close (same as
 Esc). Clicks outside a popup are ignored while it is open.
 
+## Loading
+
+Series load in a background thread, so the UI keeps responding (menus, other tiles,
+help) while a large series is read. Until the bars arrive the tile shows what is
+happening:
+
+- a progress bar, `▕████░░░░▏ 42%  12,345 / 29,000 bars`, once the bar count is known
+  (it is counted first, then the bars are read 50,000 at a time);
+- a spinner, `⠹ loading series…`, while the total is not known yet;
+- `could not load the series: …` if reading fails.
+
+The tile title shows `loading…` instead of the bar count meanwhile.
+
 ## Mouse
 
 Everything you can act on is clickable; there are no keyboard-only actions:

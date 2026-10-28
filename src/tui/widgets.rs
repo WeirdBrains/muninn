@@ -142,3 +142,55 @@ pub fn key_bar(
     f.render_widget(ratatui::widgets::Paragraph::new(Line::from(spans)), Rect { height: 1.min(r.height), ..r });
     x - r.x
 }
+
+/// Braille spinner frames; the frame advances every 100 ms of wall time.
+pub const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+pub fn spinner_frame() -> char {
+    let ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    SPINNER[(ms / 100) as usize % SPINNER.len()]
+}
+
+/// Text of a progress bar `width` cells wide: `▕████░░░░▏ 42%  12,345 / 29,000 bars`.
+pub fn progress_text(done: u64, total: u64, width: usize) -> String {
+    let pct = (done.min(total) * 100).checked_div(total).unwrap_or(100) as usize;
+    let w = width.max(4);
+    let fill = (done.min(total) as usize * w).checked_div(total as usize).unwrap_or(w);
+    format!("▕{}{}▏ {pct:>3}%  {} / {} bars", "█".repeat(fill), "░".repeat(w - fill), thousands(done), thousands(total))
+}
+
+fn thousands(n: u64) -> String {
+    let s = n.to_string();
+    let mut out = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// What a tile shows while its series loads: a progress bar when the total is known,
+/// else a spinner; a failed load shows the error.
+pub fn loading(f: &mut ratatui::Frame, area: Rect, p: &super::data::Pending, t: &crate::theme::Theme) {
+    use super::data::Pending;
+    use ratatui::text::Line;
+    if area.height == 0 || area.width < 4 {
+        return;
+    }
+    let (lines, st) = match p {
+        Pending::Loading { done, total: Some(total) } => {
+            let bar = progress_text(*done, *total, (area.width as usize).saturating_sub(34).clamp(4, 40));
+            (vec![Line::from(" loading series…"), Line::from(format!(" {bar}"))], Style::new().fg(t.accent))
+        }
+        Pending::Loading { done, total: None } => {
+            let extra = if *done > 0 { format!(" · {} bars", thousands(*done)) } else { String::new() };
+            (vec![Line::from(format!(" {} loading series…{extra}", spinner_frame()))], Style::new().fg(t.accent))
+        }
+        Pending::Failed(e) => (vec![Line::from(format!(" could not load the series: {e}"))], Style::new().fg(t.error)),
+    };
+    let h = (lines.len() as u16).min(area.height);
+    let y = area.y + area.height.saturating_sub(h) / 2;
+    f.render_widget(ratatui::widgets::Paragraph::new(lines).style(st), Rect { y, height: h, ..area });
+}

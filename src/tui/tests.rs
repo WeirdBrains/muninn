@@ -1345,3 +1345,47 @@ fn help_link_hits_follow_wrapping_and_scroll() {
     click_on(&mut a, |h| *h == Hit::HelpLink(n - 1));
     assert_eq!(help(&mut a).current.id, target);
 }
+
+#[test]
+fn tiles_show_a_spinner_then_the_bars_while_loading_in_the_background() {
+    let (_t, mut a) = app();
+    a.data.sync = false;
+    a.data.clear();
+    a.caches.clear();
+    let s = screen_text(&mut a);
+    assert!(s.contains("loading series…"), "{s}");
+    assert!(crate::tui::widgets::SPINNER.iter().any(|c| s.contains(*c)) || s.contains('▕'), "no spinner or bar: {s}");
+    // frames keep coming while the worker loads (the UI does not block)
+    let t0 = std::time::Instant::now();
+    let mut frames = 0;
+    while a.data.loading() > 0 && t0.elapsed().as_secs() < 30 {
+        screen_text(&mut a);
+        frames += 1;
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(frames > 0);
+    let s = screen_text(&mut a);
+    assert!(!s.contains("loading series…") && s.contains("bars"), "{s}");
+}
+
+#[test]
+fn loading_widget_draws_a_bar_when_the_total_is_known() {
+    use crate::tui::data::Pending;
+    let t = a_theme();
+    let draw = |p: Pending| {
+        let mut term = Terminal::new(TestBackend::new(80, 3)).unwrap();
+        term.draw(|f| crate::tui::widgets::loading(f, f.area(), &p, &t)).unwrap();
+        let buf = term.backend().buffer().clone();
+        (0..buf.area.height).map(|y| (0..buf.area.width).map(|x| buf[(x, y)].symbol().to_string()).collect::<String>() + "\n").collect::<String>()
+    };
+    let s = draw(Pending::Loading { done: 25_000, total: Some(100_000) });
+    assert!(s.contains("25%") && s.contains("25,000 / 100,000 bars") && s.contains('█') && s.contains('░'), "{s}");
+    let s = draw(Pending::Loading { done: 0, total: None });
+    assert!(crate::tui::widgets::SPINNER.iter().any(|c| s.contains(*c)), "{s}");
+    assert!(draw(Pending::Failed("boom".into())).contains("could not load the series: boom"));
+    assert_eq!(crate::tui::widgets::progress_text(5, 10, 10), "▕█████░░░░░▏  50%  5 / 10 bars");
+}
+
+fn a_theme() -> crate::theme::Theme {
+    crate::theme::builtin("tokyo-night").unwrap().resolved(crate::theme::Variant::Dark)
+}

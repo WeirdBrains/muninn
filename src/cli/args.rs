@@ -602,6 +602,9 @@ data yet, the focused tile loads the first imported series.
 Help (? or F1): follow links with Tab and Enter or a click, Backspace goes back, / searches \
 from any topic; a clickable key bar at the bottom lists the shortcuts.
 
+Loading: series load in the background; a tile shows a progress bar (bars read of the total) \
+or a spinner while the total is unknown, and the UI stays responsive.
+
 See mnnn help tui, mnnn help import and mnnn help help.";
 
 /// Extra text for `mnnn help --help` and mnnn-help(1).

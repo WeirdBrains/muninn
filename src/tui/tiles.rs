@@ -193,6 +193,8 @@ impl ChartCache {
 pub struct TileCache {
     pub list: ListCache,
     pub chart: ChartCache,
+    /// Set before drawing when the tile's series is still loading (or failed).
+    pub pending: Option<super::data::Pending>,
 }
 
 pub const COLUMNS: [(BarSort, u16); 14] = [
@@ -439,6 +441,12 @@ pub fn draw_tile(
     let inner = block.inner(area);
     f.render_widget(block, area);
     hits.push((area, Hit::Tile(t.id)));
+    if t.series.is_some() && data.is_none() {
+        cache.chart.loading = true;
+        let p = cache.pending.clone().unwrap_or(super::data::Pending::Loading { done: 0, total: None });
+        super::widgets::loading(f, inner, &p, th);
+        return;
+    }
     match t.view {
         View::List => draw_list(f, inner, t, &mut cache.list, data, scope, focused, th, hits),
         View::Chart => draw_chart(f, inner, t, &mut cache.chart, data, scope, bounds, th, hits),
