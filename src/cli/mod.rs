@@ -1,6 +1,7 @@
 //! CLI layer: thin handlers over the library.
 mod args;
 mod catalog;
+mod ingest;
 pub use args::*;
 
 use crate::interact::Interact;
@@ -54,7 +55,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
     let ctx = Ctx::new(cli.global)?;
     ctx.prefs()?;
     match cli.command {
-        Command::Ingest(_) => Err(crate::Error::NotImplemented("ingest").into()),
+        Command::Ingest(c) => ingest::run(&ctx, c),
         Command::Export(_) => Err(crate::Error::NotImplemented("export").into()),
         Command::Sources(c) => catalog::sources(&ctx, c),
         Command::Symbols(c) => catalog::symbols(&ctx, c),

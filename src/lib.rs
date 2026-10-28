@@ -8,3 +8,4 @@ pub mod prefs;
 pub use error::{Error, Result};
 pub mod model;
 pub mod store;
+pub mod ingest;
