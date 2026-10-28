@@ -11,3 +11,4 @@ pub mod store;
 pub mod ingest;
 pub mod export;
 pub mod crypto;
+pub mod backup;

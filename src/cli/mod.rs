@@ -1,5 +1,6 @@
 //! CLI layer: thin handlers over the library.
 mod args;
+mod backup;
 mod catalog;
 mod export;
 mod ingest;
@@ -86,7 +87,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Sources(c) => catalog::sources(&ctx, c),
         Command::Symbols(c) => catalog::symbols(&ctx, c),
         Command::Keys(c) => keys::run(&ctx, c),
-        Command::Backup(_) => Err(crate::Error::NotImplemented("backup").into()),
+        Command::Backup(c) => backup::run(&ctx, c),
         Command::Theme(_) => Err(crate::Error::NotImplemented("theme").into()),
         Command::Tui => Err(crate::Error::NotImplemented("tui").into()),
     }
