@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-28
+
+### Added
+- Import progress is byte-based per file and overall with ETA, moving from the first read
+- Import preview parses the first 10 lines as bars and marks invalid lines
+
 ## [0.6.1] - 2026-10-27
 
 ### Added
@@ -61,7 +67,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/kommandosaldat/muninn/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/kommandosaldat/muninn/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/kommandosaldat/muninn/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kommandosaldat/muninn/compare/v0.4.0...v0.5.0
