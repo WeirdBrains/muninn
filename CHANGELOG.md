@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-28
+
+### Added
+- A finished TUI import loads its first series into the focused tile when no tile shows data
+
 ## [1.9.0] - 2026-10-28
 
 ### Added
@@ -138,7 +143,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/kommandosaldat/muninn/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/kommandosaldat/muninn/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/kommandosaldat/muninn/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/kommandosaldat/muninn/compare/v1.6.1...v1.7.0
