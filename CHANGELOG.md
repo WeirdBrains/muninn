@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-28
+
+### Added
+- Import a whole path: mnnn ingest path <DIR> (recursive, CSV and JSON, per-file and overall progress); the TUI imports selected or highlighted folders, A imports the current folder
+- ingest csv/json search directories recursively (--no-recursive for the top level)
+
 ## [1.6.1] - 2026-10-28
 
 ### Added
@@ -122,7 +128,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.6.1...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/kommandosaldat/muninn/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/kommandosaldat/muninn/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/kommandosaldat/muninn/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/kommandosaldat/muninn/compare/v1.4.0...v1.5.0
