@@ -1,0 +1,66 @@
+[package]
+name = "muninn"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "The data ingestor for the Kommandosaldat project. It ingests data from various sources and normalizes it into a common format."
+authors = ["Michael Christenson II <m3talsmith@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/kommandosaldat/muninn"
+homepage = "https://github.com/kommandosaldat/muninn"
+keywords = ["data", "ingestion", "normalization", "csv", "sqlite"]
+categories = ["command-line-utilities"]
+readme = "README.md"
+publish = false
+
+[[bin]]
+name = "mnnn"
+path = "src/main.rs"
+
+[lib]
+name = "muninn"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4.6", features = ["env", "string", "unicode", "derive", "cargo"] }
+polars = { version = "0.55", features = ["lazy", "csv", "json", "parquet", "dtype-datetime", "strings", "temporal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+toml = "0.9"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl", "backup", "blob"] }
+uuid = { version = "1", features = ["v4"] }
+blake3 = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+bip39 = "2"
+vsss-rs = { version = "5", features = ["std"] }
+argon2 = "0.5"
+hkdf = "0.12"
+sha2 = "0.10"
+chacha20poly1305 = "0.10"
+age = "0.11"
+zeroize = { version = "1", features = ["derive"] }
+secrecy = "0.10"
+getrandom = "0.2"
+rand_core = { version = "0.6", features = ["getrandom"] }
+hex = "0.4"
+base64 = "0.22"
+ratatui = "0.30"
+crossterm = "0.29"
+terminal-light = "1"
+rpassword = "7"
+dirs = "6"
+url = "2"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+redis = { version = "0.32", default-features = false, features = ["tls-rustls", "tls-rustls-webpki-roots"] }
+postgres = "0.19"
+postgres-native-tls = "0.5"
+native-tls = { version = "0.2", features = ["vendored"] }
+tar = "0.4"
+zstd = "0.13"
+
+[dev-dependencies]
+tempfile = "3"
