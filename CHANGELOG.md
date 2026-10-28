@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-28
+
+### Added
+- Homebrew formula (packaging/homebrew) installing prebuilt macOS/Linux arm64 and x86_64 binaries
+- Arch muninn-bin PKGBUILD and scripts/dist.sh release tarballs; installing no longer needs Rust
+
 ## [1.3.0] - 2026-10-28
 
 ### Added
@@ -101,7 +107,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/kommandosaldat/muninn/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/kommandosaldat/muninn/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/kommandosaldat/muninn/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/kommandosaldat/muninn/compare/v1.0.0...v1.1.0
