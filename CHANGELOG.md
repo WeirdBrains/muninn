@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-28
+
+### Added
+- Fedora/RHEL .rpm via cargo generate-rpm (packaging/fedora)
+
 ## [1.2.0] - 2026-10-28
 
 ### Added
@@ -96,7 +101,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/kommandosaldat/muninn/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/kommandosaldat/muninn/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/kommandosaldat/muninn/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/kommandosaldat/muninn/compare/v0.8.0...v1.0.0
