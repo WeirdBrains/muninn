@@ -71,28 +71,38 @@ jobs:
           if-no-files-found: error
 
   arch:
-    name: arch package (x86_64)
+    # muninn-bin repackages the prebuilt tarball (no compiling), so the aarch64 package is
+    # built in the x86_64 Arch container with CARCH=aarch64.
+    name: arch package (${{ matrix.carch }})
     needs: unix
+    strategy:
+      fail-fast: false
+      matrix:
+        carch: [x86_64, aarch64]
     runs-on: ubuntu-22.04
     container: archlinux:base-devel
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
         with:
-          name: dist-x86_64-unknown-linux-gnu
+          name: dist-${{ matrix.carch }}-unknown-linux-gnu
           path: dist
       - name: makepkg
+        env:
+          CARCH: ${{ matrix.carch }}
         run: |
           ver="${GITHUB_REF_NAME#v}"
           useradd -m builder
-          mkdir -p /tmp/pkg && cp dist/muninn-"$ver"-x86_64-unknown-linux-gnu.tar.gz /tmp/pkg/
+          mkdir -p /tmp/pkg && cp dist/muninn-"$ver"-"$CARCH"-unknown-linux-gnu.tar.gz /tmp/pkg/
           sed "s/^pkgver=.*/pkgver=$ver/" packaging/arch/muninn-bin/PKGBUILD > /tmp/pkg/PKGBUILD
+          sed "s/^CARCH=.*/CARCH=\"$CARCH\"/" /etc/makepkg.conf > /tmp/pkg/makepkg.conf
           chown -R builder /tmp/pkg
-          su builder -c "cd /tmp/pkg && makepkg -f --noconfirm"
+          su builder -c "cd /tmp/pkg && makepkg -f --noconfirm --config /tmp/pkg/makepkg.conf"
+          ls /tmp/pkg/muninn-bin-"$ver"-*-"$CARCH".pkg.tar.zst
           mkdir -p out && cp /tmp/pkg/*.pkg.tar.zst out/
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-arch
+          name: dist-arch-${{ matrix.carch }}
           path: out/*.pkg.tar.zst
           if-no-files-found: error
 
@@ -120,8 +130,17 @@ jobs:
             echo
             scripts/release-notes.sh "$ver"
           } > notes.md
+      - name: Latest only for the highest tag
+        # Runs for several tags finish in any order; only the highest version may be "Latest".
+        id: latest
+        run: |
+          git fetch --force --tags origin
+          top="$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+          if [ "$top" = "$GITHUB_REF_NAME" ]; then echo "make_latest=true"; else echo "make_latest=false"; fi >> "$GITHUB_OUTPUT"
+          echo "highest tag: $top, this tag: $GITHUB_REF_NAME"
       - uses: softprops/action-gh-release@v2
         with:
+          make_latest: ${{ steps.latest.outputs.make_latest }}
           name: Muninn ${{ github.ref_name }}
           body_path: notes.md
           files: dist/*

@@ -15,6 +15,13 @@ Releases are cut locally and published by GitHub Actions when the tag is pushed.
 | arch | archlinux container | `muninn-bin-<ver>-1-x86_64.pkg.tar.zst` |
 | release | ubuntu-22.04 | `SHA256SUMS`, `muninn-<ver>-packaging.tar.gz` (Arch PKGBUILD, Homebrew formula and winget manifests with real sums, by `scripts/fill-sums.py`), and the GitHub Release |
 
+Only the highest version tag is marked **Latest**: the publish step compares the tag
+with `git tag -l 'v*' --sort=-v:refname` and passes `make_latest` accordingly, so runs
+for several pushed tags can finish in any order. (No `concurrency` group: GitHub would
+cancel queued tag runs beyond one pending.) The Arch job builds `muninn-bin` for
+`x86_64` and `aarch64` (the aarch64 one repackages the prebuilt aarch64 tarball with
+`CARCH=aarch64`); both packages are release assets listed in `SHA256SUMS`.
+
 Release notes are the tag annotation plus the version's `CHANGELOG.md` section
 (`scripts/release-notes.sh X.Y.Z`). `.github/workflows/ci.yml` builds, lints and tests
 pushes to `main` and pull requests.

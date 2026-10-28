@@ -39,6 +39,10 @@ and can be downloaded without logging in (public repo):
 cd packaging/arch/muninn-bin && makepkg -si
 ```
 
+Each release also attaches ready-made packages for both architectures,
+`muninn-bin-<ver>-1-x86_64.pkg.tar.zst` and `muninn-bin-<ver>-1-aarch64.pkg.tar.zst`
+(listed in `SHA256SUMS`); install one with `sudo pacman -U <file>`.
+
 Both install `/usr/bin/mnnn`, man pages and `/usr/share/doc/muninn`. Uninstall:
 `sudo pacman -R muninn` (or `muninn-bin`). Remove an earlier `cargo install` first
 (`cargo uninstall muninn`), or `~/.cargo/bin/mnnn` may shadow the package, depending on
