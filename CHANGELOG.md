@@ -6,6 +6,13 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-27
+
+### Added
+- Chart tiles with start/end period selectors, zoom, pan, jump to date and a crosshair readout.
+- Toggleable per-tile chart layers (candles, OHLC, line, area, envelope, volume, moving averages, markers, grid, axes).
+- Linked tiles: list selection centres charts, chart movement scrolls lists.
+
 ## [0.3.0] - 2026-10-27
 
 ### Added
@@ -34,7 +41,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kommandosaldat/muninn/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kommandosaldat/muninn/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kommandosaldat/muninn/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kommandosaldat/muninn/releases/tag/v0.1.0
