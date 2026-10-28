@@ -200,7 +200,6 @@ pub fn rows(series: &[SeriesInfo], query: &str, p: &SidebarPrefs, price_range: &
 pub type PriceKey = (SeriesKey, PriceMetric, Option<(i64, i64)>);
 
 /// Runtime sidebar state.
-
 #[derive(Debug, Clone, Default)]
 pub struct Sidebar {
     pub query: String,

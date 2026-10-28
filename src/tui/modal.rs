@@ -30,6 +30,7 @@ pub struct Prompt {
 pub enum Modal {
     Help(HelpView),
     Export,
+    Import,
     Keys,
     Themes,
     Prefs { sel: usize },
@@ -59,6 +60,7 @@ impl Modal {
         match self {
             Modal::Help(_) => "help",
             Modal::Export => "export",
+            Modal::Import => "import",
             Modal::Keys => "keys",
             Modal::Themes => "themes",
             Modal::Prefs { .. } => "preferences",
@@ -76,6 +78,7 @@ impl Modal {
         match self {
             Modal::Help(h) => h.searching,
             Modal::Export => app.export.typing(),
+            Modal::Import => app.import.typing(),
             Modal::Keys => app.keys.typing(),
             Modal::Themes => app.themes.typing(),
             Modal::Prompt(_) => true,
@@ -145,8 +148,12 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         let (kind, sel, edit) = (*kind, *sel, edit.clone());
         return filter_key(app, k, kind, sel, edit);
     }
+    if matches!(app.modal, Some(Modal::Import)) {
+        return super::import::on_key(app, k);
+    }
     let Some(m) = app.modal.as_mut() else { return };
     match m {
+        Modal::Import => {}
         Modal::Help(h) => {
             if h.on_key(k) {
                 app.modal = None;
@@ -435,6 +442,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     match app.modal.as_mut().unwrap() {
         Modal::Help(hv) => hv.draw(f, r, &t),
         Modal::Export => forms::draw_export(app, f, r),
+        Modal::Import => super::import::draw(app, f, r),
         Modal::Keys => forms::draw_keys(app, f, r),
         Modal::Themes => themes::draw(app, f, r),
         Modal::Info { title, lines, scroll } => {

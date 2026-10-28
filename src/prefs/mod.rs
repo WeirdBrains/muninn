@@ -69,6 +69,9 @@ pub struct TuiPrefs {
     pub header: HeaderMode,
     #[serde(default)]
     pub sidebar_collapsed: bool,
+    /// Recently imported folders (newest first).
+    #[serde(default)]
+    pub import_recent: Vec<String>,
     /// Sidebar sort and filters.
     #[serde(default)]
     pub sidebar: crate::tui::sidebar::SidebarPrefs,

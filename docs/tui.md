@@ -34,6 +34,11 @@ Always a [tiling layout](tiling.md): one list tile to start, split and rearrange
 with `Ctrl-w` commands or the **View** menu. Each tile shows a list or a chart of
 its own series.
 
+## Import
+
+`i` or **File ▸ Import…** opens a file browser with path completion, multi-select,
+preview and a background import with progress. See [import](import.md).
+
 ## Sidebar
 
 A collapsible series list at the right (`Ctrl-b`) with fuzzy search (`/`), sort and

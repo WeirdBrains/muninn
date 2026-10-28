@@ -169,7 +169,7 @@ mod tests {
         for id in [
             "README", "cli", "ingest-csv", "ingest-json", "services/http", "services/redis", "services/sqlite",
             "services/postgres", "data-model", "storage-layout", "export", "keys", "encryption", "backup-recovery",
-            "themes", "preferences", "tui", "help", "menus", "keybindings", "tiling", "charts", "sidebar",
+            "themes", "preferences", "tui", "help", "menus", "keybindings", "tiling", "charts", "sidebar", "import",
         ] {
             assert!(topic(id).is_some(), "missing docs/{id}.md");
         }

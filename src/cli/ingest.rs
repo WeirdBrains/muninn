@@ -14,6 +14,7 @@ pub fn options(ctx: &Ctx, c: &CommonIngestArgs) -> anyhow::Result<IngestOptions>
         rejects: c.rejects.clone(),
         force: c.force,
         drop_zero_volume: ctx.prefs()?.ingest.drop_zero_volume,
+        progress: None,
     })
 }
 

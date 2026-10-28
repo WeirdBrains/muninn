@@ -517,3 +517,64 @@ fn sidebar_toggle_search_sort_filter() {
     assert!(a.sidebar.rows.is_empty());
     assert_eq!(a.help_topic(), "sidebar");
 }
+
+#[test]
+fn import_popup_browses_and_imports_in_background() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("SOLUSDT_5m.csv")).unwrap();
+    std::fs::copy(fx.join("BTCUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
+    std::fs::create_dir(d.path().join("sub")).unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    assert!(matches!(a.modal, Some(Modal::Import)));
+    // type a path with Tab completion
+    a.on_key(key(KeyCode::Tab));
+    a.import.path.clear();
+    for c in format!("{}/su", d.path().display()).chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    a.on_key(key(KeyCode::Tab));
+    assert!(a.import.path.ends_with("/sub/"), "{}", a.import.path);
+    // back to the folder and select it whole
+    a.import.path = format!("{}/", d.path().display());
+    a.on_key(key(KeyCode::Enter));
+    assert_eq!(a.import.entries.iter().filter(|e| !e.dir).count(), 2);
+    a.on_key(key(KeyCode::Char('a')));
+    assert_eq!(a.import.chosen.len(), 2);
+    a.on_key(key(KeyCode::End));
+    let s = screen_text(&mut a);
+    assert!(s.contains("SOL/USDT") && s.contains("Preview") && s.contains("● SOLUSDT_5m.csv"), "{s}");
+    a.on_key(key(KeyCode::Char('s')));
+    for c in "kraken".chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Char('i')));
+    assert!(a.import.running());
+    let t0 = std::time::Instant::now();
+    while a.import.running() && t0.elapsed().as_secs() < 30 {
+        screen_text(&mut a);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    let s = screen_text(&mut a);
+    assert!(s.contains("Import finished") && s.contains("2 file(s)"), "{s}");
+    assert!(a.series.iter().any(|x| x.source == "kraken" && x.symbol.to_string() == "SOL/USDT"));
+    assert_eq!(a.prefs.tui.import_recent[0], std::fs::canonicalize(d.path()).unwrap().display().to_string());
+    a.on_key(key(KeyCode::Enter));
+    assert!(a.modal.is_none());
+}
+
+#[test]
+fn ingest_progress_counts_and_cancel_aborts() {
+    let (_t, mut a) = app();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ETHUSDT_5m.csv");
+    let p = std::sync::Arc::new(crate::ingest::Progress::default());
+    let opts = crate::ingest::IngestOptions { source: Some("p".into()), progress: Some(p.clone()), ..Default::default() };
+    crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts.clone(), &fx, &Default::default()).unwrap();
+    let (d, t) = p.get();
+    assert!(d > 0 && d == t);
+    p.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+    let o2 = crate::ingest::IngestOptions { force: true, ..opts };
+    assert!(crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), o2, &fx, &Default::default()).is_err());
+}

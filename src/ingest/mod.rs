@@ -24,6 +24,27 @@ pub struct IngestOptions {
     pub rejects: Option<PathBuf>,
     pub force: bool,
     pub drop_zero_volume: bool,
+    /// Live progress and cancellation (TUI import); checked per stored chunk.
+    pub progress: Option<std::sync::Arc<Progress>>,
+}
+
+/// Bars stored so far / bars to store, plus a cancel flag. Shared with a UI thread.
+#[derive(Debug, Default)]
+pub struct Progress {
+    pub done: std::sync::atomic::AtomicU64,
+    pub total: std::sync::atomic::AtomicU64,
+    pub cancel: std::sync::atomic::AtomicBool,
+}
+
+impl Progress {
+    pub fn cancelled(&self) -> bool {
+        self.cancel.load(std::sync::atomic::Ordering::Relaxed)
+    }
+    /// (done, total)
+    pub fn get(&self) -> (u64, u64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        (self.done.load(Relaxed), self.total.load(Relaxed))
+    }
 }
 
 /// One unit of input (a file, a response, a query result).
@@ -323,7 +344,17 @@ impl<'a> Session<'a> {
         rep.last = ts.iter().max().copied();
 
         let mut counts = UpsertCounts::default();
+        let prog = self.opts.progress.clone();
+        if let Some(p) = &prog {
+            p.total.fetch_add(v.bars.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        }
         for chunk in v.bars.chunks(50_000) {
+            if let Some(p) = &prog {
+                if p.cancelled() {
+                    return Err(Error::Aborted);
+                }
+                p.done.fetch_add(chunk.len() as u64, std::sync::atomic::Ordering::Relaxed);
+            }
             let c = self.store.upsert_bars(&source, &symbol, duration, chunk)?;
             counts.inserted += c.inserted;
             counts.duplicate += c.duplicate;

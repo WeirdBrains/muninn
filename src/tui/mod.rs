@@ -11,6 +11,7 @@ pub mod menu;
 pub mod layout;
 pub mod modal;
 pub mod sidebar;
+pub mod import;
 pub mod themes;
 pub mod tiles;
 pub mod widgets;
@@ -66,6 +67,7 @@ pub struct App {
     pub caches: std::collections::HashMap<u32, tiles::TileCache>,
     pub series: Vec<crate::store::SeriesInfo>,
     pub sidebar: sidebar::Sidebar,
+    pub import: import::ImportState,
     /// `Ctrl-w` was pressed; the next key is a window command.
     pub pending_w: bool,
     /// Content area from the last draw (split geometry, min sizes).
@@ -91,6 +93,7 @@ impl App {
             series: vec![],
             pending_w: false,
             sidebar: Default::default(),
+            import: Default::default(),
             content: Rect::new(0, 0, 120, 30),
             export: forms::ExportForm::default(),
             keys: forms::KeysForm::default(),
@@ -157,7 +160,7 @@ impl App {
             return false;
         }
         // Not built yet in this release.
-        !matches!(a, Import)
+        true
     }
 
     /// Whether a text field has focus (letters are typed, not commands).
@@ -178,6 +181,7 @@ impl App {
             KeyCode::Char('/') if !self.typing() && self.modal.is_none() => Some(Action::FocusSidebar),
             KeyCode::Char('o') if !ctrl && !self.typing() && self.modal.is_none() => Some(Action::ToggleOrder),
             KeyCode::Char('X') if !self.typing() && self.modal.is_none() => Some(Action::ClearFilters),
+            KeyCode::Char('i') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Import),
             KeyCode::Char('?') if !self.typing() => Some(Action::Help),
             KeyCode::Char('q') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Quit),
             _ => None,
@@ -238,6 +242,7 @@ impl App {
                     themes::on_key(self, KeyEvent::from(KeyCode::Char('s')));
                 }
             }
+            Import => import::open(self),
             ThemeImport => self.modal = Some(Modal::prompt("Import theme from file", modal::PromptKind::ThemeImport)),
             ThemeExport => self.modal = Some(Modal::prompt("Export current theme to file", modal::PromptKind::ThemeExport)),
             Sources => self.modal = Some(Modal::info("Sources", modal::sources_lines(&self.store))),
@@ -361,7 +366,6 @@ impl App {
                 let d = self.layout.toggle_split_dir();
                 self.set_status(format!("new tiles split {}", if d == layout::Dir::Horizontal { "right" } else { "below" }));
             }
-            _ => self.set_status(format!("{} is not available yet", a.name())),
         }
     }
 
@@ -629,6 +633,7 @@ impl App {
         let area = f.area();
         let t = self.theme.clone();
         self.hits.clear();
+        import::poll(self);
         f.render_widget(Block::new().style(Style::new().bg(t.bg).fg(t.fg)), area);
         let hh = header::height(self.prefs.tui.header, area);
         let [head, bar, body, bottom] =

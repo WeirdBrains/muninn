@@ -57,3 +57,11 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `o` | toggle sort order |
 | `X` | clear filters |
 | `s`, `f p d y`, Enter | sort key, filter editors, assign (sidebar focused) |
+
+## Import
+
+| key | action |
+|-----|--------|
+| `i` | open the [import](import.md) popup |
+| Space, `a`, `.`, `/`, Tab | select, whole folder, hidden, filter, path completion (in the popup) |
+| Esc | cancel a running import |
