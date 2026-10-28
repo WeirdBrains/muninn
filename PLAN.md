@@ -547,6 +547,9 @@ rows): 965,366 inserted, 0 rejected, 932 zero-volume (kept), 32 gaps (1,944 miss
 bars), coverage 2017-08-17 04:00 .. 2026-10-27 21:05 UTC, 41.3 s ingest; the
 re-run is skipped by content hash.
 
+TUI v2 (section 1.3) shipped as v0.2.0 header + menu bar, v0.3.0 tiling, v0.4.0
+list/chart tiles, v0.5.0 sidebar, v0.6.0 import popup.
+
 ## 10. Decisions (resolved)
 
 - The password is **not** mixed into the master key: the 24 words or a shard quorum
@@ -565,7 +568,13 @@ re-run is skipped by content hash.
 - Redis logical DB flag is `--db-index` (the global `--db` flag owns the name).
 - `bars` has an extra `flags` column (zero-volume marker).
 - CSV escape: only RFC 4180 quote doubling is supported.
-- TUI ingest shows done/idle, no live progress bar.
+- TUI ingest (v1) showed done/idle; the v2 import popup has a live progress bar (v0.6.0).
+- TUI v2 (1.3): the import progress bar counts bars stored, so it starts after a file is
+  read and validated; cancel takes effect between 50k-bar chunks.
+- TUI v2: the sidebar price filter compares each series' min/max of the chosen metric
+  (within the year scope) against the range; the year filter also scopes tiles.
+- TUI v2: the import preview shows raw head lines (fast), not parsed bars.
+- TUI v2: rows failing validation are dropped without a prompt in the TUI import.
 - Prompts are a small custom implementation, not `dialoguer`.
 - JSON is parsed with serde, then turned into a Polars frame.
 - `keys rekey` requires the master key; restoring over existing data needs confirmation.

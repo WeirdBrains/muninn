@@ -67,7 +67,8 @@ mnnn keys recover --words-file words.txt      # or --shard ... --shard ... --sha
 ## TUI, themes, help
 
 ```sh
-mnnn tui                      # ? or F1 opens help
+mnnn tui                      # ? or F1 opens help, F10 the menu bar
+                              # Ctrl-w tiling, Ctrl-b sidebar, / search, i import
 mnnn theme list
 mnnn theme set catppuccin
 mnnn theme mode dark
