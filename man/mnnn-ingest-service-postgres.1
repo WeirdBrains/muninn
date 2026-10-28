@@ -8,7 +8,7 @@ mnnn\-ingest\-service\-postgres \- Flags shared by every service
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn ingest service postgres\fR [\fB\-\-home\fR] [\fB\-\-url\fR] [\fB\-\-db\fR] [\fB\-\-username\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-password\fR] [\fB\-\-password\-env\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-password\-stdin\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-host\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-port\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-database\fR] [\fB\-\-secure\fR] [\fB\-\-ca\-cert\fR] [\fB\-\-schema\fR] [\fB\-\-table\fR] [\fB\-\-query\fR] [\fB\-\-batch\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-\-map\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn ingest service postgres\fR [\fB\-\-home\fR] [\fB\-\-url\fR] [\fB\-\-db\fR] [\fB\-\-username\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-password\fR] [\fB\-\-password\-env\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-password\-stdin\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-host\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-port\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-database\fR] [\fB\-\-secure\fR] [\fB\-\-ca\-cert\fR] [\fB\-\-schema\fR] [\fB\-\-table\fR] [\fB\-\-query\fR] [\fB\-\-batch\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-\-map\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -127,6 +127,9 @@ Write rejected rows (with reasons) to this CSV
 .TP
 \fB\-\-force\fR
 Re\-process even if this exact input was already ingested
+.TP
+\fB\-\-no\-recursive\fR
+For a directory \-\-path: only its top level (default: search subdirectories too)
 .TP
 \fB\-\-timeout\fR \fI<TIMEOUT>\fR [default: 30]
 Timeout in seconds

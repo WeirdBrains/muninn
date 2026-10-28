@@ -48,7 +48,7 @@
   Regenerate whenever the CLI or version changes; the out-of-date test must pass.
 
 ## Quality bar (before every commit)
-- `cargo build`, `cargo clippy --all-targets` (no warnings), `cargo test` all pass.
+- `cargo fmt --check`, `cargo build`, `cargo clippy --all-targets` (no warnings), `cargo test` all pass.
 - New behaviour comes with tests (TUI: ratatui `TestBackend` render tests).
 
 ## Fixed design decisions (see docs/historical/1.0/PLAN.md for detail)

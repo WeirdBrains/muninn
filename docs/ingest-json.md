@@ -5,7 +5,7 @@ mnnn ingest json --path <FILE|DIR> [--records PATH] [--source NAME] [--symbol PA
                  [--duration 5m] [--map COL=FIELD]... [--rejects FILE] [--force]
 ```
 
-Reads `.json`, `.ndjson` and `.jsonl` files (a directory ingests all of them). After
+Reads `.json`, `.ndjson` and `.jsonl` files (a directory ingests all of them, recursively; `--no-recursive` for the top level only). After
 reading, the pipeline is the same as [CSV ingest](ingest-csv.md): source, symbol,
 duration derivation, validation, idempotent upsert and the report.
 

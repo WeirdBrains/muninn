@@ -1086,3 +1086,50 @@ fn path_tab_list_cycles_and_click_picks() {
     a.on_key(key(KeyCode::Enter)); // go there
     assert!(a.import.dir.ends_with("alpha"));
 }
+
+fn wait_import(a: &mut App) -> String {
+    let t0 = std::time::Instant::now();
+    while a.import.running() && t0.elapsed().as_secs() < 60 {
+        screen_text(a);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    screen_text(a)
+}
+
+#[test]
+fn import_folder_recursively_from_tui() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    std::fs::create_dir_all(d.path().join("sub/deeper")).unwrap();
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("sub/SOLUSDT_5m.csv")).unwrap();
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("sub/deeper/ADAUSDT_5m.csv")).unwrap();
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("DOTUSDT_5m.csv")).unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    // highlight the folder "sub" and import it: both files below it, not the top one
+    a.import.sel = a.import.entries.iter().position(|e| e.name == "sub").unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    let s = wait_import(&mut a);
+    assert!(s.contains("Import finished") && s.contains("2 file(s)"), "{s}");
+    assert!(a.series.iter().any(|x| x.symbol.to_string() == "ADA/USDT"));
+    assert!(!a.series.iter().any(|x| x.symbol.to_string() == "DOT/USDT"));
+    a.on_key(key(KeyCode::Enter));
+    // A imports the whole current folder tree
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.on_key(key(KeyCode::Char('A')));
+    let s = wait_import(&mut a);
+    assert!(s.contains("3 file(s)"), "{s}");
+    assert!(a.series.iter().any(|x| x.symbol.to_string() == "DOT/USDT"));
+    // Space selects a folder too
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.import.sel = a.import.entries.iter().position(|e| e.name == "sub").unwrap();
+    a.on_key(key(KeyCode::Char(' ')));
+    assert!(a.import.chosen.contains(&a.import.dir.join("sub")));
+    let empty = tempfile::tempdir().unwrap();
+    crate::tui::import::start(&mut a, vec![empty.path().to_path_buf()]);
+    assert!(a.import.message.as_deref().unwrap().contains("no data files"));
+}

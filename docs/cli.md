@@ -3,7 +3,7 @@
 ```
 mnnn [GLOBAL FLAGS] <COMMAND>
 
-  ingest csv|json|service <http|redis|sqlite|postgres>
+  ingest csv|json|path|service <http|redis|sqlite|postgres>
   export
   sources  list|add|rename|remove
   symbols  list|add
@@ -77,3 +77,19 @@ man mnnn-ingest-csv
 ```
 
 See also [TUI](tui.md), [in-app help](help.md).
+
+## Importing a whole path
+
+```sh
+mnnn ingest path ~/Projects/kommandosaldat/raw/data --source binance -y
+mnnn ingest path ./exports --no-recursive --records data.bars
+```
+
+`mnnn ingest path <PATH>` (or `--path`) ingests every CSV-like (`.csv .tsv .txt`) and
+JSON-like (`.json .ndjson .jsonl`) file under a directory, recursively; hidden entries
+are skipped. CSV options: `--delimiter`, `--no-header`; JSON: `--records`. Each file
+prints `[i/n] relative/path` on stderr, and on a terminal a live `file % · overall %`
+line. Each file is its own transaction; Ctrl-C keeps finished files, rolls back the
+current one and is recorded in the run ledger (`mnnn ingest runs`). `ingest csv` and
+`ingest json` also search directories recursively now; `--no-recursive` limits any
+of them to the top level.

@@ -8,7 +8,7 @@ mnnn\-ingest\-json \- Ingest JSON / NDJSON file(s)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn ingest json\fR [\fB\-\-home\fR] <\fB\-p\fR|\fB\-\-path\fR> [\fB\-\-db\fR] [\fB\-\-source\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-map\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-rejects\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-force\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-records\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn ingest json\fR [\fB\-\-home\fR] <\fB\-p\fR|\fB\-\-path\fR> [\fB\-\-db\fR] [\fB\-\-source\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-map\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-rejects\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-force\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-records\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -88,6 +88,9 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-no\-recursive\fR
+For a directory \-\-path: only its top level (default: search subdirectories too)
 .TP
 \fB\-\-records\fR \fI<RECORDS>\fR
 Where the array of bars lives (dotted path or JSON pointer)

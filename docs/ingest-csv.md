@@ -6,7 +6,7 @@ mnnn ingest csv --path <FILE|DIR> [--source NAME] [--symbol PAIR] [--duration 5m
                 [--map COL=FIELD]... [--rejects FILE] [--force]
 ```
 
-Every row becomes a bar (see [data model](data-model.md)). A directory ingests every
+Every row becomes a bar (see [data model](data-model.md)). A directory (searched recursively; `--no-recursive` for the top level only, hidden entries skipped) ingests every
 `.csv`/`.tsv`/`.txt` file in it, sorted by name, as one run.
 
 ## Example with the raw data

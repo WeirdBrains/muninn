@@ -28,8 +28,9 @@ Only folders and data files (`csv tsv txt json ndjson jsonl`) are listed.
 | `j` / `k`, ↑ / ↓, PgUp / PgDn, Home / End | move |
 | Enter, `l`, → | open a folder (Enter on a file imports it, or the selection) |
 | Backspace, `h`, ← | parent folder |
-| Space | select / unselect a file (multi-select) |
-| `a` | select the whole folder (again: unselect) |
+| Space | select / unselect a file or folder (multi-select) |
+| `a` | select every file in this folder (again: unselect) |
+| `A` | import this whole folder, including subfolders |
 | `.` | show / hide hidden files |
 | `/` | filter the listing (substring) |
 | Tab, `g` | type a path (see *Path completion*); Enter goes there (or imports a file) |
@@ -37,7 +38,7 @@ Only folders and data files (`csv tsv txt json ndjson jsonl`) are listed.
 | `1`–`9` | jump to the numbered place |
 | `b` | bookmark the current folder (again: remove the bookmark) |
 | `s` `y` `d` | edit source, symbol, duration |
-| `i` | import the selection |
+| `i` | import the selection, or the highlighted file or folder |
 | Esc | close |
 
 The preview shows the guessed symbol and duration (from the file name) and the first
@@ -147,3 +148,12 @@ column, pick one with `j`/`k` and press Enter. In the column, `x` removes a book
 recent entry (built-ins stay). Bookmarks and recents are saved in
 [preferences](preferences.md) (`tui.import_bookmarks`, `tui.import_recent`). The
 popup opens in the most recent folder.
+
+## Importing a whole folder
+
+A selected or highlighted folder is imported with everything below it: subfolders are
+searched for `.csv`, `.tsv`, `.txt`, `.json`, `.ndjson` and `.jsonl` files (hidden
+entries are skipped). `A` imports the current folder that way. Progress shows the
+current file (`file i/n`) and the whole run; each file is still all-or-nothing, so a
+cancel keeps finished files, rolls back the current one and the ledger records it.
+On the command line the same is `mnnn ingest path <DIR>` (see [CLI](cli.md)).

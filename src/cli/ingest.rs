@@ -16,6 +16,7 @@ pub fn options(ctx: &Ctx, c: &CommonIngestArgs) -> anyhow::Result<IngestOptions>
         drop_zero_volume: ctx.prefs()?.ingest.drop_zero_volume,
         run_id: None,
         progress: None,
+        no_recurse: c.no_recursive,
     })
 }
 
@@ -35,15 +36,33 @@ pub fn run(ctx: &Ctx, cmd: IngestCommand) -> anyhow::Result<()> {
             let opts = options(ctx, &a.common)?;
             let csv =
                 ingest::csv::CsvOptions { delimiter: a.delimiter, quote: a.quote, escape: a.escape, header: !a.no_header, skip_rows: a.skip_rows };
-            let n = ingest::expand_path(&a.path, &["csv", "tsv", "txt"]).map(|v| v.len()).unwrap_or(0);
+            let n = ingest::find_files(&a.path, ingest::CSV_EXTS, !opts.no_recurse).map(|v| v.len()).unwrap_or(0);
             let opts = cancellable(opts);
             ingest::tracked(&mut store, "cli", n, opts, |st, o| ingest::ingest_csv(st, ctx.io, o, &a.path, &csv)).map_err(cancelled)?
         }
         IngestCommand::Json(a) => {
             let opts = cancellable(options(ctx, &a.common)?);
-            let n = ingest::expand_path(&a.path, &["json", "ndjson", "jsonl"]).map(|v| v.len()).unwrap_or(0);
+            let n = ingest::find_files(&a.path, ingest::JSON_EXTS, !opts.no_recurse).map(|v| v.len()).unwrap_or(0);
             ingest::tracked(&mut store, "cli", n, opts, |st, o| ingest::json::ingest_json(st, ctx.io, o, &a.path, a.records.as_deref()))
                 .map_err(cancelled)?
+        }
+        IngestCommand::Path(a) => {
+            let opts = cancellable(options(ctx, &a.common)?);
+            let path = a.target.or(a.path).expect("clap requires a path");
+            let n = ingest::find_files(&path, ingest::DATA_EXTS, !opts.no_recurse).map(|v| v.len()).unwrap_or(0);
+            let csv = ingest::csv::CsvOptions { delimiter: a.delimiter, header: !a.no_header, ..Default::default() };
+            let ticker = Ticker::start(ctx, opts.progress.clone());
+            let io = ctx.io;
+            let root = path.clone();
+            let r = ingest::tracked(&mut store, "cli", n, opts, |st, o| {
+                ingest::ingest_path(st, io, o, &path, &csv, a.records.as_deref(), |i, total, f| {
+                    let rel = f.strip_prefix(&root).unwrap_or(f).display().to_string();
+                    let rel = if rel.is_empty() { f.display().to_string() } else { rel };
+                    ticker.file(i, total, &rel);
+                })
+            });
+            ticker.stop();
+            r.map_err(cancelled)?
         }
         IngestCommand::Service(s) => service(ctx, &mut store, s)?,
         IngestCommand::Runs(a) => {
@@ -76,6 +95,53 @@ pub fn run(ctx: &Ctx, cmd: IngestCommand) -> anyhow::Result<()> {
     };
     report(ctx, &reports);
     Ok(())
+}
+
+/// Per-file and overall progress on stderr for `ingest path`: a `[i/n] file` line per
+/// file, plus a live `file % · overall %` line when stderr is a terminal.
+struct Ticker {
+    quiet: bool,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    handle: std::cell::RefCell<Option<std::thread::JoinHandle<()>>>,
+    tty: bool,
+}
+
+impl Ticker {
+    fn start(ctx: &Ctx, p: Option<std::sync::Arc<ingest::Progress>>) -> Self {
+        use std::io::IsTerminal;
+        let quiet = ctx.global.quiet;
+        let tty = !quiet && std::io::stderr().is_terminal();
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let handle = match (tty, p) {
+            (true, Some(p)) => {
+                let s = stop.clone();
+                Some(std::thread::spawn(move || {
+                    while !s.load(std::sync::atomic::Ordering::Relaxed) {
+                        let e = p.estimate();
+                        eprint!("\r  file {:>3.0}% · overall {:>3.0}%  ", e.file * 100.0, e.overall * 100.0);
+                        std::thread::sleep(std::time::Duration::from_millis(250));
+                    }
+                    eprint!("\r{:40}\r", "");
+                }))
+            }
+            _ => None,
+        };
+        Self { quiet, stop, handle: std::cell::RefCell::new(handle), tty }
+    }
+    fn file(&self, i: usize, n: usize, name: &str) {
+        if !self.quiet {
+            if self.tty {
+                eprint!("\r{:40}\r", "");
+            }
+            eprintln!("[{}/{n}] {name}", i + 1);
+        }
+    }
+    fn stop(&self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Some(h) = self.handle.borrow_mut().take() {
+            let _ = h.join();
+        }
+    }
 }
 
 /// Ctrl-C asks the import to stop cleanly (the current file is rolled back) instead of

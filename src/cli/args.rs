@@ -105,6 +105,9 @@ pub struct CommonIngestArgs {
     /// Re-process even if this exact input was already ingested.
     #[arg(long)]
     pub force: bool,
+    /// For a directory --path: only its top level (default: search subdirectories too).
+    #[arg(long)]
+    pub no_recursive: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -114,6 +117,8 @@ pub enum IngestCommand {
     Csv(CsvIngestArgs),
     /// Ingest JSON / NDJSON file(s).
     Json(JsonIngestArgs),
+    /// Ingest a whole path: every CSV and JSON file in a directory tree (or one file).
+    Path(PathIngestArgs),
     /// Ingest from a service.
     #[command(subcommand)]
     Service(ServiceCommand),
@@ -156,6 +161,28 @@ pub struct JsonIngestArgs {
     #[command(flatten)]
     pub common: CommonIngestArgs,
     /// Where the array of bars lives (dotted path or JSON pointer).
+    #[arg(long)]
+    pub records: Option<String>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct PathIngestArgs {
+    /// File or directory; directories are searched recursively for .csv/.tsv/.txt and
+    /// .json/.ndjson/.jsonl files (hidden entries skipped).
+    #[arg(value_name = "PATH", required_unless_present = "path")]
+    pub target: Option<PathBuf>,
+    /// Same as the positional PATH.
+    #[arg(long, short = 'p', conflicts_with = "target")]
+    pub path: Option<PathBuf>,
+    #[command(flatten)]
+    pub common: CommonIngestArgs,
+    /// CSV field delimiter.
+    #[arg(long, default_value_t = ',')]
+    pub delimiter: char,
+    /// CSV files have no header row.
+    #[arg(long)]
+    pub no_header: bool,
+    /// JSON: where the array of bars lives (dotted path or JSON pointer).
     #[arg(long)]
     pub records: Option<String>,
 }
@@ -590,6 +617,14 @@ mod tests {
             }
             _ => panic!(),
         }
+    }
+
+    #[test]
+    fn ingest_path_positional_or_flag() {
+        assert!(parse(&["ingest", "path", "/data"]).is_ok());
+        assert!(parse(&["ingest", "path", "--path", "/data", "--no-recursive"]).is_ok());
+        assert!(parse(&["ingest", "path"]).is_err());
+        assert!(parse(&["ingest", "path", "/a", "--path", "/b"]).is_err());
     }
 
     #[test]

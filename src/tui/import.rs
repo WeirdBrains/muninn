@@ -384,13 +384,14 @@ impl ImportState {
         Some(if e.name == ".." { self.dir.parent()?.to_path_buf() } else { self.dir.join(&e.name) })
     }
 
-    /// Files to import: the multi-selection, else the highlighted file.
+    /// What to import: the multi-selection (files and folders), else the highlighted
+    /// file or folder. Folders are expanded by [`expand_targets`].
     pub fn targets(&self) -> Vec<PathBuf> {
         if !self.chosen.is_empty() {
             return self.chosen.iter().cloned().collect();
         }
         match (self.current(), self.entries.get(self.sel)) {
-            (Some(p), Some(e)) if !e.dir => vec![p],
+            (Some(p), Some(e)) if e.name != ".." => vec![p],
             _ => vec![],
         }
     }
@@ -526,10 +527,35 @@ pub fn open(app: &mut App) {
     app.modal = Some(super::modal::Modal::Import);
 }
 
-/// Start the background import of `files`.
-pub fn start(app: &mut App, files: Vec<PathBuf>) {
+/// Files to import for `targets`: files as they are, folders searched recursively for
+/// supported data files (hidden entries skipped). Sorted, without duplicates.
+pub fn expand_targets(targets: &[PathBuf]) -> Vec<PathBuf> {
+    let mut out = BTreeSet::new();
+    for t in targets {
+        if t.is_dir() {
+            out.extend(ingest::find_files(t, ingest::DATA_EXTS, true).unwrap_or_default());
+        } else if t.is_file() {
+            out.insert(t.clone());
+        }
+    }
+    out.into_iter().collect()
+}
+
+/// Import the whole current folder (recursively).
+pub fn import_folder(app: &mut App) {
+    let d = app.import.dir.clone();
+    start(app, vec![d]);
+}
+
+/// Start the background import of `targets` (files and/or folders).
+pub fn start(app: &mut App, targets: Vec<PathBuf>) {
+    if targets.is_empty() {
+        app.import.message = Some("nothing selected: Space selects files or folders, A imports this whole folder".into());
+        return;
+    }
+    let files = expand_targets(&targets);
     if files.is_empty() {
-        app.import.message = Some("nothing selected: Space selects files, a selects the folder".into());
+        app.import.message = Some(format!("no data files (.csv .tsv .txt .json .ndjson .jsonl) in {}", targets[0].display()));
         return;
     }
     let progress = Arc::new(Progress::default());
@@ -908,13 +934,14 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 }
                 KeyCode::Char(' ') => {
                     if let (Some(p), Some(e)) = (st.current(), st.entries.get(st.sel))
-                        && !e.dir
+                        && e.name != ".."
                     {
                         st.toggle(p);
                         st.sel = (st.sel + 1).min(n.saturating_sub(1));
                     }
                 }
                 KeyCode::Char('a') => st.toggle_all(),
+                KeyCode::Char('A') => import_folder(app),
                 KeyCode::Char('.') => {
                     st.hidden = !st.hidden;
                     st.reload();
@@ -1067,10 +1094,10 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
     let mut lines = vec![];
     for (i, e) in st.entries.iter().enumerate().skip(st.top).take(h) {
         let p = st.dir.join(&e.name);
-        let mark = if e.dir {
-            "▸"
-        } else if st.chosen.contains(&p) {
+        let mark = if st.chosen.contains(&p) {
             "●"
+        } else if e.dir {
+            "▸"
         } else {
             "○"
         };
@@ -1126,7 +1153,7 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
         Pane::Path => "Tab complete (again: list, then cycle) · Enter go/import · Esc back",
         Pane::Filter | Pane::Field(_) => "type · Enter done · Esc back",
         Pane::Files => {
-            "Enter open/import · Space select · a folder · . hidden · / filter · Tab path · p places · 1-9 jump · b bookmark · s/y/d fields · i import"
+            "Enter open/import · Space select file/folder · a all files · A import folder (recursive) · . hidden · / filter · Tab path · p places · 1-9 jump · b bookmark · s/y/d fields · i import"
         }
         Pane::Places => "j/k move · Enter go · x remove bookmark/recent · b bookmark current folder · 1-9 jump · Esc/p back",
     };

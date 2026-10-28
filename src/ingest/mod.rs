@@ -29,6 +29,8 @@ pub struct IngestOptions {
     pub progress: Option<std::sync::Arc<Progress>>,
     /// Import run whose artifact ledger this ingest writes to.
     pub run_id: Option<i64>,
+    /// Only the top level of a directory (default: recurse into subdirectories).
+    pub no_recurse: bool,
 }
 
 pub use progress::{CountingReader, Estimate, Progress};
@@ -408,23 +410,59 @@ impl<'a> Session<'a> {
     }
 }
 
-/// Expand a path into files with one of `exts`, sorted.
-pub fn expand_path(path: &Path, exts: &[&str]) -> Result<Vec<PathBuf>> {
+/// Extensions of every supported data file (CSV-like, then JSON-like).
+pub const CSV_EXTS: &[&str] = &["csv", "tsv", "txt"];
+pub const JSON_EXTS: &[&str] = &["json", "ndjson", "jsonl"];
+pub const DATA_EXTS: &[&str] = &["csv", "tsv", "txt", "json", "ndjson", "jsonl"];
+
+fn has_ext(p: &Path, exts: &[&str]) -> bool {
+    p.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).is_some_and(|e| exts.contains(&e.as_str()))
+}
+
+/// Is this a JSON-family data file (by extension)?
+pub fn is_json_path(p: &Path) -> bool {
+    has_ext(p, JSON_EXTS)
+}
+
+/// Files under `path` with one of `exts`, sorted by path. A file is returned as is.
+/// Directories are searched recursively unless `recursive` is false; hidden entries
+/// (names starting with `.`) and symlinked directories are skipped.
+pub fn find_files(path: &Path, exts: &[&str], recursive: bool) -> Result<Vec<PathBuf>> {
     if path.is_file() {
         return Ok(vec![path.to_path_buf()]);
     }
     if !path.is_dir() {
         return Err(Error::invalid("--path", format!("{} does not exist", path.display())));
     }
-    let mut v: Vec<PathBuf> = std::fs::read_dir(path)?
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.is_file() && p.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).is_some_and(|e| exts.contains(&e.as_str())))
-        .collect();
+    fn walk(dir: &Path, exts: &[&str], recursive: bool, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
+        for e in std::fs::read_dir(dir)?.flatten() {
+            let p = e.path();
+            if e.file_name().to_string_lossy().starts_with('.') {
+                continue;
+            }
+            let ft = e.file_type()?;
+            if ft.is_dir() {
+                if recursive {
+                    walk(&p, exts, recursive, out)?;
+                }
+            } else if p.is_file() && has_ext(&p, exts) {
+                out.push(p);
+            }
+        }
+        Ok(())
+    }
+    let mut v = vec![];
+    walk(path, exts, recursive, &mut v)?;
     v.sort();
     if v.is_empty() {
         return Err(Error::invalid("--path", format!("no {} files in {}", exts.join("/"), path.display())));
     }
     Ok(v)
+}
+
+/// Expand a path into files with one of `exts` (recursively), sorted.
+pub fn expand_path(path: &Path, exts: &[&str]) -> Result<Vec<PathBuf>> {
+    find_files(path, exts, true)
 }
 
 pub(crate) fn canonical(path: &Path) -> String {
@@ -433,7 +471,7 @@ pub(crate) fn canonical(path: &Path) -> String {
 
 /// Ingest CSV file(s).
 pub fn ingest_csv(store: &mut Store, io: Interact, opts: IngestOptions, path: &Path, csv: &csv::CsvOptions) -> Result<Vec<IngestReport>> {
-    let files = expand_path(path, &["csv", "tsv", "txt"])?;
+    let files = find_files(path, CSV_EXTS, !opts.no_recurse)?;
     let kind = if path.is_dir() { "directory" } else { "file" };
     let mut s = Session::new(store, io, opts, kind, &canonical(path));
     let mut out = Vec::new();
@@ -444,6 +482,52 @@ pub fn ingest_csv(store: &mut Store, io: Interact, opts: IngestOptions, path: &P
         let frame = csv::read_csv_bytes(bytes, csv)?;
         let input = Input { locator: canonical(&f), name_hint: f.file_name().map(|n| n.to_string_lossy().to_string()), content_hash, frame };
         out.push(s.ingest(input)?);
+    }
+    Ok(out)
+}
+
+/// Ingest every supported file under `path` (CSV and JSON, chosen by extension), one
+/// file at a time: each file is all-or-nothing, and progress is reported per file
+/// (`on_file(index, total, file)`) and overall through `opts.progress`.
+pub fn ingest_path(
+    store: &mut Store,
+    io: Interact,
+    opts: IngestOptions,
+    path: &Path,
+    csv: &csv::CsvOptions,
+    records: Option<&str>,
+    mut on_file: impl FnMut(usize, usize, &Path),
+) -> Result<Vec<IngestReport>> {
+    let files = find_files(path, DATA_EXTS, !opts.no_recurse)?;
+    let kind = if path.is_dir() { "directory" } else { "file" };
+    let prog = opts.progress.clone();
+    let sizes: Vec<u64> = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).collect();
+    if let Some(p) = &prog {
+        p.bytes_total.store(sizes.iter().sum(), std::sync::atomic::Ordering::Relaxed);
+    }
+    let mut s = Session::new(store, io, opts, kind, &canonical(path));
+    let mut out = Vec::new();
+    for (i, f) in files.iter().enumerate() {
+        if prog.as_ref().is_some_and(|p| p.cancelled()) {
+            return Err(Error::Aborted);
+        }
+        on_file(i, files.len(), f);
+        if let Some(p) = &prog {
+            p.begin_file(i as u64, sizes[i]);
+        }
+        let bytes = progress::read_counted(f, prog.clone())?;
+        let content_hash = hash_bytes(&bytes);
+        let frame = if is_json_path(f) {
+            json::records_to_frame(&json::parse_records(&bytes, json::is_ndjson(f), records)?)?
+        } else {
+            csv::read_csv_bytes(bytes, csv)?
+        };
+        let input = Input { locator: canonical(f), name_hint: f.file_name().map(|n| n.to_string_lossy().to_string()), content_hash, frame };
+        let r = s.ingest(input);
+        if let Some(p) = &prog {
+            p.end_file();
+        }
+        out.push(r?);
     }
     Ok(out)
 }

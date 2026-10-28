@@ -113,3 +113,36 @@ fn export_formats_round_trip() {
     let out = e.ok(&["ingest", "csv", "--path", back.to_str().unwrap(), "--source", "roundtrip"]);
     assert!(out.contains("inserted   300"), "{out}");
 }
+
+#[test]
+fn ingest_path_recurses_mixed_formats_with_progress() {
+    let e = Env::new();
+    let root = e.dir.path().join("tree");
+    std::fs::create_dir_all(root.join("a/b")).unwrap();
+    std::fs::create_dir_all(root.join(".hidden")).unwrap();
+    std::fs::copy(fixture("BTCUSDT_5m.csv"), root.join("BTCUSDT_5m.csv")).unwrap();
+    std::fs::copy(fixture("ETHUSDT_5m.csv"), root.join("a/ETHUSDT_5m.csv")).unwrap();
+    std::fs::copy(fixture("ETHUSDT_5m.csv"), root.join(".hidden/SOLUSDT_5m.csv")).unwrap();
+    std::fs::write(
+        root.join("a/b/XRPUSDT_5m.json"),
+        r#"[{"t":"2024-01-01 00:00:00","o":1,"h":2,"l":0.5,"c":1.5,"v":10},{"t":"2024-01-01 00:05:00","o":1.5,"h":2,"l":1,"c":1.2,"v":5}]"#,
+    )
+    .unwrap();
+    std::fs::write(root.join("a/notes.md"), "not data").unwrap();
+    let p = root.to_str().unwrap();
+    // top level only
+    let out = e.ok(&["-y", "ingest", "path", p, "--source", "mix", "--no-recursive"]);
+    assert!(out.contains("BTC/USDT") && !out.contains("ETH/USDT"), "{out}");
+    // whole tree: csv + json, hidden folder skipped, per-file progress on stderr
+    let o = e.run(&["-y", "ingest", "path", "--path", p, "--source", "mix"]);
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let (out, err) = (String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr));
+    assert!(out.contains("ETH/USDT") && out.contains("XRP/USDT") && !out.contains("SOL/USDT"), "{out}");
+    assert!(err.contains("[1/3] BTCUSDT_5m.csv") && err.contains("[3/3] a/b/XRPUSDT_5m.json"), "{err}");
+    // one tracked run (the BTC file was already imported above)
+    let runs = e.ok(&["ingest", "runs"]);
+    assert!(runs.contains("completed · 2/3"), "{runs}"); // BTC was skipped: already imported
+    // csv subcommand recurses too
+    let out = e.ok(&["-y", "ingest", "csv", "--path", p, "--source", "mix2"]);
+    assert!(out.contains("mix2 ETH/USDT"), "{out}");
+}

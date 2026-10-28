@@ -1,0 +1,114 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-ingest-path 1  "mnnn-ingest-path 1.6.1" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-ingest\-path \- Ingest a whole path: every CSV and JSON file in a directory tree (or one file)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn ingest path\fR [\fB\-\-home\fR] [\fB\-p\fR|\fB\-\-path\fR] [\fB\-\-db\fR] [\fB\-\-source\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-map\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-rejects\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-force\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-delimiter\fR] [\fB\-\-no\-header\fR] [\fB\-\-records\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIPATH\fR] 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Ingest a whole path: every CSV and JSON file in a directory tree (or one file)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-p\fR, \fB\-\-path\fR \fI<PATH>\fR
+Same as the positional PATH
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-source\fR \fI<SOURCE>\fR
+Source name (created if unknown)
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-symbol\fR \fI<SYMBOL>\fR
+Symbol, e.g. BTC/USDT, BTC\-USD or BTCUSDT
+.TP
+\fB\-\-duration\fR \fI<DURATION>\fR
+Bar duration, e.g. 5m, 1h, 1d
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-map\fR \fI<COL=FIELD>\fR
+Column mapping `<col>=<field>` (fields: timestamp, open, high, low, close, volume). Repeatable
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-rejects\fR \fI<FILE>\fR
+Write rejected rows (with reasons) to this CSV
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-force\fR
+Re\-process even if this exact input was already ingested
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-no\-recursive\fR
+For a directory \-\-path: only its top level (default: search subdirectories too)
+.TP
+\fB\-\-delimiter\fR \fI<DELIMITER>\fR [default: ,]
+CSV field delimiter
+.TP
+\fB\-\-no\-header\fR
+CSV files have no header row
+.TP
+\fB\-\-records\fR \fI<RECORDS>\fR
+JSON: where the array of bars lives (dotted path or JSON pointer)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+[\fIPATH\fR]
+File or directory; directories are searched recursively for .csv/.tsv/.txt and .json/.ndjson/.jsonl files (hidden entries skipped)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v1.6.1
+.SH SEE ALSO
+\fBmnnn\fR(1)
