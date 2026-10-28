@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-10-28
+
+### Added
+- Tiles show a progress bar (bars read of total) or a spinner while a series loads; load errors are shown
+- Series load in 50,000-bar chunks on the background thread; the UI stays responsive
+
 ## [1.11.0] - 2026-10-28
 
 ### Added
@@ -150,7 +156,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.11.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.12.0...HEAD
+[1.12.0]: https://github.com/kommandosaldat/muninn/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/kommandosaldat/muninn/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/kommandosaldat/muninn/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/kommandosaldat/muninn/compare/v1.8.0...v1.9.0
