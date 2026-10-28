@@ -161,6 +161,64 @@ pub fn coverage_lines(store: &Store) -> Vec<String> {
 
 const PREF_ROWS: usize = 3;
 
+/// A click inside the open popup. Rows select and activate (like Enter), key hints
+/// press their key, form rows focus a field or run an action.
+pub fn on_click(app: &mut App, h: super::Hit) {
+    use super::Hit;
+    let enter = KeyEvent::from(KeyCode::Enter);
+    match h {
+        Hit::Press(code) => {
+            // A key button in the import picker acts on the file list, not a text input.
+            if matches!(app.modal, Some(Modal::Import)) && app.import.typing() && !matches!(code, KeyCode::Enter | KeyCode::Esc) {
+                app.import.pane = super::import::Pane::Files;
+            }
+            on_key(app, KeyEvent::from(code))
+        }
+        Hit::FormRow(i) => {
+            let fm = match app.modal {
+                Some(Modal::Export) => &mut app.export.form,
+                Some(Modal::Keys) => &mut app.keys.form,
+                _ => return,
+            };
+            fm.sel = i;
+            fm.editing = false;
+            on_key(app, enter);
+        }
+        Hit::Row(i) => match app.modal.as_mut() {
+            Some(Modal::Prefs { sel } | Modal::Layers { sel } | Modal::Pick { sel, .. }) => {
+                *sel = i;
+                on_key(app, enter);
+            }
+            Some(Modal::Filter { sel, edit, .. }) if edit.is_none() => {
+                *sel = i;
+                on_key(app, enter);
+            }
+            Some(Modal::Themes) => {
+                if let Some(ed) = app.themes.editor.as_mut() {
+                    ed.role = i.min(crate::theme::ROLES.len() - 1);
+                } else if app.themes.list.selected() == Some(i) {
+                    on_key(app, enter);
+                } else if i < app.themes.names.len() {
+                    app.themes.list.select(Some(i));
+                }
+            }
+            _ => {}
+        },
+        h => super::import::on_click(app, h),
+    }
+}
+
+/// Row hits for a bordered list popup whose rows start at `r.y + 1 + first`.
+fn row_hits(hits: &mut Vec<(Rect, super::Hit)>, r: Rect, first: u16, n: usize) {
+    for i in 0..n {
+        let y = r.y + 1 + first + i as u16;
+        if y + 1 >= r.bottom() {
+            break;
+        }
+        hits.push((Rect { x: r.x + 1, y, width: r.width.saturating_sub(2), height: 1 }, super::Hit::Row(i)));
+    }
+}
+
 pub fn on_key(app: &mut App, k: KeyEvent) {
     if let Some(Modal::Filter { kind, sel, edit }) = &app.modal {
         let (kind, sel, edit) = (*kind, *sel, edit.clone());
@@ -450,7 +508,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     let t = app.theme.clone();
     let Some(m) = app.modal.as_ref() else { return };
     let (w, h) = match m {
-        Modal::Prompt(_) => (70, 5),
+        Modal::Prompt(_) => (70, 6),
         Modal::Prefs { .. } => (60, 9),
         Modal::Info { lines, .. } => ((lines.iter().map(|l| l.chars().count()).max().unwrap_or(20) as u16 + 6).max(40), lines.len() as u16 + 4),
         Modal::Pick { items, .. } => (50, items.len() as u16 + 4),
@@ -461,6 +519,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     let r = centered(area, w, h);
     f.render_widget(Clear, r);
     app.modal_hits.clear();
+    let mut extra: Vec<(Rect, super::Hit)> = vec![];
     match app.modal.as_mut().unwrap() {
         Modal::Help(hv) => hv.draw(f, r, &t),
         Modal::Export => forms::draw_export(app, f, r),
@@ -471,11 +530,15 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
             let body: Vec<Line> = lines.iter().map(|l| Line::raw(l.clone())).collect();
             let title = format!("{title} · Esc closes");
             f.render_widget(Paragraph::new(body).scroll((*scroll, 0)).wrap(Wrap { trim: false }).block(block(&title, true, &t)), r);
+            let bar = Rect { x: r.x + 2, y: r.bottom().saturating_sub(1), width: 12.min(r.width.saturating_sub(4)), height: 1 };
+            super::widgets::key_bar(f, bar, &[("Close", KeyCode::Esc)], &t, &mut extra);
         }
         Modal::Prompt(p) => {
             let title = format!("{} · Enter ok · Esc cancel", p.title);
             let line = Line::from(vec![Span::raw(p.input.clone()), Span::styled("▏", Style::new().fg(t.accent))]);
             f.render_widget(Paragraph::new(vec![Line::raw(""), line]).block(block(&title, true, &t)), r);
+            let bar = Rect { x: r.x + 2, y: r.bottom().saturating_sub(2), width: r.width.saturating_sub(4), height: 1 };
+            super::widgets::key_bar(f, bar, &[("OK", KeyCode::Enter), ("Cancel", KeyCode::Esc)], &t, &mut extra);
         }
         Modal::Prefs { sel } => {
             let rows = [
@@ -489,8 +552,9 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
                 lines.push(Line::styled(format!(" {row} "), st));
             }
             lines.push(Line::raw(""));
-            lines.push(Line::styled(" Enter changes · saved to preferences.toml", Style::new().fg(t.muted)));
+            lines.push(Line::styled(" Enter or click changes · saved to preferences.toml", Style::new().fg(t.muted)));
             f.render_widget(Paragraph::new(lines).block(block("Preferences · Esc closes", true, &t)), r);
+            row_hits(&mut extra, r, 1, PREF_ROWS);
         }
         Modal::Filter { kind, sel, edit } => {
             let (kind, sel, edit) = (*kind, *sel, edit.clone());
@@ -514,6 +578,9 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
             lines.push(Line::styled(hint, Style::new().fg(t.muted)));
             let title = format!("Filter: {kind:?}");
             f.render_widget(Paragraph::new(lines).block(block(&title, true, &t)), r);
+            if edit.is_none() {
+                row_hits(&mut extra, r, 0, items.len());
+            }
         }
         Modal::Layers { sel } => {
             let layers = app.layout.focused().chart.layers;
@@ -525,7 +592,8 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
                 lines.push(Line::styled(format!(" [{}] {name:<22} {k} ", if on { "x" } else { " " }), st));
             }
             lines.push(Line::styled(" N line metric · M moving averages", Style::new().fg(t.muted)));
-            f.render_widget(Paragraph::new(lines).block(block("Chart layers · Space toggles · Esc", true, &t)), r);
+            f.render_widget(Paragraph::new(lines).block(block("Chart layers · Space or click toggles · Esc", true, &t)), r);
+            row_hits(&mut extra, r, 0, super::chart::LAYERS.len());
         }
         Modal::Pick { title, items, sel, .. } => {
             let mut lines = vec![];
@@ -536,10 +604,13 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
             if items.is_empty() {
                 lines.push(Line::styled(" (none)", Style::new().fg(t.muted)));
             }
-            let title = format!("{title} · Enter · Esc");
+            let title = format!("{title} · Enter or click · Esc");
+            let n = items.len();
             f.render_widget(Paragraph::new(lines).block(block(&title, true, &t)), r);
+            row_hits(&mut extra, r, 0, n);
         }
     }
+    app.modal_hits.extend(extra);
     // Every popup gets the same close control in its title bar.
     let x = super::widgets::close_button(f, r, &t);
     app.modal_hits.push((x, super::Hit::CloseModal));

@@ -56,6 +56,24 @@ filters that also scope the tiles. See [sidebar](sidebar.md).
 Every popup has a red **[X]** at the right of its title bar: click it to close (same as
 Esc). Clicks outside a popup are ignored while it is open.
 
+## Mouse
+
+Everything you can act on is clickable; there are no keyboard-only actions:
+
+| Where | Click |
+|---|---|
+| menu bar, dropdowns, submenus | open / run the item |
+| tiles, tabs | focus; list header sorts; list rows select a bar |
+| charts | period arrows ◂ ▸, plot moves the cursor; wheel zooms |
+| sidebar | search box, sort key and order, filters, chips (remove), series rows |
+| popup lists (Preferences, Chart layers, saved layouts, filters, themes) | select and activate the row (themes: first click selects, second applies) |
+| forms (Export, Keys) | a field starts editing it, a `[ button ]` runs it |
+| import picker | files/folders (click highlights, second click opens or imports), Places, path / filter / source / symbol / duration inputs, Tab-completion candidates |
+| key buttons such as `[i import]`, `[OK]`, `[Cancel]`, `[Close]` | the same as pressing that key |
+| `[X]` | close the popup |
+
+Keys still work everywhere; the key buttons show which key does the same.
+
 - **Export** (File ▸ Export…): out, symbol, source, duration, from, to; **Format**
   cycles csv → parquet → json. See [export](export.md).
 - **Keys** (File ▸ Backup ▸ Create, Keys ▸ Rotate / Re-issue shards): create a backup

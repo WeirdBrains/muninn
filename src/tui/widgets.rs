@@ -114,3 +114,31 @@ pub fn close_button(f: &mut ratatui::Frame, r: ratatui::layout::Rect, t: &crate:
     );
     x
 }
+
+/// A row of clickable key buttons, e.g. `[i Import] [A Folder]`: each records a
+/// [`super::Hit::Press`] so a click does exactly what the key does. Returns the
+/// rendered width.
+pub fn key_bar(
+    f: &mut ratatui::Frame,
+    r: Rect,
+    items: &[(&str, ratatui::crossterm::event::KeyCode)],
+    t: &crate::theme::Theme,
+    hits: &mut Vec<(Rect, super::Hit)>,
+) -> u16 {
+    use ratatui::text::{Line, Span};
+    let mut x = r.x;
+    let mut spans = vec![];
+    for (label, code) in items {
+        let text = format!("[{label}]");
+        let w = text.chars().count() as u16;
+        if x + w > r.right() {
+            break;
+        }
+        hits.push((Rect { x, y: r.y, width: w, height: 1 }, super::Hit::Press(*code)));
+        spans.push(Span::styled(text, Style::new().fg(t.accent)));
+        spans.push(Span::raw(" "));
+        x += w + 1;
+    }
+    f.render_widget(ratatui::widgets::Paragraph::new(Line::from(spans)), Rect { height: 1.min(r.height), ..r });
+    x - r.x
+}

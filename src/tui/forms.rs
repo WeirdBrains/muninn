@@ -75,6 +75,27 @@ impl Form {
     pub fn get(&self, label: &str) -> Option<String> {
         self.fields.iter().find(|f| f.label == label).and_then(|f| f.opt())
     }
+    /// Click targets for [`Form::lines`] drawn at `inner`, its first line `first` rows down.
+    pub fn hits(&self, inner: Rect, first: u16) -> Vec<(Rect, super::Hit)> {
+        let mut v = vec![];
+        let row = |i: u16| inner.y + first + i;
+        for i in 0..self.fields.len() {
+            if row(i as u16) < inner.bottom() {
+                v.push((Rect { x: inner.x, y: row(i as u16), width: inner.width, height: 1 }, super::Hit::FormRow(i)));
+            }
+        }
+        let y = row(self.fields.len() as u16 + 1);
+        let mut x = inner.x + 14;
+        for (i, a) in self.actions.iter().enumerate() {
+            let w = a.chars().count() as u16 + 4;
+            if y < inner.bottom() && x + w <= inner.right() {
+                v.push((Rect { x, y, width: w, height: 1 }, super::Hit::FormRow(self.fields.len() + i)));
+            }
+            x += w + 2;
+        }
+        v
+    }
+
     pub fn lines(&self, t: &crate::theme::Theme) -> Vec<Line<'static>> {
         let mut v = vec![];
         for (i, f) in self.fields.iter().enumerate() {
@@ -214,6 +235,11 @@ pub fn draw_export(app: &mut App, f: &mut Frame, area: Rect) {
     lines.push(Line::from(""));
     lines.push(Line::styled("Times are UTC (epoch or YYYY-MM-DD HH:MM:SS). Symbol like BTC/USDT.", Style::new().fg(t.muted)));
     f.render_widget(Paragraph::new(lines).block(block("Export", true, &t)), area);
+    let inner = Rect { x: area.x + 1, y: area.y + 1, width: area.width.saturating_sub(2), height: area.height.saturating_sub(2) };
+    let mut hits = app.export.form.hits(inner, 1);
+    // the format line cycles the format (action 0)
+    hits.push((Rect { height: 1, ..inner }, super::Hit::FormRow(app.export.form.fields.len())));
+    app.modal_hits.extend(hits);
 }
 
 // ---------------- Keys & Backup ----------------
@@ -318,6 +344,9 @@ pub fn draw_keys(app: &mut App, f: &mut Frame, area: Rect) {
     }
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }).block(block("Keys", false, &t)), info);
     f.render_widget(Paragraph::new(app.keys.form.lines(&t)).block(block("Actions", true, &t)), form);
+    let inner = Rect { x: form.x + 1, y: form.y + 1, width: form.width.saturating_sub(2), height: form.height.saturating_sub(2) };
+    let hits = app.keys.form.hits(inner, 0);
+    app.modal_hits.extend(hits);
     let body: Vec<Line> = if app.keys.secret_lines.is_empty() {
         vec![Line::styled("nothing to show", Style::new().fg(t.muted))]
     } else if app.keys.reveal {

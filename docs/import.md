@@ -149,6 +149,14 @@ recent entry (built-ins stay). Bookmarks and recents are saved in
 [preferences](preferences.md) (`tui.import_bookmarks`, `tui.import_recent`). The
 popup opens in the most recent folder.
 
+## Mouse
+
+Click a file or folder to highlight it and click it again to open the folder or import
+the file. Click the path, filter or source/symbol/duration line to type there, a Places
+entry to go there, a completion candidate to pick it. The bottom row is a bar of key
+buttons (`[Enter open]`, `[Space select]`, `[A import folder]`, `[i import]`, ...) that
+act like the keys; `[Close]` ends the finished-import view.
+
 ## Importing a whole folder
 
 A selected or highlighted folder is imported with everything below it: subfolders are

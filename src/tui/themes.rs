@@ -258,8 +258,29 @@ fn preview(f: &mut Frame, area: Rect, title: &str, t: &Theme) {
 pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     let t = app.theme.clone();
     let [left, right] = Layout::horizontal([Constraint::Length(30), Constraint::Min(0)]).areas(area);
+    let bar = Rect { x: area.x + 2, y: area.bottom().saturating_sub(1), width: area.width.saturating_sub(10), height: 1 };
     if app.themes.editor.is_some() {
-        return draw_editor(app, f, left, right);
+        draw_editor(app, f, left, right);
+        for i in 0..ROLES.len() as u16 {
+            let y = left.y + 2 + i;
+            if y + 1 < left.bottom() {
+                app.modal_hits.push((Rect { x: left.x + 1, y, width: left.width.saturating_sub(2), height: 1 }, super::Hit::Row(i as usize)));
+            }
+        }
+        let keys = [
+            ("Enter hex", KeyCode::Enter),
+            ("◂ swatch", KeyCode::Left),
+            ("swatch ▸", KeyCode::Right),
+            ("v variant", KeyCode::Char('v')),
+            ("g generate", KeyCode::Char('g')),
+            ("s save", KeyCode::Char('s')),
+            ("R reset", KeyCode::Char('R')),
+            ("Esc back", KeyCode::Esc),
+        ];
+        let mut hits = std::mem::take(&mut app.modal_hits);
+        super::widgets::key_bar(f, bar, &keys, &t, &mut hits);
+        app.modal_hits = hits;
+        return;
     }
     let items: Vec<ListItem> = app
         .themes
@@ -275,6 +296,18 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         .block(block(&title, true, &t))
         .highlight_style(Style::new().bg(t.selection_bg).fg(t.selection_fg).add_modifier(Modifier::BOLD));
     f.render_stateful_widget(list, left, &mut app.themes.list);
+    let off = app.themes.list.offset();
+    for (k, i) in (off..app.themes.names.len()).enumerate() {
+        let y = left.y + 1 + k as u16;
+        if y + 1 >= left.bottom() {
+            break;
+        }
+        app.modal_hits.push((Rect { x: left.x + 1, y, width: left.width.saturating_sub(2), height: 1 }, super::Hit::Row(i)));
+    }
+    let keys = [("Enter apply", KeyCode::Enter), ("m mode", KeyCode::Char('m')), ("e edit", KeyCode::Char('e')), ("Esc close", KeyCode::Esc)];
+    let mut hits = std::mem::take(&mut app.modal_hits);
+    super::widgets::key_bar(f, bar, &keys, &t, &mut hits);
+    app.modal_hits = hits;
     let Some(name) = app.themes.selected().map(str::to_string) else { return };
     match theme::load(&app.paths, &name) {
         Ok(tf) => {

@@ -781,6 +781,26 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             st.path = p;
             st.pane = Pane::Path;
         }
+        Hit::ImportEntry(i) => {
+            let st = &mut app.import;
+            if st.pane == Pane::Files && st.sel == i {
+                // a second click opens a folder or imports the file
+                on_key(app, KeyEvent::from(KeyCode::Enter));
+            } else {
+                st.pane = Pane::Files;
+                st.completer.reset();
+                st.sel = i.min(st.entries.len().saturating_sub(1));
+            }
+        }
+        Hit::ImportInput(n) => {
+            let st = &mut app.import;
+            st.completer.reset();
+            st.pane = match n {
+                0 => Pane::Path,
+                1 => Pane::Filter,
+                n => Pane::Field((n as usize - 2).min(2)),
+            };
+        }
         Hit::ImportPlace(i) => {
             app.import.pane = Pane::Places;
             go_place(app, i);
@@ -990,9 +1010,11 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
         Phase::Running(run) => return draw_running(run, st.message.as_deref(), f, inner, &t, app_hits),
         Phase::Done { lines, .. } => {
             let mut v: Vec<Line> = lines.iter().map(|l| Line::styled(l.clone(), style_of(l, &t))).collect();
-            v.push(Line::styled("Enter / Esc closes", Style::new().fg(t.muted)));
+            v.push(Line::raw(""));
             let skip = v.len().saturating_sub(inner.height as usize);
             f.render_widget(Paragraph::new(v).scroll((skip as u16, 0)), inner);
+            let bar = Rect { y: inner.bottom().saturating_sub(1), height: 1, ..inner };
+            super::widgets::key_bar(f, bar, &[("Close (Enter / Esc)", KeyCode::Enter)], &t, app_hits);
             return;
         }
         Phase::Browse => {}
@@ -1035,6 +1057,10 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
         ])
     });
     f.render_widget(Paragraph::new(pl), path_r);
+    app_hits.push((Rect { height: 1, ..path_r }, super::Hit::ImportInput(0)));
+    if !st.completer.active() {
+        app_hits.push((Rect { y: path_r.y + 1, height: 1, width: 30.min(path_r.width), ..path_r }, super::Hit::ImportInput(1)));
+    }
     let [places_r, files_r, prev_r] = Layout::horizontal([Constraint::Length(22), Constraint::Percentage(45), Constraint::Min(20)]).areas(body);
     // places
     let pb = block("Places (p)", st.pane == Pane::Places, &t);
@@ -1107,6 +1133,7 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
             s = Style::new().bg(t.selection_bg).fg(t.selection_fg);
         }
         lines.push(Line::styled(format!("{mark} {name}"), s));
+        app_hits.push((Rect { x: fi.x, y: fi.y + (i - st.top) as u16, width: fi.width, height: 1 }, super::Hit::ImportEntry(i)));
     }
     if st.entries.is_empty() {
         lines.push(Line::styled("(no folders or data files)", Style::new().fg(t.muted)));
@@ -1148,16 +1175,36 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
         fl.push(Line::styled(format!(" {m}"), Style::new().fg(t.warning)));
     }
     f.render_widget(Paragraph::new(fl), fields_r);
+    for i in 0..3u16 {
+        if fields_r.y + i < fields_r.bottom() {
+            app_hits.push((Rect { y: fields_r.y + i, height: 1, ..fields_r }, super::Hit::ImportInput(2 + i as u8)));
+        }
+    }
     let help = match st.pane {
         Pane::Path if st.completer.active() => "Tab / Shift-Tab cycle · click picks · Enter or typing accepts · Esc reverts",
         Pane::Path => "Tab complete (again: list, then cycle) · Enter go/import · Esc back",
         Pane::Filter | Pane::Field(_) => "type · Enter done · Esc back",
-        Pane::Files => {
-            "Enter open/import · Space select file/folder · a all files · A import folder (recursive) · . hidden · / filter · Tab path · p places · 1-9 jump · b bookmark · s/y/d fields · i import"
-        }
+        Pane::Files => "",
         Pane::Places => "j/k move · Enter go · x remove bookmark/recent · b bookmark current folder · 1-9 jump · Esc/p back",
     };
-    f.render_widget(Paragraph::new(Line::styled(help, Style::new().fg(t.muted))), help_r);
+    if help.is_empty() {
+        let keys = [
+            ("Enter open", KeyCode::Enter),
+            ("Space select", KeyCode::Char(' ')),
+            ("a all", KeyCode::Char('a')),
+            ("A import folder", KeyCode::Char('A')),
+            ("i import", KeyCode::Char('i')),
+            ("Bksp up", KeyCode::Backspace),
+            (". hidden", KeyCode::Char('.')),
+            ("/ filter", KeyCode::Char('/')),
+            ("Tab path", KeyCode::Tab),
+            ("b bookmark", KeyCode::Char('b')),
+            ("p places", KeyCode::Char('p')),
+        ];
+        super::widgets::key_bar(f, help_r, &keys, &t, app_hits);
+    } else {
+        f.render_widget(Paragraph::new(Line::styled(help, Style::new().fg(t.muted))), help_r);
+    }
 }
 
 fn style_of(l: &str, t: &Theme) -> Style {

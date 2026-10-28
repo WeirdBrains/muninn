@@ -1133,3 +1133,79 @@ fn import_folder_recursively_from_tui() {
     crate::tui::import::start(&mut a, vec![empty.path().to_path_buf()]);
     assert!(a.import.message.as_deref().unwrap().contains("no data files"));
 }
+
+/// Click the first recorded hit matching `p` (popup hits first, then the screen).
+fn click_on(a: &mut App, p: impl Fn(&Hit) -> bool) {
+    screen_text(a);
+    let r = a.modal_hits.iter().chain(a.hits.iter()).rev().find(|(_, h)| p(h)).map(|(r, _)| *r).expect("hit not drawn");
+    a.on_mouse(click(r.x, r.y));
+}
+
+#[test]
+fn import_picker_entries_inputs_and_keys_are_clickable() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    std::fs::create_dir(d.path().join("sub")).unwrap();
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("sub/SOLUSDT_5m.csv")).unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    let sub = a.import.entries.iter().position(|e| e.name == "sub").unwrap();
+    // first click highlights, second opens the folder
+    click_on(&mut a, |h| *h == Hit::ImportEntry(sub));
+    assert_eq!(a.import.sel, sub);
+    click_on(&mut a, |h| *h == Hit::ImportEntry(sub));
+    assert!(a.import.dir.ends_with("sub"));
+    // inputs focus on click
+    click_on(&mut a, |h| *h == Hit::ImportInput(3));
+    assert_eq!(a.import.pane, crate::tui::import::Pane::Field(1));
+    click_on(&mut a, |h| *h == Hit::ImportInput(0));
+    assert_eq!(a.import.pane, crate::tui::import::Pane::Path);
+    // back to the list with a click, then the key buttons
+    click_on(&mut a, |h| matches!(h, Hit::ImportEntry(_)));
+    assert_eq!(a.import.pane, crate::tui::import::Pane::Files);
+    click_on(&mut a, |h| *h == Hit::Press(KeyCode::Char('A')));
+    let t0 = std::time::Instant::now();
+    while a.import.running() && t0.elapsed().as_secs() < 30 {
+        screen_text(&mut a);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert!(a.series.iter().any(|x| x.symbol.to_string() == "SOL/USDT"));
+    click_on(&mut a, |h| *h == Hit::Press(KeyCode::Enter)); // [Close]
+    assert!(a.modal.is_none());
+}
+
+#[test]
+fn popup_rows_forms_and_list_rows_are_clickable() {
+    let (_t, mut a) = app();
+    // Preferences: click toggles the row
+    a.dispatch(crate::tui::action::Action::Preferences);
+    let before = a.prefs.ingest.drop_zero_volume;
+    click_on(&mut a, |h| *h == Hit::Row(2));
+    assert_ne!(a.prefs.ingest.drop_zero_volume, before);
+    a.close_modal();
+    // Export form: clicking a field starts editing it
+    a.dispatch(crate::tui::action::Action::Export);
+    click_on(&mut a, |h| *h == Hit::FormRow(1));
+    assert!(a.export.form.editing && a.export.form.sel == 1);
+    a.close_modal();
+    // Themes: click selects, a second click applies
+    a.themes = crate::tui::themes::ThemeState::new(&a.paths, &a.prefs.theme.name);
+    a.modal = Some(Modal::Themes);
+    let i = a.themes.names.iter().position(|n| *n != a.prefs.theme.name).unwrap();
+    click_on(&mut a, |h| *h == Hit::Row(i));
+    assert_eq!(a.themes.list.selected(), Some(i));
+    click_on(&mut a, |h| *h == Hit::Row(i));
+    assert_eq!(a.prefs.theme.name, a.themes.names[i]);
+    click_on(&mut a, |h| *h == Hit::Press(KeyCode::Esc));
+    assert!(a.modal.is_none());
+    // Prompt: [Cancel] closes
+    a.dispatch(crate::tui::action::Action::LayoutSave);
+    click_on(&mut a, |h| *h == Hit::Press(KeyCode::Esc));
+    assert!(a.modal.is_none());
+    // list tile: clicking a bar row selects it
+    screen_text(&mut a);
+    let row = a.hits.iter().filter_map(|(_, h)| if let Hit::ListRow(1, r) = h { Some(*r) } else { None }).nth(3).unwrap();
+    click_on(&mut a, |h| *h == Hit::ListRow(1, row));
+    assert_eq!(a.caches[&1].list.sel, row);
+}

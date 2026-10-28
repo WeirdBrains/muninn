@@ -56,6 +56,18 @@ pub enum Hit {
     ImportConfirm(bool),
     ImportPlace(usize),
     ImportCandidate(usize),
+    /// A file/folder row in the import picker (index into the listing).
+    ImportEntry(usize),
+    /// Import inputs: 0 path, 1 filter, 2.. the source/symbol/duration fields.
+    ImportInput(u8),
+    /// A row of a popup list (Preferences, Layers, Pick, Filter, Themes, Help topics).
+    Row(usize),
+    /// A field or action button of a form (Export, Keys): index as in `Form::sel`.
+    FormRow(usize),
+    /// A clickable key hint: acts as if that key was pressed.
+    Press(ratatui::crossterm::event::KeyCode),
+    /// A bar row of a list tile (absolute row index).
+    ListRow(u32, i64),
 }
 
 pub struct App {
@@ -576,7 +588,7 @@ impl App {
                 let h = self.modal_hits.iter().rev().find(|(r, _)| r.contains((m.column, m.row).into())).map(|(_, h)| *h);
                 match h {
                     Some(Hit::CloseModal) => self.close_modal(),
-                    Some(h) => import::on_click(self, h),
+                    Some(h) => modal::on_click(self, h),
                     None => {}
                 }
             }
@@ -587,7 +599,11 @@ impl App {
         if matches!(m.kind, MouseEventKind::ScrollUp | MouseEventKind::ScrollDown) && self.modal.is_none() && !self.menu.is_open() {
             let up = m.kind == MouseEventKind::ScrollUp;
             let id = match hit {
-                Some(Hit::ChartPlot(id)) | Some(Hit::Tile(id)) | Some(Hit::ListHeader(id, _)) | Some(Hit::ChartNav(id, _)) => id,
+                Some(Hit::ChartPlot(id))
+                | Some(Hit::Tile(id))
+                | Some(Hit::ListHeader(id, _))
+                | Some(Hit::ChartNav(id, _))
+                | Some(Hit::ListRow(id, _)) => id,
                 _ => return,
             };
             self.layout.set_focus(id);
@@ -646,7 +662,27 @@ impl App {
                 }
             }
             Some(Hit::ClearFilters) => self.dispatch(Action::ClearFilters),
-            Some(Hit::CloseModal | Hit::ImportCancel | Hit::ImportConfirm(_) | Hit::ImportPlace(_) | Hit::ImportCandidate(_)) => {}
+            Some(Hit::ListRow(id, row)) => {
+                self.menu.close();
+                self.sidebar.focused = false;
+                self.layout.set_focus(id);
+                let c = &mut self.caches.entry(id).or_default().list;
+                c.sel = row.clamp(0, (c.total - 1).max(0));
+                self.propagate_from_list(id);
+                self.layout_changed();
+            }
+            Some(Hit::Press(code)) => self.on_key(ratatui::crossterm::event::KeyEvent::from(code)),
+            Some(
+                Hit::CloseModal
+                | Hit::ImportCancel
+                | Hit::ImportConfirm(_)
+                | Hit::ImportPlace(_)
+                | Hit::ImportCandidate(_)
+                | Hit::ImportEntry(_)
+                | Hit::ImportInput(_)
+                | Hit::Row(_)
+                | Hit::FormRow(_),
+            ) => {}
             Some(Hit::SidebarRow(r)) => {
                 self.sidebar.focused = true;
                 self.sidebar.searching = false;

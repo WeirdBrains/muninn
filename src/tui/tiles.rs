@@ -329,7 +329,9 @@ pub fn draw_list(
             let text = if j == 0 { format!("{s:<w$}", w = *w as usize) } else { format!("{s:>w$} ", w = *w as usize - 1) };
             spans.push(Span::styled(text, st));
         }
-        f.render_widget(Paragraph::new(Line::from(spans)), Rect { y: area.y + 1 + r as u16, height: 1, ..area });
+        let row = Rect { y: area.y + 1 + r as u16, height: 1, ..area };
+        f.render_widget(Paragraph::new(Line::from(spans)), row);
+        hits.push((row, Hit::ListRow(t.id, i)));
     }
 }
 
