@@ -3,12 +3,14 @@
 //! Layout (PLAN.md 1.3): header, menu bar, content area, status line. Menus, keys and
 //! help all dispatch the same [`action::Action`]s through [`App::dispatch`].
 pub mod action;
+pub mod chart;
 pub mod forms;
 pub mod header;
 pub mod menu;
+pub mod layout;
 pub mod modal;
-pub mod nav;
 pub mod themes;
+pub mod tiles;
 pub mod widgets;
 
 use crate::crypto::Key32;
@@ -30,6 +32,9 @@ use ratatui::Frame;
 pub enum Hit {
     MenuTop(usize),
     MenuItem(usize, usize),
+    Tile(u32),
+    ListHeader(u32, usize),
+    TabBar(u32),
 }
 
 pub struct App {
@@ -44,7 +49,13 @@ pub struct App {
     pub quit: bool,
     pub menu: menu::MenuState,
     pub modal: Option<Modal>,
-    pub nav: nav::NavState,
+    pub layout: layout::TileLayout,
+    pub caches: std::collections::HashMap<u32, tiles::TileCache>,
+    pub series: Vec<crate::store::SeriesInfo>,
+    /// `Ctrl-w` was pressed; the next key is a window command.
+    pub pending_w: bool,
+    /// Content area from the last draw (split geometry, min sizes).
+    pub content: Rect,
     pub export: forms::ExportForm,
     pub keys: forms::KeysForm,
     pub themes: themes::ThemeState,
@@ -61,7 +72,11 @@ impl App {
         let variant = theme::resolve_variant(mode_override.unwrap_or(prefs.theme.mode));
         let theme = theme_file.resolved(variant);
         let mut app = App {
-            nav: nav::NavState::default(),
+            layout: layout::TileLayout::default(),
+            caches: Default::default(),
+            series: vec![],
+            pending_w: false,
+            content: Rect::new(0, 0, 120, 30),
             export: forms::ExportForm::default(),
             keys: forms::KeysForm::default(),
             themes: themes::ThemeState::new(&paths, &prefs.theme.name),
@@ -79,7 +94,12 @@ impl App {
             status: warn.map(|w| format!("theme error, using default: {w}")).unwrap_or_else(|| "F10 menu · ? help · q quit".into()),
             quit: false,
         };
-        app.nav.reload(&app.store, &mut app.status);
+        app.series = app.store.series().unwrap_or_default();
+        let first = app.series.first().map(layout::SeriesKey::of);
+        app.layout = match app.prefs.tui.layout.clone() {
+            Some(l) if !l.tiles().is_empty() => l,
+            _ => layout::TileLayout::single(first),
+        };
         Ok(app)
     }
 
@@ -108,14 +128,18 @@ impl App {
         match &self.modal {
             Some(m) => m.help_topic(),
             None if self.menu.is_open() => "menus",
-            None => "tui",
+            None => "tiling",
         }
     }
 
     /// Whether an action is available right now (disabled items are greyed out).
     pub fn enabled(&self, a: Action) -> bool {
         use Action::*;
-        !matches!(a, KeysInit | RecoverWords | RecoverShards)
+        if matches!(a, KeysInit | RecoverWords | RecoverShards) {
+            return false;
+        }
+        // Not built yet in this release.
+        !matches!(a, LinkTile | ChartLayers | Filter(_) | ClearFilters | SortYear | SortName | ToggleOrder | ToggleSidebar | FocusSidebar | Import)
     }
 
     /// Whether a text field has focus (letters are typed, not commands).
@@ -131,6 +155,7 @@ impl App {
             KeyCode::F(10) => Some(Action::OpenMenu),
             KeyCode::F(1) => Some(Action::Help),
             KeyCode::F(5) => Some(Action::Refresh),
+            KeyCode::Tab if self.modal.is_none() => Some(Action::FocusNext),
             KeyCode::Char('?') if !self.typing() => Some(Action::Help),
             KeyCode::Char('q') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Quit),
             _ => None,
@@ -197,8 +222,70 @@ impl App {
             Symbols => self.modal = Some(Modal::info("Symbols", modal::symbols_lines(&self.store))),
             Coverage => self.modal = Some(Modal::info("Coverage & gaps", modal::coverage_lines(&self.store))),
             Refresh => {
-                self.nav.reload(&self.store, &mut self.status);
-                self.set_status("refreshed");
+                self.series = self.store.series().unwrap_or_default();
+                self.caches.clear();
+                self.set_status(format!("refreshed: {} series", self.series.len()));
+            }
+            NewTile(v) => {
+                let d = self.layout.new_dir;
+                self.split(d, Some(view_of(v)));
+            }
+            SplitRight => self.split(layout::Dir::Horizontal, None),
+            SplitBelow => self.split(layout::Dir::Vertical, None),
+            CloseTile => {
+                let r = self.layout.close();
+                self.layout_result(r, "tile closed");
+            }
+            ZoomTile => {
+                self.layout.toggle_zoom();
+                self.layout_changed();
+            }
+            Equalize => {
+                self.layout.equalize();
+                self.layout_changed();
+            }
+            Container(m) => {
+                let r = self.layout.set_mode(m.into());
+                self.layout_result(r, &format!("container {m:?}").to_lowercase());
+            }
+            Preset(p) => {
+                let s = self.layout.focused().series.clone();
+                self.layout.preset(p, s);
+                self.caches.clear();
+                self.layout_changed();
+            }
+            LayoutSave => self.modal = Some(Modal::prompt("Save layout as", modal::PromptKind::LayoutSave)),
+            LayoutsSaved => {
+                let items: Vec<String> = self.prefs.tui.layouts.keys().cloned().collect();
+                self.modal = Some(Modal::Pick { title: "Saved layouts".into(), items, sel: 0, kind: modal::PickKind::SavedLayout });
+            }
+            Focus(d) => {
+                let c = self.content;
+                if self.layout.focus_dir(d, c) {
+                    self.layout_changed();
+                }
+            }
+            FocusNext => {
+                self.layout.focus_next();
+                self.layout_changed();
+            }
+            Resize(d) => {
+                let c = self.content;
+                let r = self.layout.resize(d, c);
+                self.layout_result(r, "resized");
+            }
+            Swap => {
+                let r = self.layout.swap();
+                self.layout_result(r, "swapped");
+            }
+            ChangeView => {
+                let v = self.layout.change_view();
+                self.layout_changed();
+                self.set_status(format!("view: {v:?}").to_lowercase());
+            }
+            ToggleSplitDir => {
+                let d = self.layout.toggle_split_dir();
+                self.set_status(format!("new tiles split {}", if d == layout::Dir::Horizontal { "right" } else { "below" }));
             }
             _ => self.set_status(format!("{} is not available yet", a.name())),
         }
@@ -230,6 +317,15 @@ impl App {
             }
             return;
         }
+        if self.pending_w {
+            self.pending_w = false;
+            if let Some(a) = window_action(k) {
+                self.dispatch(a);
+            } else {
+                self.set_status("unknown window command");
+            }
+            return;
+        }
         // Alt+letter opens a menu from anywhere.
         if k.modifiers.contains(KeyModifiers::ALT)
             && let KeyCode::Char(c) = k.code
@@ -244,7 +340,61 @@ impl App {
         if self.modal.is_some() {
             return modal::on_key(self, k);
         }
-        nav::on_key(self, k);
+        if k.code == KeyCode::Char('w') && k.modifiers.contains(KeyModifiers::CONTROL) {
+            self.pending_w = true;
+            self.set_status("C-w: v s q h j k l Tab < > + - = x z t e y");
+            return;
+        }
+        tiles::on_key(self, k);
+    }
+
+    fn split(&mut self, d: layout::Dir, v: Option<layout::View>) {
+        let c = self.content;
+        let r = self.layout.split(d, v, c).map(|_| ());
+        self.layout_result(r, "split");
+    }
+
+    fn layout_result(&mut self, r: Result<(), String>, ok: &str) {
+        match r {
+            Ok(()) => {
+                self.layout_changed();
+                self.set_status(ok.to_string());
+            }
+            Err(e) => self.set_status(e),
+        }
+    }
+
+    /// Persist the layout after any change.
+    pub fn layout_changed(&mut self) {
+        self.prefs.tui.layout = Some(self.layout.clone());
+        let _ = self.prefs.save(&self.paths);
+    }
+
+    /// Time scope for tiles (sidebar year filter).
+    pub fn scope(&self) -> Option<(i64, i64)> {
+        None
+    }
+
+    /// Show the previous/next series in the focused tile.
+    pub fn cycle_series(&mut self, step: i32) {
+        if self.series.is_empty() {
+            self.set_status("no data yet: File ▸ Import…");
+            return;
+        }
+        let keys: Vec<layout::SeriesKey> = self.series.iter().map(layout::SeriesKey::of).collect();
+        let cur = self.layout.focused().series.clone();
+        let i = cur.and_then(|c| keys.iter().position(|k| *k == c)).map(|i| i as i32).unwrap_or(-1);
+        let n = keys.len() as i32;
+        let next = keys[((i + step).rem_euclid(n)) as usize].clone();
+        self.set_series(next);
+    }
+
+    pub fn set_series(&mut self, k: layout::SeriesKey) {
+        let id = self.layout.focus;
+        self.set_status(format!("tile {id}: {}", k.label()));
+        self.layout.focused_mut().series = Some(k);
+        self.caches.remove(&id);
+        self.layout_changed();
     }
 
     pub fn on_mouse(&mut self, m: MouseEvent) {
@@ -269,6 +419,24 @@ impl App {
                     self.dispatch(a);
                 }
             }
+            Some(Hit::Tile(id)) | Some(Hit::TabBar(id)) => {
+                self.menu.close();
+                self.layout.set_focus(id);
+                self.layout_changed();
+            }
+            Some(Hit::ListHeader(id, col)) => {
+                self.layout.set_focus(id);
+                if let Some((k, _)) = tiles::COLUMNS.get(col) {
+                    let t = self.layout.focused_mut();
+                    if t.list.sort == *k {
+                        t.list.desc = !t.list.desc;
+                    } else {
+                        t.list.sort = *k;
+                        t.list.desc = false;
+                    }
+                }
+                self.layout_changed();
+            }
             None => self.menu.close(),
         }
     }
@@ -288,7 +456,7 @@ impl App {
         header::draw(f, head, &t, &self.status_items());
         let mut hits = std::mem::take(&mut self.hits);
         let xs = menu::draw_bar(&self.menu, f, bar, &t, &mut hits);
-        self.draw_content(f, body);
+        self.draw_content(f, body, &mut hits);
         if self.modal.is_some() {
             modal::draw(self, f, body);
         }
@@ -303,9 +471,77 @@ impl App {
         self.hits = hits;
     }
 
-    fn draw_content(&mut self, f: &mut Frame, area: Rect) {
-        nav::draw(self, f, area);
+    fn draw_content(&mut self, f: &mut Frame, area: Rect, hits: &mut Vec<(Rect, Hit)>) {
+        self.content = area;
+        let t = self.theme.clone();
+        let scope = self.scope();
+        for p in self.layout.placed(area) {
+            match p {
+                layout::Placed::Tile(id, r) => {
+                    let Some(tile) = self.layout.tile(id).cloned() else { continue };
+                    let cache = self.caches.entry(id).or_default();
+                    tiles::draw_tile(f, r, &tile, cache, &self.store, scope, id == self.layout.focus, &t, hits);
+                }
+                layout::Placed::Bar { rect, mode, titles, active, first_ids } => {
+                    let mut spans = vec![];
+                    let mut x = rect.x;
+                    for (i, title) in titles.iter().enumerate() {
+                        let on = i as u8 == active;
+                        let st = if on { Style::new().fg(t.bg).bg(t.accent).add_modifier(Modifier::BOLD) } else { Style::new().fg(t.muted).bg(t.selection_bg) };
+                        let text = format!(" {title} ");
+                        let w = text.chars().count() as u16;
+                        if mode == layout::Mode::Stacked {
+                            let row = Rect { x: rect.x, y: rect.y + i as u16, width: rect.width, height: 1 };
+                            if row.y < rect.bottom() {
+                                f.render_widget(Paragraph::new(format!("{text:<w$}", w = rect.width as usize)).style(st), row);
+                                hits.push((row, Hit::TabBar(first_ids[i])));
+                            }
+                        } else {
+                            spans.push(Span::styled(text, st));
+                            hits.push((Rect { x, y: rect.y, width: w, height: 1 }, Hit::TabBar(first_ids[i])));
+                            x += w;
+                        }
+                    }
+                    if mode == layout::Mode::Tabbed {
+                        f.render_widget(Paragraph::new(Line::from(spans)).style(Style::new().bg(t.selection_bg)), rect);
+                    }
+                }
+            }
+        }
     }
+}
+
+fn view_of(v: action::ViewKind) -> layout::View {
+    match v {
+        action::ViewKind::List => layout::View::List,
+        action::ViewKind::Chart => layout::View::Chart,
+    }
+}
+
+/// Window commands after `Ctrl-w`.
+pub fn window_action(k: KeyEvent) -> Option<Action> {
+    use action::Dir4::*;
+    Some(match k.code {
+        KeyCode::Char('v') => Action::SplitRight,
+        KeyCode::Char('s') => Action::SplitBelow,
+        KeyCode::Char('q') | KeyCode::Char('c') => Action::CloseTile,
+        KeyCode::Char('h') | KeyCode::Left => Action::Focus(Left),
+        KeyCode::Char('j') | KeyCode::Down => Action::Focus(Down),
+        KeyCode::Char('k') | KeyCode::Up => Action::Focus(Up),
+        KeyCode::Char('l') | KeyCode::Right => Action::Focus(Right),
+        KeyCode::Tab | KeyCode::Char('w') => Action::FocusNext,
+        KeyCode::Char('>') => Action::Resize(Right),
+        KeyCode::Char('<') => Action::Resize(Left),
+        KeyCode::Char('+') => Action::Resize(Down),
+        KeyCode::Char('-') => Action::Resize(Up),
+        KeyCode::Char('=') => Action::Equalize,
+        KeyCode::Char('x') => Action::Swap,
+        KeyCode::Char('z') => Action::ZoomTile,
+        KeyCode::Char('t') => Action::ChangeView,
+        KeyCode::Char('e') => Action::ToggleSplitDir,
+        KeyCode::Char('y') => Action::LinkTile,
+        _ => return None,
+    })
 }
 
 /// Bordered block in theme colors.

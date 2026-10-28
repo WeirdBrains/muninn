@@ -69,6 +69,12 @@ pub struct TuiPrefs {
     pub header: HeaderMode,
     #[serde(default)]
     pub sidebar_collapsed: bool,
+    /// Current tiling layout (restored on start).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<crate::tui::layout::TileLayout>,
+    /// Named layouts (View ▸ Layouts ▸ Save current…).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub layouts: std::collections::BTreeMap<String, crate::tui::layout::TileLayout>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]

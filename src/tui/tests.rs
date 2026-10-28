@@ -211,3 +211,93 @@ fn data_dialogs_and_prefs() {
     let saved = Preferences::load_or_create(&a.paths).unwrap();
     assert_eq!(saved.tui.header, HeaderMode::Compact);
 }
+
+fn ctrl_w(a: &mut App, c: KeyCode) {
+    a.on_key(mkey(KeyCode::Char('w'), KeyModifiers::CONTROL));
+    a.on_key(key(c));
+}
+
+#[test]
+fn fresh_session_is_one_list_tile_with_bars() {
+    let (_t, mut a) = app();
+    assert_eq!(a.layout.tiles().len(), 1);
+    let s = screen_text(&mut a);
+    assert!(s.contains("[1] list"), "{s}");
+    assert!(s.contains("chg%") && s.contains("time▲"), "{s}");
+    a.on_key(key(KeyCode::Char('.')));
+    let s = screen_text(&mut a);
+    assert!(s.contains("ETH/USDT · binance · 5m") || s.contains("BTC/USDT · binance · 5m"));
+}
+
+#[test]
+fn ctrl_w_keys_and_menu_split_the_same_way() {
+    let (_t, mut a) = app();
+    screen_text(&mut a);
+    ctrl_w(&mut a, KeyCode::Char('v'));
+    assert_eq!(a.last_action, Some(Action::SplitRight));
+    assert_eq!(a.layout.tiles().len(), 2);
+    // same action from the menu: View ▸ Split ▸ Below
+    a.on_key(mkey(KeyCode::Char('v'), KeyModifiers::ALT));
+    a.on_key(key(KeyCode::Char('s')));
+    a.on_key(key(KeyCode::Char('b')));
+    assert_eq!(a.last_action, Some(Action::SplitBelow));
+    assert_eq!(a.layout.tiles().len(), 3);
+    ctrl_w(&mut a, KeyCode::Char('t'));
+    let s = screen_text(&mut a);
+    assert!(s.contains("chart ·"), "{s}");
+    ctrl_w(&mut a, KeyCode::Char('h'));
+    assert_eq!(a.layout.focus, 1);
+    ctrl_w(&mut a, KeyCode::Char('z'));
+    assert!(a.layout.zoomed);
+    ctrl_w(&mut a, KeyCode::Char('z'));
+    ctrl_w(&mut a, KeyCode::Char('q'));
+    assert_eq!(a.layout.tiles().len(), 2);
+    // persisted
+    let saved = Preferences::load_or_create(&a.paths).unwrap();
+    assert_eq!(saved.tui.layout.unwrap().tiles().len(), 2);
+}
+
+#[test]
+fn list_sorts_by_keys_and_header_click() {
+    let (_t, mut a) = app();
+    screen_text(&mut a);
+    a.on_key(key(KeyCode::Char('s')));
+    assert_eq!(a.layout.focused().list.sort, crate::store::BarSort::Open);
+    a.on_key(key(KeyCode::Char('r')));
+    assert!(a.layout.focused().list.desc);
+    screen_text(&mut a);
+    let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::ListHeader(1, 7)).unwrap();
+    a.on_mouse(click(r.x + 1, r.y));
+    assert_eq!(a.layout.focused().list.sort, crate::store::BarSort::ChangePct);
+    assert!(!a.layout.focused().list.desc);
+    let s = screen_text(&mut a);
+    assert!(s.contains("chg%▲"), "{s}");
+    // selected row moves and pages lazily
+    a.on_key(key(KeyCode::End));
+    let c = &a.caches[&1].list;
+    assert_eq!(c.sel, c.total - 1);
+    screen_text(&mut a);
+    assert!(a.caches[&1].list.selected().is_some());
+}
+
+#[test]
+fn presets_and_saved_layouts() {
+    let (_t, mut a) = app();
+    a.dispatch(Action::Preset(action::Preset::Grid2x2));
+    assert_eq!(a.layout.tiles().len(), 4);
+    let s = screen_text(&mut a);
+    assert!(s.contains("[4] list"), "{s}");
+    a.dispatch(Action::LayoutSave);
+    for c in "quad".chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    a.on_key(key(KeyCode::Enter));
+    a.dispatch(Action::Preset(action::Preset::TwoUp));
+    assert_eq!(a.layout.tiles().len(), 2);
+    a.dispatch(Action::LayoutsSaved);
+    a.on_key(key(KeyCode::Enter));
+    assert_eq!(a.layout.tiles().len(), 4);
+    a.dispatch(Action::Container(action::ContainerMode::Tabbed));
+    let s = screen_text(&mut a);
+    assert!(s.contains(" list BTC/USDT ") || s.contains(" list ETH/USDT "), "{s}");
+}

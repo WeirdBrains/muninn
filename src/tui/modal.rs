@@ -242,9 +242,29 @@ impl App {
     }
 
     /// Prompts handled by later features (layouts, charts).
-    pub fn on_prompt_ext(&mut self, _kind: PromptKind, _input: &str) {}
+    pub fn on_prompt_ext(&mut self, kind: PromptKind, input: &str) {
+        if kind == PromptKind::LayoutSave {
+            if input.is_empty() {
+                return self.set_status("layout name is empty");
+            }
+            self.prefs.tui.layouts.insert(input.to_string(), self.layout.clone());
+            self.save_prefs();
+            self.set_status(format!("saved layout {input}"));
+        }
+    }
 
-    pub fn on_pick(&mut self, _kind: PickKind, _item: &str) {}
+    pub fn on_pick(&mut self, kind: PickKind, item: &str) {
+        match kind {
+            PickKind::SavedLayout => {
+                if let Some(l) = self.prefs.tui.layouts.get(item).cloned() {
+                    self.layout = l;
+                    self.caches.clear();
+                    self.layout_changed();
+                    self.set_status(format!("layout {item}"));
+                }
+            }
+        }
+    }
 }
 
 pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {

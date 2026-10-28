@@ -5,7 +5,7 @@ mnnn tui
 ```
 
 The TUI asks for the password first (or uses `MUNINN_PASSWORD`), then opens. It uses
-the same library calls as the CLI. Mouse clicks work on the menu bar and dropdowns
+the same library calls as the CLI. Mouse clicks work on the menu bar, dropdowns, tiles, tabs and list headers
 (mouse capture is on while the TUI runs; hold Shift to select text in most terminals).
 
 ## Screen layout
@@ -22,7 +22,7 @@ the same library calls as the CLI. Mouse clicks work on the menu bar and dropdow
   fewer than 80 columns) it collapses to one line, `Muninn v0.x.y`. Force compact or
   large in **File ▸ Preferences…** (`[tui] header` in [preferences](preferences.md)).
 - **Menu bar**: categorized menus with submenus, mouse and keyboard ([menus](menus.md)).
-- **Content area**: series and bars (see below).
+- **Content area**: tiles (see below).
 - **Dialogs** (export, keys, themes, preferences, help, info) open over the content
   area; Esc closes them.
 
@@ -30,9 +30,9 @@ All keys: [keybindings](keybindings.md).
 
 ## Content area
 
-Left: every series as `source symbol duration bars`. Right: coverage, a candle chart
-of the visible page and the bar table. ↑/↓ select a series, Enter focuses the table,
-Esc goes back, PgUp/PgDn page through bars, `r` reloads.
+Always a [tiling layout](tiling.md): one list tile to start, split and rearranged
+with `Ctrl-w` commands or the **View** menu. Each tile shows a list or a chart of
+its own series.
 
 ## Dialogs
 

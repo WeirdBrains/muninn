@@ -23,6 +23,8 @@ sidebar_collapsed = false
 | `ingest.drop_zero_volume` | `false` | drop zero-volume bars instead of keeping them flagged |
 | `tui.header` | `auto` | `auto` (large when the terminal has ≥ 30 rows), `compact` or `large` ([TUI](tui.md)) |
 | `tui.sidebar_collapsed` | `false` | start with the sidebar hidden |
+| `tui.layout` | one list tile | the current [tiling layout](tiling.md), saved on every change |
+| `tui.layouts.<name>` | none | named layouts |
 
 `mnnn theme set <name>`, `mnnn theme mode <mode>` and **File ▸ Preferences…** in the TUI edit the file for you.
 Preferences are part of every backup ([backup and recovery](backup-recovery.md)).

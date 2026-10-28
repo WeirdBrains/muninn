@@ -4,6 +4,9 @@ use crate::model::{Bar, BarId, Duration, Source, StoredBar, Symbol, KNOWN_ALIASE
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use std::path::Path;
 
+mod query;
+pub use query::BarSort;
+
 pub const SCHEMA_VERSION: i64 = 1;
 
 const MIGRATIONS: &[&str] = &[r#"
@@ -114,6 +117,7 @@ impl Store {
         let existed = path.exists();
         let conn = Connection::open(path)?;
         Self::apply_key(&conn, key)?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         // Verify the key works.
         conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get::<_, i64>(0))
             .map_err(|e| Error::Unlock(format!("wrong key or not a muninn database ({e})")))?;
