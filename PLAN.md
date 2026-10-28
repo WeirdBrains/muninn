@@ -391,13 +391,70 @@ round-trip including preferences and themes; wrong password fails cleanly.
 8. **Themes:** built-ins, selector, editor, backup integration.
 9. **JSON + service ingest.**
 
-## 10. Open decisions
+### 9.1 Milestone notes (as implemented)
 
-- `keys/` never holds the master key, 24 words, or shards in plaintext — those only
-  leave the program via `mnnn keys export`. OK, or should password-encrypted copies
-  also live in `keys/`?
+| Milestone | Commit |
+|---|---|
+| 1 Skeleton | `7aee339` |
+| 2 Model + store | `584f7d1` |
+| 3 CSV ingest | `3a676eb` |
+| 4 Export | `dae917b` |
+| 5 Crypto | `490bac6` |
+| 6 Backup/recovery | `c9deba0` |
+| 7+8 TUI + themes (+ help, man pages, JSON reader) | `7925fb5` |
+| 9 JSON + service ingest | `f66ef03` |
 
-- Should the password be required on top of the 24 words / shards (section 4.1)?
-- Shards as binary blobs (`vsss-rs`) or word lists (SLIP-39)?
-- Prices as REAL (f64) or scaled integers / decimal?
-- Drop or keep zero-volume bars by default?
+Docs, TUI help and man pages (sections 11–13) were added alongside milestone 7/8.
+
+Full-file run (`--release`, temp MUNINN_HOME, raw/data/BTCUSDT_5m.csv, 965,366 data
+rows): 965,366 inserted, 0 rejected, 932 zero-volume (kept), 32 gaps (1,944 missing
+bars), coverage 2017-08-17 04:00 .. 2026-10-27 21:05 UTC, 41.3 s ingest; the
+re-run is skipped by content hash.
+
+## 10. Decisions (resolved)
+
+- The password is **not** mixed into the master key: the 24 words or a shard quorum
+  alone recover the data key. The password only unwraps the service key (Argon2id).
+- Shards are `vsss-rs` binary shares (GF(256), 3-of-N) encoded as text with a checksum:
+  `muninn-shard-v1:<set>:<threshold>:<index>:<hex>:<checksum8>`. Not SLIP-39.
+- Prices are stored as REAL (f64).
+- Zero-volume bars are **kept** and flagged (`flags & FLAG_ZERO_VOLUME`);
+  `preferences.toml [ingest] drop_zero_volume = true` drops them instead.
+- `keys/` never stores the master key, the 24 words or the shards, plain or
+  encrypted. They leave only through `mnnn keys export` (age-encrypted files).
+
+### 10.1 Deviations from this plan
+
+- Milestones 7 and 8 were one commit (plus help, man pages and the JSON reader).
+- Redis logical DB flag is `--db-index` (the global `--db` flag owns the name).
+- `bars` has an extra `flags` column (zero-volume marker).
+- CSV escape: only RFC 4180 quote doubling is supported.
+- TUI ingest shows done/idle, no live progress bar.
+- Prompts are a small custom implementation, not `dialoguer`.
+- JSON is parsed with serde, then turned into a Polars frame.
+- `keys rekey` requires the master key; restoring over existing data needs confirmation.
+- The 16-colour theme fallback is heuristic.
+- Data commands fail with a hint until `mnnn keys init` has been run.
+- Redis/Postgres have unit tests plus live tests that are `#[ignore]`d and need
+  `MUNINN_TEST_REDIS` / `MUNINN_TEST_POSTGRES`.
+
+## 11. Documentation (docs/)
+
+One Markdown file per feature under `docs/` (cli, ingest-csv, ingest-json,
+services/{http,redis,sqlite,postgres}, data-model, storage-layout, export, keys,
+encryption, backup-recovery, themes, preferences, tui, help). Docs change with the
+code in the same commit.
+
+## 12. TUI help
+
+`?`/`F1` or the Help tab. Topics are compiled from `docs/` by `build.rs`. Substring and
+fuzzy search, links between topics with history/back, context-sensitive (opens on the
+current screen's topic). `mnnn help <topic>` / `mnnn help --search <q>` print the same
+text. Tests cover search and broken links.
+
+## 13. Man pages
+
+Generated with `clap_mangen` (hidden `mnnn man --out man`) and committed under `man/`:
+`mnnn(1)` with extra FILES, ENVIRONMENT, EXIT STATUS, SECURITY, EXAMPLES and SEE ALSO
+sections, plus one page per subcommand (39 pages). A test fails if a page is missing
+or stale. Install steps: README.md and docs/cli.md.

@@ -206,8 +206,8 @@ pub fn stream_entries(reply: &RV) -> Vec<(String, Vec<(String, String)>)> {
     let mut out = vec![];
     if let RV::Array(entries) = reply {
         for e in entries {
-            if let RV::Array(parts) = e {
-                if parts.len() == 2 {
+            if let RV::Array(parts) = e
+                && parts.len() == 2 {
                     let id = rv_string(&parts[0]).unwrap_or_default();
                     let mut fields = vec![];
                     if let RV::Array(kv) = &parts[1] {
@@ -219,7 +219,6 @@ pub fn stream_entries(reply: &RV) -> Vec<(String, Vec<(String, String)>)> {
                     }
                     out.push((id, fields));
                 }
-            }
         }
     }
     out

@@ -256,17 +256,16 @@ fn inline(id: &str, s: &str, t: &Theme, selected: Option<usize>, link_idx: &mut 
     };
     while i < chars.len() {
         let c = chars[i];
-        if c == '`' {
-            if let Some(end) = (i + 1..chars.len()).find(|&j| chars[j] == '`') {
+        if c == '`'
+            && let Some(end) = (i + 1..chars.len()).find(|&j| chars[j] == '`') {
                 flush(&mut buf, &mut spans);
                 let code: String = chars[i + 1..end].iter().collect();
                 spans.push(Span::styled(code, Style::new().fg(t.accent)));
                 i = end + 1;
                 continue;
             }
-        }
-        if c == '[' {
-            if let Some((text, href)) = li.peek().cloned() {
+        if c == '['
+            && let Some((text, href)) = li.peek().cloned() {
                 let pat: Vec<char> = format!("[{text}]({href})").chars().collect();
                 if chars[i..].starts_with(&pat) {
                     li.next();
@@ -286,7 +285,6 @@ fn inline(id: &str, s: &str, t: &Theme, selected: Option<usize>, link_idx: &mut 
                     continue;
                 }
             }
-        }
         if c == '*' && chars.get(i + 1) == Some(&'*') {
             i += 2;
             continue;

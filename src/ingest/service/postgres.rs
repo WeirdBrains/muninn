@@ -62,11 +62,10 @@ impl PgSource {
     }
 
     pub fn host_label(&self) -> String {
-        if let Some(u) = &self.url {
-            if let Ok(p) = url::Url::parse(u) {
+        if let Some(u) = &self.url
+            && let Ok(p) = url::Url::parse(u) {
                 return p.host_str().unwrap_or("postgres").to_string();
             }
-        }
         self.host.clone().unwrap_or_else(|| "postgres".into())
     }
 

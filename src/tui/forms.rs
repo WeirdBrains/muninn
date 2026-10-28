@@ -134,11 +134,10 @@ impl IngestForm {
 }
 
 fn expand(p: &str) -> PathBuf {
-    if let Some(rest) = p.strip_prefix("~/") {
-        if let Some(h) = dirs::home_dir() {
+    if let Some(rest) = p.strip_prefix("~/")
+        && let Some(h) = dirs::home_dir() {
             return h.join(rest);
         }
-    }
     PathBuf::from(p)
 }
 

@@ -203,21 +203,19 @@ impl HttpRequest {
             if let Some(c) = &cursor {
                 params.push((self.cursor_param.clone(), c.clone()));
             }
-            if self.paging == Paging::Time {
-                if let Some(s) = start {
+            if self.paging == Paging::Time
+                && let Some(s) = start {
                     params.retain(|(k, _)| k != &self.start_param);
                     params.push((self.start_param.clone(), s.to_string()));
                 }
-            }
             let url = build_url(&self.url, &params)?;
             if first_url.is_none() {
                 first_url = Some(build_url(&self.url, &base_params)?);
             }
-            if page > 0 {
-                if let Some(iv) = interval {
+            if page > 0
+                && let Some(iv) = interval {
                     std::thread::sleep(iv);
                 }
-            }
             let (ct, bytes) = self.send(&client, &url)?;
             all_bytes.extend_from_slice(&bytes);
             let fmt = self.format_for(ct.as_deref());

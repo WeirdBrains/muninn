@@ -209,11 +209,10 @@ impl<'a> Session<'a> {
             let sym = Symbol::parse(s)?;
             return self.store.canonical_symbol(&sym);
         }
-        if let Some(n) = name_hint {
-            if let Some(sym) = symbol_from_name(self.store, n)? {
+        if let Some(n) = name_hint
+            && let Some(sym) = symbol_from_name(self.store, n)? {
                 return Ok(sym);
             }
-        }
         if let Some(s) = &self.prompted_symbol {
             return Ok(s.clone());
         }

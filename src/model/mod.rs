@@ -92,11 +92,10 @@ impl Symbol {
         let mut qs: Vec<&str> = quotes.to_vec();
         qs.sort_by_key(|q| std::cmp::Reverse(q.len()));
         for q in qs {
-            if let Some(b) = t.strip_suffix(q) {
-                if is_asset(b) {
+            if let Some(b) = t.strip_suffix(q)
+                && is_asset(b) {
                     return Some(Symbol::new(b, q));
                 }
-            }
         }
         None
     }

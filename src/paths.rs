@@ -73,11 +73,10 @@ pub fn ensure_dir(d: &Path) -> Result<()> {
 
 /// Write a file atomically-ish with 0600 permissions.
 pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
+    if let Some(parent) = path.parent()
+        && !parent.exists() {
             fs::create_dir_all(parent)?;
         }
-    }
     let tmp = path.with_extension("tmp-muninn");
     fs::write(&tmp, bytes)?;
     set_mode(&tmp, 0o600)?;

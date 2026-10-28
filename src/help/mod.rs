@@ -94,18 +94,15 @@ pub fn inline_links(line: &str) -> Vec<(String, String)> {
     while i < b.len() {
         if b[i] == '`' {
             code = !code;
-        } else if !code && b[i] == '[' {
-            if let Some(close) = (i + 1..b.len()).find(|&j| b[j] == ']') {
-                if close + 1 < b.len() && b[close + 1] == '(' {
-                    if let Some(end) = (close + 2..b.len()).find(|&j| b[j] == ')') {
+        } else if !code && b[i] == '['
+            && let Some(close) = (i + 1..b.len()).find(|&j| b[j] == ']')
+                && close + 1 < b.len() && b[close + 1] == '('
+                    && let Some(end) = (close + 2..b.len()).find(|&j| b[j] == ')') {
                         let text: String = b[i + 1..close].iter().collect();
                         let href: String = b[close + 2..end].iter().collect();
                         out.push((text, href));
                         i = end;
                     }
-                }
-            }
-        }
         i += 1;
     }
     out
@@ -158,11 +155,10 @@ mod tests {
         let mut broken = vec![];
         for (id, body) in TOPICS {
             for l in links(id, body) {
-                if let Some(t) = &l.target {
-                    if !ids.contains(&t.as_str()) {
+                if let Some(t) = &l.target
+                    && !ids.contains(&t.as_str()) {
                         broken.push(format!("{id}: [{}]({}) -> {t}", l.text, l.href));
                     }
-                }
             }
         }
         assert!(broken.is_empty(), "broken help links:\n{}", broken.join("\n"));

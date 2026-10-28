@@ -129,11 +129,10 @@ fn editor_key(app: &mut App, k: KeyEvent) {
             KeyCode::Backspace => {
                 buf.pop();
             }
-            KeyCode::Char(c) if c.is_ascii_hexdigit() || c == '#' => {
-                if buf.len() < 7 {
+            KeyCode::Char(c) if (c.is_ascii_hexdigit() || c == '#')
+                && buf.len() < 7 => {
                     buf.push(c);
                 }
-            }
             _ => {}
         }
         return;

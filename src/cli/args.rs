@@ -38,6 +38,7 @@ pub struct GlobalArgs {
 }
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)]
 pub enum Command {
     /// Ingest bars from files or services.
     #[command(subcommand)]
@@ -101,6 +102,7 @@ pub struct CommonIngestArgs {
 }
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)]
 pub enum IngestCommand {
     /// Ingest CSV file(s).
     Csv(CsvIngestArgs),
