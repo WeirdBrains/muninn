@@ -384,6 +384,18 @@ impl Store {
 
     /// Insert bars, ignoring ids that already exist. Batched in one transaction.
     pub fn upsert_bars(&mut self, source: &Source, symbol: &Symbol, duration: Duration, bars: &[Bar]) -> Result<UpsertCounts> {
+        self.upsert_bars_with(source, symbol, duration, bars, &mut |_| {})
+    }
+
+    /// Like `upsert_bars`; calls `on_rows(n)` every 4096 rows written (progress).
+    pub fn upsert_bars_with(
+        &mut self,
+        source: &Source,
+        symbol: &Symbol,
+        duration: Duration,
+        bars: &[Bar],
+        on_rows: &mut dyn FnMut(u64),
+    ) -> Result<UpsertCounts> {
         let tx = self.conn.transaction()?;
         let mut c = UpsertCounts::default();
         {
@@ -391,7 +403,10 @@ impl Store {
                 "INSERT INTO bars(id, base, quote, timestamp, open, high, low, close, volume, source_id, duration_s, flags)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) ON CONFLICT(id) DO NOTHING",
             )?;
-            for b in bars {
+            for (i, b) in bars.iter().enumerate() {
+                if i % 4096 == 4095 {
+                    on_rows(4096);
+                }
                 let id = BarId::compute(b.ts, &source.name, symbol, duration);
                 let n = st.execute(params![
                     &id.0[..],

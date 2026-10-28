@@ -2,6 +2,7 @@
 pub mod csv;
 pub mod frame;
 pub mod json;
+pub mod progress;
 pub mod service;
 pub mod time;
 
@@ -28,24 +29,7 @@ pub struct IngestOptions {
     pub progress: Option<std::sync::Arc<Progress>>,
 }
 
-/// Bars stored so far / bars to store, plus a cancel flag. Shared with a UI thread.
-#[derive(Debug, Default)]
-pub struct Progress {
-    pub done: std::sync::atomic::AtomicU64,
-    pub total: std::sync::atomic::AtomicU64,
-    pub cancel: std::sync::atomic::AtomicBool,
-}
-
-impl Progress {
-    pub fn cancelled(&self) -> bool {
-        self.cancel.load(std::sync::atomic::Ordering::Relaxed)
-    }
-    /// (done, total)
-    pub fn get(&self) -> (u64, u64) {
-        use std::sync::atomic::Ordering::Relaxed;
-        (self.done.load(Relaxed), self.total.load(Relaxed))
-    }
-}
+pub use progress::{CountingReader, Estimate, Progress};
 
 /// One unit of input (a file, a response, a query result).
 pub struct Input {
@@ -346,16 +330,24 @@ impl<'a> Session<'a> {
         let mut counts = UpsertCounts::default();
         let prog = self.opts.progress.clone();
         if let Some(p) = &prog {
-            p.total.fetch_add(v.bars.len() as u64, std::sync::atomic::Ordering::Relaxed);
+            p.parsed(v.bars.len() as u64);
         }
         for chunk in v.bars.chunks(50_000) {
-            if let Some(p) = &prog {
-                if p.cancelled() {
-                    return Err(Error::Aborted);
-                }
-                p.done.fetch_add(chunk.len() as u64, std::sync::atomic::Ordering::Relaxed);
+            if prog.as_ref().is_some_and(|p| p.cancelled()) {
+                return Err(Error::Aborted);
             }
-            let c = self.store.upsert_bars(&source, &symbol, duration, chunk)?;
+            // Progress inside the chunk's transaction (every 4096 rows), the rest at the end.
+            let mut reported = 0u64;
+            let c = match &prog {
+                Some(p) => self.store.upsert_bars_with(&source, &symbol, duration, chunk, &mut |n| {
+                    reported += n;
+                    p.stored(n);
+                })?,
+                None => self.store.upsert_bars(&source, &symbol, duration, chunk)?,
+            };
+            if let Some(p) = &prog {
+                p.stored(chunk.len() as u64 - reported);
+            }
             counts.inserted += c.inserted;
             counts.duplicate += c.duplicate;
         }
@@ -400,14 +392,12 @@ pub fn ingest_csv(store: &mut Store, io: Interact, opts: IngestOptions, path: &P
     let kind = if path.is_dir() { "directory" } else { "file" };
     let mut s = Session::new(store, io, opts, kind, &canonical(path));
     let mut out = Vec::new();
+    let prog = s.opts.progress.clone();
     for f in files {
-        let frame = csv::read_csv(&f, csv)?;
-        let input = Input {
-            locator: canonical(&f),
-            name_hint: f.file_name().map(|n| n.to_string_lossy().to_string()),
-            content_hash: hash_file(&f)?,
-            frame,
-        };
+        let bytes = progress::read_counted(&f, prog.clone())?;
+        let content_hash = hash_bytes(&bytes);
+        let frame = csv::read_csv_bytes(bytes, csv)?;
+        let input = Input { locator: canonical(&f), name_hint: f.file_name().map(|n| n.to_string_lossy().to_string()), content_hash, frame };
         out.push(s.ingest(input)?);
     }
     Ok(out)

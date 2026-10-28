@@ -709,18 +709,45 @@ fn fullscale() {
         render(&mut a, 160, 48);
         slow_frame = slow_frame.max(f0.elapsed());
         if let import::Phase::Running(r) = &a.import.phase {
-            samples.push(r.progress.get());
+            samples.push((t.elapsed().as_secs_f64(), r.progress.estimate().overall));
         }
         std::thread::sleep(Duration::from_millis(100));
     }
     let s = render(&mut a, 160, 48);
     std::fs::write(dir.join("import_done.txt"), &s).unwrap();
-    let distinct: std::collections::BTreeSet<_> = samples.iter().map(|x| x.0).collect();
-    println!("import ETHUSD_5m.csv: {:?}, {} progress values seen, slowest frame during import {slow_frame:?}", t.elapsed(), distinct.len());
+    let distinct: std::collections::BTreeSet<u64> = samples.iter().map(|x| (x.1 * 1e6) as u64).collect();
+    let monotonic = samples.windows(2).all(|w| w[1].1 >= w[0].1);
+    let max_jump = samples.windows(2).map(|w| w[1].1 - w[0].1).fold(0.0, f64::max);
+    let first_move = samples.iter().find(|x| x.1 > 0.0).map(|x| x.0).unwrap_or(f64::NAN);
+    let pct = |sec: f64| samples.iter().take_while(|x| x.0 <= sec).last().map(|x| x.1 * 100.0).unwrap_or(0.0);
+    println!(
+        "import ETHUSD_5m.csv: {:?}, {} distinct progress values, monotonic {monotonic}, max jump {:.1}%, first move at {first_move:.2}s, at 1s {:.1}% 10s {:.1}% 20s {:.1}% 30s {:.1}%, slowest frame {slow_frame:?}",
+        t.elapsed(), distinct.len(), max_jump * 100.0, pct(1.0), pct(10.0), pct(20.0), pct(30.0)
+    );
+    assert!(monotonic);
     assert!(s.contains("Import finished"), "{s}");
     worst.sort_by_key(|x| std::cmp::Reverse(x.1));
     println!("--- slowest");
     for (n, d) in worst.iter().take(8) {
         println!("{n:<40} {d:>10.1?}");
+    }
+}
+
+/// Full-file ingest timing into a fresh temp home (raw data read-only).
+#[test]
+#[ignore]
+fn ingest_timing() {
+    let Ok(raw) = std::env::var("MUNINN_RAW_DATA") else { return };
+    let t = tempfile::tempdir().unwrap();
+    let paths = Paths::resolve(Some(t.path().join("h")), None).unwrap();
+    paths.ensure().unwrap();
+    let dek = crate::crypto::Key32::random().unwrap();
+    let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
+    for f in ["BTCUSDT_5m.csv", "ETHUSDT_5m.csv"] {
+        let progress = std::env::var_os("MUNINN_TIMING_PROGRESS").map(|_| std::sync::Arc::new(crate::ingest::Progress::default()));
+        let opts = crate::ingest::IngestOptions { source: Some("binance".into()), progress, ..Default::default() };
+        let s = std::time::Instant::now();
+        crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &std::path::Path::new(&raw).join(f), &Default::default()).unwrap();
+        println!("TIMING {f}: {:?}", s.elapsed());
     }
 }

@@ -266,8 +266,10 @@ retyped at any time.
   directly into a path bar with Tab completion, bookmarks (e.g. `raw/data`) and recent paths.
 - Select a single file, several files (Space to mark), or a whole folder.
 - Shows file size and a guessed symbol/duration per file (from the file name) before import.
-- Then: preview first rows -> resolve missing source/symbol/duration inline -> live
-  progress bar -> summary (inserted / duplicate / rejected / gaps). Esc cancels before
+- Then: preview the first 10 lines parsed as bars with the ingest parser (invalid lines
+  marked; reads at most 64 KiB) -> resolve missing source/symbol/duration inline -> live
+  byte-based progress (per file and overall, bytes and ETA; reading counted as it
+  happens, then parse and store phases weighted into each file's bytes) -> summary (inserted / duplicate / rejected / gaps). Esc cancels before
   commit; the ingest runs in a background task so the TUI stays responsive.
 
 CLI and TUI are thin layers over one library crate; no business logic in either.
@@ -568,15 +570,11 @@ list/chart tiles, v0.5.0 sidebar, v0.6.0 import popup.
 - Redis logical DB flag is `--db-index` (the global `--db` flag owns the name).
 - `bars` has an extra `flags` column (zero-volume marker).
 - CSV escape: only RFC 4180 quote doubling is supported.
-- TUI ingest (v1) showed done/idle; the v2 import popup has a live progress bar (v0.6.0).
-- TUI v2 (1.3): the import progress bar counts bars stored, so it starts after a file is
-  read and validated; cancel takes effect between 50k-bar chunks.
 - TUI v2: the sidebar price filter compares each series' min/max of the chosen metric
   (within the year scope) against the range; the year filter also scopes tiles.
 - TUI v2 (v0.6.1): tiles load whole series into memory in a background thread and
   sort/aggregate there (SQLite on ~1M encrypted rows took ~16 s per sorted page);
   series listing reads a `series_stats` table (schema migration 2).
-- TUI v2: the import preview shows raw head lines (fast), not parsed bars.
 - TUI v2: rows failing validation are dropped without a prompt in the TUI import.
 - Prompts are a small custom implementation, not `dialoguer`.
 - JSON is parsed with serde, then turned into a Polars frame.

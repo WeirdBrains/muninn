@@ -105,6 +105,90 @@ pub fn head(path: &Path, n: usize) -> Vec<String> {
     BufReader::new(f.take(64 * 1024)).lines().take(n).map(|l| l.unwrap_or_default().chars().take(200).collect()).collect()
 }
 
+/// Lines shown by the preview.
+pub const PREVIEW_LINES: usize = 10;
+
+/// One preview line: parsed bar text, or the raw line with why it is invalid.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreviewRow {
+    pub text: String,
+    pub ok: bool,
+}
+
+fn fmt_px(v: f64) -> String {
+    super::tiles::fmt_num(v)
+}
+
+/// Parse the first [`PREVIEW_LINES`] data lines of a file with the ingest parser
+/// (column mapping, timestamp parsing, validation). Reads at most 64 KiB.
+pub fn preview_bars(path: &Path) -> Vec<PreviewRow> {
+    use crate::ingest::frame::{derive_duration, Columns};
+    let json = super::forms::is_json(path);
+    let ndjson = crate::ingest::json::is_ndjson(path);
+    let header = usize::from(!json);
+    let lines = head(path, PREVIEW_LINES + header);
+    let data_lines: Vec<String> = lines.iter().skip(header).cloned().collect();
+    let raw = |why: &str| {
+        let mut v = vec![PreviewRow { text: why.to_string(), ok: false }];
+        v.extend(data_lines.iter().map(|l| PreviewRow { text: l.clone(), ok: false }));
+        v
+    };
+    let mut text = lines.join("\n");
+    text.push('\n');
+    let df = if json && !ndjson {
+        // A JSON array only parses whole; small files fit in the head read.
+        let whole = path.metadata().map(|m| m.len() <= 64 * 1024).unwrap_or(false);
+        if !whole {
+            return raw("JSON array: too large to parse a head preview (ndjson previews parse)");
+        }
+        std::fs::read(path).map_err(crate::Error::from).and_then(|b| crate::ingest::json::read_json_bytes(&b, false))
+    } else if json {
+        crate::ingest::json::read_json_bytes(text.as_bytes(), true)
+    } else {
+        crate::ingest::csv::read_csv_bytes(text.into_bytes(), &Default::default())
+    };
+    let df = match df {
+        Ok(d) => d.head(Some(PREVIEW_LINES)),
+        Err(e) => return raw(&format!("✗ cannot parse: {e}")),
+    };
+    let cols = match Columns::from_frame(&df, &Default::default()) {
+        Ok(c) => c,
+        Err(e) => return raw(&format!("✗ {e}")),
+    };
+    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let sym = crate::ingest::symbol_from_name_static(&name).map(|s| s.display()).unwrap_or_else(|| "?/?".into());
+    let dur = crate::ingest::duration_from_name(&name)
+        .or_else(|| derive_duration(&cols.valid_ts()).map(|d| d.duration))
+        // unknown duration: skip the alignment check
+        .unwrap_or(crate::model::Duration(400 * 86_400));
+    let v = cols.validate(dur, false);
+    let mut rejects: std::collections::HashMap<usize, String> = v.rejects.into_iter().map(|r| (r.row, r.reason)).collect();
+    let mut bars = v.bars.into_iter();
+    let mut out = vec![];
+    for i in 0..cols.len() {
+        let row = i + 1;
+        let line = data_lines.get(i).cloned().unwrap_or_default();
+        if let Some(why) = rejects.remove(&row) {
+            out.push(PreviewRow { text: format!("✗ {why}: {line}"), ok: false });
+        } else if let Some(b) = bars.next() {
+            let flags = if b.flags & crate::model::FLAG_ZERO_VOLUME != 0 { " zero-vol" } else { "" };
+            out.push(PreviewRow {
+                text: format!(
+                    "{} {sym} o {} h {} l {} c {} v {}{flags}",
+                    crate::ingest::time::fmt_ts(b.ts),
+                    fmt_px(b.open),
+                    fmt_px(b.high),
+                    fmt_px(b.low),
+                    fmt_px(b.close),
+                    fmt_px(b.volume)
+                ),
+                ok: true,
+            });
+        }
+    }
+    out
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Pane {
     #[default]
@@ -127,6 +211,7 @@ pub struct Running {
     pub files: Vec<PathBuf>,
     pub current: usize,
     pub log: Vec<String>,
+    pub started: std::time::Instant,
 }
 
 pub enum Phase {
@@ -150,7 +235,7 @@ pub struct ImportState {
     /// source, symbol, duration (empty = derive).
     pub fields: [String; 3],
     pub phase: Phase,
-    pub preview: Option<(PathBuf, Vec<String>)>,
+    pub preview: Option<(PathBuf, Vec<PreviewRow>)>,
     pub message: Option<String>,
 }
 
@@ -292,6 +377,8 @@ pub fn start(app: &mut App, files: Vec<PathBuf>) {
         return;
     }
     let progress = Arc::new(Progress::default());
+    let sizes: Vec<u64> = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).collect();
+    progress.bytes_total.store(sizes.iter().sum(), Ordering::Relaxed);
     let f = &app.import.fields;
     let opt = |s: &String| (!s.trim().is_empty()).then(|| s.trim().to_string());
     let opts = IngestOptions {
@@ -320,12 +407,18 @@ pub fn start(app: &mut App, files: Vec<PathBuf>) {
                 break;
             }
             let _ = tx.send(Msg::File(i));
+            if let Some(p) = &opts.progress {
+                p.begin_file(i as u64, sizes[i]);
+            }
             let io = crate::interact::Interact::batch(true);
             let r = if super::forms::is_json(f) {
                 ingest::json::ingest_json(&mut store, io, opts.clone(), f, None)
             } else {
                 ingest::ingest_csv(&mut store, io, opts.clone(), f, &Default::default())
             };
+            if let Some(p) = &opts.progress {
+                p.end_file();
+            }
             let name = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
             let _ = match r {
                 Ok(reps) => tx.send(Msg::Report(name, reps.iter().map(line_of).collect())),
@@ -341,7 +434,7 @@ pub fn start(app: &mut App, files: Vec<PathBuf>) {
     r.insert(0, d);
     r.truncate(RECENT_MAX);
     app.save_prefs();
-    app.import.phase = Phase::Running(Running { progress, rx, files, current: 0, log: vec![] });
+    app.import.phase = Phase::Running(Running { progress, rx, files, current: 0, log: vec![], started: std::time::Instant::now() });
 }
 
 fn line_of(r: &ingest::IngestReport) -> String {
@@ -370,9 +463,15 @@ pub fn poll(app: &mut App) -> bool {
     if done {
         let cancelled = run.progress.cancelled();
         let (d, _) = run.progress.get();
+        let mb = run.progress.bytes_before.load(Ordering::Relaxed) as f64 / 1e6;
+        let secs = run.started.elapsed().as_secs_f64();
         let mut lines = std::mem::take(&mut run.log);
         lines.push(String::new());
-        lines.push(format!("{} file(s), {d} bars stored{}", run.files.len(), if cancelled { " · cancelled" } else { "" }));
+        lines.push(format!(
+            "{} file(s), {mb:.1} MB, {d} bars stored in {secs:.1} s{}",
+            run.files.len(),
+            if cancelled { " · cancelled" } else { "" }
+        ));
         app.import.phase = Phase::Done { lines, cancelled };
         app.dispatch(super::action::Action::Refresh);
     }
@@ -604,7 +703,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect) {
     let mut pv = vec![];
     if let Some(p) = cur {
         if st.preview.as_ref().is_none_or(|(q, _)| *q != p) {
-            st.preview = Some((p.clone(), head(&p, 8)));
+            st.preview = Some((p.clone(), preview_bars(&p)));
         }
         let (sym, dur) = ImportState::guess(&p);
         pv.push(Line::from(vec![Span::styled("symbol ", Style::new().fg(t.muted)), Span::styled(sym, Style::new().fg(t.fg))]));
@@ -613,8 +712,8 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect) {
             pv.push(Line::styled(format!("size   {:.1} MB", m.len() as f64 / 1e6), Style::new().fg(t.muted)));
         }
         pv.push(Line::raw(""));
-        for l in &st.preview.as_ref().unwrap().1 {
-            pv.push(Line::styled(l.clone(), Style::new().fg(t.fg)));
+        for r in &st.preview.as_ref().unwrap().1 {
+            pv.push(Line::styled(r.text.clone(), Style::new().fg(if r.ok { t.fg } else { t.error })));
         }
     } else {
         pv.push(Line::styled("highlight a file to preview it", Style::new().fg(t.muted)));
@@ -653,25 +752,63 @@ fn style_of(l: &str, t: &Theme) -> Style {
     }
 }
 
+/// "1.2 MB" style.
+pub fn fmt_bytes(b: u64) -> String {
+    let b = b as f64;
+    if b >= 1e9 {
+        format!("{:.2} GB", b / 1e9)
+    } else if b >= 1e6 {
+        format!("{:.1} MB", b / 1e6)
+    } else if b >= 1e3 {
+        format!("{:.0} KB", b / 1e3)
+    } else {
+        format!("{b} B")
+    }
+}
+
+/// Seconds left from the rate so far; None until there is something to go on.
+pub fn eta(done: u64, total: u64, elapsed: f64) -> Option<f64> {
+    if done == 0 || elapsed < 0.5 || done >= total {
+        return None;
+    }
+    let rate = done as f64 / elapsed;
+    Some((total - done) as f64 / rate)
+}
+
+fn fmt_secs(s: f64) -> String {
+    let s = s.round() as u64;
+    if s >= 3600 { format!("{}h{:02}m", s / 3600, s / 60 % 60) } else if s >= 60 { format!("{}m{:02}s", s / 60, s % 60) } else { format!("{s}s") }
+}
+
 fn draw_running(run: &Running, msg: Option<&str>, f: &mut Frame, r: Rect, t: &Theme) {
-    let [info, gauge, log, help] =
-        Layout::vertical([Constraint::Length(2), Constraint::Length(1), Constraint::Min(1), Constraint::Length(1)]).areas(r);
-    let name = run.files.get(run.current).and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let [info, file_g, all_g, stats, log, help] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(2),
+        Constraint::Min(1),
+        Constraint::Length(1),
+    ])
+    .areas(r);
+    let e = run.progress.estimate();
+    let idx = (e.file_index as usize).min(run.files.len().saturating_sub(1));
+    let name = run.files.get(idx).and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    f.render_widget(Paragraph::new(Line::styled(format!(" file {}/{}: {name}", idx + 1, run.files.len()), Style::new().fg(t.fg))), info);
+    let gauge = |ratio: f64, label: String| Gauge::default().gauge_style(Style::new().fg(t.accent).bg(t.bg)).ratio(ratio.clamp(0.0, 1.0)).label(label);
+    f.render_widget(gauge(e.file, format!("file {:.0}%", e.file * 100.0)), file_g);
+    let elapsed = run.started.elapsed().as_secs_f64();
+    let left = eta(e.bytes_done, e.bytes_total, elapsed).map(|s| format!(" · ETA {}", fmt_secs(s))).unwrap_or_default();
     f.render_widget(
-        Paragraph::new(vec![
-            Line::styled(format!(" file {}/{}: {name}", run.current + 1, run.files.len()), Style::new().fg(t.fg)),
-            Line::styled(msg.unwrap_or("").to_string(), Style::new().fg(t.warning)),
-        ]),
-        info,
+        gauge(e.overall, format!("all {:.0}% · {} / {}{left}", e.overall * 100.0, fmt_bytes(e.bytes_done), fmt_bytes(e.bytes_total))),
+        all_g,
     );
     let (d, tot) = run.progress.get();
-    let ratio = if tot == 0 { 0.0 } else { (d as f64 / tot as f64).min(1.0) };
     f.render_widget(
-        Gauge::default()
-            .gauge_style(Style::new().fg(t.accent).bg(t.bg))
-            .ratio(ratio)
-            .label(format!("{d} / {tot} bars ({:.0}%)", ratio * 100.0)),
-        gauge,
+        Paragraph::new(vec![
+            Line::styled(format!(" {d} / {tot} bars stored · {}", fmt_secs(elapsed)), Style::new().fg(t.muted)),
+            Line::styled(msg.unwrap_or("").to_string(), Style::new().fg(t.warning)),
+        ]),
+        stats,
     );
     let v: Vec<Line> = run.log.iter().map(|l| Line::styled(l.clone(), style_of(l, t))).collect();
     let skip = v.len().saturating_sub(log.height as usize);
@@ -693,6 +830,42 @@ mod tests {
         std::fs::write(p.join("ETHUSDT_1h.json"), "[]").unwrap();
         std::fs::write(p.join("notes.md"), "x").unwrap();
         t
+    }
+
+    #[test]
+    fn preview_parses_head_and_marks_invalid_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("BTCUSDT_5m.csv");
+        let mut csv = String::from("timestamp,open,high,low,close,volume\n");
+        csv += "2020-01-01 00:00:00,10,12,9,11,5\n";
+        csv += "2020-01-01 00:05:00,10,9,9,11,5\n"; // high below close
+        csv += "garbage,1,2,0.5,1,1\n";
+        csv += "2020-01-01 00:10:00,11,11,11,11,0\n";
+        for i in 0..50_000 {
+            csv += &format!("2020-02-01 00:{:02}:00,1,1,1,1,1\n", i % 60);
+        }
+        std::fs::write(&f, csv).unwrap();
+        let t = std::time::Instant::now();
+        let v = preview_bars(&f);
+        assert!(t.elapsed().as_millis() < 200);
+        assert_eq!(v.len(), PREVIEW_LINES);
+        assert!(v[0].ok && v[0].text.contains("2020-01-01 00:00:00 BTC/USDT o 10"), "{:?}", v[0]);
+        assert!(!v[1].ok && v[1].text.contains("high below") && v[1].text.contains("00:05:00,10,9"), "{:?}", v[1]);
+        assert!(!v[2].ok && v[2].text.contains("timestamp"), "{:?}", v[2]);
+        assert!(v[3].ok && v[3].text.ends_with("zero-vol"), "{:?}", v[3]);
+        let n = d.path().join("x.ndjson");
+        std::fs::write(&n, "{\"t\":1577836800000,\"o\":1,\"h\":2,\"l\":0.5,\"c\":1.5,\"v\":3}\n").unwrap();
+        let v = preview_bars(&n);
+        assert!(v.len() == 1, "{v:?}");
+    }
+
+    #[test]
+    fn bytes_and_eta_format() {
+        assert_eq!(fmt_bytes(61_855_259), "61.9 MB");
+        assert_eq!(fmt_bytes(512), "512 B");
+        assert_eq!(eta(0, 100, 10.0), None);
+        assert_eq!(eta(50, 100, 10.0), Some(10.0));
+        assert_eq!(eta(100, 100, 10.0), None);
     }
 
     #[test]

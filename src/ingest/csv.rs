@@ -28,6 +28,11 @@ fn byte(c: char, what: &'static str) -> Result<u8> {
 
 /// Read every column as a string; numeric/timestamp parsing happens in normalization.
 pub fn read_csv(path: &Path, o: &CsvOptions) -> Result<DataFrame> {
+    read_csv_bytes(std::fs::read(path)?, o)
+}
+
+/// Parse CSV already in memory (read through a counting reader for progress).
+pub fn read_csv_bytes(bytes: Vec<u8>, o: &CsvOptions) -> Result<DataFrame> {
     let sep = byte(o.delimiter, "--delimiter")?;
     let quote = byte(o.quote, "--quote")?;
     if let Some(e) = o.escape {
@@ -44,7 +49,7 @@ pub fn read_csv(path: &Path, o: &CsvOptions) -> Result<DataFrame> {
         .with_skip_rows(o.skip_rows)
         .with_infer_schema_length(Some(0))
         .map_parse_options(|p| p.with_separator(sep).with_quote_char(Some(quote)).with_truncate_ragged_lines(true))
-        .try_into_reader_with_file_path(Some(path.to_path_buf()))?
+        .into_reader_with_file_handle(std::io::Cursor::new(bytes))
         .finish()?;
     Ok(df)
 }

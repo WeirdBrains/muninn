@@ -104,6 +104,11 @@ pub fn is_ndjson(p: &Path) -> bool {
     p.extension().is_some_and(|e| matches!(e.to_string_lossy().to_ascii_lowercase().as_str(), "ndjson" | "jsonl"))
 }
 
+/// Parse JSON (array/object) or NDJSON bytes into a frame.
+pub fn read_json_bytes(b: &[u8], ndjson: bool) -> Result<DataFrame> {
+    records_to_frame(&parse_records(b, ndjson, None)?)
+}
+
 pub fn read_json_file(p: &Path, records: Option<&str>) -> Result<DataFrame> {
     let b = std::fs::read(p)?;
     records_to_frame(&parse_records(&b, is_ndjson(p), records)?)
@@ -114,8 +119,9 @@ pub fn ingest_json(store: &mut Store, io: Interact, opts: IngestOptions, path: &
     let kind = if path.is_dir() { "directory" } else { "file" };
     let mut s = Session::new(store, io, opts, kind, &canonical(path));
     let mut out = Vec::new();
+    let prog = s.opts.progress.clone();
     for f in files {
-        let bytes = std::fs::read(&f)?;
+        let bytes = super::progress::read_counted(&f, prog.clone())?;
         let frame = records_to_frame(&parse_records(&bytes, is_ndjson(&f), records)?)?;
         out.push(s.ingest(Input {
             locator: canonical(&f),

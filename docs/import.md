@@ -39,7 +39,11 @@ Only folders and data files (`csv tsv txt json ndjson jsonl`) are listed.
 | Esc | close |
 
 The preview shows the guessed symbol and duration (from the file name) and the first
-lines of the highlighted file; it reads only the start of the file.
+10 lines of the highlighted file parsed as bars with the same parser as the import
+(column mapping, timestamps, validation): `time SYMBOL o h l c v [zero-vol]`. Invalid
+lines are shown in red with the reason and the raw line. It reads at most 64 KiB, so
+it is instant on huge files. A large JSON array cannot be parsed from its start, so
+its preview shows raw lines; NDJSON previews parse.
 
 ## Resolution
 
@@ -51,8 +55,19 @@ run. Recently used folders are saved in [preferences](preferences.md)
 ## Progress and cancel
 
 The import runs in a background thread on its own connection, so the TUI stays
-responsive. A gauge shows bars stored / bars to store for the current run and a log
-lists each file's result. **Esc cancels** after the current chunk (50 000 bars); bars
+responsive. Progress is byte-based:
+
+- **file** gauge: the current file's estimated completion;
+- **all** gauge: bytes done / total bytes of every file in the run, with an ETA from
+  the rate so far;
+- bars stored / to store and elapsed time as a secondary line, plus a log of each
+  file's result.
+
+Bytes are counted as the file is read (published every 64 KiB), so the bar moves from
+the first read. Reading is fast compared with storing, so each file's bytes are split
+into phases: reading 10 %, parsing and validating 5 %, storing 85 % (scaled by bars
+stored, reported every 4096 rows). The estimate is therefore linear in bytes across
+files and roughly linear in time within a file. **Esc cancels** after the current chunk (50 000 bars); bars
 already stored stay. The summary lists inserted, duplicate, rejected rows and gaps per
 series; identical files already imported are skipped. Rows failing validation are
 dropped (see the CLI `--rejects` option to keep a report).
