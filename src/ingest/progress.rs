@@ -7,7 +7,7 @@
 //! bars stored / bars to store. Overall progress = (bytes of finished files + the
 //! current file's estimated bytes) / total bytes.
 use std::io::Read;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicU8, Ordering::Relaxed};
 use std::sync::Arc;
 
 pub const READ_SHARE: f64 = 0.10;
@@ -32,6 +32,32 @@ pub struct Progress {
     pub file_parsed: AtomicBool,
     pub file_bars_done: AtomicU64,
     pub file_bars_total: AtomicU64,
+    /// Current phase (see [`Phase`]).
+    pub phase: AtomicU8,
+    /// When a cancel was asked for (ms since epoch) and by whom (1 = TUI, 2 = CLI).
+    pub cancel_at: AtomicI64,
+    pub cancel_by: AtomicU8,
+}
+
+/// What the importer is doing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Phase {
+    Idle = 0,
+    Read = 1,
+    Parse = 2,
+    Store = 3,
+}
+
+impl Phase {
+    pub fn name(self) -> &'static str {
+        match self {
+            Phase::Idle => "idle",
+            Phase::Read => "read",
+            Phase::Parse => "parse",
+            Phase::Store => "store",
+        }
+    }
 }
 
 /// A snapshot for display.
@@ -50,6 +76,31 @@ pub struct Estimate {
 impl Progress {
     pub fn cancelled(&self) -> bool {
         self.cancel.load(Relaxed)
+    }
+    /// Ask the import to stop; `by` is `tui` or `cli`. The first request wins.
+    pub fn request_cancel(&self, by: &str) {
+        if !self.cancel.swap(true, Relaxed) {
+            self.cancel_at.store(crate::store::now_ms(), Relaxed);
+            self.cancel_by.store(if by == "cli" { 2 } else { 1 }, Relaxed);
+        }
+    }
+    pub fn cancel_by_name(&self) -> &'static str {
+        match self.cancel_by.load(Relaxed) {
+            2 => "cli",
+            1 => "tui",
+            _ => "unknown",
+        }
+    }
+    pub fn set_phase(&self, p: Phase) {
+        self.phase.store(p as u8, Relaxed);
+    }
+    pub fn phase(&self) -> Phase {
+        match self.phase.load(Relaxed) {
+            1 => Phase::Read,
+            2 => Phase::Parse,
+            3 => Phase::Store,
+            _ => Phase::Idle,
+        }
     }
     /// Bars (done, total).
     pub fn get(&self) -> (u64, u64) {
@@ -163,7 +214,10 @@ pub fn read_counted(path: &std::path::Path, progress: Option<Arc<Progress>>) -> 
     let f = std::fs::File::open(path)?;
     let len = f.metadata().map(|m| m.len()).unwrap_or(0);
     let mut out = Vec::with_capacity(len as usize + 1);
-    let mut r = CountingReader::new(f, progress);
+    if let Some(p) = &progress {
+        p.set_phase(Phase::Read);
+    }
+    let mut r = CountingReader::new(f, progress.clone());
     let mut buf = vec![0u8; FLUSH_BYTES as usize];
     loop {
         let n = r.read(&mut buf)?;
@@ -171,6 +225,10 @@ pub fn read_counted(path: &std::path::Path, progress: Option<Arc<Progress>>) -> 
             break;
         }
         out.extend_from_slice(&buf[..n]);
+    }
+    drop(r);
+    if let Some(p) = &progress {
+        p.set_phase(Phase::Parse);
     }
     Ok(out)
 }

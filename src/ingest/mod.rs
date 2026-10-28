@@ -27,6 +27,8 @@ pub struct IngestOptions {
     pub drop_zero_volume: bool,
     /// Live progress and cancellation (TUI import); checked per stored chunk.
     pub progress: Option<std::sync::Arc<Progress>>,
+    /// Import run whose artifact ledger this ingest writes to.
+    pub run_id: Option<i64>,
 }
 
 pub use progress::{CountingReader, Estimate, Progress};
@@ -168,6 +170,8 @@ pub struct Session<'a> {
     rejects_started: bool,
     /// Source name used when none is given and the locator is unknown (services).
     pub default_source: Option<String>,
+    /// Artifacts of the input being ingested (written when it commits or rolls back).
+    pending: Vec<crate::store::Artifact>,
 }
 
 impl<'a> Session<'a> {
@@ -183,6 +187,7 @@ impl<'a> Session<'a> {
             prompted_duration: None,
             rejects_started: false,
             default_source: None,
+            pending: vec![],
         }
     }
 
@@ -287,8 +292,15 @@ impl<'a> Session<'a> {
     /// nothing of this input stays (bars, series stats, ingest run).
     pub fn ingest(&mut self, input: Input) -> Result<IngestReport> {
         self.store.begin_atomic()?;
+        self.pending.clear();
+        let file = input.locator.clone();
         match self.ingest_inner(input) {
             Ok(r) => {
+                if let Some(run) = self.opts.run_id {
+                    for a in std::mem::take(&mut self.pending) {
+                        self.store.add_artifact(run, &a)?;
+                    }
+                }
                 self.store.commit_atomic()?;
                 Ok(r)
             }
@@ -296,9 +308,22 @@ impl<'a> Session<'a> {
                 let _ = self.store.rollback_atomic();
                 // A source created inside the rolled-back unit no longer exists.
                 self.source = None;
+                if let Some(run) = self.opts.run_id {
+                    for mut a in std::mem::take(&mut self.pending) {
+                        a.state = "rolled_back".into();
+                        let _ = self.store.add_artifact(run, &a);
+                    }
+                    if let Some(p) = self.opts.progress.as_ref().filter(|p| p.cancelled()) {
+                        let _ = self.store.record_cancel(run, p.cancel_at.load(std::sync::atomic::Ordering::Relaxed), p.cancel_by_name(), &file, p.phase().name());
+                    }
+                }
                 Err(e)
             }
         }
+    }
+
+    fn note(&mut self, kind: &str, reference: String, file: &str) {
+        self.pending.push(crate::store::Artifact { kind: kind.into(), reference, file: file.into(), state: "kept".into() });
     }
 
     fn ingest_inner(&mut self, input: Input) -> Result<IngestReport> {
@@ -308,7 +333,15 @@ impl<'a> Session<'a> {
         let overrides = parse_map(&self.opts.map)?;
         let cols = Columns::from_frame(&input.frame, &overrides)?;
         rep.rows = cols.len() as u64;
+        let had_source = self.source.is_some();
+        let known = match &self.opts.source {
+            Some(n) => self.store.source_by_name(n)?.is_some(),
+            None => true,
+        };
         let source = self.resolve_source()?;
+        if !had_source && !known {
+            self.note("source", source.id.clone(), &input.locator);
+        }
         let symbol = self.resolve_symbol(input.name_hint.as_deref())?;
         let valid_ts = cols.valid_ts();
         let duration = self.resolve_duration(input.name_hint.as_deref(), &valid_ts, &mut rep.warnings)?;
@@ -345,8 +378,15 @@ impl<'a> Session<'a> {
         rep.first = ts.iter().min().copied();
         rep.last = ts.iter().max().copied();
 
+        let series_ref = format!("{}|{}|{}", source.name, symbol.display(), duration);
+        if !self.store.has_series(&source.id, &symbol.base, &symbol.quote, duration.0)? {
+            self.note("series", series_ref.clone(), &input.locator);
+        }
         let mut counts = UpsertCounts::default();
         let prog = self.opts.progress.clone();
+        if let Some(p) = &prog {
+            p.set_phase(progress::Phase::Store);
+        }
         if let Some(p) = &prog {
             p.parsed(v.bars.len() as u64);
         }
@@ -374,6 +414,9 @@ impl<'a> Session<'a> {
         rep.duplicate = counts.duplicate;
         self.store
             .record_run(&source, &input.locator, &input.content_hash, &symbol, duration, started_ms, counts, rep.rejected)?;
+        let rid = self.store.last_rowid();
+        self.note("bars", format!("{series_ref}: {} inserted", counts.inserted), &input.locator);
+        self.note("ingest_record", rid.to_string(), &input.locator);
         rep.elapsed_ms = started.elapsed().as_millis();
         Ok(rep)
     }
@@ -420,4 +463,35 @@ pub fn ingest_csv(store: &mut Store, io: Interact, opts: IngestOptions, path: &P
         out.push(s.ingest(input)?);
     }
     Ok(out)
+}
+
+/// Run `f` as one tracked import run: an `import_runs` row (origin `tui`/`cli`), the
+/// artifact ledger, cleanup of empty leftovers, and the final status (`completed`,
+/// `cancelled` or `failed`).
+pub fn tracked<F>(store: &mut Store, origin: &str, files_total: usize, mut opts: IngestOptions, f: F) -> Result<Vec<IngestReport>>
+where
+    F: FnOnce(&mut Store, IngestOptions) -> Result<Vec<IngestReport>>,
+{
+    let run = store.begin_import_run(origin, files_total)?;
+    opts.run_id = Some(run);
+    let prog = opts.progress.clone();
+    let mut r = f(store, opts);
+    if let Some(p) = prog.as_ref().filter(|p| p.cancelled()) {
+        // Cancelled outside a file's transaction (while reading, or between files).
+        if store.import_run(run)?.is_some_and(|x| x.cancel_requested_at.is_none()) {
+            store.record_cancel(run, p.cancel_at.load(std::sync::atomic::Ordering::Relaxed), p.cancel_by_name(), "", p.phase().name())?;
+        }
+        if r.is_err() {
+            r = Err(Error::Aborted);
+        }
+    }
+    let removed = store.cleanup_run(run).unwrap_or(0);
+    let kept = store.import_artifacts(run).map(|a| a.iter().filter(|a| a.kind == "ingest_record" && a.state == "kept").count()).unwrap_or(0);
+    let (status, note) = match &r {
+        Ok(_) => ("completed", String::new()),
+        Err(Error::Aborted) => ("cancelled", format!("current file rolled back; {removed} empty leftover(s) removed")),
+        Err(e) => ("failed", e.to_string()),
+    };
+    store.finish_import_run(run, status, kept, &note)?;
+    r
 }

@@ -63,6 +63,7 @@ native-tls = { version = "0.2", features = ["vendored"] }
 tar = "0.4"
 zstd = "0.13"
 tempfile = "3"
+ctrlc = "3"
 
 
 # Crypto (scrypt/argon2), SQLCipher and Polars are very slow unoptimized; optimize deps in dev/test.

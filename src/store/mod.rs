@@ -5,6 +5,8 @@ use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use std::path::Path;
 
 mod query;
+pub mod runs;
+pub use runs::{Artifact, ImportRun};
 pub use query::BarSort;
 
 pub const SCHEMA_VERSION: i64 = 1;
@@ -75,7 +77,7 @@ CREATE TABLE series_stats (
 );
 INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MIN(timestamp), MAX(timestamp)
     FROM bars GROUP BY source_id, base, quote, duration_s;
-"#];
+"#, runs::MIGRATION];
 
 pub fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()

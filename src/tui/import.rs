@@ -205,6 +205,8 @@ pub enum Msg {
     Failed(String, String),
     /// Cancelled while importing this file; it was rolled back.
     Cancelled(String),
+    /// The import run id (ledger).
+    Run(i64),
     Done,
 }
 
@@ -219,6 +221,9 @@ pub struct Running {
     pub confirm: bool,
     /// Files fully imported (kept).
     pub kept: usize,
+    pub run_id: Option<i64>,
+    /// The folder was added to Recent by this run (undone if nothing is kept).
+    pub recent_added: bool,
 }
 
 pub enum Phase {
@@ -480,6 +485,11 @@ pub fn start(app: &mut App, files: Vec<PathBuf>) {
                 return;
             }
         };
+        let mut opts = opts;
+        let run = store.begin_import_run("tui", list.len()).ok();
+        opts.run_id = run;
+        let mut kept = 0usize;
+        let mut failed = false;
         for (i, f) in list.iter().enumerate() {
             if opts.progress.as_ref().is_some_and(|p| p.cancelled()) {
                 break;
@@ -499,21 +509,43 @@ pub fn start(app: &mut App, files: Vec<PathBuf>) {
             }
             let name = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
             let _ = match r {
-                Ok(reps) => tx.send(Msg::Report(name, reps.iter().map(line_of).collect())),
+                Ok(reps) => {
+                    kept += 1;
+                    tx.send(Msg::Report(name, reps.iter().map(line_of).collect()))
+                }
                 Err(_) if opts.progress.as_ref().is_some_and(|p| p.cancelled()) => tx.send(Msg::Cancelled(name)),
-                Err(e) => tx.send(Msg::Failed(name, e.to_string())),
+                Err(e) => {
+                    failed = true;
+                    tx.send(Msg::Failed(name, e.to_string()))
+                }
             };
+        }
+        if let Some(run) = run {
+            let cancelled = opts.progress.as_ref().is_some_and(|p| p.cancelled());
+            if cancelled {
+                // A cancel that landed between files has no file to name.
+                if let Some(p) = &opts.progress
+                    && store.import_run(run).ok().flatten().is_some_and(|r| r.cancel_requested_at.is_none())
+                {
+                    let _ = store.record_cancel(run, p.cancel_at.load(Ordering::Relaxed), p.cancel_by_name(), "", p.phase().name());
+                }
+            }
+            let removed = store.cleanup_run(run).unwrap_or(0);
+            let status = if cancelled { "cancelled" } else if failed { "failed" } else { "completed" };
+            let _ = store.finish_import_run(run, status, kept, &format!("{removed} empty leftover(s) removed"));
+            let _ = tx.send(Msg::Run(run));
         }
         let _ = tx.send(Msg::Done);
     });
     // remember the folder
     let d = app.import.dir.display().to_string();
     let r = &mut app.prefs.tui.import_recent;
+    let recent_added = !r.contains(&d);
     r.retain(|x| *x != d);
     r.insert(0, d);
     r.truncate(RECENT_MAX);
     app.save_prefs();
-    app.import.phase = Phase::Running(Running { progress, rx, files, current: 0, log: vec![], started: std::time::Instant::now(), confirm: false, kept: 0 });
+    app.import.phase = Phase::Running(Running { progress, rx, files, current: 0, log: vec![], started: std::time::Instant::now(), confirm: false, kept: 0, run_id: None, recent_added });
 }
 
 fn line_of(r: &ingest::IngestReport) -> String {
@@ -538,6 +570,7 @@ pub fn poll(app: &mut App) -> bool {
             }
             Msg::Failed(n, e) => run.log.push(format!("✗ {n}: {e} (rolled back)")),
             Msg::Cancelled(n) => run.log.push(format!("✗ {n}: cancelled, rolled back (nothing of it stored)")),
+            Msg::Run(id) => run.run_id = Some(id),
             Msg::Done => done = true,
         }
     }
@@ -549,6 +582,13 @@ pub fn poll(app: &mut App) -> bool {
         let secs = run.started.elapsed().as_secs_f64();
         let mut lines = std::mem::take(&mut run.log);
         lines.push(String::new());
+        let mut undo_recent = None;
+        if cancelled && run.kept == 0 && run.recent_added {
+            undo_recent = Some(app.import.dir.display().to_string());
+        }
+        if let Some(id) = run.run_id {
+            lines.push(format!("import run #{id} · ledger: mnnn ingest runs --show {id}"));
+        }
         if cancelled {
             let started = (run.current + 1).min(run.files.len());
             let discarded = started - run.kept.min(started);
@@ -563,7 +603,19 @@ pub fn poll(app: &mut App) -> bool {
             run.files.len(),
             if cancelled { " · cancelled" } else { "" }
         ));
+        let run_id = run.run_id;
         app.import.phase = Phase::Done { lines, cancelled };
+        if let Some(d) = undo_recent {
+            // Nothing was imported: the Recent entry this run added goes too.
+            app.prefs.tui.import_recent.retain(|x| *x != d);
+            app.save_prefs();
+            if let Some(id) = run_id {
+                let _ = app.store.add_artifact(
+                    id,
+                    &crate::store::Artifact { kind: "recent".into(), reference: d, file: String::new(), state: "removed".into() },
+                );
+            }
+        }
         app.dispatch(super::action::Action::Refresh);
     }
     done
@@ -584,7 +636,7 @@ pub fn confirm_cancel(app: &mut App, yes: bool) {
     if let Phase::Running(r) = &mut app.import.phase {
         r.confirm = false;
         if yes {
-            r.progress.cancel.store(true, Ordering::Relaxed);
+            r.progress.request_cancel("tui");
             app.import.message = Some("Cancelling… rolling back the current file".into());
         }
     }

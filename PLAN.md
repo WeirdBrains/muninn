@@ -272,7 +272,10 @@ retyped at any time.
   happens, then parse and store phases weighted into each file's bytes) -> summary (inserted / duplicate / rejected / gaps). The ingest runs in a background
   task so the TUI stays responsive. [Cancel] / Esc / c (with confirm) stops it
   cooperatively: finished files stay, the current file is rolled back (each file is one
-  all-or-nothing transaction), the rest are not started.
+  all-or-nothing transaction), the rest are not started. Every run is an `import_runs`
+  row (origin, status, cancel time/by/file/phase) with an `import_artifacts` ledger
+  (kept / rolled_back / removed); empty leftovers (new sources, Recent entry) are
+  cleaned up. CLI Ctrl-C cancels the same way. `mnnn ingest runs` shows them.
 - Places column (Places (p)): built-ins (Home, Projects, raw/data, working folder),
   bookmarks (`b` toggles, `x` removes) and recent folders; clickable, `1`–`9`, `p` focuses.
 - Every popup draws the shared [X] close control in its title bar (same as Esc).

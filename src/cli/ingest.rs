@@ -14,6 +14,7 @@ pub fn options(ctx: &Ctx, c: &CommonIngestArgs) -> anyhow::Result<IngestOptions>
         rejects: c.rejects.clone(),
         force: c.force,
         drop_zero_volume: ctx.prefs()?.ingest.drop_zero_volume,
+        run_id: None,
         progress: None,
     })
 }
@@ -39,16 +40,65 @@ pub fn run(ctx: &Ctx, cmd: IngestCommand) -> anyhow::Result<()> {
                 header: !a.no_header,
                 skip_rows: a.skip_rows,
             };
-            ingest::ingest_csv(&mut store, ctx.io, opts, &a.path, &csv)?
+            let n = ingest::expand_path(&a.path, &["csv", "tsv", "txt"]).map(|v| v.len()).unwrap_or(0);
+            let opts = cancellable(opts);
+            ingest::tracked(&mut store, "cli", n, opts, |st, o| ingest::ingest_csv(st, ctx.io, o, &a.path, &csv)).map_err(cancelled)?
         }
         IngestCommand::Json(a) => {
-            let opts = options(ctx, &a.common)?;
-            ingest::json::ingest_json(&mut store, ctx.io, opts, &a.path, a.records.as_deref())?
+            let opts = cancellable(options(ctx, &a.common)?);
+            let n = ingest::expand_path(&a.path, &["json", "ndjson", "jsonl"]).map(|v| v.len()).unwrap_or(0);
+            ingest::tracked(&mut store, "cli", n, opts, |st, o| ingest::json::ingest_json(st, ctx.io, o, &a.path, a.records.as_deref()))
+                .map_err(cancelled)?
         }
         IngestCommand::Service(s) => service(ctx, &mut store, s)?,
+        IngestCommand::Runs(a) => {
+            let run = match a.show {
+                Some(id) => store.import_run(id)?,
+                None => store.last_import_run()?,
+            };
+            let Some(r) = run else {
+                println!("no import runs yet");
+                return Ok(());
+            };
+            println!("run #{} · {} · {} · {}/{} file(s) kept", r.id, r.origin, r.status, r.files_done, r.files_total);
+            if let Some(at) = r.cancel_requested_at {
+                println!(
+                    "cancel requested {} by {} during {} ({})",
+                    ingest::time::fmt_ts(at),
+                    r.cancel_by.unwrap_or_default(),
+                    r.cancel_phase.unwrap_or_default(),
+                    r.cancel_file.unwrap_or_default()
+                );
+            }
+            if let Some(n) = r.note.filter(|n| !n.is_empty()) {
+                println!("note: {n}");
+            }
+            for x in store.import_artifacts(r.id)? {
+                println!("  {:<12} {:<13} {} {}", x.state, x.kind, x.reference, x.file);
+            }
+            return Ok(());
+        }
     };
     report(ctx, &reports);
     Ok(())
+}
+
+/// Ctrl-C asks the import to stop cleanly (the current file is rolled back) instead of
+/// killing the process.
+fn cancellable(mut o: IngestOptions) -> IngestOptions {
+    let p = std::sync::Arc::new(ingest::Progress::default());
+    let h = p.clone();
+    if ctrlc::set_handler(move || h.request_cancel("cli")).is_ok() {
+        o.progress = Some(p);
+    }
+    o
+}
+
+fn cancelled(e: crate::Error) -> anyhow::Error {
+    match e {
+        crate::Error::Aborted => anyhow::anyhow!("import cancelled: finished files were kept, the current file was rolled back"),
+        e => e.into(),
+    }
 }
 
 fn secret(p: &PasswordArgs) -> Secret {

@@ -111,6 +111,15 @@ pub enum IngestCommand {
     /// Ingest from a service.
     #[command(subcommand)]
     Service(ServiceCommand),
+    /// Show import runs (status, cancels) and their artifact ledger.
+    Runs(RunsArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct RunsArgs {
+    /// Show one run with its artifacts (default: the latest run).
+    #[arg(long)]
+    pub show: Option<i64>,
 }
 
 #[derive(Debug, Clone, Args)]

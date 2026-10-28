@@ -962,3 +962,70 @@ fn cancel_fullsize() {
     assert_eq!(a.store.count_bars().unwrap(), before);
     assert!(a.store.series().unwrap().iter().all(|s| s.source != "big"));
 }
+
+#[test]
+fn cancel_with_new_source_leaves_no_artifacts_and_is_recorded() {
+    use std::sync::atomic::Ordering::Relaxed;
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    big_csv(&d.path().join("SOLUSDT_5m.csv"), 300_000);
+    let recent_before = a.prefs.tui.import_recent.clone();
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.import.fields[0] = "fresh".into();
+    a.on_key(key(KeyCode::Char('a')));
+    a.on_key(key(KeyCode::Char('i')));
+    let t0 = std::time::Instant::now();
+    loop {
+        screen_text(&mut a);
+        if let import::Phase::Running(r) = &a.import.phase
+            && r.progress.file_bars_done.load(Relaxed) > 0
+        {
+            break;
+        }
+        assert!(t0.elapsed().as_secs() < 60);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    a.on_key(key(KeyCode::Char('c')));
+    a.on_key(key(KeyCode::Char('y')));
+    while a.import.running() && t0.elapsed().as_secs() < 60 {
+        screen_text(&mut a);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert!(a.store.source_by_name("fresh").unwrap().is_none(), "no empty source left");
+    assert!(a.series.iter().all(|s| s.source != "fresh"));
+    assert_eq!(a.prefs.tui.import_recent, recent_before, "recent entry undone");
+    let run = a.store.last_import_run().unwrap().unwrap();
+    assert_eq!((run.origin.as_str(), run.status.as_str(), run.cancel_by.as_deref(), run.cancel_phase.as_deref()), ("tui", "cancelled", Some("tui"), Some("store")));
+    assert!(run.cancel_requested_at.is_some() && run.cancel_file.as_deref().unwrap().ends_with("SOLUSDT_5m.csv"));
+    let arts = a.store.import_artifacts(run.id).unwrap();
+    assert!(arts.iter().any(|x| x.kind == "source" && x.state == "rolled_back"), "{arts:?}");
+    assert!(arts.iter().any(|x| x.kind == "series" && x.state == "rolled_back"), "{arts:?}");
+    assert!(arts.iter().any(|x| x.kind == "recent" && x.state == "removed"), "{arts:?}");
+    assert!(arts.iter().all(|x| x.state != "kept"));
+    // re-import works and is recorded as completed with kept artifacts
+    let opts = crate::ingest::IngestOptions { source: Some("fresh".into()), ..Default::default() };
+    let f = d.path().join("SOLUSDT_5m.csv");
+    let r = crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f, &Default::default())).unwrap();
+    assert_eq!(r[0].inserted, 300_000);
+    let run = a.store.last_import_run().unwrap().unwrap();
+    assert_eq!((run.status.as_str(), run.files_done), ("completed", 1));
+    let kinds: Vec<String> = a.store.import_artifacts(run.id).unwrap().into_iter().filter(|x| x.state == "kept").map(|x| x.kind).collect();
+    assert_eq!(kinds, ["source", "series", "bars", "ingest_record"]);
+}
+
+#[test]
+fn cli_style_cancel_is_recorded_by_cli() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let f = d.path().join("SOLUSDT_5m.csv");
+    big_csv(&f, 100_000);
+    let p = std::sync::Arc::new(crate::ingest::Progress::default());
+    p.request_cancel("cli");
+    let opts = crate::ingest::IngestOptions { source: Some("clicx".into()), progress: Some(p), ..Default::default() };
+    let r = crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f, &Default::default()));
+    assert!(r.is_err());
+    let run = a.store.last_import_run().unwrap().unwrap();
+    assert_eq!((run.status.as_str(), run.cancel_by.as_deref(), run.cancel_phase.as_deref()), ("cancelled", Some("cli"), Some("read")));
+    assert!(a.store.source_by_name("clicx").unwrap().is_none());
+}

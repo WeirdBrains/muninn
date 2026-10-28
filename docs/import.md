@@ -91,7 +91,30 @@ What stays and what goes:
 - **Files not started** are not touched.
 
 The summary says how many files were kept, discarded and not started. The same
-all-or-nothing rule applies to the CLI: a file that fails part-way leaves nothing behind.
+all-or-nothing rule applies to the CLI: a file that fails part-way leaves nothing behind,
+and **Ctrl-C** in `mnnn ingest csv|json` cancels the same way (by `cli`).
+
+### Import runs and the artifact ledger
+
+Every import (TUI or CLI) is recorded as an *import run* with a status: `running`,
+`completed`, `failed` or `cancelled`. A cancel is noted when it happens: the time it
+was asked for, by whom (`tui` or `cli`), the file and the phase (`read`, `parse`,
+`store`).
+
+Each run keeps a ledger of what it created: new **source** rows, new **series**,
+**bars** (per series, with the count inserted), the **ingest record** used to skip
+identical files, and the **recent** folder entry. Artifacts of finished files are
+`kept`. Those of the cancelled or failed file are rolled back and listed as
+`rolled_back`. After the run, anything the run created that ended up empty (for
+example a new source whose only file was cancelled) is deleted and listed as
+`removed`; if nothing was imported, the Recent entry the run added is removed too.
+
+```
+mnnn ingest runs              # latest run
+mnnn ingest runs --show 12    # one run with its ledger
+```
+
+The TUI summary shows the run number.
 
 ## Places
 
