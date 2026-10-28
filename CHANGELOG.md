@@ -6,6 +6,13 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-27
+
+### Added
+- TUI header with the MUNINN banner, version and status; compact on short terminals.
+- Menu bar (File, View, Data, Keys, Theme, Help) with submenus, mnemonics, shortcuts and mouse support.
+- Menus, keys and help share named actions; Menus and Keybindings help topics.
+
 ## [0.1.0] - 2026-10-27
 
 ### Added
@@ -20,5 +27,6 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kommandosaldat/muninn/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kommandosaldat/muninn/releases/tag/v0.1.0
