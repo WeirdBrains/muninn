@@ -324,6 +324,8 @@ pub struct ImportState {
     pub message: Option<String>,
     /// Highlighted entry in the Places column.
     pub place_sel: usize,
+    /// The symbol popup, while one is open.
+    pub ask: Option<SymbolAsk>,
 }
 
 pub const FIELDS: [&str; 3] = ["source", "symbol", "duration"];
@@ -352,13 +354,14 @@ impl ImportState {
             preview: None,
             message: None,
             place_sel: 0,
+            ask: None,
         };
         s.reload();
         s
     }
 
     pub fn typing(&self) -> bool {
-        matches!(self.phase, Phase::Browse) && !matches!(self.pane, Pane::Files | Pane::Places)
+        self.ask.is_some() || matches!(self.phase, Phase::Browse) && !matches!(self.pane, Pane::Files | Pane::Places)
     }
 
     pub fn running(&self) -> bool {
@@ -558,6 +561,140 @@ pub fn start(app: &mut App, targets: Vec<PathBuf>) {
         app.import.message = Some(format!("no data files (.csv .tsv .txt .json .ndjson .jsonl) in {}", targets[0].display()));
         return;
     }
+    // Ask for the symbol of every file whose name doesn't give one (unless the symbol
+    // field is set): a popup per file, then the import starts.
+    if app.import.fields[1].trim().is_empty() {
+        let ask: Vec<PathBuf> = files
+            .iter()
+            .filter(|f| {
+                let n = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                ingest::symbol_from_name(&app.store, &n).ok().flatten().is_none()
+            })
+            .cloned()
+            .collect();
+        if !ask.is_empty() {
+            app.import.ask = Some(SymbolAsk { files, ask, answers: Default::default(), input: String::new(), error: None });
+            return;
+        }
+    }
+    launch(app, files, Default::default());
+}
+
+/// "Which symbol is this file?" asked before an import for names that don't tell.
+pub struct SymbolAsk {
+    /// Every file of the import.
+    pub files: Vec<PathBuf>,
+    /// Files still to ask about (the first is shown).
+    pub ask: Vec<PathBuf>,
+    pub answers: std::collections::HashMap<PathBuf, String>,
+    pub input: String,
+    pub error: Option<String>,
+}
+
+/// Symbol popup answers: OK (this file), OK for all remaining, skip the file, cancel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AskAction {
+    Ok,
+    All,
+    Skip,
+    Cancel,
+}
+
+pub fn ask_action(app: &mut App, a: AskAction) {
+    let Some(mut q) = app.import.ask.take() else { return };
+    if a == AskAction::Cancel {
+        app.import.message = Some("import cancelled: no symbol given".into());
+        return;
+    }
+    if a == AskAction::Skip {
+        let f = q.ask.remove(0);
+        q.files.retain(|x| *x != f);
+    } else {
+        let sym = match crate::model::Symbol::parse(&q.input) {
+            Ok(s) => s.display(),
+            Err(_) => {
+                q.error = Some(format!("`{}` is not a symbol: type BASE/QUOTE, e.g. BTC/USDT", q.input.trim()));
+                app.import.ask = Some(q);
+                return;
+            }
+        };
+        let take = if a == AskAction::All { q.ask.len() } else { 1 };
+        for f in q.ask.drain(..take) {
+            q.answers.insert(f, sym.clone());
+        }
+        q.input.clear();
+        q.error = None;
+    }
+    if !q.ask.is_empty() {
+        app.import.ask = Some(q);
+    } else if q.files.is_empty() {
+        app.import.message = Some("nothing to import: every file was skipped".into());
+    } else {
+        launch(app, q.files, q.answers);
+    }
+}
+
+fn ask_key(app: &mut App, k: KeyEvent) {
+    let Some(q) = app.import.ask.as_mut() else { return };
+    match k.code {
+        KeyCode::Enter => ask_action(app, AskAction::Ok),
+        KeyCode::Esc => ask_action(app, AskAction::Cancel),
+        KeyCode::Tab => ask_action(app, AskAction::Skip),
+        KeyCode::Char('a') if k.modifiers.contains(ratatui::crossterm::event::KeyModifiers::CONTROL) => ask_action(app, AskAction::All),
+        KeyCode::Backspace => {
+            q.input.pop();
+        }
+        KeyCode::Char(c) => q.input.push(c),
+        _ => {}
+    }
+}
+
+fn draw_ask(q: &SymbolAsk, f: &mut Frame, area: Rect, t: &Theme, hits: &mut Vec<(Rect, super::Hit)>) {
+    let r = super::centered(area, 72.min(area.width), 10.min(area.height));
+    f.render_widget(ratatui::widgets::Clear, r);
+    let b = block("Symbol needed", true, t);
+    let inner = b.inner(r);
+    f.render_widget(b, r);
+    let file = q.ask.first().map(|p| p.display().to_string()).unwrap_or_default();
+    let more = q.ask.len().saturating_sub(1);
+    let mut lines = vec![
+        Line::styled("The symbol can't be guessed from the file name:", Style::new().fg(t.muted)),
+        Line::styled(file, Style::new().fg(t.fg).add_modifier(Modifier::BOLD)),
+        Line::from(vec![
+            Span::styled("symbol ", Style::new().fg(t.accent)),
+            Span::styled(format!("{}▏", q.input), Style::new().fg(t.fg)),
+            Span::styled("  e.g. BTC/USDT", Style::new().fg(t.muted)),
+        ]),
+    ];
+    lines.push(match &q.error {
+        Some(e) => Line::styled(e.clone(), Style::new().fg(t.error)),
+        None if more > 0 => Line::styled(format!("{more} more file(s) after this one"), Style::new().fg(t.muted)),
+        None => Line::raw(""),
+    });
+    f.render_widget(Paragraph::new(lines), inner);
+    let bar = Rect { y: inner.bottom().saturating_sub(1), height: 1, ..inner };
+    let mut keys = vec![("Enter OK", KeyCode::Enter)];
+    if more > 0 {
+        keys.push(("Ctrl-a OK for all", KeyCode::F(30)));
+    }
+    keys.extend([("Tab skip file", KeyCode::Tab), ("Esc cancel", KeyCode::Esc)]);
+    let start = hits.len();
+    super::widgets::key_bar(f, bar, &keys, t, hits);
+    // map the key buttons to the popup's actions
+    for (_, h) in hits[start..].iter_mut() {
+        *h = super::Hit::ImportAsk(match h {
+            super::Hit::Press(KeyCode::Enter) => 0,
+            super::Hit::Press(KeyCode::F(30)) => 1,
+            super::Hit::Press(KeyCode::Tab) => 2,
+            _ => 3,
+        });
+    }
+    let x = super::widgets::close_button(f, r, t);
+    hits.push((x, super::Hit::ImportAsk(3)));
+}
+
+/// Start the background import of `files`; `symbols` gives a symbol for some files.
+fn launch(app: &mut App, files: Vec<PathBuf>, symbols: std::collections::HashMap<PathBuf, String>) {
     let progress = Arc::new(Progress::default());
     let sizes: Vec<u64> = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).collect();
     progress.bytes_total.store(sizes.iter().sum(), Ordering::Relaxed);
@@ -598,10 +735,14 @@ pub fn start(app: &mut App, targets: Vec<PathBuf>) {
                 p.begin_file(i as u64, sizes[i]);
             }
             let io = crate::interact::Interact::batch(true);
+            let mut o = opts.clone();
+            if let Some(sym) = symbols.get(f) {
+                o.symbol = Some(sym.clone());
+            }
             let r = if super::forms::is_json(f) {
-                ingest::json::ingest_json(&mut store, io, opts.clone(), f, None)
+                ingest::json::ingest_json(&mut store, io, o, f, None)
             } else {
-                ingest::ingest_csv(&mut store, io, opts.clone(), f, &Default::default())
+                ingest::ingest_csv(&mut store, io, o, f, &Default::default())
             };
             if let Some(p) = &opts.progress {
                 p.end_file();
@@ -758,6 +899,7 @@ pub fn confirm_cancel(app: &mut App, yes: bool) {
 
 /// Close the popup ([X] or Esc); during an import this asks to cancel instead.
 pub fn close(app: &mut App) {
+    app.import.ask = None;
     match app.import.phase {
         Phase::Running(_) => request_cancel(app),
         Phase::Done { .. } => {
@@ -781,6 +923,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             st.path = p;
             st.pane = Pane::Path;
         }
+        Hit::ImportAsk(n) => ask_action(app, [AskAction::Ok, AskAction::All, AskAction::Skip, AskAction::Cancel][n.min(3) as usize]),
         Hit::ImportEntry(i) => {
             let st = &mut app.import;
             if st.pane == Pane::Files && st.sel == i {
@@ -810,6 +953,9 @@ pub fn on_click(app: &mut App, h: super::Hit) {
 }
 
 pub fn on_key(app: &mut App, k: KeyEvent) {
+    if app.import.ask.is_some() {
+        return ask_key(app, k);
+    }
     match &app.import.phase {
         Phase::Running(r) => {
             if r.confirm {
@@ -990,6 +1136,12 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
 pub fn draw(app: &mut App, f: &mut Frame, r: Rect) {
     let mut hits = std::mem::take(&mut app.modal_hits);
     draw_body(app, f, r, &mut hits);
+    if let Some(q) = &app.import.ask {
+        // the symbol popup takes every click while it is open
+        hits.clear();
+        let t = app.theme.clone();
+        draw_ask(q, f, r, &t, &mut hits);
+    }
     app.modal_hits = hits;
 }
 

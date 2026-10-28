@@ -1209,3 +1209,51 @@ fn popup_rows_forms_and_list_rows_are_clickable() {
     click_on(&mut a, |h| *h == Hit::ListRow(1, row));
     assert_eq!(a.caches[&1].list.sel, row);
 }
+
+#[test]
+fn import_asks_for_a_symbol_it_cannot_guess() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    std::fs::copy(fx.join("unnamed.csv"), d.path().join("mystery_5m.csv")).unwrap();
+    std::fs::copy(fx.join("unnamed.csv"), d.path().join("other_5m.csv")).unwrap();
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("SOLUSDT_5m.csv")).unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.on_key(key(KeyCode::Char('A')));
+    assert!(!a.import.running());
+    let s = screen_text(&mut a);
+    assert!(s.contains("Symbol needed") && s.contains("mystery_5m.csv") && s.contains("1 more file"), "{s}");
+    assert_eq!(a.import.ask.as_ref().unwrap().ask.len(), 2); // SOLUSDT is guessed
+    // a bad answer stays in the popup with an error
+    for c in "zzz".chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    a.on_key(key(KeyCode::Enter));
+    assert!(screen_text(&mut a).contains("is not a symbol"));
+    // [X] cancels without importing
+    click_on(&mut a, |h| *h == Hit::ImportAsk(3));
+    assert!(a.import.ask.is_none() && !a.import.running());
+    // again: answer the first, skip the second (clicked)
+    a.on_key(key(KeyCode::Char('A')));
+    for c in "xmr/usdt".chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    a.on_key(key(KeyCode::Enter));
+    assert!(screen_text(&mut a).contains("other_5m.csv"));
+    click_on(&mut a, |h| *h == Hit::ImportAsk(2));
+    let s = wait_import(&mut a);
+    assert!(s.contains("2 file(s)"), "{s}");
+    assert!(a.series.iter().any(|x| x.symbol.to_string() == "XMR/USDT"));
+    assert!(a.series.iter().any(|x| x.symbol.to_string() == "SOL/USDT"));
+    // the symbol field skips the question
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.import.fields[1] = "LTC/USDT".into();
+    a.import.sel = a.import.entries.iter().position(|e| e.name == "other_5m.csv").unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    assert!(a.import.ask.is_none() && a.import.running());
+    wait_import(&mut a);
+    assert!(a.series.iter().any(|x| x.symbol.to_string() == "LTC/USDT"));
+}

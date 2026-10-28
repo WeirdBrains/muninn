@@ -149,6 +149,22 @@ recent entry (built-ins stay). Bookmarks and recents are saved in
 [preferences](preferences.md) (`tui.import_bookmarks`, `tui.import_recent`). The
 popup opens in the most recent folder.
 
+## When the symbol can't be guessed
+
+If a file's name doesn't tell its symbol (for example `export_5m.csv`) and the symbol
+field is empty, a **Symbol needed** popup asks for it before the import starts, one
+file at a time:
+
+| key / button | action |
+|---|---|
+| type, Enter / `[Enter OK]` | use this symbol (BASE/QUOTE, e.g. `BTC/USDT`) for this file |
+| Ctrl-a / `[Ctrl-a OK for all]` | use it for this and every remaining file |
+| Tab / `[Tab skip file]` | leave this file out |
+| Esc / `[Esc cancel]` / `[X]` | cancel the import (nothing is imported) |
+
+An invalid symbol shows an error and keeps the popup open. Filling the symbol field
+(`y`) beforehand skips the question.
+
 ## Mouse
 
 Click a file or folder to highlight it and click it again to open the folder or import
