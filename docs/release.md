@@ -22,8 +22,20 @@ cancel queued tag runs beyond one pending.) The Arch job builds `muninn-bin` for
 `x86_64` and `aarch64` (the aarch64 one repackages the prebuilt aarch64 tarball with
 `CARCH=aarch64`); both packages are release assets listed in `SHA256SUMS`.
 
-Release notes are the tag annotation plus the version's `CHANGELOG.md` section
-(`scripts/release-notes.sh X.Y.Z`). `.github/workflows/ci.yml` builds, lints and tests
+The release is named `Muninn vX.Y.Z` and its notes are the version's `CHANGELOG.md`
+section (`scripts/release-notes.sh X.Y.Z`). Write each bullet as the feature plus how to
+use it (the command or key), e.g. ``Import a whole folder: `mnnn ingest path <DIR>` …``.
+`release.sh` puts bullets under `### Added`, or `### Fixed` / `### Changed` when they
+start with `Fixed: ` / `Changed: `.
+
+To rewrite the notes of already-published releases from `CHANGELOG.md` (allowed for
+immutable releases; only assets and tags are locked) and mark the highest tag Latest:
+
+```sh
+scripts/sync-release-notes.sh --dry-run --latest   # preview
+scripts/sync-release-notes.sh --latest             # every release (or list tags: v1.7.0 v1.8.0)
+```
+ `.github/workflows/ci.yml` builds, lints and tests
 pushes to `main` and pull requests.
 
 After publishing: submit the winget manifests to microsoft/winget-pkgs and copy the

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Local release: bump version, regenerate man pages, changelog entry, commit, annotated tag.
-# Usage: scripts/release.sh 0.2.0 "One-line tag summary" "Added bullet" ["Added bullet" ...]
+# Usage: scripts/release.sh 0.2.0 "One-line tag summary" "Bullet" ["Bullet" ...]
+# Bullets go under "### Added" unless prefixed "Fixed: " or "Changed: ". They become the
+# GitHub release notes, so write each as: feature, then how to use it (command or key).
 # Never pushes.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -17,7 +19,12 @@ python3 - "$ver" "$@" <<'PY'
 import sys, datetime, re
 ver, bullets = sys.argv[1], sys.argv[2:]
 p = "CHANGELOG.md"; s = open(p).read()
-entry = f"## [{ver}] - {datetime.date.today()}\n\n### Added\n" + "".join(f"- {b}\n" for b in bullets) + "\n"
+secs = {"Added": [], "Changed": [], "Fixed": []}
+for b in bullets:
+    m = re.match(r"(Fixed|Changed): (.*)", b, re.S)
+    secs[m.group(1) if m else "Added"].append(m.group(2) if m else b)
+entry = f"## [{ver}] - {datetime.date.today()}\n\n" + "\n".join(
+    f"### {k}\n" + "".join(f"- {b}\n" for b in v) for k, v in secs.items() if v) + "\n"
 s = s.replace("## [Unreleased]\n\n", "## [Unreleased]\n\n" + entry, 1)
 prev = re.search(r"compare/v([0-9.]+)\.\.\.HEAD", s).group(1)
 s = s.replace(f"[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v{prev}...HEAD",

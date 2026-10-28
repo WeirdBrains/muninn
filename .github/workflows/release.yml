@@ -118,18 +118,13 @@ jobs:
           merge-multiple: true
       - name: Checksums, filled-in packaging, notes
         run: |
-          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"  # tag annotation
           ver="${GITHUB_REF_NAME#v}"
           cd dist && sha256sum -- * > SHA256SUMS && cd ..
           python3 scripts/fill-sums.py "$ver" dist
           tar -czf "dist/muninn-$ver-packaging.tar.gz" -C dist packaging
           rm -rf dist/packaging
           cd dist && sha256sum -- muninn-"$ver"-packaging.tar.gz >> SHA256SUMS && cd ..
-          {
-            git for-each-ref "refs/tags/$GITHUB_REF_NAME" --format='%(contents)'
-            echo
-            scripts/release-notes.sh "$ver"
-          } > notes.md
+          scripts/release-notes.sh "$ver" > notes.md  # the CHANGELOG section; the name is "Muninn vX.Y.Z"
       - name: Latest only for the highest tag
         # Runs for several tags finish in any order; only the highest version may be "Latest".
         id: latest

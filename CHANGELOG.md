@@ -9,46 +9,49 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ## [1.12.0] - 2026-10-28
 
 ### Added
-- Tiles show a progress bar (bars read of total) or a spinner while a series loads; load errors are shown
-- Series load in 50,000-bar chunks on the background thread; the UI stays responsive
+- Loading indicator: while a series loads, its tile shows a progress bar (`42%  12,345 / 29,000 bars`) or a spinner until the total is known
+- Series load in the background in chunks, so menus, help and other tiles keep responding; a failed load shows its error in the tile
 
 ## [1.11.0] - 2026-10-28
 
 ### Added
-- Help links are clickable and Tab/Enter-followable; selected links scroll into view
-- Help shows a clickable key bar; / searches from any topic; results and history are clickable
-- mnnn-tui(1) and mnnn-help(1) gain a NOTES section (import auto-load, help keys)
+- Clickable help: click a link to follow it, or select one with `Tab` / `Shift-Tab` and press `Enter`; `Backspace` goes back
+- Help key bar: the shortcuts are listed along the bottom of the help popup and every one is clickable
+- Search from anywhere in help: press `/` (or click the search box) on any topic; click a result or history entry to open it
+- `man mnnn-tui` and `man mnnn-help` gain a NOTES section on importing, help keys and loading
 
 ## [1.10.0] - 2026-10-28
 
 ### Added
-- A finished TUI import loads its first series into the focused tile when no tile shows data
+- Auto-load after import: when a TUI import (`i`) finishes and no tile shows data, the focused tile loads the imported series
 
 ## [1.9.0] - 2026-10-28
 
 ### Added
-- TUI import asks for the symbol in a popup (OK, OK for all, skip, cancel, [X]) when a file name doesn't give it
+- Symbol popup: when the TUI import (`i`) can't guess a symbol from a file name, a popup asks for it; `OK for all` reuses it for the remaining files, or skip the file
 
 ## [1.8.0] - 2026-10-28
 
 ### Added
-- Everything actionable in the TUI is clickable: import files/folders and inputs, popup list rows, form fields and buttons, themes, list-tile rows, and key-button bars
+- Everything actionable in the TUI is clickable: import picker files, folders and inputs, popup rows, form fields and buttons, themes, list rows
+- Key buttons such as `[Close]` and `[OK]` act like pressing that key
 
 ## [1.7.0] - 2026-10-28
 
 ### Added
-- Import a whole path: mnnn ingest path <DIR> (recursive, CSV and JSON, per-file and overall progress); the TUI imports selected or highlighted folders, A imports the current folder
-- ingest csv/json search directories recursively (--no-recursive for the top level)
+- Import a whole folder: `mnnn ingest path <DIR>` imports every CSV and JSON file under it, with per-file and overall progress; in the TUI import (`i`), `A` imports the current folder, or select folders with `Space`
+- `mnnn ingest csv` / `json` given a directory now search it recursively; `--no-recursive` limits them to the top level
 
 ## [1.6.1] - 2026-10-28
 
-### Added
-- Fixed: Arch install — packaging/arch/PKGBUILD now builds from the git checkout (makepkg -si), since the GitHub tarball and release assets it downloaded don't exist publicly; pkgver kept in step by release.sh
+### Fixed
+- Arch install: `cd packaging/arch && makepkg -si` now builds from your git checkout instead of downloading GitHub sources that aren't public
 
 ## [1.6.0] - 2026-10-28
 
 ### Added
-- GitHub Actions release workflow: Linux/macOS/Windows x86_64 and arm64 binaries, .deb, .rpm, Arch, Homebrew and winget assets, SHA256SUMS, GitHub Release; CI workflow
+- Release builds: pushing a `vX.Y.Z` tag publishes Linux, macOS and Windows binaries (x86_64 and arm64), `.deb`, `.rpm`, an Arch package, Homebrew and winget manifests and `SHA256SUMS` as a GitHub Release
+- CI checks every push and pull request (build, clippy, fmt, tests)
 
 ## [1.5.0] - 2026-10-28
 
