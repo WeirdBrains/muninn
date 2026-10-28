@@ -560,7 +560,10 @@ bars), coverage 2017-08-17 04:00 .. 2026-10-27 21:05 UTC, 41.3 s ingest; the
 re-run is skipped by content hash.
 
 TUI v2 (section 1.3) shipped as v0.2.0 header + menu bar, v0.3.0 tiling, v0.4.0
-list/chart tiles, v0.5.0 sidebar, v0.6.0 import popup.
+list/chart tiles, v0.5.0 sidebar, v0.6.0 import popup, v0.6.1/0.6.2 in-memory tiles
+and import polish, v0.7.0 cancellable import, [X] close controls and Places, v0.8.0
+import run ledger (schema migration 4) and Tab cycling. v1.0.0 freezes this plan as
+the 1.0 spec (`docs/historical/1.0/PLAN.md`).
 
 ## 10. Decisions (resolved)
 
@@ -596,11 +599,15 @@ list/chart tiles, v0.5.0 sidebar, v0.6.0 import popup.
 
 ## 10.2 Versioning and releases
 
-Semantic versioning; pre-1.0 a new feature bumps MINOR, fixes/docs bump PATCH. Each
+Semantic versioning; a new feature bumps MINOR, fixes/docs bump PATCH (pre- and
+post-1.0). From 1.0 the CLI flags, `preferences.toml`, the storage layout and the
+schema are stable: breaking changes need a MAJOR bump, schema changes a migration. Each
 release bumps `Cargo.toml`/`Cargo.lock`, regenerates man pages, adds a summary-level
 `CHANGELOG.md` entry, is committed as `release: vX.Y.Z` and gets an annotated local tag
 `vX.Y.Z`. v0.1.0 = milestones 1–9. TUI v2 lands as 0.2.0 (header + menus), 0.3.0
-(tiling + list tiles), 0.4.0 (chart layers), 0.5.0 (sidebar), 0.6.0 (import popup).
+(tiling + list tiles), 0.4.0 (chart layers), 0.5.0 (sidebar), 0.6.0 (import popup),
+0.7.0 (cancellable import), 0.8.0 (run ledger, Tab cycling), 1.0.0 (stable). 1.1–1.5
+add packaging (Arch, Debian, Fedora, Homebrew, winget; `packaging/`, `docs/install.md`).
 
 ## 11. Documentation (docs/)
 

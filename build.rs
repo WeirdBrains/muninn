@@ -1,4 +1,4 @@
-//! Embed every docs/**/*.md file as a help topic (single source of truth for docs and in-app help).
+//! Embed every docs/**/*.md file (except docs/historical/) as a help topic (single source of truth for docs and in-app help).
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -7,6 +7,9 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     let mut entries: Vec<_> = rd.flatten().map(|e| e.path()).collect();
     entries.sort();
     for p in entries {
+        if p.is_dir() && p.file_name().is_some_and(|n| n == "historical") {
+            continue; // archived snapshots are not help topics
+        }
         if p.is_dir() {
             walk(&p, out);
         } else if p.extension().is_some_and(|e| e == "md") {
