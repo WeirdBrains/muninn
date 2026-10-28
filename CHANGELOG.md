@@ -6,6 +6,13 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-28
+
+### Added
+- Import runs record cancels (time, by, file, phase) and an artifact ledger; cancelled work and empty leftovers are cleaned up (mnnn ingest runs)
+- CLI Ctrl-C cancels an ingest cleanly
+- Path input Tab completion cycles through candidates like zsh/Neovim
+
 ## [0.7.0] - 2026-10-28
 
 ### Added
@@ -74,7 +81,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/kommandosaldat/muninn/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/kommandosaldat/muninn/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/kommandosaldat/muninn/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/kommandosaldat/muninn/compare/v0.6.0...v0.6.1
