@@ -69,3 +69,23 @@ ctrlc = "3"
 # Crypto (scrypt/argon2), SQLCipher and Polars are very slow unoptimized; optimize deps in dev/test.
 [profile.dev.package."*"]
 opt-level = 2
+
+# Debian/Ubuntu package: `cargo deb` (see docs/install.md, packaging/debian/README.md)
+[package.metadata.deb]
+maintainer = "Michael Christenson II <m3talsmith@gmail.com>"
+copyright = "2026, Michael Christenson II <m3talsmith@gmail.com>"
+license-file = ["LICENSE", "0"]
+extended-description = """\
+Muninn (mnnn) ingests OHLCV market bars from CSV, JSON, HTTP APIs, Redis, SQLite and \
+Postgres, normalizes them and stores them in an encrypted SQLite (SQLCipher) database. \
+Export to CSV, Parquet or JSON; browse in a terminal UI."""
+section = "utils"
+priority = "optional"
+depends = "libc6 (>= 2.34), libgcc-s1"
+assets = [
+    ["target/release/mnnn", "usr/bin/", "755"],
+    ["man/*.1", "usr/share/man/man1/", "644"],
+    ["README.md", "usr/share/doc/muninn/", "644"],
+    ["CHANGELOG.md", "usr/share/doc/muninn/", "644"],
+    ["docs/**/*.md", "usr/share/doc/muninn/docs/", "644"],
+]

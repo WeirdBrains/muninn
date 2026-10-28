@@ -27,3 +27,17 @@ sudo pacman -U target/pkg/arch/muninn-*.pkg.tar.zst
 
 Installs `/usr/bin/mnnn`, man pages in `/usr/share/man/man1`, docs in
 `/usr/share/doc/muninn`. Uninstall: `sudo pacman -R muninn`.
+
+## Debian / Ubuntu
+
+Built with `cargo deb` from `[package.metadata.deb]` in `Cargo.toml`
+(see `packaging/debian/README.md`):
+
+```sh
+cargo install --locked cargo-deb
+cargo deb                              # -> target/debian/muninn_<ver>-1_amd64.deb
+sudo apt install ./target/debian/muninn_*_amd64.deb
+```
+
+Same layout as Arch (`/usr/bin/mnnn`, man pages, `/usr/share/doc/muninn`).
+Uninstall: `sudo apt remove muninn`.
