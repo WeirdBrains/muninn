@@ -141,6 +141,8 @@ impl Store {
     }
 
     pub fn apply_key(conn: &Connection, key: Option<&[u8; 32]>) -> Result<()> {
+        // Keep SQLCipher's own logging off stderr (wrong-key attempts are reported as errors by us).
+        let _ = conn.query_row("PRAGMA cipher_log_level = NONE", [], |_| Ok(()));
         if let Some(k) = key {
             let mut lit = format!("x'{}'", hex::encode(k));
             let r = conn.pragma_update(None, "key", &lit);

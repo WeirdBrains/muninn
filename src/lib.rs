@@ -10,3 +10,4 @@ pub mod model;
 pub mod store;
 pub mod ingest;
 pub mod export;
+pub mod crypto;

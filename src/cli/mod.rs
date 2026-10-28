@@ -3,6 +3,7 @@ mod args;
 mod catalog;
 mod export;
 mod ingest;
+mod keys;
 pub use args::*;
 
 use crate::interact::Interact;
@@ -24,9 +25,33 @@ impl Ctx {
         Ok(Self { global, paths, io })
     }
 
-    /// Open the bar store (milestone 2: unencrypted; replaced by envelope unlock in milestone 5).
+    /// Unlock the data key with the password-wrapped service key.
+    pub fn unlock(&self) -> anyhow::Result<crate::crypto::Key32> {
+        crate::crypto::keyring::Envelope::require(&self.paths)?;
+        let pw = self.password("Muninn password")?;
+        Ok(crate::crypto::keyring::unlock_with_password(&self.paths, &pw)?)
+    }
+
+    /// Open the encrypted bar store.
     pub fn open_store(&self) -> anyhow::Result<crate::store::Store> {
-        Ok(crate::store::Store::open(&self.paths.db, None)?)
+        let dek = self.unlock()?;
+        Ok(crate::store::Store::open(&self.paths.db, Some(&dek.0))?)
+    }
+
+    /// The Muninn password: `MUNINN_PASSWORD`, else a hidden prompt.
+    pub fn password(&self, question: &str) -> anyhow::Result<secrecy::SecretString> {
+        if let Ok(p) = std::env::var("MUNINN_PASSWORD") {
+            return Ok(p.into());
+        }
+        Ok(self.io.password(question, "set MUNINN_PASSWORD or run interactively")?.into())
+    }
+
+    /// Password for encrypted exports: `MUNINN_EXPORT_PASSWORD`, else `MUNINN_PASSWORD`, else a prompt.
+    pub fn export_password(&self, question: &str) -> anyhow::Result<secrecy::SecretString> {
+        if let Ok(p) = std::env::var("MUNINN_EXPORT_PASSWORD") {
+            return Ok(p.into());
+        }
+        self.password(question)
     }
 
     pub fn prefs(&self) -> anyhow::Result<Preferences> {
@@ -60,7 +85,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Export(a) => export::run(&ctx, a),
         Command::Sources(c) => catalog::sources(&ctx, c),
         Command::Symbols(c) => catalog::symbols(&ctx, c),
-        Command::Keys(_) => Err(crate::Error::NotImplemented("keys").into()),
+        Command::Keys(c) => keys::run(&ctx, c),
         Command::Backup(_) => Err(crate::Error::NotImplemented("backup").into()),
         Command::Theme(_) => Err(crate::Error::NotImplemented("theme").into()),
         Command::Tui => Err(crate::Error::NotImplemented("tui").into()),
