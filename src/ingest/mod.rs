@@ -1,6 +1,7 @@
 //! Ingestion pipeline: read -> source -> symbol -> timestamp -> duration -> validate -> upsert -> report.
 pub mod csv;
 pub mod frame;
+pub mod json;
 pub mod time;
 
 use crate::error::{Error, Result};
@@ -117,6 +118,15 @@ pub fn symbol_from_name(store: &Store, name: &str) -> Result<Option<Symbol>> {
         }
     }
     Ok(None)
+}
+
+/// Derive a symbol from a file name using only the built-in symbol list (no store; for previews).
+pub fn symbol_from_name_static(name: &str) -> Option<Symbol> {
+    let stem = Path::new(name).file_stem()?.to_string_lossy().to_string();
+    let tokens: Vec<&str> = stem.split(['_', '.', ' ']).collect();
+    tokens.iter().find_map(|t| {
+        Symbol::parse_with(t, crate::model::KNOWN_QUOTES).filter(|s| crate::model::KNOWN_BASES.contains(&s.base.as_str()))
+    })
 }
 
 /// Derive a duration from a file name token such as `5m`, `1h`, `15min`.
@@ -332,7 +342,7 @@ pub fn expand_path(path: &Path, exts: &[&str]) -> Result<Vec<PathBuf>> {
     Ok(v)
 }
 
-fn canonical(path: &Path) -> String {
+pub(crate) fn canonical(path: &Path) -> String {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()).display().to_string()
 }
 

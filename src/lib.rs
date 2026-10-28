@@ -12,3 +12,6 @@ pub mod ingest;
 pub mod export;
 pub mod crypto;
 pub mod backup;
+pub mod theme;
+pub mod help;
+pub mod tui;

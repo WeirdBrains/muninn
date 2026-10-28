@@ -1,0 +1,141 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-ingest-service-postgres 1  "mnnn-ingest-service-postgres 0.1.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-ingest\-service\-postgres \- Flags shared by every service
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn ingest service postgres\fR [\fB\-\-home\fR] [\fB\-\-url\fR] [\fB\-\-db\fR] [\fB\-\-username\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-password\fR] [\fB\-\-password\-env\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-password\-stdin\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-host\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-port\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-database\fR] [\fB\-\-secure\fR] [\fB\-\-ca\-cert\fR] [\fB\-\-schema\fR] [\fB\-\-table\fR] [\fB\-\-query\fR] [\fB\-\-batch\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-\-map\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Flags shared by every service
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-url\fR \fI<URL>\fR
+postgres://user:pass@host:port/db?sslmode=...
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-username\fR \fI<USERNAME>\fR
+
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-password\fR \fI<PASSWORD>\fR
+Password (prefer \-\-password\-env / \-\-password\-stdin: flags end up in shell history)
+.TP
+\fB\-\-password\-env\fR \fI<VAR>\fR
+Read the password from this environment variable
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-password\-stdin\fR
+Read the password from stdin
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-host\fR \fI<HOST>\fR
+
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-port\fR \fI<PORT>\fR
+
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-database\fR \fI<DATABASE>\fR
+
+.TP
+\fB\-\-secure\fR
+sslmode=require (otherwise prefer)
+.TP
+\fB\-\-ca\-cert\fR \fI<CA_CERT>\fR
+CA certificate to verify the server (verify\-full)
+.TP
+\fB\-\-schema\fR \fI<SCHEMA>\fR [default: public]
+
+.TP
+\fB\-\-table\fR \fI<TABLE>\fR
+
+.TP
+\fB\-\-query\fR \fI<QUERY>\fR
+SQL or @FILE
+.TP
+\fB\-\-batch\fR \fI<BATCH>\fR [default: 10000]
+
+.TP
+\fB\-\-source\fR \fI<SOURCE>\fR
+Source name (created if unknown)
+.TP
+\fB\-\-symbol\fR \fI<SYMBOL>\fR
+Symbol, e.g. BTC/USDT, BTC\-USD or BTCUSDT
+.TP
+\fB\-\-duration\fR \fI<DURATION>\fR
+Bar duration, e.g. 5m, 1h, 1d
+.TP
+\fB\-\-map\fR \fI<COL=FIELD>\fR
+Column mapping `<col>=<field>` (fields: timestamp, open, high, low, close, volume). Repeatable
+.TP
+\fB\-\-rejects\fR \fI<FILE>\fR
+Write rejected rows (with reasons) to this CSV
+.TP
+\fB\-\-force\fR
+Re\-process even if this exact input was already ingested
+.TP
+\fB\-\-timeout\fR \fI<TIMEOUT>\fR [default: 30]
+Timeout in seconds
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v0.1.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

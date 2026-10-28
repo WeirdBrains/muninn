@@ -5,6 +5,8 @@ mod catalog;
 mod export;
 mod ingest;
 mod keys;
+pub mod man;
+mod misc;
 pub use args::*;
 
 use crate::interact::Interact;
@@ -79,6 +81,12 @@ fn init_tracing(g: &GlobalArgs) {
 
 pub fn run(cli: Cli) -> anyhow::Result<()> {
     init_tracing(&cli.global);
+    // Commands that never touch ~/.muninn.
+    match &cli.command {
+        Command::Help { topic, search } => return misc::help(topic.as_deref(), search.as_deref()),
+        Command::Man { out } => return misc::man(out),
+        _ => {}
+    }
     let ctx = Ctx::new(cli.global)?;
     ctx.prefs()?;
     match cli.command {
@@ -88,7 +96,8 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Symbols(c) => catalog::symbols(&ctx, c),
         Command::Keys(c) => keys::run(&ctx, c),
         Command::Backup(c) => backup::run(&ctx, c),
-        Command::Theme(_) => Err(crate::Error::NotImplemented("theme").into()),
-        Command::Tui => Err(crate::Error::NotImplemented("tui").into()),
+        Command::Theme(c) => misc::theme(&ctx, c),
+        Command::Tui => misc::tui(&ctx),
+        Command::Help { .. } | Command::Man { .. } => Ok(()),
     }
 }

@@ -4,7 +4,7 @@ use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
-#[command(name = "mnnn", version, about = "Muninn: ingest and normalize crypto market data into bars")]
+#[command(name = "mnnn", version, about = "Muninn: ingest and normalize crypto market data into bars", disable_help_subcommand = true)]
 pub struct Cli {
     #[command(flatten)]
     pub global: GlobalArgs,
@@ -61,6 +61,20 @@ pub enum Command {
     Theme(ThemeCommand),
     /// Launch the terminal UI.
     Tui,
+    /// Show a help topic (the same pages as the TUI help and docs/).
+    Help {
+        /// Topic id, e.g. keys, services/redis.
+        topic: Option<String>,
+        /// List topics matching a query.
+        #[arg(long)]
+        search: Option<String>,
+    },
+    /// Generate man pages.
+    #[command(hide = true)]
+    Man {
+        #[arg(long, default_value = "man")]
+        out: PathBuf,
+    },
 }
 
 /// Values shared by every ingest kind.
