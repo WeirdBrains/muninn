@@ -11,6 +11,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Menus](menus.md) and [keybindings](keybindings.md)
 - [Tiling layout](tiling.md): splitting tiles, list tiles, presets, linking
 - [Charts](charts.md): period, zoom, layers
+- [Sidebar](sidebar.md): search, sort and filter series
 - [In-app help](help.md): searching and following links
 
 ## Getting data in and out

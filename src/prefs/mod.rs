@@ -69,6 +69,9 @@ pub struct TuiPrefs {
     pub header: HeaderMode,
     #[serde(default)]
     pub sidebar_collapsed: bool,
+    /// Sidebar sort and filters.
+    #[serde(default)]
+    pub sidebar: crate::tui::sidebar::SidebarPrefs,
     /// Current tiling layout (restored on start).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layout: Option<crate::tui::layout::TileLayout>,

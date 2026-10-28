@@ -23,6 +23,7 @@ sidebar_collapsed = false
 | `ingest.drop_zero_volume` | `false` | drop zero-volume bars instead of keeping them flagged |
 | `tui.header` | `auto` | `auto` (large when the terminal has ≥ 30 rows), `compact` or `large` ([TUI](tui.md)) |
 | `tui.sidebar_collapsed` | `false` | start with the sidebar hidden |
+| `tui.sidebar` | | [sidebar](sidebar.md) sort (`sort`, `desc`) and `filters` (sources, durations, years, price metric/min/max) |
 | `tui.layout` | one list tile | the current [tiling layout](tiling.md), saved on every change |
 | `tui.layouts.<name>` | none | named layouts |
 

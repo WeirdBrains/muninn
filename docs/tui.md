@@ -34,6 +34,11 @@ Always a [tiling layout](tiling.md): one list tile to start, split and rearrange
 with `Ctrl-w` commands or the **View** menu. Each tile shows a list or a chart of
 its own series.
 
+## Sidebar
+
+A collapsible series list at the right (`Ctrl-b`) with fuzzy search (`/`), sort and
+filters that also scope the tiles. See [sidebar](sidebar.md).
+
 ## Dialogs
 
 - **Export** (File ▸ Export…): out, symbol, source, duration, from, to; **Format**

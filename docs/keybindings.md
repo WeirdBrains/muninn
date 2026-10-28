@@ -47,3 +47,13 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `[` `]` `@` | set start / set end / jump to date |
 | Home / End, `0` | first bars / latest (live) |
 | `,` / `.` | previous / next series |
+
+## Sidebar
+
+| key | action |
+|-----|--------|
+| `Ctrl-b` | show / hide the [sidebar](sidebar.md) |
+| `/` | search series |
+| `o` | toggle sort order |
+| `X` | clear filters |
+| `s`, `f p d y`, Enter | sort key, filter editors, assign (sidebar focused) |

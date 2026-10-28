@@ -210,6 +210,26 @@ impl Store {
     }
 }
 
+impl Store {
+    /// Min and max of a price metric over the filtered bars (VWAP: one volume-weighted value).
+    pub fn metric_range(&self, f: &BarFilter, m: crate::model::PriceMetric) -> Result<Option<(f64, f64)>> {
+        let (w, p) = where_clause(f);
+        let sql = if m == crate::model::PriceMetric::Vwap {
+            format!(
+                "SELECT SUM({e} * b.volume) / NULLIF(SUM(b.volume), 0), SUM({e} * b.volume) / NULLIF(SUM(b.volume), 0) FROM bars b{w}",
+                e = m.sql()
+            )
+        } else {
+            format!("SELECT MIN({e}), MAX({e}) FROM bars b{w}", e = m.sql())
+        };
+        let r: (Option<f64>, Option<f64>) = self.conn.query_row(&sql, rusqlite::params_from_iter(p), |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(match r {
+            (Some(a), Some(b)) => Some((a, b)),
+            _ => None,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,6 +271,18 @@ mod tests {
         let p = s.page_bars(&f(), BarSort::Time, false, 3, 4).unwrap();
         assert_eq!(p[0].ts, 4 * 300_000);
         assert_eq!(s.time_index(&f(), 5 * 300_000, false).unwrap(), 5);
+    }
+
+    #[test]
+    fn metric_ranges() {
+        let s = store();
+        let (lo, hi) = s.metric_range(&f(), crate::model::PriceMetric::Close).unwrap().unwrap();
+        assert!(lo < hi);
+        let (a, b) = s.metric_range(&f(), crate::model::PriceMetric::Vwap).unwrap().unwrap();
+        assert_eq!(a, b);
+        let mut none = f();
+        none.from = Some(i64::MAX - 1);
+        assert_eq!(s.metric_range(&none, crate::model::PriceMetric::Close).unwrap(), None);
     }
 
     #[test]

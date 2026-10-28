@@ -35,6 +35,8 @@ pub enum Modal {
     Prefs { sel: usize },
     Info { title: String, lines: Vec<String>, scroll: u16 },
     Prompt(Prompt),
+    /// Sidebar filter editor.
+    Filter { kind: super::action::FilterKind, sel: usize, edit: Option<String> },
     /// Chart layer checklist for the focused chart tile.
     Layers { sel: usize },
     /// Pick from a list of strings (e.g. saved layouts).
@@ -62,6 +64,7 @@ impl Modal {
             Modal::Prefs { .. } => "preferences",
             Modal::Info { .. } | Modal::Pick { .. } => "tui",
             Modal::Layers { .. } => "charts",
+            Modal::Filter { .. } => "sidebar",
             Modal::Prompt(p) => match p.kind {
                 PromptKind::ThemeImport | PromptKind::ThemeExport => "themes",
                 PromptKind::LayoutSave => "tiling",
@@ -76,6 +79,7 @@ impl Modal {
             Modal::Keys => app.keys.typing(),
             Modal::Themes => app.themes.typing(),
             Modal::Prompt(_) => true,
+            Modal::Filter { edit, .. } => edit.is_some(),
             _ => false,
         }
     }
@@ -137,6 +141,10 @@ pub fn coverage_lines(store: &Store) -> Vec<String> {
 const PREF_ROWS: usize = 3;
 
 pub fn on_key(app: &mut App, k: KeyEvent) {
+    if let Some(Modal::Filter { kind, sel, edit }) = &app.modal {
+        let (kind, sel, edit) = (*kind, *sel, edit.clone());
+        return filter_key(app, k, kind, sel, edit);
+    }
     let Some(m) = app.modal.as_mut() else { return };
     match m {
         Modal::Help(h) => {
@@ -189,6 +197,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             KeyCode::Esc | KeyCode::Char('q') => app.modal = None,
             _ => {}
         },
+        Modal::Filter { .. } => unreachable!(),
         Modal::Layers { sel } => {
             let n = super::chart::LAYERS.len();
             match k.code {
@@ -295,6 +304,120 @@ impl App {
     }
 }
 
+
+fn put(app: &mut App, kind: super::action::FilterKind, sel: usize, edit: Option<String>) {
+    if matches!(app.modal, Some(Modal::Filter { .. })) {
+        app.modal = Some(Modal::Filter { kind, sel, edit });
+    }
+}
+
+fn filter_key(app: &mut App, k: KeyEvent, kind: super::action::FilterKind, mut sel: usize, mut edit: Option<String>) {
+            let items = filter_items(app, kind);
+            let n = items.len().max(1);
+            if let Some(buf) = edit.as_mut() {
+                match k.code {
+                    KeyCode::Esc => edit = None,
+                    KeyCode::Backspace => {
+                        buf.pop();
+                    }
+                    KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == '-' => buf.push(c),
+                    KeyCode::Enter => {
+                        let v = buf.trim().parse::<f64>().ok();
+                        let which = sel;
+                        edit = None;
+                        let pf = &mut app.prefs.tui.sidebar.filters.price;
+                        if which == 1 { pf.min = v } else { pf.max = v }
+                        app.filters_changed();
+                    }
+                    _ => {}
+                }
+                put(app, kind, sel, edit);
+                return;
+            }
+            match k.code {
+                KeyCode::Down | KeyCode::Char('j') => sel = (sel + 1) % n,
+                KeyCode::Up | KeyCode::Char('k') => sel = (sel + n - 1) % n,
+                KeyCode::Esc | KeyCode::Char('q') => {
+                    app.modal = None;
+                    return;
+                }
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    use super::action::FilterKind::*;
+                    let i = sel;
+                    let fl = &mut app.prefs.tui.sidebar.filters;
+                    match kind {
+                        Price => match i {
+                            0 => fl.price.metric = fl.price.metric.next(),
+                            1 | 2 => {
+                                let cur = if i == 1 { fl.price.min } else { fl.price.max };
+                                edit = Some(cur.map(|v| v.to_string()).unwrap_or_default());
+                                put(app, kind, sel, edit);
+                                return;
+                            }
+                            _ => {
+                                fl.price.min = None;
+                                fl.price.max = None;
+                            }
+                        },
+                        Source | Period | Year => {
+                            let Some(item) = items.get(i).map(|x| x.0.clone()) else { return };
+                            match kind {
+                                Source => toggle(&mut fl.sources, item),
+                                Period => toggle(&mut fl.durations, item),
+                                _ => toggle(&mut fl.years, item.parse().unwrap_or(0)),
+                            }
+                        }
+                    }
+                    app.filters_changed();
+                }
+                _ => {}
+            }
+            put(app, kind, sel, edit);
+}
+
+fn toggle<T: Ord>(set: &mut std::collections::BTreeSet<T>, v: T) {
+    if !set.remove(&v) {
+        set.insert(v);
+    }
+}
+
+/// Rows of the filter editor: (value, label, checked).
+pub fn filter_items(app: &App, kind: super::action::FilterKind) -> Vec<(String, String, bool)> {
+    use super::action::FilterKind::*;
+    use super::sidebar::year_of;
+    let fl = &app.prefs.tui.sidebar.filters;
+    match kind {
+        Source => {
+            let set: std::collections::BTreeSet<String> = app.series.iter().map(|s| s.source.clone()).collect();
+            set.into_iter().map(|s| (s.clone(), s.clone(), fl.sources.contains(&s))).collect()
+        }
+        Period => {
+            let mut d: Vec<crate::model::Duration> = app.series.iter().map(|s| s.duration).collect();
+            d.sort_by_key(|d| d.0);
+            d.dedup();
+            d.into_iter().map(|d| (d.to_string(), d.to_string(), fl.durations.contains(&d.to_string()))).collect()
+        }
+        Year => {
+            let mut ys = std::collections::BTreeSet::new();
+            for s in &app.series {
+                for y in year_of(s.first)..=year_of(s.last) {
+                    ys.insert(y);
+                }
+            }
+            ys.into_iter().map(|y| (y.to_string(), y.to_string(), fl.years.contains(&y))).collect()
+        }
+        Price => {
+            let f = |o: Option<f64>| o.map(|v| v.to_string()).unwrap_or_else(|| "–".into());
+            vec![
+                ("metric".into(), format!("metric  {}", fl.price.metric.label()), false),
+                ("min".into(), format!("min     {}", f(fl.price.min)), false),
+                ("max".into(), format!("max     {}", f(fl.price.max)), false),
+                ("clear".into(), "clear price filter".into(), false),
+            ]
+        }
+    }
+}
+
 pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     let t = app.theme.clone();
     let Some(m) = app.modal.as_ref() else { return };
@@ -304,6 +427,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Info { lines, .. } => ((lines.iter().map(|l| l.chars().count()).max().unwrap_or(20) as u16 + 6).max(40), lines.len() as u16 + 4),
         Modal::Pick { items, .. } => (50, items.len() as u16 + 4),
         Modal::Layers { .. } => (44, super::chart::LAYERS.len() as u16 + 4),
+        Modal::Filter { kind, .. } => (46, (filter_items(app, *kind).len() as u16 + 5).min(area.height)),
         _ => (area.width.saturating_sub(4), area.height.saturating_sub(2)),
     };
     let r = centered(area, w, h);
@@ -337,6 +461,29 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
             lines.push(Line::raw(""));
             lines.push(Line::styled(" Enter changes · saved to preferences.toml", Style::new().fg(t.muted)));
             f.render_widget(Paragraph::new(lines).block(block("Preferences · Esc closes", true, &t)), r);
+        }
+        Modal::Filter { kind, sel, edit } => {
+            let (kind, sel, edit) = (*kind, *sel, edit.clone());
+            let items = filter_items(app, kind);
+            let price = kind == super::action::FilterKind::Price;
+            let mut lines = vec![];
+            for (i, (_, label, on)) in items.iter().enumerate() {
+                let st = if i == sel { Style::new().bg(t.selection_bg).fg(t.selection_fg) } else { Style::new().fg(t.fg) };
+                let text = match (price, &edit) {
+                    (true, Some(buf)) if i == sel => format!(" {}  {buf}▏", &label[..7]),
+                    (true, _) => format!(" {label}"),
+                    _ => format!(" [{}] {label}", if *on { "x" } else { " " }),
+                };
+                lines.push(Line::styled(text, st));
+            }
+            if items.is_empty() {
+                lines.push(Line::styled(" no data yet", Style::new().fg(t.muted)));
+            }
+            lines.push(Line::raw(""));
+            let hint = if price { " Enter: cycle metric / edit value · Esc" } else { " Space toggles · several can be on · Esc" };
+            lines.push(Line::styled(hint, Style::new().fg(t.muted)));
+            let title = format!("Filter: {kind:?}");
+            f.render_widget(Paragraph::new(lines).block(block(&title, true, &t)), r);
         }
         Modal::Layers { sel } => {
             let layers = app.layout.focused().chart.layers;

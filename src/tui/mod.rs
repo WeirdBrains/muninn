@@ -10,6 +10,7 @@ pub mod header;
 pub mod menu;
 pub mod layout;
 pub mod modal;
+pub mod sidebar;
 pub mod themes;
 pub mod tiles;
 pub mod widgets;
@@ -39,6 +40,14 @@ pub enum Hit {
     /// Chart period selector arrows: 0 start◂, 1 start▸, 2 end◂, 3 end▸.
     ChartNav(u32, u8),
     ChartPlot(u32),
+    Sidebar,
+    SidebarSearch,
+    SidebarSortKey,
+    SidebarSortOrder,
+    SidebarFilter(action::FilterKind),
+    SidebarRow(usize),
+    Chip(usize),
+    ClearFilters,
 }
 
 pub struct App {
@@ -56,6 +65,7 @@ pub struct App {
     pub layout: layout::TileLayout,
     pub caches: std::collections::HashMap<u32, tiles::TileCache>,
     pub series: Vec<crate::store::SeriesInfo>,
+    pub sidebar: sidebar::Sidebar,
     /// `Ctrl-w` was pressed; the next key is a window command.
     pub pending_w: bool,
     /// Content area from the last draw (split geometry, min sizes).
@@ -80,6 +90,7 @@ impl App {
             caches: Default::default(),
             series: vec![],
             pending_w: false,
+            sidebar: Default::default(),
             content: Rect::new(0, 0, 120, 30),
             export: forms::ExportForm::default(),
             keys: forms::KeysForm::default(),
@@ -104,6 +115,7 @@ impl App {
             Some(l) if !l.tiles().is_empty() => l,
             _ => layout::TileLayout::single(first),
         };
+        app.refresh_rows();
         Ok(app)
     }
 
@@ -132,6 +144,7 @@ impl App {
         match &self.modal {
             Some(m) => m.help_topic(),
             None if self.menu.is_open() => "menus",
+            None if self.sidebar.focused => "sidebar",
             None if self.layout.focused().view == layout::View::Chart => "charts",
             None => "tiling",
         }
@@ -144,12 +157,12 @@ impl App {
             return false;
         }
         // Not built yet in this release.
-        !matches!(a, Filter(_) | ClearFilters | SortYear | SortName | ToggleOrder | ToggleSidebar | FocusSidebar | Import)
+        !matches!(a, Import)
     }
 
     /// Whether a text field has focus (letters are typed, not commands).
     fn typing(&self) -> bool {
-        self.modal.as_ref().is_some_and(|m| m.typing(self))
+        self.sidebar.searching || self.modal.as_ref().is_some_and(|m| m.typing(self))
     }
 
     /// Map a key to a global action.
@@ -160,7 +173,11 @@ impl App {
             KeyCode::F(10) => Some(Action::OpenMenu),
             KeyCode::F(1) => Some(Action::Help),
             KeyCode::F(5) => Some(Action::Refresh),
-            KeyCode::Tab if self.modal.is_none() => Some(Action::FocusNext),
+            KeyCode::Tab if self.modal.is_none() && !self.sidebar.focused => Some(Action::FocusNext),
+            KeyCode::Char('b') if ctrl => Some(Action::ToggleSidebar),
+            KeyCode::Char('/') if !self.typing() && self.modal.is_none() => Some(Action::FocusSidebar),
+            KeyCode::Char('o') if !ctrl && !self.typing() && self.modal.is_none() => Some(Action::ToggleOrder),
+            KeyCode::Char('X') if !self.typing() && self.modal.is_none() => Some(Action::ClearFilters),
             KeyCode::Char('?') if !self.typing() => Some(Action::Help),
             KeyCode::Char('q') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Quit),
             _ => None,
@@ -229,6 +246,8 @@ impl App {
             Refresh => {
                 self.series = self.store.series().unwrap_or_default();
                 self.caches.clear();
+                self.sidebar.price_cache.clear();
+                self.refresh_rows();
                 self.set_status(format!("refreshed: {} series", self.series.len()));
             }
             NewTile(v) => {
@@ -307,6 +326,37 @@ impl App {
                 }
                 self.modal = Some(Modal::Layers { sel: 0 });
             }
+            ToggleSidebar => {
+                self.prefs.tui.sidebar_collapsed = !self.prefs.tui.sidebar_collapsed;
+                if self.prefs.tui.sidebar_collapsed {
+                    self.sidebar.focused = false;
+                    self.sidebar.searching = false;
+                }
+                self.save_prefs();
+            }
+            FocusSidebar => {
+                self.prefs.tui.sidebar_collapsed = false;
+                self.sidebar.focused = true;
+                self.sidebar.searching = true;
+            }
+            Filter(kind) => {
+                self.prefs.tui.sidebar_collapsed = false;
+                self.modal = Some(Modal::Filter { kind, sel: 0, edit: None });
+            }
+            ClearFilters => {
+                self.prefs.tui.sidebar.filters = Default::default();
+                self.filters_changed();
+                self.set_status("filters cleared");
+            }
+            SortYear | SortName => {
+                self.prefs.tui.sidebar.sort = if a == SortYear { sidebar::SortBy::Year } else { sidebar::SortBy::Name };
+                self.sidebar_prefs_changed();
+            }
+            ToggleOrder => {
+                self.prefs.tui.sidebar.desc = !self.prefs.tui.sidebar.desc;
+                self.sidebar_prefs_changed();
+                self.set_status(if self.prefs.tui.sidebar.desc { "sort: descending" } else { "sort: ascending" });
+            }
             ToggleSplitDir => {
                 let d = self.layout.toggle_split_dir();
                 self.set_status(format!("new tiles split {}", if d == layout::Dir::Horizontal { "right" } else { "below" }));
@@ -369,7 +419,53 @@ impl App {
             self.set_status("C-w: v s q h j k l Tab < > + - = x z t e y");
             return;
         }
+        if self.sidebar.focused && sidebar_key(self, k) {
+            return;
+        }
         tiles::on_key(self, k);
+    }
+
+    /// Recompute the sidebar rows (search, filters, sort).
+    pub fn refresh_rows(&mut self) {
+        let p = self.prefs.tui.sidebar.clone();
+        let scope = p.filters.scope();
+        let metric = p.filters.price.metric;
+        if p.filters.price.active() {
+            for s in &self.series {
+                let k = (layout::SeriesKey::of(s), metric, scope);
+                if !self.sidebar.price_cache.contains_key(&k) {
+                    let mut f = k.0.filter();
+                    if let Some((a, b)) = scope {
+                        f.from = Some(a);
+                        f.to = Some(b);
+                    }
+                    let r = self.store.metric_range(&f, metric).ok().flatten();
+                    self.sidebar.price_cache.insert(k, r);
+                }
+            }
+        }
+        let cache = &self.sidebar.price_cache;
+        let price = |s: &crate::store::SeriesInfo| cache.get(&(layout::SeriesKey::of(s), metric, scope)).copied().flatten();
+        self.sidebar.rows = sidebar::rows(&self.series, &self.sidebar.query, &p, &price);
+    }
+
+    pub fn sidebar_prefs_changed(&mut self) {
+        self.refresh_rows();
+        self.save_prefs();
+    }
+
+    /// Filters changed: rows and tile scope.
+    pub fn filters_changed(&mut self) {
+        self.caches.clear();
+        self.sidebar_prefs_changed();
+    }
+
+    /// Show the selected sidebar series in the focused tile.
+    pub fn assign_selected(&mut self) {
+        if let Some(&i) = self.sidebar.rows.get(self.sidebar.sel) {
+            let k = layout::SeriesKey::of(&self.series[i]);
+            self.set_series(k);
+        }
     }
 
     fn split(&mut self, d: layout::Dir, v: Option<layout::View>) {
@@ -396,7 +492,7 @@ impl App {
 
     /// Time scope for tiles (sidebar year filter).
     pub fn scope(&self) -> Option<(i64, i64)> {
-        None
+        self.prefs.tui.sidebar.filters.scope()
     }
 
     /// Show the previous/next series in the focused tile.
@@ -405,7 +501,9 @@ impl App {
             self.set_status("no data yet: File ▸ Import…");
             return;
         }
-        let keys: Vec<layout::SeriesKey> = self.series.iter().map(layout::SeriesKey::of).collect();
+        // Follow the sidebar (search, filters, sort); fall back to every series.
+        let idx: Vec<usize> = if self.sidebar.rows.is_empty() { (0..self.series.len()).collect() } else { self.sidebar.rows.clone() };
+        let keys: Vec<layout::SeriesKey> = idx.iter().map(|i| layout::SeriesKey::of(&self.series[*i])).collect();
         let cur = self.layout.focused().series.clone();
         let i = cur.and_then(|c| keys.iter().position(|k| *k == c)).map(|i| i as i32).unwrap_or(-1);
         let n = keys.len() as i32;
@@ -463,8 +561,34 @@ impl App {
             }
             Some(Hit::Tile(id)) | Some(Hit::TabBar(id)) => {
                 self.menu.close();
+                self.sidebar.focused = false;
+                self.sidebar.searching = false;
                 self.layout.set_focus(id);
                 self.layout_changed();
+            }
+            Some(Hit::Sidebar) => self.sidebar.focused = true,
+            Some(Hit::SidebarSearch) => {
+                self.sidebar.focused = true;
+                self.sidebar.searching = true;
+            }
+            Some(Hit::SidebarSortKey) => {
+                let a = if self.prefs.tui.sidebar.sort == sidebar::SortBy::Year { Action::SortName } else { Action::SortYear };
+                self.dispatch(a);
+            }
+            Some(Hit::SidebarSortOrder) => self.dispatch(Action::ToggleOrder),
+            Some(Hit::SidebarFilter(k)) => self.dispatch(Action::Filter(k)),
+            Some(Hit::Chip(i)) => {
+                if let Some((c, _)) = self.prefs.tui.sidebar.filters.chips().get(i).cloned() {
+                    self.prefs.tui.sidebar.filters.remove(&c);
+                    self.filters_changed();
+                }
+            }
+            Some(Hit::ClearFilters) => self.dispatch(Action::ClearFilters),
+            Some(Hit::SidebarRow(r)) => {
+                self.sidebar.focused = true;
+                self.sidebar.searching = false;
+                self.sidebar.sel = r;
+                self.assign_selected();
             }
             Some(Hit::ChartNav(id, which)) => {
                 self.layout.set_focus(id);
@@ -512,7 +636,17 @@ impl App {
         header::draw(f, head, &t, &self.status_items());
         let mut hits = std::mem::take(&mut self.hits);
         let xs = menu::draw_bar(&self.menu, f, bar, &t, &mut hits);
-        self.draw_content(f, body, &mut hits);
+        let (content, side) = if self.prefs.tui.sidebar_collapsed || body.width < 60 {
+            (body, None)
+        } else {
+            let [c, s] = Layout::horizontal([Constraint::Min(0), Constraint::Length(sidebar::WIDTH)]).areas(body);
+            (c, Some(s))
+        };
+        self.draw_content(f, content, &mut hits);
+        if let Some(s) = side {
+            let cur = self.layout.focused().series.clone();
+            sidebar::draw(&mut self.sidebar, &self.prefs.tui.sidebar, &self.series, cur.as_ref(), f, s, &t, &mut hits);
+        }
         if self.modal.is_some() {
             modal::draw(self, f, body);
         }
@@ -566,6 +700,51 @@ impl App {
             }
         }
     }
+}
+
+/// Keys while the sidebar has focus. Returns true when handled.
+fn sidebar_key(app: &mut App, k: KeyEvent) -> bool {
+    let sb = &mut app.sidebar;
+    if sb.searching {
+        match k.code {
+            KeyCode::Esc | KeyCode::Enter | KeyCode::Down => sb.searching = false,
+            KeyCode::Backspace => {
+                sb.query.pop();
+                sb.sel = 0;
+                app.refresh_rows();
+            }
+            KeyCode::Char(c) if !k.modifiers.contains(KeyModifiers::CONTROL) => {
+                sb.query.push(c);
+                sb.sel = 0;
+                app.refresh_rows();
+            }
+            _ => return false,
+        }
+        return true;
+    }
+    let n = sb.rows.len();
+    match k.code {
+        KeyCode::Down | KeyCode::Char('j') => sb.sel = (sb.sel + 1).min(n.saturating_sub(1)),
+        KeyCode::Up | KeyCode::Char('k') => sb.sel = sb.sel.saturating_sub(1),
+        KeyCode::PageDown => sb.sel = (sb.sel + 10).min(n.saturating_sub(1)),
+        KeyCode::PageUp => sb.sel = sb.sel.saturating_sub(10),
+        KeyCode::Home => sb.sel = 0,
+        KeyCode::End => sb.sel = n.saturating_sub(1),
+        KeyCode::Enter => app.assign_selected(),
+        KeyCode::Char('s') => {
+            let a = if app.prefs.tui.sidebar.sort == sidebar::SortBy::Year { Action::SortName } else { Action::SortYear };
+            app.dispatch(a);
+        }
+        KeyCode::Char('f') => app.dispatch(Action::Filter(action::FilterKind::Source)),
+        KeyCode::Char('p') => app.dispatch(Action::Filter(action::FilterKind::Price)),
+        KeyCode::Char('d') => app.dispatch(Action::Filter(action::FilterKind::Period)),
+        KeyCode::Char('y') => app.dispatch(Action::Filter(action::FilterKind::Year)),
+        KeyCode::Esc | KeyCode::Tab | KeyCode::Left => {
+            sb.focused = false;
+        }
+        _ => return false,
+    }
+    true
 }
 
 fn view_of(v: action::ViewKind) -> layout::View {

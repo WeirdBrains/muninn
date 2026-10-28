@@ -424,7 +424,7 @@ fn snapshots() {
     };
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/tui-snapshots");
     std::fs::create_dir_all(&dir).unwrap();
-    let mut shot = |a: &mut App, name: &str, w: u16, h: u16| {
+    let shot = |a: &mut App, name: &str, w: u16, h: u16| {
         let started = std::time::Instant::now();
         let s = render(a, w, h);
         println!("{name}: rendered in {:?}", started.elapsed());
@@ -462,4 +462,58 @@ fn snapshots() {
         a.on_key(key(KeyCode::Char('-')));
     }
     shot(&mut a, "07-zoomed-out", 200, 50);
+}
+
+#[test]
+fn sidebar_toggle_search_sort_filter() {
+    let (_t, mut a) = app();
+    let s = screen_text(&mut a);
+    assert!(s.contains("ETH/USDT") && s.contains("BTC/USDT"), "{s}");
+    a.on_key(mkey(KeyCode::Char('b'), KeyModifiers::CONTROL));
+    assert!(a.prefs.tui.sidebar_collapsed);
+    a.on_key(key(KeyCode::Char('/')));
+    assert!(!a.prefs.tui.sidebar_collapsed && a.sidebar.searching);
+    for c in "eth".chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    assert_eq!(a.sidebar.rows.len(), 1);
+    assert_eq!(a.series[a.sidebar.rows[0]].symbol.to_string(), "ETH/USDT");
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Enter));
+    assert_eq!(a.layout.focused().series.as_ref().unwrap().symbol.to_string(), "ETH/USDT");
+    // clear search, sort by name desc
+    a.on_key(key(KeyCode::Char('/')));
+    for _ in 0..3 {
+        a.on_key(key(KeyCode::Backspace));
+    }
+    a.on_key(key(KeyCode::Esc));
+    a.dispatch(Action::SortName);
+    let first = |a: &App| a.series[a.sidebar.rows[0]].symbol.to_string();
+    assert_eq!(first(&a), "BTC/USDT");
+    a.on_key(key(KeyCode::Char('o')));
+    assert_eq!(first(&a), "ETH/USDT");
+    // source filter with no match, then chip shows and clear all
+    a.prefs.tui.sidebar.filters.sources.insert("kraken".into());
+    a.filters_changed();
+    assert!(a.sidebar.rows.is_empty());
+    assert!(screen_text(&mut a).contains("kraken"));
+    a.on_key(key(KeyCode::Esc));
+    a.on_key(key(KeyCode::Char('X')));
+    assert_eq!(a.sidebar.rows.len(), 2);
+    // filter editor via modal
+    a.dispatch(Action::Filter(action::FilterKind::Source));
+    assert!(screen_text(&mut a).contains("[ ] binance"));
+    a.on_key(key(KeyCode::Char(' ')));
+    assert!(a.prefs.tui.sidebar.filters.sources.contains("binance"));
+    // price editor: max far below any price excludes all
+    a.on_key(key(KeyCode::Esc));
+    a.dispatch(Action::Filter(action::FilterKind::Price));
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Char('1')));
+    a.on_key(key(KeyCode::Enter));
+    assert_eq!(a.prefs.tui.sidebar.filters.price.max, Some(1.0));
+    assert!(a.sidebar.rows.is_empty());
+    assert_eq!(a.help_topic(), "sidebar");
 }
