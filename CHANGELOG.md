@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-28
+
+### Added
+- GitHub Actions release workflow: Linux/macOS/Windows x86_64 and arm64 binaries, .deb, .rpm, Arch, Homebrew and winget assets, SHA256SUMS, GitHub Release; CI workflow
+
 ## [1.5.0] - 2026-10-28
 
 ### Added
@@ -112,7 +117,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/kommandosaldat/muninn/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/kommandosaldat/muninn/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/kommandosaldat/muninn/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/kommandosaldat/muninn/compare/v1.2.0...v1.3.0
