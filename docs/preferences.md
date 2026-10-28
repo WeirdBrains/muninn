@@ -1,0 +1,25 @@
+# Preferences
+
+`~/.muninn/preferences.toml` is plain, human-editable TOML. It is created with
+defaults on first run:
+
+```toml
+[theme]
+name = "tokyo-night"
+mode = "system"
+
+[ingest]
+drop_zero_volume = false
+```
+
+| key | default | meaning |
+|-----|---------|---------|
+| `theme.name` | `tokyo-night` | active theme folder under `themes/` |
+| `theme.mode` | `system` | `light`, `dark` or `system` (see [themes](themes.md)) |
+| `ingest.drop_zero_volume` | `false` | drop zero-volume bars instead of keeping them flagged |
+
+`mnnn theme set <name>` and `mnnn theme mode <mode>` edit the file for you.
+Preferences are part of every backup ([backup and recovery](backup-recovery.md)).
+
+Failure modes: invalid TOML makes every command fail with a `toml:` error naming
+the problem; fix or delete the file (it is recreated with defaults).

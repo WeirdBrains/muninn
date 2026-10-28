@@ -1,5 +1,6 @@
 //! CLI layer: thin handlers over the library.
 mod args;
+mod catalog;
 pub use args::*;
 
 use crate::interact::Interact;
@@ -19,6 +20,11 @@ impl Ctx {
         paths.ensure()?;
         let io = Interact::new(global.non_interactive, global.yes, global.quiet);
         Ok(Self { global, paths, io })
+    }
+
+    /// Open the bar store (milestone 2: unencrypted; replaced by envelope unlock in milestone 5).
+    pub fn open_store(&self) -> anyhow::Result<crate::store::Store> {
+        Ok(crate::store::Store::open(&self.paths.db, None)?)
     }
 
     pub fn prefs(&self) -> anyhow::Result<Preferences> {
@@ -50,8 +56,8 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Command::Ingest(_) => Err(crate::Error::NotImplemented("ingest").into()),
         Command::Export(_) => Err(crate::Error::NotImplemented("export").into()),
-        Command::Sources(_) => Err(crate::Error::NotImplemented("sources").into()),
-        Command::Symbols(_) => Err(crate::Error::NotImplemented("symbols").into()),
+        Command::Sources(c) => catalog::sources(&ctx, c),
+        Command::Symbols(c) => catalog::symbols(&ctx, c),
         Command::Keys(_) => Err(crate::Error::NotImplemented("keys").into()),
         Command::Backup(_) => Err(crate::Error::NotImplemented("backup").into()),
         Command::Theme(_) => Err(crate::Error::NotImplemented("theme").into()),
