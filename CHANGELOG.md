@@ -6,6 +6,13 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-28
+
+### Added
+- Help links are clickable and Tab/Enter-followable; selected links scroll into view
+- Help shows a clickable key bar; / searches from any topic; results and history are clickable
+- mnnn-tui(1) and mnnn-help(1) gain a NOTES section (import auto-load, help keys)
+
 ## [1.10.0] - 2026-10-28
 
 ### Added
@@ -143,7 +150,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/kommandosaldat/muninn/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/kommandosaldat/muninn/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/kommandosaldat/muninn/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/kommandosaldat/muninn/compare/v1.7.0...v1.8.0
