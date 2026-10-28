@@ -1289,3 +1289,59 @@ fn finished_import_loads_into_an_empty_view_only() {
     wait_import(&mut a);
     assert_eq!(a.layout.focused().series.as_ref().map(|k| k.symbol.as_str()), Some("SOL/USDT"));
 }
+
+fn help(a: &mut App) -> &mut crate::help::HelpView {
+    match a.modal.as_mut() {
+        Some(Modal::Help(h)) => h,
+        _ => panic!("help is not open"),
+    }
+}
+
+#[test]
+fn help_links_footer_and_search_are_clickable() {
+    let (_t, mut a) = app();
+    a.open_help("README");
+    let s = screen_text(&mut a);
+    for k in ["[Tab next link]", "[Enter follow]", "[Bksp back]", "[/ search]", "[Esc close]"] {
+        assert!(s.contains(k), "footer misses {k}: {s}");
+    }
+    // click the second link
+    let target = help(&mut a).internal_links()[1].1.clone();
+    click_on(&mut a, |h| *h == Hit::HelpLink(1));
+    assert_eq!(help(&mut a).current.id, target);
+    // the footer's Back button returns
+    click_on(&mut a, |h| *h == Hit::Press(KeyCode::Backspace));
+    assert_eq!(help(&mut a).current.id, "README");
+    // keyboard: Tab to the second link, Enter follows it
+    a.on_key(key(KeyCode::Tab));
+    a.on_key(key(KeyCode::Enter));
+    assert_eq!(help(&mut a).current.id, target);
+    // `/` starts a search from a topic other than the index; click a result
+    a.on_key(key(KeyCode::Char('/')));
+    assert!(help(&mut a).searching);
+    for c in "redis".chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    assert!(screen_text(&mut a).contains("[Esc stop search]"));
+    click_on(&mut a, |h| *h == Hit::Row(0));
+    assert_eq!(help(&mut a).current.id, "services/redis");
+    // the search box is clickable too, and [X] still closes
+    click_on(&mut a, |h| *h == Hit::Press(KeyCode::Char('/')));
+    assert!(help(&mut a).searching);
+    click_on(&mut a, |h| *h == Hit::CloseModal);
+    assert!(a.modal.is_none());
+}
+
+#[test]
+fn help_link_hits_follow_wrapping_and_scroll() {
+    let (_t, mut a) = app();
+    a.open_help("README");
+    let n = help(&mut a).internal_links().len();
+    // walking to the last link scrolls it into view, where it can be clicked
+    for _ in 1..n {
+        a.on_key(key(KeyCode::Tab));
+    }
+    let target = help(&mut a).internal_links()[n - 1].1.clone();
+    click_on(&mut a, |h| *h == Hit::HelpLink(n - 1));
+    assert_eq!(help(&mut a).current.id, target);
+}

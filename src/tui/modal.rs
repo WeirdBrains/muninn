@@ -184,7 +184,13 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             fm.editing = false;
             on_key(app, enter);
         }
+        Hit::HelpLink(n) => {
+            if let Some(Modal::Help(h)) = app.modal.as_mut() {
+                h.click_link(n);
+            }
+        }
         Hit::Row(i) => match app.modal.as_mut() {
+            Some(Modal::Help(h)) => h.click_row(i),
             Some(Modal::Prefs { sel } | Modal::Layers { sel } | Modal::Pick { sel, .. }) => {
                 *sel = i;
                 on_key(app, enter);
@@ -521,7 +527,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     app.modal_hits.clear();
     let mut extra: Vec<(Rect, super::Hit)> = vec![];
     match app.modal.as_mut().unwrap() {
-        Modal::Help(hv) => hv.draw(f, r, &t),
+        Modal::Help(hv) => hv.draw(f, r, &t, &mut extra),
         Modal::Export => forms::draw_export(app, f, r),
         Modal::Import => super::import::draw(app, f, r),
         Modal::Keys => forms::draw_keys(app, f, r),

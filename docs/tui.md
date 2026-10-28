@@ -68,6 +68,7 @@ Everything you can act on is clickable; there are no keyboard-only actions:
 | sidebar | search box, sort key and order, filters, chips (remove), series rows |
 | popup lists (Preferences, Chart layers, saved layouts, filters, themes) | select and activate the row (themes: first click selects, second applies) |
 | forms (Export, Keys) | a field starts editing it, a `[ button ]` runs it |
+| help | links (follow), search box, results and history entries, the key bar along the bottom |
 | import picker | files/folders (click highlights, second click opens or imports), Places, path / filter / source / symbol / duration inputs, Tab-completion candidates |
 | key buttons such as `[i import]`, `[OK]`, `[Cancel]`, `[Close]` | the same as pressing that key |
 | `[X]` | close the popup |

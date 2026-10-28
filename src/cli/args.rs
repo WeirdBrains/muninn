@@ -67,8 +67,10 @@ pub enum Command {
     #[command(subcommand)]
     Theme(ThemeCommand),
     /// Launch the terminal UI.
+    #[command(after_long_help = TUI_NOTES)]
     Tui,
     /// Show a help topic (the same pages as the TUI help and docs/).
+    #[command(after_long_help = HELP_NOTES)]
     Help {
         /// Topic id, e.g. keys, services/redis.
         topic: Option<String>,
@@ -587,6 +589,26 @@ pub enum ThemeCommand {
         name: String,
     },
 }
+
+/// Extra text for `mnnn tui --help` and mnnn-tui(1); details in docs/tui.md and docs/import.md.
+const TUI_NOTES: &str = "\
+Everything you can act on is clickable: menus, tiles, sidebar, popup rows, form fields, \
+import picker entries and the key buttons ([X] closes any popup).
+
+Import (i): pick a file or a whole folder (A imports the folder, recursing). If a symbol \
+cannot be guessed from a file name, a popup asks for it. After an import, if no tile shows \
+data yet, the focused tile loads the first imported series.
+
+Help (? or F1): follow links with Tab and Enter or a click, Backspace goes back, / searches \
+from any topic; a clickable key bar at the bottom lists the shortcuts.
+
+See mnnn help tui, mnnn help import and mnnn help help.";
+
+/// Extra text for `mnnn help --help` and mnnn-help(1).
+const HELP_NOTES: &str = "\
+In the TUI help (? or F1): Tab / Shift-Tab select a link, Enter or a click follows it, \
+Backspace or Alt-Left goes back, / searches from any topic, i opens the index, Esc closes. \
+A key bar at the bottom shows these keys and every button is clickable.";
 
 #[cfg(test)]
 mod tests {

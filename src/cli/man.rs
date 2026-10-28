@@ -92,6 +92,12 @@ mnnn help keys
 \fBmnnn-backup\fR(1), \fBmnnn-theme\fR(1), \fBmnnn-tui\fR(1), \fBmnnn-help\fR(1), \fBsqlcipher\fR(1), \fBage\fR(1)
 "#;
 
+/// Escape plain text for roff: backslashes, hyphens and a leading dot or quote.
+fn roff_escape(s: &str) -> String {
+    let e = s.replace('\\', "\\e").replace('-', "\\-");
+    if e.starts_with('.') || e.starts_with('\'') { format!("\\&{e}") } else { e }
+}
+
 fn page_name(path: &[String]) -> String {
     path.join("-")
 }
@@ -110,6 +116,12 @@ fn render(cmd: &clap::Command, path: &[String], out: &Path, count: &mut usize) -
         man.render_description_section(&mut buf)?;
     }
     man.render_options_section(&mut buf)?;
+    if let Some(notes) = cmd.get_after_long_help() {
+        writeln!(buf, ".SH NOTES")?;
+        for para in notes.to_string().split("\n\n") {
+            writeln!(buf, ".PP\n{}", roff_escape(para))?;
+        }
+    }
     if cmd.get_subcommands().any(|s| !s.is_hide_set()) {
         man.render_subcommands_section(&mut buf)?;
     }
@@ -156,6 +168,16 @@ pub fn expected_pages() -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn tui_and_help_pages_carry_the_notes() {
+        let d = tempfile::tempdir().unwrap();
+        super::generate(d.path()).unwrap();
+        let tui = std::fs::read_to_string(d.path().join("mnnn-tui.1")).unwrap();
+        assert!(tui.contains(".SH NOTES") && tui.contains("loads the first imported series"), "{tui}");
+        let help = std::fs::read_to_string(d.path().join("mnnn-help.1")).unwrap();
+        assert!(help.contains("searches from any topic") && help.contains("key bar"), "{help}");
+    }
+
     #[test]
     fn every_subcommand_has_a_page() {
         let dir = tempfile::tempdir().unwrap();

@@ -62,6 +62,8 @@ pub enum Hit {
     ImportEntry(usize),
     /// Import inputs: 0 path, 1 filter, 2.. the source/symbol/duration fields.
     ImportInput(u8),
+    /// The n-th internal link of the open help topic.
+    HelpLink(usize),
     /// A row of a popup list (Preferences, Layers, Pick, Filter, Themes, Help topics).
     Row(usize),
     /// A field or action button of a form (Export, Keys): index as in `Form::sel`.
@@ -684,6 +686,7 @@ impl App {
                 | Hit::ImportAsk(_)
                 | Hit::ImportInput(_)
                 | Hit::Row(_)
+                | Hit::HelpLink(_)
                 | Hit::FormRow(_),
             ) => {}
             Some(Hit::SidebarRow(r)) => {

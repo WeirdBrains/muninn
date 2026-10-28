@@ -16,10 +16,17 @@ Help opens on the topic for what you are doing: the export dialog opens
 | Tab / → , Shift-Tab / ← | select the next / previous link |
 | Enter | follow the selected link |
 | Backspace / Alt-← | back (history is shown on the right) |
-| `/` | search: type to filter, results update as you type; ↑/↓ and Enter to open |
+| `/` | search from any topic: type to filter, results update as you type; ↑/↓ and Enter to open, Esc stops searching |
 | `i` | index ([documentation home](README.md)) |
 | ↑/↓, PgUp/PgDn, Home | scroll |
 | Esc, q, F1 | close |
+
+A key bar along the bottom of the help popup lists these shortcuts; while searching it
+switches to the search keys. Every button in it is clickable.
+
+With the mouse: click a link to follow it, click a search result or a history entry
+(on the right) to open it, click the search box to start searching, and `[X]` closes.
+Selecting a link with Tab scrolls it into view.
 
 Search matches titles and bodies (substring); titles also match fuzzily, so `bckprcv`
 finds "Backup and recovery". Headings, lists, `code` and links are rendered in the
