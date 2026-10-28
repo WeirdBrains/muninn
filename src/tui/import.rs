@@ -98,6 +98,79 @@ pub fn complete(input: &str, hidden: bool) -> (String, Vec<String>) {
     }
 }
 
+/// Zsh/Neovim-style completion state for the path input.
+///
+/// Tab extends the common prefix; when that changes nothing and several names match,
+/// Tab shows the candidate list; further Tab / Shift-Tab cycle through it, filling the
+/// highlighted candidate into the input. Typing or Enter accepts, Esc reverts.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Completer {
+    /// What the user had typed when the list opened (Esc restores it).
+    pub typed: String,
+    /// Directory part the candidates are appended to.
+    pub base: String,
+    pub cands: Vec<String>,
+    /// The list is visible.
+    pub shown: bool,
+    pub sel: Option<usize>,
+}
+
+impl Completer {
+    pub fn active(&self) -> bool {
+        self.shown && !self.cands.is_empty()
+    }
+
+    /// Tab (`forward`) or Shift-Tab.
+    pub fn tab(&mut self, path: &mut String, hidden: bool, forward: bool) {
+        if self.active() {
+            let n = self.cands.len();
+            let i = match (self.sel, forward) {
+                (None, true) => 0,
+                (None, false) => n - 1,
+                (Some(i), true) => (i + 1) % n,
+                (Some(i), false) => (i + n - 1) % n,
+            };
+            self.pick(i, path);
+            return;
+        }
+        let (t, c) = complete(path, hidden);
+        if c.is_empty() || t != *path {
+            *path = t;
+            self.reset();
+        } else {
+            self.typed = path.clone();
+            self.base = match path.rfind('/') {
+                Some(i) => path[..=i].to_string(),
+                None => String::new(),
+            };
+            self.cands = c;
+            self.shown = true;
+            self.sel = None;
+            if !forward {
+                self.tab(path, hidden, false);
+            }
+        }
+    }
+
+    pub fn pick(&mut self, i: usize, path: &mut String) {
+        if let Some(c) = self.cands.get(i) {
+            self.sel = Some(i);
+            *path = format!("{}{c}", self.base);
+        }
+    }
+
+    /// Keep what is in the input and close the list.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Esc: back to what was typed.
+    pub fn revert(&mut self, path: &mut String) {
+        *path = self.typed.clone();
+        self.reset();
+    }
+}
+
 /// First lines of a file, read without parsing the whole thing.
 pub fn head(path: &Path, n: usize) -> Vec<String> {
     use std::io::{BufRead, BufReader, Read};
@@ -242,7 +315,7 @@ pub struct ImportState {
     pub hidden: bool,
     pub filter: String,
     pub path: String,
-    pub completions: Vec<String>,
+    pub completer: Completer,
     pub pane: Pane,
     /// source, symbol, duration (empty = derive).
     pub fields: [String; 3],
@@ -272,7 +345,7 @@ impl ImportState {
             hidden: false,
             filter: String::new(),
             path: String::new(),
-            completions: vec![],
+            completer: Completer::default(),
             pane: Pane::Files,
             fields: Default::default(),
             phase: Phase::Browse,
@@ -660,6 +733,13 @@ pub fn on_click(app: &mut App, h: super::Hit) {
     match h {
         Hit::ImportCancel => request_cancel(app),
         Hit::ImportConfirm(yes) => confirm_cancel(app, yes),
+        Hit::ImportCandidate(i) => {
+            let st = &mut app.import;
+            let mut p = std::mem::take(&mut st.path);
+            st.completer.pick(i, &mut p);
+            st.path = p;
+            st.pane = Pane::Path;
+        }
         Hit::ImportPlace(i) => {
             app.import.pane = Pane::Places;
             go_place(app, i);
@@ -696,14 +776,17 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
     let st = &mut app.import;
     match st.pane {
         Pane::Path => match k.code {
-            KeyCode::Tab => {
-                let (t, c) = complete(&st.path, st.hidden);
-                st.path = t;
-                st.completions = c;
+            KeyCode::Tab => st.completer.tab(&mut st.path, st.hidden, true),
+            KeyCode::BackTab => st.completer.tab(&mut st.path, st.hidden, false),
+            KeyCode::Enter if st.completer.active() => st.completer.reset(),
+            KeyCode::Esc if st.completer.active() => {
+                let mut p = std::mem::take(&mut st.path);
+                st.completer.revert(&mut p);
+                st.path = p;
             }
             KeyCode::Enter => {
                 let p = super::forms::expand(&st.path);
-                st.completions.clear();
+                st.completer.reset();
                 if p.is_dir() {
                     st.cd(p);
                     st.pane = Pane::Files;
@@ -719,14 +802,18 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 }
             }
             KeyCode::Esc => {
-                st.completions.clear();
+                st.completer.reset();
                 st.reload();
                 st.pane = Pane::Files;
             }
             KeyCode::Backspace => {
+                st.completer.reset();
                 st.path.pop();
             }
-            KeyCode::Char(c) => st.path.push(c),
+            KeyCode::Char(c) => {
+                st.completer.reset();
+                st.path.push(c);
+            }
             _ => {}
         },
         Pane::Filter => match k.code {
@@ -820,7 +907,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 KeyCode::Char('/') => st.pane = Pane::Filter,
                 KeyCode::Char('g') | KeyCode::Tab => {
                     st.pane = Pane::Path;
-                    st.completions.clear();
+                    st.completer.reset();
                 }
                 KeyCode::Char('s') => st.pane = Pane::Field(0),
                 KeyCode::Char('y') => st.pane = Pane::Field(1),
@@ -874,8 +961,27 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
     let focus = |p: Pane| if st.pane == p { Style::new().fg(t.accent).add_modifier(Modifier::BOLD) } else { Style::new().fg(t.muted) };
     let caret = |p: Pane| if st.pane == p { "▏" } else { "" };
     let mut pl = vec![Line::from(vec![Span::styled(" path ", focus(Pane::Path)), Span::styled(format!("{}{}", st.path, caret(Pane::Path)), Style::new().fg(t.fg))])];
-    pl.push(if !st.completions.is_empty() {
-        Line::styled(format!("      {}", st.completions.join("  ")), Style::new().fg(t.info))
+    pl.push(if st.completer.active() {
+        let mut spans = vec![Span::raw("      ")];
+        let mut x = path_r.x + 6;
+        let y = path_r.y + 1;
+        for (i, c) in st.completer.cands.iter().enumerate() {
+            let w = c.chars().count() as u16;
+            if x + w > path_r.right() {
+                spans.push(Span::styled("…", Style::new().fg(t.muted)));
+                break;
+            }
+            let style = if st.completer.sel == Some(i) {
+                Style::new().bg(t.selection_bg).fg(t.selection_fg).add_modifier(Modifier::BOLD)
+            } else {
+                Style::new().fg(t.info)
+            };
+            app_hits.push((Rect { x, y, width: w, height: 1 }, super::Hit::ImportCandidate(i)));
+            spans.push(Span::styled(c.clone(), style));
+            spans.push(Span::raw("  "));
+            x += w + 2;
+        }
+        Line::from(spans)
     } else {
         Line::from(vec![
             Span::styled(" filter ", focus(Pane::Filter)),
@@ -993,7 +1099,8 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
     }
     f.render_widget(Paragraph::new(fl), fields_r);
     let help = match st.pane {
-        Pane::Path => "Tab complete · Enter go/import · Esc back",
+        Pane::Path if st.completer.active() => "Tab / Shift-Tab cycle · click picks · Enter or typing accepts · Esc reverts",
+        Pane::Path => "Tab complete (again: list, then cycle) · Enter go/import · Esc back",
         Pane::Filter | Pane::Field(_) => "type · Enter done · Esc back",
         Pane::Files => "Enter open/import · Space select · a folder · . hidden · / filter · Tab path · p places · 1-9 jump · b bookmark · s/y/d fields · i import",
         Pane::Places => "j/k move · Enter go · x remove bookmark/recent · b bookmark current folder · 1-9 jump · Esc/p back",
@@ -1164,6 +1271,42 @@ mod tests {
         assert!(complete(&base, false).1.iter().all(|c| !c.starts_with('.')));
         assert_eq!(complete(&format!("{base}.h"), false).0, format!("{base}.hidden/"));
         assert_eq!(complete(&format!("{base}zzz"), false), (format!("{base}zzz"), vec![]));
+    }
+
+    #[test]
+    fn tab_cycles_like_zsh() {
+        let t = tree();
+        let base = format!("{}/", t.path().display());
+        let mut c = Completer::default();
+        // "da" + "do": first Tab on "d" can't extend -> list shown, nothing picked
+        let mut p = format!("{base}d");
+        c.tab(&mut p, false, true);
+        assert!(c.active() && c.sel.is_none() && p == format!("{base}d"));
+        assert_eq!(c.cands, ["data/", "docs/"]);
+        c.tab(&mut p, false, true);
+        assert_eq!((c.sel, p.as_str()), (Some(0), format!("{base}data/").as_str()));
+        c.tab(&mut p, false, true);
+        assert_eq!(p, format!("{base}docs/"));
+        c.tab(&mut p, false, true); // wraps
+        assert_eq!(p, format!("{base}data/"));
+        c.tab(&mut p, false, false); // Shift-Tab back (wraps)
+        assert_eq!(p, format!("{base}docs/"));
+        c.revert(&mut p); // Esc
+        assert_eq!(p, format!("{base}d"));
+        assert!(!c.active());
+        // a prefix that extends first, then lists on the next Tab
+        let mut p = base.to_string();
+        std::fs::write(t.path().join("ETHUSDT_5m.csv"), "").unwrap();
+        p.push('E');
+        c.tab(&mut p, false, true);
+        assert_eq!(p, format!("{base}ETHUSDT_"));
+        assert!(!c.active());
+        c.tab(&mut p, false, true);
+        assert!(c.active() && c.cands.len() == 2);
+        c.pick(1, &mut p); // mouse
+        assert_eq!(p, format!("{base}ETHUSDT_5m.csv"));
+        c.reset(); // Enter / typing accepts
+        assert_eq!(p, format!("{base}ETHUSDT_5m.csv"));
     }
 
     #[test]

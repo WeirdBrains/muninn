@@ -278,6 +278,8 @@ retyped at any time.
   cleaned up. CLI Ctrl-C cancels the same way. `mnnn ingest runs` shows them.
 - Places column (Places (p)): built-ins (Home, Projects, raw/data, working folder),
   bookmarks (`b` toggles, `x` removes) and recent folders; clickable, `1`–`9`, `p` focuses.
+- Path input completion cycles like zsh/Neovim: Tab extends, Tab lists, Tab/Shift-Tab
+  cycle (click picks), Enter/typing accepts, Esc reverts.
 - Every popup draws the shared [X] close control in its title bar (same as Esc).
 
 CLI and TUI are thin layers over one library crate; no business logic in either.

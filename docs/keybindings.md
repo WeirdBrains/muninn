@@ -66,4 +66,5 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | Space, `a`, `.`, `/`, Tab | select, whole folder, hidden, filter, path completion (in the popup) |
 | Esc, `c`, [Cancel] | cancel a running import (asks first; `y`/`n`) |
 | `p`, `1`–`9`, `b` | places column, jump to a place, bookmark the folder (in the popup) |
+| Tab / Shift-Tab | path input: complete, list, then cycle candidates; Esc reverts |
 | click [X] | close any popup (during an import: asks to cancel) |

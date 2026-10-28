@@ -1029,3 +1029,32 @@ fn cli_style_cancel_is_recorded_by_cli() {
     assert_eq!((run.status.as_str(), run.cancel_by.as_deref(), run.cancel_phase.as_deref()), ("cancelled", Some("cli"), Some("read")));
     assert!(a.store.source_by_name("clicx").unwrap().is_none());
 }
+
+#[test]
+fn path_tab_list_cycles_and_click_picks() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    std::fs::create_dir(d.path().join("alpha")).unwrap();
+    std::fs::create_dir(d.path().join("apple")).unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    a.on_key(key(KeyCode::Tab)); // into the path input
+    a.import.path = format!("{}/a", d.path().display());
+    a.on_key(key(KeyCode::Tab)); // "a" -> "ap"? no: alpha/apple share only "a" -> list
+    let s = screen_text(&mut a);
+    assert!(s.contains("alpha/") && s.contains("apple/") && s.contains("Shift-Tab cycle"), "{s}");
+    a.on_key(key(KeyCode::Tab));
+    assert!(a.import.path.ends_with("/alpha/"));
+    a.on_key(mkey(KeyCode::BackTab, KeyModifiers::SHIFT));
+    assert!(a.import.path.ends_with("/apple/"));
+    screen_text(&mut a);
+    let (r, _) = *a.modal_hits.iter().find(|(_, h)| *h == Hit::ImportCandidate(0)).unwrap();
+    a.on_mouse(click(r.x, r.y));
+    assert!(a.import.path.ends_with("/alpha/"));
+    a.on_key(key(KeyCode::Esc)); // revert to typed
+    assert!(a.import.path.ends_with("/a"));
+    a.on_key(key(KeyCode::Tab));
+    a.on_key(key(KeyCode::Tab));
+    a.on_key(key(KeyCode::Enter)); // accept selection
+    a.on_key(key(KeyCode::Enter)); // go there
+    assert!(a.import.dir.ends_with("alpha"));
+}

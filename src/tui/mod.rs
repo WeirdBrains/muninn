@@ -55,6 +55,7 @@ pub enum Hit {
     ImportCancel,
     ImportConfirm(bool),
     ImportPlace(usize),
+    ImportCandidate(usize),
 }
 
 pub struct App {
@@ -622,7 +623,7 @@ impl App {
                 }
             }
             Some(Hit::ClearFilters) => self.dispatch(Action::ClearFilters),
-            Some(Hit::CloseModal | Hit::ImportCancel | Hit::ImportConfirm(_) | Hit::ImportPlace(_)) => {}
+            Some(Hit::CloseModal | Hit::ImportCancel | Hit::ImportConfirm(_) | Hit::ImportPlace(_) | Hit::ImportCandidate(_)) => {}
             Some(Hit::SidebarRow(r)) => {
                 self.sidebar.focused = true;
                 self.sidebar.searching = false;

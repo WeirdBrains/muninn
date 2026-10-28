@@ -32,7 +32,7 @@ Only folders and data files (`csv tsv txt json ndjson jsonl`) are listed.
 | `a` | select the whole folder (again: unselect) |
 | `.` | show / hide hidden files |
 | `/` | filter the listing (substring) |
-| Tab, `g` | type a path; Tab completes it like a shell, listing candidates when ambiguous; Enter goes there (or imports a file) |
+| Tab, `g` | type a path (see *Path completion*); Enter goes there (or imports a file) |
 | `p` | focus the Places column (see below) |
 | `1`–`9` | jump to the numbered place |
 | `b` | bookmark the current folder (again: remove the bookmark) |
@@ -46,6 +46,20 @@ The preview shows the guessed symbol and duration (from the file name) and the f
 lines are shown in red with the reason and the raw line. It reads at most 64 KiB, so
 it is instant on huge files. A large JSON array cannot be parsed from its start, so
 its preview shows raw lines; NDJSON previews parse.
+
+## Path completion
+
+In the path input, Tab works like zsh or Neovim:
+
+1. **Tab** completes as far as the matching names agree (`/data/BT` → `/data/BTCUSDT_`).
+2. If several names still match, the next **Tab** shows them as a list under the input.
+3. Further **Tab** steps through the list, highlighting a candidate and filling it into
+   the input; **Shift-Tab** steps backwards; both wrap around. Clicking a candidate
+   picks it.
+4. **Enter** or typing accepts the candidate (a second Enter goes there); **Esc** puts
+   back what you had typed.
+
+Hidden names are offered only when hidden files are shown (`.`) or you type the dot.
 
 ## Resolution
 
