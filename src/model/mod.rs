@@ -207,3 +207,74 @@ mod tests {
         assert_eq!(a.0, *expect.as_bytes());
     }
 }
+
+/// A per-bar price used by chart lines and the price filter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PriceMetric {
+    Open,
+    High,
+    Low,
+    #[default]
+    Close,
+    /// (high + low + close) / 3
+    Typical,
+    /// (high + low) / 2
+    Median,
+    /// (open + high + low + close) / 4
+    OhlcAvg,
+    /// Volume-weighted typical price (over a range; per bar it is the typical price).
+    Vwap,
+}
+
+impl PriceMetric {
+    pub const ALL: [PriceMetric; 8] = [
+        PriceMetric::Open,
+        PriceMetric::High,
+        PriceMetric::Low,
+        PriceMetric::Close,
+        PriceMetric::Typical,
+        PriceMetric::Median,
+        PriceMetric::OhlcAvg,
+        PriceMetric::Vwap,
+    ];
+    pub fn value(self, b: &Bar) -> f64 {
+        match self {
+            PriceMetric::Open => b.open,
+            PriceMetric::High => b.high,
+            PriceMetric::Low => b.low,
+            PriceMetric::Close => b.close,
+            PriceMetric::Typical | PriceMetric::Vwap => (b.high + b.low + b.close) / 3.0,
+            PriceMetric::Median => (b.high + b.low) / 2.0,
+            PriceMetric::OhlcAvg => (b.open + b.high + b.low + b.close) / 4.0,
+        }
+    }
+    /// SQL expression over the `bars b` alias (per bar).
+    pub fn sql(self) -> &'static str {
+        match self {
+            PriceMetric::Open => "b.open",
+            PriceMetric::High => "b.high",
+            PriceMetric::Low => "b.low",
+            PriceMetric::Close => "b.close",
+            PriceMetric::Typical | PriceMetric::Vwap => "((b.high + b.low + b.close) / 3.0)",
+            PriceMetric::Median => "((b.high + b.low) / 2.0)",
+            PriceMetric::OhlcAvg => "((b.open + b.high + b.low + b.close) / 4.0)",
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            PriceMetric::Open => "open",
+            PriceMetric::High => "high",
+            PriceMetric::Low => "low",
+            PriceMetric::Close => "close",
+            PriceMetric::Typical => "typical",
+            PriceMetric::Median => "median",
+            PriceMetric::OhlcAvg => "ohlc avg",
+            PriceMetric::Vwap => "vwap",
+        }
+    }
+    pub fn next(self) -> Self {
+        let i = Self::ALL.iter().position(|m| *m == self).unwrap_or(0);
+        Self::ALL[(i + 1) % Self::ALL.len()]
+    }
+}

@@ -301,3 +301,165 @@ fn presets_and_saved_layouts() {
     let s = screen_text(&mut a);
     assert!(s.contains(" list BTC/USDT ") || s.contains(" list ETH/USDT "), "{s}");
 }
+
+fn chart_tile(a: &mut App) {
+    screen_text(a);
+    ctrl_w(a, KeyCode::Char('t'));
+    assert_eq!(a.layout.focused().view, layout::View::Chart);
+}
+
+#[test]
+fn chart_renders_layers_and_selectors() {
+    let (_t, mut a) = app();
+    chart_tile(&mut a);
+    let s = screen_text(&mut a);
+    assert!(s.contains("start ◂") && s.contains("end ◂"), "{s}");
+    assert!(s.contains('█') || s.contains('│'), "candles: {s}");
+    assert!(s.contains("live"));
+    assert!(s.contains("o ") && s.contains(" v "), "readout: {s}");
+    // toggle every layer on and render
+    for (k, _) in chart::LAYERS {
+        if !a.layout.focused().chart.layers.get(k) {
+            a.on_key(key(KeyCode::Char(k)));
+        }
+    }
+    let s = screen_text(&mut a);
+    assert!(s.contains('•'), "line/MA: {s}");
+    assert!(s.contains('┄'), "envelope");
+    assert!(s.contains('░'), "area");
+    // layers persist with the layout
+    let saved = Preferences::load_or_create(&a.paths).unwrap().tui.layout.unwrap();
+    assert!(saved.focused().chart.layers.envelope);
+    // turn candles off -> OHLC bars
+    a.on_key(key(KeyCode::Char('c')));
+    let s = screen_text(&mut a);
+    assert!(s.contains('┤') || s.contains('├') || s.contains('┼'), "{s}");
+    // layer menu
+    a.on_key(key(KeyCode::Char('L')));
+    assert!(screen_text(&mut a).contains("Chart layers"));
+    a.on_key(key(KeyCode::Char('c')));
+    assert!(a.layout.focused().chart.layers.candles);
+}
+
+#[test]
+fn chart_zoom_pan_jump_and_period() {
+    let (_t, mut a) = app();
+    chart_tile(&mut a);
+    a.on_key(key(KeyCode::Char('-')));
+    screen_text(&mut a);
+    assert_eq!(a.layout.focused().chart.zoom, 2);
+    a.on_key(key(KeyCode::Char('h')));
+    screen_text(&mut a);
+    assert!(a.layout.focused().chart.end.is_some());
+    a.on_key(key(KeyCode::End));
+    assert!(a.layout.focused().chart.end.is_none());
+    a.on_key(key(KeyCode::Char('@')));
+    for c in "2017-08-17 06:00".chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    a.on_key(key(KeyCode::Enter));
+    let s = screen_text(&mut a);
+    assert!(s.contains("2017-08-17 06:00:00  o"), "{s}");
+    a.on_key(key(KeyCode::Char('[')));
+    for c in "2017-08-17".chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    a.on_key(key(KeyCode::Enter));
+    screen_text(&mut a);
+    let c = &a.caches[&a.layout.focus].chart;
+    assert!(c.start <= crate::ingest::time::parse_ts("2017-08-17").unwrap(), "{}", c.start);
+    // clicking the end ▸ arrow moves the window later
+    let before = c.end;
+    let (r, _) = *a.hits.iter().find(|(_, h)| matches!(h, Hit::ChartNav(_, 3))).unwrap();
+    a.on_mouse(click(r.x, r.y));
+    screen_text(&mut a);
+    assert!(a.caches[&a.layout.focus].chart.end > before);
+}
+
+#[test]
+fn linked_list_centers_chart_and_chart_scrolls_list() {
+    let (_t, mut a) = app();
+    a.dispatch(Action::Preset(action::Preset::TwoUp));
+    screen_text(&mut a);
+    a.dispatch(Action::LinkTile); // tile 1 (list) -> tile 2 (chart)
+    assert_eq!(a.layout.tile(1).unwrap().link, Some(2));
+    for _ in 0..10 {
+        a.on_key(key(KeyCode::Down));
+    }
+    screen_text(&mut a);
+    let sel_ts = a.caches[&1].list.selected().unwrap().ts;
+    assert_eq!(a.caches[&2].chart.cursor, Some(sel_ts));
+    assert!(screen_text(&mut a).contains(&crate::ingest::time::fmt_ts(sel_ts)));
+    // move the chart crosshair: the list follows
+    a.on_key(key(KeyCode::Tab));
+    a.on_key(key(KeyCode::Left));
+    a.on_key(key(KeyCode::Left));
+    screen_text(&mut a);
+    let cur = a.caches[&2].chart.cursor.unwrap();
+    assert_eq!(a.caches[&1].list.selected().unwrap().ts, cur);
+}
+
+/// Manual sanity: `cargo test --lib snapshots -- --ignored` writes renders to
+/// `target/tui-snapshots/`. Set MUNINN_RAW_DATA to use the full raw CSVs.
+#[test]
+#[ignore]
+fn snapshots() {
+    let (_t, mut a) = match std::env::var("MUNINN_RAW_DATA") {
+        Ok(raw) => {
+            let t = tempfile::tempdir().unwrap();
+            let paths = Paths::resolve(Some(t.path().join("h")), None).unwrap();
+            paths.ensure().unwrap();
+            let dek = crate::crypto::Key32::random().unwrap();
+            let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
+            for f in ["BTCUSDT_5m.csv", "ETHUSDT_5m.csv"] {
+                let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
+                let started = std::time::Instant::now();
+                crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &std::path::Path::new(&raw).join(f), &Default::default()).unwrap();
+                println!("ingested {f} in {:?}", started.elapsed());
+            }
+            let prefs = Preferences::load_or_create(&paths).unwrap();
+            (t, App::new(paths, store, dek, prefs, Some(ThemeMode::Dark)).unwrap())
+        }
+        Err(_) => app(),
+    };
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/tui-snapshots");
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut shot = |a: &mut App, name: &str, w: u16, h: u16| {
+        let started = std::time::Instant::now();
+        let s = render(a, w, h);
+        println!("{name}: rendered in {:?}", started.elapsed());
+        std::fs::write(dir.join(format!("{name}.txt")), s).unwrap();
+    };
+    shot(&mut a, "01-fresh", 160, 48);
+    shot(&mut a, "02-compact", 120, 26);
+    a.on_key(mkey(KeyCode::Char('v'), KeyModifiers::ALT));
+    a.on_key(key(KeyCode::Char('l')));
+    shot(&mut a, "03-menu-view-layouts", 160, 48);
+    a.menu.close();
+    a.dispatch(Action::Preset(action::Preset::MainStack));
+    shot(&mut a, "04-main-stack", 160, 48);
+    for k in ['m', 'e', 'w', 'z'] {
+        a.on_key(key(KeyCode::Char(k)));
+    }
+    a.on_key(key(KeyCode::Char('-')));
+    a.on_key(key(KeyCode::Char('-')));
+    shot(&mut a, "05-chart-layers", 160, 48);
+    a.dispatch(Action::Preset(action::Preset::Grid2x2));
+    a.on_key(key(KeyCode::Char('s')));
+    a.on_key(key(KeyCode::Char('s')));
+    a.on_key(key(KeyCode::Char('s')));
+    a.on_key(key(KeyCode::Char('s')));
+    a.on_key(key(KeyCode::Char('s')));
+    a.on_key(key(KeyCode::Char('s')));
+    a.on_key(key(KeyCode::Char('s')));
+    a.on_key(key(KeyCode::Char('r')));
+    shot(&mut a, "06-grid-sorted-chgpct", 200, 50);
+    for _ in 0..12 {
+        a.on_key(key(KeyCode::Char('-')));
+    }
+    a.on_key(key(KeyCode::Tab));
+    for _ in 0..14 {
+        a.on_key(key(KeyCode::Char('-')));
+    }
+    shot(&mut a, "07-zoomed-out", 200, 50);
+}

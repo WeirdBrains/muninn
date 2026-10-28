@@ -4,6 +4,7 @@
 //! help all dispatch the same [`action::Action`]s through [`App::dispatch`].
 pub mod action;
 pub mod chart;
+mod charting;
 pub mod forms;
 pub mod header;
 pub mod menu;
@@ -35,6 +36,9 @@ pub enum Hit {
     Tile(u32),
     ListHeader(u32, usize),
     TabBar(u32),
+    /// Chart period selector arrows: 0 start◂, 1 start▸, 2 end◂, 3 end▸.
+    ChartNav(u32, u8),
+    ChartPlot(u32),
 }
 
 pub struct App {
@@ -128,6 +132,7 @@ impl App {
         match &self.modal {
             Some(m) => m.help_topic(),
             None if self.menu.is_open() => "menus",
+            None if self.layout.focused().view == layout::View::Chart => "charts",
             None => "tiling",
         }
     }
@@ -139,7 +144,7 @@ impl App {
             return false;
         }
         // Not built yet in this release.
-        !matches!(a, LinkTile | ChartLayers | Filter(_) | ClearFilters | SortYear | SortName | ToggleOrder | ToggleSidebar | FocusSidebar | Import)
+        !matches!(a, Filter(_) | ClearFilters | SortYear | SortName | ToggleOrder | ToggleSidebar | FocusSidebar | Import)
     }
 
     /// Whether a text field has focus (letters are typed, not commands).
@@ -283,6 +288,25 @@ impl App {
                 self.layout_changed();
                 self.set_status(format!("view: {v:?}").to_lowercase());
             }
+            LinkTile => {
+                let l = self.layout.cycle_link();
+                self.layout_changed();
+                let id = self.layout.focus;
+                match l {
+                    Some(o) => {
+                        self.set_status(format!("tile {id} linked to tile {o}"));
+                        self.propagate_from_list(id);
+                        self.propagate_from_chart(id);
+                    }
+                    None => self.set_status(format!("tile {id} unlinked")),
+                }
+            }
+            ChartLayers => {
+                if self.layout.focused().view != layout::View::Chart {
+                    return self.set_status("focus a chart tile first (Ctrl-w t turns a list into a chart)");
+                }
+                self.modal = Some(Modal::Layers { sel: 0 });
+            }
             ToggleSplitDir => {
                 let d = self.layout.toggle_split_dir();
                 self.set_status(format!("new tiles split {}", if d == layout::Dir::Horizontal { "right" } else { "below" }));
@@ -398,10 +422,28 @@ impl App {
     }
 
     pub fn on_mouse(&mut self, m: MouseEvent) {
+        let found = self.hits.iter().rev().find(|(r, _)| r.contains((m.column, m.row).into())).copied();
+        let hit = found.map(|(_, h)| h);
+        if matches!(m.kind, MouseEventKind::ScrollUp | MouseEventKind::ScrollDown) && self.modal.is_none() && !self.menu.is_open() {
+            let up = m.kind == MouseEventKind::ScrollUp;
+            let id = match hit {
+                Some(Hit::ChartPlot(id)) | Some(Hit::Tile(id)) | Some(Hit::ListHeader(id, _)) | Some(Hit::ChartNav(id, _)) => id,
+                _ => return,
+            };
+            self.layout.set_focus(id);
+            match self.layout.focused().view {
+                layout::View::Chart => self.chart_zoom(id, up),
+                layout::View::List => {
+                    let c = &mut self.caches.entry(id).or_default().list;
+                    c.sel = (c.sel + if up { -3 } else { 3 }).clamp(0, (c.total - 1).max(0));
+                    self.propagate_from_list(id);
+                }
+            }
+            return;
+        }
         if m.kind != MouseEventKind::Down(MouseButton::Left) {
             return;
         }
-        let hit = self.hits.iter().rev().find(|(r, _)| r.contains((m.column, m.row).into())).map(|(_, h)| *h);
         match hit {
             Some(Hit::MenuTop(i)) => {
                 if self.menu.open == Some(i) {
@@ -423,6 +465,20 @@ impl App {
                 self.menu.close();
                 self.layout.set_focus(id);
                 self.layout_changed();
+            }
+            Some(Hit::ChartNav(id, which)) => {
+                self.layout.set_focus(id);
+                self.chart_nav(id, which);
+            }
+            Some(Hit::ChartPlot(id)) => {
+                self.layout.set_focus(id);
+                let r = found.unwrap().0;
+                let c = &mut self.caches.entry(id).or_default().chart;
+                let idx = (m.column - r.x) as usize;
+                if let Some(b) = c.visible().get(idx) {
+                    c.cursor = Some(b.ts);
+                }
+                self.propagate_from_chart(id);
             }
             Some(Hit::ListHeader(id, col)) => {
                 self.layout.set_focus(id);
@@ -479,8 +535,9 @@ impl App {
             match p {
                 layout::Placed::Tile(id, r) => {
                     let Some(tile) = self.layout.tile(id).cloned() else { continue };
+                    let bounds = self.bounds(tile.series.as_ref());
                     let cache = self.caches.entry(id).or_default();
-                    tiles::draw_tile(f, r, &tile, cache, &self.store, scope, id == self.layout.focus, &t, hits);
+                    tiles::draw_tile(f, r, &tile, cache, &self.store, scope, bounds, id == self.layout.focus, &t, hits);
                 }
                 layout::Placed::Bar { rect, mode, titles, active, first_ids } => {
                     let mut spans = vec![];

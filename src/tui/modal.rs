@@ -18,6 +18,7 @@ pub enum PromptKind {
     JumpDate,
     ChartStart,
     ChartEnd,
+    Mas,
 }
 
 pub struct Prompt {
@@ -34,6 +35,8 @@ pub enum Modal {
     Prefs { sel: usize },
     Info { title: String, lines: Vec<String>, scroll: u16 },
     Prompt(Prompt),
+    /// Chart layer checklist for the focused chart tile.
+    Layers { sel: usize },
     /// Pick from a list of strings (e.g. saved layouts).
     Pick { title: String, items: Vec<String>, sel: usize, kind: PickKind },
 }
@@ -58,6 +61,7 @@ impl Modal {
             Modal::Themes => "themes",
             Modal::Prefs { .. } => "preferences",
             Modal::Info { .. } | Modal::Pick { .. } => "tui",
+            Modal::Layers { .. } => "charts",
             Modal::Prompt(p) => match p.kind {
                 PromptKind::ThemeImport | PromptKind::ThemeExport => "themes",
                 PromptKind::LayoutSave => "tiling",
@@ -185,6 +189,27 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             KeyCode::Esc | KeyCode::Char('q') => app.modal = None,
             _ => {}
         },
+        Modal::Layers { sel } => {
+            let n = super::chart::LAYERS.len();
+            match k.code {
+                KeyCode::Down | KeyCode::Char('j') => *sel = (*sel + 1) % n,
+                KeyCode::Up | KeyCode::Char('k') => *sel = (*sel + n - 1) % n,
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    let key = super::chart::LAYERS[*sel].0;
+                    app.layout.focused_mut().chart.layers.toggle(key);
+                    app.layout_changed();
+                }
+                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('L') => app.modal = None,
+                KeyCode::Char(c) => {
+                    if let Some(i) = super::chart::LAYERS.iter().position(|(k, _)| *k == c) {
+                        *sel = i;
+                        app.layout.focused_mut().chart.layers.toggle(c);
+                        app.layout_changed();
+                    }
+                }
+                _ => {}
+            }
+        }
         Modal::Pick { items, sel, kind, .. } => match k.code {
             KeyCode::Down | KeyCode::Char('j') => *sel = (*sel + 1).min(items.len().saturating_sub(1)),
             KeyCode::Up | KeyCode::Char('k') => *sel = sel.saturating_sub(1),
@@ -243,7 +268,10 @@ impl App {
 
     /// Prompts handled by later features (layouts, charts).
     pub fn on_prompt_ext(&mut self, kind: PromptKind, input: &str) {
-        if kind == PromptKind::LayoutSave {
+        if kind != PromptKind::LayoutSave {
+            return self.chart_prompt(kind, input);
+        }
+        {
             if input.is_empty() {
                 return self.set_status("layout name is empty");
             }
@@ -275,6 +303,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Prefs { .. } => (60, 9),
         Modal::Info { lines, .. } => ((lines.iter().map(|l| l.chars().count()).max().unwrap_or(20) as u16 + 6).max(40), lines.len() as u16 + 4),
         Modal::Pick { items, .. } => (50, items.len() as u16 + 4),
+        Modal::Layers { .. } => (44, super::chart::LAYERS.len() as u16 + 4),
         _ => (area.width.saturating_sub(4), area.height.saturating_sub(2)),
     };
     let r = centered(area, w, h);
@@ -308,6 +337,17 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
             lines.push(Line::raw(""));
             lines.push(Line::styled(" Enter changes · saved to preferences.toml", Style::new().fg(t.muted)));
             f.render_widget(Paragraph::new(lines).block(block("Preferences · Esc closes", true, &t)), r);
+        }
+        Modal::Layers { sel } => {
+            let layers = app.layout.focused().chart.layers;
+            let mut lines = vec![];
+            for (i, (k, name)) in super::chart::LAYERS.iter().enumerate() {
+                let on = layers.get(*k);
+                let st = if i == *sel { Style::new().bg(t.selection_bg).fg(t.selection_fg) } else { Style::new().fg(if on { t.fg } else { t.muted }) };
+                lines.push(Line::styled(format!(" [{}] {name:<22} {k} ", if on { "x" } else { " " }), st));
+            }
+            lines.push(Line::styled(" N line metric · M moving averages", Style::new().fg(t.muted)));
+            f.render_widget(Paragraph::new(lines).block(block("Chart layers · Space toggles · Esc", true, &t)), r);
         }
         Modal::Pick { title, items, sel, .. } => {
             let mut lines = vec![];

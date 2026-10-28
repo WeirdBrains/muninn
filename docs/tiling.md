@@ -28,6 +28,7 @@ own series and options. The whole tree is saved to `[tui.layout]` in
 | `Ctrl-w z` | zoom (maximize) the tile, again to restore | View ▸ Zoom tile |
 | `Ctrl-w t` | switch the tile between list and chart | View ▸ Change view |
 | `Ctrl-w e` | toggle the direction for **View ▸ New tile** (right / below) | |
+| `Ctrl-w y` | link to the next tile / cycle / unlink | View ▸ Link tile |
 
 Mouse: click a tile to focus it; click a tab or stack title to show that branch.
 
@@ -85,4 +86,15 @@ Narrow tiles show the columns that fit, from the left.
 
 ## Chart tiles
 
-Candles of the most recent bars that fit the tile width. `,` / `.` change the series.
+Candles with volume, period selectors, zoom/pan and toggleable layers: see
+[charts](charts.md).
+
+## Linked tiles
+
+**View ▸ Link tile** (`Ctrl-w y`) links the focused tile to the next tile; press again
+to cycle the target, and once more to unlink. The title shows `⛓<id>`.
+
+- Moving the selection in a linked **list** centres the linked **chart** on that bar
+  and puts the crosshair on it.
+- Moving a linked **chart** (crosshair, pan, zoom, period) scrolls linked
+  time-sorted lists to the crosshair bar (or the window start).

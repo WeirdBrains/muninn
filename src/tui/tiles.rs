@@ -81,32 +81,90 @@ impl ListCache {
 /// Runtime state of one chart tile.
 #[derive(Debug, Clone, Default)]
 pub struct ChartCache {
-    key: Option<(SeriesKey, u16, Option<(i64, i64)>)>,
+    key: Option<(SeriesKey, u16, i64, i64, Option<(i64, i64)>, usize)>,
     pub bars: Vec<Bar>,
+    pub first: usize,
+    /// Plot width in columns and bucket size from the last draw.
+    pub width: u16,
+    pub bucket_ms: i64,
+    pub dur_ms: i64,
+    /// Window from the last draw.
+    pub start: i64,
+    pub end: i64,
+    /// Data bounds of the series.
+    pub data_first: i64,
+    pub data_last: i64,
+    /// Crosshair bar time.
+    pub cursor: Option<i64>,
 }
 
 impl ChartCache {
-    pub fn ensure(&mut self, store: &Store, tile: &Tile, scope: Option<(i64, i64)>, width: u16) {
+    pub fn ensure(&mut self, store: &Store, tile: &Tile, scope: Option<(i64, i64)>, width: u16, bounds: Option<(i64, i64)>) {
         let Some(series) = &tile.series else {
             self.bars.clear();
             return;
         };
-        let key = (series.clone(), width, scope);
+        let Some((mut lo, mut hi)) = bounds else {
+            self.bars.clear();
+            return;
+        };
+        if let Some((a, b)) = scope {
+            lo = lo.max(a);
+            hi = hi.min(b);
+        }
+        let dur = crate::model::Duration::parse(&series.duration).map(|d| d.millis()).unwrap_or(60_000).max(1);
+        let o = &tile.chart;
+        let bucket = dur * o.zoom.max(1) as i64;
+        let w = width.max(1) as i64;
+        let end = o.end.unwrap_or(hi).clamp(lo, hi.max(lo));
+        let start = end - (w - 1) * bucket;
+        let warm = if o.layers.ma { o.mas.iter().map(|m| m.period).max().unwrap_or(0) } else { 0 }.max(if o.layers.envelope { 20 } else { 0 });
+        self.width = width;
+        self.bucket_ms = bucket;
+        self.dur_ms = dur;
+        self.start = start;
+        self.end = end;
+        self.data_first = lo;
+        self.data_last = hi;
+        let key = (series.clone(), width, bucket, end, scope, warm);
         if self.key.as_ref() == Some(&key) {
             return;
         }
         let mut f = series.filter();
-        if let Some((a, b)) = scope {
-            f.from = Some(a);
-            f.to = Some(b);
+        f.from = Some((start - warm as i64 * bucket).max(lo));
+        f.to = Some(end + bucket - 1);
+        if let Some((_, b)) = scope {
+            f.to = Some(f.to.unwrap().min(b));
         }
-        let mut v = store.page_bars(&f, BarSort::Time, true, width as i64, 0).unwrap_or_default();
-        v.reverse();
-        self.bars = v;
+        self.bars = store.bucketed(&f, bucket).unwrap_or_default();
+        let aligned = start - start.rem_euclid(bucket);
+        self.first = self.bars.iter().position(|b| b.ts >= aligned).unwrap_or(self.bars.len());
         self.key = Some(key);
     }
     pub fn invalidate(&mut self) {
         self.key = None;
+    }
+    /// First column time (bucket aligned).
+    pub fn aligned_start(&self) -> i64 {
+        let b = self.bucket_ms.max(1);
+        self.start - self.start.rem_euclid(b)
+    }
+    pub fn visible(&self) -> &[Bar] {
+        let v = &self.bars[self.first.min(self.bars.len())..];
+        let lim = self.aligned_start() + self.width as i64 * self.bucket_ms.max(1);
+        let n = v.iter().take_while(|b| b.ts < lim).count();
+        &v[..n]
+    }
+    /// Index of the crosshair in the visible bars (defaults to the last bar).
+    pub fn cursor_index(&self) -> Option<usize> {
+        let v = self.visible();
+        if v.is_empty() {
+            return None;
+        }
+        Some(match self.cursor {
+            Some(ts) => v.iter().position(|b| b.ts >= ts - ts.rem_euclid(self.bucket_ms.max(1))).unwrap_or(v.len() - 1),
+            None => v.len() - 1,
+        })
     }
 }
 
@@ -231,18 +289,68 @@ pub fn draw_list(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ListCache, sto
     }
 }
 
-pub fn draw_chart(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ChartCache, store: &Store, scope: Option<(i64, i64)>, th: &Theme) {
-    cache.ensure(store, t, scope, area.width);
-    if cache.bars.is_empty() {
-        f.render_widget(Paragraph::new(" no bars").style(Style::new().fg(th.muted)), area);
+pub fn draw_chart(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ChartCache, store: &Store, scope: Option<(i64, i64)>, bounds: Option<(i64, i64)>, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+    if area.height < 3 || area.width < 10 {
         return;
     }
-    f.render_widget(super::widgets::Candles { bars: &cache.bars, theme: th }, area);
+    let l = &t.chart.layers;
+    let head_h = if l.crosshair { 2 } else { 1 };
+    let body = Rect { y: area.y + head_h, height: area.height - head_h, ..area };
+    let plot_w = super::chart::areas(body, l).plot.width;
+    cache.ensure(store, t, scope, plot_w, bounds);
+    if t.series.is_none() || cache.bars.is_empty() {
+        f.render_widget(Paragraph::new(" no bars · pick a series with `,` / `.` or the sidebar").style(Style::new().fg(th.muted)), area);
+        return;
+    }
+    // period selectors: start ◂ date ▸   end ◂ date ▸   zoom
+    let ms = Style::new().fg(th.muted);
+    let acc = Style::new().fg(th.accent);
+    let mut x = area.x;
+    let mut spans: Vec<Span> = vec![];
+    let mut push = |text: String, st: Style, hit: Option<u8>, spans: &mut Vec<Span>, hits: &mut Vec<(Rect, Hit)>| {
+        let w = text.chars().count() as u16;
+        if let Some(h) = hit {
+            hits.push((Rect { x, y: area.y, width: w, height: 1 }, Hit::ChartNav(t.id, h)));
+        }
+        spans.push(Span::styled(text, st));
+        x += w;
+    };
+    push("start ".into(), ms, None, &mut spans, hits);
+    push("◂".into(), acc, Some(0), &mut spans, hits);
+    push(format!(" {} ", &fmt_ts(cache.start.max(cache.data_first))[..16]), Style::new().fg(th.fg), None, &mut spans, hits);
+    push("▸".into(), acc, Some(1), &mut spans, hits);
+    push("   end ".into(), ms, None, &mut spans, hits);
+    push("◂".into(), acc, Some(2), &mut spans, hits);
+    push(format!(" {} ", &fmt_ts(cache.end)[..16]), Style::new().fg(th.fg), None, &mut spans, hits);
+    push("▸".into(), acc, Some(3), &mut spans, hits);
+    let per = crate::model::Duration(cache.bucket_ms / 1000).to_string();
+    push(format!("   {per}/col{}", if t.chart.end.is_none() { " · live" } else { "" }), ms, None, &mut spans, hits);
+    f.render_widget(Paragraph::new(Line::from(spans)), Rect { height: 1, ..area });
+    let ci = cache.cursor_index();
+    if l.crosshair
+        && let Some(b) = ci.and_then(|i| cache.visible().get(i)) {
+            let mut text = super::chart::readout(b);
+            if l.ma {
+                text.push_str(&format!("  {}", t.chart.mas.iter().map(|m| m.label()).collect::<Vec<_>>().join(" ")));
+            }
+            if l.line {
+                text.push_str(&format!("  line {}", t.chart.line_metric.label()));
+            }
+            f.render_widget(Paragraph::new(text).style(Style::new().fg(th.info)), Rect { y: area.y + 1, height: 1, ..area });
+        }
+    let plot = super::chart::areas(body, l).plot;
+    hits.push((plot, Hit::ChartPlot(t.id)));
+    let data = super::chart::ChartData { bars: &cache.bars, first: cache.first, bucket_ms: cache.bucket_ms, start: cache.aligned_start(), opts: &t.chart, cursor: ci, theme: th };
+    super::chart::render(&data, body, f.buffer_mut());
 }
 
 /// Draw one tile with its border.
 #[allow(clippy::too_many_arguments)]
-pub fn draw_tile(f: &mut Frame, area: Rect, t: &Tile, cache: &mut TileCache, store: &Store, scope: Option<(i64, i64)>, focused: bool, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+pub fn draw_tile(f: &mut Frame, area: Rect, t: &Tile, cache: &mut TileCache, store: &Store, scope: Option<(i64, i64)>, bounds: Option<(i64, i64)>, focused: bool, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+    if t.view == View::List {
+        let inner = Block::bordered().inner(area);
+        cache.list.ensure(store, t, scope, inner.height as i64 - 1);
+    }
     let title = title(t, cache);
     let block = Block::bordered()
         .title(Span::styled(format!(" {title} "), Style::new().fg(if focused { th.accent } else { th.header }).add_modifier(Modifier::BOLD)))
@@ -253,7 +361,7 @@ pub fn draw_tile(f: &mut Frame, area: Rect, t: &Tile, cache: &mut TileCache, sto
     hits.push((area, Hit::Tile(t.id)));
     match t.view {
         View::List => draw_list(f, inner, t, &mut cache.list, store, scope, focused, th, hits),
-        View::Chart => draw_chart(f, inner, t, &mut cache.chart, store, scope, th),
+        View::Chart => draw_chart(f, inner, t, &mut cache.chart, store, scope, bounds, th, hits),
     }
 }
 
@@ -301,7 +409,51 @@ pub fn on_key(app: &mut App, k: KeyEvent) -> bool {
         }
         let c = &mut app.caches.entry(id).or_default().list;
         c.sel = c.sel.clamp(0, (c.total - 1).max(0));
+        app.propagate_from_list(id);
         return true;
     }
-    false
+    chart_key(app, k)
+}
+
+/// Keys for a focused chart tile.
+pub fn chart_key(app: &mut App, k: KeyEvent) -> bool {
+    use super::modal::{Modal, PromptKind};
+    let id = app.layout.focus;
+    match k.code {
+        KeyCode::Char(c) if super::chart::LAYERS.iter().any(|(k, _)| *k == c) => {
+            let on = app.layout.focused_mut().chart.layers.toggle(c).unwrap_or(false);
+            let name = super::chart::LAYERS.iter().find(|(k, _)| *k == c).map(|(_, n)| *n).unwrap_or("");
+            app.set_status(format!("{name} {}", if on { "on" } else { "off" }));
+            app.layout_changed();
+        }
+        KeyCode::Char('N') => {
+            let t = app.layout.focused_mut();
+            t.chart.line_metric = t.chart.line_metric.next();
+            t.chart.layers.line = true;
+            let m = t.chart.line_metric.label();
+            app.set_status(format!("line: {m}"));
+            app.layout_changed();
+        }
+        KeyCode::Char('M') => app.modal = Some(Modal::prompt("Moving averages (e.g. sma20, ema50)", PromptKind::Mas)),
+        KeyCode::Char('L') => app.dispatch(super::action::Action::ChartLayers),
+        KeyCode::Char('[') => app.modal = Some(Modal::prompt("Period start (YYYY-MM-DD [HH:MM])", PromptKind::ChartStart)),
+        KeyCode::Char(']') => app.modal = Some(Modal::prompt("Period end (YYYY-MM-DD [HH:MM])", PromptKind::ChartEnd)),
+        KeyCode::Char('@') => app.modal = Some(Modal::prompt("Jump to date (YYYY-MM-DD [HH:MM])", PromptKind::JumpDate)),
+        KeyCode::Char('h') => app.chart_pan(id, -0.25),
+        KeyCode::Char('l') => app.chart_pan(id, 0.25),
+        KeyCode::Char('H') | KeyCode::PageUp => app.chart_pan(id, -1.0),
+        KeyCode::PageDown => app.chart_pan(id, 1.0),
+        KeyCode::Char('+') | KeyCode::Char('=') => app.chart_zoom(id, true),
+        KeyCode::Char('-') => app.chart_zoom(id, false),
+        KeyCode::Left => app.chart_cursor(id, -1),
+        KeyCode::Right => app.chart_cursor(id, 1),
+        KeyCode::Home => {
+            let c = app.caches.entry(id).or_default().chart.clone();
+            let end = c.data_first + (c.width.max(1) as i64 - 1) * c.bucket_ms;
+            app.chart_set_end(id, Some(end));
+        }
+        KeyCode::End | KeyCode::Char('0') => app.chart_set_end(id, None),
+        _ => return false,
+    }
+    true
 }
