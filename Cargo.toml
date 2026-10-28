@@ -89,3 +89,16 @@ assets = [
     ["CHANGELOG.md", "usr/share/doc/muninn/", "644"],
     ["docs/**/*.md", "usr/share/doc/muninn/docs/", "644"],
 ]
+
+# Fedora/RHEL package: `cargo build --release && cargo generate-rpm` (packaging/fedora)
+[package.metadata.generate-rpm]
+summary = "Local, encrypted store for OHLCV market bars (mnnn)"
+license = "MIT"
+release = "1"
+assets = [
+    { source = "target/release/mnnn", dest = "/usr/bin/mnnn", mode = "755" },
+    { source = "man/*.1", dest = "/usr/share/man/man1/", mode = "644", doc = true },
+    { source = "README.md", dest = "/usr/share/doc/muninn/README.md", mode = "644", doc = true },
+    { source = "CHANGELOG.md", dest = "/usr/share/doc/muninn/CHANGELOG.md", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/licenses/muninn/LICENSE", mode = "644", doc = true },
+]

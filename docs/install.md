@@ -41,3 +41,16 @@ sudo apt install ./target/debian/muninn_*_amd64.deb
 
 Same layout as Arch (`/usr/bin/mnnn`, man pages, `/usr/share/doc/muninn`).
 Uninstall: `sudo apt remove muninn`.
+
+## Fedora / RHEL
+
+Built with `cargo generate-rpm` from `[package.metadata.generate-rpm]` in `Cargo.toml`
+(see `packaging/fedora/README.md`):
+
+```sh
+cargo install --locked cargo-generate-rpm
+cargo build --release && cargo generate-rpm   # -> target/generate-rpm/muninn-<ver>-1.x86_64.rpm
+sudo dnf install ./target/generate-rpm/muninn-*.x86_64.rpm
+```
+
+Uninstall: `sudo dnf remove muninn`.
