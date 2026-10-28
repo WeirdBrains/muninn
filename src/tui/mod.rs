@@ -1,6 +1,6 @@
 //! Terminal UI (ratatui + crossterm). Thin layer over the library.
 //!
-//! Layout (PLAN.md 1.3): header, menu bar, content area, status line. Menus, keys and
+//! Layout (docs/historical/1.0/PLAN.md 1.3): header, menu bar, content area, status line. Menus, keys and
 //! help all dispatch the same [`action::Action`]s through [`App::dispatch`].
 pub mod action;
 pub mod chart;

@@ -101,5 +101,7 @@ MUNINN_RAW_DATA=~/Projects/kommandosaldat/raw/data cargo test --release --test c
 
 ## Versioning
 
-Semantic versioning with annotated git tags (`v0.1.0`, ...). Pre-1.0, each new feature
-bumps the minor version and fixes/docs bump the patch version. See `CHANGELOG.md`.
+Semantic versioning with annotated git tags (`v1.0.0`, ...): new features bump the
+minor version, fixes/docs the patch version, breaking changes the major. See
+`CHANGELOG.md`. The 1.0 spec, announcement and changelog are archived in
+`docs/historical/1.0/`; `PLAN.md` is the plan for 2.0.

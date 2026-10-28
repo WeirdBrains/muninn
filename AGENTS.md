@@ -7,8 +7,11 @@
   crate features over installing system packages; ask before installing anything.
 
 ## Source of truth
-- `PLAN.md` is the spec. Read it before changing anything; record new decisions and any
-  deviations there (section 10 / 10.1).
+- The 1.0 spec is `docs/historical/1.0/PLAN.md` (frozen snapshot, with
+  `ANNOUNCEMENT.md` and `CHANGELOG.md` beside it). Read it before changing anything;
+  record 1.x decisions in the relevant `docs/` page and `CHANGELOG.md`.
+- `PLAN.md` is the owner's 2.0 plan, still being written. Do not edit it or implement
+  it unless asked.
 - CLI (clap), TUI (ratatui) and any other front end are thin layers over the library;
   no business logic in them. Menus, keybindings and help dispatch the same named actions.
 
@@ -48,7 +51,7 @@
 - `cargo build`, `cargo clippy --all-targets` (no warnings), `cargo test` all pass.
 - New behaviour comes with tests (TUI: ratatui `TestBackend` render tests).
 
-## Fixed design decisions (see PLAN.md for detail)
+## Fixed design decisions (see docs/historical/1.0/PLAN.md for detail)
 - Binary `mnnn`; global flags include `--home`, `--db`, `--non-interactive`, `-v`,
   `-q/--quiet`, `-y/--yes` (yes never invents missing values).
 - Storage: `~/.muninn/{storage/muninn.database, keys/, themes/<name>/{assets,interface.toml},

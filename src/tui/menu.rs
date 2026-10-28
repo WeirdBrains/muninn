@@ -42,7 +42,7 @@ pub struct Menu {
     pub items: Vec<Item>,
 }
 
-/// The menu tree (PLAN.md 1.3).
+/// The menu tree (docs/historical/1.0/PLAN.md 1.3).
 pub fn menus() -> Vec<Menu> {
     use Action::*;
     vec![
