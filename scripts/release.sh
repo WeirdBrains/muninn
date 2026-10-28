@@ -8,6 +8,9 @@ ver="$1"; summary="$2"; shift 2
 [[ -z "$(git status --porcelain)" ]] || { echo "working tree not clean" >&2; exit 1; }
 git rev-parse -q --verify "refs/tags/v$ver" >/dev/null && { echo "tag v$ver exists" >&2; exit 1; }
 sed -i "0,/^version = \".*\"/s//version = \"$ver\"/" Cargo.toml
+# keep packaging versions in step
+sed -i "s/^pkgver=.*/pkgver=$ver/" packaging/arch/PKGBUILD packaging/arch/muninn-bin/PKGBUILD
+sed -i "0,/^  version \".*\"/s//  version \"$ver\"/" packaging/homebrew/muninn.rb
 cargo build -q
 cargo run -q -- man --out man >/dev/null
 python3 - "$ver" "$@" <<'PY'

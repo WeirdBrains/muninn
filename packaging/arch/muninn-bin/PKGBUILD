@@ -1,14 +1,17 @@
 # Maintainer: Michael Christenson II <m3talsmith@gmail.com>
-# Binary package: installs the prebuilt release binary. No Rust needed.
+# Binary package: installs the prebuilt binary attached to a published GitHub release
+# (vX.Y.Z assets from .github/workflows/release.yml). No Rust needed, but the release
+# must exist and be downloadable (public repo); otherwise use ../PKGBUILD or
+# ../build-local.sh.
 pkgname=muninn-bin
-pkgver=1.4.0
+pkgver=1.6.1
 pkgrel=1
 pkgdesc="Local, encrypted store for OHLCV market bars (mnnn), prebuilt"
 arch=('x86_64' 'aarch64')
 url="https://github.com/kommandosaldat/muninn"
 license=('MIT')
 depends=('gcc-libs' 'glibc')
-provides=('muninn')
+provides=('muninn' 'mnnn')
 conflicts=('muninn')
 options=('!strip' '!debug')
 source_x86_64=("$url/releases/download/v$pkgver/muninn-$pkgver-x86_64-unknown-linux-gnu.tar.gz")
