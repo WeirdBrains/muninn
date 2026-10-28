@@ -22,7 +22,8 @@ p = "CHANGELOG.md"; s = open(p).read()
 secs = {"Added": [], "Changed": [], "Fixed": []}
 for b in bullets:
     m = re.match(r"(Fixed|Changed): (.*)", b, re.S)
-    secs[m.group(1) if m else "Added"].append(m.group(2) if m else b)
+    text = m.group(2) if m else b
+    secs[m.group(1) if m else "Added"].append(text[:1].upper() + text[1:])
 entry = f"## [{ver}] - {datetime.date.today()}\n\n" + "\n".join(
     f"### {k}\n" + "".join(f"- {b}\n" for b in v) for k, v in secs.items() if v) + "\n"
 s = s.replace("## [Unreleased]\n\n", "## [Unreleased]\n\n" + entry, 1)

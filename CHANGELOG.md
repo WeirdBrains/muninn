@@ -6,6 +6,17 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.12.1] - 2026-10-28
+
+### Added
+- Arch package for ARM: releases now include `muninn-bin-<ver>-1-aarch64.pkg.tar.zst` next to the x86_64 one (in `SHA256SUMS`); install with `sudo pacman -U <file>`
+
+### Changed
+- Release notes list each feature with how to use it; `scripts/sync-release-notes.sh --latest` rewrites published releases' notes from the changelog
+
+### Fixed
+- The newest version is now the release marked Latest on GitHub, even when several tags are pushed together
+
 ## [1.12.0] - 2026-10-28
 
 ### Added
@@ -159,7 +170,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.12.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.12.1...HEAD
+[1.12.1]: https://github.com/kommandosaldat/muninn/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/kommandosaldat/muninn/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/kommandosaldat/muninn/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/kommandosaldat/muninn/compare/v1.9.0...v1.10.0
