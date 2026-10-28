@@ -275,6 +275,8 @@ pub enum Pane {
 pub enum Msg {
     File(usize),
     Report(String, Vec<String>),
+    /// Series written by a finished file (for auto-loading).
+    Series(Vec<super::layout::SeriesKey>),
     Failed(String, String),
     /// Cancelled while importing this file; it was rolled back.
     Cancelled(String),
@@ -297,6 +299,8 @@ pub struct Running {
     pub run_id: Option<i64>,
     /// The folder was added to Recent by this run (undone if nothing is kept).
     pub recent_added: bool,
+    /// Series of the files that were kept, in import order.
+    pub imported: Vec<super::layout::SeriesKey>,
 }
 
 pub enum Phase {
@@ -751,6 +755,11 @@ fn launch(app: &mut App, files: Vec<PathBuf>, symbols: std::collections::HashMap
             let _ = match r {
                 Ok(reps) => {
                     kept += 1;
+                    let keys = reps
+                        .iter()
+                        .map(|r| super::layout::SeriesKey { source: r.source.clone(), symbol: r.symbol.clone(), duration: r.duration.clone() })
+                        .collect();
+                    let _ = tx.send(Msg::Series(keys));
                     tx.send(Msg::Report(name, reps.iter().map(line_of).collect()))
                 }
                 Err(_) if opts.progress.as_ref().is_some_and(|p| p.cancelled()) => tx.send(Msg::Cancelled(name)),
@@ -802,6 +811,7 @@ fn launch(app: &mut App, files: Vec<PathBuf>, symbols: std::collections::HashMap
         kept: 0,
         run_id: None,
         recent_added,
+        imported: vec![],
     });
 }
 
@@ -831,6 +841,7 @@ pub fn poll(app: &mut App) -> bool {
             Msg::Failed(n, e) => run.log.push(format!("✗ {n}: {e} (rolled back)")),
             Msg::Cancelled(n) => run.log.push(format!("✗ {n}: cancelled, rolled back (nothing of it stored)")),
             Msg::Run(id) => run.run_id = Some(id),
+            Msg::Series(k) => run.imported.extend(k),
             Msg::Done => done = true,
         }
     }
@@ -860,6 +871,7 @@ pub fn poll(app: &mut App) -> bool {
         }
         lines.push(format!("{} file(s), {mb:.1} MB, {d} bars stored in {secs:.1} s{}", run.files.len(), if cancelled { " · cancelled" } else { "" }));
         let run_id = run.run_id;
+        let first = run.imported.first().cloned();
         app.import.phase = Phase::Done { lines, cancelled };
         if let Some(d) = undo_recent {
             // Nothing was imported: the Recent entry this run added goes too.
@@ -872,6 +884,13 @@ pub fn poll(app: &mut App) -> bool {
             }
         }
         app.dispatch(super::action::Action::Refresh);
+        // Nothing on screen yet: show what was just imported.
+        if let Some(k) = first
+            && app.layout.tiles().iter().all(|t| t.series.is_none())
+        {
+            app.set_series(k.clone());
+            app.set_status(format!("loaded the import: {}", k.label()));
+        }
     }
     done
 }

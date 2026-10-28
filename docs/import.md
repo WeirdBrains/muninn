@@ -149,6 +149,12 @@ recent entry (built-ins stay). Bookmarks and recents are saved in
 [preferences](preferences.md) (`tui.import_bookmarks`, `tui.import_recent`). The
 popup opens in the most recent folder.
 
+## After an import
+
+When the import finishes and no tile shows a series yet, the focused tile loads the
+first series that was imported (the status line says `loaded the import: …`). If any
+tile already shows data, the view is left as it is; pick the new series in the sidebar.
+
 ## When the symbol can't be guessed
 
 If a file's name doesn't tell its symbol (for example `export_5m.csv`) and the symbol

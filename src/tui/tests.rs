@@ -1257,3 +1257,35 @@ fn import_asks_for_a_symbol_it_cannot_guess() {
     wait_import(&mut a);
     assert!(a.series.iter().any(|x| x.symbol.to_string() == "LTC/USDT"));
 }
+
+#[test]
+fn finished_import_loads_into_an_empty_view_only() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("SOLUSDT_5m.csv")).unwrap();
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
+    let ids: Vec<u32> = a.layout.tiles().iter().map(|t| t.id).collect();
+    for id in ids {
+        a.layout.set_focus(id);
+        a.layout.focused_mut().series = None;
+    }
+    // nothing loaded: the import shows up
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.import.sel = a.import.entries.iter().position(|e| e.name == "SOLUSDT_5m.csv").unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    wait_import(&mut a);
+    assert_eq!(a.layout.focused().series.as_ref().map(|k| k.symbol.as_str()), Some("SOL/USDT"));
+    assert!(a.status.contains("loaded the import"), "{}", a.status);
+    let s = screen_text(&mut a);
+    assert!(!s.contains("pick a series"), "{s}");
+    // something loaded: a later import leaves the view alone
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.import.sel = a.import.entries.iter().position(|e| e.name == "ADAUSDT_5m.csv").unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    wait_import(&mut a);
+    assert_eq!(a.layout.focused().series.as_ref().map(|k| k.symbol.as_str()), Some("SOL/USDT"));
+}
