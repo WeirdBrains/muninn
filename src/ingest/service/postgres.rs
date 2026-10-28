@@ -2,7 +2,7 @@
 use super::{ident, sql_or_file};
 use crate::error::{Error, Result};
 use crate::ingest::json::records_to_frame;
-use crate::ingest::{hash_bytes, Input};
+use crate::ingest::{Input, hash_bytes};
 use serde_json::Value;
 use std::path::PathBuf;
 
@@ -63,9 +63,10 @@ impl PgSource {
 
     pub fn host_label(&self) -> String {
         if let Some(u) = &self.url
-            && let Ok(p) = url::Url::parse(u) {
-                return p.host_str().unwrap_or("postgres").to_string();
-            }
+            && let Ok(p) = url::Url::parse(u)
+        {
+            return p.host_str().unwrap_or("postgres").to_string();
+        }
         self.host.clone().unwrap_or_else(|| "postgres".into())
     }
 
@@ -89,17 +90,14 @@ impl PgSource {
     pub fn read(&self) -> Result<Input> {
         let conn = self.conn_string()?;
         let sql = self.sql()?;
-        let mut client = postgres::Client::connect(&conn, self.tls()?)
-            .map_err(|e| Error::Other(format!("postgres {}: {e}", self.host_label())))?;
+        let mut client = postgres::Client::connect(&conn, self.tls()?).map_err(|e| Error::Other(format!("postgres {}: {e}", self.host_label())))?;
         let mut tx = client.transaction().map_err(|e| Error::Other(format!("postgres: {e}")))?;
         tx.batch_execute(&format!("DECLARE muninn_cur NO SCROLL CURSOR FOR SELECT row_to_json(t)::text FROM ({sql}) t"))
             .map_err(|e| Error::Other(format!("postgres: {e}")))?;
         let mut records: Vec<Value> = vec![];
         let mut hasher = blake3::Hasher::new();
         loop {
-            let rows = tx
-                .query(&format!("FETCH {} FROM muninn_cur", self.batch.max(1)), &[])
-                .map_err(|e| Error::Other(format!("postgres: {e}")))?;
+            let rows = tx.query(&format!("FETCH {} FROM muninn_cur", self.batch.max(1)), &[]).map_err(|e| Error::Other(format!("postgres: {e}")))?;
             if rows.is_empty() {
                 break;
             }
@@ -111,7 +109,12 @@ impl PgSource {
         }
         tx.commit().map_err(|e| Error::Other(format!("postgres: {e}")))?;
         Ok(Input {
-            locator: format!("postgres://{}/{}#{}", self.host_label(), self.database.as_deref().unwrap_or("postgres"), self.table.as_deref().unwrap_or("query")),
+            locator: format!(
+                "postgres://{}/{}#{}",
+                self.host_label(),
+                self.database.as_deref().unwrap_or("postgres"),
+                self.table.as_deref().unwrap_or("query")
+            ),
             name_hint: self.table.clone(),
             content_hash: hash_bytes(format!("{sql}|{}", hasher.finalize().to_hex()).as_bytes()),
             frame: records_to_frame(&records)?,
@@ -125,7 +128,14 @@ mod tests {
 
     #[test]
     fn connection_strings() {
-        let p = PgSource { username: Some("u".into()), host: Some("h".into()), schema: "public".into(), table: Some("t".into()), timeout: 30, ..Default::default() };
+        let p = PgSource {
+            username: Some("u".into()),
+            host: Some("h".into()),
+            schema: "public".into(),
+            table: Some("t".into()),
+            timeout: 30,
+            ..Default::default()
+        };
         let s = p.conn_string().unwrap();
         assert!(s.contains("host='h' port=5432 user='u' dbname='postgres' sslmode=prefer"), "{s}");
         assert!(!s.contains("password"));

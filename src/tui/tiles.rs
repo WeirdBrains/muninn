@@ -1,18 +1,18 @@
 //! Tile views: virtualized, sortable bar list and the chart; per-tile caches and keys.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
+use super::data::SeriesData;
 use super::layout::{SeriesKey, Tile, View};
 use super::{App, Hit};
 use crate::ingest::time::fmt_ts;
 use crate::model::{Bar, FLAG_ZERO_VOLUME};
-use super::data::SeriesData;
 use crate::store::BarSort;
 use crate::theme::Theme;
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
-use ratatui::Frame;
 
 type Data = Option<std::sync::Arc<SeriesData>>;
 
@@ -239,7 +239,13 @@ fn cell(k: BarSort, b: &Bar) -> String {
             let v = k.value(b);
             if v.is_nan() { "–".into() } else { format!("{v:.2}") }
         }
-        BarSort::Flags => if b.flags & FLAG_ZERO_VOLUME != 0 { "∅".into() } else { String::new() },
+        BarSort::Flags => {
+            if b.flags & FLAG_ZERO_VOLUME != 0 {
+                "∅".into()
+            } else {
+                String::new()
+            }
+        }
         _ => fmt_num(k.value(b)),
     }
 }
@@ -260,7 +266,17 @@ pub fn title(t: &Tile, cache: &TileCache) -> String {
     }
 }
 
-pub fn draw_list(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ListCache, data: Data, scope: Option<(i64, i64)>, focused: bool, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+pub fn draw_list(
+    f: &mut Frame,
+    area: Rect,
+    t: &Tile,
+    cache: &mut ListCache,
+    data: Data,
+    scope: Option<(i64, i64)>,
+    focused: bool,
+    th: &Theme,
+    hits: &mut Vec<(Rect, Hit)>,
+) {
     if area.height < 2 {
         return;
     }
@@ -274,7 +290,11 @@ pub fn draw_list(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ListCache, dat
         }
         let arrow = if *k == t.list.sort { if t.list.desc { "▼" } else { "▲" } } else { "" };
         let label = format!("{}{arrow}", k.label());
-        let st = if *k == t.list.sort { Style::new().fg(th.accent).add_modifier(Modifier::BOLD) } else { Style::new().fg(th.header).add_modifier(Modifier::BOLD) };
+        let st = if *k == t.list.sort {
+            Style::new().fg(th.accent).add_modifier(Modifier::BOLD)
+        } else {
+            Style::new().fg(th.header).add_modifier(Modifier::BOLD)
+        };
         let text = if i == 0 { format!("{label:<w$}", w = *w as usize) } else { format!("{label:>w$}", w = *w as usize - 1) + " " };
         header.push(Span::styled(text, st));
         hits.push((Rect { x, y: area.y, width: *w, height: 1 }, Hit::ListHeader(t.id, i)));
@@ -283,7 +303,10 @@ pub fn draw_list(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ListCache, dat
     }
     f.render_widget(Paragraph::new(Line::from(header)), Rect { height: 1, ..area });
     if t.series.is_none() {
-        f.render_widget(Paragraph::new(" pick a series: `,` / `.` or the sidebar").style(Style::new().fg(th.muted)), Rect { y: area.y + 1, height: 1, ..area });
+        f.render_widget(
+            Paragraph::new(" pick a series: `,` / `.` or the sidebar").style(Style::new().fg(th.muted)),
+            Rect { y: area.y + 1, height: 1, ..area },
+        );
         return;
     }
     for r in 0..(area.height - 1) as i64 {
@@ -310,7 +333,17 @@ pub fn draw_list(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ListCache, dat
     }
 }
 
-pub fn draw_chart(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ChartCache, data: Data, scope: Option<(i64, i64)>, bounds: Option<(i64, i64)>, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+pub fn draw_chart(
+    f: &mut Frame,
+    area: Rect,
+    t: &Tile,
+    cache: &mut ChartCache,
+    data: Data,
+    scope: Option<(i64, i64)>,
+    bounds: Option<(i64, i64)>,
+    th: &Theme,
+    hits: &mut Vec<(Rect, Hit)>,
+) {
     if area.height < 3 || area.width < 10 {
         return;
     }
@@ -353,25 +386,45 @@ pub fn draw_chart(f: &mut Frame, area: Rect, t: &Tile, cache: &mut ChartCache, d
     f.render_widget(Paragraph::new(Line::from(spans)), Rect { height: 1, ..area });
     let ci = cache.cursor_index();
     if l.crosshair
-        && let Some(b) = ci.and_then(|i| cache.visible().get(i)) {
-            let mut text = super::chart::readout(b);
-            if l.ma {
-                text.push_str(&format!("  {}", t.chart.mas.iter().map(|m| m.label()).collect::<Vec<_>>().join(" ")));
-            }
-            if l.line {
-                text.push_str(&format!("  line {}", t.chart.line_metric.label()));
-            }
-            f.render_widget(Paragraph::new(text).style(Style::new().fg(th.info)), Rect { y: area.y + 1, height: 1, ..area });
+        && let Some(b) = ci.and_then(|i| cache.visible().get(i))
+    {
+        let mut text = super::chart::readout(b);
+        if l.ma {
+            text.push_str(&format!("  {}", t.chart.mas.iter().map(|m| m.label()).collect::<Vec<_>>().join(" ")));
         }
+        if l.line {
+            text.push_str(&format!("  line {}", t.chart.line_metric.label()));
+        }
+        f.render_widget(Paragraph::new(text).style(Style::new().fg(th.info)), Rect { y: area.y + 1, height: 1, ..area });
+    }
     let plot = super::chart::areas(body, l).plot;
     hits.push((plot, Hit::ChartPlot(t.id)));
-    let data = super::chart::ChartData { bars: &cache.bars, first: cache.first, bucket_ms: cache.bucket_ms, start: cache.aligned_start(), opts: &t.chart, cursor: ci, theme: th };
+    let data = super::chart::ChartData {
+        bars: &cache.bars,
+        first: cache.first,
+        bucket_ms: cache.bucket_ms,
+        start: cache.aligned_start(),
+        opts: &t.chart,
+        cursor: ci,
+        theme: th,
+    };
     super::chart::render(&data, body, f.buffer_mut());
 }
 
 /// Draw one tile with its border.
 #[allow(clippy::too_many_arguments)]
-pub fn draw_tile(f: &mut Frame, area: Rect, t: &Tile, cache: &mut TileCache, data: Data, scope: Option<(i64, i64)>, bounds: Option<(i64, i64)>, focused: bool, th: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+pub fn draw_tile(
+    f: &mut Frame,
+    area: Rect,
+    t: &Tile,
+    cache: &mut TileCache,
+    data: Data,
+    scope: Option<(i64, i64)>,
+    bounds: Option<(i64, i64)>,
+    focused: bool,
+    th: &Theme,
+    hits: &mut Vec<(Rect, Hit)>,
+) {
     if t.view == View::List {
         let inner = Block::bordered().inner(area);
         cache.list.ensure(data.clone(), t, scope, inner.height as i64 - 1);

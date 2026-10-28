@@ -5,14 +5,14 @@
 pub mod action;
 pub mod chart;
 mod charting;
+pub mod data;
 pub mod forms;
 pub mod header;
-pub mod menu;
+pub mod import;
 pub mod layout;
+pub mod menu;
 pub mod modal;
 pub mod sidebar;
-pub mod import;
-pub mod data;
 pub mod themes;
 pub mod tiles;
 pub mod widgets;
@@ -24,12 +24,12 @@ use crate::store::Store;
 use crate::theme::{self, Theme, ThemeFile, Variant};
 use action::Action;
 use modal::Modal;
+use ratatui::Frame;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
-use ratatui::Frame;
 
 /// Clickable regions recorded while drawing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -232,9 +232,30 @@ impl App {
                 };
                 self.modal = Some(Modal::Keys);
             }
-            BackupRestore => self.modal = Some(Modal::info("Restore", modal::cli_hint("backup restore --from <archive or dir>", "Restoring replaces the open database, so it runs from the command line with the TUI closed."))),
-            Rekey => self.modal = Some(Modal::info("Rekey", modal::cli_hint("keys rekey --words-file <words>", "Rekeying rewrites the whole database; run it with the TUI closed."))),
-            KeysExport => self.modal = Some(Modal::info("Export keys", modal::cli_hint("keys export --out <dir> --words-file <words>", "Exports age-encrypted key files; the words never pass through the TUI."))),
+            BackupRestore => {
+                self.modal = Some(Modal::info(
+                    "Restore",
+                    modal::cli_hint(
+                        "backup restore --from <archive or dir>",
+                        "Restoring replaces the open database, so it runs from the command line with the TUI closed.",
+                    ),
+                ))
+            }
+            Rekey => {
+                self.modal = Some(Modal::info(
+                    "Rekey",
+                    modal::cli_hint("keys rekey --words-file <words>", "Rekeying rewrites the whole database; run it with the TUI closed."),
+                ))
+            }
+            KeysExport => {
+                self.modal = Some(Modal::info(
+                    "Export keys",
+                    modal::cli_hint(
+                        "keys export --out <dir> --words-file <words>",
+                        "Exports age-encrypted key files; the words never pass through the TUI.",
+                    ),
+                ))
+            }
             KeysInit | RecoverWords | RecoverShards => {}
             Lock => {
                 self.set_status("locked");
@@ -420,14 +441,16 @@ impl App {
         // Alt+letter opens a menu from anywhere.
         if k.modifiers.contains(KeyModifiers::ALT)
             && let KeyCode::Char(c) = k.code
-                && let Some(i) = menu::menus().iter().position(|m| m.mnemonic == c.to_ascii_lowercase()) {
-                    self.menu.open_top(i);
-                    return;
-                }
+            && let Some(i) = menu::menus().iter().position(|m| m.mnemonic == c.to_ascii_lowercase())
+        {
+            self.menu.open_top(i);
+            return;
+        }
         if let Some(a) = self.key_action(k)
-            && !(a == Action::Help && matches!(self.modal, Some(Modal::Help(_)))) {
-                return self.dispatch(a);
-            }
+            && !(a == Action::Help && matches!(self.modal, Some(Modal::Help(_))))
+        {
+            return self.dispatch(a);
+        }
         if self.modal.is_some() {
             return modal::on_key(self, k);
         }
@@ -723,7 +746,11 @@ impl App {
                     let mut x = rect.x;
                     for (i, title) in titles.iter().enumerate() {
                         let on = i as u8 == active;
-                        let st = if on { Style::new().fg(t.bg).bg(t.accent).add_modifier(Modifier::BOLD) } else { Style::new().fg(t.muted).bg(t.selection_bg) };
+                        let st = if on {
+                            Style::new().fg(t.bg).bg(t.accent).add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::new().fg(t.muted).bg(t.selection_bg)
+                        };
                         let text = format!(" {title} ");
                         let w = text.chars().count() as u16;
                         if mode == layout::Mode::Stacked {
@@ -841,7 +868,10 @@ pub fn centered(area: Rect, w: u16, h: u16) -> Rect {
 
 /// Run the TUI until quit.
 pub fn run(mut app: App) -> crate::Result<()> {
-    use ratatui::crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, execute};
+    use ratatui::crossterm::{
+        event::{DisableMouseCapture, EnableMouseCapture},
+        execute,
+    };
     let mut terminal = ratatui::init();
     let _ = execute!(std::io::stdout(), EnableMouseCapture);
     let res = (|| -> crate::Result<()> {

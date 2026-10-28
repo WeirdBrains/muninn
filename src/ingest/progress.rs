@@ -7,8 +7,8 @@
 //! bars stored / bars to store. Overall progress = (bytes of finished files + the
 //! current file's estimated bytes) / total bytes.
 use std::io::Read;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicU8, Ordering::Relaxed};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU8, AtomicU64, Ordering::Relaxed};
 
 pub const READ_SHARE: f64 = 0.10;
 pub const PARSE_SHARE: f64 = 0.05;

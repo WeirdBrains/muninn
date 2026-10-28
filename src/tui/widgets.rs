@@ -109,10 +109,7 @@ pub fn close_button(f: &mut ratatui::Frame, r: ratatui::layout::Rect, t: &crate:
     }
     let x = ratatui::layout::Rect { x: r.right() - w - 2, y: r.y, width: w, height: 1 };
     f.render_widget(
-        ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
-            " [X] ".to_string(),
-            Style::new().fg(t.error).add_modifier(Modifier::BOLD),
-        )),
+        ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(" [X] ".to_string(), Style::new().fg(t.error).add_modifier(Modifier::BOLD))),
         x,
     );
     x

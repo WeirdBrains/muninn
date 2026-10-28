@@ -31,27 +31,38 @@ pub fn os_variant() -> Option<Variant> {
         });
     }
     if cfg!(windows) {
-        let s = run(
-            "reg",
-            &["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "/v", "AppsUseLightTheme"],
-        )?;
+        let s = run("reg", &["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "/v", "AppsUseLightTheme"])?;
         return Some(if s.contains("0x0") { Variant::Dark } else { Variant::Light });
     }
     // freedesktop portal: org.freedesktop.appearance color-scheme (1 = dark, 2 = light, 0 = no preference)
     let out = run(
         "busctl",
         &[
-            "--user", "call", "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
-            "org.freedesktop.portal.Settings", "ReadOne", "ss", "org.freedesktop.appearance", "color-scheme",
+            "--user",
+            "call",
+            "org.freedesktop.portal.Desktop",
+            "/org/freedesktop/portal/desktop",
+            "org.freedesktop.portal.Settings",
+            "ReadOne",
+            "ss",
+            "org.freedesktop.appearance",
+            "color-scheme",
         ],
     )
     .or_else(|| {
         run(
             "gdbus",
             &[
-                "call", "--session", "--dest", "org.freedesktop.portal.Desktop", "--object-path",
-                "/org/freedesktop/portal/desktop", "--method", "org.freedesktop.portal.Settings.ReadOne",
-                "org.freedesktop.appearance", "color-scheme",
+                "call",
+                "--session",
+                "--dest",
+                "org.freedesktop.portal.Desktop",
+                "--object-path",
+                "/org/freedesktop/portal/desktop",
+                "--method",
+                "org.freedesktop.portal.Settings.ReadOne",
+                "org.freedesktop.appearance",
+                "color-scheme",
             ],
         )
     })?;

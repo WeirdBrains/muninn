@@ -16,11 +16,7 @@ pub fn topics() -> Vec<Topic> {
         .iter()
         .map(|(id, body)| Topic {
             id,
-            title: body
-                .lines()
-                .find_map(|l| l.strip_prefix("# "))
-                .map(|s| s.trim().to_string())
-                .unwrap_or_else(|| id.to_string()),
+            title: body.lines().find_map(|l| l.strip_prefix("# ")).map(|s| s.trim().to_string()).unwrap_or_else(|| id.to_string()),
             body,
         })
         .collect()
@@ -94,15 +90,18 @@ pub fn inline_links(line: &str) -> Vec<(String, String)> {
     while i < b.len() {
         if b[i] == '`' {
             code = !code;
-        } else if !code && b[i] == '['
+        } else if !code
+            && b[i] == '['
             && let Some(close) = (i + 1..b.len()).find(|&j| b[j] == ']')
-                && close + 1 < b.len() && b[close + 1] == '('
-                    && let Some(end) = (close + 2..b.len()).find(|&j| b[j] == ')') {
-                        let text: String = b[i + 1..close].iter().collect();
-                        let href: String = b[close + 2..end].iter().collect();
-                        out.push((text, href));
-                        i = end;
-                    }
+            && close + 1 < b.len()
+            && b[close + 1] == '('
+            && let Some(end) = (close + 2..b.len()).find(|&j| b[j] == ')')
+        {
+            let text: String = b[i + 1..close].iter().collect();
+            let href: String = b[close + 2..end].iter().collect();
+            out.push((text, href));
+            i = end;
+        }
         i += 1;
     }
     out
@@ -156,9 +155,10 @@ mod tests {
         for (id, body) in TOPICS {
             for l in links(id, body) {
                 if let Some(t) = &l.target
-                    && !ids.contains(&t.as_str()) {
-                        broken.push(format!("{id}: [{}]({}) -> {t}", l.text, l.href));
-                    }
+                    && !ids.contains(&t.as_str())
+                {
+                    broken.push(format!("{id}: [{}]({}) -> {t}", l.text, l.href));
+                }
             }
         }
         assert!(broken.is_empty(), "broken help links:\n{}", broken.join("\n"));
@@ -167,9 +167,30 @@ mod tests {
     #[test]
     fn required_topics_exist() {
         for id in [
-            "README", "cli", "ingest-csv", "ingest-json", "services/http", "services/redis", "services/sqlite",
-            "services/postgres", "data-model", "storage-layout", "export", "keys", "encryption", "backup-recovery",
-            "themes", "preferences", "tui", "help", "menus", "keybindings", "tiling", "charts", "sidebar", "import",
+            "README",
+            "cli",
+            "ingest-csv",
+            "ingest-json",
+            "services/http",
+            "services/redis",
+            "services/sqlite",
+            "services/postgres",
+            "data-model",
+            "storage-layout",
+            "export",
+            "keys",
+            "encryption",
+            "backup-recovery",
+            "themes",
+            "preferences",
+            "tui",
+            "help",
+            "menus",
+            "keybindings",
+            "tiling",
+            "charts",
+            "sidebar",
+            "import",
         ] {
             assert!(topic(id).is_some(), "missing docs/{id}.md");
         }

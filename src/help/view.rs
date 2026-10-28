@@ -1,12 +1,12 @@
 //! The TUI help screen: topic view with link navigation, history and live search.
-use super::{inline_links, resolve_href, search, topic, Topic};
+use super::{Topic, inline_links, resolve_href, search, topic};
 use crate::theme::Theme;
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{List, ListItem, ListState, Paragraph, Wrap};
-use ratatui::Frame;
 
 pub struct HelpView {
     pub current: Topic,
@@ -39,10 +39,7 @@ impl HelpView {
 
     /// Internal links of the current topic, in order: (text, target id).
     pub fn internal_links(&self) -> Vec<(String, String)> {
-        super::links(self.current.id, self.current.body)
-            .into_iter()
-            .filter_map(|l| l.target.map(|t| (l.text, t)))
-            .collect()
+        super::links(self.current.id, self.current.body).into_iter().filter_map(|l| l.target.map(|t| (l.text, t))).collect()
     }
 
     fn reset_link(&mut self) {
@@ -172,14 +169,17 @@ impl HelpView {
         let lines = render(self.current.id, self.current.body, t, self.link);
         let title = format!(" Help: {} ", self.current.title);
         f.render_widget(
-            Paragraph::new(lines)
-                .wrap(Wrap { trim: false })
-                .scroll((self.scroll, 0))
-                .block(crate::tui::block(&title, !self.searching, t)),
+            Paragraph::new(lines).wrap(Wrap { trim: false }).scroll((self.scroll, 0)).block(crate::tui::block(&title, !self.searching, t)),
             main,
         );
         let [search_box, list, keys] = Layout::vertical([Constraint::Length(3), Constraint::Min(0), Constraint::Length(8)]).areas(side);
-        let q = if self.searching { format!("{}▏", self.query) } else if self.query.is_empty() { "/ to search".into() } else { self.query.clone() };
+        let q = if self.searching {
+            format!("{}▏", self.query)
+        } else if self.query.is_empty() {
+            "/ to search".into()
+        } else {
+            self.query.clone()
+        };
         f.render_widget(Paragraph::new(q).block(crate::tui::block("Search", self.searching, t)), search_box);
         let items: Vec<ListItem> = if self.searching || !self.query.is_empty() {
             self.results.iter().map(|r| ListItem::new(r.title.clone())).collect()
@@ -188,9 +188,7 @@ impl HelpView {
         };
         let title = if self.searching || !self.query.is_empty() { "Results" } else { "History" };
         f.render_stateful_widget(
-            List::new(items)
-                .block(crate::tui::block(title, false, t))
-                .highlight_style(Style::new().bg(t.selection_bg).fg(t.selection_fg)),
+            List::new(items).block(crate::tui::block(title, false, t)).highlight_style(Style::new().bg(t.selection_bg).fg(t.selection_fg)),
             list,
             &mut self.result_sel,
         );
@@ -257,34 +255,36 @@ fn inline(id: &str, s: &str, t: &Theme, selected: Option<usize>, link_idx: &mut 
     while i < chars.len() {
         let c = chars[i];
         if c == '`'
-            && let Some(end) = (i + 1..chars.len()).find(|&j| chars[j] == '`') {
+            && let Some(end) = (i + 1..chars.len()).find(|&j| chars[j] == '`')
+        {
+            flush(&mut buf, &mut spans);
+            let code: String = chars[i + 1..end].iter().collect();
+            spans.push(Span::styled(code, Style::new().fg(t.accent)));
+            i = end + 1;
+            continue;
+        }
+        if c == '['
+            && let Some((text, href)) = li.peek().cloned()
+        {
+            let pat: Vec<char> = format!("[{text}]({href})").chars().collect();
+            if chars[i..].starts_with(&pat) {
+                li.next();
                 flush(&mut buf, &mut spans);
-                let code: String = chars[i + 1..end].iter().collect();
-                spans.push(Span::styled(code, Style::new().fg(t.accent)));
-                i = end + 1;
+                let internal = resolve_href(id, &href).is_some();
+                let mut st = Style::new().fg(t.info).add_modifier(Modifier::UNDERLINED);
+                if internal {
+                    if selected == Some(*link_idx) {
+                        st = Style::new().bg(t.selection_bg).fg(t.selection_fg).add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
+                    }
+                    *link_idx += 1;
+                    spans.push(Span::styled(text, st));
+                } else {
+                    spans.push(Span::styled(format!("{text} <{href}>"), st));
+                }
+                i += pat.len();
                 continue;
             }
-        if c == '['
-            && let Some((text, href)) = li.peek().cloned() {
-                let pat: Vec<char> = format!("[{text}]({href})").chars().collect();
-                if chars[i..].starts_with(&pat) {
-                    li.next();
-                    flush(&mut buf, &mut spans);
-                    let internal = resolve_href(id, &href).is_some();
-                    let mut st = Style::new().fg(t.info).add_modifier(Modifier::UNDERLINED);
-                    if internal {
-                        if selected == Some(*link_idx) {
-                            st = Style::new().bg(t.selection_bg).fg(t.selection_fg).add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
-                        }
-                        *link_idx += 1;
-                        spans.push(Span::styled(text, st));
-                    } else {
-                        spans.push(Span::styled(format!("{text} <{href}>"), st));
-                    }
-                    i += pat.len();
-                    continue;
-                }
-            }
+        }
         if c == '*' && chars.get(i + 1) == Some(&'*') {
             i += 2;
             continue;

@@ -9,8 +9,8 @@ pub mod time;
 use crate::error::{Error, Result};
 use crate::interact::Interact;
 use crate::model::{Duration, Source, Symbol};
-use crate::store::{now_ms, Store, UpsertCounts};
-use frame::{derive_duration, gaps, parse_map, Columns, Reject};
+use crate::store::{Store, UpsertCounts, now_ms};
+use frame::{Columns, Reject, derive_duration, gaps, parse_map};
 use polars::prelude::DataFrame;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -144,17 +144,13 @@ pub fn symbol_from_name(store: &Store, name: &str) -> Result<Option<Symbol>> {
 pub fn symbol_from_name_static(name: &str) -> Option<Symbol> {
     let stem = Path::new(name).file_stem()?.to_string_lossy().to_string();
     let tokens: Vec<&str> = stem.split(['_', '.', ' ']).collect();
-    tokens.iter().find_map(|t| {
-        Symbol::parse_with(t, crate::model::KNOWN_QUOTES).filter(|s| crate::model::KNOWN_BASES.contains(&s.base.as_str()))
-    })
+    tokens.iter().find_map(|t| Symbol::parse_with(t, crate::model::KNOWN_QUOTES).filter(|s| crate::model::KNOWN_BASES.contains(&s.base.as_str())))
 }
 
 /// Derive a duration from a file name token such as `5m`, `1h`, `15min`.
 pub fn duration_from_name(name: &str) -> Option<Duration> {
     let stem = name_stem(name);
-    stem.split(['_', '.', '-', ' ', ':', '/'])
-        .filter(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit()))
-        .find_map(|t| Duration::parse(t).ok())
+    stem.split(['_', '.', '-', ' ', ':', '/']).filter(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit())).find_map(|t| Duration::parse(t).ok())
 }
 
 /// An ingest session: answers to prompts are reused for the rest of a file/directory run.
@@ -202,12 +198,7 @@ impl<'a> Session<'a> {
         } else if let Some(name) = self.default_source.clone() {
             self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
         } else {
-            let name = self.io.prompt(
-                "source",
-                &format!("Source name for {}", self.source_locator),
-                None,
-                "pass --source <NAME>",
-            )?;
+            let name = self.io.prompt("source", &format!("Source name for {}", self.source_locator), None, "pass --source <NAME>")?;
             self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
         };
         self.source = Some(s.clone());
@@ -220,9 +211,10 @@ impl<'a> Session<'a> {
             return self.store.canonical_symbol(&sym);
         }
         if let Some(n) = name_hint
-            && let Some(sym) = symbol_from_name(self.store, n)? {
-                return Ok(sym);
-            }
+            && let Some(sym) = symbol_from_name(self.store, n)?
+        {
+            return Ok(sym);
+        }
         if let Some(s) = &self.prompted_symbol {
             return Ok(s.clone());
         }
@@ -247,11 +239,7 @@ impl<'a> Session<'a> {
         }
         if let Some(d) = derive_duration(ts) {
             if d.share < 0.9 {
-                warnings.push(format!(
-                    "derived duration {} covers only {:.1}% of timestamp differences",
-                    d.duration,
-                    d.share * 100.0
-                ));
+                warnings.push(format!("derived duration {} covers only {:.1}% of timestamp differences", d.duration, d.share * 100.0));
             }
             return Ok(d.duration);
         }
@@ -275,14 +263,7 @@ impl<'a> Session<'a> {
             f
         };
         for r in rejects {
-            writeln!(
-                f,
-                "\"{}\",{},{},{}",
-                locator.replace('"', "\"\""),
-                r.row,
-                r.timestamp.map(time::fmt_ts).unwrap_or_default(),
-                r.reason
-            )?;
+            writeln!(f, "\"{}\",{},{},{}", locator.replace('"', "\"\""), r.row, r.timestamp.map(time::fmt_ts).unwrap_or_default(), r.reason)?;
         }
         Ok(())
     }
@@ -314,7 +295,13 @@ impl<'a> Session<'a> {
                         let _ = self.store.add_artifact(run, &a);
                     }
                     if let Some(p) = self.opts.progress.as_ref().filter(|p| p.cancelled()) {
-                        let _ = self.store.record_cancel(run, p.cancel_at.load(std::sync::atomic::Ordering::Relaxed), p.cancel_by_name(), &file, p.phase().name());
+                        let _ = self.store.record_cancel(
+                            run,
+                            p.cancel_at.load(std::sync::atomic::Ordering::Relaxed),
+                            p.cancel_by_name(),
+                            &file,
+                            p.phase().name(),
+                        );
                     }
                 }
                 Err(e)
@@ -412,8 +399,7 @@ impl<'a> Session<'a> {
         }
         rep.inserted = counts.inserted;
         rep.duplicate = counts.duplicate;
-        self.store
-            .record_run(&source, &input.locator, &input.content_hash, &symbol, duration, started_ms, counts, rep.rejected)?;
+        self.store.record_run(&source, &input.locator, &input.content_hash, &symbol, duration, started_ms, counts, rep.rejected)?;
         let rid = self.store.last_rowid();
         self.note("bars", format!("{series_ref}: {} inserted", counts.inserted), &input.locator);
         self.note("ingest_record", rid.to_string(), &input.locator);
@@ -432,10 +418,7 @@ pub fn expand_path(path: &Path, exts: &[&str]) -> Result<Vec<PathBuf>> {
     }
     let mut v: Vec<PathBuf> = std::fs::read_dir(path)?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| {
-            p.is_file()
-                && p.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).is_some_and(|e| exts.contains(&e.as_str()))
-        })
+        .filter(|p| p.is_file() && p.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).is_some_and(|e| exts.contains(&e.as_str())))
         .collect();
     v.sort();
     if v.is_empty() {

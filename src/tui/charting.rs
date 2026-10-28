@@ -1,6 +1,6 @@
 //! App-level chart navigation and tile linking.
-use super::layout::View;
 use super::App;
+use super::layout::View;
 use crate::ingest::time::parse_ts;
 
 impl App {
@@ -171,7 +171,8 @@ impl App {
             let r = d.range(self.scope());
             let sl = &d.bars[r];
             // Same as Store::time_index: bars before the target in the list's order.
-            let i = if lt.list.desc { (sl.len() - sl.partition_point(|b| b.ts <= target)) as i64 } else { sl.partition_point(|b| b.ts < target) as i64 };
+            let i =
+                if lt.list.desc { (sl.len() - sl.partition_point(|b| b.ts <= target)) as i64 } else { sl.partition_point(|b| b.ts < target) as i64 };
             {
                 let lc = &mut self.caches.entry(other).or_default().list;
                 lc.sel = i;

@@ -49,4 +49,3 @@ impl Env {
         String::from_utf8_lossy(&o.stdout).to_string()
     }
 }
-

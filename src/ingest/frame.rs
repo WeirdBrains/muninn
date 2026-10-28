@@ -28,9 +28,7 @@ pub fn is_timestamp_alias(name: &str) -> bool {
 pub fn parse_map(items: &[String]) -> Result<HashMap<String, String>> {
     let mut m = HashMap::new();
     for it in items {
-        let (col, field) = it
-            .split_once('=')
-            .ok_or_else(|| Error::invalid("--map", format!("`{it}` (expected COL=FIELD)")))?;
+        let (col, field) = it.split_once('=').ok_or_else(|| Error::invalid("--map", format!("`{it}` (expected COL=FIELD)")))?;
         let field = field.trim().to_ascii_lowercase();
         if !FIELDS.contains(&field.as_str()) {
             return Err(Error::invalid("--map", format!("unknown field `{field}` (fields: {})", FIELDS.join(", "))));
@@ -57,18 +55,10 @@ pub fn map_columns(df: &DataFrame, overrides: &HashMap<String, String>) -> Resul
             out.push(names[i].clone());
             continue;
         }
-        let found = aliases(f)
-            .iter()
-            .find_map(|a| names.iter().find(|n| n.trim().eq_ignore_ascii_case(a)))
-            .cloned();
+        let found = aliases(f).iter().find_map(|a| names.iter().find(|n| n.trim().eq_ignore_ascii_case(a))).cloned();
         match found {
             Some(c) => out.push(c),
-            None => {
-                return Err(Error::missing(
-                    "column",
-                    format!("no `{f}` column (have: {}); map one with --map <col>={f}", names.join(", ")),
-                ))
-            }
+            None => return Err(Error::missing("column", format!("no `{f}` column (have: {}); map one with --map <col>={f}", names.join(", ")))),
         }
     }
     Ok([out[0].clone(), out[1].clone(), out[2].clone(), out[3].clone(), out[4].clone(), out[5].clone()])

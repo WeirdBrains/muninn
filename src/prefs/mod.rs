@@ -1,6 +1,6 @@
 //! `preferences.toml`.
 use crate::error::Result;
-use crate::paths::{write_private, Paths};
+use crate::paths::{Paths, write_private};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, clap::ValueEnum)]

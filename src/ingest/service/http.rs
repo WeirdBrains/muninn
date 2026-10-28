@@ -3,7 +3,7 @@ use crate::error::{Error, Result};
 use crate::ingest::frame::Columns;
 use crate::ingest::json::{parse_records, records_to_frame, select};
 use crate::ingest::time::parse_ts;
-use crate::ingest::{hash_bytes, Input};
+use crate::ingest::{Input, hash_bytes};
 use polars::prelude::*;
 use serde_json::Value;
 use std::time::Duration as StdDuration;
@@ -136,8 +136,8 @@ impl HttpRequest {
     }
 
     fn send(&self, client: &reqwest::blocking::Client, url: &url::Url) -> Result<(Option<String>, Vec<u8>)> {
-        let method = reqwest::Method::from_bytes(self.method.to_ascii_uppercase().as_bytes())
-            .map_err(|_| Error::invalid("--method", self.method.clone()))?;
+        let method =
+            reqwest::Method::from_bytes(self.method.to_ascii_uppercase().as_bytes()).map_err(|_| Error::invalid("--method", self.method.clone()))?;
         let headers = build_headers(&self.headers)?;
         let body = self.body_bytes()?;
         let mut attempt = 0;
@@ -204,18 +204,20 @@ impl HttpRequest {
                 params.push((self.cursor_param.clone(), c.clone()));
             }
             if self.paging == Paging::Time
-                && let Some(s) = start {
-                    params.retain(|(k, _)| k != &self.start_param);
-                    params.push((self.start_param.clone(), s.to_string()));
-                }
+                && let Some(s) = start
+            {
+                params.retain(|(k, _)| k != &self.start_param);
+                params.push((self.start_param.clone(), s.to_string()));
+            }
             let url = build_url(&self.url, &params)?;
             if first_url.is_none() {
                 first_url = Some(build_url(&self.url, &base_params)?);
             }
             if page > 0
-                && let Some(iv) = interval {
-                    std::thread::sleep(iv);
-                }
+                && let Some(iv) = interval
+            {
+                std::thread::sleep(iv);
+            }
             let (ct, bytes) = self.send(&client, &url)?;
             all_bytes.extend_from_slice(&bytes);
             let fmt = self.format_for(ct.as_deref());
@@ -242,13 +244,11 @@ impl HttpRequest {
                     json_records.extend(recs);
                     if self.paging == Paging::Cursor {
                         let doc: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-                        cursor = select(&doc, Some(&self.cursor_path))
-                            .ok()
-                            .and_then(|v| match v {
-                                Value::String(s) if !s.is_empty() => Some(s.clone()),
-                                Value::Number(n) => Some(n.to_string()),
-                                _ => None,
-                            });
+                        cursor = select(&doc, Some(&self.cursor_path)).ok().and_then(|v| match v {
+                            Value::String(s) if !s.is_empty() => Some(s.clone()),
+                            Value::Number(n) => Some(n.to_string()),
+                            _ => None,
+                        });
                     }
                     (n, df)
                 }
@@ -285,12 +285,7 @@ impl HttpRequest {
         }
         let u = first_url.unwrap_or(build_url(&self.url, &[])?);
         let name_hint = u.path_segments().and_then(|mut s| s.next_back().map(str::to_string)).filter(|s| !s.is_empty());
-        Ok(Input {
-            locator: redact(&u),
-            name_hint,
-            content_hash: hash_bytes(&[u.as_str().as_bytes(), &all_bytes].concat()),
-            frame,
-        })
+        Ok(Input { locator: redact(&u), name_hint, content_hash: hash_bytes(&[u.as_str().as_bytes(), &all_bytes].concat()), frame })
     }
 }
 

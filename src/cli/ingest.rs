@@ -2,8 +2,8 @@
 use super::{CommonIngestArgs, Ctx, IngestCommand};
 use crate::cli::args::{DataFormat, Paginate, PasswordArgs, RedisType, ServiceCommand, ValueFormat};
 use crate::ingest::service::{self as svc, Secret};
-use crate::store::Store;
 use crate::ingest::{self, IngestOptions, IngestReport};
+use crate::store::Store;
 
 pub fn options(ctx: &Ctx, c: &CommonIngestArgs) -> anyhow::Result<IngestOptions> {
     Ok(IngestOptions {
@@ -33,13 +33,8 @@ pub fn run(ctx: &Ctx, cmd: IngestCommand) -> anyhow::Result<()> {
     let reports = match cmd {
         IngestCommand::Csv(a) => {
             let opts = options(ctx, &a.common)?;
-            let csv = ingest::csv::CsvOptions {
-                delimiter: a.delimiter,
-                quote: a.quote,
-                escape: a.escape,
-                header: !a.no_header,
-                skip_rows: a.skip_rows,
-            };
+            let csv =
+                ingest::csv::CsvOptions { delimiter: a.delimiter, quote: a.quote, escape: a.escape, header: !a.no_header, skip_rows: a.skip_rows };
             let n = ingest::expand_path(&a.path, &["csv", "tsv", "txt"]).map(|v| v.len()).unwrap_or(0);
             let opts = cancellable(opts);
             ingest::tracked(&mut store, "cli", n, opts, |st, o| ingest::ingest_csv(st, ctx.io, o, &a.path, &csv)).map_err(cancelled)?

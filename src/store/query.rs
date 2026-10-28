@@ -99,7 +99,13 @@ impl BarSort {
             BarSort::Close => b.close,
             BarSort::Volume => b.volume,
             BarSort::Change => b.close - b.open,
-            BarSort::ChangePct => if b.open != 0.0 { (b.close - b.open) / b.open * 100.0 } else { f64::NAN },
+            BarSort::ChangePct => {
+                if b.open != 0.0 {
+                    (b.close - b.open) / b.open * 100.0
+                } else {
+                    f64::NAN
+                }
+            }
             BarSort::Range => b.high - b.low,
             BarSort::Body => (b.close - b.open).abs(),
             BarSort::UpperWick => b.high - b.open.max(b.close),
@@ -243,7 +249,15 @@ mod tests {
             .map(|i| {
                 let o = 100.0 + i as f64;
                 let c = if i % 2 == 0 { o + 2.0 } else { o - 1.0 };
-                Bar { ts: i * 300_000, open: o, high: o.max(c) + i as f64, low: o.min(c) - 1.0, close: c, volume: (10 - i) as f64, flags: (i == 3) as i64 }
+                Bar {
+                    ts: i * 300_000,
+                    open: o,
+                    high: o.max(c) + i as f64,
+                    low: o.min(c) - 1.0,
+                    close: c,
+                    volume: (10 - i) as f64,
+                    flags: (i == 3) as i64,
+                }
             })
             .collect();
         s.upsert_bars(&src, &sym, Duration(300), &bars).unwrap();
@@ -299,4 +313,3 @@ mod tests {
         assert_eq!(b[0].high, raw[..3].iter().map(|x| x.high).fold(f64::MIN, f64::max));
     }
 }
-

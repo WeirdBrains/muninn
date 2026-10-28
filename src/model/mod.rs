@@ -56,14 +56,13 @@ pub struct Symbol {
 
 /// Quote currencies, longest first for suffix matching.
 pub const KNOWN_QUOTES: &[&str] = &[
-    "FDUSD", "USDT", "USDC", "BUSD", "TUSD", "USDP", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "TRY", "BRL",
-    "KRW", "DAI", "BTC", "ETH", "BNB",
+    "FDUSD", "USDT", "USDC", "BUSD", "TUSD", "USDP", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "TRY", "BRL", "KRW", "DAI", "BTC", "ETH", "BNB",
 ];
 
 /// Default known base assets.
 pub const KNOWN_BASES: &[&str] = &[
-    "BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BNB", "DOT", "AVAX", "LINK", "MATIC", "POL", "BCH", "XLM", "TRX",
-    "ATOM", "UNI", "ETC", "XMR", "FIL", "NEAR", "APT", "ARB", "OP", "SHIB", "TON", "SUI", "PEPE", "AAVE",
+    "BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BNB", "DOT", "AVAX", "LINK", "MATIC", "POL", "BCH", "XLM", "TRX", "ATOM", "UNI", "ETC", "XMR",
+    "FIL", "NEAR", "APT", "ARB", "OP", "SHIB", "TON", "SUI", "PEPE", "AAVE",
 ];
 
 /// Default asset aliases.
@@ -93,9 +92,10 @@ impl Symbol {
         qs.sort_by_key(|q| std::cmp::Reverse(q.len()));
         for q in qs {
             if let Some(b) = t.strip_suffix(q)
-                && is_asset(b) {
-                    return Some(Symbol::new(b, q));
-                }
+                && is_asset(b)
+            {
+                return Some(Symbol::new(b, q));
+            }
         }
         None
     }

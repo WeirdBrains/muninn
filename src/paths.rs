@@ -16,9 +16,7 @@ impl Paths {
     pub fn resolve(home: Option<PathBuf>, db: Option<PathBuf>) -> Result<Self> {
         let home = match home {
             Some(h) => h,
-            None => dirs::home_dir()
-                .ok_or_else(|| Error::missing("home directory", "pass --home or set MUNINN_HOME"))?
-                .join(".muninn"),
+            None => dirs::home_dir().ok_or_else(|| Error::missing("home directory", "pass --home or set MUNINN_HOME"))?.join(".muninn"),
         };
         let db = db.unwrap_or_else(|| home.join("storage").join(DB_FILE));
         Ok(Self { home, db })
@@ -48,13 +46,7 @@ impl Paths {
 
     /// Create the directory tree with 0700 directories.
     pub fn ensure(&self) -> Result<()> {
-        for d in [
-            self.home.clone(),
-            self.storage_dir(),
-            self.keys_dir(),
-            self.service_keys_dir(),
-            self.themes_dir(),
-        ] {
+        for d in [self.home.clone(), self.storage_dir(), self.keys_dir(), self.service_keys_dir(), self.themes_dir()] {
             ensure_dir(&d)?;
         }
         if let Some(parent) = self.db.parent() {
@@ -74,9 +66,10 @@ pub fn ensure_dir(d: &Path) -> Result<()> {
 /// Write a file atomically-ish with 0600 permissions.
 pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
     if let Some(parent) = path.parent()
-        && !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent)?;
+    }
     let tmp = path.with_extension("tmp-muninn");
     fs::write(&tmp, bytes)?;
     set_mode(&tmp, 0o600)?;

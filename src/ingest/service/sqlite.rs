@@ -1,7 +1,7 @@
 //! SQLite source (read-only).
 use super::{ident, sql_or_file};
 use crate::error::{Error, Result};
-use crate::ingest::{hash_bytes, Input};
+use crate::ingest::{Input, hash_bytes};
 use polars::prelude::*;
 use rusqlite::types::ValueRef;
 use std::path::Path;
@@ -54,7 +54,9 @@ impl SqliteSource<'_> {
         let canon = std::fs::canonicalize(self.path).unwrap_or_else(|_| self.path.to_path_buf());
         Ok(Input {
             locator: format!("sqlite://{}#{}", canon.display(), self.table.unwrap_or("query")),
-            name_hint: Some(self.table.map(str::to_string).unwrap_or_else(|| self.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default())),
+            name_hint: Some(
+                self.table.map(str::to_string).unwrap_or_else(|| self.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()),
+            ),
             content_hash: hash_bytes(format!("{}|{}|{}", canon.display(), sql, hasher.finalize().to_hex()).as_bytes()),
             frame,
         })

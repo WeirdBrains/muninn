@@ -6,7 +6,7 @@
 //! rolled back and its artifacts are written as `rolled_back`, so the ledger shows what
 //! was discarded. Afterwards `cleanup_run` removes anything left that the run created
 //! but that holds no data (state `removed`).
-use super::{now_ms, Store};
+use super::{Store, now_ms};
 use crate::error::Result;
 use rusqlite::params;
 
@@ -195,7 +195,10 @@ mod tests {
         assert!(s.source_by_name("empty").unwrap().is_none());
         s.finish_import_run(run, "completed", 0, "x").unwrap();
         let r = s.import_run(run).unwrap().unwrap();
-        assert_eq!((r.status.as_str(), r.cancel_by.as_deref(), r.cancel_phase.as_deref(), r.cancel_requested_at), ("cancelled", Some("cli"), Some("store"), Some(123)));
+        assert_eq!(
+            (r.status.as_str(), r.cancel_by.as_deref(), r.cancel_phase.as_deref(), r.cancel_requested_at),
+            ("cancelled", Some("cli"), Some("store"), Some(123))
+        );
         let a = s.import_artifacts(run).unwrap();
         assert_eq!(a.last().unwrap().state, "removed");
     }

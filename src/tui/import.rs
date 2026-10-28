@@ -1,17 +1,17 @@
 //! Import popup: file browser, per-file guesses, background ingest with live progress.
-use super::{block, App};
+use super::{App, block};
 use crate::ingest::{self, IngestOptions, Progress};
 use crate::theme::Theme;
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Gauge, Paragraph};
-use ratatui::Frame;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 
 /// File extensions the importer reads.
 pub const EXTS: &[&str] = &["csv", "tsv", "txt", "json", "ndjson", "jsonl"];
@@ -195,7 +195,7 @@ fn fmt_px(v: f64) -> String {
 /// Parse the first [`PREVIEW_LINES`] data lines of a file with the ingest parser
 /// (column mapping, timestamp parsing, validation). Reads at most 64 KiB.
 pub fn preview_bars(path: &Path) -> Vec<PreviewRow> {
-    use crate::ingest::frame::{derive_duration, Columns};
+    use crate::ingest::frame::{Columns, derive_duration};
     let json = super::forms::is_json(path);
     let ndjson = crate::ingest::json::is_ndjson(path);
     let header = usize::from(!json);
@@ -604,7 +604,13 @@ pub fn start(app: &mut App, files: Vec<PathBuf>) {
                 }
             }
             let removed = store.cleanup_run(run).unwrap_or(0);
-            let status = if cancelled { "cancelled" } else if failed { "failed" } else { "completed" };
+            let status = if cancelled {
+                "cancelled"
+            } else if failed {
+                "failed"
+            } else {
+                "completed"
+            };
             let _ = store.finish_import_run(run, status, kept, &format!("{removed} empty leftover(s) removed"));
             let _ = tx.send(Msg::Run(run));
         }
@@ -618,7 +624,18 @@ pub fn start(app: &mut App, files: Vec<PathBuf>) {
     r.insert(0, d);
     r.truncate(RECENT_MAX);
     app.save_prefs();
-    app.import.phase = Phase::Running(Running { progress, rx, files, current: 0, log: vec![], started: std::time::Instant::now(), confirm: false, kept: 0, run_id: None, recent_added });
+    app.import.phase = Phase::Running(Running {
+        progress,
+        rx,
+        files,
+        current: 0,
+        log: vec![],
+        started: std::time::Instant::now(),
+        confirm: false,
+        kept: 0,
+        run_id: None,
+        recent_added,
+    });
 }
 
 fn line_of(r: &ingest::IngestReport) -> String {
@@ -626,7 +643,10 @@ fn line_of(r: &ingest::IngestReport) -> String {
         return format!("{} {} {}: skipped (already imported)", r.source, r.symbol, r.duration);
     }
     let w = if r.warnings.is_empty() { String::new() } else { format!(" · {}", r.warnings.join("; ")) };
-    format!("{} {} {}: {} rows, {} new, {} dup, {} rejected, {} gaps{w}", r.source, r.symbol, r.duration, r.rows, r.inserted, r.duplicate, r.rejected, r.gaps)
+    format!(
+        "{} {} {}: {} rows, {} new, {} dup, {} rejected, {} gaps{w}",
+        r.source, r.symbol, r.duration, r.rows, r.inserted, r.duplicate, r.rejected, r.gaps
+    )
 }
 
 /// Drain messages from the background import. Returns true when it finished.
@@ -671,11 +691,7 @@ pub fn poll(app: &mut App) -> bool {
                 run.files.len() - started
             ));
         }
-        lines.push(format!(
-            "{} file(s), {mb:.1} MB, {d} bars stored in {secs:.1} s{}",
-            run.files.len(),
-            if cancelled { " · cancelled" } else { "" }
-        ));
+        lines.push(format!("{} file(s), {mb:.1} MB, {d} bars stored in {secs:.1} s{}", run.files.len(), if cancelled { " · cancelled" } else { "" }));
         let run_id = run.run_id;
         app.import.phase = Phase::Done { lines, cancelled };
         if let Some(d) = undo_recent {
@@ -683,10 +699,9 @@ pub fn poll(app: &mut App) -> bool {
             app.prefs.tui.import_recent.retain(|x| *x != d);
             app.save_prefs();
             if let Some(id) = run_id {
-                let _ = app.store.add_artifact(
-                    id,
-                    &crate::store::Artifact { kind: "recent".into(), reference: d, file: String::new(), state: "removed".into() },
-                );
+                let _ = app
+                    .store
+                    .add_artifact(id, &crate::store::Artifact { kind: "recent".into(), reference: d, file: String::new(), state: "removed".into() });
             }
         }
         app.dispatch(super::action::Action::Refresh);
@@ -960,7 +975,10 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
     // path line + completions
     let focus = |p: Pane| if st.pane == p { Style::new().fg(t.accent).add_modifier(Modifier::BOLD) } else { Style::new().fg(t.muted) };
     let caret = |p: Pane| if st.pane == p { "▏" } else { "" };
-    let mut pl = vec![Line::from(vec![Span::styled(" path ", focus(Pane::Path)), Span::styled(format!("{}{}", st.path, caret(Pane::Path)), Style::new().fg(t.fg))])];
+    let mut pl = vec![Line::from(vec![
+        Span::styled(" path ", focus(Pane::Path)),
+        Span::styled(format!("{}{}", st.path, caret(Pane::Path)), Style::new().fg(t.fg)),
+    ])];
     pl.push(if st.completer.active() {
         let mut spans = vec![Span::raw("      ")];
         let mut x = path_r.x + 6;
@@ -990,8 +1008,7 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
         ])
     });
     f.render_widget(Paragraph::new(pl), path_r);
-    let [places_r, files_r, prev_r] =
-        Layout::horizontal([Constraint::Length(22), Constraint::Percentage(45), Constraint::Min(20)]).areas(body);
+    let [places_r, files_r, prev_r] = Layout::horizontal([Constraint::Length(22), Constraint::Percentage(45), Constraint::Min(20)]).areas(body);
     // places
     let pb = block("Places (p)", st.pane == Pane::Places, &t);
     let pi = pb.inner(places_r);
@@ -1050,7 +1067,13 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
     let mut lines = vec![];
     for (i, e) in st.entries.iter().enumerate().skip(st.top).take(h) {
         let p = st.dir.join(&e.name);
-        let mark = if e.dir { "▸" } else if st.chosen.contains(&p) { "●" } else { "○" };
+        let mark = if e.dir {
+            "▸"
+        } else if st.chosen.contains(&p) {
+            "●"
+        } else {
+            "○"
+        };
         let name = if e.dir && e.name != ".." { format!("{}/", e.name) } else { e.name.clone() };
         let mut s = Style::new().fg(if e.dir { t.accent } else { t.fg });
         if i == st.sel {
@@ -1102,7 +1125,9 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
         Pane::Path if st.completer.active() => "Tab / Shift-Tab cycle · click picks · Enter or typing accepts · Esc reverts",
         Pane::Path => "Tab complete (again: list, then cycle) · Enter go/import · Esc back",
         Pane::Filter | Pane::Field(_) => "type · Enter done · Esc back",
-        Pane::Files => "Enter open/import · Space select · a folder · . hidden · / filter · Tab path · p places · 1-9 jump · b bookmark · s/y/d fields · i import",
+        Pane::Files => {
+            "Enter open/import · Space select · a folder · . hidden · / filter · Tab path · p places · 1-9 jump · b bookmark · s/y/d fields · i import"
+        }
         Pane::Places => "j/k move · Enter go · x remove bookmark/recent · b bookmark current folder · 1-9 jump · Esc/p back",
     };
     f.render_widget(Paragraph::new(Line::styled(help, Style::new().fg(t.muted))), help_r);
@@ -1143,7 +1168,13 @@ pub fn eta(done: u64, total: u64, elapsed: f64) -> Option<f64> {
 
 fn fmt_secs(s: f64) -> String {
     let s = s.round() as u64;
-    if s >= 3600 { format!("{}h{:02}m", s / 3600, s / 60 % 60) } else if s >= 60 { format!("{}m{:02}s", s / 60, s % 60) } else { format!("{s}s") }
+    if s >= 3600 {
+        format!("{}h{:02}m", s / 3600, s / 60 % 60)
+    } else if s >= 60 {
+        format!("{}m{:02}s", s / 60, s % 60)
+    } else {
+        format!("{s}s")
+    }
 }
 
 fn draw_running(run: &Running, msg: Option<&str>, f: &mut Frame, r: Rect, t: &Theme, hits: &mut Vec<(Rect, super::Hit)>) {
@@ -1160,7 +1191,8 @@ fn draw_running(run: &Running, msg: Option<&str>, f: &mut Frame, r: Rect, t: &Th
     let idx = (e.file_index as usize).min(run.files.len().saturating_sub(1));
     let name = run.files.get(idx).and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
     f.render_widget(Paragraph::new(Line::styled(format!(" file {}/{}: {name}", idx + 1, run.files.len()), Style::new().fg(t.fg))), info);
-    let gauge = |ratio: f64, label: String| Gauge::default().gauge_style(Style::new().fg(t.accent).bg(t.bg)).ratio(ratio.clamp(0.0, 1.0)).label(label);
+    let gauge =
+        |ratio: f64, label: String| Gauge::default().gauge_style(Style::new().fg(t.accent).bg(t.bg)).ratio(ratio.clamp(0.0, 1.0)).label(label);
     f.render_widget(gauge(e.file, format!("file {:.0}%", e.file * 100.0)), file_g);
     let elapsed = run.started.elapsed().as_secs_f64();
     let left = eta(e.bytes_done, e.bytes_total, elapsed).map(|s| format!(" · ETA {}", fmt_secs(s))).unwrap_or_default();
@@ -1194,7 +1226,11 @@ fn draw_running(run: &Running, msg: Option<&str>, f: &mut Frame, r: Rect, t: &Th
     if run.progress.cancelled() {
         put(&mut spans, Span::styled("Cancelling… the current file is being rolled back", Style::new().fg(t.warning)), None);
     } else if run.confirm {
-        put(&mut spans, Span::styled("Cancel the import? Completed files stay; the current file is rolled back.  ", Style::new().fg(t.warning)), None);
+        put(
+            &mut spans,
+            Span::styled("Cancel the import? Completed files stay; the current file is rolled back.  ", Style::new().fg(t.warning)),
+            None,
+        );
         put(&mut spans, btn("[Yes, cancel]", t.bg, t.error), Some(super::Hit::ImportConfirm(true)));
         put(&mut spans, Span::raw("  "), None);
         put(&mut spans, btn("[No, continue]", t.bg, t.accent), Some(super::Hit::ImportConfirm(false)));

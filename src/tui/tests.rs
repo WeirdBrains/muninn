@@ -3,9 +3,9 @@ use super::action::Action;
 use super::modal::Modal;
 use super::*;
 use crate::prefs::{HeaderMode, ThemeMode};
+use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyEventState, KeyModifiers};
-use ratatui::Terminal;
 
 pub fn key(c: KeyCode) -> KeyEvent {
     KeyEvent { code: c, modifiers: KeyModifiers::NONE, kind: KeyEventKind::Press, state: KeyEventState::NONE }
@@ -415,7 +415,14 @@ fn snapshots() {
             for f in ["BTCUSDT_5m.csv", "ETHUSDT_5m.csv"] {
                 let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
                 let started = std::time::Instant::now();
-                crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &std::path::Path::new(&raw).join(f), &Default::default()).unwrap();
+                crate::ingest::ingest_csv(
+                    &mut store,
+                    crate::interact::Interact::batch(true),
+                    opts,
+                    &std::path::Path::new(&raw).join(f),
+                    &Default::default(),
+                )
+                .unwrap();
                 println!("ingested {f} in {:?}", started.elapsed());
             }
             let prefs = Preferences::load_or_create(&paths).unwrap();
@@ -722,7 +729,13 @@ fn fullscale() {
     let pct = |sec: f64| samples.iter().take_while(|x| x.0 <= sec).last().map(|x| x.1 * 100.0).unwrap_or(0.0);
     println!(
         "import ETHUSD_5m.csv: {:?}, {} distinct progress values, monotonic {monotonic}, max jump {:.1}%, first move at {first_move:.2}s, at 1s {:.1}% 10s {:.1}% 20s {:.1}% 30s {:.1}%, slowest frame {slow_frame:?}",
-        t.elapsed(), distinct.len(), max_jump * 100.0, pct(1.0), pct(10.0), pct(20.0), pct(30.0)
+        t.elapsed(),
+        distinct.len(),
+        max_jump * 100.0,
+        pct(1.0),
+        pct(10.0),
+        pct(20.0),
+        pct(30.0)
     );
     assert!(monotonic);
     assert!(s.contains("Import finished"), "{s}");
@@ -747,7 +760,8 @@ fn ingest_timing() {
         let progress = std::env::var_os("MUNINN_TIMING_PROGRESS").map(|_| std::sync::Arc::new(crate::ingest::Progress::default()));
         let opts = crate::ingest::IngestOptions { source: Some("binance".into()), progress, ..Default::default() };
         let s = std::time::Instant::now();
-        crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &std::path::Path::new(&raw).join(f), &Default::default()).unwrap();
+        crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &std::path::Path::new(&raw).join(f), &Default::default())
+            .unwrap();
         println!("TIMING {f}: {:?}", s.elapsed());
     }
 }
@@ -955,7 +969,13 @@ fn cancel_fullsize() {
         })
     };
     let opts = crate::ingest::IngestOptions { source: Some("big".into()), progress: Some(p.clone()), ..Default::default() };
-    let r = crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts, &std::path::Path::new(&raw).join("BTCUSDT_5m.csv"), &Default::default());
+    let r = crate::ingest::ingest_csv(
+        &mut a.store,
+        crate::interact::Interact::batch(true),
+        opts,
+        &std::path::Path::new(&raw).join("BTCUSDT_5m.csv"),
+        &Default::default(),
+    );
     let asked = w.join().unwrap();
     println!("CANCEL stopped {:?} after the request, at {} bars stored", asked.elapsed(), p.file_bars_done.load(Relaxed));
     assert!(matches!(r, Err(crate::Error::Aborted)));
@@ -996,7 +1016,10 @@ fn cancel_with_new_source_leaves_no_artifacts_and_is_recorded() {
     assert!(a.series.iter().all(|s| s.source != "fresh"));
     assert_eq!(a.prefs.tui.import_recent, recent_before, "recent entry undone");
     let run = a.store.last_import_run().unwrap().unwrap();
-    assert_eq!((run.origin.as_str(), run.status.as_str(), run.cancel_by.as_deref(), run.cancel_phase.as_deref()), ("tui", "cancelled", Some("tui"), Some("store")));
+    assert_eq!(
+        (run.origin.as_str(), run.status.as_str(), run.cancel_by.as_deref(), run.cancel_phase.as_deref()),
+        ("tui", "cancelled", Some("tui"), Some("store"))
+    );
     assert!(run.cancel_requested_at.is_some() && run.cancel_file.as_deref().unwrap().ends_with("SOLUSDT_5m.csv"));
     let arts = a.store.import_artifacts(run.id).unwrap();
     assert!(arts.iter().any(|x| x.kind == "source" && x.state == "rolled_back"), "{arts:?}");
@@ -1006,7 +1029,10 @@ fn cancel_with_new_source_leaves_no_artifacts_and_is_recorded() {
     // re-import works and is recorded as completed with kept artifacts
     let opts = crate::ingest::IngestOptions { source: Some("fresh".into()), ..Default::default() };
     let f = d.path().join("SOLUSDT_5m.csv");
-    let r = crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f, &Default::default())).unwrap();
+    let r = crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| {
+        crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f, &Default::default())
+    })
+    .unwrap();
     assert_eq!(r[0].inserted, 300_000);
     let run = a.store.last_import_run().unwrap().unwrap();
     assert_eq!((run.status.as_str(), run.files_done), ("completed", 1));
@@ -1023,7 +1049,9 @@ fn cli_style_cancel_is_recorded_by_cli() {
     let p = std::sync::Arc::new(crate::ingest::Progress::default());
     p.request_cancel("cli");
     let opts = crate::ingest::IngestOptions { source: Some("clicx".into()), progress: Some(p), ..Default::default() };
-    let r = crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f, &Default::default()));
+    let r = crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| {
+        crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f, &Default::default())
+    });
     assert!(r.is_err());
     let run = a.store.last_import_run().unwrap().unwrap();
     assert_eq!((run.status.as_str(), run.cancel_by.as_deref(), run.cancel_phase.as_deref()), ("cancelled", Some("cli"), Some("read")));

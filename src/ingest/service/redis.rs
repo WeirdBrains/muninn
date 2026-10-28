@@ -2,7 +2,7 @@
 use crate::error::{Error, Result};
 use crate::ingest::frame::is_timestamp_alias;
 use crate::ingest::json::{parse_records, records_to_frame};
-use crate::ingest::{hash_bytes, Input};
+use crate::ingest::{Input, hash_bytes};
 use redis::Value as RV;
 use serde_json::{Map, Value};
 
@@ -207,18 +207,19 @@ pub fn stream_entries(reply: &RV) -> Vec<(String, Vec<(String, String)>)> {
     if let RV::Array(entries) = reply {
         for e in entries {
             if let RV::Array(parts) = e
-                && parts.len() == 2 {
-                    let id = rv_string(&parts[0]).unwrap_or_default();
-                    let mut fields = vec![];
-                    if let RV::Array(kv) = &parts[1] {
-                        for pair in kv.chunks(2) {
-                            if let [k, v] = pair {
-                                fields.push((rv_string(k).unwrap_or_default(), rv_string(v).unwrap_or_default()));
-                            }
+                && parts.len() == 2
+            {
+                let id = rv_string(&parts[0]).unwrap_or_default();
+                let mut fields = vec![];
+                if let RV::Array(kv) = &parts[1] {
+                    for pair in kv.chunks(2) {
+                        if let [k, v] = pair {
+                            fields.push((rv_string(k).unwrap_or_default(), rv_string(v).unwrap_or_default()));
                         }
                     }
-                    out.push((id, fields));
                 }
+                out.push((id, fields));
+            }
         }
     }
     out
@@ -380,7 +381,16 @@ mod tests {
             let _: String = redis::cmd("XADD")
                 .arg("muninn:test:BTCUSDT_5m")
                 .arg(format!("{}-0", 1502942400000 + i * 300_000))
-                .arg("open").arg("1").arg("high").arg("2").arg("low").arg("0.5").arg("close").arg("1.5").arg("volume").arg("3")
+                .arg("open")
+                .arg("1")
+                .arg("high")
+                .arg("2")
+                .arg("low")
+                .arg("0.5")
+                .arg("close")
+                .arg("1.5")
+                .arg("volume")
+                .arg("3")
                 .query(&mut con)
                 .unwrap();
         }

@@ -1,14 +1,17 @@
 //! Theme selector (live preview of both variants, mode toggle) and editor.
-use super::{block, widgets::{sample_bars, Candles}, App};
+use super::{
+    App, block,
+    widgets::{Candles, sample_bars},
+};
 use crate::paths::Paths;
 use crate::prefs::ThemeMode;
-use crate::theme::{self, contrast_warnings, parse_hex, Theme, ThemeFile, Variant, ROLES};
+use crate::theme::{self, ROLES, Theme, ThemeFile, Variant, contrast_warnings, parse_hex};
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, List, ListItem, ListState, Paragraph, Row, Table};
-use ratatui::Frame;
 
 pub struct Editor {
     pub file: ThemeFile,
@@ -93,7 +96,9 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             match theme::load(&app.paths, &name) {
                 Ok(file) => {
                     app.themes.editor = Some(Editor { file, variant: app.variant, role: 0, hex_input: None, save_name: None, dirty: false });
-                    app.set_status("editor: ↑↓ role · ←→ palette · Enter hex · v variant · g generate other variant · s save as · R reset · Esc back");
+                    app.set_status(
+                        "editor: ↑↓ role · ←→ palette · Enter hex · v variant · g generate other variant · s save as · R reset · Esc back",
+                    );
                 }
                 Err(e) => app.set_status(format!("theme error: {e}")),
             }
@@ -129,10 +134,9 @@ fn editor_key(app: &mut App, k: KeyEvent) {
             KeyCode::Backspace => {
                 buf.pop();
             }
-            KeyCode::Char(c) if (c.is_ascii_hexdigit() || c == '#')
-                && buf.len() < 7 => {
-                    buf.push(c);
-                }
+            KeyCode::Char(c) if (c.is_ascii_hexdigit() || c == '#') && buf.len() < 7 => {
+                buf.push(c);
+            }
             _ => {}
         }
         return;
@@ -298,10 +302,7 @@ fn draw_editor(app: &mut App, f: &mut Frame, left: Rect, right: Rect) {
         let sel = i == ed.role;
         lines.push(Line::from(vec![
             Span::styled("██ ", Style::new().fg(ratatui::style::Color::Rgb(rgb.0, rgb.1, rgb.2))),
-            Span::styled(
-                format!("{r:<13}{val}"),
-                if sel { Style::new().bg(t.selection_bg).fg(t.selection_fg) } else { Style::new().fg(t.fg) },
-            ),
+            Span::styled(format!("{r:<13}{val}"), if sel { Style::new().bg(t.selection_bg).fg(t.selection_fg) } else { Style::new().fg(t.fg) }),
         ]));
     }
     if let Some(h) = &ed.hex_input {

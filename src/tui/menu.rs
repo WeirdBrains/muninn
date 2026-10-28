@@ -1,14 +1,14 @@
 //! Menu bar with dropdowns and nested submenus.
-use super::action::{Action, ContainerMode, FilterKind, Preset as P, ViewKind};
 use super::Hit;
+use super::action::{Action, ContainerMode, FilterKind, Preset as P, ViewKind};
 use crate::prefs::ThemeMode as TM;
 use crate::theme::Theme;
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
-use ratatui::Frame;
 
 #[derive(Debug, Clone)]
 pub enum Kind {
@@ -351,7 +351,16 @@ pub fn draw_bar(state: &MenuState, f: &mut Frame, area: Rect, t: &Theme, hits: &
 
 /// Draw open dropdowns on top of everything.
 #[allow(clippy::too_many_arguments)]
-pub fn draw_dropdowns(state: &MenuState, f: &mut Frame, screen: Rect, bar: Rect, xs: &[u16], t: &Theme, enabled: &dyn Fn(Action) -> bool, hits: &mut Vec<(Rect, Hit)>) {
+pub fn draw_dropdowns(
+    state: &MenuState,
+    f: &mut Frame,
+    screen: Rect,
+    bar: Rect,
+    xs: &[u16],
+    t: &Theme,
+    enabled: &dyn Fn(Action) -> bool,
+    hits: &mut Vec<(Rect, Hit)>,
+) {
     let Some(top) = state.open else { return };
     let ms = menus();
     let mut x = xs.get(top).copied().unwrap_or(bar.x);

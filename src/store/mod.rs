@@ -1,17 +1,18 @@
 //! SQLite / SQLCipher storage: schema, migrations, queries, upsert.
 use crate::error::{Error, Result};
-use crate::model::{Bar, BarId, Duration, Source, StoredBar, Symbol, KNOWN_ALIASES, KNOWN_BASES, KNOWN_QUOTES};
-use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
+use crate::model::{Bar, BarId, Duration, KNOWN_ALIASES, KNOWN_BASES, KNOWN_QUOTES, Source, StoredBar, Symbol};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 use std::path::Path;
 
 mod query;
 pub mod runs;
-pub use runs::{Artifact, ImportRun};
 pub use query::BarSort;
+pub use runs::{Artifact, ImportRun};
 
 pub const SCHEMA_VERSION: i64 = 1;
 
-const MIGRATIONS: &[&str] = &[r#"
+const MIGRATIONS: &[&str] = &[
+    r#"
 CREATE TABLE sources (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
@@ -62,7 +63,8 @@ CREATE TABLE ingest_runs (
     rejected INTEGER NOT NULL
 );
 CREATE INDEX ingest_runs_hash ON ingest_runs(content_hash, source_id, base, quote, duration_s);
-"#, r#"
+"#,
+    r#"
 -- Per-series bar count and time range, kept up to date by upsert_bars (listing
 -- series by GROUP BY over millions of encrypted rows takes seconds).
 CREATE TABLE series_stats (
@@ -77,7 +79,9 @@ CREATE TABLE series_stats (
 );
 INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MIN(timestamp), MAX(timestamp)
     FROM bars GROUP BY source_id, base, quote, duration_s;
-"#, runs::MIGRATION];
+"#,
+    runs::MIGRATION,
+];
 
 pub fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
@@ -190,9 +194,7 @@ impl Store {
     fn migrate(&mut self) -> Result<()> {
         self.conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
         self.conn.execute_batch("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);")?;
-        let v: i64 = self
-            .conn
-            .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
+        let v: i64 = self.conn.query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
         let tx = self.conn.transaction()?;
         for (i, m) in MIGRATIONS.iter().enumerate() {
             let target = i as i64 + 1;
@@ -204,10 +206,7 @@ impl Store {
                         tx.execute("INSERT OR IGNORE INTO assets(name, is_quote) VALUES (?1, 0)", [b])?;
                     }
                     for q in KNOWN_QUOTES {
-                        tx.execute(
-                            "INSERT INTO assets(name, is_quote) VALUES (?1, 1) ON CONFLICT(name) DO UPDATE SET is_quote = 1",
-                            [q],
-                        )?;
+                        tx.execute("INSERT INTO assets(name, is_quote) VALUES (?1, 1) ON CONFLICT(name) DO UPDATE SET is_quote = 1", [q])?;
                     }
                     for (a, c) in KNOWN_ALIASES {
                         tx.execute("INSERT OR IGNORE INTO asset_aliases(alias, canonical) VALUES (?1, ?2)", [a, c])?;
@@ -236,10 +235,7 @@ impl Store {
     }
 
     pub fn source_by_name(&self, name: &str) -> Result<Option<Source>> {
-        Ok(self
-            .conn
-            .query_row("SELECT id, name, kind, locator, created_at FROM sources WHERE name = ?1", [name], Self::row_source)
-            .optional()?)
+        Ok(self.conn.query_row("SELECT id, name, kind, locator, created_at FROM sources WHERE name = ?1", [name], Self::row_source).optional()?)
     }
 
     pub fn source_by_locator(&self, locator: &str) -> Result<Option<Source>> {
@@ -295,8 +291,7 @@ impl Store {
         tx.execute("UPDATE sources SET name = ?1 WHERE id = ?2", params![to, src.id])?;
         let rows: Vec<(Vec<u8>, String, String, i64, i64)> = {
             let mut st = tx.prepare("SELECT id, base, quote, timestamp, duration_s FROM bars WHERE source_id = ?1")?;
-            st.query_map([&src.id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))?
-                .collect::<rusqlite::Result<Vec<_>>>()?
+            st.query_map([&src.id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))?.collect::<rusqlite::Result<Vec<_>>>()?
         };
         let mut n = 0;
         {
@@ -329,20 +324,12 @@ impl Store {
     }
 
     pub fn is_known_asset(&self, name: &str) -> Result<bool> {
-        Ok(self
-            .conn
-            .query_row("SELECT 1 FROM assets WHERE name = ?1", [name], |_| Ok(()))
-            .optional()?
-            .is_some())
+        Ok(self.conn.query_row("SELECT 1 FROM assets WHERE name = ?1", [name], |_| Ok(())).optional()?.is_some())
     }
 
     pub fn canonical_asset(&self, name: &str) -> Result<String> {
         let up = name.to_ascii_uppercase();
-        Ok(self
-            .conn
-            .query_row("SELECT canonical FROM asset_aliases WHERE alias = ?1", [&up], |r| r.get(0))
-            .optional()?
-            .unwrap_or(up))
+        Ok(self.conn.query_row("SELECT canonical FROM asset_aliases WHERE alias = ?1", [&up], |r| r.get(0)).optional()?.unwrap_or(up))
     }
 
     pub fn canonical_symbol(&self, s: &Symbol) -> Result<Symbol> {
@@ -352,27 +339,17 @@ impl Store {
     pub fn add_symbol(&self, sym: &Symbol, aliases: &[String]) -> Result<()> {
         self.conn.execute("INSERT OR IGNORE INTO symbols(base, quote) VALUES (?1, ?2)", params![sym.base, sym.quote])?;
         self.conn.execute("INSERT OR IGNORE INTO assets(name, is_quote) VALUES (?1, 0)", [&sym.base])?;
-        self.conn.execute(
-            "INSERT INTO assets(name, is_quote) VALUES (?1, 1) ON CONFLICT(name) DO UPDATE SET is_quote = 1",
-            [&sym.quote],
-        )?;
+        self.conn.execute("INSERT INTO assets(name, is_quote) VALUES (?1, 1) ON CONFLICT(name) DO UPDATE SET is_quote = 1", [&sym.quote])?;
         for a in aliases {
-            self.conn.execute(
-                "INSERT OR REPLACE INTO asset_aliases(alias, canonical) VALUES (?1, ?2)",
-                params![a.to_ascii_uppercase(), sym.base],
-            )?;
+            self.conn.execute("INSERT OR REPLACE INTO asset_aliases(alias, canonical) VALUES (?1, ?2)", params![a.to_ascii_uppercase(), sym.base])?;
         }
         Ok(())
     }
 
     /// Known symbols: explicit ones plus every stored series.
     pub fn symbols(&self) -> Result<Vec<Symbol>> {
-        let mut st = self.conn.prepare(
-            "SELECT base, quote FROM symbols UNION SELECT DISTINCT base, quote FROM bars ORDER BY 1, 2",
-        )?;
-        let v = st
-            .query_map([], |r| Ok(Symbol { base: r.get(0)?, quote: r.get(1)? }))?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut st = self.conn.prepare("SELECT base, quote FROM symbols UNION SELECT DISTINCT base, quote FROM bars ORDER BY 1, 2")?;
+        let v = st.query_map([], |r| Ok(Symbol { base: r.get(0)?, quote: r.get(1)? }))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(v)
     }
 
@@ -636,10 +613,8 @@ mod tests {
         s.upsert_bars(&src, &sym, Duration(300), &bars[3..8]).unwrap();
         s.upsert_bars(&src, &sym, Duration(300), &bars).unwrap();
         s.upsert_bars(&src, &sym, Duration(300), &bars[..2]).unwrap();
-        let group: (i64, i64, i64) = s
-            .conn
-            .query_row("SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM bars", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
-            .unwrap();
+        let group: (i64, i64, i64) =
+            s.conn.query_row("SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM bars", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
         let v = s.series().unwrap();
         assert_eq!((v[0].count, v[0].first, v[0].last), group);
         s.remove_source("binance").unwrap();

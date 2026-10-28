@@ -226,7 +226,13 @@ impl Node {
 pub enum Placed {
     Tile(u32, Rect),
     /// Title bar of a tabbed/stacked container: titles of both children, active index.
-    Bar { rect: Rect, mode: Mode, titles: [String; 2], active: u8, first_ids: [u32; 2] },
+    Bar {
+        rect: Rect,
+        mode: Mode,
+        titles: [String; 2],
+        active: u8,
+        first_ids: [u32; 2],
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -366,9 +372,10 @@ impl TileLayout {
         }
         if let Some(pp) = self.parent_path()
             && let Node::Split(c) = self.root.at(&pp)
-                && c.mode == Mode::Split {
-                    self.new_dir = c.dir;
-                }
+            && c.mode == Mode::Split
+        {
+            self.new_dir = c.dir;
+        }
     }
 
     pub fn set_focus(&mut self, id: u32) {

@@ -4,8 +4,8 @@
 //! service key and by a master-derived KEK. The service key itself is stored wrapped by the
 //! user's password (Argon2id). The master key, words and shards are never stored.
 use super::*;
-use crate::paths::{write_private, Paths};
-use crate::store::{now_ms, Store};
+use crate::paths::{Paths, write_private};
+use crate::store::{Store, now_ms};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -80,12 +80,7 @@ pub fn service_files(paths: &Paths) -> Result<Vec<ServiceKeyFile>> {
 }
 
 fn write_service_file(paths: &Paths, db_id: &str, v: u32, key: &Key32, password: &SecretString) -> Result<()> {
-    let f = ServiceKeyFile {
-        version: v,
-        created_at: now_ms(),
-        retired: false,
-        wrapped: Some(password_seal(password, &key.0, &svc_aad(db_id, v))?),
-    };
+    let f = ServiceKeyFile { version: v, created_at: now_ms(), retired: false, wrapped: Some(password_seal(password, &key.0, &svc_aad(db_id, v))?) };
     write_private(&service_file(paths, v), toml::to_string_pretty(&f)?.as_bytes())
 }
 
@@ -175,9 +170,7 @@ pub fn unlock_with_password(paths: &Paths, password: &SecretString) -> Result<Ke
 pub fn unlock_with_master(paths: &Paths, master: &Key32) -> Result<Key32> {
     let env = Envelope::require(paths)?;
     let kek = master_kek(master, &env.db_id)?;
-    Key32::from_slice(
-        &open(&kek, &env.master_wrap, DEK_AAD).map_err(|_| Error::Unlock("master key does not match this database".into()))?,
-    )
+    Key32::from_slice(&open(&kek, &env.master_wrap, DEK_AAD).map_err(|_| Error::Unlock("master key does not match this database".into()))?)
 }
 
 /// Rotate: derive service key v{n+1}, re-wrap the DEK, retire the old one.
@@ -248,13 +241,7 @@ impl ExportItem {
 }
 
 /// Write each item as its own age (password) file. Returns the written paths.
-pub fn export(
-    paths: &Paths,
-    master: &Key32,
-    password: &SecretString,
-    out: &Path,
-    items: &[ExportItem],
-) -> Result<Vec<std::path::PathBuf>> {
+pub fn export(paths: &Paths, master: &Key32, password: &SecretString, out: &Path, items: &[ExportItem]) -> Result<Vec<std::path::PathBuf>> {
     verify_master(paths, master)?;
     crate::paths::ensure_dir(out)?;
     let mut written = Vec::new();
@@ -395,9 +382,8 @@ mod tests {
         assert_eq!(files.len(), 8);
         let m = read_maybe_age(&dir.join("master.key.age"), || Ok(pw.clone())).unwrap();
         assert_eq!(Key32::from_hex(&m).unwrap(), master);
-        let shards: Vec<String> = (1..=3)
-            .map(|i| read_maybe_age(&dir.join(format!("shard-{i}.age")), || Ok(pw.clone())).unwrap().to_string())
-            .collect();
+        let shards: Vec<String> =
+            (1..=3).map(|i| read_maybe_age(&dir.join(format!("shard-{i}.age")), || Ok(pw.clone())).unwrap().to_string()).collect();
         assert_eq!(combine_shards(&shards).unwrap(), master);
         assert!(read_maybe_age(&dir.join("words.txt.age"), || Ok(SecretString::from("wrong"))).is_err());
     }

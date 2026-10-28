@@ -2,8 +2,8 @@
 use crate::crypto::{self, Key32};
 use crate::error::{Error, Result};
 use crate::interact::Interact;
-use crate::paths::{ensure_dir, Paths};
-use crate::store::{now_ms, Store};
+use crate::paths::{Paths, ensure_dir};
+use crate::store::{Store, now_ms};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -122,12 +122,7 @@ pub struct RestoreReport {
 }
 
 /// Restore an archive into `paths.home`, prompting before overwriting.
-pub fn restore(
-    paths: &Paths,
-    from: &Path,
-    io: &Interact,
-    password: impl FnOnce() -> Result<SecretString>,
-) -> Result<RestoreReport> {
+pub fn restore(paths: &Paths, from: &Path, io: &Interact, password: impl FnOnce() -> Result<SecretString>) -> Result<RestoreReport> {
     let archive = locate(from)?;
     let raw = fs::read(&archive)?;
     let tar_bytes = if crypto::is_age(&raw) { crypto::age_decrypt(&password()?, &raw)?.to_vec() } else { raw };
@@ -145,9 +140,7 @@ pub fn restore(
 
     let src_db = s.join("storage").join(crate::paths::DB_FILE);
     if src_db.exists() {
-        if (paths.db.exists() || paths.envelope().exists())
-            && !io.confirm("overwrite the existing database and keys with the backup?")?
-        {
+        if (paths.db.exists() || paths.envelope().exists()) && !io.confirm("overwrite the existing database and keys with the backup?")? {
             return Err(Error::Aborted);
         }
         for ext in ["database-wal", "database-shm"] {

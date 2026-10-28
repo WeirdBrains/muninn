@@ -1,14 +1,14 @@
 //! Modal dialogs drawn over the content area.
-use super::{block, centered, forms, themes, App};
+use super::{App, block, centered, forms, themes};
 use crate::help::HelpView;
 use crate::ingest::time::fmt_ts;
 use crate::store::Store;
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph, Wrap};
-use ratatui::Frame;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptKind {
@@ -33,15 +33,32 @@ pub enum Modal {
     Import,
     Keys,
     Themes,
-    Prefs { sel: usize },
-    Info { title: String, lines: Vec<String>, scroll: u16 },
+    Prefs {
+        sel: usize,
+    },
+    Info {
+        title: String,
+        lines: Vec<String>,
+        scroll: u16,
+    },
     Prompt(Prompt),
     /// Sidebar filter editor.
-    Filter { kind: super::action::FilterKind, sel: usize, edit: Option<String> },
+    Filter {
+        kind: super::action::FilterKind,
+        sel: usize,
+        edit: Option<String>,
+    },
     /// Chart layer checklist for the focused chart tile.
-    Layers { sel: usize },
+    Layers {
+        sel: usize,
+    },
     /// Pick from a list of strings (e.g. saved layouts).
-    Pick { title: String, items: Vec<String>, sel: usize, kind: PickKind },
+    Pick {
+        title: String,
+        items: Vec<String>,
+        sel: usize,
+        kind: PickKind,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -121,7 +138,8 @@ pub fn symbols_lines(store: &Store) -> Vec<String> {
 pub fn coverage_lines(store: &Store) -> Vec<String> {
     match store.series() {
         Ok(v) if !v.is_empty() => {
-            let mut out = vec![format!("{:<12} {:<12} {:>4} {:>9} {:>8}  {:<19}  {:<19}", "source", "symbol", "dur", "bars", "missing", "first", "last")];
+            let mut out =
+                vec![format!("{:<12} {:<12} {:>4} {:>9} {:>8}  {:<19}  {:<19}", "source", "symbol", "dur", "bars", "missing", "first", "last")];
             for s in v {
                 out.push(format!(
                     "{:<12} {:<12} {:>4} {:>9} {:>8}  {:<19}  {:<19}",
@@ -311,7 +329,6 @@ impl App {
     }
 }
 
-
 fn put(app: &mut App, kind: super::action::FilterKind, sel: usize, edit: Option<String>) {
     if matches!(app.modal, Some(Modal::Filter { .. })) {
         app.modal = Some(Modal::Filter { kind, sel, edit });
@@ -319,67 +336,71 @@ fn put(app: &mut App, kind: super::action::FilterKind, sel: usize, edit: Option<
 }
 
 fn filter_key(app: &mut App, k: KeyEvent, kind: super::action::FilterKind, mut sel: usize, mut edit: Option<String>) {
-            let items = filter_items(app, kind);
-            let n = items.len().max(1);
-            if let Some(buf) = edit.as_mut() {
-                match k.code {
-                    KeyCode::Esc => edit = None,
-                    KeyCode::Backspace => {
-                        buf.pop();
-                    }
-                    KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == '-' => buf.push(c),
-                    KeyCode::Enter => {
-                        let v = buf.trim().parse::<f64>().ok();
-                        let which = sel;
-                        edit = None;
-                        let pf = &mut app.prefs.tui.sidebar.filters.price;
-                        if which == 1 { pf.min = v } else { pf.max = v }
-                        app.filters_changed();
-                    }
-                    _ => {}
-                }
-                put(app, kind, sel, edit);
-                return;
+    let items = filter_items(app, kind);
+    let n = items.len().max(1);
+    if let Some(buf) = edit.as_mut() {
+        match k.code {
+            KeyCode::Esc => edit = None,
+            KeyCode::Backspace => {
+                buf.pop();
             }
-            match k.code {
-                KeyCode::Down | KeyCode::Char('j') => sel = (sel + 1) % n,
-                KeyCode::Up | KeyCode::Char('k') => sel = (sel + n - 1) % n,
-                KeyCode::Esc | KeyCode::Char('q') => {
-                    app.modal = None;
-                    return;
+            KeyCode::Char(c) if c.is_ascii_digit() || c == '.' || c == '-' => buf.push(c),
+            KeyCode::Enter => {
+                let v = buf.trim().parse::<f64>().ok();
+                let which = sel;
+                edit = None;
+                let pf = &mut app.prefs.tui.sidebar.filters.price;
+                if which == 1 {
+                    pf.min = v
+                } else {
+                    pf.max = v
                 }
-                KeyCode::Enter | KeyCode::Char(' ') => {
-                    use super::action::FilterKind::*;
-                    let i = sel;
-                    let fl = &mut app.prefs.tui.sidebar.filters;
+                app.filters_changed();
+            }
+            _ => {}
+        }
+        put(app, kind, sel, edit);
+        return;
+    }
+    match k.code {
+        KeyCode::Down | KeyCode::Char('j') => sel = (sel + 1) % n,
+        KeyCode::Up | KeyCode::Char('k') => sel = (sel + n - 1) % n,
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.modal = None;
+            return;
+        }
+        KeyCode::Enter | KeyCode::Char(' ') => {
+            use super::action::FilterKind::*;
+            let i = sel;
+            let fl = &mut app.prefs.tui.sidebar.filters;
+            match kind {
+                Price => match i {
+                    0 => fl.price.metric = fl.price.metric.next(),
+                    1 | 2 => {
+                        let cur = if i == 1 { fl.price.min } else { fl.price.max };
+                        edit = Some(cur.map(|v| v.to_string()).unwrap_or_default());
+                        put(app, kind, sel, edit);
+                        return;
+                    }
+                    _ => {
+                        fl.price.min = None;
+                        fl.price.max = None;
+                    }
+                },
+                Source | Period | Year => {
+                    let Some(item) = items.get(i).map(|x| x.0.clone()) else { return };
                     match kind {
-                        Price => match i {
-                            0 => fl.price.metric = fl.price.metric.next(),
-                            1 | 2 => {
-                                let cur = if i == 1 { fl.price.min } else { fl.price.max };
-                                edit = Some(cur.map(|v| v.to_string()).unwrap_or_default());
-                                put(app, kind, sel, edit);
-                                return;
-                            }
-                            _ => {
-                                fl.price.min = None;
-                                fl.price.max = None;
-                            }
-                        },
-                        Source | Period | Year => {
-                            let Some(item) = items.get(i).map(|x| x.0.clone()) else { return };
-                            match kind {
-                                Source => toggle(&mut fl.sources, item),
-                                Period => toggle(&mut fl.durations, item),
-                                _ => toggle(&mut fl.years, item.parse().unwrap_or(0)),
-                            }
-                        }
+                        Source => toggle(&mut fl.sources, item),
+                        Period => toggle(&mut fl.durations, item),
+                        _ => toggle(&mut fl.years, item.parse().unwrap_or(0)),
                     }
-                    app.filters_changed();
                 }
-                _ => {}
             }
-            put(app, kind, sel, edit);
+            app.filters_changed();
+        }
+        _ => {}
+    }
+    put(app, kind, sel, edit);
 }
 
 fn toggle<T: Ord>(set: &mut std::collections::BTreeSet<T>, v: T) {
@@ -499,7 +520,8 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
             let mut lines = vec![];
             for (i, (k, name)) in super::chart::LAYERS.iter().enumerate() {
                 let on = layers.get(*k);
-                let st = if i == *sel { Style::new().bg(t.selection_bg).fg(t.selection_fg) } else { Style::new().fg(if on { t.fg } else { t.muted }) };
+                let st =
+                    if i == *sel { Style::new().bg(t.selection_bg).fg(t.selection_fg) } else { Style::new().fg(if on { t.fg } else { t.muted }) };
                 lines.push(Line::styled(format!(" [{}] {name:<22} {k} ", if on { "x" } else { " " }), st));
             }
             lines.push(Line::styled(" N line metric · M moving averages", Style::new().fg(t.muted)));

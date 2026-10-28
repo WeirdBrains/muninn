@@ -1,5 +1,5 @@
 //! JSON / NDJSON reader: records (objects or positional arrays) -> an all-string Polars frame.
-use super::{canonical, expand_path, hash_bytes, IngestOptions, IngestReport, Input, Session};
+use super::{IngestOptions, IngestReport, Input, Session, canonical, expand_path, hash_bytes};
 use crate::error::{Error, Result};
 use crate::interact::Interact;
 use crate::store::Store;
@@ -71,11 +71,7 @@ pub fn records_to_frame(records: &[Value]) -> Result<DataFrame> {
             cols[i].push(v.and_then(cell));
         }
     }
-    let columns: Vec<Column> = names
-        .iter()
-        .zip(cols)
-        .map(|(n, c)| Column::new(n.as_str().into(), c))
-        .collect();
+    let columns: Vec<Column> = names.iter().zip(cols).map(|(n, c)| Column::new(n.as_str().into(), c)).collect();
     Ok(DataFrame::new_infer_height(columns)?)
 }
 

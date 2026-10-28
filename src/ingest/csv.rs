@@ -19,11 +19,7 @@ impl Default for CsvOptions {
 }
 
 fn byte(c: char, what: &'static str) -> Result<u8> {
-    if c.is_ascii() {
-        Ok(c as u8)
-    } else {
-        Err(Error::invalid(what, format!("`{c}` must be a single ASCII character")))
-    }
+    if c.is_ascii() { Ok(c as u8) } else { Err(Error::invalid(what, format!("`{c}` must be a single ASCII character"))) }
 }
 
 /// Read every column as a string; numeric/timestamp parsing happens in normalization.
@@ -38,10 +34,7 @@ pub fn read_csv_bytes(bytes: Vec<u8>, o: &CsvOptions) -> Result<DataFrame> {
     if let Some(e) = o.escape {
         // Polars only supports RFC 4180 escaping (doubling the quote character).
         if e != o.quote {
-            return Err(Error::invalid(
-                "--escape",
-                format!("`{e}`: only the quote character itself (RFC 4180 doubling) is supported"),
-            ));
+            return Err(Error::invalid("--escape", format!("`{e}`: only the quote character itself (RFC 4180 doubling) is supported")));
         }
     }
     let df = CsvReadOptions::default()

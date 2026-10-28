@@ -6,12 +6,12 @@ pub mod paths;
 pub mod prefs;
 
 pub use error::{Error, Result};
+pub mod backup;
+pub mod crypto;
+pub mod export;
+pub mod help;
+pub mod ingest;
 pub mod model;
 pub mod store;
-pub mod ingest;
-pub mod export;
-pub mod crypto;
-pub mod backup;
 pub mod theme;
-pub mod help;
 pub mod tui;

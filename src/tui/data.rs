@@ -8,7 +8,7 @@ use super::layout::SeriesKey;
 use crate::model::{Bar, PriceMetric};
 use crate::store::{BarSort, Store};
 use std::collections::HashMap;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 
 /// All bars of one series in time order.
 #[derive(Debug, Default)]
@@ -222,7 +222,15 @@ mod tests {
                 .map(|i| {
                     let o = 100.0 + i as f64;
                     let c = if i % 2 == 0 { o + 2.0 } else { o - 1.0 };
-                    Bar { ts: i * 300_000, open: o, high: o.max(c) + i as f64, low: o.min(c) - 1.0, close: c, volume: (10 - i) as f64, flags: (i == 3) as i64 }
+                    Bar {
+                        ts: i * 300_000,
+                        open: o,
+                        high: o.max(c) + i as f64,
+                        low: o.min(c) - 1.0,
+                        close: c,
+                        volume: (10 - i) as f64,
+                        flags: (i == 3) as i64,
+                    }
                 })
                 .collect(),
         )

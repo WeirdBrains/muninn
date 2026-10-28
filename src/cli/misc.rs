@@ -1,7 +1,7 @@
 //! `mnnn theme`, `mnnn tui`, `mnnn help`, `mnnn man`.
 use super::{Ctx, ThemeCommand};
-use crate::theme::{self, ThemeFile};
 use crate::Error;
+use crate::theme::{self, ThemeFile};
 use std::path::Path;
 
 pub fn theme(ctx: &Ctx, cmd: ThemeCommand) -> anyhow::Result<()> {
@@ -89,9 +89,8 @@ pub fn help(topic: Option<&str>, search: Option<&str>) -> anyhow::Result<()> {
             }
         }
         Some(id) => {
-            let t = crate::help::topic(id).ok_or_else(|| {
-                Error::invalid("topic", format!("`{id}` (see `mnnn help` for the list, or `mnnn help --search {id}`)"))
-            })?;
+            let t = crate::help::topic(id)
+                .ok_or_else(|| Error::invalid("topic", format!("`{id}` (see `mnnn help` for the list, or `mnnn help --search {id}`)")))?;
             print!("{}", t.body);
         }
     }

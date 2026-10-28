@@ -1,7 +1,7 @@
 //! Export bars to CSV, Parquet or JSON via Polars.
 use crate::error::{Error, Result};
 use crate::ingest::time::{fmt_ts, parse_ts};
-use crate::model::{Duration, Symbol, StoredBar, FLAG_ZERO_VOLUME};
+use crate::model::{Duration, FLAG_ZERO_VOLUME, StoredBar, Symbol};
 use crate::store::{BarFilter, Store};
 use polars::prelude::*;
 use std::path::Path;

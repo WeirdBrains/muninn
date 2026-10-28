@@ -1,8 +1,8 @@
 //! `mnnn keys ...`
 use super::{Ctx, KeysCommand, MasterInput};
+use crate::Error;
 use crate::crypto::keyring::{self, Envelope, ExportItem};
 use crate::crypto::{self, Key32};
-use crate::Error;
 use secrecy::{ExposeSecret, SecretString};
 
 /// Resolve the master key from words, shards or an exported master file.

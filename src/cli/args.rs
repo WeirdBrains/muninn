@@ -4,8 +4,13 @@ use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
-#[command(name = "mnnn", version, about = "Muninn: ingest and normalize crypto market data into bars", disable_help_subcommand = true,
-    after_help = "Docs: `mnnn help` (topics), `mnnn help install` (install and uninstall per platform).")]
+#[command(
+    name = "mnnn",
+    version,
+    about = "Muninn: ingest and normalize crypto market data into bars",
+    disable_help_subcommand = true,
+    after_help = "Docs: `mnnn help` (topics), `mnnn help install` (install and uninstall per platform)."
+)]
 pub struct Cli {
     #[command(flatten)]
     pub global: GlobalArgs,
@@ -422,8 +427,13 @@ pub enum SourcesCommand {
         #[arg(long)]
         locator: Option<String>,
     },
-    Rename { from: String, to: String },
-    Remove { name: String },
+    Rename {
+        from: String,
+        to: String,
+    },
+    Remove {
+        name: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -530,7 +540,9 @@ pub enum ThemeCommand {
     List,
     /// Show the active theme and resolved mode.
     Show,
-    Set { name: String },
+    Set {
+        name: String,
+    },
     Mode {
         #[arg(value_enum)]
         mode: ThemeMode,
@@ -540,9 +552,13 @@ pub enum ThemeCommand {
         #[arg(long)]
         out: PathBuf,
     },
-    Import { file: PathBuf },
+    Import {
+        file: PathBuf,
+    },
     /// Restore a built-in theme to its shipped version.
-    Reset { name: String },
+    Reset {
+        name: String,
+    },
 }
 
 #[cfg(test)]

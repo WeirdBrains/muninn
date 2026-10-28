@@ -120,17 +120,11 @@ pub fn combine_shards(shards: &[String]) -> Result<Key32> {
     idx.sort_unstable();
     idx.dedup();
     if idx.len() < first.threshold {
-        return Err(Error::Crypto(format!(
-            "need at least {} distinct shards, got {}",
-            first.threshold,
-            idx.len()
-        )));
+        return Err(Error::Crypto(format!("need at least {} distinct shards, got {}", first.threshold, idx.len())));
     }
     let mut seen = std::collections::HashSet::new();
     let shares: Vec<Vec<u8>> = parsed.iter().filter(|p| seen.insert(p.index)).map(|p| p.share.to_vec()).collect();
-    let secret = Zeroizing::new(
-        vsss_rs::Gf256::combine_array(&shares).map_err(|e| Error::Crypto(format!("shard combine failed: {e:?}")))?,
-    );
+    let secret = Zeroizing::new(vsss_rs::Gf256::combine_array(&shares).map_err(|e| Error::Crypto(format!("shard combine failed: {e:?}")))?);
     let mut shares = shares;
     for s in shares.iter_mut() {
         s.zeroize();
@@ -168,9 +162,7 @@ pub struct Sealed {
 pub fn seal(key: &Key32, plaintext: &[u8], aad: &[u8]) -> Result<Sealed> {
     let c = XChaCha20Poly1305::new((&key.0).into());
     let nonce: [u8; 24] = random_bytes()?;
-    let ct = c
-        .encrypt(XNonce::from_slice(&nonce), Payload { msg: plaintext, aad })
-        .map_err(|_| Error::Crypto("encryption failed".into()))?;
+    let ct = c.encrypt(XNonce::from_slice(&nonce), Payload { msg: plaintext, aad }).map_err(|_| Error::Crypto("encryption failed".into()))?;
     Ok(Sealed { nonce: hex::encode(nonce), ct: hex::encode(ct) })
 }
 
@@ -181,9 +173,7 @@ pub fn open(key: &Key32, s: &Sealed, aad: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
         return Err(Error::Crypto("bad nonce".into()));
     }
     let ct = hex::decode(&s.ct).map_err(|_| Error::Crypto("bad ciphertext".into()))?;
-    c.decrypt(XNonce::from_slice(&nonce), Payload { msg: &ct, aad })
-        .map(Zeroizing::new)
-        .map_err(|_| Error::Unlock("wrong key or password".into()))
+    c.decrypt(XNonce::from_slice(&nonce), Payload { msg: &ct, aad }).map(Zeroizing::new).map_err(|_| Error::Unlock("wrong key or password".into()))
 }
 
 // ---------- password wrapping (Argon2id) ----------
@@ -203,8 +193,7 @@ fn argon2_key(password: &SecretString, salt: &[u8], m: u32, t: u32, p: u32) -> R
     let params = argon2::Params::new(m, t, p, Some(32)).map_err(|e| Error::Crypto(e.to_string()))?;
     let a = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
     let mut out = [0u8; 32];
-    a.hash_password_into(password.expose_secret().as_bytes(), salt, &mut out)
-        .map_err(|e| Error::Crypto(e.to_string()))?;
+    a.hash_password_into(password.expose_secret().as_bytes(), salt, &mut out).map_err(|e| Error::Crypto(e.to_string()))?;
     Ok(Key32(out))
 }
 
@@ -215,14 +204,7 @@ pub fn password_seal(password: &SecretString, plaintext: &[u8], aad: &[u8]) -> R
     let salt: [u8; 16] = random_bytes()?;
     let (m, t, p) = (19 * 1024, 2, 1);
     let k = argon2_key(password, &salt, m, t, p)?;
-    Ok(PasswordSealed {
-        kdf: "argon2id".into(),
-        salt: hex::encode(salt),
-        m_cost: m,
-        t_cost: t,
-        p_cost: p,
-        sealed: seal(&k, plaintext, aad)?,
-    })
+    Ok(PasswordSealed { kdf: "argon2id".into(), salt: hex::encode(salt), m_cost: m, t_cost: t, p_cost: p, sealed: seal(&k, plaintext, aad)? })
 }
 
 pub fn password_open(password: &SecretString, s: &PasswordSealed, aad: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
@@ -243,9 +225,7 @@ pub fn age_encrypt(password: &SecretString, plaintext: &[u8]) -> Result<Vec<u8>>
 
 pub fn age_decrypt(password: &SecretString, ct: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
     let id = age::scrypt::Identity::new(password.clone());
-    age::decrypt(&id, ct)
-        .map(Zeroizing::new)
-        .map_err(|e| Error::Unlock(format!("could not decrypt export (wrong password?): {e}")))
+    age::decrypt(&id, ct).map(Zeroizing::new).map_err(|e| Error::Unlock(format!("could not decrypt export (wrong password?): {e}")))
 }
 
 pub fn is_age(bytes: &[u8]) -> bool {

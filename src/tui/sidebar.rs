@@ -1,15 +1,15 @@
 //! Right sidebar: series list with fuzzy search, sort by year/name, and filters.
-use super::layout::SeriesKey;
 use super::Hit;
+use super::layout::SeriesKey;
 use crate::model::PriceMetric;
 use crate::store::SeriesInfo;
 use crate::theme::Theme;
 use chrono::{Datelike, TimeZone, Utc};
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
-use ratatui::Frame;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 
@@ -212,7 +212,16 @@ pub struct Sidebar {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn draw(sb: &mut Sidebar, p: &SidebarPrefs, series: &[SeriesInfo], current: Option<&SeriesKey>, f: &mut Frame, area: Rect, t: &Theme, hits: &mut Vec<(Rect, Hit)>) {
+pub fn draw(
+    sb: &mut Sidebar,
+    p: &SidebarPrefs,
+    series: &[SeriesInfo],
+    current: Option<&SeriesKey>,
+    f: &mut Frame,
+    area: Rect,
+    t: &Theme,
+    hits: &mut Vec<(Rect, Hit)>,
+) {
     let block = Block::new()
         .borders(Borders::LEFT)
         .border_style(Style::new().fg(if sb.focused { t.border_focus } else { t.border }))
@@ -240,7 +249,12 @@ pub fn draw(sb: &mut Sidebar, p: &SidebarPrefs, series: &[SeriesInfo], current: 
     line(
         f,
         y,
-        Line::from(vec![Span::styled(" sort: ", Style::new().fg(t.muted)), Span::styled(format!("[{key}]"), bst), Span::raw(" "), Span::styled(format!("[{arrow}]"), bst)]),
+        Line::from(vec![
+            Span::styled(" sort: ", Style::new().fg(t.muted)),
+            Span::styled(format!("[{key}]"), bst),
+            Span::raw(" "),
+            Span::styled(format!("[{arrow}]"), bst),
+        ]),
     );
     hits.push((Rect { x: x0, y, width: key.len() as u16 + 2, height: 1 }, Hit::SidebarSortKey));
     hits.push((Rect { x: x0 + key.len() as u16 + 3, y, width: arrow.chars().count() as u16 + 2, height: 1 }, Hit::SidebarSortOrder));
@@ -321,7 +335,11 @@ pub fn draw(sb: &mut Sidebar, p: &SidebarPrefs, series: &[SeriesInfo], current: 
         let text = format!("{mark}{:<10} {:<9} {:>4} {years}", s.symbol.display(), trunc(&s.source, 9), s.duration.to_string());
         let mut st = Style::new().fg(t.fg);
         if r == sb.sel {
-            st = if sb.focused { Style::new().fg(t.selection_fg).bg(t.selection_bg).add_modifier(Modifier::BOLD) } else { st.add_modifier(Modifier::REVERSED) };
+            st = if sb.focused {
+                Style::new().fg(t.selection_fg).bg(t.selection_bg).add_modifier(Modifier::BOLD)
+            } else {
+                st.add_modifier(Modifier::REVERSED)
+            };
         }
         line(f, y, Line::styled(format!("{text:<w$}"), st));
         hits.push((Rect { x: inner.x, y, width: inner.width, height: 1 }, Hit::SidebarRow(r)));
@@ -344,7 +362,12 @@ mod tests {
     }
 
     fn data() -> Vec<SeriesInfo> {
-        vec![si("BTC", "binance", 300, 2017, 2026), si("ETH", "binance", 300, 2017, 2025), si("SOL", "kraken", 3600, 2020, 2024), si("ADA", "kraken", 300, 2018, 2026)]
+        vec![
+            si("BTC", "binance", 300, 2017, 2026),
+            si("ETH", "binance", 300, 2017, 2025),
+            si("SOL", "kraken", 3600, 2020, 2024),
+            si("ADA", "kraken", 300, 2018, 2026),
+        ]
     }
 
     fn names(v: &[SeriesInfo], r: &[usize]) -> Vec<String> {

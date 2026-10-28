@@ -2,7 +2,7 @@
 pub mod detect;
 
 use crate::error::{Error, Result};
-use crate::paths::{ensure_dir, write_private, Paths};
+use crate::paths::{Paths, ensure_dir, write_private};
 use crate::prefs::ThemeMode;
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
@@ -10,8 +10,27 @@ use std::collections::BTreeMap;
 
 /// Semantic roles every variant must define.
 pub const ROLES: [&str; 21] = [
-    "bg", "fg", "muted", "border", "border_focus", "selection_bg", "selection_fg", "accent", "header", "up", "down",
-    "warning", "error", "success", "info", "chart_1", "chart_2", "chart_3", "chart_4", "chart_5", "chart_6",
+    "bg",
+    "fg",
+    "muted",
+    "border",
+    "border_focus",
+    "selection_bg",
+    "selection_fg",
+    "accent",
+    "header",
+    "up",
+    "down",
+    "warning",
+    "error",
+    "success",
+    "info",
+    "chart_1",
+    "chart_2",
+    "chart_3",
+    "chart_4",
+    "chart_5",
+    "chart_6",
 ];
 
 pub const DEFAULT_THEME: &str = "tokyo-night";
@@ -131,10 +150,7 @@ impl ThemeFile {
                     return Err(Error::invalid("theme", format!("[{vn}] is missing role `{r}`")));
                 }
                 if v.resolve(r).is_none() {
-                    return Err(Error::invalid(
-                        "theme",
-                        format!("[{vn}] role `{r}` = `{}` is neither #rrggbb nor a palette name", v.roles[r]),
-                    ));
+                    return Err(Error::invalid("theme", format!("[{vn}] role `{r}` = `{}` is neither #rrggbb nor a palette name", v.roles[r])));
                 }
             }
             for k in v.roles.keys() {
@@ -259,8 +275,22 @@ impl ColorDepth {
 }
 
 const ANSI16: [(u8, u8, u8); 16] = [
-    (0, 0, 0), (128, 0, 0), (0, 128, 0), (128, 128, 0), (0, 0, 128), (128, 0, 128), (0, 128, 128), (192, 192, 192),
-    (128, 128, 128), (255, 0, 0), (0, 255, 0), (255, 255, 0), (0, 0, 255), (255, 0, 255), (0, 255, 255), (255, 255, 255),
+    (0, 0, 0),
+    (128, 0, 0),
+    (0, 128, 0),
+    (128, 128, 0),
+    (0, 0, 128),
+    (128, 0, 128),
+    (0, 128, 128),
+    (192, 192, 192),
+    (128, 128, 128),
+    (255, 0, 0),
+    (0, 255, 0),
+    (255, 255, 0),
+    (0, 0, 255),
+    (255, 0, 255),
+    (0, 255, 255),
+    (255, 255, 255),
 ];
 
 fn dist(a: (u8, u8, u8), b: (u8, u8, u8)) -> i32 {
@@ -360,10 +390,7 @@ pub fn materialize(paths: &Paths) -> Result<()> {
 
 /// Restore the shipped version of a built-in theme.
 pub fn reset(paths: &Paths, name: &str) -> Result<()> {
-    let (_, text) = BUILTINS
-        .iter()
-        .find(|(n, _)| *n == name)
-        .ok_or_else(|| Error::invalid("theme", format!("`{name}` is not a built-in theme")))?;
+    let (_, text) = BUILTINS.iter().find(|(n, _)| *n == name).ok_or_else(|| Error::invalid("theme", format!("`{name}` is not a built-in theme")))?;
     let dir = paths.theme_dir(name);
     ensure_dir(&dir)?;
     ensure_dir(&dir.join("assets"))?;
@@ -375,8 +402,7 @@ pub fn load(paths: &Paths, name: &str) -> Result<ThemeFile> {
     if !p.exists() {
         return builtin(name).ok_or_else(|| Error::invalid("theme", format!("`{name}` not found in {}", paths.themes_dir().display())));
     }
-    ThemeFile::parse(&std::fs::read_to_string(&p)?)
-        .map_err(|e| Error::invalid("theme", format!("{}: {e}", p.display())))
+    ThemeFile::parse(&std::fs::read_to_string(&p)?).map_err(|e| Error::invalid("theme", format!("{}: {e}", p.display())))
 }
 
 pub fn save(paths: &Paths, t: &ThemeFile) -> Result<()> {

@@ -1,13 +1,13 @@
 //! Export and Keys & Backup dialogs, plus file preview helpers.
-use super::{block, widgets::Input, App};
+use super::{App, block, widgets::Input};
 use crate::export::{self, Format};
 use crate::ingest::{self, frame::Columns, time::fmt_ts};
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
-use ratatui::Frame;
 use std::path::PathBuf;
 
 /// Fields followed by action buttons. Up/Down select, Enter edits a field or runs an action, Esc stops editing.
@@ -90,11 +90,7 @@ impl Form {
         let mut acts = vec![Span::raw("              ")];
         for (i, a) in self.actions.iter().enumerate() {
             let sel = self.fields.len() + i == self.sel;
-            let st = if sel {
-                Style::new().bg(t.accent).fg(t.bg).add_modifier(Modifier::BOLD)
-            } else {
-                Style::new().fg(t.accent)
-            };
+            let st = if sel { Style::new().bg(t.accent).fg(t.bg).add_modifier(Modifier::BOLD) } else { Style::new().fg(t.accent) };
             acts.push(Span::styled(format!("[ {a} ]"), st));
             acts.push(Span::raw("  "));
         }
@@ -107,9 +103,10 @@ impl Form {
 
 pub fn expand(p: &str) -> PathBuf {
     if let Some(rest) = p.strip_prefix("~/")
-        && let Some(h) = dirs::home_dir() {
-            return h.join(rest);
-        }
+        && let Some(h) = dirs::home_dir()
+    {
+        return h.join(rest);
+    }
     PathBuf::from(p)
 }
 
@@ -144,7 +141,6 @@ pub fn preview(path: &std::path::Path, n: usize) -> crate::Result<Vec<String>> {
     }
     Ok(out)
 }
-
 
 // ---------------- Export ----------------
 
@@ -248,11 +244,7 @@ impl KeysForm {
 }
 
 fn master_from_form(app: &App) -> crate::Result<crate::crypto::Key32> {
-    let w = app
-        .keys
-        .form
-        .get("words")
-        .ok_or_else(|| crate::Error::missing("words", "type the 24 recovery words"))?;
+    let w = app.keys.form.get("words").ok_or_else(|| crate::Error::missing("words", "type the 24 recovery words"))?;
     let m = crate::crypto::from_words(&w)?;
     crate::crypto::keyring::verify_master(&app.paths, &m)?;
     Ok(m)
@@ -273,11 +265,8 @@ pub fn keys_key(app: &mut App, k: KeyEvent) {
         }
         FormEvent::Action(1) => {
             let r = master_from_form(app).and_then(|m| {
-                let pw = app
-                    .keys
-                    .form
-                    .get("password")
-                    .ok_or_else(|| crate::Error::missing("password", "type the password that will wrap the new key"))?;
+                let pw =
+                    app.keys.form.get("password").ok_or_else(|| crate::Error::missing("password", "type the password that will wrap the new key"))?;
                 crate::crypto::keyring::rotate(&app.paths, &m, &pw.into())
             });
             match r {

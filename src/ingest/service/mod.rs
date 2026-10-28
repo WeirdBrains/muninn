@@ -25,9 +25,7 @@ impl Secret {
             return Ok(Some(p.clone()));
         }
         if let Some(var) = &self.env {
-            return std::env::var(var)
-                .map(Some)
-                .map_err(|_| Error::missing("password", format!("environment variable {var} is not set")));
+            return std::env::var(var).map(Some).map_err(|_| Error::missing("password", format!("environment variable {var} is not set")));
         }
         if self.stdin {
             let mut s = String::new();

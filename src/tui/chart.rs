@@ -4,7 +4,7 @@
 //! (line, envelope, moving averages) < markers (wicks, gaps, zero volume) < crosshair.
 use super::tiles::fmt_num;
 use crate::ingest::time::fmt_ts;
-use crate::model::{Bar, PriceMetric, FLAG_ZERO_VOLUME};
+use crate::model::{Bar, FLAG_ZERO_VOLUME, PriceMetric};
 use crate::theme::Theme;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -376,7 +376,15 @@ pub fn render(d: &ChartData, area: Rect, buf: &mut Buffer) {
         } else if l.ohlc {
             let (ro, rc) = (row(b.open), row(b.close));
             for y in top..=bot {
-                let ch = if y == ro && y == rc { "┼" } else if y == ro { "┤" } else if y == rc { "├" } else { "│" };
+                let ch = if y == ro && y == rc {
+                    "┼"
+                } else if y == ro {
+                    "┤"
+                } else if y == rc {
+                    "├"
+                } else {
+                    "│"
+                };
                 put(buf, x, y, ch, col, bg);
             }
         }
@@ -446,20 +454,21 @@ pub fn render(d: &ChartData, area: Rect, buf: &mut Buffer) {
     }
     // crosshair
     if l.crosshair
-        && let Some(c) = d.cursor.filter(|c| *c < vis.len()) {
-            let x = xs[c];
-            let y = row(vis[c].close);
-            for yy in p.y..p.bottom() {
-                if empty(buf, x, yy) {
-                    put(buf, x, yy, "│", t.muted, bg);
-                }
-            }
-            for xx in p.x..p.right() {
-                if empty(buf, xx, y) {
-                    put(buf, xx, y, "─", t.muted, bg);
-                }
+        && let Some(c) = d.cursor.filter(|c| *c < vis.len())
+    {
+        let x = xs[c];
+        let y = row(vis[c].close);
+        for yy in p.y..p.bottom() {
+            if empty(buf, x, yy) {
+                put(buf, x, yy, "│", t.muted, bg);
             }
         }
+        for xx in p.x..p.right() {
+            if empty(buf, xx, y) {
+                put(buf, xx, y, "─", t.muted, bg);
+            }
+        }
+    }
     // axes
     if let Some(ax) = a.price_axis {
         for y in (p.y..p.bottom()).step_by(4).chain(std::iter::once(p.bottom() - 1)) {

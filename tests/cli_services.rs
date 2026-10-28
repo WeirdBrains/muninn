@@ -37,7 +37,19 @@ fn sqlite_table_and_query() {
     assert!(out.contains("exchange BTC/USDT 1h"), "{out}");
     assert!(out.contains("48"), "{out}");
     // a query over the same rows: all duplicates
-    let out = e.ok(&["-y", "ingest", "service", "sqlite", "--path", p, "--query", "SELECT * FROM BTCUSDT_1h WHERE ts < 1503000000000", "--symbol", "BTC/USDT", "--force"]);
+    let out = e.ok(&[
+        "-y",
+        "ingest",
+        "service",
+        "sqlite",
+        "--path",
+        p,
+        "--query",
+        "SELECT * FROM BTCUSDT_1h WHERE ts < 1503000000000",
+        "--symbol",
+        "BTC/USDT",
+        "--force",
+    ]);
     assert!(out.contains("duplicate"), "{out}");
     // missing file is a clear error
     let o = e.run(&["-y", "ingest", "service", "sqlite", "--path", "/nonexistent.db", "--table", "x"]);
@@ -69,14 +81,34 @@ fn http_cursor_paging_sends_user_agent() {
             }
             let page2 = line.contains("cursor=p2");
             seen2.lock().unwrap().push((line.clone(), ua));
-            let (bars, next) = if page2 { ((10..20).map(bar_json).collect::<Vec<_>>(), "null".to_string()) } else { ((0..10).map(bar_json).collect(), "\"p2\"".into()) };
+            let (bars, next) = if page2 {
+                ((10..20).map(bar_json).collect::<Vec<_>>(), "null".to_string())
+            } else {
+                ((0..10).map(bar_json).collect(), "\"p2\"".into())
+            };
             let body = format!(r#"{{"result":[{}],"next":{}}}"#, bars.join(","), next);
-            write!(s, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body).unwrap();
+            write!(s, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body)
+                .unwrap();
         }
     });
     let e = Env::new();
     let url = format!("http://127.0.0.1:{port}/api/klines");
-    let out = e.ok(&["-y", "ingest", "service", "http", "--url", &url, "--records", "result", "--paginate", "cursor", "--symbol", "SOL/USDT", "--duration", "5m"]);
+    let out = e.ok(&[
+        "-y",
+        "ingest",
+        "service",
+        "http",
+        "--url",
+        &url,
+        "--records",
+        "result",
+        "--paginate",
+        "cursor",
+        "--symbol",
+        "SOL/USDT",
+        "--duration",
+        "5m",
+    ]);
     assert!(out.contains("127.0.0.1 SOL/USDT 5m"), "{out}");
     assert!(out.contains("20"), "{out}");
     let seen = seen.lock().unwrap();
