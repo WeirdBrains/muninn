@@ -31,6 +31,7 @@ pub fn app() -> (tempfile::TempDir, App) {
     let prefs = Preferences::load_or_create(&paths).unwrap();
     let mut a = App::new(paths, store, dek, prefs, Some(ThemeMode::Dark)).unwrap();
     a.data.sync = true;
+    a.save_prints_only = true;
     (t, a)
 }
 

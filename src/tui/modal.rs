@@ -41,6 +41,10 @@ pub enum Modal {
     Projects,
     /// Projects ▸ Journals…
     Journals,
+    /// Projects ▸ Reports…
+    Reports,
+    /// Export a journal, entry, report or project as a document.
+    DocExport,
     /// Choose a project (add to project, fork a journal into one).
     PickProject,
     Prefs {
@@ -96,6 +100,8 @@ impl Modal {
             Modal::Searches => "live-searches",
             Modal::Projects | Modal::PickProject => "projects",
             Modal::Journals => "journals",
+            Modal::Reports => "reports",
+            Modal::DocExport => "export-formats",
             Modal::Prefs { .. } => "preferences",
             Modal::Info { .. } | Modal::Pick { .. } => "tui",
             Modal::Layers { .. } => "charts",
@@ -123,6 +129,8 @@ impl Modal {
             Modal::Searches => app.searches.typing(),
             Modal::Projects => app.projects.typing(),
             Modal::Journals => app.journals.typing(),
+            Modal::Reports => app.reports.typing(),
+            Modal::DocExport => app.doc_export.typing(),
             Modal::PickProject => app.pick_project.typing(),
             Modal::Prompt(_) => true,
             Modal::Filter { edit, .. } => edit.is_some(),
@@ -230,6 +238,8 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             Some(Modal::Searches) => super::searches::on_click(app, i),
             Some(Modal::Projects) => super::projects::on_click(app, i),
             Some(Modal::Journals) => super::journals::on_click(app, i),
+            Some(Modal::Reports) => super::reports::on_click(app, i),
+            Some(Modal::DocExport) => super::docexport::on_click(app, i),
             Some(Modal::PickProject) => super::workspace::on_click(app, i),
             Some(Modal::Themes) => {
                 if let Some(ed) = app.themes.editor.as_mut() {
@@ -297,6 +307,8 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Searches => super::searches::on_key(app, k),
         Modal::Projects => super::projects::on_key(app, k),
         Modal::Journals => super::journals::on_key(app, k),
+        Modal::Reports => super::reports::on_key(app, k),
+        Modal::DocExport => super::docexport::on_key(app, k),
         Modal::PickProject => super::workspace::on_key(app, k),
         Modal::Themes => {
             if k.code == KeyCode::Esc && app.themes.editor.is_none() {
@@ -567,6 +579,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Prefs { .. } => (60, 10),
         Modal::Authors => (76, (app.authors.list.len() as u16 + 6).clamp(10, area.height)),
         Modal::PickProject => (70, (app.pick_project.list.len() as u16 + 7).clamp(10, area.height)),
+        Modal::DocExport => (area.width.saturating_sub(4).min(90), (app.doc_export.formats.len() as u16 + 9).clamp(12, area.height)),
         Modal::Info { lines, .. } => ((lines.iter().map(|l| l.chars().count()).max().unwrap_or(20) as u16 + 6).max(40), lines.len() as u16 + 4),
         Modal::Pick { items, .. } => (50, items.len() as u16 + 4),
         Modal::Layers { .. } => (44, super::chart::LAYERS.len() as u16 + 4),
@@ -594,6 +607,8 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Searches => super::searches::draw(app, f, r, &mut extra),
         Modal::Projects => super::projects::draw(app, f, r, &mut extra),
         Modal::Journals => super::journals::draw(app, f, r, &mut extra),
+        Modal::Reports => super::reports::draw(app, f, r, &mut extra),
+        Modal::DocExport => super::docexport::draw(app, f, r, &mut extra),
         Modal::PickProject => super::workspace::draw(app, f, r, &mut extra),
         Modal::Info { title, lines, scroll } => {
             let body: Vec<Line> = lines.iter().map(|l| Line::raw(l.clone())).collect();

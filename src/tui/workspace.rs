@@ -139,6 +139,7 @@ pub enum Back {
     Close,
     Searches,
     Journals,
+    Reports,
 }
 
 #[derive(Debug, Default)]
@@ -175,6 +176,7 @@ fn go_back(app: &mut App) {
         Back::Close => app.modal = None,
         Back::Searches => super::searches::reopen(app),
         Back::Journals => super::journals::reopen(app),
+        Back::Reports => super::reports::reopen(app),
     }
 }
 

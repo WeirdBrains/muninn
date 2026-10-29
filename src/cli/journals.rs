@@ -335,10 +335,19 @@ pub fn run(ctx: &Ctx, cmd: JournalCommand) -> anyhow::Result<()> {
             let into = p.map(|p| format!(" in project {}", p.name)).unwrap_or_default();
             ctx.io.info(format!("imported journal {} ({}){into}: {} entries, {} images", j.name, j.short_id(), r.entries, r.attachments));
         }
-        JournalCommand::Print { journal, entries, printer, out } => {
+        JournalCommand::Print { journal, entries, printer, out, save_only } => {
             let j = store.find_journal(&journal)?;
             let entries = entry_ids(&store, &j, &entries)?;
-            let p = crate::export::files::print_journal(&store, &j.id, &entries, printer.as_deref(), out.as_deref(), &ctx.paths.prints_dir(), "cli")?;
+            let p = crate::export::files::print_journal(
+                &store,
+                &j.id,
+                &entries,
+                printer.as_deref(),
+                out.as_deref(),
+                &ctx.paths.prints_dir(),
+                !save_only,
+                "cli",
+            )?;
             ctx.io.info(p.message());
         }
     }

@@ -1165,6 +1165,9 @@ pub enum JournalCommand {
         /// Where to keep the PDF (default: ~/.muninn/prints/).
         #[arg(long)]
         out: Option<PathBuf>,
+        /// Only make and keep the PDF; do not send it to a printer.
+        #[arg(long, conflicts_with = "printer")]
+        save_only: bool,
     },
 }
 

@@ -188,6 +188,12 @@ fn journals_export_print_and_round_trip() {
     assert!(msg.contains("no print command") && msg.contains("prints"), "{msg}");
     let prints: Vec<_> = std::fs::read_dir(e.home().join("prints")).unwrap().collect();
     assert_eq!(prints.len(), 1);
+    // --save-only never calls a printer, even when there is one.
+    let kept = dir.join("kept.pdf");
+    let o = e.run(&["journal", "print", "Desk", "--save-only", "--out", kept.to_str().unwrap()]);
+    let msg = err(&o) + &String::from_utf8_lossy(&o.stdout);
+    assert!(o.status.success() && msg.contains("not sent to a printer"), "{msg}");
+    assert!(std::fs::read(&kept).unwrap().starts_with(b"%PDF-"));
     let k = kinds(&e);
     for want in ["journal.export", "entry.export", "journal.import", "journal.print"] {
         assert!(k.iter().any(|(kind, _)| kind == want), "{want} missing: {k:?}");

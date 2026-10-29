@@ -174,6 +174,13 @@ pub fn open_result(app: &mut App, r: &SeriesRef) {
     app.set_status(format!("result {}", r.label()));
 }
 
+/// E: export the project (an archive by default) or render it as a document.
+fn export(app: &mut App, id: &str) {
+    let name = app.store.project(id).ok().flatten().map(|p| p.name).unwrap_or_default();
+    let t = crate::export::files::Target::Project { id: id.to_string(), rows: crate::store::reports::DEFAULT_ROWS, data: true };
+    super::docexport::open(app, t, format!("project {name}"), super::docexport::From::Projects);
+}
+
 fn drop_item(app: &mut App) {
     let Some((it, name, _)) = app.projects.items.get(app.projects.isel).cloned() else { return };
     let pname = app.store.project(&it.project_id).ok().flatten().map(|p| p.name).unwrap_or_default();
@@ -264,6 +271,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             KeyCode::Char('n') => st.ask = Some(Ask::new(PAsk::NewJournal, "New journal in this project", "")),
             KeyCode::Char('s') => super::searches::open_save(app, Some(pid)),
             KeyCode::Char('a') => add_selected_series(app, &pid),
+            KeyCode::Char('E') => export(app, &pid),
             KeyCode::Char('r') => {
                 let v = app.store.project(&pid).ok().flatten().map(|p| p.name).unwrap_or_default();
                 app.projects.ask = Some(Ask::new(PAsk::Rename, "Rename project to", v));
@@ -303,6 +311,12 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             if let Some(p) = st.selected() {
                 st.msg = Some((format!("delete project {}? Its journals stay. y confirms", p.name), false));
                 st.confirm_delete = true;
+            }
+        }
+        KeyCode::Char('E') => {
+            if let Some(p) = st.selected() {
+                let id = p.id.clone();
+                export(app, &id);
             }
         }
         KeyCode::Enter | KeyCode::Right => {
@@ -354,6 +368,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ("n new", KeyCode::Char('n')),
                 ("r rename", KeyCode::Char('r')),
                 ("e describe", KeyCode::Char('e')),
+                ("E export", KeyCode::Char('E')),
                 ("d delete", KeyCode::Char('d')),
                 ("Esc", KeyCode::Esc),
             ];
@@ -395,6 +410,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ("a add series", KeyCode::Char('a')),
                 ("n new journal", KeyCode::Char('n')),
                 ("d drop", KeyCode::Char('d')),
+                ("E export", KeyCode::Char('E')),
                 ("r rename", KeyCode::Char('r')),
                 ("Esc back", KeyCode::Esc),
             ];

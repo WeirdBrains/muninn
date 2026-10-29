@@ -7,6 +7,7 @@ pub mod authors;
 pub mod chart;
 mod charting;
 pub mod data;
+pub mod docexport;
 pub mod forms;
 pub mod header;
 pub mod history;
@@ -128,6 +129,10 @@ pub struct App {
     pub searches: searches::SearchesState,
     pub projects: projects::ProjectsState,
     pub journals: journals::JournalsState,
+    pub reports: reports::ReportsState,
+    pub doc_export: docexport::DocExport,
+    /// P in Journals only saves the PDF (tests; never sends to a printer).
+    pub save_prints_only: bool,
     pub pick_project: workspace::PickProject,
     /// View state as of the last recorded action; a change from it is the next action.
     pub view_base: crate::history::ViewState,
@@ -161,6 +166,9 @@ impl App {
             searches: Default::default(),
             projects: Default::default(),
             journals: Default::default(),
+            reports: Default::default(),
+            doc_export: Default::default(),
+            save_prints_only: false,
             pick_project: Default::default(),
             view_base: crate::history::ViewState::capture(&prefs),
             paths,
@@ -253,6 +261,7 @@ impl App {
             KeyCode::Char('F') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::LiveSearches),
             KeyCode::Char('B') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::SaveSearch),
             KeyCode::Char('J') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Journals),
+            KeyCode::Char('O') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reports),
             KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
             KeyCode::Char('u') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryBack),
             KeyCode::Char('U') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryForward),
@@ -332,6 +341,8 @@ impl App {
             SaveSearch => searches::open_save(self, None),
             Journals => journals::open(self),
             NewJournal => journals::open_new(self),
+            Reports => reports::open(self),
+            NewReport => reports::open_new(self),
             AddToProject => match projects::selected_series(self) {
                 Some(r) => {
                     let label = r.label();
@@ -1100,6 +1111,8 @@ impl App {
     pub fn tick(&mut self) {}
 }
 
+#[cfg(test)]
+mod reports_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

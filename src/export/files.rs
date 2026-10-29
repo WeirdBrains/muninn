@@ -244,6 +244,8 @@ pub struct Printed {
     pub command: Option<String>,
     /// What the print command said (job id).
     pub output: String,
+    /// Only saved: printing was not asked for (`--save-only`).
+    pub saved_only: bool,
 }
 
 impl Printed {
@@ -257,6 +259,7 @@ impl Printed {
                     self.pdf.display()
                 )
             }
+            None if self.saved_only => format!("saved the PDF at {} (not sent to a printer)", self.pdf.display()),
             None => format!("no print command (lp or lpr) found: the PDF is at {}", self.pdf.display()),
         }
     }
@@ -295,7 +298,8 @@ pub fn send_to_printer(pdf: &Path, title: &str, printer: Option<&str>) -> Result
 }
 
 /// Print a journal (or some entries): render to PDF at `out` (or `<dir>/<name>-<time>.pdf`)
-/// and hand it to `lp`/`lpr` when there is one. Recorded as `journal.print`.
+/// and hand it to `lp`/`lpr` when there is one (and `send`). Recorded as `journal.print`.
+#[allow(clippy::too_many_arguments)]
 pub fn print_journal(
     store: &Store,
     id: &str,
@@ -303,6 +307,7 @@ pub fn print_journal(
     printer: Option<&str>,
     out: Option<&Path>,
     dir: &Path,
+    send: bool,
     origin: &str,
 ) -> Result<Printed> {
     let t = Target::Journal { id: id.to_string(), entries: entries.to_vec() };
@@ -315,14 +320,15 @@ pub fn print_journal(
         }
     };
     write(store, &t, OutFormat::Pdf, &pdf)?;
-    let (command, output) = send_to_printer(&pdf, &name, printer)?;
-    let p = Printed { pdf, command, output };
+    let (command, output) = if send { send_to_printer(&pdf, &name, printer)? } else { (None, String::new()) };
+    let p = Printed { pdf, command, output, saved_only: !send };
     let mut params = t.params();
     params["pdf"] = p.pdf.display().to_string().into();
     params["command"] = p.command.clone().into();
     params["printer"] = printer.into();
     let summary = match &p.command {
         Some(c) => format!("print {what} with {c}"),
+        None if !send => format!("print {what} to {} (saved only)", p.pdf.display()),
         None => format!("print {what} to {} (no printer command)", p.pdf.display()),
     };
     store.note_action(&NewAction::new("journal.print", origin, summary).params(params));

@@ -57,6 +57,8 @@ pub enum Action {
     SaveSearch,
     Journals,
     NewJournal,
+    Reports,
+    NewReport,
     AddToProject,
     // View
     NewTile(ViewKind),
@@ -137,6 +139,8 @@ impl Action {
             SaveSearch => "search.save".into(),
             Journals => "journals".into(),
             NewJournal => "journal.new".into(),
+            Reports => "reports".into(),
+            NewReport => "report.new".into(),
             AddToProject => "project.add-series".into(),
             Quit => "quit".into(),
             NewTile(v) => format!("tile.new.{}", if v == ViewKind::List { "list" } else { "chart" }),

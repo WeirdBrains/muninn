@@ -2,6 +2,7 @@
 //! journal, an entry or selected words, and highlights.
 use super::workspace::{Ask, Back, Purpose, Typed, View, ask_key, draw_view, muted, pick_project, record, row_style};
 use super::{App, Hit};
+use crate::export::files::Target;
 use crate::history::author_label;
 use crate::ingest::time::fmt_ts;
 use crate::store::{Annotation, AnnotationKind, Attachment, Entry, EntryFormat, ItemKind, Journal, LiveSearch, Span as Sel};
@@ -419,7 +420,7 @@ fn answer(app: &mut App, kind: JAsk, v: String) {
 }
 
 /// `~/` at the start of a typed path means the home directory.
-fn shellexpand(p: &str) -> String {
+pub(super) fn shellexpand(p: &str) -> String {
     match (p.strip_prefix("~/"), std::env::var("HOME")) {
         (Some(rest), Ok(h)) => format!("{h}/{rest}"),
         _ => p.to_string(),
@@ -527,6 +528,29 @@ fn ask_confirm(app: &mut App, c: Confirm, what: String) {
     app.journals.confirm = Some(c);
 }
 
+/// Entries marked with Space in this journal, in journal order (none: the whole journal).
+fn marked(app: &App, j: &Journal) -> Vec<String> {
+    if app.journals.marks.is_empty() {
+        return vec![];
+    }
+    app.store.entries(&j.id).unwrap_or_default().into_iter().filter(|e| app.journals.marks.contains(&e.id)).map(|e| e.id).collect()
+}
+
+/// P: print the journal (or the entries): a PDF to lp/lpr, else saved under prints/.
+fn print(app: &mut App, j: &Journal, entries: Vec<String>) {
+    let dir = app.paths.prints_dir();
+    match crate::export::files::print_journal(&app.store, &j.id, &entries, None, None, &dir, !app.save_prints_only, "tui") {
+        Ok(p) => {
+            app.refresh_history(true);
+            ok(app, p.message());
+        }
+        Err(e) => {
+            app.refresh_history(true);
+            err(app, e)
+        }
+    }
+}
+
 fn highlight(app: &mut App) {
     let st = &app.journals;
     let (Some(e), Some(span)) = (st.entry.clone(), st.selection()) else { return err(app, "nothing to highlight") };
@@ -620,6 +644,16 @@ fn journal_common(app: &mut App, k: KeyEvent, j: &Journal) {
         KeyCode::Char('f') => pick_project(app, Purpose::ForkJournal(j.id.clone(), j.name.clone()), Back::Journals),
         KeyCode::Char('p') => pick_project(app, Purpose::Add(ItemKind::Journal, j.id.clone(), serde_json::json!({}), j.name.clone()), Back::Journals),
         KeyCode::Char('N') => app.journals.ask = Some(Ask::new(JAsk::JournalNote, format!("Note on journal {}", j.name), "")),
+        KeyCode::Char('E') => {
+            let entries = marked(app, j);
+            let what =
+                if entries.is_empty() { format!("journal {}", j.name) } else { format!("{} of {}", crate::live::entries(entries.len()), j.name) };
+            super::docexport::open(app, Target::Journal { id: j.id.clone(), entries }, what, super::docexport::From::Journals);
+        }
+        KeyCode::Char('P') => {
+            let entries = marked(app, j);
+            print(app, j, entries);
+        }
         KeyCode::Char('t') => match app.store.update_journal(&j.id, None, Some(j.format.toggle())) {
             Ok(n) => {
                 record(app, "journal.edit", format!("journal {} writes {} now", n.name, n.format.as_str()), jparams(&n));
@@ -717,6 +751,17 @@ fn entry_key(app: &mut App, k: KeyEvent) {
             }
         }
         KeyCode::Char('i') => st.ask = Some(Ask::new(JAsk::Attach, "Attach image (path)", "")),
+        KeyCode::Char('E') => super::docexport::open(
+            app,
+            Target::Journal { id: e.journal_id.clone(), entries: vec![e.id.clone()] },
+            format!("entry {}", e.heading()),
+            super::docexport::From::Journals,
+        ),
+        KeyCode::Char('P') => {
+            if let Ok(Some(j)) = app.store.journal(&e.journal_id) {
+                print(app, &j, vec![e.id.clone()]);
+            }
+        }
         KeyCode::Char('e') => edit_entry(app, Some(e)),
         KeyCode::Char('d') => ask_confirm(app, Confirm::Entry(e.id.clone()), format!("entry {}", e.heading())),
         KeyCode::Esc if st.anchor.is_some() => st.anchor = None,
@@ -869,6 +914,8 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ("r rename", KeyCode::Char('r')),
                 ("f fork", KeyCode::Char('f')),
                 ("p project", KeyCode::Char('p')),
+                ("E export", KeyCode::Char('E')),
+                ("P print", KeyCode::Char('P')),
                 ("D delete", KeyCode::Char('D')),
                 ("Esc", KeyCode::Esc),
             ];
@@ -917,6 +964,8 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ("N note", KeyCode::Char('N')),
                 ("f fork", KeyCode::Char('f')),
                 ("p project", KeyCode::Char('p')),
+                ("E export", KeyCode::Char('E')),
+                ("P print", KeyCode::Char('P')),
                 ("d delete", KeyCode::Char('d')),
                 ("Esc back", KeyCode::Esc),
             ];
@@ -956,6 +1005,8 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ("m highlight", KeyCode::Char('m')),
                 (if sel_on { "n note words" } else { "n note entry" }, KeyCode::Char('n')),
                 ("i image", KeyCode::Char('i')),
+                ("E export", KeyCode::Char('E')),
+                ("P print", KeyCode::Char('P')),
                 ("e edit", KeyCode::Char('e')),
                 ("x remove note", KeyCode::Char('x')),
                 ("Esc back", KeyCode::Esc),
