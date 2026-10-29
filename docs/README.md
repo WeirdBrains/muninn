@@ -19,6 +19,12 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Authors](authors.md): who actions are attributed to, the current author
 - [Action history](history.md): the history bar, stepping back and forward, forks
 
+## Research
+
+- [Live searches](live-searches.md): saved searches that always run on current data; fork and optimize
+- [Projects](projects.md): live searches, results and journals together
+- [Journals](journals.md): Markdown or LaTeX entries with images, notes and highlights
+
 ## Getting data in and out
 
 - [CSV ingest](ingest-csv.md)
@@ -49,5 +55,7 @@ export MUNINN_HOME=/tmp/mnnn-demo          # never touches ~/.muninn
 mnnn keys init                             # write down the words and shards
 mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data --source binance -y
 mnnn export --format parquet --out /tmp/btc.parquet --symbol BTC/USDT
+mnnn search save "btc 5m" --symbol BTC/USDT --period 5m
+mnnn project create Research && mnnn project add Research --search "btc 5m"
 mnnn tui
 ```

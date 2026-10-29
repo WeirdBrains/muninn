@@ -1086,7 +1086,14 @@ forks indented; u / U step back / forward and restore the filters, time range an
 Enter or a click on a row goes to that action. Authors (A, File > Authors...): add, edit, \
 delete and pick the current author that new actions are attributed to.
 
-See mnnn help tui, mnnn help import, mnnn help history, mnnn help authors and mnnn help help.";
+Projects menu (Alt-P): Projects... (P) lists projects and their live searches, results and \
+journals; Live searches... (F) and Save search as live search... (B) keep a sidebar search \
+that always runs on current data; Journals... (J) holds entries in Markdown or LaTeX with \
+images, notes and highlights on selected words (v selects, m highlights, n notes). In the \
+sidebar, a adds the selected series to a project.
+
+See mnnn help tui, mnnn help import, mnnn help history, mnnn help authors, \
+mnnn help projects, mnnn help live-searches, mnnn help journals and mnnn help help.";
 
 /// Extra text for `mnnn help --help` and mnnn-help(1).
 const HELP_NOTES: &str = "\

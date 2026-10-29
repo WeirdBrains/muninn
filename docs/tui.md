@@ -58,6 +58,13 @@ line and every fork. `u` / `U` step back and forward, restoring filters and them
 [history](history.md); actions are attributed to the current [author](authors.md)
 (`A`).
 
+## Projects, live searches and journals
+
+The **Projects** menu (Alt+P) opens [projects](projects.md) (`P`),
+[live searches](live-searches.md) (`F`, save with `B`) and [journals](journals.md)
+(`J`). They open over the content area like other dialogs; opening a live search or a
+project's result changes the sidebar and tiles behind them.
+
 ## Dialogs
 
 Every popup has a red **[X]** at the right of its title bar: click it to close (same as

@@ -7,7 +7,7 @@ Every key runs the same named action as its [menu](menus.md) item.
 | key | action |
 |-----|--------|
 | F10 | open the menu bar |
-| Alt+F/V/D/K/T/H | open File / View / Data / Keys / Theme / Help |
+| Alt+F/V/D/P/K/T/H | open File / View / Data / Projects / Keys / Theme / Help |
 | `?`, F1 | help for the current context ([in-app help](help.md)) |
 | F5 | refresh data |
 | Tab / Shift-Tab | focus the next / previous tile |
@@ -70,6 +70,22 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `u` / `U` | step back / forward in the history |
 | `j k`, Enter, Esc | move, go to the action, leave (history bar focused) |
 | `A` | the [authors](authors.md) popup (`a` add, `e` edit, `d` delete, Enter current) |
+
+## Projects, live searches and journals
+
+| key | action |
+|-----|--------|
+| `P` | the [projects](projects.md) page |
+| `F` | the [live searches](live-searches.md) list |
+| `B` | save the sidebar's search as a live search |
+| `J` | the [journals](journals.md) list |
+| `a` | add the selected series to a project (sidebar focused) |
+
+Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
+project, Enter open, Esc back. In an entry: ← → move by word, `v` select, `m`
+highlight, `n` note, `i` image; the editor saves with Ctrl-S and switches Markdown ↔
+LaTeX with Ctrl-T. Full tables: [live searches](live-searches.md),
+[projects](projects.md), [journals](journals.md).
 
 ## Import
 

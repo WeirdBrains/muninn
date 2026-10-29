@@ -62,9 +62,22 @@ mnnn symbols add FOO/USD --alias FO
 - `actions`: the [action history](history.md) tree (parent, kind, summary, params,
   origin, author, time, view state before and after).
 - `settings`: small key/value pairs (current author, history head).
+- `live_searches`: name, target (series or journals), the search as JSON, the search it
+  was forked from, author, times ([live searches](live-searches.md)). Results are never
+  stored; a live search runs on the current data.
+- `projects` and `project_items`: a project's name and description, and its items by
+  kind (`live_search`, `result`, `journal`, and `rule_set` reserved for a later
+  release) and reference; a result's series and time range are in the item's payload
+  ([projects](projects.md)).
+- `journals`, `journal_entries`, `journal_annotations`, `journal_attachments`: journals
+  (standalone or in a project, default format, forked from), entries (title, text,
+  Markdown or LaTeX, position), notes and highlights (on the journal, an entry or a
+  character range of an entry with the quoted words) and images (encrypted with the
+  rest of the database) ([journals](journals.md)). Every row carries its author.
 - `schema_version`: migrations, applied automatically on open. Version 4 adds
-  `authors` and `settings`, version 5 `actions`; both only add tables, so 1.x
-  databases upgrade in place on the first open by 2.x.
+  `authors` and `settings`, version 5 `actions`, version 6 `live_searches`, version 7
+  `projects` and `project_items`, version 8 the journal tables. All of them only add
+  tables, so older databases upgrade in place on the first open.
 
 ## Decisions
 

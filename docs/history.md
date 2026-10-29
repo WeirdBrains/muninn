@@ -1,8 +1,8 @@
 # Action history
 
 Muninn records what you do in the encrypted database: imports, exports, filter and
-time range changes, theme and theme mode changes, source and symbol changes, and author
-changes. Each action has an id, a kind, a summary, when it ran, where it came from
+time range changes, theme and theme mode changes, source and symbol changes, author
+changes, and work on live searches, projects and journals. Each action has an id, a kind, a summary, when it ran, where it came from
 (`cli` or `tui`) and the [author](authors.md) who was current.
 
 ## A tree, not a list
@@ -81,5 +81,13 @@ entry, because they never ask for the password.
 | `theme`, `theme.mode` | TUI, CLI | the new theme or mode |
 | `source.add`, `source.rename`, `source.remove`, `symbol.add` | CLI | what changed |
 | `author.add`, `author.edit`, `author.remove`, `author.use` | CLI, TUI | the author |
+| `search.save`, `search.fork`, `search.edit`, `search.remove` | CLI, TUI | the [live search](live-searches.md) |
+| `project.create`, `project.edit`, `project.remove`, `project.add`, `project.drop` | CLI, TUI | the [project](projects.md) and item |
+| `journal.create`, `journal.edit`, `journal.remove`, `journal.fork` | CLI, TUI | the [journal](journals.md) |
+| `entry.add`, `entry.edit`, `entry.remove`, `entry.copy` | CLI, TUI | the entry (copies: how many, to which journal) |
+| `note.add`, `note.edit`, `note.remove`, `highlight.add`, `highlight.remove`, `image.add` | CLI, TUI | the note, highlight or image |
+
+Stepping back over these actions moves the head only; it does not undo the change
+(stepping back restores view state: filters, time range and theme).
 
 See also: [authors](authors.md), [sidebar](sidebar.md), [themes](themes.md).

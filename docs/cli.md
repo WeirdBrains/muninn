@@ -12,6 +12,10 @@ mnnn [GLOBAL FLAGS] <COMMAND>
   theme    list|show|set|mode|export|import|reset
   author   list|show|add|edit|remove|use
   history  list|show|tree|back|forward|goto
+  search   list|show|run|find|save|fork|edit|remove
+  project  list|create|show|edit|remove|add|drop
+  journal  list|new|show|edit|remove|fork|write|entry|edit-entry|remove-entry|copy|
+           note|highlight|edit-note|remove-note|attach|image
   tui
   help     [TOPIC] [--search TEXT]
 ```

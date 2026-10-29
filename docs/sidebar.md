@@ -33,6 +33,7 @@ Esc ends typing; the list keeps the filter until you clear the text.
 | `f` `m` `p` `d` `y` | edit the source, symbol, price, period (duration) or year filter |
 | `t` | set the time range (date and time picker) |
 | `X` | clear all filters (also works anywhere) |
+| `a` | add the selected series (with the current time range) to a [project](projects.md) |
 | Esc, Tab, ← | back to the tiles |
 
 ## Filters
@@ -56,3 +57,6 @@ bars inside them (a list tile's own `[` / `]` range narrows it further). `,` / `
 Sort and filters are saved in [preferences](preferences.md).
 
 Also on the **Data** menu (Filter, Clear filters, Sort by year/name, Toggle order).
+
+The current search, filters and sort can be kept as a [live search](live-searches.md)
+(`B`) that always runs on the current data.
