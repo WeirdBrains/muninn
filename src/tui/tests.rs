@@ -1538,3 +1538,35 @@ fn list_range_filters_the_listed_bars() {
     screen_text(&mut a);
     assert_eq!(a.caches[&id].list.total, all);
 }
+
+#[test]
+fn tile_focus_next_previous_and_direct_jump() {
+    let (_t, mut a) = app();
+    a.dispatch(Action::Preset(action::Preset::TwoUp));
+    a.dispatch(Action::SplitBelow);
+    screen_text(&mut a);
+    let ids: Vec<u32> = a.layout.tiles().iter().map(|t| t.id).collect();
+    assert!(ids.len() >= 3, "{ids:?}");
+    a.layout.set_focus(ids[0]);
+    a.on_key(key(KeyCode::Tab));
+    assert_eq!(a.layout.focus, ids[1]);
+    a.on_key(mkey(KeyCode::BackTab, KeyModifiers::SHIFT));
+    assert_eq!(a.layout.focus, ids[0]);
+    a.on_key(mkey(KeyCode::BackTab, KeyModifiers::SHIFT));
+    assert_eq!(a.layout.focus, *ids.last().unwrap(), "wraps around");
+    // Alt+n jumps to tile [n]
+    let target = ids[1];
+    a.on_key(mkey(KeyCode::Char(char::from_digit(target, 10).unwrap()), KeyModifiers::ALT));
+    assert_eq!(a.layout.focus, target);
+    a.on_key(mkey(KeyCode::Char('9'), KeyModifiers::ALT));
+    assert_eq!(a.layout.focus, target);
+    assert!(a.status.contains("no tile [9]"), "{}", a.status);
+    // Ctrl-w p / W: previous
+    a.on_key(mkey(KeyCode::Char('w'), KeyModifiers::CONTROL));
+    a.on_key(key(KeyCode::Char('p')));
+    assert_eq!(a.layout.focus, ids[0]);
+    // Alt+letter still opens menus, Alt+digit inside a popup does nothing
+    a.on_key(key(KeyCode::Char('?')));
+    a.on_key(mkey(KeyCode::Char(char::from_digit(target, 10).unwrap()), KeyModifiers::ALT));
+    assert_eq!(a.layout.focus, ids[0]);
+}

@@ -529,6 +529,12 @@ impl TileLayout {
         self.set_focus(ids[(i + 1) % ids.len()]);
     }
 
+    pub fn focus_prev(&mut self) {
+        let ids: Vec<u32> = self.tiles().iter().map(|t| t.id).collect();
+        let i = ids.iter().position(|i| *i == self.focus).unwrap_or(0);
+        self.set_focus(ids[(i + ids.len() - 1) % ids.len()]);
+    }
+
     /// Swap the focused tile with the next one (focus moves with it).
     pub fn swap(&mut self) -> Result<(), String> {
         let ids: Vec<u32> = self.tiles().iter().map(|t| t.id).collect();

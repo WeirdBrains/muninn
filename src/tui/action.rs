@@ -61,6 +61,9 @@ pub enum Action {
     ToggleSidebar,
     Focus(Dir4),
     FocusNext,
+    FocusPrev,
+    /// Focus the tile with this id (Alt+1..9).
+    FocusTile(u32),
     Resize(Dir4),
     Swap,
     ChangeView,
@@ -127,6 +130,8 @@ impl Action {
             ToggleSidebar => "sidebar.toggle".into(),
             Focus(d) => format!("tile.focus.{d:?}").to_lowercase(),
             FocusNext => "tile.focus-next".into(),
+            FocusPrev => "tile.focus-prev".into(),
+            FocusTile(n) => format!("tile.focus-{n}"),
             Resize(d) => format!("tile.resize.{d:?}").to_lowercase(),
             Swap => "tile.swap".into(),
             ChangeView => "tile.change-view".into(),

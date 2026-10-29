@@ -144,7 +144,9 @@ impl App {
             theme_file,
             variant,
             theme,
-            status: warn.map(|w| format!("theme error, using default: {w}")).unwrap_or_else(|| "F10 menu · ? help · q quit".into()),
+            status: warn
+                .map(|w| format!("theme error, using default: {w}"))
+                .unwrap_or_else(|| "F10 menu · ? help · Tab/S-Tab tiles · Alt-1..9 tile · q quit".into()),
             quit: false,
         };
         app.series = app.store.series().unwrap_or_default();
@@ -212,6 +214,8 @@ impl App {
             KeyCode::F(1) => Some(Action::Help),
             KeyCode::F(5) => Some(Action::Refresh),
             KeyCode::Tab if self.modal.is_none() && !self.sidebar.focused => Some(Action::FocusNext),
+            KeyCode::BackTab if self.modal.is_none() && !self.sidebar.focused => Some(Action::FocusPrev),
+            KeyCode::Char(c @ '1'..='9') if alt && self.modal.is_none() => Some(Action::FocusTile(c as u32 - '0' as u32)),
             KeyCode::Char('b') if ctrl => Some(Action::ToggleSidebar),
             KeyCode::Char('/') if !self.typing() && self.modal.is_none() => Some(Action::FocusSidebar),
             KeyCode::Char('o') if !ctrl && !self.typing() && self.modal.is_none() => Some(Action::ToggleOrder),
@@ -354,6 +358,18 @@ impl App {
             FocusNext => {
                 self.layout.focus_next();
                 self.layout_changed();
+            }
+            FocusPrev => {
+                self.layout.focus_prev();
+                self.layout_changed();
+            }
+            FocusTile(n) => {
+                if self.layout.tile(n).is_some() {
+                    self.layout.set_focus(n);
+                    self.layout_changed();
+                } else {
+                    self.set_status(format!("no tile [{n}]"));
+                }
             }
             Resize(d) => {
                 let c = self.content;
@@ -898,6 +914,7 @@ pub fn window_action(k: KeyEvent) -> Option<Action> {
         KeyCode::Char('k') | KeyCode::Up => Action::Focus(Up),
         KeyCode::Char('l') | KeyCode::Right => Action::Focus(Right),
         KeyCode::Tab | KeyCode::Char('w') => Action::FocusNext,
+        KeyCode::BackTab | KeyCode::Char('W') | KeyCode::Char('p') => Action::FocusPrev,
         KeyCode::Char('>') => Action::Resize(Right),
         KeyCode::Char('<') => Action::Resize(Left),
         KeyCode::Char('+') => Action::Resize(Down),

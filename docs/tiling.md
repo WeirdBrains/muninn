@@ -21,6 +21,8 @@ own series and options. The whole tree is saved to `[tui.layout]` in
 | `Ctrl-w q` | close the tile (its sibling takes the space) | View ▸ Close tile |
 | `Ctrl-w h/j/k/l` (or arrows) | focus the tile left / below / above / right | |
 | `Tab`, `Ctrl-w Tab`, `Ctrl-w w` | focus the next tile | |
+| `Shift-Tab`, `Ctrl-w Shift-Tab`, `Ctrl-w W`, `Ctrl-w p` | focus the previous tile | |
+| `Alt-1` … `Alt-9` | focus tile `[1]` … `[9]` (the number in its title), also inside tabs and stacks | |
 | `Ctrl-w >` / `<` | make the tile wider / narrower | |
 | `Ctrl-w +` / `-` | make the tile taller / shorter | |
 | `Ctrl-w =` | equalize all splits | View ▸ Equalize |

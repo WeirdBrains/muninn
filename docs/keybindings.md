@@ -10,7 +10,8 @@ Every key runs the same named action as its [menu](menus.md) item.
 | Alt+F/V/D/K/T/H | open File / View / Data / Keys / Theme / Help |
 | `?`, F1 | help for the current context ([in-app help](help.md)) |
 | F5 | refresh data |
-| Tab | focus the next tile |
+| Tab / Shift-Tab | focus the next / previous tile |
+| Alt-1 … Alt-9 | focus tile [1] … [9] |
 | q | quit (when no dialog is open and you are not typing) |
 | Ctrl-C | quit |
 | Esc | close the open menu or dialog |
@@ -26,7 +27,7 @@ Every key runs the same named action as its [menu](menus.md) item.
 ## Tiles
 
 Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below,
-`q` close, `h j k l` focus, `Tab` next, `< > + -` resize, `=` equalize, `x` swap,
+`q` close, `h j k l` focus, `Tab` next, `W` or `p` previous, `< > + -` resize, `=` equalize, `x` swap,
 `z` zoom, `t` list ↔ chart, `e` new-tile direction, `y` link. See [tiling](tiling.md).
 
 | key (list tile) | action |

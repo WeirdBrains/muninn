@@ -603,6 +603,9 @@ data yet, the focused tile loads the first imported series.
 Help (? or F1): follow links with Tab and Enter or a click, Backspace goes back, / searches \
 from any topic; a clickable key bar at the bottom lists the shortcuts.
 
+Tiles: Tab / Shift-Tab focus the next / previous tile, Alt-1..9 jumps to tile [n]; the \
+status line shows these keys.
+
 Ranges: [ and ] (or a click on a date) open a date and time picker for a chart's \
 period or a list tile's range (from / to; \\ clears it); arrows or digits set year, month, \
 day, hour and minute.
