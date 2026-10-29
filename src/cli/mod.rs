@@ -6,9 +6,12 @@ mod catalog;
 mod export;
 mod history;
 mod ingest;
+mod journals;
 mod keys;
 pub mod man;
 mod misc;
+mod projects;
+mod searches;
 pub use args::*;
 
 use crate::interact::Interact;
@@ -109,6 +112,9 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Theme(c) => misc::theme(&ctx, c),
         Command::Author(c) => authors::run(&ctx, c),
         Command::History(c) => history::run(&ctx, c),
+        Command::Search(c) => searches::run(&ctx, c),
+        Command::Project(c) => projects::run(&ctx, c),
+        Command::Journal(c) => journals::run(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }

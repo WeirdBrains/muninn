@@ -88,11 +88,19 @@ mnnn theme mode system
 mnnn author add --name "Ada Lovelace" --email ada@example.org
 mnnn history tree
 mnnn history back 2
+mnnn search save btc-2024 --query btc --year 2024
+mnnn search run btc-2024
+mnnn project create Breakouts
+mnnn project add Breakouts --result binance:BTC/USDT:5m --from 2024-03-01
+mnnn journal new Notes --project Breakouts
+mnnn journal write Notes --title "March" --text "BTC broke out of the range"
+mnnn journal highlight ENTRY --on "broke out" --color yellow
 mnnn help keys
 .fi
 .SH SEE ALSO
 \fBmnnn-ingest\fR(1), \fBmnnn-export\fR(1), \fBmnnn-sources\fR(1), \fBmnnn-symbols\fR(1), \fBmnnn-keys\fR(1),
-\fBmnnn-backup\fR(1), \fBmnnn-theme\fR(1), \fBmnnn-author\fR(1), \fBmnnn-history\fR(1), \fBmnnn-tui\fR(1), \fBmnnn-help\fR(1), \fBsqlcipher\fR(1), \fBage\fR(1)
+\fBmnnn-backup\fR(1), \fBmnnn-theme\fR(1), \fBmnnn-author\fR(1), \fBmnnn-history\fR(1),
+\fBmnnn-search\fR(1), \fBmnnn-project\fR(1), \fBmnnn-journal\fR(1), \fBmnnn-tui\fR(1), \fBmnnn-help\fR(1), \fBsqlcipher\fR(1), \fBage\fR(1)
 "#;
 
 /// Escape plain text for roff: backslashes, hyphens and a leading dot or quote.

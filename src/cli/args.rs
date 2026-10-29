@@ -72,6 +72,15 @@ pub enum Command {
     /// Action history: list, inspect and step through what was done (forks are kept).
     #[command(subcommand)]
     History(HistoryCommand),
+    /// Live searches: saved searches that always run on the current data.
+    #[command(subcommand, alias = "searches")]
+    Search(SearchCommand),
+    /// Projects: collections of live searches, results and journals.
+    #[command(subcommand, alias = "projects")]
+    Project(ProjectCommand),
+    /// Journals: entries in Markdown or LaTeX with images, notes and highlights.
+    #[command(subcommand, alias = "journals")]
+    Journal(JournalCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -579,6 +588,359 @@ pub enum HistoryCommand {
     Goto { id: i64 },
 }
 
+/// What to search for. Options given replace that part of the search; the rest is kept.
+#[derive(Debug, Clone, Args, Default)]
+pub struct SpecArgs {
+    /// Search text (fuzzy; words in any order), like the sidebar search.
+    #[arg(long)]
+    pub query: Option<String>,
+    /// Search journal entries (title and text) instead of series.
+    #[arg(long, conflicts_with = "series")]
+    pub journals: bool,
+    /// Search series (the default).
+    #[arg(long)]
+    pub series: bool,
+    /// Only these sources. Repeatable.
+    #[arg(long = "source", value_name = "NAME")]
+    pub sources: Vec<String>,
+    /// Only these symbols, e.g. BTC/USDT or btc-usdt. Repeatable.
+    #[arg(long = "symbol", value_name = "SYMBOL")]
+    pub symbols: Vec<String>,
+    /// Only these bar periods, e.g. 5m, 1h. Repeatable.
+    #[arg(long = "period", value_name = "DURATION")]
+    pub periods: Vec<String>,
+    /// Only series covering these years. Repeatable.
+    #[arg(long = "year")]
+    pub years: Vec<i32>,
+    /// Time range start (date or date and time, UTC).
+    #[arg(long, value_name = "TIME")]
+    pub from: Option<String>,
+    /// Time range end.
+    #[arg(long, value_name = "TIME")]
+    pub to: Option<String>,
+    /// Price filter metric: open, high, low, close, typical, median, ohlc, vwap.
+    #[arg(long, value_name = "METRIC")]
+    pub price: Option<String>,
+    /// Price filter minimum.
+    #[arg(long)]
+    pub min: Option<f64>,
+    /// Price filter maximum.
+    #[arg(long)]
+    pub max: Option<f64>,
+    /// Sort series by year or name.
+    #[arg(long, value_parser = ["year", "name"])]
+    pub sort: Option<String>,
+    /// Sort descending.
+    #[arg(long, conflicts_with = "asc")]
+    pub desc: bool,
+    /// Sort ascending.
+    #[arg(long)]
+    pub asc: bool,
+    /// Start from the filters and sort the TUI shows now.
+    #[arg(long)]
+    pub from_view: bool,
+    /// Start with no filters (edit and fork: drop the existing ones first).
+    #[arg(long)]
+    pub clear: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SearchCommand {
+    /// List live searches with how many matches they have now.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show a live search's definition.
+    Show {
+        /// Id, id prefix or name.
+        search: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Run a live search on the current data.
+    #[command(alias = "results")]
+    Run {
+        search: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Search once without saving (add --save NAME to keep it as a live search).
+    Find {
+        #[command(flatten)]
+        spec: SpecArgs,
+        /// Save this search as a live search with this name.
+        #[arg(long, value_name = "NAME")]
+        save: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Save a search as a live search.
+    Save {
+        name: String,
+        #[command(flatten)]
+        spec: SpecArgs,
+    },
+    /// Fork a live search: a linked copy, optionally changed by the options given.
+    Fork {
+        search: String,
+        /// Name of the fork (default: "<name> (fork)").
+        #[arg(long)]
+        name: Option<String>,
+        #[command(flatten)]
+        spec: SpecArgs,
+    },
+    /// Refine a live search in place (rename it or change what it searches for).
+    #[command(alias = "optimize")]
+    Edit {
+        search: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[command(flatten)]
+        spec: SpecArgs,
+    },
+    /// Remove a live search (it also leaves every project).
+    #[command(alias = "rm")]
+    Remove { search: String },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProjectCommand {
+    /// List projects.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Create a project.
+    #[command(alias = "new")]
+    Create {
+        name: String,
+        #[arg(long, default_value = "")]
+        description: String,
+    },
+    /// Show a project: its live searches (with current matches), results and journals.
+    Show {
+        project: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Rename a project or change its description.
+    Edit {
+        project: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// Remove a project. Its journals stay, as standalone journals.
+    #[command(alias = "rm")]
+    Remove { project: String },
+    /// Add a live search, a journal or a result (a series, optionally a time range) to a project.
+    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "result"])))]
+    Add {
+        project: String,
+        /// Live search id or name.
+        #[arg(long)]
+        search: Option<String>,
+        /// Journal id or name.
+        #[arg(long)]
+        journal: Option<String>,
+        /// A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m.
+        #[arg(long, value_name = "SERIES")]
+        result: Option<String>,
+        /// Result time range start.
+        #[arg(long, value_name = "TIME")]
+        from: Option<String>,
+        /// Result time range end.
+        #[arg(long, value_name = "TIME")]
+        to: Option<String>,
+    },
+    /// Take an item out of a project (the item itself is kept).
+    Drop {
+        project: String,
+        /// Item number from `mnnn project show`.
+        item: i64,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum FormatArg {
+    Markdown,
+    Latex,
+}
+
+impl From<FormatArg> for crate::store::EntryFormat {
+    fn from(f: FormatArg) -> Self {
+        match f {
+            FormatArg::Markdown => crate::store::EntryFormat::Markdown,
+            FormatArg::Latex => crate::store::EntryFormat::Latex,
+        }
+    }
+}
+
+/// Entry text from an option, a file or stdin (`-`).
+#[derive(Debug, Clone, Args, Default)]
+pub struct TextArgs {
+    /// The text.
+    #[arg(long, conflicts_with = "file")]
+    pub text: Option<String>,
+    /// Read the text from a file (`-`: stdin).
+    #[arg(long)]
+    pub file: Option<PathBuf>,
+}
+
+/// Selected words of an entry.
+#[derive(Debug, Clone, Args, Default)]
+pub struct SelectArgs {
+    /// The words to select (their first occurrence, or --nth).
+    #[arg(long, value_name = "WORDS", conflicts_with = "range")]
+    pub on: Option<String>,
+    /// Which occurrence of --on (1 = first).
+    #[arg(long, default_value_t = 1, requires = "on")]
+    pub nth: usize,
+    /// Character range START..END of the entry text.
+    #[arg(long, value_name = "START..END")]
+    pub range: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum JournalCommand {
+    /// List journals (standalone and in projects).
+    List {
+        /// Only journals of this project.
+        #[arg(long)]
+        project: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Create a journal, standalone or in a project.
+    #[command(alias = "create")]
+    New {
+        name: String,
+        #[arg(long)]
+        project: Option<String>,
+        /// Format for new entries.
+        #[arg(long, value_enum, default_value = "markdown")]
+        format: FormatArg,
+    },
+    /// Show a journal: notes, entries, highlights and images (--json: the whole document).
+    Show {
+        journal: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Rename a journal or change the format for new entries.
+    Edit {
+        journal: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long, value_enum)]
+        format: Option<FormatArg>,
+    },
+    /// Remove a journal with its entries, notes, highlights and images.
+    #[command(alias = "rm")]
+    Remove { journal: String },
+    /// Fork a journal (everything in it) into a project-specific journal.
+    Fork {
+        journal: String,
+        /// Project for the fork (none: a standalone fork).
+        #[arg(long)]
+        project: Option<String>,
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Write a new entry.
+    Write {
+        journal: String,
+        #[arg(long, default_value = "")]
+        title: String,
+        /// Entry format (default: the journal's).
+        #[arg(long, value_enum)]
+        format: Option<FormatArg>,
+        #[command(flatten)]
+        text: TextArgs,
+    },
+    /// Show one entry with its notes, highlights and images.
+    Entry {
+        entry: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Change an entry's title, text or format (notes and highlights follow their words).
+    EditEntry {
+        entry: String,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long, value_enum)]
+        format: Option<FormatArg>,
+        #[command(flatten)]
+        text: TextArgs,
+    },
+    /// Remove an entry.
+    RemoveEntry { entry: String },
+    /// Add selected entries (copies) to another journal or a new one.
+    #[command(group(ArgGroup::new("target").required(true).args(["to", "new"])))]
+    Copy {
+        #[arg(required = true)]
+        entries: Vec<String>,
+        /// Target journal.
+        #[arg(long)]
+        to: Option<String>,
+        /// Create a new journal with this name.
+        #[arg(long, value_name = "NAME")]
+        new: Option<String>,
+        /// Project for the new journal.
+        #[arg(long, requires = "new")]
+        project: Option<String>,
+    },
+    /// Add a note to a journal, an entry, or selected words of an entry.
+    #[command(group(ArgGroup::new("target").required(true).args(["journal", "entry"])))]
+    Note {
+        /// The note text.
+        body: String,
+        /// Note on the whole journal.
+        #[arg(long, conflicts_with = "entry")]
+        journal: Option<String>,
+        /// Note on an entry.
+        #[arg(long)]
+        entry: Option<String>,
+        #[command(flatten)]
+        select: SelectArgs,
+    },
+    /// Highlight selected words of an entry.
+    #[command(group(ArgGroup::new("words").required(true).args(["on", "range"])))]
+    Highlight {
+        entry: String,
+        #[command(flatten)]
+        select: SelectArgs,
+        /// Color name, e.g. yellow.
+        #[arg(long)]
+        color: Option<String>,
+        /// A comment kept with the highlight.
+        #[arg(long, default_value = "")]
+        comment: String,
+    },
+    /// Change a note's text (or a highlight's comment).
+    EditNote { id: String, body: String },
+    /// Remove a note or highlight.
+    #[command(alias = "unmark")]
+    RemoveNote { id: String },
+    /// Attach an image to an entry (stored in the database; a reference is added to the text).
+    Attach {
+        entry: String,
+        file: PathBuf,
+        /// Name to store (default: the file name).
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Write an attached image to a file.
+    Image {
+        id: String,
+        #[arg(long)]
+        out: PathBuf,
+    },
+}
+
 /// Where the master key comes from.
 #[derive(Debug, Clone, Args, Default)]
 pub struct MasterInput {
@@ -757,6 +1119,34 @@ mod tests {
         assert!(matches!(parse(&["history", "back"]).unwrap().command, Command::History(HistoryCommand::Back { steps: 1 })));
         assert!(matches!(parse(&["history", "list", "-n", "5"]).unwrap().command, Command::History(HistoryCommand::List { limit: 5, .. })));
         assert!(matches!(parse(&["history", "goto", "0"]).unwrap().command, Command::History(HistoryCommand::Goto { id: 0 })));
+    }
+
+    #[test]
+    fn search_project_journal_commands() {
+        match parse(&["search", "save", "btc", "--query", "btc", "--source", "binance", "--year", "2024", "--desc"]).unwrap().command {
+            Command::Search(SearchCommand::Save { name, spec }) => {
+                assert_eq!(
+                    (name.as_str(), spec.query.as_deref(), spec.sources.len(), spec.years.as_slice(), spec.desc),
+                    ("btc", Some("btc"), 1, &[2024][..], true)
+                );
+            }
+            c => panic!("{c:?}"),
+        }
+        assert!(matches!(parse(&["search", "optimize", "x", "--clear"]).unwrap().command, Command::Search(SearchCommand::Edit { .. })));
+        assert!(parse(&["search", "save", "x", "--desc", "--asc"]).is_err());
+        assert!(parse(&["project", "add", "p"]).is_err(), "needs an item");
+        assert!(matches!(parse(&["projects", "new", "P"]).unwrap().command, Command::Project(ProjectCommand::Create { .. })));
+        assert!(parse(&["journal", "copy", "e1"]).is_err(), "needs --to or --new");
+        assert!(parse(&["journal", "note", "hi"]).is_err(), "needs --journal or --entry");
+        assert!(parse(&["journal", "highlight", "e"]).is_err(), "needs words");
+        match parse(&["journal", "highlight", "e", "--on", "broke out", "--nth", "2"]).unwrap().command {
+            Command::Journal(JournalCommand::Highlight { select, .. }) => assert_eq!((select.on.as_deref(), select.nth), (Some("broke out"), 2)),
+            c => panic!("{c:?}"),
+        }
+        assert!(matches!(
+            parse(&["journal", "new", "J", "--format", "latex"]).unwrap().command,
+            Command::Journal(JournalCommand::New { format: FormatArg::Latex, .. })
+        ));
     }
 
     #[test]

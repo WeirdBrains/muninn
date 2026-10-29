@@ -78,6 +78,13 @@ impl Interact {
         }
     }
 
+    /// Informational output on stderr, for commands whose stdout is data.
+    pub fn note(&self, msg: impl AsRef<str>) {
+        if !self.quiet {
+            eprintln!("{}", msg.as_ref());
+        }
+    }
+
     pub fn warn(&self, msg: impl AsRef<str>) {
         if !self.quiet {
             eprintln!("warning: {}", msg.as_ref());

@@ -1,0 +1,96 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-journal-highlight 1  "mnnn-journal-highlight 2.0.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-journal\-highlight \- Highlight selected words of an entry
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn journal highlight\fR [\fB\-\-home\fR] [\fB\-\-on\fR] [\fB\-\-db\fR] [\fB\-\-nth\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-range\fR] [\fB\-\-color\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-comment\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIENTRY\fR> 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Highlight selected words of an entry
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-on\fR \fI<WORDS>\fR
+The words to select (their first occurrence, or \-\-nth)
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-nth\fR \fI<NTH>\fR [default: 1]
+Which occurrence of \-\-on (1 = first)
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-range\fR \fI<START..END>\fR
+Character range START..END of the entry text
+.TP
+\fB\-\-color\fR \fI<COLOR>\fR
+Color name, e.g. yellow
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-comment\fR \fI<COMMENT>\fR [default: ]
+A comment kept with the highlight
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fIENTRY\fR>
+
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.0.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

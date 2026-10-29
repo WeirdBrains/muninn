@@ -149,6 +149,11 @@ impl ProjectItem {
     }
 }
 
+/// First 8 characters of any id.
+pub fn short_of(id: &str) -> &str {
+    super::short(id)
+}
+
 fn check_name(name: &str) -> Result<String> {
     let n = name.trim();
     if n.is_empty() {
