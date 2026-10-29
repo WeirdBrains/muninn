@@ -85,11 +85,14 @@ mnnn -q export --format csv --out - --from 2026-10-01 | head
 mnnn backup create --out ~/backups --encrypt
 mnnn keys recover --shard a.age --shard b.age --shard c.age
 mnnn theme mode system
+mnnn author add --name "Ada Lovelace" --email ada@example.org
+mnnn history tree
+mnnn history back 2
 mnnn help keys
 .fi
 .SH SEE ALSO
 \fBmnnn-ingest\fR(1), \fBmnnn-export\fR(1), \fBmnnn-sources\fR(1), \fBmnnn-symbols\fR(1), \fBmnnn-keys\fR(1),
-\fBmnnn-backup\fR(1), \fBmnnn-theme\fR(1), \fBmnnn-tui\fR(1), \fBmnnn-help\fR(1), \fBsqlcipher\fR(1), \fBage\fR(1)
+\fBmnnn-backup\fR(1), \fBmnnn-theme\fR(1), \fBmnnn-author\fR(1), \fBmnnn-history\fR(1), \fBmnnn-tui\fR(1), \fBmnnn-help\fR(1), \fBsqlcipher\fR(1), \fBage\fR(1)
 "#;
 
 /// Escape plain text for roff: backslashes, hyphens and a leading dot or quote.

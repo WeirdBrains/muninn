@@ -83,3 +83,25 @@ pub fn export(store: &Store, f: &BarFilter, format: Format, out: &Path) -> Resul
     w.flush()?;
     Ok(bars.len())
 }
+
+/// [`export`], then record it in the action history (`origin` is `cli` or `tui`).
+pub fn export_recorded(store: &Store, f: &BarFilter, format: Format, out: &Path, origin: &str) -> Result<usize> {
+    let n = export(store, f, format, out)?;
+    let fmt = format!("{format:?}").to_lowercase();
+    let dest = if out.as_os_str() == "-" { "stdout".to_string() } else { out.display().to_string() };
+    let mut scope = vec![];
+    if let Some(s) = &f.source {
+        scope.push(format!("source {s}"));
+    }
+    if let Some(s) = &f.symbol {
+        scope.push(s.display());
+    }
+    if let Some(d) = f.duration {
+        scope.push(d.to_string());
+    }
+    let a = crate::store::NewAction::new("export", origin, format!("export {n} bars to {dest} ({fmt})")).params(serde_json::json!({
+        "out": dest, "format": fmt, "bars": n, "scope": scope, "from": f.from, "to": f.to,
+    }));
+    store.note_action(&a);
+    Ok(n)
+}

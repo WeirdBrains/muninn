@@ -212,7 +212,7 @@ pub fn export_key(app: &mut App, k: KeyEvent) {
                 fm.get("from").as_deref(),
                 fm.get("to").as_deref(),
             )
-            .and_then(|flt| export::export(&app.store, &flt, app.export.format, &expand(&out)));
+            .and_then(|flt| export::export_recorded(&app.store, &flt, app.export.format, &expand(&out), "tui"));
             match r {
                 Ok(n) => app.set_status(format!("wrote {n} bars to {out}")),
                 Err(e) => app.set_status(format!("export failed: {e}")),

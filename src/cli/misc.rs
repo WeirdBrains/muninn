@@ -1,8 +1,20 @@
 //! `mnnn theme`, `mnnn tui`, `mnnn help`, `mnnn man`.
 use super::{Ctx, ThemeCommand};
 use crate::Error;
+use crate::history::{ViewState, view_action};
+use crate::prefs::Preferences;
 use crate::theme::{self, ThemeFile};
 use std::path::Path;
+
+/// Record a view change when the store opens without a prompt (see `Ctx::store_if_unlocked`).
+fn record_view(ctx: &Ctx, kind: &str, summary: String, before: &ViewState, prefs: &Preferences) {
+    let after = ViewState::capture(prefs);
+    if after != *before
+        && let Some(store) = ctx.store_if_unlocked()
+    {
+        store.note_action(&view_action(kind, "cli", summary, before, &after));
+    }
+}
 
 pub fn theme(ctx: &Ctx, cmd: ThemeCommand) -> anyhow::Result<()> {
     theme::materialize(&ctx.paths)?;
@@ -30,13 +42,17 @@ pub fn theme(ctx: &Ctx, cmd: ThemeCommand) -> anyhow::Result<()> {
         }
         ThemeCommand::Set { name } => {
             theme::load(&ctx.paths, &name)?;
+            let before = ViewState::capture(&prefs);
             prefs.theme.name = name.clone();
             prefs.save(&ctx.paths)?;
+            record_view(ctx, "theme", format!("theme {name}"), &before, &prefs);
             ctx.io.info(format!("theme set to {name}"));
         }
         ThemeCommand::Mode { mode } => {
+            let before = ViewState::capture(&prefs);
             prefs.theme.mode = mode;
             prefs.save(&ctx.paths)?;
+            record_view(ctx, "theme.mode", format!("theme mode {mode}"), &before, &prefs);
             ctx.io.info(format!("theme mode set to {mode}"));
         }
         ThemeCommand::Export { name, out } => {

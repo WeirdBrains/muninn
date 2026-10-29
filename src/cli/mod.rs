@@ -1,8 +1,10 @@
 //! CLI layer: thin handlers over the library.
 mod args;
+mod authors;
 mod backup;
 mod catalog;
 mod export;
+mod history;
 mod ingest;
 mod keys;
 pub mod man;
@@ -39,6 +41,14 @@ impl Ctx {
     pub fn open_store(&self) -> anyhow::Result<crate::store::Store> {
         let dek = self.unlock()?;
         Ok(crate::store::Store::open(&self.paths.db, Some(&dek.0))?)
+    }
+
+    /// The store, only if it opens without prompting (`MUNINN_PASSWORD` set, keys initialized).
+    /// Used to record history for commands that otherwise never unlock (theme set/mode).
+    pub fn store_if_unlocked(&self) -> Option<crate::store::Store> {
+        std::env::var_os("MUNINN_PASSWORD")?;
+        crate::crypto::keyring::Envelope::require(&self.paths).ok()?;
+        self.open_store().map_err(|e| tracing::debug!("history not recorded: {e}")).ok()
     }
 
     /// The Muninn password: `MUNINN_PASSWORD`, else a hidden prompt.
@@ -97,6 +107,8 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Keys(c) => keys::run(&ctx, c),
         Command::Backup(c) => backup::run(&ctx, c),
         Command::Theme(c) => misc::theme(&ctx, c),
+        Command::Author(c) => authors::run(&ctx, c),
+        Command::History(c) => history::run(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }

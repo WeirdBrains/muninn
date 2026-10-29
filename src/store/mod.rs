@@ -4,12 +4,17 @@ use crate::model::{Bar, BarId, Duration, KNOWN_ALIASES, KNOWN_BASES, KNOWN_QUOTE
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 use std::path::Path;
 
+pub mod authors;
+pub mod history;
 mod query;
 pub mod runs;
+pub use authors::{Author, AuthorChange};
+pub use history::{ActionRecord, Move, NewAction, TreeRow};
 pub use query::BarSort;
 pub use runs::{Artifact, ImportRun};
 
-pub const SCHEMA_VERSION: i64 = 1;
+/// Schema version after all migrations (1.x databases are at 3 and migrate on open).
+pub const SCHEMA_VERSION: i64 = MIGRATIONS.len() as i64;
 
 const MIGRATIONS: &[&str] = &[
     r#"
@@ -81,6 +86,9 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     FROM bars GROUP BY source_id, base, quote, duration_s;
 "#,
     runs::MIGRATION,
+    // 2.0: authorship, then action history
+    authors::MIGRATION,
+    history::MIGRATION,
 ];
 
 pub fn now_ms() -> i64 {
@@ -192,11 +200,16 @@ impl Store {
     }
 
     fn migrate(&mut self) -> Result<()> {
+        self.migrate_to(MIGRATIONS.len())
+    }
+
+    /// Apply migrations up to `upto` (tests build older schemas with this).
+    fn migrate_to(&mut self, upto: usize) -> Result<()> {
         self.conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
         self.conn.execute_batch("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);")?;
         let v: i64 = self.conn.query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
         let tx = self.conn.transaction()?;
-        for (i, m) in MIGRATIONS.iter().enumerate() {
+        for (i, m) in MIGRATIONS.iter().enumerate().take(upto) {
             let target = i as i64 + 1;
             if v < target {
                 tx.execute_batch(m)?;
@@ -641,6 +654,37 @@ mod tests {
         s.add_symbol(&Symbol::new("FOO", "USD"), &["FO".into()]).unwrap();
         assert_eq!(s.canonical_asset("FO").unwrap(), "FOO");
         assert!(s.symbols().unwrap().contains(&Symbol::new("FOO", "USD")));
+    }
+
+    #[test]
+    fn a_1x_database_migrates_and_keeps_its_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("old.database");
+        let key = [7u8; 32];
+        {
+            // a v1.16 database: schema 3 with bars and an import run
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store { conn };
+            s.migrate_to(3).unwrap();
+            assert_eq!(s.schema_version().unwrap(), 3);
+            let src = s.add_source("binance", "file", None).unwrap();
+            s.upsert_bars(&src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0), bar(300_000)]).unwrap();
+            let run = s.begin_import_run("cli", 1).unwrap();
+            s.conn.execute("UPDATE import_runs SET status = 'completed' WHERE id = ?1", [run]).unwrap();
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        assert_eq!(s.count_bars().unwrap(), 2);
+        assert_eq!(s.series().unwrap().len(), 1);
+        assert_eq!(s.last_import_run().unwrap().unwrap().status, "completed");
+        assert!(s.authors().unwrap().is_empty() && s.actions().unwrap().is_empty());
+        s.add_author("Michael", None, &[]).unwrap();
+        s.record_action(&NewAction::new("filter", "cli", "x")).unwrap();
+        drop(s);
+        // reopening is a no-op
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!((s.authors().unwrap().len(), s.actions().unwrap().len()), (1, 1));
     }
 
     #[test]

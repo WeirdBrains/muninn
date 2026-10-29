@@ -92,12 +92,36 @@ impl Store {
     }
 
     /// Finish a run. A cancelled run stays `cancelled` whatever `status` says.
+    /// The run is also recorded in the action history (kind `import`).
     pub fn finish_import_run(&self, run: i64, status: &str, files_done: usize, note: &str) -> Result<()> {
         self.conn.execute(
             "UPDATE import_runs SET status = CASE WHEN status = 'cancelled' THEN status ELSE ?2 END,
                     finished_at = ?3, files_done = ?4, note = ?5 WHERE id = ?1",
             params![run, status, now_ms(), files_done as i64, note],
         )?;
+        if let Some(r) = self.import_run(run)? {
+            let bars: i64 = self.conn.query_row(
+                "SELECT COALESCE(SUM(i.inserted), 0) FROM import_artifacts a JOIN ingest_runs i ON i.id = CAST(a.reference AS INTEGER)
+                 WHERE a.run_id = ?1 AND a.kind = 'ingest_record' AND a.state = 'kept'",
+                [run],
+                |r| r.get(0),
+            )?;
+            let files: Vec<String> = {
+                let mut st =
+                    self.conn.prepare("SELECT DISTINCT file FROM import_artifacts WHERE run_id = ?1 AND kind = 'ingest_record' ORDER BY rowid")?;
+                st.query_map([run], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?
+            };
+            let what = match files.as_slice() {
+                [one] => std::path::Path::new(one).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| one.clone()),
+                _ => format!("{}/{} file(s)", r.files_done, r.files_total),
+            };
+            let a = super::NewAction::new("import", &r.origin, format!("import {what} · {bars} bars · {} · run #{run}", r.status)).params(
+                serde_json::json!({
+                    "run": run, "status": r.status, "files_done": r.files_done, "files_total": r.files_total, "files": files, "inserted": bars,
+                }),
+            );
+            self.note_action(&a);
+        }
         Ok(())
     }
 

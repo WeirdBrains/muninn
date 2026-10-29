@@ -10,6 +10,7 @@ pub mod backup;
 pub mod crypto;
 pub mod export;
 pub mod help;
+pub mod history;
 pub mod ingest;
 pub mod model;
 pub mod store;

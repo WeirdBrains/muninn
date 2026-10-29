@@ -10,7 +10,7 @@ pub fn run(ctx: &Ctx, a: ExportArgs) -> anyhow::Result<()> {
         ExportFormat::Parquet => Format::Parquet,
         ExportFormat::Json => Format::Json,
     };
-    let n = export::export(&store, &f, fmt, &a.out)?;
+    let n = export::export_recorded(&store, &f, fmt, &a.out, "cli")?;
     if a.out.as_os_str() != "-" {
         ctx.io.info(format!("wrote {n} bars to {}", a.out.display()));
     }

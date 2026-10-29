@@ -66,6 +66,12 @@ pub enum Command {
     /// Themes.
     #[command(subcommand)]
     Theme(ThemeCommand),
+    /// Authors: who actions are attributed to (stored in the encrypted database).
+    #[command(subcommand, alias = "authors")]
+    Author(AuthorCommand),
+    /// Action history: list, inspect and step through what was done (forks are kept).
+    #[command(subcommand)]
+    History(HistoryCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -478,6 +484,101 @@ pub enum SymbolsCommand {
     },
 }
 
+#[derive(Debug, Subcommand)]
+pub enum AuthorCommand {
+    /// List authors (`*` marks the current one).
+    List {
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show one author (default: the current one).
+    Show {
+        /// Id, id prefix, name or email.
+        author: Option<String>,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Add an author. The first author becomes the current one.
+    Add {
+        /// Display name.
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        email: Option<String>,
+        /// Extra detail `key=value`, e.g. org=Acme. Repeatable.
+        #[arg(long = "detail", value_name = "KEY=VALUE")]
+        details: Vec<String>,
+        /// Make this the current author.
+        #[arg(long)]
+        current: bool,
+    },
+    /// Change an author's name, email or details.
+    Edit {
+        /// Id, id prefix, name or email.
+        author: String,
+        #[arg(long)]
+        name: Option<String>,
+        /// New email; an empty value clears it.
+        #[arg(long)]
+        email: Option<String>,
+        /// Set a detail `key=value`; `key=` removes it. Repeatable.
+        #[arg(long = "detail", value_name = "KEY=VALUE")]
+        details: Vec<String>,
+        /// Replace all details with the ones given.
+        #[arg(long)]
+        replace_details: bool,
+    },
+    /// Remove an author (past actions keep their attribution id).
+    #[command(alias = "rm")]
+    Remove { author: String },
+    /// Make an author the current one; `--none` clears it.
+    Use {
+        #[arg(required_unless_present = "none")]
+        author: Option<String>,
+        #[arg(long, conflicts_with = "author")]
+        none: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HistoryCommand {
+    /// The current line of actions, newest first (`*` marks the head).
+    List {
+        /// Show at most this many actions.
+        #[arg(long, short = 'n', default_value_t = 50)]
+        limit: usize,
+        /// Every action on every fork, newest first.
+        #[arg(long)]
+        all: bool,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show one action (default: the head).
+    Show {
+        id: Option<i64>,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// The whole history as a tree, forks indented under the action they branch from.
+    Tree,
+    /// Step the head back N actions, restoring the filters and theme from before them.
+    Back {
+        #[arg(default_value_t = 1)]
+        steps: usize,
+    },
+    /// Step the head forward N actions (along the branch you stepped back from).
+    Forward {
+        #[arg(default_value_t = 1)]
+        steps: usize,
+    },
+    /// Move the head to an action (`0` = before the first action).
+    Goto { id: i64 },
+}
+
 /// Where the master key comes from.
 #[derive(Debug, Clone, Args, Default)]
 pub struct MasterInput {
@@ -635,6 +736,22 @@ mod tests {
         let mut v = vec!["mnnn"];
         v.extend_from_slice(args);
         Cli::try_parse_from(v)
+    }
+
+    #[test]
+    fn author_and_history_commands() {
+        match parse(&["author", "add", "--name", "Ada", "--email", "a@x.io", "--detail", "org=X", "--current"]).unwrap().command {
+            Command::Author(AuthorCommand::Add { name, email, details, current }) => {
+                assert_eq!((name.as_str(), email.as_deref(), details.len(), current), ("Ada", Some("a@x.io"), 1, true));
+            }
+            c => panic!("{c:?}"),
+        }
+        assert!(matches!(parse(&["authors", "list"]).unwrap().command, Command::Author(AuthorCommand::List { json: false })));
+        assert!(matches!(parse(&["author", "use", "--none"]).unwrap().command, Command::Author(AuthorCommand::Use { author: None, none: true })));
+        assert!(parse(&["author", "use"]).is_err());
+        assert!(matches!(parse(&["history", "back"]).unwrap().command, Command::History(HistoryCommand::Back { steps: 1 })));
+        assert!(matches!(parse(&["history", "list", "-n", "5"]).unwrap().command, Command::History(HistoryCommand::List { limit: 5, .. })));
+        assert!(matches!(parse(&["history", "goto", "0"]).unwrap().command, Command::History(HistoryCommand::Goto { id: 0 })));
     }
 
     #[test]
