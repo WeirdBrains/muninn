@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Package a prebuilt binary as a release tarball (zip on Windows targets):
-#   dist/muninn-<ver>-<target>.tar.gz  containing  muninn-<ver>-<target>/{mnnn,man/,docs/,README.md,CHANGELOG.md,LICENSE}
+#   dist/muninn-<ver>-<target>.tar.gz  containing  muninn-<ver>-<target>/{mnnn,man/,docs/,README.md,CHANGELOG.md,LICENSE,LICENSE-FONTS}
 # Usage: scripts/dist.sh [<target-triple>] [<path-to-built-binary>]
 # Defaults: host triple, target/release/mnnn (or target/<triple>/release/mnnn).
 set -euo pipefail
@@ -17,6 +17,7 @@ stage="dist/$name"
 rm -rf "$stage" && mkdir -p "$stage"
 install -m755 "$bin" "$stage/$exe"
 cp -r man docs README.md CHANGELOG.md LICENSE "$stage/"
+cp assets/fonts/LICENSE-OFL.txt "$stage/LICENSE-FONTS"
 rm -rf "$stage/docs/historical"
 cd dist
 if [[ "$target" == *windows* ]]; then

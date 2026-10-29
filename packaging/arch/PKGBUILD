@@ -50,4 +50,5 @@ package() {
   cp -r docs "$pkgdir/usr/share/doc/$pkgname/"
   rm -rf "$pkgdir/usr/share/doc/$pkgname/docs/historical"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 assets/fonts/LICENSE-OFL.txt "$pkgdir/usr/share/licenses/$pkgname/LICENSE-FONTS"
 }

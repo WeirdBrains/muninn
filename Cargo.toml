@@ -93,6 +93,7 @@ assets = [
     ["man/*.1", "usr/share/man/man1/", "644"],
     ["README.md", "usr/share/doc/muninn/", "644"],
     ["CHANGELOG.md", "usr/share/doc/muninn/", "644"],
+    ["assets/fonts/LICENSE-OFL.txt", "usr/share/doc/muninn/LICENSE-FONTS", "644"],
     ["docs/**/*.md", "usr/share/doc/muninn/docs/", "644"],
 ]
 
@@ -107,6 +108,7 @@ assets = [
     { source = "README.md", dest = "/usr/share/doc/muninn/README.md", mode = "644", doc = true },
     { source = "CHANGELOG.md", dest = "/usr/share/doc/muninn/CHANGELOG.md", mode = "644", doc = true },
     { source = "LICENSE", dest = "/usr/share/licenses/muninn/LICENSE", mode = "644", doc = true },
+    { source = "assets/fonts/LICENSE-OFL.txt", dest = "/usr/share/licenses/muninn/LICENSE-FONTS", mode = "644", doc = true },
 ]
 
 # Release binaries ship without symbols (smaller; packagers need not strip).
