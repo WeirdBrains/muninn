@@ -1,0 +1,108 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-rule-create 1  "mnnn-rule-create 2.2.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-rule\-create \- Create a rule
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn rule create\fR [\fB\-\-home\fR] [\fB\-\-on\fR] [\fB\-\-db\fR] [\fB\-\-if\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-then\fR] [\fB\-\-project\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-journal\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-search\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-related\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-disabled\fR] [\fB\-\-description\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Create a rule
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-on\fR \fI<KIND>\fR
+Action kinds to react to: import, journal.*, * (repeat or comma\-separate)
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-if\fR \fI<CONDITION>\fR
+A condition: FIELD OP VALUE, e.g. "inserted > 0" (repeat: all must hold)
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-then\fR \fI<ACTION>\fR
+A then\-action, e.g. "status Imported {inserted} bars" (repeat: run in order)
+.TP
+\fB\-\-project\fR \fI<PROJECT>\fR
+Put it in a project (as a project item)
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-journal\fR \fI<JOURNAL>\fR
+Let it live in a journal (its default journal)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-search\fR \fI<SEARCH>\fR
+Let it live in a live search (its default search)
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-related\fR
+Only react to actions about where it lives
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-disabled\fR
+Create it switched off
+.TP
+\fB\-\-description\fR \fI<DESCRIPTION>\fR [default: ]
+
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fINAME\fR>
+
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.2.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

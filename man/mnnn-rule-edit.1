@@ -1,0 +1,114 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-rule-edit 1  "mnnn-rule-edit 2.2.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-rule\-edit \- Change a rule: given \-\-on, \-\-if or \-\-then replace the old ones
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn rule edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-on\fR] [\fB\-\-if\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-then\fR] [\fB\-\-clear\-if\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-journal\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-search\fR] [\fB\-\-standalone\fR] [\fB\-\-related\fR] [\fB\-\-unrelated\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIRULE\fR> 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Change a rule: given \-\-on, \-\-if or \-\-then replace the old ones
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-name\fR \fI<NAME>\fR
+
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-description\fR \fI<DESCRIPTION>\fR
+
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-on\fR \fI<KIND>\fR
+Action kinds to react to: import, journal.*, * (repeat or comma\-separate)
+.TP
+\fB\-\-if\fR \fI<CONDITION>\fR
+A condition: FIELD OP VALUE, e.g. "inserted > 0" (repeat: all must hold)
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-then\fR \fI<ACTION>\fR
+A then\-action, e.g. "status Imported {inserted} bars" (repeat: run in order)
+.TP
+\fB\-\-clear\-if\fR
+Drop every condition
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-journal\fR \fI<JOURNAL>\fR
+Move it into a journal
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-search\fR \fI<SEARCH>\fR
+Move it into a live search
+.TP
+\fB\-\-standalone\fR
+Take it out of its journal or live search (projects are kept)
+.TP
+\fB\-\-related\fR
+Only react to actions about where it lives
+.TP
+\fB\-\-unrelated\fR
+React to every matching action
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fIRULE\fR>
+
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.2.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

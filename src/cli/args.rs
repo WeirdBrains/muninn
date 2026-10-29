@@ -85,6 +85,10 @@ pub enum Command {
     /// as PDF, Word, HTML, LaTeX, JSON or CSV.
     #[command(subcommand, alias = "reports")]
     Report(ReportCommand),
+    /// Rules: if this action happens (and these fields match), then do that. They live on
+    /// their own, in a journal, a live search or projects.
+    #[command(subcommand, alias = "rules", after_long_help = RULE_NOTES)]
+    Rule(RuleCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -774,14 +778,17 @@ pub enum ProjectCommand {
     /// Remove a project. Its journals stay, as standalone journals.
     #[command(alias = "rm")]
     Remove { project: String },
-    /// Add a live search, a journal, a report or a result (a series, optionally a time
-    /// range) to a project.
-    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "result"])))]
+    /// Add a live search, a journal, a report, a rule or a result (a series, optionally a
+    /// time range) to a project.
+    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "rule", "result"])))]
     Add {
         project: String,
         /// Live search id or name.
         #[arg(long)]
         search: Option<String>,
+        /// Rule id or name.
+        #[arg(long)]
+        rule: Option<String>,
         /// Journal id or name.
         #[arg(long)]
         journal: Option<String>,
@@ -875,6 +882,153 @@ pub struct SectionArgs {
     /// Put the section at this position (1 = first; default: last).
     #[arg(long)]
     pub at: Option<usize>,
+}
+
+pub const RULE_NOTES: &str = "\
+Conditions (--if, all must hold): FIELD OP VALUE with = != ~ (contains) !~ > >= < <=,
+or FIELD ? (present) / FIELD !? (missing). Fields: kind, summary, origin, author,
+action, before.X, after.X and the action's params (see `mnnn rule events`). = takes *
+wildcards; numbers compare as numbers; text ignores case.
+
+Then-actions (--then, run in order):
+  status TEXT                               message (TUI status line, stderr)
+  search [SEARCH]                           run a live search, report its matches
+  export-report REPORT to=PATH [format=F]   export a report
+  export-journal [JOURNAL] to=PATH [format=F]
+  add-to-project [PROJECT] [item=subject|search:S|journal:J|report:R]
+  entry [JOURNAL] \"TEXT\" [title=T]          write a journal entry
+  note [JOURNAL] \"TEXT\"                     add a note to a journal
+Left out, a target is the rule's own journal, live search or project. Texts and paths
+take {kind} {summary} {origin} {author} {action} {rule} {date} {time} {now} and {FIELD}.
+
+Examples:
+  mnnn rule create \"Weekly after import\" --on import --if \"inserted > 0\" \\
+      --then \"export-report Weekly to=~/reports/weekly-{date}.pdf\"
+  mnnn rule create Collect --project Halving --on search.save --then add-to-project
+  mnnn rule test Collect            # against the newest action
+  mnnn rule dry-run Collect --action 42";
+
+#[derive(Debug, Args)]
+pub struct RuleSpecArgs {
+    /// Action kinds to react to: import, journal.*, * (repeat or comma-separate).
+    #[arg(long = "on", value_name = "KIND")]
+    pub on: Vec<String>,
+    /// A condition: FIELD OP VALUE, e.g. "inserted > 0" (repeat: all must hold).
+    #[arg(long = "if", value_name = "CONDITION")]
+    pub when: Vec<String>,
+    /// A then-action, e.g. "status Imported {inserted} bars" (repeat: run in order).
+    #[arg(long = "then", value_name = "ACTION")]
+    pub then: Vec<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum RuleCommand {
+    /// Create a rule.
+    #[command(alias = "new")]
+    Create {
+        name: String,
+        #[command(flatten)]
+        spec: RuleSpecArgs,
+        /// Put it in a project (as a project item).
+        #[arg(long, conflicts_with_all = ["journal", "search"])]
+        project: Option<String>,
+        /// Let it live in a journal (its default journal).
+        #[arg(long, conflicts_with = "search")]
+        journal: Option<String>,
+        /// Let it live in a live search (its default search).
+        #[arg(long)]
+        search: Option<String>,
+        /// Only react to actions about where it lives.
+        #[arg(long)]
+        related: bool,
+        /// Create it switched off.
+        #[arg(long)]
+        disabled: bool,
+        #[arg(long, default_value = "")]
+        description: String,
+    },
+    /// Change a rule: given --on, --if or --then replace the old ones.
+    Edit {
+        rule: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        #[command(flatten)]
+        spec: RuleSpecArgs,
+        /// Drop every condition.
+        #[arg(long, conflicts_with = "when")]
+        clear_if: bool,
+        /// Move it into a journal.
+        #[arg(long, conflicts_with_all = ["search", "standalone"])]
+        journal: Option<String>,
+        /// Move it into a live search.
+        #[arg(long, conflicts_with = "standalone")]
+        search: Option<String>,
+        /// Take it out of its journal or live search (projects are kept).
+        #[arg(long)]
+        standalone: bool,
+        /// Only react to actions about where it lives.
+        #[arg(long, conflicts_with = "unrelated")]
+        related: bool,
+        /// React to every matching action.
+        #[arg(long)]
+        unrelated: bool,
+    },
+    /// List rules.
+    #[command(alias = "ls")]
+    List {
+        /// Only the rules in this project.
+        #[arg(long)]
+        project: Option<String>,
+        /// Only the rules living in this journal.
+        #[arg(long)]
+        journal: Option<String>,
+        /// Only the rules living in this live search.
+        #[arg(long)]
+        search: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show a rule and its recent runs.
+    Show {
+        rule: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Delete a rule (it leaves its projects).
+    #[command(alias = "rm")]
+    Remove { rule: String },
+    /// Switch a rule on.
+    Enable { rule: String },
+    /// Switch a rule off.
+    Disable { rule: String },
+    /// Check a rule (or every rule) against an action: which parts match and why.
+    Test {
+        rule: Option<String>,
+        /// Action number (default: the newest, see `mnnn history list`).
+        #[arg(long)]
+        action: Option<i64>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// What a rule would do for an action, without doing it.
+    #[command(name = "dry-run")]
+    DryRun {
+        rule: Option<String>,
+        /// Action number (default: the newest).
+        #[arg(long)]
+        action: Option<i64>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// The action kinds rules react to, with their fields.
+    Events {
+        /// Only kinds matching this (e.g. journal.*).
+        kind: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]

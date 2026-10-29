@@ -91,7 +91,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
                 }
                 println!("author:      {}", crate::history::author_label(&store, p.author_id.as_deref()));
                 println!("created:     {}", fmt_ts(p.created_at));
-                for k in [ItemKind::LiveSearch, ItemKind::Result, ItemKind::Journal, ItemKind::Report] {
+                for k in [ItemKind::LiveSearch, ItemKind::Result, ItemKind::Journal, ItemKind::Report, ItemKind::RuleSet] {
                     let v: Vec<&ProjectItem> = items.iter().filter(|i| i.kind == k).collect();
                     if v.is_empty() {
                         continue;
@@ -122,7 +122,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
             record(&store, "project.remove", format!("remove project {}", p.name), params(&p));
             ctx.io.info(format!("removed project {}", p.name));
         }
-        ProjectCommand::Add { project, search, journal, report, result, from, to } => {
+        ProjectCommand::Add { project, search, rule, journal, report, result, from, to } => {
             if result.is_none() && (from.is_some() || to.is_some()) {
                 return Err(anyhow!("--from and --to belong to --result"));
             }
@@ -136,6 +136,9 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
             } else if let Some(r) = report {
                 let r = store.find_report(&r)?;
                 store.add_project_item(&p.id, ItemKind::Report, &r.id, serde_json::json!({}))?
+            } else if let Some(r) = rule {
+                let r = store.find_rule(&r)?;
+                store.add_project_item(&p.id, ItemKind::RuleSet, &r.id, serde_json::json!({}))?
             } else {
                 let r = parse_result(&store, result.as_deref().unwrap_or(""), from.as_deref(), to.as_deref())?;
                 store.add_project_result(&p.id, &r)?

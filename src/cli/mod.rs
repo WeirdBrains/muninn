@@ -12,6 +12,7 @@ pub mod man;
 mod misc;
 mod projects;
 mod reports;
+mod rules;
 mod searches;
 pub use args::*;
 
@@ -44,7 +45,10 @@ impl Ctx {
     /// Open the encrypted bar store.
     pub fn open_store(&self) -> anyhow::Result<crate::store::Store> {
         let dek = self.unlock()?;
-        Ok(crate::store::Store::open(&self.paths.db, Some(&dek.0))?)
+        let s = crate::store::Store::open(&self.paths.db, Some(&dek.0))?;
+        // what rules do is reported on stderr (`--quiet` hides it)
+        s.set_rule_echo(!self.global.quiet);
+        Ok(s)
     }
 
     /// The store, only if it opens without prompting (`MUNINN_PASSWORD` set, keys initialized).
@@ -117,6 +121,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Project(c) => projects::run(&ctx, c),
         Command::Journal(c) => journals::run(&ctx, c),
         Command::Report(c) => reports::run(&ctx, c),
+        Command::Rule(c) => rules::run(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }

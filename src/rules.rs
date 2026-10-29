@@ -649,6 +649,15 @@ fn own(r: &Rule, kind: OwnerKind) -> Option<String> {
     (r.owner_kind == kind).then(|| r.owner_id.clone()).flatten()
 }
 
+/// An export path: templates filled, a leading `~/` is the home folder.
+fn out_path(store: &Store, r: &Rule, a: &ActionRecord, to: &str) -> PathBuf {
+    let p = expand(store, r, a, to);
+    match (p.strip_prefix("~/"), std::env::var_os("HOME")) {
+        (Some(rest), Some(h)) => PathBuf::from(h).join(rest),
+        _ => PathBuf::from(p),
+    }
+}
+
 fn out_format(format: &Option<String>, to: &str) -> Result<OutFormat> {
     if let Some(f) = format {
         return OutFormat::parse(f);
@@ -695,11 +704,11 @@ pub fn plan(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
         }
         Then::ExportReport { report, to, format } => {
             let rep = store.report(report)?.ok_or_else(|| Error::invalid("report", format!("`{report}` no longer exists")))?;
-            let to = expand(store, r, a, to);
+            let to = out_path(store, r, a, to).display().to_string();
             format!("export report {} to {} ({})", rep.name, to, out_format(format, &to)?.as_str())
         }
         Then::ExportJournal { journal: j, to, format } => {
-            let to = expand(store, r, a, to);
+            let to = out_path(store, r, a, to).display().to_string();
             format!("export journal {} to {} ({})", journal(j)?, to, out_format(format, &to)?.as_str())
         }
         Then::AddToProject { project, item } => {
@@ -760,14 +769,14 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
         }
         Then::ExportReport { report, to, format } => {
             let rep = store.report(report)?.ok_or_else(|| Error::invalid("report", format!("`{report}` no longer exists")))?;
-            let to = PathBuf::from(expand(store, r, a, to));
+            let to = out_path(store, r, a, to);
             let f = out_format(format, &to.to_string_lossy())?;
             let files = crate::export::files::write_recorded(store, &Target::Report(rep.id), f, &to, ORIGIN)?;
             Ok(format!("exported report {} to {} ({} file{})", rep.name, to.display(), files.len(), if files.len() == 1 { "" } else { "s" }))
         }
         Then::ExportJournal { journal: j, to, format } => {
             let jr = journal(j)?;
-            let to = PathBuf::from(expand(store, r, a, to));
+            let to = out_path(store, r, a, to);
             let f = out_format(format, &to.to_string_lossy())?;
             let files = crate::export::files::write_recorded(store, &Target::Journal { id: jr.id, entries: vec![] }, f, &to, ORIGIN)?;
             Ok(format!("exported journal {} to {} ({} file{})", jr.name, to.display(), files.len(), if files.len() == 1 { "" } else { "s" }))
