@@ -40,6 +40,10 @@ impl Paths {
     pub fn theme_dir(&self, name: &str) -> PathBuf {
         self.themes_dir().join(name)
     }
+    /// PDFs made for printing.
+    pub fn prints_dir(&self) -> PathBuf {
+        self.home.join("prints")
+    }
     pub fn preferences(&self) -> PathBuf {
         self.home.join("preferences.toml")
     }

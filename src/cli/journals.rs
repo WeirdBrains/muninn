@@ -1,6 +1,7 @@
 //! `mnnn journal`.
 use super::searches::record;
 use super::{Ctx, JournalCommand, SelectArgs, TextArgs};
+use crate::export::files::Target;
 use crate::ingest::time::fmt_ts;
 use crate::store::journals::{AnnotationDoc, select};
 use crate::store::{Annotation, AnnotationKind, Entry, Journal, Span};
@@ -36,6 +37,19 @@ impl SelectArgs {
         let n = |v: &str| v.trim().parse::<usize>().map_err(|_| anyhow!("invalid --range: `{r}`"));
         Ok(Some(Span { start: n(a)?, end: n(b)? }))
     }
+}
+
+/// Entries named on the command line, checked to be in the journal.
+fn entry_ids(store: &crate::store::Store, j: &Journal, keys: &[String]) -> anyhow::Result<Vec<String>> {
+    let mut v = vec![];
+    for k in keys {
+        let e = store.find_entry(k)?;
+        if e.journal_id != j.id {
+            return Err(anyhow!("entry {} is not in journal {}", e.heading(), j.name));
+        }
+        v.push(e.id);
+    }
+    Ok(v)
 }
 
 fn jparams(j: &Journal) -> serde_json::Value {
@@ -302,6 +316,30 @@ pub fn run(ctx: &Ctx, cmd: JournalCommand) -> anyhow::Result<()> {
             let (a, data) = store.attachment_data(one)?.ok_or_else(|| anyhow!("image `{id}` not found"))?;
             std::fs::write(&out, &data).with_context(|| format!("writing {}", out.display()))?;
             ctx.io.info(format!("wrote {} ({} bytes) to {}", a.name, data.len(), out.display()));
+        }
+        JournalCommand::Export { journal, entries, format, out } => {
+            let j = store.find_journal(&journal)?;
+            let entries = entry_ids(&store, &j, &entries)?;
+            super::reports::export(ctx, &store, &Target::Journal { id: j.id, entries }, format.into(), out)?;
+        }
+        JournalCommand::Import { file, project, name } => {
+            let p = project.map(|p| store.find_project(&p)).transpose()?;
+            let r = crate::export::archive::import_journal(&store, &file, p.as_ref().map(|p| p.id.as_str()), name.as_deref())?;
+            let j = r.journals[0].clone();
+            record(
+                &store,
+                "journal.import",
+                format!("import journal {} from {}", j.name, file.display()),
+                serde_json::json!({ "journal": j.id, "name": j.name, "file": file.display().to_string(), "entries": r.entries }),
+            );
+            let into = p.map(|p| format!(" in project {}", p.name)).unwrap_or_default();
+            ctx.io.info(format!("imported journal {} ({}){into}: {} entries, {} images", j.name, j.short_id(), r.entries, r.attachments));
+        }
+        JournalCommand::Print { journal, entries, printer, out } => {
+            let j = store.find_journal(&journal)?;
+            let entries = entry_ids(&store, &j, &entries)?;
+            let p = crate::export::files::print_journal(&store, &j.id, &entries, printer.as_deref(), out.as_deref(), &ctx.paths.prints_dir(), "cli")?;
+            ctx.io.info(p.message());
         }
     }
     Ok(())

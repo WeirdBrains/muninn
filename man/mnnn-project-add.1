@@ -4,15 +4,15 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-project\-add \- Add a live search, a journal or a result (a series, optionally a time range) to a project
+mnnn\-project\-add \- Add a live search, a journal, a report or a result (a series, optionally a time range) to a project
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn project add\fR [\fB\-\-home\fR] [\fB\-\-search\fR] [\fB\-\-db\fR] [\fB\-\-journal\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-result\fR] [\fB\-\-from\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-to\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPROJECT\fR> 
+\fBmnnn project add\fR [\fB\-\-home\fR] [\fB\-\-search\fR] [\fB\-\-db\fR] [\fB\-\-journal\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-report\fR] [\fB\-\-result\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-from\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-to\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPROJECT\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-Add a live search, a journal or a result (a series, optionally a time range) to a project
+Add a live search, a journal, a report or a result (a series, optionally a time range) to a project
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -41,14 +41,17 @@ Never prompt; missing values are errors
 May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
 .RE
 .TP
+\fB\-\-report\fR \fI<REPORT>\fR
+Report id or name
+.TP
 \fB\-\-result\fR \fI<SERIES>\fR
 A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m
 .TP
-\fB\-\-from\fR \fI<TIME>\fR
-Result time range start
-.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
+.TP
+\fB\-\-from\fR \fI<TIME>\fR
+Result time range start
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data

@@ -1,6 +1,7 @@
 //! `mnnn project`.
 use super::searches::record;
 use super::{Ctx, ProjectCommand};
+use crate::export::files::Target;
 use crate::ingest::time::{fmt_ts, parse_ts};
 use crate::model::{Duration, Symbol};
 use crate::store::{ItemKind, Project, ProjectItem, SeriesRef, Store};
@@ -31,8 +32,34 @@ fn params(p: &Project) -> serde_json::Value {
 }
 
 pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
-    let store = ctx.open_store()?;
+    let mut store = ctx.open_store()?;
     match cmd {
+        ProjectCommand::Export { project, format, out, rows, no_data } => {
+            let p = store.find_project(&project)?;
+            super::reports::export(ctx, &store, &Target::Project { id: p.id, rows, data: !no_data }, format.into(), out)?;
+        }
+        ProjectCommand::Import { file, name } => {
+            let r = crate::export::archive::import_project(&mut store, &file, name.as_deref())?;
+            let p = r.project.clone().expect("imported project");
+            record(
+                &store,
+                "project.import",
+                format!("import project {} from {}", p.name, file.display()),
+                serde_json::json!({ "project": p.id, "name": p.name, "file": file.display().to_string(), "restored": r }),
+            );
+            ctx.io.info(format!(
+                "imported project {} ({}): {} journals, {} entries, {} images, {} reports, {} live searches, {} new bars{}",
+                p.name,
+                p.short_id(),
+                r.journals.len(),
+                r.entries,
+                r.attachments,
+                r.reports,
+                r.live_searches,
+                r.bars,
+                if r.authors_added > 0 { format!(", {} authors added", r.authors_added) } else { String::new() }
+            ));
+        }
         ProjectCommand::List { json } => {
             let all = store.projects()?;
             if json {
@@ -75,7 +102,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
                 }
                 println!("author:      {}", crate::history::author_label(&store, p.author_id.as_deref()));
                 println!("created:     {}", fmt_ts(p.created_at));
-                for k in [ItemKind::LiveSearch, ItemKind::Result, ItemKind::Journal] {
+                for k in [ItemKind::LiveSearch, ItemKind::Result, ItemKind::Journal, ItemKind::Report] {
                     let v: Vec<&ProjectItem> = items.iter().filter(|i| i.kind == k).collect();
                     if v.is_empty() {
                         continue;
@@ -106,7 +133,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
             record(&store, "project.remove", format!("remove project {}", p.name), params(&p));
             ctx.io.info(format!("removed project {}", p.name));
         }
-        ProjectCommand::Add { project, search, journal, result, from, to } => {
+        ProjectCommand::Add { project, search, journal, report, result, from, to } => {
             if result.is_none() && (from.is_some() || to.is_some()) {
                 return Err(anyhow!("--from and --to belong to --result"));
             }
@@ -117,6 +144,9 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
             } else if let Some(j) = journal {
                 let j = store.find_journal(&j)?;
                 store.add_project_item(&p.id, ItemKind::Journal, &j.id, serde_json::json!({}))?
+            } else if let Some(r) = report {
+                let r = store.find_report(&r)?;
+                store.add_project_item(&p.id, ItemKind::Report, &r.id, serde_json::json!({}))?
             } else {
                 let r = parse_result(&store, result.as_deref().unwrap_or(""), from.as_deref(), to.as_deref())?;
                 store.add_project_result(&p.id, &r)?

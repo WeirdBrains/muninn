@@ -445,6 +445,12 @@ impl Store {
         {
             return Err(Error::invalid("project", format!("`{p}` not found")));
         }
+        // Like projects: a journal of the same name gets "(imported)" unless a name is given.
+        let clash = match name {
+            None if self.journals()?.iter().any(|j| j.name == f.pack.journal.name) => Some(format!("{} (imported)", f.pack.journal.name)),
+            _ => None,
+        };
+        let name = clash.as_deref().or(name);
         self.begin_atomic()?;
         let mut out = Restored::default();
         let r = (|| -> Result<()> {

@@ -557,6 +557,45 @@ fn unmark(v: Vec<Inline>) -> Vec<Inline> {
     v
 }
 
+/// What a section shows, in one line (`records BTC/USDT binance 5m · latest 20 bars`).
+pub fn section_summary(store: &Store, s: &Section) -> String {
+    let p = &s.params;
+    let name = |r: Result<Option<String>>, gone: &str| r.ok().flatten().unwrap_or_else(|| gone.to_string());
+    match s.kind {
+        SectionKind::Text => {
+            let words = s.body.split_whitespace().count();
+            format!("text · {} · {words} words", s.format.as_str())
+        }
+        SectionKind::Records => match &p.series {
+            Some(r) => {
+                let rows = match p.rows.unwrap_or(crate::store::reports::DEFAULT_ROWS) {
+                    0 => "every bar".to_string(),
+                    n => format!("latest {n} bars"),
+                };
+                format!("records {} · {rows}", r.label())
+            }
+            None => "records (no series)".into(),
+        },
+        SectionKind::Series => match &p.search {
+            Some(id) => format!("series matching live search {}", name(store.live_search(id).map(|o| o.map(|l| l.name)), "(removed)")),
+            None => "every series".into(),
+        },
+        SectionKind::Journal => {
+            let j = name(p.journal.as_deref().map(|j| store.journal(j).map(|o| o.map(|j| j.name))).unwrap_or(Ok(None)), "(removed)");
+            match p.entries.len() {
+                0 => format!("journal {j} · every entry"),
+                1 => format!("journal {j} · 1 entry"),
+                n => format!("journal {j} · {n} entries"),
+            }
+        }
+        SectionKind::Project => {
+            format!("project {}", name(p.project.as_deref().map(|x| store.project(x).map(|o| o.map(|p| p.name))).unwrap_or(Ok(None)), "(removed)"))
+        }
+        SectionKind::Authors => "authors of the report".into(),
+        SectionKind::Code => format!("code space {} (placeholder)", p.space.clone().unwrap_or_default()),
+    }
+}
+
 /// A journal, or some of its entries, as a document.
 pub fn journal(store: &Store, id: &str, entries: &[String]) -> Result<Doc> {
     let j = store.journal(id)?.ok_or_else(|| Error::invalid("journal", format!("`{id}` not found")))?;

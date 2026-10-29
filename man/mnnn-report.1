@@ -1,0 +1,114 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-report 1  "mnnn-report 2.1.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-report \- Reports for people: text, records, series, journals, projects and authors, exported as PDF, Word, HTML, LaTeX, JSON or CSV
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn report\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Reports for people: text, records, series, journals, projects and authors, exported as PDF, Word, HTML, LaTeX, JSON or CSV
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-report\-list(1)
+List reports
+.TP
+mnnn\-report\-create(1)
+Create a report (optionally in a project)
+.TP
+mnnn\-report\-show(1)
+Show a report\*(Aqs sections (\-\-json: the definition)
+.TP
+mnnn\-report\-edit(1)
+Rename a report or change its description
+.TP
+mnnn\-report\-remove(1)
+Remove a report (and its place in projects)
+.TP
+mnnn\-report\-add(1)
+Add a section: text, records, series, a journal, a project, authors or code output
+.TP
+mnnn\-report\-edit\-section(1)
+Change a section\*(Aqs title, text, format or rows
+.TP
+mnnn\-report\-remove\-section(1)
+Remove a section
+.TP
+mnnn\-report\-move(1)
+Move a section to another position
+.TP
+mnnn\-report\-export(1)
+Export a report with the data as it is now
+.TP
+mnnn\-report\-preview(1)
+Print a report as text in the terminal
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.1.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

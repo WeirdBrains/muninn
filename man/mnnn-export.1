@@ -28,6 +28,16 @@ csv
 parquet
 .IP \(bu 2
 json
+.IP \(bu 2
+html: A document: a summary and every bar per series
+.IP \(bu 2
+latex
+.IP \(bu 2
+pdf
+.IP \(bu 2
+docx
+.IP \(bu 2
+text
 .RE
 .TP
 \fB\-\-home\fR \fI<DIR>\fR
@@ -43,7 +53,7 @@ May also be specified with the \fBMUNINN_DB\fR environment variable.
 .RE
 .TP
 \fB\-\-out\fR \fI<OUT>\fR
-Output path, or `\-` for stdout (csv/json)
+Output path, or `\-` for stdout (csv/json/text)
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
@@ -100,7 +110,7 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 .RE
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-Print help
+Print help (see a summary with \*(Aq\-h\*(Aq)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION

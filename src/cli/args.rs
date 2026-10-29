@@ -81,6 +81,10 @@ pub enum Command {
     /// Journals: entries in Markdown or LaTeX with images, notes and highlights.
     #[command(subcommand, alias = "journals")]
     Journal(JournalCommand),
+    /// Reports for people: text, records, series, journals, projects and authors, exported
+    /// as PDF, Word, HTML, LaTeX, JSON or CSV.
+    #[command(subcommand, alias = "reports")]
+    Report(ReportCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -441,13 +445,48 @@ pub enum ExportFormat {
     Csv,
     Parquet,
     Json,
+    /// A document: a summary and every bar per series.
+    Html,
+    Latex,
+    Pdf,
+    Docx,
+    Text,
+}
+
+/// Document formats (`archive`: projects only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum DocFormatArg {
+    Pdf,
+    Html,
+    Docx,
+    Latex,
+    Json,
+    Csv,
+    Text,
+    Archive,
+}
+
+impl From<DocFormatArg> for crate::export::files::OutFormat {
+    fn from(f: DocFormatArg) -> Self {
+        use crate::export::files::OutFormat as O;
+        match f {
+            DocFormatArg::Pdf => O::Pdf,
+            DocFormatArg::Html => O::Html,
+            DocFormatArg::Docx => O::Docx,
+            DocFormatArg::Latex => O::Latex,
+            DocFormatArg::Json => O::Json,
+            DocFormatArg::Csv => O::Csv,
+            DocFormatArg::Text => O::Text,
+            DocFormatArg::Archive => O::Archive,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct ExportArgs {
     #[arg(long, value_enum)]
     pub format: ExportFormat,
-    /// Output path, or `-` for stdout (csv/json).
+    /// Output path, or `-` for stdout (csv/json/text).
     #[arg(long)]
     pub out: PathBuf,
     #[arg(long)]
@@ -735,8 +774,9 @@ pub enum ProjectCommand {
     /// Remove a project. Its journals stay, as standalone journals.
     #[command(alias = "rm")]
     Remove { project: String },
-    /// Add a live search, a journal or a result (a series, optionally a time range) to a project.
-    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "result"])))]
+    /// Add a live search, a journal, a report or a result (a series, optionally a time
+    /// range) to a project.
+    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "result"])))]
     Add {
         project: String,
         /// Live search id or name.
@@ -745,6 +785,9 @@ pub enum ProjectCommand {
         /// Journal id or name.
         #[arg(long)]
         journal: Option<String>,
+        /// Report id or name.
+        #[arg(long)]
+        report: Option<String>,
         /// A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m.
         #[arg(long, value_name = "SERIES")]
         result: Option<String>,
@@ -760,6 +803,155 @@ pub enum ProjectCommand {
         project: String,
         /// Item number from `mnnn project show`.
         item: i64,
+    },
+    /// Export a project: one archive with everything (journals, images, reports, live
+    /// searches, results and their bars), or a document of it.
+    Export {
+        project: String,
+        #[arg(long, value_enum, default_value = "archive")]
+        format: DocFormatArg,
+        /// Output file (default: <project>.<ext> in the current directory).
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Bars listed per result in documents (0: all).
+        #[arg(long, default_value_t = 20)]
+        rows: usize,
+        /// Leave the bars out of archives and JSON.
+        #[arg(long)]
+        no_data: bool,
+    },
+    /// Import a project archive (.mnnp) or JSON pack as a new project.
+    Import {
+        file: PathBuf,
+        /// Name for the imported project (default: its name, "(imported)" added if taken).
+        #[arg(long)]
+        name: Option<String>,
+    },
+}
+
+/// What a new report section shows (choose one).
+#[derive(Debug, Clone, Args)]
+#[command(group(ArgGroup::new("kind").required(true).args(["text", "file", "records", "series", "journal", "project", "authors", "code"])))]
+pub struct SectionArgs {
+    pub report: String,
+    /// Section title (default: one from what it shows).
+    #[arg(long)]
+    pub title: Option<String>,
+    #[command(flatten)]
+    pub body: TextArgs,
+    /// Format of the text.
+    #[arg(long, value_enum)]
+    pub format: Option<FormatArg>,
+    /// Records of a series as SOURCE:SYMBOL:PERIOD: a summary and a table of bars.
+    #[arg(long, value_name = "SERIES")]
+    pub records: Option<String>,
+    /// Records time range start.
+    #[arg(long, value_name = "TIME", requires = "records")]
+    pub from: Option<String>,
+    /// Records time range end.
+    #[arg(long, value_name = "TIME", requires = "records")]
+    pub to: Option<String>,
+    /// Bars listed (the latest; 0: all). Default 20.
+    #[arg(long, requires = "records")]
+    pub rows: Option<usize>,
+    /// A table of series: what a live search matches now (id or name), or every series.
+    #[arg(long, value_name = "SEARCH", num_args = 0..=1, default_missing_value = "")]
+    pub series: Option<String>,
+    /// A journal's entries (with notes and highlights).
+    #[arg(long)]
+    pub journal: Option<String>,
+    /// Only these entries of --journal. Repeatable.
+    #[arg(long = "entry", requires = "journal")]
+    pub entries: Vec<String>,
+    /// A project's contents.
+    #[arg(long)]
+    pub project: Option<String>,
+    /// Everyone who contributed to the report.
+    #[arg(long)]
+    pub authors: bool,
+    /// Output of a code space (a placeholder until code spaces arrive).
+    #[arg(long, value_name = "SPACE")]
+    pub code: Option<String>,
+    /// Put the section at this position (1 = first; default: last).
+    #[arg(long)]
+    pub at: Option<usize>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ReportCommand {
+    /// List reports.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Create a report (optionally in a project).
+    #[command(alias = "new")]
+    Create {
+        name: String,
+        #[arg(long, default_value = "")]
+        description: String,
+        /// Add it to this project.
+        #[arg(long)]
+        project: Option<String>,
+    },
+    /// Show a report's sections (--json: the definition).
+    Show {
+        report: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Rename a report or change its description.
+    Edit {
+        report: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// Remove a report (and its place in projects).
+    #[command(alias = "rm")]
+    Remove { report: String },
+    /// Add a section: text, records, series, a journal, a project, authors or code output.
+    Add(SectionArgs),
+    /// Change a section's title, text, format or rows.
+    EditSection {
+        report: String,
+        /// Section number (from `mnnn report show`) or id.
+        section: String,
+        #[arg(long)]
+        title: Option<String>,
+        #[command(flatten)]
+        body: TextArgs,
+        #[arg(long, value_enum)]
+        format: Option<FormatArg>,
+        /// Bars listed by a records section (0: all).
+        #[arg(long)]
+        rows: Option<usize>,
+    },
+    /// Remove a section.
+    RemoveSection { report: String, section: String },
+    /// Move a section to another position.
+    Move {
+        report: String,
+        section: String,
+        /// New position (1 = first).
+        #[arg(long)]
+        to: usize,
+    },
+    /// Export a report with the data as it is now.
+    Export {
+        report: String,
+        #[arg(long, value_enum, default_value = "pdf")]
+        format: DocFormatArg,
+        /// Output file (default: <report>.<ext> in the current directory).
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Print a report as text in the terminal.
+    Preview {
+        report: String,
+        #[arg(long, default_value_t = 100)]
+        width: usize,
     },
 }
 
@@ -938,6 +1130,41 @@ pub enum JournalCommand {
         id: String,
         #[arg(long)]
         out: PathBuf,
+    },
+    /// Export a journal (or some entries) as PDF, Word, HTML, LaTeX, text or JSON (JSON can
+    /// be imported again).
+    Export {
+        journal: String,
+        /// Only these entries. Repeatable.
+        #[arg(long = "entry")]
+        entries: Vec<String>,
+        #[arg(long, value_enum, default_value = "pdf")]
+        format: DocFormatArg,
+        /// Output file (default: <name>.<ext> in the current directory).
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Import a journal exported as JSON (as a new journal).
+    Import {
+        file: PathBuf,
+        /// Put it in this project.
+        #[arg(long)]
+        project: Option<String>,
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Print a journal (or some entries): a PDF sent to lp/lpr, or saved if there is none.
+    Print {
+        journal: String,
+        /// Only these entries. Repeatable.
+        #[arg(long = "entry")]
+        entries: Vec<String>,
+        /// Printer name (default: the system default).
+        #[arg(long)]
+        printer: Option<String>,
+        /// Where to keep the PDF (default: ~/.muninn/prints/).
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
 }
 

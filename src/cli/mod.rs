@@ -11,6 +11,7 @@ mod keys;
 pub mod man;
 mod misc;
 mod projects;
+mod reports;
 mod searches;
 pub use args::*;
 
@@ -115,6 +116,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Search(c) => searches::run(&ctx, c),
         Command::Project(c) => projects::run(&ctx, c),
         Command::Journal(c) => journals::run(&ctx, c),
+        Command::Report(c) => reports::run(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }
