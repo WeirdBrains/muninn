@@ -337,6 +337,13 @@ impl<'a> Builder<'a> {
                 }
             }
         }
+        // Later edits are in the history: whoever changed the report or one of its sections.
+        for a in self.store.actions()?.iter().filter(|a| {
+            matches!(a.kind.as_str(), "report.edit" | "report.section.edit" | "report.section.move" | "report.section.remove")
+                && a.params.get("report").and_then(|v| v.as_str()) == Some(r.id.as_str())
+        }) {
+            add(&a.author_id, "edits".into());
+        }
         let mut rows = vec![];
         for (id, what) in by {
             let a = self.store.author(&id)?;
@@ -344,7 +351,8 @@ impl<'a> Builder<'a> {
             let email = a.as_ref().and_then(|a| a.email.clone()).unwrap_or_default();
             let details = a.map(|a| a.details.iter().map(|(k, v)| format!("{k}: {v}")).collect::<Vec<_>>().join("; ")).unwrap_or_default();
             let mut what: Vec<String> = what;
-            what.dedup();
+            let mut seen = std::collections::HashSet::new();
+            what.retain(|w| seen.insert(w.clone()));
             rows.push(vec![name, email, details, what.join(", ")]);
         }
         if rows.is_empty() {

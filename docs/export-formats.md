@@ -93,7 +93,8 @@ the same project as one JSON file with images and bars inline.
 
 Import restores everything as new items with new ids, so it can sit next to the
 original: a project or journal of the same name is imported as "NAME (imported)"
-unless `--name` is given. Bars are added like an ingest (existing bars are kept),
+unless `--name` is given, and so are a project's journals and reports whose names are
+taken. Bars are added like an ingest (existing bars are kept),
 authors are matched by id and added when missing, and references between the
 project's journals, live searches, reports and images are rewritten. An import is all
 or nothing. Recorded as `project.import` / `journal.import`.

@@ -518,11 +518,16 @@ impl Store {
         }
         for j in &p.journals {
             let in_project = j.journal.project_id.as_deref() == Some(p.project.id.as_str());
-            self.restore_journal(j, in_project.then_some(np.id.as_str()), None, blobs, &mut ids, &mut out)?;
+            let clash = self.journals()?.iter().any(|x| x.name == j.journal.name);
+            let jname = clash.then(|| format!("{} (imported)", j.journal.name));
+            self.restore_journal(j, in_project.then_some(np.id.as_str()), jname.as_deref(), blobs, &mut ids, &mut out)?;
         }
         for r in &p.reports {
             let mut nr = r.report.clone();
             nr.id = super::new_id();
+            if self.reports()?.iter().any(|x| x.name == nr.name) {
+                nr.name = format!("{} (imported)", nr.name);
+            }
             self.conn.execute(
                 "INSERT INTO reports(id, name, description, author_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 params![nr.id, nr.name, nr.description, nr.author_id, nr.created_at, nr.updated_at],

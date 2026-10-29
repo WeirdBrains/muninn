@@ -272,6 +272,11 @@ fn projects_export_to_one_archive_and_import_back() {
     // JSON pack too, and a clash gets a new name.
     f.ok(&["project", "import", json.to_str().unwrap()]);
     assert!(f.ok(&["project", "list"]).contains("Breakouts (imported)"));
+    // Its journal and report get new names too, so the originals stay unambiguous.
+    assert!(f.ok(&["journal", "list"]).contains("Desk (imported)"));
+    assert!(f.ok(&["report", "list"]).contains("Weekly (imported)"));
+    f.ok(&["journal", "show", "Desk"]);
+    f.ok(&["report", "show", "Weekly"]);
     f.ok(&["project", "import", arc.to_str().unwrap(), "--name", "Copy"]);
     assert!(f.ok(&["project", "list"]).contains("Copy"));
     // Without data the archive is smaller and still imports.
@@ -299,4 +304,19 @@ fn bars_export_as_documents() {
     assert!(text.contains("BTC/USDT"), "{text}");
     let o = e.run(&["export", "--format", "pdf", "--out", "-"]);
     assert!(!o.status.success());
+}
+
+#[test]
+fn report_authors_include_later_editors() {
+    let e = Env::new();
+    e.ok(&["report", "create", "Notes"]);
+    e.ok(&["report", "add", "Notes", "--text", "Draft"]);
+    e.ok(&["report", "add", "Notes", "--authors"]);
+    let before = e.ok(&["report", "preview", "Notes"]);
+    assert!(before.contains("No authors recorded"), "{before}");
+    e.ok(&["author", "add", "--name", "Grace"]);
+    e.ok(&["author", "use", "Grace"]);
+    e.ok(&["report", "edit-section", "Notes", "1", "--text", "Final"]);
+    let after = e.ok(&["report", "preview", "Notes"]);
+    assert!(after.contains("Grace") && after.contains("edits"), "{after}");
 }

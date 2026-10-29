@@ -13,7 +13,7 @@ exported to PDF, HTML, Word (.docx), LaTeX, JSON, CSV or plain text (see
 | `series` | every series a [live search](live-searches.md) matches now, or every series, one summary row each |
 | `journal` | a [journal](journals.md), or some of its entries, with notes as footnotes and highlights marked |
 | `project` | a project's contents: live searches, results, journals and reports |
-| `authors` | who wrote the report and its sections |
+| `authors` | who created the report, added its sections or entries, and later edited it |
 | `code` | output of a code space; a placeholder until code spaces arrive |
 
 ## Command line
