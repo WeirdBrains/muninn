@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.12.2] - 2026-10-28
+
+### Fixed
+- `packaging/arch/build-local.sh` now installs the package it builds (`sudo pacman -U --needed`), with or without namcap; `--no-install` only builds
+- Arch packages pass namcap cleanly: stripped `mnnn` binary, `libgcc` dependency, `$CARCH` sources
+
 ## [1.12.1] - 2026-10-28
 
 ### Added
@@ -170,7 +176,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.12.1...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.12.2...HEAD
+[1.12.2]: https://github.com/kommandosaldat/muninn/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/kommandosaldat/muninn/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/kommandosaldat/muninn/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/kommandosaldat/muninn/compare/v1.10.0...v1.11.0
