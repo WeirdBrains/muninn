@@ -11,6 +11,7 @@ pub mod journals;
 pub mod projects;
 mod query;
 pub mod reports;
+pub mod rules;
 pub mod runs;
 pub mod searches;
 pub use authors::{Author, AuthorChange};
@@ -19,6 +20,7 @@ pub use journals::{Annotation, AnnotationKind, Attachment, Entry, EntryFormat, J
 pub use projects::{ItemKind, Project, ProjectItem, SeriesRef};
 pub use query::{BarSort, BarSummary};
 pub use reports::{NewSection, Report, Section, SectionChange, SectionKind, SectionParams};
+pub use rules::{Condition, ItemRef, NewRule, Op, OwnerKind, Rule, RuleChange, RuleSpec, Then};
 pub use runs::{Artifact, ImportRun};
 pub use searches::{LiveSearch, SearchSpec, SearchTarget};
 
@@ -104,6 +106,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     journals::MIGRATION,
     // 2.2: reports
     reports::MIGRATION,
+    // 2.3: rules
+    rules::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
@@ -172,6 +176,8 @@ pub struct BarFilter {
 
 pub struct Store {
     pub conn: Connection,
+    /// Rule engine state for this connection (see [`crate::rules`]).
+    pub(crate) rules_rt: rules::RuleRuntime,
 }
 
 /// Outcome of upserting a batch.
@@ -197,7 +203,7 @@ impl Store {
         if !existed {
             crate::paths::set_mode(path, 0o600)?;
         }
-        let mut s = Self { conn };
+        let mut s = Self::wrap(conn);
         s.migrate()?;
         Ok(s)
     }
@@ -207,8 +213,12 @@ impl Store {
         let _ = self.conn.execute_batch("PRAGMA cache_size = -262144; PRAGMA temp_store = MEMORY;");
     }
 
+    fn wrap(conn: Connection) -> Self {
+        Self { conn, rules_rt: Default::default() }
+    }
+
     pub fn open_in_memory() -> Result<Self> {
-        let mut s = Self { conn: Connection::open_in_memory()? };
+        let mut s = Self::wrap(Connection::open_in_memory()?);
         s.migrate()?;
         Ok(s)
     }
@@ -709,7 +719,7 @@ mod tests {
             // a v1.16 database: schema 3 with bars and an import run
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
-            let mut s = Store { conn };
+            let mut s = Store::wrap(conn);
             s.migrate_to(3).unwrap();
             assert_eq!(s.schema_version().unwrap(), 3);
             let src = s.add_source("binance", "file", None).unwrap();
@@ -741,7 +751,7 @@ mod tests {
             // a v2.0 database: schema 5 with an author and actions
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
-            let mut s = Store { conn };
+            let mut s = Store::wrap(conn);
             s.migrate_to(5).unwrap();
             s.add_author("Ada", None, &[]).unwrap();
             s.record_action(&NewAction::new("theme", "cli", "theme nord")).unwrap();
@@ -758,6 +768,33 @@ mod tests {
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.project_items(&p.id).unwrap().len(), 1);
         assert_eq!(s.entries(&j.id).unwrap()[0].author_id, s.current_author_id().unwrap());
+    }
+
+    #[test]
+    fn a_2_2_database_migrates_and_gains_rules() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v22.database");
+        let key = [3u8; 32];
+        let report;
+        {
+            // a v2.2 database: everything up to reports
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store::wrap(conn);
+            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            report = s.create_report("R", "").unwrap().id;
+            s.record_action(&NewAction::new("report.create", "cli", "create report R")).unwrap();
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        assert!(s.report(&report).unwrap().is_some());
+        assert_eq!(s.actions().unwrap().len(), 1);
+        assert!(s.rules().unwrap().is_empty());
+        let spec = RuleSpec { on: vec!["*".into()], then: vec![Then::Status { text: "x".into() }], ..Default::default() };
+        s.create_rule(&NewRule { name: "r".into(), spec, enabled: true, ..Default::default() }).unwrap();
+        drop(s);
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.rules().unwrap().len(), 1);
     }
 
     #[test]

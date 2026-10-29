@@ -15,6 +15,7 @@ pub mod ingest;
 pub mod live;
 pub mod model;
 pub mod render;
+pub mod rules;
 pub mod store;
 pub mod theme;
 pub mod tui;

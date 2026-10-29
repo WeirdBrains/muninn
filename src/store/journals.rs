@@ -479,6 +479,7 @@ impl Store {
     pub fn remove_journal(&self, id: &str) -> Result<Journal> {
         let j = self.journal(id)?.ok_or_else(|| Error::invalid("journal", format!("`{id}` not found")))?;
         self.conn.execute("DELETE FROM project_items WHERE kind = 'journal' AND ref_id = ?1", [id])?;
+        self.orphan_rules(super::OwnerKind::Journal, id)?;
         self.conn.execute("DELETE FROM journals WHERE id = ?1", [id])?;
         Ok(j)
     }

@@ -8,6 +8,7 @@
 use super::journals::{Annotation, Attachment, Entry, Journal};
 use super::projects::{ItemKind, Project, ProjectItem, SeriesRef};
 use super::reports::{Report, Section, SectionKind};
+use super::rules::{ItemRef, OwnerKind, Rule, Then};
 use super::searches::{LiveSearch, SearchTarget};
 use super::{Author, Store, now_ms};
 use crate::error::{Error, Result};
@@ -78,6 +79,9 @@ pub struct ProjectPack {
     pub live_searches: Vec<LiveSearch>,
     pub journals: Vec<JournalPack>,
     pub reports: Vec<ReportPack>,
+    /// The project's rules and those living in its journals and live searches (2.3+).
+    #[serde(default)]
+    pub rules: Vec<Rule>,
     #[serde(default)]
     pub data: Vec<DataPack>,
 }
@@ -103,6 +107,8 @@ pub struct Restored {
     pub attachments: usize,
     pub live_searches: usize,
     pub reports: usize,
+    /// Rules brought in (they arrive switched off).
+    pub rules: usize,
     pub bars: u64,
     pub authors_added: usize,
 }
@@ -122,6 +128,9 @@ impl Restored {
         if project {
             v.push(n(self.reports as u64, "report", "reports"));
             v.push(n(self.live_searches as u64, "live search", "live searches"));
+            if self.rules > 0 {
+                v.push(n(self.rules as u64, "rule (off)", "rules (off)"));
+            }
             v.push(n(self.bars, "new bar", "new bars"));
         }
         if self.authors_added > 0 {
@@ -328,8 +337,22 @@ impl Store {
                 live_searches.push(l);
             }
         }
+        let mut rules: Vec<Rule> = vec![];
+        let mut rule_ids = std::collections::BTreeSet::new();
+        let owned = journals
+            .iter()
+            .map(|j| (OwnerKind::Journal, j.journal.id.clone()))
+            .chain(live_searches.iter().map(|l| (OwnerKind::LiveSearch, l.id.clone())))
+            .map(|(k, i)| self.owned_rules(k, &i))
+            .collect::<Result<Vec<_>>>()?;
+        for r in self.project_rules(&project.id)?.into_iter().chain(owned.into_iter().flatten()) {
+            if rule_ids.insert(r.id.clone()) {
+                rules.push(r);
+            }
+        }
         let mut ids: Vec<Option<String>> = vec![project.author_id.clone()];
         ids.extend(items.iter().map(|i| i.author_id.clone()));
+        ids.extend(rules.iter().map(|r| r.author_id.clone()));
         ids.extend(live_searches.iter().map(|l| l.author_id.clone()));
         for j in &journals {
             ids.extend(journal_author_ids(j));
@@ -350,6 +373,7 @@ impl Store {
             live_searches,
             journals,
             reports,
+            rules,
             data: vec![],
         };
         if with_data {
@@ -570,9 +594,32 @@ impl Store {
             }
             out.reports += 1;
         }
+        for r in &p.rules {
+            let mut nr = r.clone();
+            nr.id = super::new_id();
+            if self.rules()?.iter().any(|x| x.name == nr.name) {
+                nr.name = format!("{} (imported)", nr.name);
+            }
+            let map = |v: &str| ids.get(v).cloned().unwrap_or_else(|| v.to_string());
+            nr.owner_id = r.owner_id.as_deref().and_then(|o| ids.get(o).cloned());
+            if nr.owner_id.is_none() {
+                nr.owner_kind = OwnerKind::Standalone;
+            }
+            for t in &mut nr.spec.then {
+                remap_then(t, &map);
+            }
+            // a rule acts on its own; it waits for `mnnn rule enable` after an import
+            nr.enabled = false;
+            nr.runs = 0;
+            nr.last_run_at = None;
+            nr.last_status = None;
+            self.insert_rule(&nr)?;
+            ids.insert(r.id.clone(), nr.id);
+            out.rules += 1;
+        }
         for it in &p.items {
             let ref_id = match it.kind {
-                ItemKind::Result | ItemKind::RuleSet => it.ref_id.clone(),
+                ItemKind::Result => it.ref_id.clone(),
                 _ => match ids.get(&it.ref_id) {
                     Some(n) => n.clone(),
                     None => continue,
@@ -594,6 +641,28 @@ impl Store {
         }
         out.project = Some(np);
         Ok(out)
+    }
+}
+
+/// Point a then-action at the imported copies of what it names.
+fn remap_then(t: &mut Then, map: &dyn Fn(&str) -> String) {
+    let opt = |v: &mut Option<String>| {
+        if let Some(x) = v {
+            *x = map(x);
+        }
+    };
+    match t {
+        Then::Status { .. } => {}
+        Then::RunSearch { search } => opt(search),
+        Then::ExportReport { report, .. } => *report = map(report),
+        Then::ExportJournal { journal, .. } | Then::WriteEntry { journal, .. } | Then::AddNote { journal, .. } => opt(journal),
+        Then::AddToProject { project, item } => {
+            opt(project);
+            match item {
+                ItemRef::Subject => {}
+                ItemRef::LiveSearch(i) | ItemRef::Journal(i) | ItemRef::Report(i) => *i = map(i),
+            }
+        }
     }
 }
 
@@ -624,5 +693,59 @@ mod tests {
         let r = Restored { entries: 1, attachments: 2, reports: 1, bars: 0, ..Default::default() };
         assert_eq!(r.counts(false), "1 entry, 2 images");
         assert_eq!(r.counts(true), "0 journals, 1 entry, 2 images, 1 report, 0 live searches, 0 new bars");
+        let r = Restored { rules: 2, ..Default::default() };
+        assert!(r.counts(true).contains("2 rules (off)"));
+    }
+
+    #[test]
+    fn rules_travel_with_projects() {
+        use crate::store::*;
+        let a = Store::open_in_memory().unwrap();
+        let p = a.create_project("P", "").unwrap();
+        let j = a.create_journal("J", Some(&p.id), EntryFormat::Markdown).unwrap();
+        a.add_project_item(&p.id, ItemKind::Journal, &j.id, serde_json::json!({})).unwrap();
+        let spec = |t: Then| RuleSpec { on: vec!["*".into()], then: vec![t], ..Default::default() };
+        let owned = a
+            .create_rule(&NewRule {
+                name: "in journal".into(),
+                owner_kind: OwnerKind::Journal,
+                owner_id: Some(j.id.clone()),
+                spec: spec(Then::AddNote { journal: Some(j.id.clone()), text: "x".into() }),
+                enabled: true,
+                ..Default::default()
+            })
+            .unwrap();
+        let member = a
+            .create_rule(&NewRule {
+                name: "in project".into(),
+                spec: spec(Then::AddToProject { project: Some(p.id.clone()), item: ItemRef::Subject }),
+                enabled: true,
+                ..Default::default()
+            })
+            .unwrap();
+        a.add_project_item(&p.id, ItemKind::RuleSet, &member.id, serde_json::json!({})).unwrap();
+        a.create_rule(&NewRule { name: "elsewhere".into(), spec: spec(Then::Status { text: "x".into() }), ..Default::default() }).unwrap();
+        let pack = a.project_pack(&p.id, false).unwrap();
+        assert_eq!(pack.rules.len(), 2);
+        let json = serde_json::to_string(&pack).unwrap();
+        let mut b = Store::open_in_memory().unwrap();
+        let out = b.import_project(&serde_json::from_str(&json).unwrap(), None, &super::Inline).unwrap();
+        assert_eq!(out.rules, 2);
+        let np = out.project.unwrap();
+        let nj = &out.journals[0];
+        let rules = b.rules().unwrap();
+        assert!(rules.iter().all(|r| !r.enabled && r.id != owned.id && r.id != member.id));
+        let o = rules.iter().find(|r| r.name == "in journal").unwrap();
+        assert_eq!(o.owner_id.as_deref(), Some(nj.id.as_str()));
+        assert_eq!(o.spec.then[0], Then::AddNote { journal: Some(nj.id.clone()), text: "x".into() });
+        let m = &b.project_rules(&np.id).unwrap()[0];
+        assert_eq!(m.spec.then[0], Then::AddToProject { project: Some(np.id.clone()), item: ItemRef::Subject });
+        // a 2.2 pack (no rules) still reads
+        let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        v.as_object_mut().unwrap().remove("rules");
+        let old = b.import_project(&serde_json::from_value(v).unwrap(), None, &super::Inline).unwrap();
+        assert_eq!((old.rules, old.journals.len()), (0, 1));
+        let p2 = old.project.unwrap();
+        assert!(b.project_rules(&p2.id).unwrap().is_empty(), "a rule item with no rule in the pack is dropped");
     }
 }

@@ -177,6 +177,7 @@ impl Store {
     pub fn remove_live_search(&self, id: &str) -> Result<LiveSearch> {
         let s = self.live_search(id)?.ok_or_else(|| Error::invalid("live search", format!("`{id}` not found")))?;
         self.conn.execute("DELETE FROM project_items WHERE kind = 'live_search' AND ref_id = ?1", [id])?;
+        self.orphan_rules(super::OwnerKind::LiveSearch, id)?;
         self.conn.execute("DELETE FROM live_searches WHERE id = ?1", [id])?;
         Ok(s)
     }

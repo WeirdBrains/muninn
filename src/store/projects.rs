@@ -1,8 +1,8 @@
 //! Projects: named collections of live searches, results and journals.
 //!
 //! A project holds items. Each item points at something by kind and id: a live search,
-//! a result (a series, optionally within a time range), a journal or a report. Rule sets (2.x Phase 4)
-//! attach the same way with kind `rule_set`; nothing else in the schema has to change.
+//! a result (a series, optionally within a time range), a journal, a report or a rule. Rules
+//! attach with kind `rule_set` (a project's rules are its rule set); see `docs/rules.md`.
 //! Journals created in (or forked into) a project are owned by it (`journals.project_id`);
 //! removing a project keeps its journals as standalone ones. See `docs/projects.md`.
 use super::{Store, now_ms};
@@ -41,7 +41,7 @@ pub enum ItemKind {
     /// A series (optionally a time range of it): always shows the bars stored now.
     Result,
     Journal,
-    /// Reserved for rule sets (Phase 4).
+    /// A rule (`mnnn rule`); a project's rules make up its rule set.
     RuleSet,
     Report,
 }
@@ -71,7 +71,7 @@ impl ItemKind {
             ItemKind::LiveSearch => "live search",
             ItemKind::Result => "result",
             ItemKind::Journal => "journal",
-            ItemKind::RuleSet => "rule set",
+            ItemKind::RuleSet => "rule",
             ItemKind::Report => "report",
         }
     }
@@ -80,7 +80,7 @@ impl ItemKind {
             ItemKind::LiveSearch => "live searches",
             ItemKind::Result => "results",
             ItemKind::Journal => "journals",
-            ItemKind::RuleSet => "rule sets",
+            ItemKind::RuleSet => "rules",
             ItemKind::Report => "reports",
         }
     }
@@ -282,7 +282,7 @@ impl Store {
             ItemKind::Journal => self.journal(ref_id)?.is_some(),
             ItemKind::Result => true,
             ItemKind::Report => self.report(ref_id)?.is_some(),
-            ItemKind::RuleSet => return Err(Error::NotImplemented("rule sets")),
+            ItemKind::RuleSet => self.rule(ref_id)?.is_some(),
         };
         if !exists {
             return Err(Error::invalid(kind.label(), format!("`{ref_id}` not found")));
@@ -334,7 +334,7 @@ mod tests {
         let (ri, _) = s.add_project_result(&p.id, &r).unwrap();
         assert_eq!(ri.series(), Some(r));
         assert!(s.add_project_item(&p.id, ItemKind::LiveSearch, "nope", serde_json::json!({})).is_err());
-        assert!(s.add_project_item(&p.id, ItemKind::RuleSet, "x", serde_json::json!({})).is_err());
+        assert!(s.add_project_item(&p.id, ItemKind::RuleSet, "x", serde_json::json!({})).is_err(), "no such rule");
         assert_eq!(s.project_items(&p.id).unwrap().len(), 2);
         assert_eq!(s.projects_with(ItemKind::LiveSearch, &l.id).unwrap()[0].id, p.id);
         s.remove_live_search(&l.id).unwrap();

@@ -680,7 +680,15 @@ pub fn project(store: &Store, id: &str, rows: usize) -> Result<Doc> {
                     blocks.extend(b.series(Some(&it.ref_id))?);
                 }
             }
-            ItemKind::RuleSet => {}
+            ItemKind::RuleSet => {
+                if let Some(r) = store.rule(&it.ref_id)? {
+                    blocks.push(Block::Heading(1, vec![t(format!("Rule: {}", r.name))]));
+                    let mut lines = vec![crate::rules::brief(&r)];
+                    lines.extend(r.spec.when.iter().map(|c| format!("if {}", crate::rules::condition_text(c))));
+                    lines.extend(r.spec.then.iter().map(|x| format!("then {}", crate::rules::then_text(store, x))));
+                    blocks.extend(lines.into_iter().map(|l| Block::Para(vec![t(l)])));
+                }
+            }
         }
     }
     let mut d = b.doc(p.name.clone(), blocks);

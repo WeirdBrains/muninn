@@ -146,7 +146,10 @@ pub fn describe_item(store: &Store, it: &crate::store::ProjectItem) -> (String, 
             }
             None => ("(removed report)".into(), String::new()),
         },
-        crate::store::ItemKind::RuleSet => (it.ref_id.clone(), "rule sets arrive in a later release".into()),
+        crate::store::ItemKind::RuleSet => match store.rule(&it.ref_id).ok().flatten() {
+            Some(r) => (r.name.clone(), crate::rules::brief(&r)),
+            None => ("(removed rule)".into(), String::new()),
+        },
     }
 }
 

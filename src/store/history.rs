@@ -124,14 +124,37 @@ impl Store {
         let parent = self.history_head()?;
         let author = self.setting("current_author")?;
         let s = |v: &Option<Value>| v.as_ref().map(|v| v.to_string());
+        // actions taken by a rule carry the chain of rules that led to them (provenance)
+        let chain = self.rules_rt.chain.borrow().clone();
+        let mut params = a.params.clone();
+        if !chain.is_empty() {
+            if !params.is_object() {
+                params = serde_json::json!({});
+            }
+            params["rule_chain"] = serde_json::json!(chain);
+        }
         self.conn.execute(
             "INSERT INTO actions(parent_id, kind, summary, params, origin, author_id, created_at, state_before, state_after)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![parent, a.kind, a.summary, a.params.to_string(), a.origin, author, now_ms(), s(&a.before), s(&a.after)],
+            params![parent, a.kind, a.summary, params.to_string(), a.origin, author, now_ms(), s(&a.before), s(&a.after)],
         )?;
         let id = self.conn.last_insert_rowid();
         self.set_setting(HEAD, Some(&id.to_string()))?;
+        crate::rules::after_action(self, id);
         Ok(id)
+    }
+
+    /// Rewrite an action's summary and params (a rule run fills in its results).
+    pub(crate) fn update_action(&self, id: i64, summary: &str, params: &Value) -> Result<()> {
+        self.conn.execute("UPDATE actions SET summary = ?2, params = ?3 WHERE id = ?1", params![id, summary, params.to_string()])?;
+        Ok(())
+    }
+
+    /// Actions of one kind, oldest first.
+    pub fn actions_of_kind(&self, kind: &str) -> Result<Vec<ActionRecord>> {
+        let mut st = self.conn.prepare(&format!("SELECT {COLS} FROM actions WHERE kind = ?1 ORDER BY id"))?;
+        let v = st.query_map([kind], row)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(v)
     }
 
     /// Record, logging instead of failing (history must never break the action itself).
