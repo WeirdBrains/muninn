@@ -3,11 +3,13 @@
 //! Layout (docs/historical/1.0/PLAN.md 1.3): header, menu bar, content area, status line. Menus, keys and
 //! help all dispatch the same [`action::Action`]s through [`App::dispatch`].
 pub mod action;
+pub mod authors;
 pub mod chart;
 mod charting;
 pub mod data;
 pub mod forms;
 pub mod header;
+pub mod history;
 pub mod import;
 pub mod layout;
 pub mod menu;
@@ -79,6 +81,10 @@ pub enum Hit {
     Press(ratatui::crossterm::event::KeyCode),
     /// A bar row of a list tile (absolute row index).
     ListRow(u32, i64),
+    /// The history bar (focus), its `«` collapse button, and a row (0: the start).
+    HistoryBar,
+    HistoryCollapse,
+    HistoryRow(usize),
 }
 
 pub struct App {
@@ -112,6 +118,10 @@ pub struct App {
     pub hits: Vec<(Rect, Hit)>,
     /// Last dispatched action (tests and the status line).
     pub last_action: Option<Action>,
+    pub authors: authors::AuthorsState,
+    pub history: history::HistoryPane,
+    /// View state as of the last recorded action; a change from it is the next action.
+    pub view_base: crate::history::ViewState,
 }
 
 impl App {
@@ -137,6 +147,9 @@ impl App {
             modal: None,
             hits: vec![],
             last_action: None,
+            authors: Default::default(),
+            history: Default::default(),
+            view_base: crate::history::ViewState::capture(&prefs),
             paths,
             store,
             dek,
@@ -184,6 +197,7 @@ impl App {
         match &self.modal {
             Some(m) => m.help_topic(),
             None if self.menu.is_open() => "menus",
+            None if self.history.focused => "history",
             None if self.sidebar.focused => "sidebar",
             None if self.layout.focused().view == layout::View::Chart => "charts",
             None => "tiling",
@@ -221,6 +235,10 @@ impl App {
             KeyCode::Char('o') if !ctrl && !self.typing() && self.modal.is_none() => Some(Action::ToggleOrder),
             KeyCode::Char('X') if !self.typing() && self.modal.is_none() => Some(Action::ClearFilters),
             KeyCode::Char('i') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Import),
+            KeyCode::Char('A') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Authors),
+            KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
+            KeyCode::Char('u') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryBack),
+            KeyCode::Char('U') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryForward),
             KeyCode::Char('T') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Filter(action::FilterKind::Time)),
             KeyCode::Char('?') if !self.typing() => Some(Action::Help),
             KeyCode::Char('q') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Quit),
@@ -290,6 +308,32 @@ impl App {
                 self.quit = true;
             }
             Preferences => self.modal = Some(Modal::Prefs { sel: 0 }),
+            Authors => authors::open(self),
+            ToggleHistory => {
+                let open = self.prefs.tui.history_open;
+                if open && !self.history.focused {
+                    self.history.focused = true;
+                    self.sidebar.focused = false;
+                    self.sidebar.searching = false;
+                } else {
+                    self.prefs.tui.history_open = !open;
+                    self.history.focused = !open;
+                    if !open {
+                        self.sidebar.focused = false;
+                        self.sidebar.searching = false;
+                        self.refresh_history(true);
+                    }
+                    self.save_prefs();
+                }
+            }
+            HistoryBack => {
+                let r = self.store.history_back(1);
+                self.apply_move(r);
+            }
+            HistoryForward => {
+                let r = self.store.history_forward(1);
+                self.apply_move(r);
+            }
             ThemeSelect => self.modal = Some(Modal::Themes),
             ThemeMode(m) => self.set_theme_mode(m),
             ThemeEdit | ThemeNew => {
@@ -414,6 +458,7 @@ impl App {
                 self.save_prefs();
             }
             FocusSidebar => {
+                self.history.focused = false;
                 self.prefs.tui.sidebar_collapsed = false;
                 self.sidebar.focused = true;
                 self.sidebar.searching = true;
@@ -451,6 +496,7 @@ impl App {
         let t = self.theme_file.clone();
         self.apply_theme(t, v);
         self.set_status(format!("mode {m} (showing {})", v.name()));
+        self.note_view();
     }
 
     pub fn on_key(&mut self, k: KeyEvent) {
@@ -498,6 +544,9 @@ impl App {
         if k.code == KeyCode::Char('w') && k.modifiers.contains(KeyModifiers::CONTROL) {
             self.pending_w = true;
             self.set_status("C-w: v s q h j k l Tab < > + - = x z t e y");
+            return;
+        }
+        if self.history.focused && self.prefs.tui.history_open && history::on_key(self, k) {
             return;
         }
         if self.sidebar.focused && sidebar_key(self, k) {
@@ -549,6 +598,7 @@ impl App {
     pub fn filters_changed(&mut self) {
         self.caches.clear();
         self.sidebar_prefs_changed();
+        self.note_view();
     }
 
     /// Show the selected sidebar series in the focused tile.
@@ -673,7 +723,26 @@ impl App {
                 self.layout.set_focus(id);
                 self.layout_changed();
             }
-            Some(Hit::Sidebar) => self.sidebar.focused = true,
+            Some(Hit::Sidebar) => {
+                self.sidebar.focused = true;
+                self.history.focused = false;
+            }
+            Some(Hit::HistoryBar) => {
+                self.history.focused = true;
+                self.sidebar.focused = false;
+                self.sidebar.searching = false;
+            }
+            Some(Hit::HistoryCollapse) => self.dispatch(Action::ToggleHistory),
+            Some(Hit::HistoryRow(r)) => {
+                self.history.focused = true;
+                self.sidebar.focused = false;
+                self.sidebar.searching = false;
+                if self.history.sel == r {
+                    self.history_goto_row(r);
+                } else {
+                    self.history.sel = r;
+                }
+            }
             Some(Hit::SidebarSearch) => {
                 self.sidebar.focused = true;
                 self.sidebar.searching = true;
@@ -761,7 +830,11 @@ impl App {
     }
 
     pub fn status_items(&self) -> Vec<String> {
-        vec![format!("● unlocked · {} ({})", self.prefs.theme.mode, self.variant.name()), self.paths.home.display().to_string()]
+        let mut v = vec![format!("● unlocked · {} ({})", self.prefs.theme.mode, self.variant.name()), self.paths.home.display().to_string()];
+        if let Ok(Some(a)) = self.store.current_author() {
+            v.push(format!("author: {}", a.name));
+        }
+        v
     }
 
     pub fn draw(&mut self, f: &mut Frame) {
@@ -779,10 +852,17 @@ impl App {
         header::draw(f, head, &t, &self.status_items());
         let mut hits = std::mem::take(&mut self.hits);
         let xs = menu::draw_bar(&self.menu, f, bar, &t, &mut hits);
-        let (content, side) = if self.prefs.tui.sidebar_collapsed || body.width < 60 {
-            (body, None)
+        let main = if self.prefs.tui.history_open && body.width >= 60 + history::WIDTH {
+            let [h, rest] = Layout::horizontal([Constraint::Length(history::WIDTH), Constraint::Min(0)]).areas(body);
+            history::draw(self, f, h, &t, &mut hits);
+            rest
         } else {
-            let [c, s] = Layout::horizontal([Constraint::Min(0), Constraint::Length(sidebar::WIDTH)]).areas(body);
+            body
+        };
+        let (content, side) = if self.prefs.tui.sidebar_collapsed || main.width < 60 {
+            (main, None)
+        } else {
+            let [c, s] = Layout::horizontal([Constraint::Min(0), Constraint::Length(sidebar::WIDTH)]).areas(main);
             (c, Some(s))
         };
         self.draw_content(f, content, &mut hits);

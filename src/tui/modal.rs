@@ -33,6 +33,8 @@ pub enum Modal {
     Import,
     Keys,
     Themes,
+    /// File ▸ Authors…
+    Authors,
     Prefs {
         sel: usize,
     },
@@ -82,6 +84,7 @@ impl Modal {
             Modal::Import => "import",
             Modal::Keys => "keys",
             Modal::Themes => "themes",
+            Modal::Authors => "authors",
             Modal::Prefs { .. } => "preferences",
             Modal::Info { .. } | Modal::Pick { .. } => "tui",
             Modal::Layers { .. } => "charts",
@@ -105,6 +108,7 @@ impl Modal {
             Modal::Import => app.import.typing(),
             Modal::Keys => app.keys.typing(),
             Modal::Themes => app.themes.typing(),
+            Modal::Authors => app.authors.typing(),
             Modal::Prompt(_) => true,
             Modal::Filter { edit, .. } => edit.is_some(),
             _ => false,
@@ -166,7 +170,7 @@ pub fn coverage_lines(store: &Store) -> Vec<String> {
     }
 }
 
-const PREF_ROWS: usize = 3;
+const PREF_ROWS: usize = 4;
 
 /// A click inside the open popup. Rows select and activate (like Enter), key hints
 /// press their key, form rows focus a field or run an action.
@@ -207,6 +211,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
                 *sel = i;
                 on_key(app, enter);
             }
+            Some(Modal::Authors) => super::authors::on_click(app, i),
             Some(Modal::Themes) => {
                 if let Some(ed) = app.themes.editor.as_mut() {
                     ed.role = i.min(crate::theme::ROLES.len() - 1);
@@ -269,6 +274,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 forms::keys_key(app, k);
             }
         }
+        Modal::Authors => super::authors::on_key(app, k),
         Modal::Themes => {
             if k.code == KeyCode::Esc && app.themes.editor.is_none() {
                 app.modal = None;
@@ -291,7 +297,8 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 match *sel {
                     0 => app.prefs.tui.header = app.prefs.tui.header.next(),
                     1 => app.prefs.tui.sidebar_collapsed = !app.prefs.tui.sidebar_collapsed,
-                    _ => app.prefs.ingest.drop_zero_volume = !app.prefs.ingest.drop_zero_volume,
+                    2 => app.prefs.ingest.drop_zero_volume = !app.prefs.ingest.drop_zero_volume,
+                    _ => app.prefs.tui.history_open = !app.prefs.tui.history_open,
                 }
                 app.save_prefs();
             }
@@ -534,7 +541,8 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     let Some(m) = app.modal.as_ref() else { return };
     let (w, h) = match m {
         Modal::Prompt(_) => (70, 6),
-        Modal::Prefs { .. } => (60, 9),
+        Modal::Prefs { .. } => (60, 10),
+        Modal::Authors => (76, (app.authors.list.len() as u16 + 6).clamp(10, area.height)),
         Modal::Info { lines, .. } => ((lines.iter().map(|l| l.chars().count()).max().unwrap_or(20) as u16 + 6).max(40), lines.len() as u16 + 4),
         Modal::Pick { items, .. } => (50, items.len() as u16 + 4),
         Modal::Layers { .. } => (44, super::chart::LAYERS.len() as u16 + 4),
@@ -558,6 +566,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Import => super::import::draw(app, f, r),
         Modal::Keys => forms::draw_keys(app, f, r),
         Modal::Themes => themes::draw(app, f, r),
+        Modal::Authors => super::authors::draw(app, f, r, &mut extra),
         Modal::Info { title, lines, scroll } => {
             let body: Vec<Line> = lines.iter().map(|l| Line::raw(l.clone())).collect();
             let title = format!("{title} · Esc closes");
@@ -577,6 +586,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
                 format!("header           {:?}", app.prefs.tui.header).to_lowercase(),
                 format!("sidebar          {}", if app.prefs.tui.sidebar_collapsed { "collapsed" } else { "shown" }),
                 format!("drop zero volume {}", app.prefs.ingest.drop_zero_volume),
+                format!("history bar      {}", if app.prefs.tui.history_open { "shown" } else { "collapsed" }),
             ];
             let mut lines = vec![Line::raw("")];
             for (i, row) in rows.iter().enumerate() {

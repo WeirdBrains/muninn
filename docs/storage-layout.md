@@ -3,7 +3,7 @@
 ```
 ~/.muninn/
   storage/
-    muninn.database       # SQLCipher-encrypted SQLite
+    muninn.database       # SQLCipher-encrypted SQLite (bars, authors, action history)
   keys/
     envelope.toml         # wrapped data key + service-key version
     service/              # password-wrapped service key per version

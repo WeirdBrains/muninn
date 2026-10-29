@@ -16,6 +16,8 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Sidebar](sidebar.md): search, sort and filter series
 - [Import](import.md): file browser and background import
 - [In-app help](help.md): searching and following links
+- [Authors](authors.md): who actions are attributed to, the current author
+- [Action history](history.md): the history bar, stepping back and forward, forks
 
 ## Getting data in and out
 

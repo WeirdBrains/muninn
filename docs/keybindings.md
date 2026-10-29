@@ -62,6 +62,15 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `T` | time range for every view (date and time picker: from, then to) |
 | `s`, `f m p d y`, `t`, Enter | sort key, filter editors (source, symbol, price, period, year), time range, assign (sidebar focused) |
 
+## History and authors
+
+| key | action |
+|-----|--------|
+| `Y` | show and focus / hide the [history](history.md) bar |
+| `u` / `U` | step back / forward in the history |
+| `j k`, Enter, Esc | move, go to the action, leave (history bar focused) |
+| `A` | the [authors](authors.md) popup (`a` add, `e` edit, `d` delete, Enter current) |
+
 ## Import
 
 | key | action |

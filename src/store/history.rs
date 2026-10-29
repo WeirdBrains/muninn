@@ -141,6 +141,12 @@ impl Store {
         }
     }
 
+    /// Cheap change marker (count, newest id, head) so views reload only when history moved.
+    pub fn history_stamp(&self) -> Result<(i64, i64, Option<i64>)> {
+        let (n, max) = self.conn.query_row("SELECT COUNT(*), COALESCE(MAX(id), 0) FROM actions", [], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok((n, max, self.history_head()?))
+    }
+
     pub fn history_head(&self) -> Result<Option<i64>> {
         Ok(self.setting(HEAD)?.and_then(|s| s.parse().ok()))
     }

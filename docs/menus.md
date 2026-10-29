@@ -26,8 +26,8 @@ Every menu item runs a named action. The same actions are bound to keys
 
 | menu | items |
 |------|-------|
-| File | Import… · Export… · Backup ▸ (Create, Restore) · Preferences… · Quit |
-| View | New tile ▸ · Split ▸ · Close tile · Zoom tile · Equalize · Change view · Link tile · Chart layers… · Container ▸ · Layouts ▸ · Toggle sidebar |
+| File | Import… · Export… · Backup ▸ (Create, Restore) · Authors… · Preferences… · Quit |
+| View | New tile ▸ · Split ▸ · Close tile · Zoom tile · Equalize · Change view · Link tile · Chart layers… · Container ▸ · Layouts ▸ · Toggle sidebar · History ▸ (Show/hide history bar, Step back, Step forward) |
 | Data | Sources… · Symbols… · Filters ▸ (Source, Symbol, Time range…, Price, Period, Year, Clear all) · Sort ▸ · Coverage & gaps · Refresh |
 | Keys | Initialize… · Lock · Rotate service key · Rekey database · Export… · Recover ▸ · Re-issue shards |
 | Theme | Select… · Mode ▸ (Light, Dark, System) · Edit current… · New from current… · Import… · Export… |
@@ -44,5 +44,7 @@ Notes:
   dialog on that action.
 - **Theme** items open the [theme](themes.md) selector or editor; **Import…/Export…**
   ask for a file path.
-- **File ▸ Preferences…** toggles the header size, the sidebar and zero-volume
+- **File ▸ Authors…** manages [authors](authors.md) and the current author.
+- **View ▸ History** shows the [history](history.md) bar and steps through it.
+- **File ▸ Preferences…** toggles the header size, the sidebar, the history bar and zero-volume
   handling ([preferences](preferences.md)).

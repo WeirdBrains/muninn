@@ -75,6 +75,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                     let v = app.variant;
                     app.apply_theme(t, v);
                     app.set_status(format!("theme set to {name}"));
+                    app.note_view();
                 }
                 Err(e) => app.set_status(format!("theme error: {e}")),
             }
@@ -90,6 +91,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             let t = app.theme_file.clone();
             app.apply_theme(t, v);
             app.set_status(format!("mode {} (showing {})", app.prefs.theme.mode, v.name()));
+            app.note_view();
         }
         KeyCode::Char('e') => {
             let Some(name) = st.selected().map(str::to_string) else { return };

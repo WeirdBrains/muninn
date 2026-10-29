@@ -53,6 +53,7 @@ pub fn menus() -> Vec<Menu> {
                 a("Import…", 'i', "i", Import),
                 a("Export…", 'e', "", Export),
                 sub("Backup", 'b', vec![a("Create", 'c', "", BackupCreate), a("Restore", 'r', "", BackupRestore)]),
+                a("Authors…", 'a', "A", Authors),
                 a("Preferences…", 'p', "", Preferences),
                 sep(),
                 a("Quit", 'q', "q", Quit),
@@ -94,6 +95,15 @@ pub fn menus() -> Vec<Menu> {
                 ),
                 sep(),
                 a("Toggle sidebar", 't', "C-b", ToggleSidebar),
+                sub(
+                    "History",
+                    'h',
+                    vec![
+                        a("Show/hide history bar", 'h', "Y", ToggleHistory),
+                        a("Step back", 'b', "u", HistoryBack),
+                        a("Step forward", 'f', "U", HistoryForward),
+                    ],
+                ),
             ],
         },
         Menu {

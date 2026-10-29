@@ -58,7 +58,13 @@ mnnn symbols add FOO/USD --alias FO
 
 - `ingest_runs`: content hash, source, series, counts. An identical input is
   skipped the next time (use `--force` to re-process).
-- `schema_version`: migrations, applied automatically on open.
+- `authors`: name, email, details (JSON); see [authors](authors.md).
+- `actions`: the [action history](history.md) tree (parent, kind, summary, params,
+  origin, author, time, view state before and after).
+- `settings`: small key/value pairs (current author, history head).
+- `schema_version`: migrations, applied automatically on open. Version 4 adds
+  `authors` and `settings`, version 5 `actions`; both only add tables, so 1.x
+  databases upgrade in place on the first open by 2.x.
 
 ## Decisions
 

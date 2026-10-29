@@ -18,7 +18,7 @@ the same library calls as the CLI. Mouse clicks work on the menu bar, dropdowns,
 ```
 
 - **Header**: MUNINN in block letters with the version and status (unlocked, theme
-  mode and resolved variant, home folder). On terminals with fewer than 30 rows (or
+  mode and resolved variant, home folder, current author). On terminals with fewer than 30 rows (or
   fewer than 80 columns) it collapses to one line, `Muninn v0.x.y`. Force compact or
   large in **File ▸ Preferences…** (`[tui] header` in [preferences](preferences.md)).
 - **Menu bar**: categorized menus with submenus, mouse and keyboard ([menus](menus.md)).
@@ -50,6 +50,13 @@ preview and a background import with progress. See [import](import.md).
 
 A collapsible series list at the right (`Ctrl-b`) with fuzzy search (`/`), sort and
 filters that also scope the tiles. See [sidebar](sidebar.md).
+
+## History bar
+
+A collapsible pane at the left (`Y`) with the action tree: the head, the current
+line and every fork. `u` / `U` step back and forward, restoring filters and theme. See
+[history](history.md); actions are attributed to the current [author](authors.md)
+(`A`).
 
 ## Dialogs
 

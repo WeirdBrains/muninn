@@ -719,7 +719,12 @@ symbols; search ignores separators (btc-usdt finds BTC/USDT) and word order.
 Loading: series load in the background; a tile shows a progress bar (bars read of the total) \
 or a spinner while the total is unknown, and the UI stays responsive.
 
-See mnnn help tui, mnnn help import and mnnn help help.";
+History (Y, View > History): a collapsible bar on the left shows every action as a tree, \
+forks indented; u / U step back / forward and restore the filters, time range and theme, \
+Enter or a click on a row goes to that action. Authors (A, File > Authors...): add, edit, \
+delete and pick the current author that new actions are attributed to.
+
+See mnnn help tui, mnnn help import, mnnn help history, mnnn help authors and mnnn help help.";
 
 /// Extra text for `mnnn help --help` and mnnn-help(1).
 const HELP_NOTES: &str = "\

@@ -69,6 +69,9 @@ pub struct TuiPrefs {
     pub header: HeaderMode,
     #[serde(default)]
     pub sidebar_collapsed: bool,
+    /// The history bar on the left (View ▸ History, `Y`).
+    #[serde(default)]
+    pub history_open: bool,
     /// Bookmarked import folders (Places).
     #[serde(default)]
     pub import_bookmarks: Vec<String>,

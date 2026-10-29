@@ -1698,3 +1698,155 @@ fn time_range_filters_every_view_from_key_menu_and_sidebar() {
     let s = screen_text(&mut a);
     assert!(s.contains("[X]"), "{s}");
 }
+
+fn type_text(a: &mut App, s: &str) {
+    for c in s.chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+}
+
+#[test]
+fn view_changes_are_recorded_and_stepping_restores_them() {
+    let (_t, mut a) = app();
+    assert!(a.store.actions().unwrap().is_empty(), "loading the fixtures records nothing");
+    a.dispatch(Action::ClearFilters); // nothing to clear: no action
+    assert!(a.store.actions().unwrap().is_empty());
+    a.prefs.tui.sidebar.filters.sources.insert("binance".into());
+    a.filters_changed();
+    a.set_theme_mode(ThemeMode::Light);
+    let acts = a.store.actions().unwrap();
+    assert_eq!(acts.iter().map(|x| x.kind.as_str()).collect::<Vec<_>>(), ["filter", "theme.mode"]);
+    assert!(acts.iter().all(|x| x.origin == "tui"));
+    // u steps back: the mode, then the filter.
+    a.on_key(key(KeyCode::Char('u')));
+    assert_eq!(a.prefs.theme.mode, ThemeMode::System);
+    assert!(a.prefs.tui.sidebar.filters.sources.contains("binance"));
+    a.on_key(key(KeyCode::Char('u')));
+    assert!(a.prefs.tui.sidebar.filters.is_empty());
+    assert_eq!(a.store.history_head().unwrap(), None);
+    a.on_key(key(KeyCode::Char('u')));
+    assert!(a.status.contains("start"), "{}", a.status);
+    // U steps forward again; replaying records nothing.
+    a.on_key(key(KeyCode::Char('U')));
+    assert!(a.prefs.tui.sidebar.filters.sources.contains("binance"));
+    assert_eq!(a.store.actions().unwrap().len(), 2);
+    // A different change now forks from #1; the old branch is kept.
+    a.prefs.tui.sidebar.filters.years.insert(2017);
+    a.filters_changed();
+    assert_eq!(a.store.actions().unwrap().len(), 3);
+    assert_eq!(a.store.history_forks().unwrap(), 1);
+    // The preferences file has the restored state too.
+    let p = crate::prefs::Preferences::load_or_create(&a.paths).unwrap();
+    assert!(p.tui.sidebar.filters.years.contains(&2017));
+}
+
+#[test]
+fn history_bar_shows_the_tree_and_goes_to_actions() {
+    let (_t, mut a) = app();
+    a.prefs.tui.sidebar.filters.sources.insert("binance".into());
+    a.filters_changed();
+    a.set_theme_mode(ThemeMode::Light);
+    a.dispatch(Action::HistoryBack);
+    a.dispatch(Action::ThemeMode(ThemeMode::Dark)); // fork
+    assert!(!a.prefs.tui.history_open);
+    assert!(!screen_text(&mut a).contains("History ·"));
+    a.on_key(key(KeyCode::Char('Y')));
+    assert!(a.prefs.tui.history_open && a.history.focused);
+    assert_eq!(a.help_topic(), "history");
+    let s = screen_text(&mut a);
+    assert!(s.contains("History · 3"), "{s}");
+    assert!(s.contains("start") && s.contains("#1 filters: src:binance"), "{s}");
+    // Rows: start, #1, #2, then the fork #3 (indented under #1), which is the head.
+    assert!(s.contains("○ #2 theme mode light") && s.contains("  ●⑂ #3 theme mode dark"), "{s}");
+    assert_eq!(a.history.sel, 3);
+    a.on_key(key(KeyCode::Char('k')));
+    a.on_key(key(KeyCode::Enter));
+    assert_eq!(a.store.history_head().unwrap(), Some(2));
+    assert_eq!(a.prefs.theme.mode, ThemeMode::Light);
+    // Click: first selects, second goes there.
+    click_on(&mut a, |h| *h == Hit::HistoryRow(0));
+    assert_eq!(a.history.sel, 0);
+    assert_eq!(a.store.history_head().unwrap(), Some(2));
+    click_on(&mut a, |h| *h == Hit::HistoryRow(0));
+    assert_eq!(a.store.history_head().unwrap(), None);
+    assert!(a.prefs.tui.sidebar.filters.is_empty());
+    // Esc leaves the bar, Y focuses it again, the « button collapses it.
+    a.on_key(key(KeyCode::Esc));
+    assert!(!a.history.focused);
+    a.on_key(key(KeyCode::Char('Y')));
+    assert!(a.history.focused && a.prefs.tui.history_open);
+    click_on(&mut a, |h| *h == Hit::HistoryCollapse);
+    assert!(!a.prefs.tui.history_open);
+    // Actions recorded by another connection (a background import) show up on the next draw.
+    a.on_key(key(KeyCode::Char('Y')));
+    screen_text(&mut a);
+    let other = Store::open(&a.paths.db, Some(&a.dek.0)).unwrap();
+    other.record_action(&crate::store::NewAction::new("import", "tui", "import x.csv")).unwrap();
+    assert!(screen_text(&mut a).contains("#4 import x.csv"));
+}
+
+#[test]
+fn authors_popup_adds_edits_deletes_and_sets_current() {
+    let (_t, mut a) = app();
+    a.on_key(key(KeyCode::Char('A')));
+    assert!(matches!(a.modal, Some(Modal::Authors)));
+    assert_eq!(a.help_topic(), "authors");
+    assert!(screen_text(&mut a).contains("no authors yet"));
+    a.on_key(key(KeyCode::Char('a')));
+    assert!(a.typing());
+    type_text(&mut a, "Ada"); // `q`, `u` and friends are typed, not run
+    a.on_key(key(KeyCode::Tab));
+    type_text(&mut a, "ada@example.org");
+    a.on_key(key(KeyCode::Tab));
+    type_text(&mut a, "org=Analytical; role=poet");
+    a.on_key(key(KeyCode::Enter));
+    let cur = a.store.current_author().unwrap().expect("first author becomes current");
+    assert_eq!((cur.name.as_str(), cur.email.as_deref(), cur.details.len()), ("Ada", Some("ada@example.org"), 2));
+    let s = screen_text(&mut a);
+    assert!(s.contains("★ Ada <ada@example.org>"), "{s}");
+    assert!(s.contains("author: Ada"), "header shows the current author: {s}");
+    // An empty name is an error shown in the popup.
+    a.on_key(key(KeyCode::Char('a')));
+    a.on_key(key(KeyCode::Enter));
+    assert!(a.authors.error.is_some() && a.authors.form.is_some());
+    a.on_key(key(KeyCode::Esc));
+    // Add a second one, make it current by clicking its row twice.
+    a.on_key(key(KeyCode::Char('a')));
+    type_text(&mut a, "Grace");
+    a.on_key(key(KeyCode::Enter));
+    let gi = a.authors.list.iter().position(|x| x.name == "Grace").unwrap();
+    a.authors.sel = 0;
+    click_on(&mut a, |h| *h == Hit::Row(gi));
+    click_on(&mut a, |h| *h == Hit::Row(gi));
+    assert_eq!(a.store.current_author().unwrap().unwrap().name, "Grace");
+    // Edit: rename Grace.
+    a.on_key(key(KeyCode::Char('e')));
+    type_text(&mut a, " Hopper");
+    a.on_key(key(KeyCode::Enter));
+    assert_eq!(a.store.current_author().unwrap().unwrap().name, "Grace Hopper");
+    // Delete needs y.
+    a.on_key(key(KeyCode::Char('d')));
+    a.on_key(key(KeyCode::Char('n')));
+    assert_eq!(a.store.authors().unwrap().len(), 2);
+    a.on_key(key(KeyCode::Char('d')));
+    a.on_key(key(KeyCode::Char('y')));
+    assert_eq!(a.store.authors().unwrap().len(), 1);
+    assert!(a.store.current_author().unwrap().is_none());
+    // Every change is in the history, attributed to whoever was current.
+    let kinds: Vec<String> = a.store.actions().unwrap().into_iter().map(|x| x.kind).collect();
+    assert_eq!(kinds, ["author.add", "author.add", "author.use", "author.edit", "author.remove"]);
+    a.on_key(key(KeyCode::Esc));
+    assert!(a.modal.is_none());
+}
+
+#[test]
+fn menus_have_authors_and_history() {
+    let all = crate::tui::menu::all_actions();
+    for x in [Action::Authors, Action::ToggleHistory, Action::HistoryBack, Action::HistoryForward] {
+        assert!(all.contains(&x), "{x:?}");
+    }
+    let (_t, mut a) = app();
+    a.on_key(mkey(KeyCode::Char('v'), KeyModifiers::ALT));
+    let s = screen_text(&mut a);
+    assert!(s.contains("History"), "{s}");
+}

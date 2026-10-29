@@ -10,6 +10,8 @@ mnnn [GLOBAL FLAGS] <COMMAND>
   keys     init|status|rotate|rekey|export|recover|shards
   backup   create|restore
   theme    list|show|set|mode|export|import|reset
+  author   list|show|add|edit|remove|use
+  history  list|show|tree|back|forward|goto
   tui
   help     [TOPIC] [--search TEXT]
 ```
@@ -53,6 +55,8 @@ command-line usage (clap).
 mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance -y
 mnnn -q export --format csv --out - --symbol BTC/USDT --from 2026-10-01 | head
 mnnn sources list
+mnnn author add --name "Ada Lovelace" --email ada@example.org
+mnnn history tree
 mnnn help keys
 mnnn help --search shard
 ```

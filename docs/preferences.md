@@ -14,6 +14,7 @@ drop_zero_volume = false
 [tui]
 header = "auto"
 sidebar_collapsed = false
+history_open = false
 ```
 
 | key | default | meaning |
@@ -23,6 +24,7 @@ sidebar_collapsed = false
 | `ingest.drop_zero_volume` | `false` | drop zero-volume bars instead of keeping them flagged |
 | `tui.header` | `auto` | `auto` (large when the terminal has ≥ 30 rows), `compact` or `large` ([TUI](tui.md)) |
 | `tui.sidebar_collapsed` | `false` | start with the sidebar hidden |
+| `tui.history_open` | `false` | show the [history](history.md) bar on the left |
 | `tui.sidebar` | | [sidebar](sidebar.md) sort (`sort`, `desc`) and `filters` (sources, durations, years, price metric/min/max) |
 | `tui.import_recent` | `[]` | recently imported folders ([import](import.md)) |
 | `tui.import_bookmarks` | `[]` | bookmarked import folders (Places) |
