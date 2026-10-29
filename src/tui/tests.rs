@@ -84,13 +84,13 @@ fn menu_opens_with_f10_alt_and_mouse() {
     a.on_key(key(KeyCode::Esc));
     assert!(!a.menu.is_open());
     a.on_key(mkey(KeyCode::Char('t'), KeyModifiers::ALT));
-    assert_eq!(a.menu.open, Some(4));
+    assert_eq!(a.menu.open, Some(5));
     a.on_key(key(KeyCode::Esc));
     // mouse: click "Help" in the menu bar, then "About Muninn"
     screen_text(&mut a);
-    let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuTop(5)).unwrap();
+    let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuTop(6)).unwrap();
     a.on_mouse(click(r.x + 1, r.y));
-    assert_eq!(a.menu.open, Some(5));
+    assert_eq!(a.menu.open, Some(6));
     screen_text(&mut a);
     let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuItem(0, 3)).unwrap();
     a.on_mouse(click(r.x + 2, r.y));

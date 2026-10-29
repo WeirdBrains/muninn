@@ -26,29 +26,6 @@ pub fn parse_result(store: &Store, s: &str, from: Option<&str>, to: Option<&str>
     Ok(r)
 }
 
-/// What an item is and what it holds now.
-pub fn describe_item(store: &Store, it: &ProjectItem) -> (String, String) {
-    match it.kind {
-        ItemKind::LiveSearch => match store.live_search(&it.ref_id).ok().flatten() {
-            Some(s) => (s.name.clone(), format!("{} matches now · {}", crate::live::count(store, &s.spec), s.spec.describe())),
-            None => ("(removed live search)".into(), String::new()),
-        },
-        ItemKind::Result => match it.series() {
-            Some(r) => (r.label(), format!("{} bars now", store.count_filtered(&r.filter()).unwrap_or(0))),
-            None => ("(unreadable result)".into(), String::new()),
-        },
-        ItemKind::Journal => match store.journal(&it.ref_id).ok().flatten() {
-            Some(j) => {
-                let n = store.entries(&j.id).map(|v| v.len()).unwrap_or(0);
-                let own = if j.project_id.as_deref() == Some(it.project_id.as_str()) { "project journal" } else { "linked" };
-                (j.name, format!("{n} entries · {own}"))
-            }
-            None => ("(removed journal)".into(), String::new()),
-        },
-        ItemKind::RuleSet => (it.ref_id.clone(), "rule sets arrive in a later release".into()),
-    }
-}
-
 fn params(p: &Project) -> serde_json::Value {
     serde_json::json!({ "project": p.id, "name": p.name })
 }
@@ -85,7 +62,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
                 let v: Vec<_> = items
                     .iter()
                     .map(|i| {
-                        let (name, now) = describe_item(&store, i);
+                        let (name, now) = crate::live::describe_item(&store, i);
                         serde_json::json!({ "item": i, "name": name, "now": now })
                     })
                     .collect();
@@ -105,7 +82,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
                     }
                     println!("\n{}s:", k.label());
                     for i in v {
-                        let (name, now) = describe_item(&store, i);
+                        let (name, now) = crate::live::describe_item(&store, i);
                         println!("  #{}\t{name}\t{now}", i.id);
                     }
                 }
@@ -144,7 +121,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
                 let r = parse_result(&store, result.as_deref().unwrap_or(""), from.as_deref(), to.as_deref())?;
                 store.add_project_result(&p.id, &r)?
             };
-            let (name, _) = describe_item(&store, &it);
+            let (name, _) = crate::live::describe_item(&store, &it);
             if new {
                 record(
                     &store,
@@ -161,7 +138,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
             let p = store.find_project(&project)?;
             let it =
                 store.project_items(&p.id)?.into_iter().find(|i| i.id == item).ok_or_else(|| anyhow!("project {} has no item #{item}", p.name))?;
-            let (name, _) = describe_item(&store, &it);
+            let (name, _) = crate::live::describe_item(&store, &it);
             store.remove_project_item(it.id)?;
             record(
                 &store,

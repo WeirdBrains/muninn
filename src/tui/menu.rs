@@ -132,6 +132,22 @@ pub fn menus() -> Vec<Menu> {
             ],
         },
         Menu {
+            title: "Projects",
+            mnemonic: 'p',
+            items: vec![
+                a("Projects…", 'p', "P", Projects),
+                a("New project…", 'n', "", NewProject),
+                sep(),
+                a("Live searches…", 'l', "F", LiveSearches),
+                a("Save search as live search…", 's', "B", SaveSearch),
+                sep(),
+                a("Journals…", 'j', "J", Journals),
+                a("New journal…", 'e', "", NewJournal),
+                sep(),
+                a("Add selected series to project…", 'a', "a", AddToProject),
+            ],
+        },
+        Menu {
             title: "Keys",
             mnemonic: 'k',
             items: vec![

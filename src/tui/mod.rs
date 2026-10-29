@@ -11,14 +11,18 @@ pub mod forms;
 pub mod header;
 pub mod history;
 pub mod import;
+pub mod journals;
 pub mod layout;
 pub mod menu;
 pub mod modal;
 pub mod picker;
+pub mod projects;
+pub mod searches;
 pub mod sidebar;
 pub mod themes;
 pub mod tiles;
 pub mod widgets;
+pub mod workspace;
 
 use crate::crypto::Key32;
 use crate::paths::Paths;
@@ -120,6 +124,10 @@ pub struct App {
     pub last_action: Option<Action>,
     pub authors: authors::AuthorsState,
     pub history: history::HistoryPane,
+    pub searches: searches::SearchesState,
+    pub projects: projects::ProjectsState,
+    pub journals: journals::JournalsState,
+    pub pick_project: workspace::PickProject,
     /// View state as of the last recorded action; a change from it is the next action.
     pub view_base: crate::history::ViewState,
 }
@@ -149,6 +157,10 @@ impl App {
             last_action: None,
             authors: Default::default(),
             history: Default::default(),
+            searches: Default::default(),
+            projects: Default::default(),
+            journals: Default::default(),
+            pick_project: Default::default(),
             view_base: crate::history::ViewState::capture(&prefs),
             paths,
             store,
@@ -236,6 +248,10 @@ impl App {
             KeyCode::Char('X') if !self.typing() && self.modal.is_none() => Some(Action::ClearFilters),
             KeyCode::Char('i') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Import),
             KeyCode::Char('A') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Authors),
+            KeyCode::Char('P') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Projects),
+            KeyCode::Char('F') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::LiveSearches),
+            KeyCode::Char('B') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::SaveSearch),
+            KeyCode::Char('J') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Journals),
             KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
             KeyCode::Char('u') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryBack),
             KeyCode::Char('U') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryForward),
@@ -309,6 +325,24 @@ impl App {
             }
             Preferences => self.modal = Some(Modal::Prefs { sel: 0 }),
             Authors => authors::open(self),
+            Projects => projects::open(self),
+            NewProject => projects::open_new(self),
+            LiveSearches => searches::open(self),
+            SaveSearch => searches::open_save(self, None),
+            Journals => journals::open(self),
+            NewJournal => journals::open_new(self),
+            AddToProject => match projects::selected_series(self) {
+                Some(r) => {
+                    let label = r.label();
+                    let payload = serde_json::to_value(&r).unwrap_or_default();
+                    workspace::pick_project(
+                        self,
+                        workspace::Purpose::Add(crate::store::ItemKind::Result, r.key(), payload, label),
+                        workspace::Back::Close,
+                    );
+                }
+                None => self.set_status("select a series in the sidebar first"),
+            },
             ToggleHistory => {
                 let open = self.prefs.tui.history_open;
                 if open && !self.history.focused {
@@ -971,6 +1005,7 @@ fn sidebar_key(app: &mut App, k: KeyEvent) -> bool {
         KeyCode::Char('p') => app.dispatch(Action::Filter(action::FilterKind::Price)),
         KeyCode::Char('d') => app.dispatch(Action::Filter(action::FilterKind::Period)),
         KeyCode::Char('y') => app.dispatch(Action::Filter(action::FilterKind::Year)),
+        KeyCode::Char('a') => app.dispatch(Action::AddToProject),
         KeyCode::Esc | KeyCode::Tab | KeyCode::Left => {
             sb.focused = false;
         }
@@ -1066,3 +1101,5 @@ impl App {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod workspace_tests;

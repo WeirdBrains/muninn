@@ -110,6 +110,29 @@ pub fn count(store: &Store, spec: &SearchSpec) -> usize {
     run(store, spec).map(|v| v.len()).unwrap_or(0)
 }
 
+/// What an item is and what it holds now.
+pub fn describe_item(store: &Store, it: &crate::store::ProjectItem) -> (String, String) {
+    match it.kind {
+        crate::store::ItemKind::LiveSearch => match store.live_search(&it.ref_id).ok().flatten() {
+            Some(s) => (s.name.clone(), format!("{} matches now · {}", crate::live::count(store, &s.spec), s.spec.describe())),
+            None => ("(removed live search)".into(), String::new()),
+        },
+        crate::store::ItemKind::Result => match it.series() {
+            Some(r) => (r.label(), format!("{} bars now", store.count_filtered(&r.filter()).unwrap_or(0))),
+            None => ("(unreadable result)".into(), String::new()),
+        },
+        crate::store::ItemKind::Journal => match store.journal(&it.ref_id).ok().flatten() {
+            Some(j) => {
+                let n = store.entries(&j.id).map(|v| v.len()).unwrap_or(0);
+                let own = if j.project_id.as_deref() == Some(it.project_id.as_str()) { "project journal" } else { "linked" };
+                (j.name, format!("{n} entries · {own}"))
+            }
+            None => ("(removed journal)".into(), String::new()),
+        },
+        crate::store::ItemKind::RuleSet => (it.ref_id.clone(), "rule sets arrive in a later release".into()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
