@@ -25,7 +25,7 @@ CREATE TABLE authors (
 
 const CURRENT: &str = "current_author";
 
-#[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct Author {
     pub id: String,
     pub name: String,

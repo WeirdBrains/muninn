@@ -4,18 +4,21 @@ use crate::model::{Bar, BarId, Duration, KNOWN_ALIASES, KNOWN_BASES, KNOWN_QUOTE
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 use std::path::Path;
 
+pub mod archive;
 pub mod authors;
 pub mod history;
 pub mod journals;
 pub mod projects;
 mod query;
+pub mod reports;
 pub mod runs;
 pub mod searches;
 pub use authors::{Author, AuthorChange};
 pub use history::{ActionRecord, Move, NewAction, TreeRow};
 pub use journals::{Annotation, AnnotationKind, Attachment, Entry, EntryFormat, Journal, JournalDoc, Span};
 pub use projects::{ItemKind, Project, ProjectItem, SeriesRef};
-pub use query::BarSort;
+pub use query::{BarSort, BarSummary};
+pub use reports::{NewSection, Report, Section, SectionChange, SectionKind, SectionParams};
 pub use runs::{Artifact, ImportRun};
 pub use searches::{LiveSearch, SearchSpec, SearchTarget};
 
@@ -99,6 +102,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     searches::MIGRATION,
     projects::MIGRATION,
     journals::MIGRATION,
+    // 2.2: reports
+    reports::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).

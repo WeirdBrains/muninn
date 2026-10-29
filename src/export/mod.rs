@@ -1,4 +1,8 @@
-//! Export bars to CSV, Parquet or JSON via Polars.
+//! Export bars to CSV, Parquet or JSON via Polars; documents (journals, reports, projects) in
+//! [`docs`], archives of whole projects in [`archive`].
+pub mod archive;
+pub mod docs;
+pub mod files;
 use crate::error::{Error, Result};
 use crate::ingest::time::{fmt_ts, parse_ts};
 use crate::model::{Duration, FLAG_ZERO_VOLUME, StoredBar, Symbol};

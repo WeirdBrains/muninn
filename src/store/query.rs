@@ -216,7 +216,51 @@ impl Store {
     }
 }
 
+/// Totals over the bars of a filter (for report summaries).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BarSummary {
+    pub count: i64,
+    pub first: i64,
+    pub last: i64,
+    /// Open of the first bar, close of the last.
+    pub open: f64,
+    pub close: f64,
+    pub high: f64,
+    pub low: f64,
+    pub volume: f64,
+}
+
+impl BarSummary {
+    /// Change from the first open to the last close, in percent.
+    pub fn change_pct(&self) -> Option<f64> {
+        (self.open != 0.0).then(|| (self.close - self.open) / self.open * 100.0)
+    }
+}
+
 impl Store {
+    /// Count, range, open/close, extremes and total volume of the filtered bars.
+    pub fn bar_summary(&self, f: &BarFilter) -> Result<Option<BarSummary>> {
+        let (w, p) = where_clause(f);
+        type Row = (i64, Option<i64>, Option<i64>, Option<f64>, Option<f64>, Option<f64>);
+        let row: Row = self.conn.query_row(
+            &format!("SELECT COUNT(*), MIN(b.timestamp), MAX(b.timestamp), MAX(b.high), MIN(b.low), SUM(b.volume) FROM bars b{w}"),
+            rusqlite::params_from_iter(p.clone()),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+        )?;
+        let (count, Some(first), Some(last), Some(high), Some(low), volume) = row else { return Ok(None) };
+        if count == 0 {
+            return Ok(None);
+        }
+        let px = |ts: i64, col: &str| -> Result<f64> {
+            let mut q = p.clone();
+            q.push(ts.into());
+            Ok(self
+                .conn
+                .query_row(&format!("SELECT b.{col} FROM bars b{w} AND b.timestamp = ? LIMIT 1"), rusqlite::params_from_iter(q), |r| r.get(0))?)
+        };
+        Ok(Some(BarSummary { count, first, last, open: px(first, "open")?, close: px(last, "close")?, high, low, volume: volume.unwrap_or(0.0) }))
+    }
+
     /// Min and max of a price metric over the filtered bars (VWAP: one volume-weighted value).
     pub fn metric_range(&self, f: &BarFilter, m: crate::model::PriceMetric) -> Result<Option<(f64, f64)>> {
         let (w, p) = where_clause(f);
@@ -285,6 +329,19 @@ mod tests {
         let p = s.page_bars(&f(), BarSort::Time, false, 3, 4).unwrap();
         assert_eq!(p[0].ts, 4 * 300_000);
         assert_eq!(s.time_index(&f(), 5 * 300_000, false).unwrap(), 5);
+    }
+
+    #[test]
+    fn summaries() {
+        let s = store();
+        let raw = s.bucketed(&f(), 300_000).unwrap();
+        let m = s.bar_summary(&f()).unwrap().unwrap();
+        assert_eq!((m.count, m.first, m.last), (10, raw[0].ts, raw[9].ts));
+        assert_eq!((m.open, m.close), (raw[0].open, raw[9].close));
+        assert_eq!(m.volume, raw.iter().map(|b| b.volume).sum::<f64>());
+        let mut none = f();
+        none.from = Some(i64::MAX - 1);
+        assert_eq!(s.bar_summary(&none).unwrap(), None);
     }
 
     #[test]

@@ -73,7 +73,7 @@ impl SearchSpec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LiveSearch {
     pub id: String,
     pub name: String,

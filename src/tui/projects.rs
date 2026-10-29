@@ -152,6 +152,7 @@ fn open_item(app: &mut App) {
             None => app.projects.msg = Some(("this result cannot be read".into(), true)),
         },
         ItemKind::Journal => super::journals::open_journal(app, &it.ref_id),
+        ItemKind::Report => super::reports::open_report(app, &it.ref_id),
         ItemKind::RuleSet => app.projects.msg = Some(("rule sets arrive in a later release".into(), false)),
     }
 }
@@ -375,6 +376,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                     ItemKind::Result => "▤",
                     ItemKind::Journal => "✎",
                     ItemKind::RuleSet => "§",
+                    ItemKind::Report => "▦",
                 };
                 v.rows.push(Line::from(vec![
                     Span::styled(format!(" {icon} {name} "), row_style(&t, i == st.isel)),

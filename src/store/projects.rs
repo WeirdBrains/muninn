@@ -1,7 +1,7 @@
 //! Projects: named collections of live searches, results and journals.
 //!
 //! A project holds items. Each item points at something by kind and id: a live search,
-//! a result (a series, optionally within a time range) or a journal. Rule sets (2.x Phase 4)
+//! a result (a series, optionally within a time range), a journal or a report. Rule sets (2.x Phase 4)
 //! attach the same way with kind `rule_set`; nothing else in the schema has to change.
 //! Journals created in (or forked into) a project are owned by it (`journals.project_id`);
 //! removing a project keeps its journals as standalone ones. See `docs/projects.md`.
@@ -43,6 +43,7 @@ pub enum ItemKind {
     Journal,
     /// Reserved for rule sets (Phase 4).
     RuleSet,
+    Report,
 }
 
 impl ItemKind {
@@ -52,6 +53,7 @@ impl ItemKind {
             ItemKind::Result => "result",
             ItemKind::Journal => "journal",
             ItemKind::RuleSet => "rule_set",
+            ItemKind::Report => "report",
         }
     }
     pub fn parse(s: &str) -> Option<Self> {
@@ -60,6 +62,7 @@ impl ItemKind {
             "result" => ItemKind::Result,
             "journal" => ItemKind::Journal,
             "rule_set" => ItemKind::RuleSet,
+            "report" => ItemKind::Report,
             _ => return None,
         })
     }
@@ -69,6 +72,7 @@ impl ItemKind {
             ItemKind::Result => "result",
             ItemKind::Journal => "journal",
             ItemKind::RuleSet => "rule set",
+            ItemKind::Report => "report",
         }
     }
     pub fn plural(self) -> &'static str {
@@ -77,6 +81,7 @@ impl ItemKind {
             ItemKind::Result => "results",
             ItemKind::Journal => "journals",
             ItemKind::RuleSet => "rule sets",
+            ItemKind::Report => "reports",
         }
     }
 }
@@ -123,7 +128,7 @@ impl SeriesRef {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Project {
     pub id: String,
     pub name: String,
@@ -139,7 +144,7 @@ impl Project {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProjectItem {
     pub id: i64,
     pub project_id: String,
@@ -276,6 +281,7 @@ impl Store {
             ItemKind::LiveSearch => self.live_search(ref_id)?.is_some(),
             ItemKind::Journal => self.journal(ref_id)?.is_some(),
             ItemKind::Result => true,
+            ItemKind::Report => self.report(ref_id)?.is_some(),
             ItemKind::RuleSet => return Err(Error::NotImplemented("rule sets")),
         };
         if !exists {

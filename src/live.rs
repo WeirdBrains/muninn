@@ -139,6 +139,13 @@ pub fn describe_item(store: &Store, it: &crate::store::ProjectItem) -> (String, 
             }
             None => ("(removed journal)".into(), String::new()),
         },
+        crate::store::ItemKind::Report => match store.report(&it.ref_id).ok().flatten() {
+            Some(r) => {
+                let n = store.sections(&r.id).map(|v| v.len()).unwrap_or(0);
+                (r.name, format!("{n} section{}", if n == 1 { "" } else { "s" }))
+            }
+            None => ("(removed report)".into(), String::new()),
+        },
         crate::store::ItemKind::RuleSet => (it.ref_id.clone(), "rule sets arrive in a later release".into()),
     }
 }

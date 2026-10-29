@@ -17,6 +17,7 @@ pub mod menu;
 pub mod modal;
 pub mod picker;
 pub mod projects;
+pub mod reports;
 pub mod searches;
 pub mod sidebar;
 pub mod themes;

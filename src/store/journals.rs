@@ -98,7 +98,7 @@ impl EntryFormat {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Journal {
     pub id: String,
     pub name: String,
@@ -118,7 +118,7 @@ impl Journal {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Entry {
     pub id: String,
     pub journal_id: String,
@@ -156,7 +156,7 @@ pub enum AnnotationKind {
 }
 
 impl AnnotationKind {
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             AnnotationKind::Note => "note",
             AnnotationKind::Highlight => "highlight",
@@ -166,7 +166,7 @@ impl AnnotationKind {
 
 /// A note or highlight. `entry_id` None: a note on the whole journal. A span (`start..end`,
 /// character offsets into the entry text) marks selected words; `quote` is their text.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Annotation {
     pub id: String,
     pub journal_id: String,
@@ -196,7 +196,7 @@ impl Annotation {
 }
 
 /// Attachment metadata (the bytes come from [`Store::attachment_data`]).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Attachment {
     pub id: String,
     pub entry_id: String,
