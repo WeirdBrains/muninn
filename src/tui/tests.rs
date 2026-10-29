@@ -361,7 +361,7 @@ fn chart_zoom_pan_jump_and_period() {
     a.on_key(key(KeyCode::Enter));
     let s = screen_text(&mut a);
     assert!(s.contains("2017-08-17 06:00:00  o"), "{s}");
-    a.on_key(key(KeyCode::Char('[')));
+    a.on_key(key(KeyCode::Char('{')));
     for c in "2017-08-17".chars() {
         a.on_key(key(KeyCode::Char(c)));
     }
@@ -1428,4 +1428,113 @@ fn ellipsize_left_keeps_the_end() {
     assert_eq!(ellipsize_left("/a/b/c", 10), "/a/b/c");
     assert_eq!(ellipsize_left("/home/me/data/raw", 8), "…ata/raw");
     assert_eq!(ellipsize_left("abc", 0), "");
+}
+
+fn picker(a: &mut App) -> &mut crate::tui::picker::DatePicker {
+    match a.modal.as_mut() {
+        Some(Modal::DateTime(p)) => p,
+        _ => panic!("picker not open"),
+    }
+}
+
+#[test]
+fn chart_period_picker_sets_date_and_time_by_keys_and_mouse() {
+    use crate::ingest::time::parse_ts;
+    let (_t, mut a) = app();
+    chart_tile(&mut a);
+    screen_text(&mut a);
+    // keyboard: type a date and a time
+    a.on_key(key(KeyCode::Char('[')));
+    let s = screen_text(&mut a);
+    assert!(s.contains("Period start (UTC)") && s.contains("▲") && s.contains("[Enter OK]"), "{s}");
+    for c in "2017-08-17 06:30".chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    assert_eq!(picker(&mut a).text(), "2017-08-17 06:30");
+    a.on_key(key(KeyCode::Enter));
+    screen_text(&mut a);
+    let c = &a.caches[&a.layout.focus].chart;
+    assert!(c.start <= parse_ts("2017-08-17 06:30").unwrap(), "{}", c.start);
+    // arrows: hour up, minute down
+    a.on_key(key(KeyCode::Char(']')));
+    let p = picker(&mut a).clone();
+    a.on_key(key(KeyCode::Right));
+    a.on_key(key(KeyCode::Right));
+    a.on_key(key(KeyCode::Right));
+    a.on_key(key(KeyCode::Up));
+    assert_eq!(picker(&mut a).millis(), p.millis() + 3_600_000);
+    a.on_key(key(KeyCode::Esc));
+    assert!(a.modal.is_none());
+    // mouse: click the end date, then the minute ▼, then OK
+    click_on(&mut a, |h| matches!(h, Hit::ChartDate(_, 1)));
+    let p0 = picker(&mut a).millis();
+    click_on(&mut a, |h| *h == Hit::Picker(crate::tui::picker::PickHit::Down(4)));
+    click_on(&mut a, |h| *h == Hit::Picker(crate::tui::picker::PickHit::Down(4)));
+    assert_eq!(picker(&mut a).millis(), p0 - 120_000);
+    assert_eq!(picker(&mut a).field, 4);
+    click_on(&mut a, |h| *h == Hit::Picker(crate::tui::picker::PickHit::Ok));
+    assert!(a.modal.is_none());
+    assert_eq!(a.layout.focused().chart.end, Some(p0 - 120_000));
+    // [X] closes
+    a.on_key(key(KeyCode::Char('[')));
+    click_on(&mut a, |h| *h == Hit::CloseModal);
+    assert!(a.modal.is_none());
+}
+
+#[test]
+fn picker_steps_keep_dates_valid() {
+    use crate::tui::picker::{DatePicker, Target};
+    let ms = crate::ingest::time::parse_ts("2024-01-31 23:59").unwrap();
+    let mut p = DatePicker::new(Target::ChartStart, 1, ms);
+    p.step(1, 1);
+    assert_eq!(p.text(), "2024-02-29 23:59");
+    p.step(4, 1);
+    assert_eq!(p.text(), "2024-03-01 00:00");
+    p.step(0, -1);
+    assert_eq!(p.text(), "2023-03-01 00:00");
+    p.field = 1;
+    p.typed = "13".into();
+    p.commit();
+    assert_eq!(p.text(), "2023-03-01 00:00", "month 13 is ignored");
+}
+
+#[test]
+fn list_range_filters_the_listed_bars() {
+    use crate::ingest::time::parse_ts;
+    let (_t, mut a) = app();
+    let s = screen_text(&mut a);
+    assert!(s.contains("from start to end"), "{s}");
+    let id = a.layout.focus;
+    let all = a.caches[&id].list.total;
+    let first = a.caches[&id].list.selected().unwrap().ts;
+    // keyboard: from = first bar + 1h
+    a.on_key(key(KeyCode::Char('[')));
+    let from = first + 3_600_000;
+    *picker(&mut a) = crate::tui::picker::DatePicker::new(crate::tui::picker::Target::ListFrom, id, from);
+    a.on_key(key(KeyCode::Enter));
+    screen_text(&mut a);
+    let n1 = a.caches[&id].list.total;
+    assert!(n1 < all && n1 > 0, "{n1} of {all}");
+    assert!(a.caches[&id].list.selected().unwrap().ts >= from);
+    assert_eq!(a.layout.focused().list.from, Some(from));
+    // mouse: click "to …" in the title, type a time 2h after the start, OK
+    click_on(&mut a, |h| *h == Hit::ListRange(id, 1));
+    let to_text = crate::ingest::time::fmt_ts(from + 2 * 3_600_000)[..16].to_string();
+    for c in to_text.chars() {
+        a.on_key(key(KeyCode::Char(c)));
+    }
+    click_on(&mut a, |h| *h == Hit::Picker(crate::tui::picker::PickHit::Ok));
+    let s = screen_text(&mut a);
+    let n2 = a.caches[&id].list.total;
+    assert!(n2 < n1 && n2 > 0, "{n2} of {n1}");
+    assert!(s.contains(&format!("to {to_text}")), "{s}");
+    let to = a.layout.focused().list.to.unwrap();
+    assert!(to >= parse_ts(&to_text).unwrap());
+    // the last listed bar is inside the range
+    a.on_key(key(KeyCode::End));
+    assert!(a.caches[&id].list.selected().unwrap().ts <= to);
+    // backslash clears the range
+    a.on_key(key(KeyCode::Char('\\')));
+    screen_text(&mut a);
+    assert_eq!(a.caches[&id].list.total, all);
 }

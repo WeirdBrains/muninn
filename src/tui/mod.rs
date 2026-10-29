@@ -12,6 +12,7 @@ pub mod import;
 pub mod layout;
 pub mod menu;
 pub mod modal;
+pub mod picker;
 pub mod sidebar;
 pub mod themes;
 pub mod tiles;
@@ -68,6 +69,12 @@ pub enum Hit {
     Row(usize),
     /// A field or action button of a form (Export, Keys): index as in `Form::sel`.
     FormRow(usize),
+    /// Date/time picker controls.
+    Picker(picker::PickHit),
+    /// List tile range labels: 0 from, 1 to.
+    ListRange(u32, u8),
+    /// Chart period dates (open the picker): 0 start, 1 end.
+    ChartDate(u32, u8),
     /// A clickable key hint: acts as if that key was pressed.
     Press(ratatui::crossterm::event::KeyCode),
     /// A bar row of a list tile (absolute row index).
@@ -687,6 +694,7 @@ impl App {
                 | Hit::ImportInput(_)
                 | Hit::Row(_)
                 | Hit::HelpLink(_)
+                | Hit::Picker(_)
                 | Hit::FormRow(_),
             ) => {}
             Some(Hit::SidebarRow(r)) => {
@@ -698,6 +706,14 @@ impl App {
             Some(Hit::ChartNav(id, which)) => {
                 self.layout.set_focus(id);
                 self.chart_nav(id, which);
+            }
+            Some(Hit::ChartDate(id, which)) => {
+                self.layout.set_focus(id);
+                self.open_picker(id, if which == 0 { picker::Target::ChartStart } else { picker::Target::ChartEnd });
+            }
+            Some(Hit::ListRange(id, which)) => {
+                self.layout.set_focus(id);
+                self.open_picker(id, if which == 0 { picker::Target::ListFrom } else { picker::Target::ListTo });
             }
             Some(Hit::ChartPlot(id)) => {
                 self.layout.set_focus(id);

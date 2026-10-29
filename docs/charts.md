@@ -28,14 +28,30 @@ a full million-bar series zoomed out reads only one row per column.
 | PgUp / PgDn, `H` | pan a full screen |
 | Home | first bars of the series |
 | End, `0` | back to the latest bar (`live`, follows new data) |
-| `[` | set the period **start** (keeps the end, zooms to fit) |
-| `]` | set the period **end** |
+| `[`, click the start date | pick the period **start** (keeps the end, zooms to fit) |
+| `]`, click the end date | pick the period **end** (`x` in the picker: back to live) |
+| `{` / `}` | type the start / end instead |
 | `@` | jump to a date (centres it and puts the crosshair there) |
 | click `◂` / `▸` | move start or end by a quarter of the window |
 | ← / →, click in the chart | move the crosshair |
 | `,` / `.` | previous / next series |
 
-Dates are `YYYY-MM-DD`, `YYYY-MM-DD HH:MM[:SS]` (UTC) or epoch seconds/ms.
+## Date and time picker
+
+`[` / `]` (and clicking a date) open a picker with year, month, day, hour and minute
+(UTC). The same picker sets a list tile's range ([tiling](tiling.md)).
+
+| input | action |
+|---|---|
+| ← / →, Tab / Shift-Tab, click a field | select a field |
+| ↑ / ↓, click `▲` / `▼` | change it (months and years keep the day valid); PgUp / PgDn by 10 |
+| digits | type the field, e.g. `2017-08-17 06:30` fills every field |
+| `n` | now |
+| Enter / `[Enter OK]` | apply |
+| `x` / `[x clear]` | clear a list range end, or make the chart end live |
+| Esc / `[Esc cancel]` / `[X]` | close without changes |
+
+Typed dates (`{` `}` `@`) are `YYYY-MM-DD`, `YYYY-MM-DD HH:MM[:SS]` (UTC) or epoch seconds/ms.
 
 ## Layers
 

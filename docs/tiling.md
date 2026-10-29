@@ -82,6 +82,8 @@ Narrow tiles show the columns that fit, from the left.
 | `s` / `S` | sort by the next / previous column |
 | `r` | reverse (ascending ↔ descending) |
 | click a column header | sort by it; click again to reverse |
+| `[` / `]`, click `from …` / `to …` in the title | list only bars from / to a date and time ([picker](charts.md#date-and-time-picker)) |
+| `\` | clear the list's time range |
 | `,` / `.` | previous / next series in this tile |
 
 ## Chart tiles

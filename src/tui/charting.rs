@@ -87,6 +87,49 @@ impl App {
         self.chart_set_end(id, Some(end));
     }
 
+    /// Open the date/time picker for a chart period end or a list range end.
+    pub fn open_picker(&mut self, id: u32, target: super::picker::Target) {
+        use super::picker::{DatePicker, Target};
+        let Some(t) = self.layout.tile(id).cloned() else { return };
+        let c = self.chart_geom(id);
+        let d = t.series.as_ref().and_then(|k| self.data.get(k, &self.store));
+        let (first, last) = d.as_ref().and_then(|d| Some((d.bars.first()?.ts, d.bars.last()?.ts))).unwrap_or((0, 0));
+        let ms = match target {
+            Target::ChartStart => c.start.max(c.data_first),
+            Target::ChartEnd => c.end,
+            Target::ListFrom => t.list.from.unwrap_or(first),
+            Target::ListTo => t.list.to.unwrap_or(last),
+        };
+        self.modal = Some(super::modal::Modal::DateTime(DatePicker::new(target, id, ms)));
+    }
+
+    /// Set (or clear with None) one end of a list tile's time range.
+    pub fn list_set_range(&mut self, id: u32, from: Option<i64>, to: Option<i64>, set_from: bool) {
+        let Some(t) = self.layout.tile_mut(id) else { return };
+        if set_from {
+            t.list.from = from;
+        } else {
+            t.list.to = to;
+        }
+        if let (Some(a), Some(b)) = (t.list.from, t.list.to)
+            && a > b
+        {
+            if set_from {
+                t.list.to = None;
+            } else {
+                t.list.from = None;
+            }
+        }
+        let (a, b) = (t.list.from, t.list.to);
+        if let Some(c) = self.caches.get_mut(&id) {
+            c.list.sel = 0;
+            c.list.top = 0;
+        }
+        self.layout_changed();
+        let f = |v: Option<i64>| v.map(|x| crate::ingest::time::fmt_ts(x)[..16].to_string()).unwrap_or_else(|| "…".into());
+        self.set_status(if a.is_none() && b.is_none() { "list range cleared".to_string() } else { format!("list range {} → {}", f(a), f(b)) });
+    }
+
     /// Period selector arrows.
     pub fn chart_nav(&mut self, id: u32, which: u8) {
         let c = self.chart_geom(id);
@@ -168,7 +211,7 @@ impl App {
             }
             let Some(s) = &lt.series else { continue };
             let Some(d) = self.data.get(s, &self.store) else { continue };
-            let r = d.range(self.scope());
+            let r = d.range(lt.list.scope(self.scope()));
             let sl = &d.bars[r];
             // Same as Store::time_index: bars before the target in the list's order.
             let i =

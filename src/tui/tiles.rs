@@ -379,6 +379,10 @@ pub fn draw_chart(
     };
     push("start ".into(), ms, None, &mut spans, hits);
     push("◂".into(), acc, Some(0), &mut spans, hits);
+    let w = 18u16;
+    // "start ◂" is 7 cells, then the 18-cell date; "▸   end ◂" is 9 more
+    hits.push((Rect { x: area.x + 7, y: area.y, width: w, height: 1 }, Hit::ChartDate(t.id, 0)));
+    hits.push((Rect { x: area.x + 34, y: area.y, width: w, height: 1 }, Hit::ChartDate(t.id, 1)));
     push(format!(" {} ", &fmt_ts(cache.start.max(cache.data_first))[..16]), Style::new().fg(th.fg), None, &mut spans, hits);
     push("▸".into(), acc, Some(1), &mut spans, hits);
     push("   end ".into(), ms, None, &mut spans, hits);
@@ -429,11 +433,26 @@ pub fn draw_tile(
     th: &Theme,
     hits: &mut Vec<(Rect, Hit)>,
 ) {
+    let scope = if t.view == View::List { t.list.scope(scope) } else { scope };
     if t.view == View::List {
         let inner = Block::bordered().inner(area);
         cache.list.ensure(data.clone(), t, scope, inner.height as i64 - 1);
     }
     let title = title(t, cache);
+    // list range labels after the title, clickable
+    let mut range_hits = vec![];
+    let title = if t.view == View::List {
+        let f = |v: Option<i64>| v.map(|x| fmt_ts(x)[..16].to_string()).unwrap_or_else(|| "start".into());
+        let g = |v: Option<i64>| v.map(|x| fmt_ts(x)[..16].to_string()).unwrap_or_else(|| "end".into());
+        let (a, b) = (format!("from {}", f(t.list.from)), format!("to {}", g(t.list.to)));
+        let x0 = area.x + 2 + title.chars().count() as u16 + 3;
+        range_hits.push((Rect { x: x0, y: area.y, width: a.chars().count() as u16, height: 1 }, Hit::ListRange(t.id, 0)));
+        let x1 = x0 + a.chars().count() as u16 + 1;
+        range_hits.push((Rect { x: x1, y: area.y, width: b.chars().count() as u16, height: 1 }, Hit::ListRange(t.id, 1)));
+        format!("{title} · {a} {b}")
+    } else {
+        title
+    };
     let block = Block::bordered()
         .title(Span::styled(format!(" {title} "), Style::new().fg(if focused { th.accent } else { th.header }).add_modifier(Modifier::BOLD)))
         .border_style(Style::new().fg(if focused { th.border_focus } else { th.border }))
@@ -441,6 +460,11 @@ pub fn draw_tile(
     let inner = block.inner(area);
     f.render_widget(block, area);
     hits.push((area, Hit::Tile(t.id)));
+    for (r, h) in range_hits {
+        if r.right() < area.right() {
+            hits.push((r, h));
+        }
+    }
     if t.series.is_some() && data.is_none() {
         cache.chart.loading = true;
         let p = cache.pending.clone().unwrap_or(super::data::Pending::Loading { done: 0, total: None });
@@ -493,6 +517,19 @@ pub fn on_key(app: &mut App, k: KeyEvent) -> bool {
                 t.list.desc = !t.list.desc;
                 app.layout_changed();
             }
+            KeyCode::Char('[') => {
+                app.open_picker(id, super::picker::Target::ListFrom);
+                return true;
+            }
+            KeyCode::Char(']') => {
+                app.open_picker(id, super::picker::Target::ListTo);
+                return true;
+            }
+            KeyCode::Char('\\') => {
+                app.list_set_range(id, None, None, true);
+                app.list_set_range(id, None, None, false);
+                return true;
+            }
             _ => return false,
         }
         let c = &mut app.caches.entry(id).or_default().list;
@@ -524,8 +561,10 @@ pub fn chart_key(app: &mut App, k: KeyEvent) -> bool {
         }
         KeyCode::Char('M') => app.modal = Some(Modal::prompt("Moving averages (e.g. sma20, ema50)", PromptKind::Mas)),
         KeyCode::Char('L') => app.dispatch(super::action::Action::ChartLayers),
-        KeyCode::Char('[') => app.modal = Some(Modal::prompt("Period start (YYYY-MM-DD [HH:MM])", PromptKind::ChartStart)),
-        KeyCode::Char(']') => app.modal = Some(Modal::prompt("Period end (YYYY-MM-DD [HH:MM])", PromptKind::ChartEnd)),
+        KeyCode::Char('[') => app.open_picker(id, super::picker::Target::ChartStart),
+        KeyCode::Char(']') => app.open_picker(id, super::picker::Target::ChartEnd),
+        KeyCode::Char('{') => app.modal = Some(Modal::prompt("Period start (YYYY-MM-DD [HH:MM])", PromptKind::ChartStart)),
+        KeyCode::Char('}') => app.modal = Some(Modal::prompt("Period end (YYYY-MM-DD [HH:MM])", PromptKind::ChartEnd)),
         KeyCode::Char('@') => app.modal = Some(Modal::prompt("Jump to date (YYYY-MM-DD [HH:MM])", PromptKind::JumpDate)),
         KeyCode::Char('h') => app.chart_pan(id, -0.25),
         KeyCode::Char('l') => app.chart_pan(id, 0.25),

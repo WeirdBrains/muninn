@@ -34,6 +34,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | ↑ ↓ j k PgUp PgDn Home End | move |
 | `s` / `S` | next / previous sort column |
 | `r` | reverse sort |
+| `[` / `]` / `\` | list range from / to (date and time picker) / clear |
 | `,` / `.` | previous / next series |
 
 | key (chart tile) | action |
@@ -44,7 +45,8 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `h` `l`, PgUp PgDn | pan a quarter / a full screen |
 | `+` `-` | zoom in / out |
 | ← → | move the crosshair |
-| `[` `]` `@` | set start / set end / jump to date |
+| `[` `]` | period start / end (date and time picker) |
+| `{` `}` `@` | type start / type end / jump to date |
 | Home / End, `0` | first bars / latest (live) |
 | `,` / `.` | previous / next series |
 

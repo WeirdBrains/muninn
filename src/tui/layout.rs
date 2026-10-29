@@ -87,6 +87,23 @@ pub struct ListOpts {
     pub sort: BarSort,
     #[serde(default)]
     pub desc: bool,
+    /// Only list bars at or after this time (ms).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<i64>,
+    /// Only list bars at or before this time (ms).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<i64>,
+}
+
+impl ListOpts {
+    /// The list's own range intersected with the sidebar scope.
+    pub fn scope(&self, outer: Option<(i64, i64)>) -> Option<(i64, i64)> {
+        if self.from.is_none() && self.to.is_none() {
+            return outer;
+        }
+        let (a, b) = outer.unwrap_or((i64::MIN, i64::MAX));
+        Some((a.max(self.from.unwrap_or(i64::MIN)), b.min(self.to.unwrap_or(i64::MAX))))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -42,6 +42,8 @@ pub enum Modal {
         scroll: u16,
     },
     Prompt(Prompt),
+    /// Date and time picker (period/list range).
+    DateTime(super::picker::DatePicker),
     /// Sidebar filter editor.
     Filter {
         kind: super::action::FilterKind,
@@ -83,6 +85,10 @@ impl Modal {
             Modal::Prefs { .. } => "preferences",
             Modal::Info { .. } | Modal::Pick { .. } => "tui",
             Modal::Layers { .. } => "charts",
+            Modal::DateTime(p) => match p.target {
+                super::picker::Target::ListFrom | super::picker::Target::ListTo => "tiling",
+                _ => "charts",
+            },
             Modal::Filter { .. } => "sidebar",
             Modal::Prompt(p) => match p.kind {
                 PromptKind::ThemeImport | PromptKind::ThemeExport => "themes",
@@ -184,6 +190,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             fm.editing = false;
             on_key(app, enter);
         }
+        Hit::Picker(p) => super::picker::on_click(app, p),
         Hit::HelpLink(n) => {
             if let Some(Modal::Help(h)) = app.modal.as_mut() {
                 h.click_link(n);
@@ -233,8 +240,12 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
     if matches!(app.modal, Some(Modal::Import)) {
         return super::import::on_key(app, k);
     }
+    if matches!(app.modal, Some(Modal::DateTime(_))) {
+        return super::picker::on_key(app, k);
+    }
     let Some(m) = app.modal.as_mut() else { return };
     match m {
+        Modal::DateTime(_) => {}
         Modal::Import => {}
         Modal::Help(h) => {
             if h.on_key(k) {
@@ -528,6 +539,13 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     let mut extra: Vec<(Rect, super::Hit)> = vec![];
     match app.modal.as_mut().unwrap() {
         Modal::Help(hv) => hv.draw(f, r, &t, &mut extra),
+        Modal::DateTime(p) => {
+            let pr = super::picker::draw(p, f, area, &t, &mut extra);
+            app.modal_hits.extend(extra);
+            let x = super::widgets::close_button(f, pr, &t);
+            app.modal_hits.push((x, super::Hit::CloseModal));
+            return;
+        }
         Modal::Export => forms::draw_export(app, f, r),
         Modal::Import => super::import::draw(app, f, r),
         Modal::Keys => forms::draw_keys(app, f, r),
