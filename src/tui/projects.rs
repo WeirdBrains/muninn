@@ -15,6 +15,7 @@ pub enum PAsk {
     Rename,
     Describe,
     NewJournal,
+    Import,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -103,7 +104,12 @@ fn answer(app: &mut App, kind: PAsk, value: String) {
         Some(id) => app.store.project(id).ok().flatten(),
         None => app.projects.selected().cloned(),
     };
+    if kind == PAsk::Import {
+        import(app, &value);
+        return;
+    }
     let res = match (kind, cur) {
+        (PAsk::Import, _) => return,
         (PAsk::New, _) => app.store.create_project(&value, "").map(|p| ("project.create", format!("create project {}", p.name), p)),
         (PAsk::Rename, Some(p)) => {
             app.store.update_project(&p.id, Some(&value), None).map(|n| ("project.edit", format!("rename project {} → {}", p.name, n.name), n))
@@ -175,6 +181,26 @@ pub fn open_result(app: &mut App, r: &SeriesRef) {
 }
 
 /// E: export the project (an archive by default) or render it as a document.
+/// Restore a project archive (`.mnnp`) or JSON pack as a new project.
+fn import(app: &mut App, value: &str) {
+    let path = std::path::PathBuf::from(super::journals::shellexpand(value.trim()));
+    match crate::export::archive::import_project(&mut app.store, &path, None) {
+        Ok(r) => {
+            let Some(p) = r.project.clone() else { return };
+            record(
+                app,
+                "project.import",
+                format!("import project {} from {}", p.name, path.display()),
+                serde_json::json!({ "project": p.id, "name": p.name, "file": path.display().to_string(), "restored": r }),
+            );
+            reload(app);
+            app.projects.sel = app.projects.list.iter().position(|x| x.id == p.id).unwrap_or(0);
+            app.projects.msg = Some((format!("imported project {}: {}", p.name, r.counts(true)), false));
+        }
+        Err(e) => app.projects.msg = Some((e.to_string(), true)),
+    }
+}
+
 fn export(app: &mut App, id: &str) {
     let name = app.store.project(id).ok().flatten().map(|p| p.name).unwrap_or_default();
     let t = crate::export::files::Target::Project { id: id.to_string(), rows: crate::store::reports::DEFAULT_ROWS, data: true };
@@ -295,6 +321,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         KeyCode::Down | KeyCode::Char('j') => st.sel = (st.sel + 1).min(n.saturating_sub(1)),
         KeyCode::Up | KeyCode::Char('k') => st.sel = st.sel.saturating_sub(1),
         KeyCode::Char('n') | KeyCode::Char('a') => st.ask = Some(Ask::new(PAsk::New, "New project name", "")),
+        KeyCode::Char('I') => st.ask = Some(Ask::new(PAsk::Import, "Import project from (.mnnp or .json)", "")),
         KeyCode::Char('r') => {
             if let Some(p) = st.selected() {
                 let v = p.name.clone();
@@ -369,6 +396,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ("r rename", KeyCode::Char('r')),
                 ("e describe", KeyCode::Char('e')),
                 ("E export", KeyCode::Char('E')),
+                ("I import", KeyCode::Char('I')),
                 ("d delete", KeyCode::Char('d')),
                 ("Esc", KeyCode::Esc),
             ];

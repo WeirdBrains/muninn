@@ -86,7 +86,7 @@ Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add t
 project, Enter open, Esc back. In an entry: ← → move by word, `v` select, `m`
 highlight, `n` note, `i` image; the editor saves with Ctrl-S and switches Markdown ↔
 LaTeX with Ctrl-T. `E` exports (journals, entries, reports, projects) and `P` prints
-(journals, entries); in a report `a` adds a section, `J` / `K` move it, `v` previews.
+(journals, entries); `I` in the projects list imports an archive; in a report `a` adds a section, `J` / `K` move it, `v` previews.
 Full tables: [live searches](live-searches.md),
 [projects](projects.md), [journals](journals.md), [reports](reports.md),
 [export formats](export-formats.md).

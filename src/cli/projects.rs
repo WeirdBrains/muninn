@@ -47,18 +47,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
                 format!("import project {} from {}", p.name, file.display()),
                 serde_json::json!({ "project": p.id, "name": p.name, "file": file.display().to_string(), "restored": r }),
             );
-            ctx.io.info(format!(
-                "imported project {} ({}): {} journals, {} entries, {} images, {} reports, {} live searches, {} new bars{}",
-                p.name,
-                p.short_id(),
-                r.journals.len(),
-                r.entries,
-                r.attachments,
-                r.reports,
-                r.live_searches,
-                r.bars,
-                if r.authors_added > 0 { format!(", {} authors added", r.authors_added) } else { String::new() }
-            ));
+            ctx.io.info(format!("imported project {} ({}): {}", p.name, p.short_id(), r.counts(true)));
         }
         ProjectCommand::List { json } => {
             let all = store.projects()?;

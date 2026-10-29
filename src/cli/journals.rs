@@ -333,7 +333,7 @@ pub fn run(ctx: &Ctx, cmd: JournalCommand) -> anyhow::Result<()> {
                 serde_json::json!({ "journal": j.id, "name": j.name, "file": file.display().to_string(), "entries": r.entries }),
             );
             let into = p.map(|p| format!(" in project {}", p.name)).unwrap_or_default();
-            ctx.io.info(format!("imported journal {} ({}){into}: {} entries, {} images", j.name, j.short_id(), r.entries, r.attachments));
+            ctx.io.info(format!("imported journal {} ({}){into}: {}", j.name, j.short_id(), r.counts(false)));
         }
         JournalCommand::Print { journal, entries, printer, out, save_only } => {
             let j = store.find_journal(&journal)?;

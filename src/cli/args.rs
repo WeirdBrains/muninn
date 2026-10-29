@@ -1323,7 +1323,7 @@ images, notes and highlights on selected words (v selects, m highlights, n notes
 and P prints a journal, the marked entries or an entry. Reports... (O) builds reports from \
 text, records, series, journals, projects and authors (a adds a section, J/K move it, v \
 previews). E exports journals, reports and projects (PDF, HTML, Word, LaTeX, JSON, CSV, text, \
-project archives). In the sidebar, a adds the selected series to a project.
+project archives); I in the projects list imports one. In the sidebar, a adds the selected series to a project.
 
 See mnnn help tui, mnnn help import, mnnn help history, mnnn help authors, \
 mnnn help projects, mnnn help live-searches, mnnn help journals, mnnn help reports, \

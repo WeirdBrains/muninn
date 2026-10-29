@@ -107,6 +107,30 @@ pub struct Restored {
     pub authors_added: usize,
 }
 
+impl Restored {
+    /// "1 journal, 3 entries, …" for messages.
+    pub fn counts(&self, project: bool) -> String {
+        fn n(c: u64, one: &str, many: &str) -> String {
+            format!("{c} {}", if c == 1 { one } else { many })
+        }
+        let mut v = vec![];
+        if project {
+            v.push(n(self.journals.len() as u64, "journal", "journals"));
+        }
+        v.push(n(self.entries as u64, "entry", "entries"));
+        v.push(n(self.attachments as u64, "image", "images"));
+        if project {
+            v.push(n(self.reports as u64, "report", "reports"));
+            v.push(n(self.live_searches as u64, "live search", "live searches"));
+            v.push(n(self.bars, "new bar", "new bars"));
+        }
+        if self.authors_added > 0 {
+            v.push(n(self.authors_added as u64, "author added", "authors added"));
+        }
+        v.join(", ")
+    }
+}
+
 /// Bytes for a pack's attachments and data.
 pub trait Blobs {
     fn attachment(&self, a: &AttachmentPack) -> Result<Vec<u8>>;
@@ -589,4 +613,16 @@ fn check_format(format: &str, version: u32, want: &str) -> Result<()> {
         return Err(Error::invalid("pack", format!("version {version} is newer than this Muninn reads ({PACK_VERSION}); update Muninn")));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Restored;
+
+    #[test]
+    fn restored_counts_read_naturally() {
+        let r = Restored { entries: 1, attachments: 2, reports: 1, bars: 0, ..Default::default() };
+        assert_eq!(r.counts(false), "1 entry, 2 images");
+        assert_eq!(r.counts(true), "0 journals, 1 entry, 2 images, 1 report, 0 live searches, 0 new bars");
+    }
 }

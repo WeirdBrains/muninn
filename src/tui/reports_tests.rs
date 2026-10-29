@@ -199,4 +199,14 @@ fn journals_export_and_print_and_projects_export() {
     assert_eq!(r.journals.len(), 1);
     assert_eq!(r.entries, 2);
     assert!(kinds(&a).iter().any(|x| x == "project.export"));
+    // I on the list restores an archive next to the original.
+    a.on_key(key(KeyCode::Char('I')));
+    typ(&mut a, &format!("{}\n", arc.display()));
+    let msg = a.projects.msg.clone().unwrap();
+    assert!(!msg.1 && msg.0.contains("imported project Breakouts (imported)") && msg.0.contains("1 journal,"), "{msg:?}");
+    assert!(a.projects.list.iter().any(|p| p.name == "Breakouts (imported)"));
+    assert!(kinds(&a).iter().any(|x| x == "project.import"));
+    a.on_key(key(KeyCode::Char('I')));
+    typ(&mut a, "/nonexistent/x.mnnp\n");
+    assert!(a.projects.msg.as_ref().unwrap().1);
 }

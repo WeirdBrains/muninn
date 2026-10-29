@@ -75,6 +75,7 @@ The projects page lists the projects; `n` (or **New project…**) creates one.
 | `n` / `a` | new project |
 | `r` / `e` | rename / describe |
 | `E` | export (archive first; any document format) |
+| `I` | import a project archive (`.mnnp`) or JSON pack as a new project |
 | `d` | delete (`y` confirms; its journals stay) |
 | Esc, `q` | close |
 

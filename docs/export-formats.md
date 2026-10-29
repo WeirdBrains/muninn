@@ -24,7 +24,8 @@ In the TUI, `E` opens the export window in [journals](journals.md) (the journal,
 marked entries or the open entry), [reports](reports.md) and [projects](projects.md):
 choose a format, then confirm or change the path (`<current dir>/<name>.<ext>`).
 Exports are recorded in the [history](history.md) (`journal.export`, `entry.export`,
-`report.export`, `project.export`).
+`report.export`, `project.export`). `I` in the projects list imports a project
+archive or JSON pack.
 
 ## How documents are made
 
