@@ -83,7 +83,7 @@ and themes too.
 .nf
 export MUNINN_HOME=/tmp/mnnn-demo
 mnnn keys init
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/BTCUSDT_5m.csv --source binance -y
+mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance -y
 mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data --source binance -y
 mnnn export --format parquet --out /tmp/btc.parquet --symbol BTC/USDT
 mnnn -q export --format csv --out - --from 2026-10-01 | head

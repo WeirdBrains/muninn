@@ -18,7 +18,7 @@ JSON is an array of objects, one per bar.
 ## Examples
 
 ```
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/ETHUSDT_5m.csv --source binance -y
+mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_ETHUSDT_5m.csv --source binance -y
 mnnn export --format parquet --out /tmp/eth.parquet --symbol ETH/USDT
 mnnn export --format csv --out - --symbol ETH/USDT --from 2024-01-01 --to 2024-01-31 | head
 mnnn -q export --format json --out - --source binance --duration 5m > bars.json

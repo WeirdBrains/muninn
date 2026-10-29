@@ -13,7 +13,7 @@ and a background import with a live progress bar. The same pipeline as
 ││2 raw/data  ││● BTCUSDT_5m.csv   ││period 5m                       ││
 ││3 cwd       ││○ ETHUSDT_1h.csv   ││timestamp,open,high,...         ││
 │└────────────┘└───────────────────┘└────────────────────────────────┘│
-│ source   local (default)                                             │
+│ source   from file name, else local (s)                              │
 │ symbol   derive from name / data                                     │
 │ duration derive from name / data                                     │
 └──────────────────────────────────────────────────────────────────────┘
@@ -64,7 +64,10 @@ Hidden names are offered only when hidden files are shown (`.`) or you type the 
 
 ## Resolution
 
-Source defaults to `local`. Symbol and duration are derived from each file name and,
+**Source** records where the data originally came from (also when the files were
+copied or uploaded from elsewhere): press `s` (or click the source line) and type it to
+use it for every file in the run. Left empty, each file's source is the exchange in its
+name (the preview shows `source kraken (from name)`), else `local`. Symbol and duration are derived from each file name and,
 for the duration, from the data; type a value to override it for every file in the
 run. Recently used folders are saved in [preferences](preferences.md)
 (`tui.import_recent`).

@@ -31,6 +31,8 @@ pub struct IngestOptions {
     pub run_id: Option<i64>,
     /// Only the top level of a directory (default: recurse into subdirectories).
     pub no_recurse: bool,
+    /// Source used when none is given and the file name names no exchange (TUI: "local").
+    pub default_source: Option<String>,
 }
 
 pub use progress::{CountingReader, Estimate, Progress};
@@ -131,6 +133,12 @@ pub fn symbol_from_name(store: &Store, name: &str) -> Result<Option<Symbol>> {
     for w in tokens.windows(2) {
         candidates.push(format!("{}/{}", w[0], w[1]));
     }
+    // `coinbase-BTC-USD`, `Kraken-ETHUSDT`: also try the dash-separated parts and pairs
+    for t in tokens.iter().filter(|t| t.contains('-')) {
+        let parts: Vec<&str> = t.split('-').collect();
+        candidates.extend(parts.iter().map(|p| p.to_string()));
+        candidates.extend(parts.windows(2).map(|w| format!("{}/{}", w[0], w[1])));
+    }
     for c in candidates {
         if let Some(sym) = Symbol::parse_with(&c, &qrefs) {
             let sym = store.canonical_symbol(&sym)?;
@@ -147,6 +155,40 @@ pub fn symbol_from_name_static(name: &str) -> Option<Symbol> {
     let stem = Path::new(name).file_stem()?.to_string_lossy().to_string();
     let tokens: Vec<&str> = stem.split(['_', '.', ' ']).collect();
     tokens.iter().find_map(|t| Symbol::parse_with(t, crate::model::KNOWN_QUOTES).filter(|s| crate::model::KNOWN_BASES.contains(&s.base.as_str())))
+}
+
+/// Exchanges recognised in file names (lower case; aliases map to the canonical name).
+pub const EXCHANGES: &[(&str, &str)] = &[
+    ("binance", "binance"),
+    ("binanceus", "binanceus"),
+    ("coinbase", "coinbase"),
+    ("gdax", "coinbase"),
+    ("kraken", "kraken"),
+    ("bitstamp", "bitstamp"),
+    ("bitfinex", "bitfinex"),
+    ("bybit", "bybit"),
+    ("okx", "okx"),
+    ("okex", "okx"),
+    ("kucoin", "kucoin"),
+    ("gemini", "gemini"),
+    ("huobi", "htx"),
+    ("htx", "htx"),
+    ("gateio", "gateio"),
+    ("bitmex", "bitmex"),
+    ("deribit", "deribit"),
+    ("poloniex", "poloniex"),
+    ("bittrex", "bittrex"),
+    ("bitget", "bitget"),
+    ("mexc", "mexc"),
+    ("cryptocom", "cryptocom"),
+    ("upbit", "upbit"),
+    ("bithumb", "bithumb"),
+];
+
+/// The exchange named by a file name token, e.g. `coinbase_BTC-USD_5m.csv` -> coinbase.
+pub fn source_from_name(name: &str) -> Option<String> {
+    let stem = name_stem(name).to_lowercase();
+    stem.split(['_', '.', '-', ' ', ':', '/']).find_map(|t| EXCHANGES.iter().find(|(k, _)| *k == t).map(|(_, v)| v.to_string()))
 }
 
 /// Derive a duration from a file name token such as `5m`, `1h`, `15min`.
@@ -197,7 +239,7 @@ impl<'a> Session<'a> {
             self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
         } else if let Some(s) = self.store.source_by_locator(&self.source_locator)? {
             s
-        } else if let Some(name) = self.default_source.clone() {
+        } else if let Some(name) = self.opts.default_source.clone().or_else(|| self.default_source.clone()) {
             self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
         } else {
             let name = self.io.prompt("source", &format!("Source name for {}", self.source_locator), None, "pass --source <NAME>")?;
@@ -322,12 +364,17 @@ impl<'a> Session<'a> {
         let overrides = parse_map(&self.opts.map)?;
         let cols = Columns::from_frame(&input.frame, &overrides)?;
         rep.rows = cols.len() as u64;
-        let had_source = self.source.is_some();
-        let known = match &self.opts.source {
+        // An exchange named in the file name wins over remembered/default sources (not over --source).
+        let guessed = if self.opts.source.is_none() { input.name_hint.as_deref().and_then(source_from_name) } else { None };
+        let had_source = self.source.is_some() && guessed.is_none();
+        let known = match guessed.as_ref().or(self.opts.source.as_ref()) {
             Some(n) => self.store.source_by_name(n)?.is_some(),
             None => true,
         };
-        let source = self.resolve_source()?;
+        let source = match &guessed {
+            Some(n) => self.store.get_or_create_source(n, &self.source_kind, Some(&input.locator))?,
+            None => self.resolve_source()?,
+        };
         if !had_source && !known {
             self.note("source", source.id.clone(), &input.locator);
         }
@@ -561,4 +608,17 @@ where
     };
     store.finish_import_run(run, status, kept, &note)?;
     r
+}
+
+#[cfg(test)]
+mod source_name_tests {
+    #[test]
+    fn exchange_tokens_in_names() {
+        use super::source_from_name as s;
+        assert_eq!(s("binance_BTCUSDT_5m.csv").as_deref(), Some("binance"));
+        assert_eq!(s("Coinbase-BTC-USD_5m.csv").as_deref(), Some("coinbase"));
+        assert_eq!(s("gdax_btc.csv").as_deref(), Some("coinbase"));
+        assert_eq!(s("BTCUSDT_5m.csv"), None);
+        assert_eq!(s("okxish_5m.csv"), None, "whole tokens only");
+    }
 }

@@ -50,7 +50,7 @@ command-line usage (clap).
 ## Examples
 
 ```
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/BTCUSDT_5m.csv --source binance -y
+mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance -y
 mnnn -q export --format csv --out - --symbol BTC/USDT --from 2026-10-01 | head
 mnnn sources list
 mnnn help keys
@@ -81,7 +81,8 @@ See also [TUI](tui.md), [in-app help](help.md).
 ## Importing a whole path
 
 ```sh
-mnnn ingest path ~/Projects/kommandosaldat/raw/data --source binance -y
+mnnn ingest path ~/Projects/kommandosaldat/raw/data -y              # source from each name (binance_…, coinbase_…)
+mnnn ingest path ~/Downloads/export --source coinbase -y           # set it explicitly
 mnnn ingest path ./exports --no-recursive --records data.bars
 ```
 

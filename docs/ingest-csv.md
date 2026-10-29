@@ -12,7 +12,7 @@ Every row becomes a bar (see [data model](data-model.md)). A directory (searched
 ## Example with the raw data
 
 ```
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/BTCUSDT_5m.csv --source binance -y
+mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance -y
 mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data --source binance -y
 ```
 
@@ -26,8 +26,12 @@ The file name gives the symbol (`BTCUSDT` -> `BTC/USDT`) and the duration (`_5m`
    `open`/`o`, `high`/`h`, `low`/`l`, `close`/`c`, `volume`/`vol`/`v`. Override with
    `--map <col>=<field>`, e.g. `--map ts=timestamp`. With `--no-header`, columns are
    taken in the order timestamp, open, high, low, close, volume.
-3. **Source**: `--source` (created if unknown), else a source whose locator equals the
-   path, else a prompt.
+3. **Source** (where the data originally came from, even for uploaded copies):
+   `--source NAME` (created if unknown) on `ingest csv`, `ingest json` and `ingest path`;
+   else an exchange named in the file name (`coinbase_BTC-USD_5m.csv` → `coinbase`;
+   binance, coinbase/gdax, kraken, bitstamp, bitfinex, bybit, okx, kucoin, gemini, …),
+   per file, so a folder of mixed exchanges lands in the right sources; else a source
+   whose locator equals the path, else a prompt.
 4. **Symbol**: `--symbol` (`BTC/USDT`, `BTC-USD` or `BTCUSDT`), else parsed from the file
    name against the known symbol list (longest quote suffix wins, aliases like `XBT`
    applied), else a prompt. A prompted answer is reused for the rest of the run.

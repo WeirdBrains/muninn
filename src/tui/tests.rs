@@ -412,7 +412,7 @@ fn snapshots() {
             paths.ensure().unwrap();
             let dek = crate::crypto::Key32::random().unwrap();
             let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
-            for f in ["BTCUSDT_5m.csv", "ETHUSDT_5m.csv"] {
+            for f in ["binance_BTCUSDT_5m.csv", "binance_ETHUSDT_5m.csv"] {
                 let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
                 let started = std::time::Instant::now();
                 crate::ingest::ingest_csv(
@@ -612,7 +612,7 @@ fn fullscale() {
     };
     let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
     if store.series().unwrap().len() < 2 {
-        for f in ["BTCUSDT_5m.csv", "ETHUSDT_5m.csv"] {
+        for f in ["binance_BTCUSDT_5m.csv", "binance_ETHUSDT_5m.csv"] {
             let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
             let t = Instant::now();
             let r = crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &raw.join(f), &Default::default()).unwrap();
@@ -704,7 +704,7 @@ fn fullscale() {
     a.sidebar.focused = false;
     step(&mut a, "import open", &mut |a| a.on_key(key(KeyCode::Char('i'))));
     step(&mut a, "import cd raw/data", &mut |a| a.import.cd(raw.clone()));
-    let pos = a.import.entries.iter().position(|e| e.name == "ETHUSD_5m.csv").unwrap();
+    let pos = a.import.entries.iter().position(|e| e.name == "bitstamp_ETHUSD_5m.csv").unwrap();
     step(&mut a, "import preview highlight", &mut |a| a.import.sel = pos);
     a.import.fields[0] = format!("perf{}", std::process::id());
     let t = Instant::now();
@@ -728,7 +728,7 @@ fn fullscale() {
     let first_move = samples.iter().find(|x| x.1 > 0.0).map(|x| x.0).unwrap_or(f64::NAN);
     let pct = |sec: f64| samples.iter().take_while(|x| x.0 <= sec).last().map(|x| x.1 * 100.0).unwrap_or(0.0);
     println!(
-        "import ETHUSD_5m.csv: {:?}, {} distinct progress values, monotonic {monotonic}, max jump {:.1}%, first move at {first_move:.2}s, at 1s {:.1}% 10s {:.1}% 20s {:.1}% 30s {:.1}%, slowest frame {slow_frame:?}",
+        "import bitstamp_ETHUSD_5m.csv: {:?}, {} distinct progress values, monotonic {monotonic}, max jump {:.1}%, first move at {first_move:.2}s, at 1s {:.1}% 10s {:.1}% 20s {:.1}% 30s {:.1}%, slowest frame {slow_frame:?}",
         t.elapsed(),
         distinct.len(),
         max_jump * 100.0,
@@ -756,7 +756,7 @@ fn ingest_timing() {
     paths.ensure().unwrap();
     let dek = crate::crypto::Key32::random().unwrap();
     let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
-    for f in ["BTCUSDT_5m.csv", "ETHUSDT_5m.csv"] {
+    for f in ["binance_BTCUSDT_5m.csv", "binance_ETHUSDT_5m.csv"] {
         let progress = std::env::var_os("MUNINN_TIMING_PROGRESS").map(|_| std::sync::Arc::new(crate::ingest::Progress::default()));
         let opts = crate::ingest::IngestOptions { source: Some("binance".into()), progress, ..Default::default() };
         let s = std::time::Instant::now();
@@ -973,7 +973,7 @@ fn cancel_fullsize() {
         &mut a.store,
         crate::interact::Interact::batch(true),
         opts,
-        &std::path::Path::new(&raw).join("BTCUSDT_5m.csv"),
+        &std::path::Path::new(&raw).join("binance_BTCUSDT_5m.csv"),
         &Default::default(),
     );
     let asked = w.join().unwrap();
@@ -1569,4 +1569,34 @@ fn tile_focus_next_previous_and_direct_jump() {
     a.on_key(key(KeyCode::Char('?')));
     a.on_key(mkey(KeyCode::Char(char::from_digit(target, 10).unwrap()), KeyModifiers::ALT));
     assert_eq!(a.layout.focus, ids[0]);
+}
+
+#[test]
+fn import_source_defaults_to_the_exchange_in_the_name_then_local() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("kraken_SOLUSDT_5m.csv")).unwrap();
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.import.sel = a.import.entries.iter().position(|e| e.name == "kraken_SOLUSDT_5m.csv").unwrap();
+    let s = screen_text(&mut a);
+    assert!(s.contains("source kraken (from name)"), "{s}");
+    assert!(s.contains("from file name, else local"), "{s}");
+    a.on_key(key(KeyCode::Char('A')));
+    wait_import(&mut a);
+    let src = |a: &App, sym: &str| a.series.iter().find(|x| x.symbol.to_string() == sym).map(|x| x.source.clone());
+    assert_eq!(src(&a, "SOL/USDT").as_deref(), Some("kraken"));
+    assert_eq!(src(&a, "ADA/USDT").as_deref(), Some("local"));
+    // a typed source wins (s focuses the field)
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.import.fields[0] = "coinbase".into();
+    a.import.sel = a.import.entries.iter().position(|e| e.name == "kraken_SOLUSDT_5m.csv").unwrap();
+    assert!(screen_text(&mut a).contains("source coinbase"));
+    a.on_key(key(KeyCode::Char('i')));
+    wait_import(&mut a);
+    assert!(a.series.iter().any(|x| x.source == "coinbase" && x.symbol.to_string() == "SOL/USDT"));
 }

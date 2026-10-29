@@ -17,6 +17,7 @@ pub fn options(ctx: &Ctx, c: &CommonIngestArgs) -> anyhow::Result<IngestOptions>
         run_id: None,
         progress: None,
         no_recurse: c.no_recursive,
+        default_source: None,
     })
 }
 

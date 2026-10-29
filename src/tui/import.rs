@@ -742,7 +742,8 @@ fn launch(app: &mut App, files: Vec<PathBuf>, symbols: std::collections::HashMap
     let f = &app.import.fields;
     let opt = |s: &String| (!s.trim().is_empty()).then(|| s.trim().to_string());
     let opts = IngestOptions {
-        source: opt(&f[0]).or_else(|| Some("local".into())),
+        source: opt(&f[0]),
+        default_source: Some("local".into()),
         symbol: opt(&f[1]),
         duration: opt(&f[2]),
         drop_zero_volume: app.prefs.ingest.drop_zero_volume,
@@ -1355,6 +1356,15 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
             st.preview = Some((p.clone(), preview_bars(&p)));
         }
         let (sym, dur) = ImportState::guess(&p);
+        let src = match st.fields[0].trim() {
+            "" => p
+                .file_name()
+                .and_then(|n| crate::ingest::source_from_name(&n.to_string_lossy()))
+                .map(|s| format!("{s} (from name)"))
+                .unwrap_or_else(|| "local (default)".into()),
+            s => s.to_string(),
+        };
+        pv.push(Line::from(vec![Span::styled("source ", Style::new().fg(t.muted)), Span::styled(src, Style::new().fg(t.fg))]));
         pv.push(Line::from(vec![Span::styled("symbol ", Style::new().fg(t.muted)), Span::styled(sym, Style::new().fg(t.fg))]));
         pv.push(Line::from(vec![Span::styled("period ", Style::new().fg(t.muted)), Span::styled(dur, Style::new().fg(t.fg))]));
         if let Ok(m) = p.metadata() {
@@ -1373,7 +1383,7 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
     for (i, name) in FIELDS.iter().enumerate() {
         let v = &st.fields[i];
         let shown = if v.is_empty() && st.pane != Pane::Field(i) {
-            Span::styled(if i == 0 { "local (default)" } else { "derive from name / data" }, Style::new().fg(t.muted))
+            Span::styled(if i == 0 { "from file name, else local (s)" } else { "derive from name / data" }, Style::new().fg(t.muted))
         } else {
             Span::styled(format!("{v}{}", caret(Pane::Field(i))), Style::new().fg(t.fg))
         };

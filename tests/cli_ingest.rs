@@ -82,7 +82,7 @@ fn quiet_prints_nothing() {
 #[ignore]
 fn full_file_btc_ingest() {
     let raw = std::env::var("MUNINN_RAW_DATA").expect("set MUNINN_RAW_DATA");
-    let f = Path::new(&raw).join("BTCUSDT_5m.csv");
+    let f = Path::new(&raw).join("binance_BTCUSDT_5m.csv");
     let e = Env::new();
     let t = std::time::Instant::now();
     let out = e.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
@@ -145,4 +145,23 @@ fn ingest_path_recurses_mixed_formats_with_progress() {
     // csv subcommand recurses too
     let out = e.ok(&["-y", "ingest", "csv", "--path", p, "--source", "mix2"]);
     assert!(out.contains("mix2 ETH/USDT"), "{out}");
+}
+
+#[test]
+fn source_comes_from_the_flag_else_the_exchange_in_the_file_name() {
+    let e = Env::new();
+    let dir = e.dir.path().join("in");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::copy(fixture("BTCUSDT_5m.csv"), dir.join("binance_BTCUSDT_5m.csv")).unwrap();
+    std::fs::copy(fixture("ETHUSDT_5m.csv"), dir.join("Coinbase-ETHUSDT_5m.csv")).unwrap();
+    // no --source: each file's exchange is taken from its name
+    let out = e.ok(&["-y", "ingest", "path", dir.to_str().unwrap()]);
+    assert!(out.contains("binance BTC/USDT 5m") && out.contains("coinbase ETH/USDT 5m"), "{out}");
+    // --source wins over the name (records where the data came from, e.g. an upload)
+    let out = e.ok(&["-y", "ingest", "csv", "--path", dir.join("binance_BTCUSDT_5m.csv").to_str().unwrap(), "--source", "kraken", "--force"]);
+    assert!(out.contains("kraken BTC/USDT 5m"), "{out}");
+    let out = e.ok(&["sources", "list"]);
+    for s in ["binance", "coinbase", "kraken"] {
+        assert!(out.contains(s), "{out}");
+    }
 }

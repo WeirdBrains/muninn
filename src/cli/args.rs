@@ -89,7 +89,8 @@ pub enum Command {
 /// Values shared by every ingest kind.
 #[derive(Debug, Clone, Args, Default)]
 pub struct CommonIngestArgs {
-    /// Source name (created if unknown).
+    /// Where the data came from, e.g. coinbase (created if unknown). Default: an exchange
+    /// named in the file name (binance_…, coinbase_…), else a prompt.
     #[arg(long)]
     pub source: Option<String>,
     /// Symbol, e.g. BTC/USDT, BTC-USD or BTCUSDT.

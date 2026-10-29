@@ -15,7 +15,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Added
 - Date and time picker: in a chart, `[` / `]` or a click on the start or end date opens a picker for year, month, day, hour and minute; change fields with the arrows, digits or the clickable `▲` / `▼`
-- List time range: in a list tile, `[` / `]` or a click on `from …` / `to …` in the title lists only bars in that range; `\\` clears it
+- List time range: in a list tile, `[` / `]` or a click on `from …` / `to …` in the title lists only bars in that range; `\` clears it
 
 ### Changed
 - Typing a chart start or end moved to `{` / `}`
