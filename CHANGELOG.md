@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-10-29
+
+### Added
+- Set where data came from: `mnnn ingest path <DIR> --source coinbase` (also `ingest csv` / `json`), or in the TUI import press `s` and type it; left empty, each file's source is the exchange in its name (`coinbase_BTC-USD_5m.csv` → `coinbase`), else `local` in the TUI
+- The TUI import preview shows the source each file will get, e.g. `source kraken (from name)`
+
 ## [1.14.0] - 2026-10-29
 
 ### Added
@@ -195,7 +201,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.14.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.15.0...HEAD
+[1.15.0]: https://github.com/kommandosaldat/muninn/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/kommandosaldat/muninn/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/kommandosaldat/muninn/compare/v1.12.3...v1.13.0
 [1.12.3]: https://github.com/kommandosaldat/muninn/compare/v1.12.2...v1.12.3
