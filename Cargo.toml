@@ -64,6 +64,12 @@ tar = "0.4"
 zstd = "0.13"
 tempfile = "3"
 ctrlc = "3"
+pdf-writer = "0.15"
+ttf-parser = "0.25"
+subsetter = { version = "0.2", default-features = false }
+png = "0.18"
+flate2 = "1"
+crc32fast = "1"
 
 
 # Crypto (scrypt/argon2), SQLCipher and Polars are very slow unoptimized; optimize deps in dev/test.

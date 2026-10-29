@@ -14,6 +14,7 @@ pub mod history;
 pub mod ingest;
 pub mod live;
 pub mod model;
+pub mod render;
 pub mod store;
 pub mod theme;
 pub mod tui;
