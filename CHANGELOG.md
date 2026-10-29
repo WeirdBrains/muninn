@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-29
+
+### Added
+- Reports: build from text, records, series, journals, projects, authors and a code placeholder — `mnnn report create|add|edit-section|move|export|preview`, or Reports… (O) in the TUI
+- Document export in PDF, Word, HTML, LaTeX, JSON, CSV and text, rendered in pure Rust from LaTeX — `--format` on `report|journal|project export`, or E in the TUI
+- Journal export, import and print — `mnnn journal export|import|print` (`--save-only` keeps the PDF), or E / P in the TUI
+- Project archives that restore everything — `mnnn project export` (.mnnp) and `mnnn project import`, or E / I in the TUI
+- Bars as documents — `mnnn export --format pdf|docx|html|latex`
+
 ## [2.1.0] - 2026-10-29
 
 ### Added
@@ -231,7 +240,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/kommandosaldat/muninn/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/kommandosaldat/muninn/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/kommandosaldat/muninn/compare/v1.16.0...v2.0.0
 [1.16.0]: https://github.com/kommandosaldat/muninn/compare/v1.15.0...v1.16.0
