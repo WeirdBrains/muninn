@@ -216,6 +216,11 @@ impl Store {
         Ok(a)
     }
 
+    /// Id of the current author, for attributing new work.
+    pub fn current_author_id(&self) -> Result<Option<String>> {
+        self.setting(CURRENT)
+    }
+
     pub fn current_author(&self) -> Result<Option<Author>> {
         match self.setting(CURRENT)? {
             Some(id) => self.author(&id),

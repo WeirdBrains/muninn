@@ -6,12 +6,18 @@ use std::path::Path;
 
 pub mod authors;
 pub mod history;
+pub mod journals;
+pub mod projects;
 mod query;
 pub mod runs;
+pub mod searches;
 pub use authors::{Author, AuthorChange};
 pub use history::{ActionRecord, Move, NewAction, TreeRow};
+pub use journals::{Annotation, AnnotationKind, Attachment, Entry, EntryFormat, Journal, JournalDoc, Span};
+pub use projects::{ItemKind, Project, ProjectItem, SeriesRef};
 pub use query::BarSort;
 pub use runs::{Artifact, ImportRun};
+pub use searches::{LiveSearch, SearchSpec, SearchTarget};
 
 /// Schema version after all migrations (1.x databases are at 3 and migrate on open).
 pub const SCHEMA_VERSION: i64 = MIGRATIONS.len() as i64;
@@ -89,7 +95,40 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     // 2.0: authorship, then action history
     authors::MIGRATION,
     history::MIGRATION,
+    // 2.1: live searches, projects, journals
+    searches::MIGRATION,
+    projects::MIGRATION,
+    journals::MIGRATION,
 ];
+
+/// A new random id (32 hex characters).
+pub(crate) fn new_id() -> String {
+    uuid::Uuid::new_v4().simple().to_string()
+}
+
+/// The first 8 characters of an id, for listings.
+pub(crate) fn short(id: &str) -> &str {
+    &id[..id.len().min(8)]
+}
+
+/// Find one item by id, unique id prefix or exact name (case-insensitive).
+pub(crate) fn pick<T: Clone>(all: Vec<T>, key: &str, id: fn(&T) -> &str, name: fn(&T) -> &str, what: &'static str, list: &str) -> Result<T> {
+    let k = key.trim();
+    if let Some(x) = all.iter().find(|x| id(x) == k) {
+        return Ok(x.clone());
+    }
+    let lk = k.to_lowercase();
+    let by_name: Vec<&T> = all.iter().filter(|x| name(x).to_lowercase() == lk).collect();
+    if by_name.len() == 1 {
+        return Ok(by_name[0].clone());
+    }
+    let by_prefix: Vec<&T> = all.iter().filter(|x| !k.is_empty() && id(x).starts_with(k)).collect();
+    match (by_name.len(), by_prefix.len()) {
+        (0, 1) => Ok(by_prefix[0].clone()),
+        (0, 0) => Err(crate::Error::invalid(what, format!("`{k}` not found (see `{list}`)"))),
+        _ => Err(crate::Error::invalid(what, format!("`{k}` matches more than one; use the id"))),
+    }
+}
 
 pub fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
@@ -679,12 +718,41 @@ mod tests {
         assert_eq!(s.series().unwrap().len(), 1);
         assert_eq!(s.last_import_run().unwrap().unwrap().status, "completed");
         assert!(s.authors().unwrap().is_empty() && s.actions().unwrap().is_empty());
+        assert!(s.live_searches().unwrap().is_empty() && s.projects().unwrap().is_empty() && s.journals().unwrap().is_empty());
         s.add_author("Michael", None, &[]).unwrap();
         s.record_action(&NewAction::new("filter", "cli", "x")).unwrap();
         drop(s);
         // reopening is a no-op
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!((s.authors().unwrap().len(), s.actions().unwrap().len()), (1, 1));
+    }
+
+    #[test]
+    fn a_2_0_database_migrates_and_keeps_authors_and_history() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v2.database");
+        let key = [9u8; 32];
+        {
+            // a v2.0 database: schema 5 with an author and actions
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store { conn };
+            s.migrate_to(5).unwrap();
+            s.add_author("Ada", None, &[]).unwrap();
+            s.record_action(&NewAction::new("theme", "cli", "theme nord")).unwrap();
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        assert_eq!(s.current_author().unwrap().unwrap().name, "Ada");
+        assert_eq!(s.actions().unwrap().len(), 1);
+        let p = s.create_project("P", "").unwrap();
+        let j = s.create_journal("J", Some(&p.id), EntryFormat::Markdown).unwrap();
+        s.add_entry(&j.id, "t", "b", None).unwrap();
+        s.save_live_search("L", &SearchSpec::default(), None).unwrap();
+        drop(s);
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.project_items(&p.id).unwrap().len(), 1);
+        assert_eq!(s.entries(&j.id).unwrap()[0].author_id, s.current_author_id().unwrap());
     }
 
     #[test]
