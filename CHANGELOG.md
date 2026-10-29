@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-10-29
+
+### Added
+- Tile navigation: `Shift-Tab` (or `Ctrl-w p`) focuses the previous tile, `Tab` the next, and `Alt-1` … `Alt-9` jumps straight to tile `[n]`, also inside tabs and stacks; the status line lists the keys
+
 ## [1.13.0] - 2026-10-29
 
 ### Added
@@ -190,7 +195,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.13.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.14.0...HEAD
+[1.14.0]: https://github.com/kommandosaldat/muninn/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/kommandosaldat/muninn/compare/v1.12.3...v1.13.0
 [1.12.3]: https://github.com/kommandosaldat/muninn/compare/v1.12.2...v1.12.3
 [1.12.2]: https://github.com/kommandosaldat/muninn/compare/v1.12.1...v1.12.2
