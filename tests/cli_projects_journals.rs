@@ -73,7 +73,8 @@ fn projects_hold_searches_results_and_journals() {
     e.ok(&["journal", "new", "Loose"]);
     e.ok(&["project", "add", "Breakouts", "--journal", "Loose"]);
     let show = e.ok(&["project", "show", "Breakouts"]);
-    assert!(show.contains("1 matches now"), "{show}");
+    assert!(show.contains("1 match now"), "{show}");
+    assert!(show.contains("live searches:") && show.contains("results:") && show.contains("journals:"), "{show}");
     assert!(show.contains("binance BTC/USDT 5m") || show.contains("BTC/USDT"), "{show}");
     assert!(show.contains("bars now"), "{show}");
     assert!(show.contains("Notes\t0 entries · project journal") && show.contains("Loose\t0 entries · linked"), "{show}");

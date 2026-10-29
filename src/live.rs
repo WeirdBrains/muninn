@@ -105,6 +105,16 @@ pub fn run(store: &Store, spec: &SearchSpec) -> crate::Result<Vec<Found>> {
     })
 }
 
+/// `1 entry`, `2 entries`.
+pub fn entries(n: usize) -> String {
+    if n == 1 { "1 entry".into() } else { format!("{n} entries") }
+}
+
+/// `1 match`, `2 matches`.
+pub fn matches(n: usize) -> String {
+    if n == 1 { "1 match".into() } else { format!("{n} matches") }
+}
+
 /// Number of matches now (for listings).
 pub fn count(store: &Store, spec: &SearchSpec) -> usize {
     run(store, spec).map(|v| v.len()).unwrap_or(0)
@@ -114,7 +124,7 @@ pub fn count(store: &Store, spec: &SearchSpec) -> usize {
 pub fn describe_item(store: &Store, it: &crate::store::ProjectItem) -> (String, String) {
     match it.kind {
         crate::store::ItemKind::LiveSearch => match store.live_search(&it.ref_id).ok().flatten() {
-            Some(s) => (s.name.clone(), format!("{} matches now · {}", crate::live::count(store, &s.spec), s.spec.describe())),
+            Some(s) => (s.name.clone(), format!("{} now · {}", matches(count(store, &s.spec)), s.spec.describe())),
             None => ("(removed live search)".into(), String::new()),
         },
         crate::store::ItemKind::Result => match it.series() {
@@ -125,7 +135,7 @@ pub fn describe_item(store: &Store, it: &crate::store::ProjectItem) -> (String, 
             Some(j) => {
                 let n = store.entries(&j.id).map(|v| v.len()).unwrap_or(0);
                 let own = if j.project_id.as_deref() == Some(it.project_id.as_str()) { "project journal" } else { "linked" };
-                (j.name, format!("{n} entries · {own}"))
+                (j.name, format!("{} · {own}", entries(n)))
             }
             None => ("(removed journal)".into(), String::new()),
         },
@@ -138,6 +148,13 @@ mod tests {
     use super::*;
     use crate::model::{Bar, Duration, Symbol};
     use crate::store::EntryFormat;
+
+    #[test]
+    fn counts_read_as_words() {
+        assert_eq!((matches(1), matches(0), matches(2)), ("1 match".into(), "0 matches".into(), "2 matches".into()));
+        assert_eq!((entries(1), entries(3)), ("1 entry".into(), "3 entries".into()));
+        assert_eq!(crate::store::ItemKind::LiveSearch.plural(), "live searches");
+    }
 
     fn bars(n: i64, px: f64) -> Vec<Bar> {
         (0..n).map(|i| Bar { ts: i * 300_000, open: px, high: px + 1.0, low: px - 1.0, close: px, volume: 1.0, flags: 0 }).collect()

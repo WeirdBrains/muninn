@@ -71,6 +71,14 @@ impl ItemKind {
             ItemKind::RuleSet => "rule set",
         }
     }
+    pub fn plural(self) -> &'static str {
+        match self {
+            ItemKind::LiveSearch => "live searches",
+            ItemKind::Result => "results",
+            ItemKind::Journal => "journals",
+            ItemKind::RuleSet => "rule sets",
+        }
+    }
 }
 
 /// A result: one series, optionally limited to a time range (UTC ms).

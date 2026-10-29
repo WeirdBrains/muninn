@@ -100,7 +100,13 @@ pub fn run(ctx: &Ctx, cmd: JournalCommand) -> anyhow::Result<()> {
                         Some(p) => store.project(p)?.map(|p| p.name).unwrap_or_default(),
                         None => "-".into(),
                     };
-                    println!("{}\t{}\t{} entries\tproject: {proj}\t{}", j.short_id(), j.name, store.entries(&j.id)?.len(), j.format.as_str());
+                    println!(
+                        "{}\t{}\t{}\tproject: {proj}\t{}",
+                        j.short_id(),
+                        j.name,
+                        crate::live::entries(store.entries(&j.id)?.len()),
+                        j.format.as_str()
+                    );
                 }
                 if all.is_empty() {
                     ctx.io.info("no journals yet; create one with `mnnn journal new NAME` (or J in the TUI)");
@@ -221,10 +227,10 @@ pub fn run(ctx: &Ctx, cmd: JournalCommand) -> anyhow::Result<()> {
             record(
                 &store,
                 "entry.copy",
-                format!("add {} entries to journal {}", copied.len(), target.name),
+                format!("add {} to journal {}", crate::live::entries(copied.len()), target.name),
                 serde_json::json!({ "journal": target.id, "entries": copied.iter().map(|e| &e.id).collect::<Vec<_>>(), "from": ids }),
             );
-            ctx.io.info(format!("added {} entries to {} ({})", copied.len(), target.name, target.short_id()));
+            ctx.io.info(format!("added {} to {} ({})", crate::live::entries(copied.len()), target.name, target.short_id()));
         }
         JournalCommand::Note { body, journal, entry, select } => {
             let (jid, e) = match (journal, entry) {

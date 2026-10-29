@@ -80,7 +80,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
                     if v.is_empty() {
                         continue;
                     }
-                    println!("\n{}s:", k.label());
+                    println!("\n{}:", k.plural());
                     for i in v {
                         let (name, now) = crate::live::describe_item(&store, i);
                         println!("  #{}\t{name}\t{now}", i.id);

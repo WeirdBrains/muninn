@@ -179,7 +179,7 @@ pub fn open_found(app: &mut App, s: &LiveSearch) {
     st.fsel = 0;
     st.screen = JScreen::Found;
     let n = st.found.len();
-    app.set_status(format!("live search {}: {n} entries", s.name));
+    app.set_status(format!("live search {}: {}", s.name, crate::live::entries(n)));
 }
 
 /// Back from the project picker.
@@ -441,12 +441,12 @@ fn copy_to(app: &mut App, ids: &[String], j: &Journal) {
             record(
                 app,
                 "entry.copy",
-                format!("add {} entries to journal {}", v.len(), j.name),
+                format!("add {} to journal {}", crate::live::entries(v.len()), j.name),
                 serde_json::json!({ "journal": j.id, "entries": v.iter().map(|e| &e.id).collect::<Vec<_>>(), "from": ids }),
             );
             app.journals.marks.clear();
             reload(app);
-            ok(app, format!("added {} entries to {}", v.len(), j.name));
+            ok(app, format!("added {} to {}", crate::live::entries(v.len()), j.name));
         }
         Err(e) => err(app, e),
     }
@@ -855,7 +855,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 let fork = if j.forked_from.is_some() { " ⑂" } else { "" };
                 v.rows.push(Line::from(vec![
                     Span::styled(format!(" {}{fork} ", j.name), row_style(&t, i == st.sel)),
-                    Span::styled(format!(" {n} entries"), Style::new().fg(t.accent)),
+                    Span::styled(format!(" {}", crate::live::entries(n)), Style::new().fg(t.accent)),
                     Span::styled(format!("{p} · {}", j.format.as_str()), Style::new().fg(t.muted)),
                 ]));
             }
@@ -1004,7 +1004,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         }
     };
     if let Some(p) = &st.pick {
-        v = View::new(format!("Add {} entries to journal", p.ids.len()));
+        v = View::new(format!("Add {} to journal", crate::live::entries(p.ids.len())));
         for (i, (label, _)) in p.items.iter().enumerate() {
             v.rows.push(Line::styled(format!(" {label}"), row_style(&t, i == p.sel)));
         }

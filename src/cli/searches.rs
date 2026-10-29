@@ -110,7 +110,7 @@ pub fn run(ctx: &Ctx, cmd: SearchCommand) -> anyhow::Result<()> {
                 println!("{}", serde_json::to_string_pretty(&v)?);
             } else {
                 for s in &all {
-                    println!("{}\t{}\t{} matches\t{}", s.short_id(), s.name, crate::live::count(&store, &s.spec), s.spec.describe());
+                    println!("{}\t{}\t{}\t{}", s.short_id(), s.name, crate::live::matches(crate::live::count(&store, &s.spec)), s.spec.describe());
                 }
                 if all.is_empty() {
                     ctx.io.info("no live searches yet; save one with `mnnn search save NAME --query TEXT` (or B in the TUI)");
@@ -158,11 +158,11 @@ pub fn run(ctx: &Ctx, cmd: SearchCommand) -> anyhow::Result<()> {
             let s = store.save_live_search(&name, &sp, None)?;
             record(&store, "search.save", format!("save live search {}", s.name), params(&s));
             ctx.io.info(format!(
-                "saved live search {} ({}): {}, {} matches now",
+                "saved live search {} ({}): {}, {} now",
                 s.name,
                 s.short_id(),
                 s.spec.describe(),
-                crate::live::count(&store, &s.spec)
+                crate::live::matches(crate::live::count(&store, &s.spec))
             ));
         }
         SearchCommand::Fork { search, name, spec } => {
