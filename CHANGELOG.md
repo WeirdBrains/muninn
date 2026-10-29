@@ -6,6 +6,16 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-10-29
+
+### Added
+- Time range on every view: press `T` (or **Data ▸ Filters ▸ Time range…**, or click the sidebar's `time` row) to pick a date and time from, then to; lists, charts and the sidebar show only bars in that range, `x` leaves an end open
+- Symbol filter: `m` in the sidebar (or **Data ▸ Filters ▸ Symbol**) lists only the checked symbols
+
+### Fixed
+- Sidebar search found no symbol when typed with `-` or `_` (`btc-usdt`) or with words in another order (`binance btc`)
+- The import preview showed `?` as the symbol for names like `Kraken-ETHUSDT_1h.csv` although the import found it
+
 ## [1.15.0] - 2026-10-29
 
 ### Added
@@ -201,7 +211,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.15.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.16.0...HEAD
+[1.16.0]: https://github.com/kommandosaldat/muninn/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/kommandosaldat/muninn/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/kommandosaldat/muninn/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/kommandosaldat/muninn/compare/v1.12.3...v1.13.0
