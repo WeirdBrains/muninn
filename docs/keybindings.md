@@ -79,13 +79,17 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `F` | the [live searches](live-searches.md) list |
 | `B` | save the sidebar's search as a live search |
 | `J` | the [journals](journals.md) list |
+| `O` | the [reports](reports.md) list |
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
 project, Enter open, Esc back. In an entry: ← → move by word, `v` select, `m`
 highlight, `n` note, `i` image; the editor saves with Ctrl-S and switches Markdown ↔
-LaTeX with Ctrl-T. Full tables: [live searches](live-searches.md),
-[projects](projects.md), [journals](journals.md).
+LaTeX with Ctrl-T. `E` exports (journals, entries, reports, projects) and `P` prints
+(journals, entries); in a report `a` adds a section, `J` / `K` move it, `v` previews.
+Full tables: [live searches](live-searches.md),
+[projects](projects.md), [journals](journals.md), [reports](reports.md),
+[export formats](export-formats.md).
 
 ## Import
 

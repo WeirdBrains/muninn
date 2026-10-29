@@ -1319,11 +1319,15 @@ delete and pick the current author that new actions are attributed to.
 Projects menu (Alt-P): Projects... (P) lists projects and their live searches, results and \
 journals; Live searches... (F) and Save search as live search... (B) keep a sidebar search \
 that always runs on current data; Journals... (J) holds entries in Markdown or LaTeX with \
-images, notes and highlights on selected words (v selects, m highlights, n notes). In the \
-sidebar, a adds the selected series to a project.
+images, notes and highlights on selected words (v selects, m highlights, n notes); E exports \
+and P prints a journal, the marked entries or an entry. Reports... (O) builds reports from \
+text, records, series, journals, projects and authors (a adds a section, J/K move it, v \
+previews). E exports journals, reports and projects (PDF, HTML, Word, LaTeX, JSON, CSV, text, \
+project archives). In the sidebar, a adds the selected series to a project.
 
 See mnnn help tui, mnnn help import, mnnn help history, mnnn help authors, \
-mnnn help projects, mnnn help live-searches, mnnn help journals and mnnn help help.";
+mnnn help projects, mnnn help live-searches, mnnn help journals, mnnn help reports, \
+mnnn help export-formats and mnnn help help.";
 
 /// Extra text for `mnnn help --help` and mnnn-help(1).
 const HELP_NOTES: &str = "\

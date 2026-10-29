@@ -24,6 +24,8 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Live searches](live-searches.md): saved searches that always run on current data; fork and optimize
 - [Projects](projects.md): live searches, results and journals together
 - [Journals](journals.md): Markdown or LaTeX entries with images, notes and highlights
+- [Reports](reports.md): sections built from records, journals, projects and authors
+- [Export formats](export-formats.md): PDF, HTML, Word, LaTeX, JSON, CSV; printing; project archives and import
 
 ## Getting data in and out
 

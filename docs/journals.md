@@ -46,6 +46,10 @@ mnnn journal remove-note ID                   # notes and highlights (alias: unm
 
 mnnn journal attach ENTRY FILE [--name NAME]  # adds the reference to the entry text
 mnnn journal image ID [--out PATH]            # writes the image back out
+
+mnnn journal export JOURNAL [--entry ENTRY]... [--format pdf|html|docx|latex|json|text] [--out PATH]
+mnnn journal import FILE [--project PROJECT] [--name NAME]    # a JSON export
+mnnn journal print JOURNAL [--entry ENTRY]... [--printer NAME] [--out PATH] [--save-only]
 ```
 
 Journals, entries, notes and images are named by id or unique id prefix; journals also
@@ -60,7 +64,14 @@ mnnn journal highlight 1a2b3c4d --on "above 3800" --comment "resistance"
 mnnn journal note "check the 1h chart" --entry 1a2b3c4d --on breakout
 mnnn journal attach 1a2b3c4d ~/charts/june3.png
 mnnn journal copy 1a2b3c4d 5e6f7a8b --new "Best setups"
+mnnn journal export "Summer notes" --out summer.pdf
+mnnn journal export "Summer notes" --entry 1a2b3c4d --format docx --out june3.docx
+mnnn journal print "Summer notes" --printer office
 ```
+
+Exports keep notes (as footnotes), highlights and images; JSON exports can be imported
+again with everything. Printing makes a PDF and hands it to `lp`/`lpr`, or keeps it in
+`<home>/prints/` when there is no print command. See [export formats](export-formats.md).
 
 ## Terminal UI
 
@@ -77,6 +88,8 @@ mnnn journal copy 1a2b3c4d 5e6f7a8b --new "Best setups"
 | `f` | fork into a project (or standalone) |
 | `p` | add to a project |
 | `D` | delete the journal (`y` confirms) |
+| `E` | export the journal (choose a format, then a path) |
+| `P` | print the journal |
 
 | key (journal) | action |
 |-----|--------|
@@ -88,6 +101,7 @@ mnnn journal copy 1a2b3c4d 5e6f7a8b --new "Best setups"
 | `c` | copy the marked entries (or the selected one) to another journal or **+ New journal…** (a new journal joins this journal's project) |
 | `d` | delete the entry (`y` confirms) |
 | `N`, `f`, `p`, `r`, `t`, `D` | as in the list |
+| `E` / `P` | export / print the marked entries (none marked: the whole journal) |
 | Esc | back to the list |
 
 Reading an entry shows its text, with highlights and noted words marked, then its
@@ -106,6 +120,7 @@ notes, highlights and images. The cursor is a word:
 | `x` | delete the selected note or highlight (`y` confirms) |
 | `i` | attach an image (type its path; `~/` works) |
 | `e` / `d` | edit / delete the entry |
+| `E` / `P` | export / print this entry |
 | PgUp / PgDn | scroll |
 | Esc | drop the selection, then back to the journal |
 
@@ -115,11 +130,6 @@ the text, **Ctrl-S** saves, **Ctrl-T** switches Markdown ↔ LaTeX, Esc cancels.
 A [live search](live-searches.md) on journals (`--journals`) lists the matching
 entries; Enter reads one.
 
-## Later
-
-Export, import and print (HTML, JSON, LaTeX, PDF, Docx) come with Phase 3. `mnnn
-journal show --json` already writes the whole journal as one document (entries,
-notes, highlights and image metadata), which is what the exporters will read.
-
-See also: [projects](projects.md), [live searches](live-searches.md),
+See also: [projects](projects.md), [reports](reports.md), [export formats](export-formats.md),
+[live searches](live-searches.md),
 [authors](authors.md), [history](history.md).

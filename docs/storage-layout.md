@@ -12,6 +12,7 @@
       interface.toml      # palette + role mapping, [dark] and [light]
       assets/             # optional extras
   preferences.toml        # active theme and mode, ingest defaults
+  prints/                 # PDFs made by `journal print` (and P in the TUI)
 ```
 
 - The root is `~/.muninn` unless `--home <DIR>` or `MUNINN_HOME` is set. Tests and

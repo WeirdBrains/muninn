@@ -1,8 +1,8 @@
 # Export
 
 ```
-mnnn export --format <csv|parquet|json> --out <PATH|-> [--symbol PAIR] [--source NAME]
-            [--duration 5m] [--from TIME] [--to TIME]
+mnnn export --format <csv|parquet|json|pdf|html|docx|latex|text> --out <PATH|-> [--symbol PAIR]
+            [--source NAME] [--duration 5m] [--from TIME] [--to TIME]
 ```
 
 Writes stored bars through Polars. `--out -` writes CSV or JSON to stdout (parquet
@@ -24,6 +24,13 @@ mnnn export --format csv --out - --symbol ETH/USDT --from 2024-01-01 --to 2024-0
 mnnn -q export --format json --out - --source binance --duration 5m > bars.json
 ```
 
+## As a document
+
+`--format pdf|html|docx|latex|text` writes the matching bars as a document: per series
+a summary (bars, first and last, open, close, high, low, change, volume) and a table of
+every bar. `--out -` works for text, HTML and LaTeX. These are made by the built-in
+document layer; see [export formats](export-formats.md).
+
 An exported CSV can be ingested again (the `timestamp` column is recognized).
 
 ## Failure modes
@@ -32,4 +39,4 @@ An exported CSV can be ingested again (the `timestamp` column is recognized).
 - Unparseable `--from`/`--to`/`--symbol`/`--duration`: error naming the flag.
 - No matching bars: an empty file with only the header (CSV) or `[]` (JSON).
 
-See also [data model](data-model.md), [TUI](tui.md).
+See also [data model](data-model.md), [export formats](export-formats.md), [TUI](tui.md).

@@ -86,6 +86,11 @@ entry, because they never ask for the password.
 | `journal.create`, `journal.edit`, `journal.remove`, `journal.fork` | CLI, TUI | the [journal](journals.md) |
 | `entry.add`, `entry.edit`, `entry.remove`, `entry.copy` | CLI, TUI | the entry (copies: how many, to which journal) |
 | `note.add`, `note.edit`, `note.remove`, `highlight.add`, `highlight.remove`, `image.add` | CLI, TUI | the note, highlight or image |
+| `report.create`, `report.edit`, `report.remove` | CLI, TUI | the [report](reports.md) |
+| `report.section.add`, `report.section.edit`, `report.section.remove`, `report.section.move` | CLI, TUI | the section, its kind and position |
+| `journal.export`, `entry.export`, `report.export`, `project.export` | CLI, TUI | what was exported, the format and file ([export formats](export-formats.md)) |
+| `journal.print` | CLI, TUI | the PDF and the print command (or none) |
+| `journal.import`, `project.import` | CLI | the file and what was restored |
 
 Stepping back over these actions moves the head only; it does not undo the change
 (stepping back restores view state: filters, time range and theme).

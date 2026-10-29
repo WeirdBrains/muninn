@@ -13,9 +13,10 @@ mnnn [GLOBAL FLAGS] <COMMAND>
   author   list|show|add|edit|remove|use
   history  list|show|tree|back|forward|goto
   search   list|show|run|find|save|fork|edit|remove
-  project  list|create|show|edit|remove|add|drop
+  project  list|create|show|edit|remove|add|drop|export|import
   journal  list|new|show|edit|remove|fork|write|entry|edit-entry|remove-entry|copy|
-           note|highlight|edit-note|remove-note|attach|image
+           note|highlight|edit-note|remove-note|attach|image|export|import|print
+  report   list|create|show|edit|remove|add|edit-section|remove-section|move|export|preview
   tui
   help     [TOPIC] [--search TEXT]
 ```

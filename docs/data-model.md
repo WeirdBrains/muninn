@@ -74,9 +74,14 @@ mnnn symbols add FOO/USD --alias FO
   Markdown or LaTeX, position), notes and highlights (on the journal, an entry or a
   character range of an entry with the quoted words) and images (encrypted with the
   rest of the database) ([journals](journals.md)). Every row carries its author.
+- `reports` and `report_sections`: a report's name and description, and its sections in
+  order with their kind (`text`, `records`, `series`, `journal`, `project`, `authors`,
+  `code`), title, text and format, and what they show as JSON (series and range, live
+  search, journal and entries, project, code space) ([reports](reports.md)).
 - `schema_version`: migrations, applied automatically on open. Version 4 adds
   `authors` and `settings`, version 5 `actions`, version 6 `live_searches`, version 7
-  `projects` and `project_items`, version 8 the journal tables. All of them only add
+  `projects` and `project_items`, version 8 the journal tables, version 9 `reports` and
+  `report_sections`; project items may now be reports. All of them only add
   tables, so older databases upgrade in place on the first open.
 
 ## Decisions
