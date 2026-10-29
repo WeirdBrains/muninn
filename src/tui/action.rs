@@ -33,9 +33,11 @@ pub enum Dir4 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FilterKind {
     Source,
+    Symbol,
     Price,
     Period,
     Year,
+    Time,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

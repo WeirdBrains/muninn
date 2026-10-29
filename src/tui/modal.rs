@@ -87,6 +87,7 @@ impl Modal {
             Modal::Layers { .. } => "charts",
             Modal::DateTime(p) => match p.target {
                 super::picker::Target::ListFrom | super::picker::Target::ListTo => "tiling",
+                super::picker::Target::RangeFrom | super::picker::Target::RangeTo => "sidebar",
                 _ => "charts",
             },
             Modal::Filter { .. } => "sidebar",
@@ -462,10 +463,12 @@ fn filter_key(app: &mut App, k: KeyEvent, kind: super::action::FilterKind, mut s
                         fl.price.max = None;
                     }
                 },
-                Source | Period | Year => {
+                Time => {}
+                Source | Symbol | Period | Year => {
                     let Some(item) = items.get(i).map(|x| x.0.clone()) else { return };
                     match kind {
                         Source => toggle(&mut fl.sources, item),
+                        Symbol => toggle(&mut fl.symbols, item),
                         Period => toggle(&mut fl.durations, item),
                         _ => toggle(&mut fl.years, item.parse().unwrap_or(0)),
                     }
@@ -494,6 +497,11 @@ pub fn filter_items(app: &App, kind: super::action::FilterKind) -> Vec<(String, 
             let set: std::collections::BTreeSet<String> = app.series.iter().map(|s| s.source.clone()).collect();
             set.into_iter().map(|s| (s.clone(), s.clone(), fl.sources.contains(&s))).collect()
         }
+        Symbol => {
+            let set: std::collections::BTreeSet<String> = app.series.iter().map(|s| s.symbol.display()).collect();
+            set.into_iter().map(|s| (s.clone(), s.clone(), fl.symbols.contains(&s))).collect()
+        }
+        Time => vec![],
         Period => {
             let mut d: Vec<crate::model::Duration> = app.series.iter().map(|s| s.duration).collect();
             d.sort_by_key(|d| d.0);

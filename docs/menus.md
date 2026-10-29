@@ -28,7 +28,7 @@ Every menu item runs a named action. The same actions are bound to keys
 |------|-------|
 | File | Import… · Export… · Backup ▸ (Create, Restore) · Preferences… · Quit |
 | View | New tile ▸ · Split ▸ · Close tile · Zoom tile · Equalize · Change view · Link tile · Chart layers… · Container ▸ · Layouts ▸ · Toggle sidebar |
-| Data | Sources… · Symbols… · Filters ▸ · Sort ▸ · Coverage & gaps · Refresh |
+| Data | Sources… · Symbols… · Filters ▸ (Source, Symbol, Time range…, Price, Period, Year, Clear all) · Sort ▸ · Coverage & gaps · Refresh |
 | Keys | Initialize… · Lock · Rotate service key · Rekey database · Export… · Recover ▸ · Re-issue shards |
 | Theme | Select… · Mode ▸ (Light, Dark, System) · Edit current… · New from current… · Import… · Export… |
 | Help | Help topics · Search help… · Keybindings · About Muninn |

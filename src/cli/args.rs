@@ -609,7 +609,11 @@ status line shows these keys.
 
 Ranges: [ and ] (or a click on a date) open a date and time picker for a chart's \
 period or a list tile's range (from / to; \\ clears it); arrows or digits set year, month, \
-day, hour and minute.
+day, hour and minute. T (Data > Filters > Time range...) sets one time range for every view and \
+tile, from then to; x leaves an end open.
+
+Symbols: the sidebar symbol filter (m, Data > Filters > Symbol) lists only the chosen \
+symbols; search ignores separators (btc-usdt finds BTC/USDT) and word order.
 
 Loading: series load in the background; a tile shows a progress bar (bars read of the total) \
 or a spinner while the total is unknown, and the UI stays responsive.

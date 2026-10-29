@@ -1600,3 +1600,101 @@ fn import_source_defaults_to_the_exchange_in_the_name_then_local() {
     wait_import(&mut a);
     assert!(a.series.iter().any(|x| x.source == "coinbase" && x.symbol.to_string() == "SOL/USDT"));
 }
+
+#[test]
+fn symbols_are_guessed_searched_and_filtered_with_exchange_prefixed_names() {
+    // names with the exchange in front (raw/data since v1.15.0)
+    for (n, want) in [
+        ("coinbase_BTC-USD_5m.csv", "BTC/USD"),
+        ("binance_BTCUSDT_5m.csv", "BTC/USDT"),
+        ("bitstamp_BTCUSD_5m_part1.csv", "BTC/USD"),
+        ("Kraken-ETHUSDT_1h.csv", "ETH/USDT"),
+    ] {
+        assert_eq!(crate::ingest::symbol_from_name_static(n).map(|s| s.display()).as_deref(), Some(want), "{n}");
+    }
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    std::fs::copy(fx.join("BTCUSDT_5m.csv"), d.path().join("coinbase_BTC-USD_5m.csv")).unwrap();
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.on_key(key(KeyCode::Char('A')));
+    assert!(a.import.ask.is_none(), "symbol guessed, no popup");
+    wait_import(&mut a);
+    a.on_key(key(KeyCode::Enter));
+    assert!(a.series.iter().any(|x| x.source == "coinbase" && x.symbol.display() == "BTC/USD"));
+    // search ignores separators and word order
+    let n = |a: &App, q: &str| crate::tui::sidebar::rows(&a.series, q, &a.prefs.tui.sidebar, &|_| None).len();
+    assert_eq!(n(&a, "btc-usdt"), 1);
+    assert_eq!(n(&a, "BTC_USDT"), 1);
+    assert_eq!(n(&a, "binance btc"), 1);
+    assert_eq!(n(&a, "btc binance"), 1);
+    // symbol filter: key m in the sidebar, Space toggles
+    a.on_key(key(KeyCode::Char('/')));
+    a.on_key(key(KeyCode::Esc));
+    a.sidebar.focused = true;
+    a.sidebar.searching = false;
+    a.on_key(key(KeyCode::Char('m')));
+    let s = screen_text(&mut a);
+    assert!(s.contains("[ ] BTC/USD") && s.contains("[ ] ETH/USDT"), "{s}");
+    a.on_key(key(KeyCode::Char(' ')));
+    assert!(a.prefs.tui.sidebar.filters.symbols.contains("BTC/USD"));
+    assert_eq!(a.sidebar.rows.len(), 1);
+    assert_eq!(a.series[a.sidebar.rows[0]].source, "coinbase");
+    a.on_key(key(KeyCode::Esc));
+    assert!(screen_text(&mut a).contains("sym:BTC/USD"));
+    a.dispatch(Action::ClearFilters);
+    assert_eq!(a.sidebar.rows.len(), 3);
+}
+
+#[test]
+fn time_range_filters_every_view_from_key_menu_and_sidebar() {
+    let (_t, mut a) = app();
+    let bars = |a: &mut App| {
+        let s = screen_text(a);
+        s.lines().next().map(|_| s.clone()).unwrap()
+    };
+    let all = a.layout.focused().series.clone().unwrap();
+    let d = a.data.get(&all, &a.store).unwrap();
+    let (first, n) = (d.bars[0].ts, d.bars.len());
+    // T opens the picker on any view (here a list), From then To
+    a.on_key(key(KeyCode::Char('T')));
+    assert!(matches!(a.modal, Some(Modal::DateTime(ref p)) if p.target == picker::Target::RangeFrom));
+    assert!(screen_text(&mut a).contains("Time range from"));
+    for _ in 0..2 {
+        a.on_key(key(KeyCode::Right));
+    }
+    a.on_key(key(KeyCode::Right)); // hour
+    a.on_key(key(KeyCode::Up));
+    a.on_key(key(KeyCode::Enter));
+    assert!(matches!(a.modal, Some(Modal::DateTime(ref p)) if p.target == picker::Target::RangeTo));
+    a.on_key(key(KeyCode::Enter));
+    let fl = a.prefs.tui.sidebar.filters.clone();
+    assert_eq!(fl.from, Some(first + 3_600_000));
+    let s = bars(&mut a);
+    assert!(s.contains("from ") && !s.contains("2017-08-17 04:00:00"), "{s}");
+    // the chart view is scoped the same way
+    a.dispatch(Action::ChangeView);
+    let s = screen_text(&mut a);
+    assert!(!s.contains("04:00"), "{s}");
+    a.dispatch(Action::ChangeView);
+    // the list tile lists fewer bars
+    let cnt = a.caches.get(&a.layout.focus).map(|c| c.list.total as usize).unwrap_or(0);
+    assert!(cnt > 0 && cnt < n, "{cnt} of {n}");
+    // a range outside a series hides it from the sidebar
+    a.range_set(Some(i64::MAX - 10), true);
+    assert!(a.sidebar.rows.is_empty());
+    // the menu item and the sidebar row open the same picker; x clears
+    a.modal = None;
+    a.dispatch(Action::Filter(action::FilterKind::Time));
+    a.on_key(key(KeyCode::Char('x')));
+    a.on_key(key(KeyCode::Char('x')));
+    assert!(a.modal.is_none());
+    assert_eq!((a.prefs.tui.sidebar.filters.from, a.prefs.tui.sidebar.filters.to), (None, None));
+    assert_eq!(a.sidebar.rows.len(), 2);
+    click_on(&mut a, |h| *h == Hit::SidebarFilter(action::FilterKind::Time));
+    assert!(matches!(a.modal, Some(Modal::DateTime(_))));
+    assert_eq!(a.help_topic(), "sidebar");
+    let s = screen_text(&mut a);
+    assert!(s.contains("[X]"), "{s}");
+}

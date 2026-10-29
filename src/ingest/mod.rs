@@ -154,7 +154,14 @@ pub fn symbol_from_name(store: &Store, name: &str) -> Result<Option<Symbol>> {
 pub fn symbol_from_name_static(name: &str) -> Option<Symbol> {
     let stem = Path::new(name).file_stem()?.to_string_lossy().to_string();
     let tokens: Vec<&str> = stem.split(['_', '.', ' ']).collect();
-    tokens.iter().find_map(|t| Symbol::parse_with(t, crate::model::KNOWN_QUOTES).filter(|s| crate::model::KNOWN_BASES.contains(&s.base.as_str())))
+    // also the dash parts and pairs (`Kraken-ETHUSDT`, `coinbase-BTC-USD`), like symbol_from_name
+    let mut candidates: Vec<String> = tokens.iter().map(|t| t.to_string()).collect();
+    for t in tokens.iter().filter(|t| t.contains('-')) {
+        let parts: Vec<&str> = t.split('-').collect();
+        candidates.extend(parts.iter().map(|p| p.to_string()));
+        candidates.extend(parts.windows(2).map(|w| format!("{}/{}", w[0], w[1])));
+    }
+    candidates.iter().find_map(|t| Symbol::parse_with(t, crate::model::KNOWN_QUOTES).filter(|s| crate::model::KNOWN_BASES.contains(&s.base.as_str())))
 }
 
 /// Exchanges recognised in file names (lower case; aliases map to the canonical name).

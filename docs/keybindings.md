@@ -59,7 +59,8 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `/` | search series |
 | `o` | toggle sort order |
 | `X` | clear filters |
-| `s`, `f p d y`, Enter | sort key, filter editors, assign (sidebar focused) |
+| `T` | time range for every view (date and time picker: from, then to) |
+| `s`, `f m p d y`, `t`, Enter | sort key, filter editors (source, symbol, price, period, year), time range, assign (sidebar focused) |
 
 ## Import
 

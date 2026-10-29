@@ -39,7 +39,8 @@ a full million-bar series zoomed out reads only one row per column.
 ## Date and time picker
 
 `[` / `]` (and clicking a date) open a picker with year, month, day, hour and minute
-(UTC). The same picker sets a list tile's range ([tiling](tiling.md)).
+(UTC). The same picker sets a list tile's range ([tiling](tiling.md)) and, with `T`
+in any view, the time range of every tile ([sidebar](sidebar.md#filters)).
 
 | input | action |
 |---|---|

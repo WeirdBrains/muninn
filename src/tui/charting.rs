@@ -99,8 +99,43 @@ impl App {
             Target::ChartEnd => c.end,
             Target::ListFrom => t.list.from.unwrap_or(first),
             Target::ListTo => t.list.to.unwrap_or(last),
+            Target::RangeFrom | Target::RangeTo => return self.open_range_picker(target),
         };
         self.modal = Some(super::modal::Modal::DateTime(DatePicker::new(target, id, ms)));
+    }
+
+    /// Open the picker for the time range of every view, starting at the current value,
+    /// else the first/last bar of all series.
+    pub fn open_range_picker(&mut self, target: super::picker::Target) {
+        use super::picker::{DatePicker, Target};
+        let fl = &self.prefs.tui.sidebar.filters;
+        let first = self.series.iter().map(|s| s.first).min().unwrap_or(0);
+        let last = self.series.iter().map(|s| s.last).max().unwrap_or(0);
+        let ms = if target == Target::RangeTo { fl.to.unwrap_or(last) } else { fl.from.unwrap_or(first) };
+        self.modal = Some(super::modal::Modal::DateTime(DatePicker::new(target, self.layout.focus, ms)));
+    }
+
+    /// Set (or clear with None) one end of the time range of every view.
+    pub fn range_set(&mut self, v: Option<i64>, set_from: bool) {
+        let fl = &mut self.prefs.tui.sidebar.filters;
+        if set_from {
+            fl.from = v;
+        } else {
+            fl.to = v;
+        }
+        if let (Some(a), Some(b)) = (fl.from, fl.to)
+            && a > b
+        {
+            if set_from {
+                fl.to = None;
+            } else {
+                fl.from = None;
+            }
+        }
+        let (a, b) = (fl.from, fl.to);
+        self.filters_changed();
+        let f = |v: Option<i64>| v.map(|x| crate::ingest::time::fmt_ts(x)[..16].to_string()).unwrap_or_else(|| "…".into());
+        self.set_status(if a.is_none() && b.is_none() { "time range cleared".to_string() } else { format!("time range {} → {}", f(a), f(b)) });
     }
 
     /// Set (or clear with None) one end of a list tile's time range.

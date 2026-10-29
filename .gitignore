@@ -8,3 +8,6 @@
 /packaging/arch/muninn-bin/pkg/
 /packaging/arch/muninn-bin/*.tar.gz
 /packaging/arch/muninn-bin/*.pkg.tar.*
+
+# Local assistant handoff context (never committed)
+.agent-context/

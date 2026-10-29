@@ -221,6 +221,7 @@ impl App {
             KeyCode::Char('o') if !ctrl && !self.typing() && self.modal.is_none() => Some(Action::ToggleOrder),
             KeyCode::Char('X') if !self.typing() && self.modal.is_none() => Some(Action::ClearFilters),
             KeyCode::Char('i') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Import),
+            KeyCode::Char('T') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Filter(action::FilterKind::Time)),
             KeyCode::Char('?') if !self.typing() => Some(Action::Help),
             KeyCode::Char('q') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Quit),
             _ => None,
@@ -417,6 +418,7 @@ impl App {
                 self.sidebar.focused = true;
                 self.sidebar.searching = true;
             }
+            Filter(action::FilterKind::Time) => self.open_range_picker(picker::Target::RangeFrom),
             Filter(kind) => {
                 self.prefs.tui.sidebar_collapsed = false;
                 self.modal = Some(Modal::Filter { kind, sel: 0, edit: None });
@@ -884,6 +886,8 @@ fn sidebar_key(app: &mut App, k: KeyEvent) -> bool {
             app.dispatch(a);
         }
         KeyCode::Char('f') => app.dispatch(Action::Filter(action::FilterKind::Source)),
+        KeyCode::Char('m') => app.dispatch(Action::Filter(action::FilterKind::Symbol)),
+        KeyCode::Char('t') => app.dispatch(Action::Filter(action::FilterKind::Time)),
         KeyCode::Char('p') => app.dispatch(Action::Filter(action::FilterKind::Price)),
         KeyCode::Char('d') => app.dispatch(Action::Filter(action::FilterKind::Period)),
         KeyCode::Char('y') => app.dispatch(Action::Filter(action::FilterKind::Year)),

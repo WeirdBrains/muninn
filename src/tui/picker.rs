@@ -16,6 +16,9 @@ pub enum Target {
     ChartEnd,
     ListFrom,
     ListTo,
+    /// The time range of every view (Data ▸ Filters ▸ Time range, `T`).
+    RangeFrom,
+    RangeTo,
 }
 
 impl Target {
@@ -25,10 +28,12 @@ impl Target {
             Target::ChartEnd => "Period end",
             Target::ListFrom => "List from",
             Target::ListTo => "List to",
+            Target::RangeFrom => "Time range from",
+            Target::RangeTo => "Time range to",
         }
     }
     fn clearable(self) -> bool {
-        matches!(self, Target::ListFrom | Target::ListTo | Target::ChartEnd)
+        !matches!(self, Target::ChartStart)
     }
 }
 
@@ -198,6 +203,12 @@ fn apply(app: &mut App) {
         Target::ChartEnd => app.chart_set_end(id, Some(ms)),
         Target::ListFrom => app.list_set_range(id, Some(ms), None, true),
         Target::ListTo => app.list_set_range(id, None, Some(ms + 59_999), false),
+        Target::RangeFrom => {
+            app.range_set(Some(ms), true);
+            // then ask for the end
+            app.open_range_picker(Target::RangeTo);
+        }
+        Target::RangeTo => app.range_set(Some(ms + 59_999), false),
     }
 }
 
@@ -210,6 +221,11 @@ fn clear(app: &mut App) {
         }
         Target::ListFrom => app.list_set_range(p.tile, None, None, true),
         Target::ListTo => app.list_set_range(p.tile, None, None, false),
+        Target::RangeFrom => {
+            app.range_set(None, true);
+            app.open_range_picker(Target::RangeTo);
+        }
+        Target::RangeTo => app.range_set(None, false),
         Target::ChartStart => {}
     }
 }

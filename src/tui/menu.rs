@@ -107,6 +107,8 @@ pub fn menus() -> Vec<Menu> {
                     'f',
                     vec![
                         a("Source", 's', "", Filter(FilterKind::Source)),
+                        a("Symbol", 'm', "", Filter(FilterKind::Symbol)),
+                        a("Time range…", 't', "T", Filter(FilterKind::Time)),
                         a("Price", 'p', "", Filter(FilterKind::Price)),
                         a("Period", 'e', "", Filter(FilterKind::Period)),
                         a("Year", 'y', "", Filter(FilterKind::Year)),

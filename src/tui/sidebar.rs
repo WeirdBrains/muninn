@@ -51,6 +51,13 @@ pub struct Filters {
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub sources: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub symbols: BTreeSet<String>,
+    /// Time range (UTC ms) for every view: tiles and the sidebar show only bars inside it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<i64>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub durations: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub years: BTreeSet<i32>,
@@ -60,10 +67,25 @@ pub struct Filters {
 
 impl Filters {
     pub fn is_empty(&self) -> bool {
-        self.sources.is_empty() && self.durations.is_empty() && self.years.is_empty() && !self.price.active()
+        self.sources.is_empty()
+            && self.symbols.is_empty()
+            && self.from.is_none()
+            && self.to.is_none()
+            && self.durations.is_empty()
+            && self.years.is_empty()
+            && !self.price.active()
     }
-    /// Time scope from the year filter: Jan 1 of the first year .. end of the last year.
+    /// Time scope: the year filter (Jan 1 of the first year .. end of the last year)
+    /// intersected with the time range.
     pub fn scope(&self) -> Option<(i64, i64)> {
+        let years = self.year_scope();
+        if self.from.is_none() && self.to.is_none() {
+            return years;
+        }
+        let (a, b) = years.unwrap_or((i64::MIN, i64::MAX));
+        Some((a.max(self.from.unwrap_or(i64::MIN)), b.min(self.to.unwrap_or(i64::MAX))))
+    }
+    fn year_scope(&self) -> Option<(i64, i64)> {
         let (a, b) = (*self.years.first()?, *self.years.last()?);
         let from = Utc.with_ymd_and_hms(a, 1, 1, 0, 0, 0).single()?.timestamp_millis();
         let to = Utc.with_ymd_and_hms(b + 1, 1, 1, 0, 0, 0).single()?.timestamp_millis() - 1;
@@ -74,6 +96,16 @@ impl Filters {
         let mut v = vec![];
         for s in &self.sources {
             v.push((Chip::Source(s.clone()), format!("src:{s}")));
+        }
+        for s in &self.symbols {
+            v.push((Chip::Symbol(s.clone()), format!("sym:{s}")));
+        }
+        let ts = |ms: i64| crate::ingest::time::fmt_ts(ms)[..16].to_string();
+        if let Some(a) = self.from {
+            v.push((Chip::From, format!("from {}", ts(a))));
+        }
+        if let Some(b) = self.to {
+            v.push((Chip::To, format!("to {}", ts(b))));
         }
         for d in &self.durations {
             v.push((Chip::Duration(d.clone()), format!("per:{d}")));
@@ -95,6 +127,11 @@ impl Filters {
             Chip::Duration(d) => {
                 self.durations.remove(d);
             }
+            Chip::Symbol(s) => {
+                self.symbols.remove(s);
+            }
+            Chip::From => self.from = None,
+            Chip::To => self.to = None,
             Chip::Year(y) => {
                 self.years.remove(y);
             }
@@ -109,6 +146,9 @@ impl Filters {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Chip {
     Source(String),
+    Symbol(String),
+    From,
+    To,
     Duration(String),
     Year(i32),
     Price,
@@ -125,6 +165,17 @@ pub struct SidebarPrefs {
     pub filters: Filters,
 }
 
+/// Sidebar summary of the time range: `any`, `2024-01-01 →`, `→ 2024-06-30` or both.
+fn time_summary(f: &Filters) -> String {
+    let d = |ms: i64| crate::ingest::time::fmt_ts(ms)[..10].to_string();
+    match (f.from, f.to) {
+        (None, None) => "any".into(),
+        (Some(a), None) => format!("{} →", d(a)),
+        (None, Some(b)) => format!("→ {}", d(b)),
+        (Some(a), Some(b)) => format!("{}→{}", d(a), d(b)),
+    }
+}
+
 pub fn year_of(ms: i64) -> i32 {
     Utc.timestamp_millis_opt(ms).single().map(|d| d.year()).unwrap_or(1970)
 }
@@ -136,7 +187,17 @@ pub fn fuzzy(query: &str, text: &str) -> Option<i64> {
         return Some(0);
     }
     let t = text.to_lowercase();
-    let qc: String = q.chars().filter(|c| !c.is_whitespace()).collect();
+    // Several words (`binance btc`): every word must match, in any order.
+    let words: Vec<&str> = q.split_whitespace().collect();
+    if words.len() > 1 && t.find(&q).is_none() {
+        let compact: String = t.chars().filter(|c| c.is_alphanumeric()).collect();
+        let sep = |w: &str| w.chars().filter(|c| c.is_alphanumeric()).collect::<String>();
+        if words.iter().all(|w| t.contains(w) || compact.contains(&sep(w))) {
+            return Some(700);
+        }
+    }
+    // Separators don't matter for symbols: btc-usdt, btc_usdt, btcusdt all find BTC/USDT.
+    let qc: String = q.chars().filter(|c| c.is_alphanumeric()).collect();
     if let Some(p) = t.find(&q) {
         return Some(1000 - p as i64);
     }
@@ -171,6 +232,8 @@ pub fn rows(series: &[SeriesInfo], query: &str, p: &SidebarPrefs, price_range: &
         .iter()
         .enumerate()
         .filter(|(_, s)| f.sources.is_empty() || f.sources.contains(&s.source))
+        .filter(|(_, s)| f.symbols.is_empty() || f.symbols.contains(&s.symbol.display()))
+        .filter(|(_, s)| s.last >= f.from.unwrap_or(i64::MIN) && s.first <= f.to.unwrap_or(i64::MAX))
         .filter(|(_, s)| f.durations.is_empty() || f.durations.contains(&s.duration.to_string()))
         .filter(|(_, s)| {
             let (a, b) = (year_of(s.first), year_of(s.last));
@@ -264,6 +327,8 @@ pub fn draw(
     let summary = |n: usize, what: &str| if n == 0 { "any".to_string() } else { format!("{n} {what}") };
     let rows_f = [
         ("source", summary(fl.sources.len(), "selected"), super::action::FilterKind::Source),
+        ("symbol", summary(fl.symbols.len(), "selected"), super::action::FilterKind::Symbol),
+        ("time", time_summary(fl), super::action::FilterKind::Time),
         ("price", if fl.price.active() { fl.price.metric.label().to_string() } else { "any".into() }, super::action::FilterKind::Price),
         ("period", summary(fl.durations.len(), "selected"), super::action::FilterKind::Period),
         ("year", summary(fl.years.len(), "selected"), super::action::FilterKind::Year),
