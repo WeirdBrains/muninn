@@ -102,3 +102,7 @@ assets = [
     { source = "CHANGELOG.md", dest = "/usr/share/doc/muninn/CHANGELOG.md", mode = "644", doc = true },
     { source = "LICENSE", dest = "/usr/share/licenses/muninn/LICENSE", mode = "644", doc = true },
 ]
+
+# Release binaries ship without symbols (smaller; packagers need not strip).
+[profile.release]
+strip = "symbols"

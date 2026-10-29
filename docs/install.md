@@ -46,8 +46,13 @@ Each release also attaches ready-made packages for both architectures,
 Both install `/usr/bin/mnnn`, man pages and `/usr/share/doc/muninn`. Uninstall:
 `sudo pacman -R muninn` (or `muninn-bin`). Remove an earlier `cargo install` first
 (`cargo uninstall muninn`), or `~/.cargo/bin/mnnn` may shadow the package, depending on
-your `PATH`. `packaging/arch/build-local.sh [--source]` builds the package into
-`target/pkg/arch/` without installing (`sudo pacman -U target/pkg/arch/muninn*.pkg.tar.zst`).
+your `PATH`. 
+
+**Build and install from a checkout in one step:** `packaging/arch/build-local.sh`
+builds `muninn-bin` from the current checkout (no download) and installs it with
+`sudo pacman -U --needed`. `--source` builds `packaging/arch/PKGBUILD` (package
+`muninn`) instead, `--no-install` only builds into `target/pkg/arch/`. If `namcap` is
+installed it lints the package first; it is optional and never blocks the install.
 
 ## Debian / Ubuntu
 

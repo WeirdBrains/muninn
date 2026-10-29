@@ -22,3 +22,5 @@ jobs:
       - run: cargo build --locked
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
+      - name: Arch build-local.sh installs with or without namcap (stubbed)
+        run: packaging/arch/test-build-local.sh

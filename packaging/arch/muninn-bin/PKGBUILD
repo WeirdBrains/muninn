@@ -10,12 +10,12 @@ pkgdesc="Local, encrypted store for OHLCV market bars (mnnn), prebuilt"
 arch=('x86_64' 'aarch64')
 url="https://github.com/kommandosaldat/muninn"
 license=('MIT')
-depends=('gcc-libs' 'glibc')
+depends=('libgcc' 'glibc')
 provides=('muninn' 'mnnn')
 conflicts=('muninn')
 options=('!strip' '!debug')
-source_x86_64=("$url/releases/download/v$pkgver/muninn-$pkgver-x86_64-unknown-linux-gnu.tar.gz")
-source_aarch64=("$url/releases/download/v$pkgver/muninn-$pkgver-aarch64-unknown-linux-gnu.tar.gz")
+source_x86_64=("$url/releases/download/v$pkgver/muninn-$pkgver-$CARCH-unknown-linux-gnu.tar.gz")
+source_aarch64=("$url/releases/download/v$pkgver/muninn-$pkgver-$CARCH-unknown-linux-gnu.tar.gz")
 # Filled from the release's SHA256SUMS when published (updpkgsums).
 sha256sums_x86_64=('SKIP')
 sha256sums_aarch64=('SKIP')
