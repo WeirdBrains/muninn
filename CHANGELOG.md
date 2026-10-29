@@ -6,6 +6,17 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-29
+
+### Added
+- Authors: `mnnn author add --name NAME [--email E] [--detail k=v]`, `list`, `show`, `edit`, `remove`, `use`; in the TUI `A` (**File ▸ Authors…**) adds, edits, deletes and picks the current author, shown in the header
+- Action history: imports, exports, filter and time range changes, theme changes, sources, symbols and author changes are saved with their author; `mnnn history list|show|tree`
+- Step back and forward through the history: `u` / `U` in the TUI or `mnnn history back|forward|goto` restore filters, time range and theme; acting after a step back starts a fork, and every branch is kept
+- History bar: `Y` (**View ▸ History**) opens a collapsible left pane with the action tree and its forks; Enter or a click goes to an action
+
+### Changed
+- The database schema moves to version 5 (new authors, settings and actions tables); 1.x databases upgrade in place on first open
+
 ## [1.16.0] - 2026-10-29
 
 ### Added
@@ -211,7 +222,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.16.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/kommandosaldat/muninn/compare/v1.16.0...v2.0.0
 [1.16.0]: https://github.com/kommandosaldat/muninn/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/kommandosaldat/muninn/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/kommandosaldat/muninn/compare/v1.13.0...v1.14.0
