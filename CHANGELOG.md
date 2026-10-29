@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-29
+
+### Added
+- Live searches: saved searches that always run on current data; mnnn search save|run|fork|edit, or B to save and F to open them in the TUI
+- Projects: live searches, results and journals together; mnnn project create|add|show, or Projects ▸ Projects… (P) in the TUI, with a in the sidebar to add a series
+- Journals: Markdown or LaTeX entries with images, notes and highlights on selected words; mnnn journal new|write|note|highlight|attach, or J in the TUI (v selects, m highlights, n notes)
+- Fork a journal into a project and copy selected entries to another or a new journal: mnnn journal fork|copy, or f and c in the TUI
+- Projects menu (Alt+P) in the TUI and help topics live-searches, projects and journals
+
 ## [2.0.0] - 2026-10-29
 
 ### Added
@@ -222,7 +231,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/kommandosaldat/muninn/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/kommandosaldat/muninn/compare/v1.16.0...v2.0.0
 [1.16.0]: https://github.com/kommandosaldat/muninn/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/kommandosaldat/muninn/compare/v1.14.0...v1.15.0
