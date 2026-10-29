@@ -1389,3 +1389,43 @@ fn loading_widget_draws_a_bar_when_the_total_is_known() {
 fn a_theme() -> crate::theme::Theme {
     crate::theme::builtin("tokyo-night").unwrap().resolved(crate::theme::Variant::Dark)
 }
+
+#[test]
+fn symbol_popup_keeps_the_file_name_visible_with_long_paths() {
+    let (_t, mut a) = app();
+    let d = tempfile::tempdir().unwrap();
+    let deep = d.path().join("a_very_long_directory_name_for_market_data/exchange_exports/2026/october/raw");
+    std::fs::create_dir_all(&deep).unwrap();
+    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    for n in ["mystery_5m.csv", "second_mystery_file_with_a_long_name_5m.csv", "third_5m.csv"] {
+        std::fs::copy(fx.join("unnamed.csv"), deep.join(n)).unwrap();
+    }
+    a.on_key(key(KeyCode::Char('i')));
+    a.import.cd(d.path().to_path_buf());
+    a.on_key(key(KeyCode::Char('A')));
+    let first = a.import.ask.as_ref().unwrap().ask[0].file_name().unwrap().to_string_lossy().into_owned();
+    for w in [60u16, 80, 140] {
+        let s = render(&mut a, w, 30);
+        assert!(s.contains(&first), "file name cut at width {w}: {s}");
+        assert!(s.contains("file 1 of 3"), "{s}");
+        assert!(s.contains("…") || w == 140, "long dir not shortened at width {w}: {s}");
+        assert!(s.contains("/raw"), "end of the directory missing at width {w}: {s}");
+        assert!(a.modal_hits.iter().any(|(_, h)| *h == Hit::ImportAsk(3)), "[X] missing");
+    }
+    // the long name wraps instead of being cut, and the counter advances
+    a.on_key(key(KeyCode::Tab));
+    a.on_key(key(KeyCode::Tab));
+    let s = render(&mut a, 60, 30);
+    assert!(s.contains("file 3 of 3") || s.contains("file 2 of 3"), "{s}");
+    let name = a.import.ask.as_ref().unwrap().ask[0].file_name().unwrap().to_string_lossy().into_owned();
+    let flat: String = s.split('\n').map(|l| l.replace('│', "")).collect::<Vec<_>>().join("").replace(' ', "");
+    assert!(flat.contains(&name.replace(' ', "")), "{name} not shown whole: {s}");
+}
+
+#[test]
+fn ellipsize_left_keeps_the_end() {
+    use super::import::ellipsize_left;
+    assert_eq!(ellipsize_left("/a/b/c", 10), "/a/b/c");
+    assert_eq!(ellipsize_left("/home/me/data/raw", 8), "…ata/raw");
+    assert_eq!(ellipsize_left("abc", 0), "");
+}

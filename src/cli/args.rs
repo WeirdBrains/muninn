@@ -596,7 +596,8 @@ Everything you can act on is clickable: menus, tiles, sidebar, popup rows, form 
 import picker entries and the key buttons ([X] closes any popup).
 
 Import (i): pick a file or a whole folder (A imports the folder, recursing). If a symbol \
-cannot be guessed from a file name, a popup asks for it. After an import, if no tile shows \
+cannot be guessed from a file name, a popup asks for it, showing the file name on its own \
+line, its folder below and (file i of n) during folder imports. After an import, if no tile shows \
 data yet, the focused tile loads the first imported series.
 
 Help (? or F1): follow links with Tab and Enter or a click, Backspace goes back, / searches \

@@ -159,7 +159,10 @@ tile already shows data, the view is left as it is; pick the new series in the s
 
 If a file's name doesn't tell its symbol (for example `export_5m.csv`) and the symbol
 field is empty, a **Symbol needed** popup asks for it before the import starts, one
-file at a time:
+file at a time. The popup shows the file name on its own line (`file`, wrapped if
+very long, never cut) and its folder below it (`in`, shortened from the left with `…`
+so the end of the path stays visible). When several files need a symbol, as in a
+folder import (`A`), the title counts them: `Symbol needed · file 3 of 12`.
 
 | key / button | action |
 |---|---|

@@ -577,7 +577,7 @@ pub fn start(app: &mut App, targets: Vec<PathBuf>) {
             .cloned()
             .collect();
         if !ask.is_empty() {
-            app.import.ask = Some(SymbolAsk { files, ask, answers: Default::default(), input: String::new(), error: None });
+            app.import.ask = Some(SymbolAsk { files, asked: ask.len(), ask, answers: Default::default(), input: String::new(), error: None });
             return;
         }
     }
@@ -590,6 +590,8 @@ pub struct SymbolAsk {
     pub files: Vec<PathBuf>,
     /// Files still to ask about (the first is shown).
     pub ask: Vec<PathBuf>,
+    /// How many files needed a symbol when the popup opened (for "file i of n").
+    pub asked: usize,
     pub answers: std::collections::HashMap<PathBuf, String>,
     pub input: String,
     pub error: Option<String>,
@@ -653,23 +655,58 @@ fn ask_key(app: &mut App, k: KeyEvent) {
     }
 }
 
+/// `s` cut to at most `w` columns from the left, with a leading `…` when shortened.
+pub fn ellipsize_left(s: &str, w: usize) -> String {
+    let n = s.chars().count();
+    if n <= w {
+        return s.to_string();
+    }
+    if w == 0 {
+        return String::new();
+    }
+    let tail: String = s.chars().skip(n - (w - 1)).collect();
+    format!("…{tail}")
+}
+
+/// Split a file name into rows of at most `w` columns (never cut, only wrapped).
+fn wrap_name(s: &str, w: usize) -> Vec<String> {
+    let c: Vec<char> = s.chars().collect();
+    c.chunks(w.max(1)).map(|ch| ch.iter().collect()).collect()
+}
+
 fn draw_ask(q: &SymbolAsk, f: &mut Frame, area: Rect, t: &Theme, hits: &mut Vec<(Rect, super::Hit)>) {
-    let r = super::centered(area, 72.min(area.width), 10.min(area.height));
+    let path = q.ask.first().cloned().unwrap_or_default();
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string());
+    let dir = path.parent().map(|d| d.display().to_string()).unwrap_or_default();
+    let w = 76.min(area.width);
+    let inner_w = w.saturating_sub(2) as usize;
+    let name_rows = wrap_name(&name, inner_w.saturating_sub(6));
+    let r = super::centered(area, w, (9 + name_rows.len() as u16).min(area.height));
     f.render_widget(ratatui::widgets::Clear, r);
-    let b = block("Symbol needed", true, t);
+    let pos = q.asked.saturating_sub(q.ask.len()) + 1;
+    let title = if q.asked > 1 { format!("Symbol needed · file {pos} of {}", q.asked) } else { "Symbol needed".to_string() };
+    let b = block(&title, true, t);
     let inner = b.inner(r);
     f.render_widget(b, r);
-    let file = q.ask.first().map(|p| p.display().to_string()).unwrap_or_default();
     let more = q.ask.len().saturating_sub(1);
-    let mut lines = vec![
-        Line::styled("The symbol can't be guessed from the file name:", Style::new().fg(t.muted)),
-        Line::styled(file, Style::new().fg(t.fg).add_modifier(Modifier::BOLD)),
-        Line::from(vec![
-            Span::styled("symbol ", Style::new().fg(t.accent)),
-            Span::styled(format!("{}▏", q.input), Style::new().fg(t.fg)),
-            Span::styled("  e.g. BTC/USDT", Style::new().fg(t.muted)),
-        ]),
-    ];
+    let mut lines = vec![Line::styled("The symbol can't be guessed from the file name:", Style::new().fg(t.muted))];
+    for (i, row) in name_rows.into_iter().enumerate() {
+        let label = if i == 0 { "file  " } else { "      " };
+        lines.push(Line::from(vec![
+            Span::styled(label, Style::new().fg(t.accent)),
+            Span::styled(row, Style::new().fg(t.fg).add_modifier(Modifier::BOLD)),
+        ]));
+    }
+    lines.push(Line::from(vec![
+        Span::styled("in    ", Style::new().fg(t.accent)),
+        Span::styled(ellipsize_left(&dir, inner_w.saturating_sub(6)), Style::new().fg(t.muted)),
+    ]));
+    lines.push(Line::raw(""));
+    lines.push(Line::from(vec![
+        Span::styled("symbol ", Style::new().fg(t.accent)),
+        Span::styled(format!("{}▏", q.input), Style::new().fg(t.fg)),
+        Span::styled("  e.g. BTC/USDT", Style::new().fg(t.muted)),
+    ]));
     lines.push(match &q.error {
         Some(e) => Line::styled(e.clone(), Style::new().fg(t.error)),
         None if more > 0 => Line::styled(format!("{more} more file(s) after this one"), Style::new().fg(t.muted)),
