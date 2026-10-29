@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [1.12.3] - 2026-10-29
+
+### Fixed
+- The TUI symbol popup shows the file name on its own line and its folder below (shortened with `…`), so long paths no longer hide it; folder imports (`A`) count `file 3 of 12` in the title
+
 ## [1.12.2] - 2026-10-28
 
 ### Fixed
@@ -176,7 +181,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.12.2...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v1.12.3...HEAD
+[1.12.3]: https://github.com/kommandosaldat/muninn/compare/v1.12.2...v1.12.3
 [1.12.2]: https://github.com/kommandosaldat/muninn/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/kommandosaldat/muninn/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/kommandosaldat/muninn/compare/v1.11.0...v1.12.0
