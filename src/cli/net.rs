@@ -1,7 +1,7 @@
 //! `mnnn net`: the network. Thin over [`crate::net`].
 use super::{Ctx, NetCommand, NetExchangeCommand, NetRelayCommand, NetShardCommand};
 use crate::crypto::{self, Key32, keyring};
-use crate::ingest::time::fmt_ts;
+use crate::ingest::time::fmt_local;
 use crate::net::{self, Node, auto, client, identity, local};
 use crate::org::host;
 use crate::prefs::Preferences;
@@ -85,7 +85,7 @@ fn print_status(s: &net::Status, label: &str, running: Option<u32>) {
     println!("node:       {label}");
     println!("peer id:    {}", s.peer_id);
     match running {
-        Some(pid) => println!("running:    yes (pid {pid}, since {})", fmt_ts(s.started_at)),
+        Some(pid) => println!("running:    yes (pid {pid}, since {})", fmt_local(s.started_at)),
         None => println!("running:    no (start with `mnnn net start`)"),
     }
     if running.is_some() {
@@ -169,7 +169,7 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                         client::caps_text(&p.caps),
                         st,
                         p.source,
-                        fmt_ts(p.last_seen)
+                        fmt_local(p.last_seen)
                     );
                 }
                 if ps.is_empty() {
@@ -241,7 +241,7 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                 return Ok(());
             }
             for x in &reqs {
-                println!("{}\t{}\t{}\t{}", &x.id[..8.min(x.id.len())], x.title(), auto::purpose(x), fmt_ts(x.created_at));
+                println!("{}\t{}\t{}\t{}", &x.id[..8.min(x.id.len())], x.title(), auto::purpose(x), fmt_local(x.created_at));
             }
             if reqs.is_empty() {
                 ctx.io.info("no requests waiting");
@@ -675,13 +675,13 @@ fn print_exchange(n: &Net, x: &crate::store::Exchange, tokens: bool) {
     if let Some(e) = x.expires_at
         && x.status == ExchangeStatus::Offered
     {
-        println!("expires:     {}", fmt_ts(e));
+        println!("expires:     {}", fmt_local(e));
     }
     if let Some(r) = x.revoked_at {
-        println!("revoked:     {} by {}", fmt_ts(r), x.revoked_by.as_deref().unwrap_or("?"));
+        println!("revoked:     {} by {}", fmt_local(r), x.revoked_by.as_deref().unwrap_or("?"));
     }
     println!("author:      {}", crate::history::author_label(&n.store, x.author_id.as_deref()));
-    println!("created:     {}", fmt_ts(x.created_at));
+    println!("created:     {}", fmt_local(x.created_at));
     if let Ok(sh) = n.store.shares_for(&x.id) {
         println!("we share:    {} item(s)", sh.len());
     }

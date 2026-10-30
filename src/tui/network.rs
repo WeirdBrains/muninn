@@ -948,7 +948,7 @@ pub fn on_click(app: &mut App, i: usize) {
 }
 
 fn fmt_ms(ms: i64) -> String {
-    crate::ingest::time::fmt_ts(ms)
+    crate::ingest::time::fmt_local(ms)
 }
 
 fn node_lines(app: &App) -> Vec<String> {

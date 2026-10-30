@@ -57,9 +57,27 @@ pub fn fmt_ts(ms: i64) -> String {
     }
 }
 
+/// Wall-clock moments (when a peer was seen, a node started, an invite expires)
+/// in local time with the UTC offset, so they are never mistaken for UTC.
+/// Data timestamps (bars, records) keep using [`fmt_ts`] in UTC.
+pub fn fmt_local(ms: i64) -> String {
+    match chrono::Local.timestamp_millis_opt(ms) {
+        chrono::LocalResult::Single(d) => d.format("%Y-%m-%d %H:%M:%S %:z").to_string(),
+        _ => ms.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_times_carry_their_offset() {
+        let s = fmt_local(1_502_942_400_000);
+        let off = &s[s.len() - 6..];
+        assert!(off.starts_with('+') || off.starts_with('-'), "{s}");
+        assert_eq!(&off[3..4], ":");
+    }
 
     #[test]
     fn formats() {

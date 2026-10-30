@@ -12,8 +12,9 @@ mnnn net shard drop ID          # stop holding someone's shard
 
 ## What happens
 
-- **Entrust.** The master key (from the words, `--words-file`, or the unlocked
-  database) is split with Shamir's scheme: one shard per exchange, any *threshold*
+- **Entrust.** The master key (from the words, `--words-file`, 3 `--shard` files
+  or an exported `--master-file`; it is never stored, so an unlocked database alone
+  is not enough) is split with Shamir's scheme: one shard per exchange, any *threshold*
   of them restore it (default: a majority, at least 2; the peers must be different
   nodes). Each shard is sealed with your **shard password** (Argon2id + XChaCha20,
   bound to the set and shard number) before it leaves, and travels inside the
