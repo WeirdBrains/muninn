@@ -295,6 +295,7 @@ Private organizations can still have a front door.
 3. Roles include access to the org's published code spaces (view source, run, edit or manage), enforced on every node and endpoint
 4. Each org node defines which of the org's code spaces it executes as part of hosting (per-node config), served through hosting, endpoints and gRPC, gated by those code-space permissions
 5. Members give their code spaces to an org with a clear action (CLI `mnnn org give … code`, TUI); every org node syncs the source, builds it itself (builds cached) and asks before the first run of new or changed code
+6. Executables are described in protobuf (`muninn.code.v1.Executable`: id, name, language, version hash, typed inputs, output shape) with a discovery call listing what an org node serves, filtered by the caller's role; each served code space gets generated message and service definitions from its declared inputs and outputs, exposed over gRPC with reflection and downloadable `.proto` files, plus JSON, all generated in pure Rust
 
 ## Review Copies
 
