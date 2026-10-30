@@ -2,7 +2,7 @@
 //! across the network and dark shards. The CLI and TUI call these; every change is
 //! recorded in the action history.
 use super::exchange::{self, Answer, Offer, Token};
-use super::node::{Node, addr_peer, parse_addrs};
+use super::node::{Node, addr_peer, parse_addrs, reach_rank, shareable};
 use super::proto::{Item, Req, Resp, ShardBlob, SharedItem, Wire, WireResp};
 use super::service;
 use crate::crypto::{self, Key32};
@@ -62,15 +62,76 @@ pub fn peer_addrs(s: &Store, peer: &str, relays: &[String]) -> Vec<Multiaddr> {
             out.push(a);
         }
     }
-    for r in parse_addrs(relays) {
-        if addr_peer(&r).is_some() {
-            let c = r.with(Protocol::P2pCircuit);
-            if !out.contains(&c) {
-                out.push(c);
-            }
+    let configured: Vec<Multiaddr> = parse_addrs(relays).into_iter().filter(|r| addr_peer(r).is_some()).collect();
+    for r in &configured {
+        let c = r.clone().with(Protocol::P2pCircuit);
+        if !out.contains(&c) {
+            out.push(c);
         }
     }
+    one_circuit_per_relay(out.into_iter().filter(shareable).collect(), &configured)
+}
+
+/// The relay a circuit address (`…/p2p/RELAY/p2p-circuit[/p2p/PEER]`) goes through.
+fn circuit_relay(a: &Multiaddr) -> Option<PeerId> {
+    let mut relay = None;
+    for p in a.iter() {
+        match p {
+            Protocol::P2p(id) => relay = Some(id),
+            Protocol::P2pCircuit => return relay,
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Keep one circuit address per relay, the most reachable one (a relay the user named
+/// first). libp2p dials the relay once per circuit address and the first of those dials to
+/// fail cancels the others, so many addresses for one relay (a relay listens on Docker,
+/// VPN and loopback addresses too) make the peer unreachable instead of better reached.
+pub(crate) fn one_circuit_per_relay(addrs: Vec<Multiaddr>, configured: &[Multiaddr]) -> Vec<Multiaddr> {
+    let rank = |a: &Multiaddr| {
+        let base: Multiaddr = a.iter().take_while(|p| *p != Protocol::P2pCircuit).collect();
+        (!configured.contains(&base), reach_rank(a))
+    };
+    let mut best: Vec<(PeerId, Multiaddr)> = vec![];
+    let mut out = vec![];
+    for a in addrs {
+        match circuit_relay(&a) {
+            None => out.push(a),
+            Some(r) => match best.iter_mut().find(|(p, _)| *p == r) {
+                Some((_, b)) if rank(&a) < rank(b) => *b = a,
+                Some(_) => {}
+                None => best.push((r, a)),
+            },
+        }
+    }
+    out.extend(best.into_iter().map(|(_, a)| a));
     out
+}
+
+#[cfg(test)]
+#[test]
+fn one_reachable_circuit_per_relay() {
+    let r = "12D3KooWC21S2Wxq3UCGcZYTsipGKjRitEar4nFARuvzpiUv2HH2";
+    let m = "12D3KooWPNK5evehBHG3pftjw1tN1VuH7CLjo8dZfMxes9tdQHTg";
+    let c = |base: &str| -> Multiaddr { format!("{base}/p2p/{r}/p2p-circuit").parse().unwrap() };
+    let direct: Multiaddr = "/ip4/192.168.50.230/tcp/4741".parse().unwrap();
+    let all = vec![
+        direct.clone(),
+        c("/ip4/127.0.0.1/tcp/4741"),
+        c("/ip4/100.75.141.6/udp/4741/quic-v1"),
+        c("/ip4/192.168.50.2/tcp/4741"),
+        c("/dns4/alien.example/udp/4741/quic-v1"),
+        c("/dns4/alien.example/tcp/4741"),
+    ];
+    assert_eq!(one_circuit_per_relay(all.clone(), &[]), vec![direct.clone(), c("/dns4/alien.example/tcp/4741")]);
+    let named: Multiaddr = format!("/ip4/192.168.50.2/tcp/4741/p2p/{r}").parse().unwrap();
+    assert_eq!(one_circuit_per_relay(all, &[named]), vec![direct, c("/ip4/192.168.50.2/tcp/4741")]);
+    let docker: Multiaddr = format!("/ip4/172.17.0.1/tcp/4741/p2p/{r}/p2p-circuit/p2p/{m}").parse().unwrap();
+    let fe80: Multiaddr = format!("/ip6/fe80::1/tcp/4741/p2p/{r}/p2p-circuit/p2p/{m}").parse().unwrap();
+    assert!(!shareable(&docker) && !shareable(&fe80));
+    assert!(shareable(&"/ip4/127.0.0.1/tcp/1".parse().unwrap()) && shareable(&"/ip4/172.16.0.1/tcp/1".parse().unwrap()));
 }
 
 /// A peer by full address (`…/p2p/ID`), peer id, or a known peer's label or short id.

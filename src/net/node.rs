@@ -219,13 +219,39 @@ pub fn parse_addrs<S: AsRef<str>>(v: &[S]) -> Vec<Multiaddr> {
     v.iter().filter_map(|s| s.as_ref().trim().parse().ok()).collect()
 }
 
-/// Whether an address is worth giving to others (not unspecified or loopback-only wildcard).
+/// Whether an address is worth giving to others: not unspecified, not IPv6 link-local
+/// (`fe80::`, needs an interface to dial), not a Docker bridge (172.17/16, 172.18/16,
+/// unreachable from other hosts) — anywhere in it, so a relay circuit through one is left
+/// out too. Loopback stays: nodes on one host use it.
 pub fn shareable(a: &Multiaddr) -> bool {
     !a.iter().any(|p| match p {
-        Protocol::Ip4(ip) => ip.is_unspecified(),
-        Protocol::Ip6(ip) => ip.is_unspecified(),
+        Protocol::Ip4(ip) => ip.is_unspecified() || (ip.octets()[0] == 172 && matches!(ip.octets()[1], 17 | 18)),
+        Protocol::Ip6(ip) => ip.is_unspecified() || (ip.segments()[0] & 0xffc0) == 0xfe80,
         _ => false,
     })
+}
+
+/// How good an address is to reach a relay from elsewhere (lower is better): a DNS name,
+/// then a public IP, a private LAN one, CGNAT/VPN (100.64/10) or IPv6 ULA, and loopback
+/// last; TCP before QUIC at each step (a dead TCP address fails at once).
+pub fn reach_rank(a: &Multiaddr) -> u8 {
+    let mut r = 1;
+    for p in a.iter() {
+        r = match p {
+            Protocol::Dns(_) | Protocol::Dns4(_) | Protocol::Dns6(_) => 0,
+            Protocol::Ip4(ip) if ip.is_loopback() => 5,
+            Protocol::Ip4(ip) if ip.octets()[0] == 100 && (ip.octets()[1] & 0xc0) == 64 => 3,
+            Protocol::Ip4(ip) if ip.is_private() => 2,
+            Protocol::Ip4(_) => 1,
+            Protocol::Ip6(ip) if ip.is_loopback() => 5,
+            Protocol::Ip6(ip) if (ip.segments()[0] & 0xfe00) == 0xfc00 => 4,
+            Protocol::Ip6(_) => 1,
+            _ => continue,
+        };
+        break;
+    }
+    let quic = a.iter().any(|p| matches!(p, Protocol::QuicV1));
+    r * 2 + quic as u8
 }
 
 impl Node {
@@ -679,7 +705,7 @@ impl Loop {
                 if is_relay
                     && private
                     && self.relay_listening.is_empty()
-                    && let Some(a) = info.listen_addrs.iter().find(|a| shareable(a))
+                    && let Some(a) = info.listen_addrs.iter().filter(|a| shareable(a)).min_by_key(|a| reach_rank(a))
                 {
                     self.add_relay(a.clone().with(Protocol::P2p(peer_id)));
                 }

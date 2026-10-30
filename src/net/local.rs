@@ -89,8 +89,9 @@ pub fn reachable(s: &Status) -> Vec<String> {
 }
 
 /// Our addresses for offers: the running node's (this or another process), else the saved ones.
-/// IPv6 link-local addresses are left out: they need an interface to dial and only make
-/// invite links longer.
+/// IPv6 link-local and Docker bridge addresses are left out (anywhere in the address), and
+/// only the most reachable circuit through each relay is kept: they make invite links longer
+/// and dials through a relay fail.
 pub fn offer_addrs(home: &Path, store: &Store, node: Option<&Node>) -> Vec<String> {
     let all = match node.map(|n| n.reachable_addrs()).filter(|v| !v.is_empty()) {
         Some(v) => v,
@@ -99,7 +100,10 @@ pub fn offer_addrs(home: &Path, store: &Store, node: Option<&Node>) -> Vec<Strin
             None => super::client::my_addrs(store, None),
         },
     };
-    all.into_iter().filter(|a| !link_local(a) && !docker(a)).collect()
+    let keep: Vec<libp2p::Multiaddr> = super::node::parse_addrs(&all).into_iter().filter(super::node::shareable).collect();
+    let mut v: Vec<String> = super::client::one_circuit_per_relay(keep, &[]).iter().map(|a| a.to_string()).collect();
+    v.retain(|a| !link_local(a) && !docker(a));
+    v
 }
 
 fn link_local(a: &str) -> bool {
