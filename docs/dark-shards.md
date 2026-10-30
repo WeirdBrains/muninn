@@ -21,7 +21,7 @@ mnnn net shard drop ID          # stop holding someone's shard
   nodes). Each shard is sealed with your **shard password** (Argon2id + XChaCha20,
   bound to the set and shard number) before it leaves, and travels inside the
   exchange's sealed channel. Peers store a blob they cannot open — a *dark* shard.
-  Unverified exchanges ask before they are trusted with a shard.
+  An exchange whose short code was never verified asks first, unless its node belongs to a trusted connection.
 - **Restore.** `restore` asks your peers for the shards they hold for you, opens
   them with the shard password and rebuilds the key; it checks the key against the
   database, or with `--recover` (default with `--backup`) sets a new Muninn

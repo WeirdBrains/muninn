@@ -23,7 +23,7 @@ id (`12D3KooW…`) is how others know it.
 | Start | `mnnn net start [--port N] [--listen ADDR] [--no-mdns] [--relay-server] [--for SECS]` | Net ▸ Node ▸ Start node, or `S` in the Network window |
 | Stop | `mnnn net stop` (or Ctrl-C) | Net ▸ Node ▸ Stop node, or `X` |
 | Status | `mnnn net status [--json]` | Net ▸ Node ▸ Status… (`K`) |
-| Peers | `mnnn net peers`, `forget PEER` | Peers page: `c` connect, `l` label, `d` forget |
+| Peers | `mnnn net peers` (with the user each node belongs to; a connection's name works wherever a peer is asked for), `forget PEER` | Peers page: `c` connect, `l` label, `d` forget |
 | Nodes | `mnnn net connect X`, `invite`, `requests`, `accept X`, `decline X`, `disconnect X` | Nodes page: `c` `n` `p` `a` `d` `r` |
 | Users, invites | `mnnn user …`, `mnnn connection …`, `mnnn invite …` ([users](users.md)) | Connections and Invites pages |
 | Sync your nodes | `mnnn sync …` ([sync](sync.md)) | runs on its own with the node |
