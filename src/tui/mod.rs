@@ -19,6 +19,7 @@ pub mod modal;
 pub mod picker;
 pub mod projects;
 pub mod reports;
+pub mod rules;
 pub mod searches;
 pub mod sidebar;
 pub mod themes;
@@ -127,6 +128,7 @@ pub struct App {
     pub authors: authors::AuthorsState,
     pub history: history::HistoryPane,
     pub searches: searches::SearchesState,
+    pub rules: rules::RulesState,
     pub projects: projects::ProjectsState,
     pub journals: journals::JournalsState,
     pub reports: reports::ReportsState,
@@ -164,6 +166,7 @@ impl App {
             authors: Default::default(),
             history: Default::default(),
             searches: Default::default(),
+            rules: Default::default(),
             projects: Default::default(),
             journals: Default::default(),
             reports: Default::default(),
@@ -190,6 +193,7 @@ impl App {
             _ => layout::TileLayout::single(first),
         };
         app.refresh_rows();
+        rules::poll(&mut app);
         Ok(app)
     }
 
@@ -262,6 +266,7 @@ impl App {
             KeyCode::Char('B') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::SaveSearch),
             KeyCode::Char('J') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Journals),
             KeyCode::Char('O') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reports),
+            KeyCode::Char('R') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Rules),
             KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
             KeyCode::Char('u') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryBack),
             KeyCode::Char('U') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryForward),
@@ -343,6 +348,7 @@ impl App {
             NewJournal => journals::open_new(self),
             Reports => reports::open(self),
             NewReport => reports::open_new(self),
+            Rules => rules::open(self),
             AddToProject => match projects::selected_series(self) {
                 Some(r) => {
                     let label = r.label();
@@ -1108,11 +1114,16 @@ pub fn run(mut app: App) -> crate::Result<()> {
 
 impl App {
     /// Periodic work between frames (background tasks).
-    pub fn tick(&mut self) {}
+    /// Every loop turn (about 10 a second): show what rules did.
+    pub fn tick(&mut self) {
+        rules::poll(self);
+    }
 }
 
 #[cfg(test)]
 mod reports_tests;
+#[cfg(test)]
+mod rules_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

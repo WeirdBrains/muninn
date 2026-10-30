@@ -818,6 +818,20 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
     }
 }
 
+/// The action `rule test`/`dry-run` checks by default: the newest action on the
+/// current branch that a person did, skipping rule runs and what they did.
+pub fn last_trigger(store: &Store) -> Result<Option<ActionRecord>> {
+    let mut at = store.history_head()?;
+    while let Some(id) = at {
+        let Some(a) = store.action(id)? else { break };
+        if !a.kind.starts_with("rule.") && a.params.get("rule_chain").is_none() {
+            return Ok(Some(a));
+        }
+        at = a.parent;
+    }
+    Ok(None)
+}
+
 /// Called by [`Store::record_action`] after every action.
 pub(crate) fn after_action(store: &Store, id: i64) {
     let rt = &store.rules_rt;

@@ -147,6 +147,8 @@ pub fn menus() -> Vec<Menu> {
                 a("Reports…", 'r', "O", Reports),
                 a("New report…", 'w', "", NewReport),
                 sep(),
+                a("Rules…", 'u', "R", Rules),
+                sep(),
                 a("Add selected series to project…", 'a', "a", AddToProject),
             ],
         },

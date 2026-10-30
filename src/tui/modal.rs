@@ -43,6 +43,8 @@ pub enum Modal {
     Journals,
     /// Projects ▸ Reports…
     Reports,
+    /// Projects ▸ Rules…
+    Rules,
     /// Export a journal, entry, report or project as a document.
     DocExport,
     /// Choose a project (add to project, fork a journal into one).
@@ -101,6 +103,7 @@ impl Modal {
             Modal::Projects | Modal::PickProject => "projects",
             Modal::Journals => "journals",
             Modal::Reports => "reports",
+            Modal::Rules => "rules",
             Modal::DocExport => "export-formats",
             Modal::Prefs { .. } => "preferences",
             Modal::Info { .. } | Modal::Pick { .. } => "tui",
@@ -130,6 +133,7 @@ impl Modal {
             Modal::Projects => app.projects.typing(),
             Modal::Journals => app.journals.typing(),
             Modal::Reports => app.reports.typing(),
+            Modal::Rules => app.rules.typing(),
             Modal::DocExport => app.doc_export.typing(),
             Modal::PickProject => app.pick_project.typing(),
             Modal::Prompt(_) => true,
@@ -239,6 +243,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             Some(Modal::Projects) => super::projects::on_click(app, i),
             Some(Modal::Journals) => super::journals::on_click(app, i),
             Some(Modal::Reports) => super::reports::on_click(app, i),
+            Some(Modal::Rules) => super::rules::on_click(app, i),
             Some(Modal::DocExport) => super::docexport::on_click(app, i),
             Some(Modal::PickProject) => super::workspace::on_click(app, i),
             Some(Modal::Themes) => {
@@ -308,6 +313,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Projects => super::projects::on_key(app, k),
         Modal::Journals => super::journals::on_key(app, k),
         Modal::Reports => super::reports::on_key(app, k),
+        Modal::Rules => super::rules::on_key(app, k),
         Modal::DocExport => super::docexport::on_key(app, k),
         Modal::PickProject => super::workspace::on_key(app, k),
         Modal::Themes => {
@@ -608,6 +614,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Projects => super::projects::draw(app, f, r, &mut extra),
         Modal::Journals => super::journals::draw(app, f, r, &mut extra),
         Modal::Reports => super::reports::draw(app, f, r, &mut extra),
+        Modal::Rules => super::rules::draw(app, f, r, &mut extra),
         Modal::DocExport => super::docexport::draw(app, f, r, &mut extra),
         Modal::PickProject => super::workspace::draw(app, f, r, &mut extra),
         Modal::Info { title, lines, scroll } => {

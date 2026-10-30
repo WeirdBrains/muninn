@@ -152,8 +152,13 @@ impl Store {
 
     /// Actions of one kind, oldest first.
     pub fn actions_of_kind(&self, kind: &str) -> Result<Vec<ActionRecord>> {
-        let mut st = self.conn.prepare(&format!("SELECT {COLS} FROM actions WHERE kind = ?1 ORDER BY id"))?;
-        let v = st.query_map([kind], row)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        self.actions_of_kind_after(kind, 0)
+    }
+
+    /// Actions of one kind newer than `after`, oldest first.
+    pub fn actions_of_kind_after(&self, kind: &str, after: i64) -> Result<Vec<ActionRecord>> {
+        let mut st = self.conn.prepare(&format!("SELECT {COLS} FROM actions WHERE kind = ?1 AND id > ?2 ORDER BY id"))?;
+        let v = st.query_map(params![kind, after], row)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(v)
     }
 

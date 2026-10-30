@@ -39,10 +39,7 @@ fn owner(store: &Store, journal: &Option<String>, search: &Option<String>) -> an
 fn the_action(store: &Store, id: Option<i64>) -> anyhow::Result<ActionRecord> {
     match id {
         Some(i) => store.action(i)?.ok_or_else(|| anyhow!("no action #{i} (see `mnnn history list`)")),
-        None => {
-            let head = store.history_head()?.ok_or_else(|| anyhow!("nothing in the history yet; give --action"))?;
-            Ok(store.action(head)?.ok_or_else(|| anyhow!("the newest action is missing"))?)
-        }
+        None => crate::rules::last_trigger(store)?.ok_or_else(|| anyhow!("nothing in the history yet; give --action")),
     }
 }
 

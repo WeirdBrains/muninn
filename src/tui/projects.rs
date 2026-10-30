@@ -159,7 +159,7 @@ fn open_item(app: &mut App) {
         },
         ItemKind::Journal => super::journals::open_journal(app, &it.ref_id),
         ItemKind::Report => super::reports::open_report(app, &it.ref_id),
-        ItemKind::RuleSet => app.projects.msg = Some(("rules open in the Rules window (R)".into(), false)),
+        ItemKind::RuleSet => super::rules::open_rule(app, &it.ref_id),
     }
 }
 

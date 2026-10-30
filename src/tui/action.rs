@@ -59,6 +59,7 @@ pub enum Action {
     NewJournal,
     Reports,
     NewReport,
+    Rules,
     AddToProject,
     // View
     NewTile(ViewKind),
@@ -141,6 +142,7 @@ impl Action {
             NewJournal => "journal.new".into(),
             Reports => "reports".into(),
             NewReport => "report.new".into(),
+            Rules => "rules".into(),
             AddToProject => "project.add-series".into(),
             Quit => "quit".into(),
             NewTile(v) => format!("tile.new.{}", if v == ViewKind::List { "list" } else { "chart" }),

@@ -140,6 +140,7 @@ pub enum Back {
     Searches,
     Journals,
     Reports,
+    Rules,
 }
 
 #[derive(Debug, Default)]
@@ -177,6 +178,7 @@ fn go_back(app: &mut App) {
         Back::Searches => super::searches::reopen(app),
         Back::Journals => super::journals::reopen(app),
         Back::Reports => super::reports::reopen(app),
+        Back::Rules => super::rules::reopen(app),
     }
 }
 
