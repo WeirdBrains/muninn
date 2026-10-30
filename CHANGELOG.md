@@ -6,6 +6,16 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-10-29
+
+### Added
+- Model designer: typed fields with constraints, drafts, migration plans, apply and roll back - mnnn model create|edit|plan|apply|rollback, or D (Data > Model designer) in the TUI
+- Records for any model with filters, text search, sort, group and totals - mnnn model record create|update|list|show|delete, or r in the designer
+- Bars take added fields of their own; built-in bar fields stay fixed
+- Rules feed models - then-actions model-create|edit|apply|remove and record-create|update|delete; rules can live in a model (--model)
+- Live searches and report sections over records - mnnn search save --model M --where COND, mnnn report add --model M
+- Projects and archives carry models with their versions, records and rules - mnnn project add --model
+
 ## [2.3.0] - 2026-10-29
 
 ### Added
@@ -249,7 +259,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/kommandosaldat/muninn/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/kommandosaldat/muninn/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/kommandosaldat/muninn/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/kommandosaldat/muninn/compare/v2.0.0...v2.1.0
