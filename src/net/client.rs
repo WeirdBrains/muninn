@@ -266,6 +266,7 @@ pub fn accept(
             let x = s.complete_exchange(&o.id, &o.peer, &o.label, &atoken, &d.key, &d.short_code, &d.fingerprint)?;
             s.upsert_net_peer(&o.peer, Some(&o.label), &o.addrs, None, None, "exchange")?;
             crate::org::net::answered(s, &x)?;
+            crate::review::net::answered(s, &x)?;
             let delivered = node.map(|n| {
                 let addrs = peer_addrs(s, &from.to_string(), &[]);
                 match n.request(from, &addrs, Wire::Answer { token: atoken.clone() }) {

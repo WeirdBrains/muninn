@@ -139,6 +139,11 @@ pub enum Req {
         org: String,
         req: crate::org::net::OrgReq,
     },
+    /// A request to a review this exchange is a reviewer's link to (2.8).
+    Review {
+        review: String,
+        req: crate::review::net::ReviewReq,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -167,6 +172,10 @@ pub enum Resp {
     },
     /// An organization's answer.
     Org {
+        body: serde_json::Value,
+    },
+    /// A review's answer.
+    Review {
         body: serde_json::Value,
     },
 }

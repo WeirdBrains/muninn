@@ -16,6 +16,7 @@ pub mod projects;
 mod query;
 pub mod records;
 pub mod reports;
+pub mod reviews;
 pub mod rules;
 pub mod runs;
 pub mod searches;
@@ -33,6 +34,10 @@ pub use projects::{ItemKind, Project, ProjectItem, SeriesRef};
 pub use query::{BarSort, BarSummary};
 pub use records::{Group, Record, RecordQuery};
 pub use reports::{NewSection, Report, Section, SectionChange, SectionKind, SectionParams};
+pub use reviews::{
+    NewReviewItem, Review, ReviewItem, ReviewItemKind, ReviewItemState, ReviewKind, ReviewStatus, Reviewer, ReviewerStatus, Reviewing,
+    ReviewingStatus, Revision,
+};
 pub use rules::{Condition, ItemRef, NewRule, Op, OwnerKind, Rule, RuleChange, RuleSpec, Then};
 pub use runs::{Artifact, ImportRun};
 pub use searches::{LiveSearch, SearchSpec, SearchTarget};
@@ -129,6 +134,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     net::MIGRATION,
     // 2.7: organizations
     orgs::MIGRATION,
+    // 2.8: reviews
+    reviews::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
@@ -913,7 +920,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
             s.set_node_identity(b"kp", "12D3KooWx").unwrap();
             s.create_project("p", "").unwrap();
         }
@@ -927,6 +934,35 @@ mod tests {
         drop(s);
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.org_projects(&o.id).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_2_7_database_migrates_and_gains_reviews() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v27.database");
+        let key = [9u8; 32];
+        {
+            // a v2.7 database: everything up to organizations
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store::wrap(conn);
+            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.insert_org("Lab", None, "", "12D3KooWx").unwrap();
+            let j = s.create_journal("Lab book", None, EntryFormat::Markdown).unwrap();
+            s.add_entry(&j.id, "Day 1", "teh result", None).unwrap();
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        assert_eq!(s.orgs().unwrap().len(), 1);
+        assert!(s.reviews().unwrap().is_empty() && s.reviewing().unwrap().is_empty());
+        let j = s.find_journal("Lab book").unwrap();
+        let e = s.entries(&j.id).unwrap().remove(0);
+        let r = s.create_review(ReviewKind::Entry, &e.id, None, &e.title, "", "", &["view".into()]).unwrap();
+        s.add_revision(ReviewKind::Entry, &e.id, Some(&r.id), &serde_json::json!({}), &serde_json::json!({}), &[]).unwrap();
+        drop(s);
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.find_review(&r.id).unwrap().name, "Day 1");
+        assert_eq!(s.revisions(ReviewKind::Entry, &e.id).unwrap().len(), 1);
     }
 
     #[test]

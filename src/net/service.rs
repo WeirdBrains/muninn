@@ -63,6 +63,7 @@ impl Service {
                 let req: Req = serde_json::from_slice(&plain).map_err(|e| Error::invalid("request", e.to_string()))?;
                 let done = match req {
                     Req::Org { org, req } => crate::org::net::serve(s, &x, from, &org, req),
+                    Req::Review { review, req } => crate::review::net::serve(s, &x, from, &review, req),
                     req => answer(s, &x, from, req, &self.label),
                 };
                 let resp = match done {
@@ -176,6 +177,7 @@ pub fn complete_offer(s: &Store, a: &exchange::Answer, token: &str) -> Result<Ex
     let x = s.complete_exchange(&x.id, &a.peer, &a.label, &token.split_whitespace().collect::<String>(), &d.key, &d.short_code, &d.fingerprint)?;
     s.upsert_net_peer(&a.peer, Some(&a.label), &a.addrs, None, None, "exchange")?;
     crate::org::net::answered(s, &x)?;
+    crate::review::net::answered(s, &x)?;
     Ok(x)
 }
 
@@ -449,9 +451,11 @@ pub fn answer(s: &Store, x: &Exchange, from: &PeerId, req: Req, label: &str) -> 
             Resp::Shards { shards }
         }
         Req::Org { .. } => return Err(Error::Other("organization requests are answered by the org's node".into())),
+        Req::Review { .. } => return Err(Error::Other("review requests are answered by the author's node".into())),
         Req::Revoke => {
             let x = s.set_exchange_status(&x.id, ExchangeStatus::Revoked, Some("peer"))?;
             crate::org::net::ended(s, &x)?;
+            crate::review::net::ended(s, &x)?;
             record(s, "net.exchange.revoke", format!("{} ended the key exchange", x.title()), serde_json::json!({ "exchange": x.id, "by": "peer" }));
             Resp::Ok
         }

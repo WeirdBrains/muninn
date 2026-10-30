@@ -19,6 +19,7 @@ pub mod model;
 pub mod net;
 pub mod org;
 pub mod render;
+pub mod review;
 pub mod rules;
 pub mod store;
 pub mod theme;

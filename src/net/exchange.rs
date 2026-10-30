@@ -33,8 +33,9 @@ const TRANSCRIPT_DOMAIN: &[u8] = b"muninn/net/exchange/v1";
 /// Offers are good for a week unless asked otherwise.
 pub const DEFAULT_TTL_MS: i64 = 7 * 24 * 3600 * 1000;
 
-/// What an exchange is for. Only `node` exists now; `organization` (2.7) and `resource`
-/// (2.8, review links) are reserved so their offers are refused instead of misread.
+/// What an exchange is for: `node` (two nodes), `organization` (2.7, a membership) or
+/// `resource` (2.8, a review link: `as: review` names the review). Older nodes refuse the
+/// newer kinds instead of misreading them.
 pub fn node_scope() -> serde_json::Value {
     serde_json::json!({ "kind": "node" })
 }
@@ -51,7 +52,15 @@ fn check_scope(scope: &serde_json::Value) -> Result<()> {
             }
             Ok(())
         }
-        Some("resource") => Err(Error::invalid("exchange", "`resource` exchanges come with a later version of Muninn")),
+        // a review link: one reviewer's way into one review on the author's node
+        Some("resource") => {
+            let review = scope.get("review").and_then(|v| v.as_str()).unwrap_or("");
+            let how = scope.get("as").and_then(|v| v.as_str()).unwrap_or("");
+            if review.is_empty() || review.len() > 64 || how != "review" {
+                return Err(Error::invalid("exchange", "a resource exchange names the review it is a link to (newer Muninn?)"));
+            }
+            Ok(())
+        }
         _ => Err(Error::invalid("exchange", "unknown scope")),
     }
 }
@@ -360,6 +369,7 @@ mod tests {
         assert!(offer.verify(1_000 + 61_000).unwrap_err().to_string().contains("expired"));
         assert!(Offer::new(&a, "", vec![], serde_json::json!({"kind": "organization"}), 0, 60_000).is_err());
         assert!(Offer::new(&a, "", vec![], serde_json::json!({"kind": "resource"}), 0, 60_000).is_err());
+        assert!(Offer::new(&a, "", vec![], serde_json::json!({"kind": "resource", "as": "review", "review": "r1"}), 0, 60_000).is_ok());
         assert!(Offer::new(&a, "", vec![], serde_json::json!({"kind": "organization", "org": "o1", "as": "apply"}), 0, 60_000).is_ok());
         // own offer
         assert!(Answer::new(&a, &offer, "", vec![], 1_000).is_err());

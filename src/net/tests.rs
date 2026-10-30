@@ -449,3 +449,88 @@ fn an_admin_on_another_node_manages_members_remotely() {
     assert_eq!(crate::org::serve::route(&b.store, "GET", "/o/lab/", b"", None).status, 200);
     assert_eq!(crate::org::serve::route(&b.store, "POST", "/o/lab/api/call/x", b"{}", None).status, 405);
 }
+
+#[test]
+fn reviewers_join_by_link_comment_suggest_vote_and_see_the_merge() {
+    use crate::review::{self, Ask, net as rnet};
+    use crate::store::{ReviewItemKind, ReviewItemState, ReviewKind, ReviewerStatus, ReviewingStatus};
+    use serde_json::json;
+    let a = Peer::new("anna");
+    let b = Peer::new("ben");
+    let c = Peer::new("cleo");
+    let j = a.store.create_journal("lab notes", None, EntryFormat::Markdown).unwrap();
+    let e = a.store.add_entry(&j.id, "Comet", "a brite comet", None).unwrap();
+    let r = review::request(&a.store, "cli", ReviewKind::Entry, &e.id, "Comet check", "typos?", &[]).unwrap();
+
+    // a link (a scoped offer); ben takes it and his answer reaches anna's node
+    let (inv, made) = rnet::invite(&a.store, Some(a.node()), &a.kp, &r, "ben", None, &[], "cli").unwrap();
+    assert_eq!(inv.status, ReviewerStatus::Invited);
+    assert_eq!(rnet::peek(&made.token).unwrap()["title"], json!("Comet check"));
+    let (g, acc) = rnet::join(&b.store, Some(b.node()), &b.kp, &made.token, "", "cli").unwrap();
+    assert!(matches!(acc.delivered, Some(Ok(_))), "{:?}", acc.delivered);
+    assert_eq!((g.status, g.title.as_str()), (ReviewingStatus::Joined, "Comet check"));
+    wait(|| a.store.reviewer(&inv.id).unwrap().filter(|v| v.status == ReviewerStatus::Joined));
+    assert!(rnet::join(&b.store, Some(b.node()), &b.kp, &made.token, "", "cli").is_err(), "already reviewing");
+    assert!(rnet::join(&c.store, Some(c.node()), &c.kp, &made.token, "", "cli").is_err(), "a link is for one reviewer");
+
+    // ben views, comments, suggests and votes
+    let g = rnet::sync(&b.store, b.node(), &g, &[]).unwrap();
+    assert_eq!(g.allow.len(), 5);
+    let v = rnet::view(&b.store, b.node(), &g, &[]).unwrap();
+    assert_eq!(v["content"]["body"], json!("a brite comet"));
+    rnet::add(&b.store, b.node(), &g, &Ask { kind: ReviewItemKind::Comment, body: "lovely".into(), ..Default::default() }, &[], "cli").unwrap();
+    let sug = rnet::add(
+        &b.store,
+        b.node(),
+        &g,
+        &Ask { kind: ReviewItemKind::Suggestion, at: Some("brite".into()), value: Some(json!("bright")), ..Default::default() },
+        &[],
+        "cli",
+    )
+    .unwrap();
+    assert_eq!(sug.who, "ben");
+    rnet::add(&b.store, b.node(), &g, &Ask { kind: ReviewItemKind::Vote, value: Some(json!("changes")), ..Default::default() }, &[], "cli").unwrap();
+    let bad = rnet::add(
+        &b.store,
+        b.node(),
+        &g,
+        &Ask { kind: ReviewItemKind::Suggestion, field: "nope".into(), value: Some(json!(1)), ..Default::default() },
+        &[],
+        "cli",
+    );
+    assert!(bad.is_err());
+
+    // anna accepts and merges; ben sees it merged
+    review::decide(&a.store, "cli", &r, &[], true).unwrap();
+    let m = review::merge(&a.store, "cli", &r, false).unwrap();
+    assert_eq!(m.revisions[0].rev, 1);
+    assert_eq!(a.store.entry(&e.id).unwrap().unwrap().body, "a bright comet");
+    let t = rnet::thread(&b.store, b.node(), &g, &[]).unwrap();
+    assert_eq!(t.len(), 3);
+    assert_eq!(t.iter().find(|i| i.id == sug.id).unwrap().state, ReviewItemState::Merged);
+    assert!(a.store.actions().unwrap().iter().any(|x| x.kind == "review.serve"));
+
+    // cleo may only comment on a second review, then leaves it
+    let r2 = review::request(&a.store, "cli", ReviewKind::Journal, "lab notes", "", "", &["comment".into()]).unwrap();
+    let (_, made2) = rnet::invite(&a.store, Some(a.node()), &a.kp, &r2, "cleo", None, &[], "cli").unwrap();
+    let (gc, _) = rnet::join(&c.store, Some(c.node()), &c.kp, &made2.token, "", "cli").unwrap();
+    wait(|| a.store.reviewers(&r2.id).unwrap().into_iter().find(|v| v.status == ReviewerStatus::Joined));
+    let no = rnet::add(&c.store, c.node(), &gc, &Ask { kind: ReviewItemKind::Vote, value: Some(json!("approve")), ..Default::default() }, &[], "cli");
+    assert!(no.unwrap_err().to_string().contains("may not vote"));
+    rnet::add(
+        &c.store,
+        c.node(),
+        &gc,
+        &Ask { kind: ReviewItemKind::Comment, target: e.id.clone(), body: "ok".into(), ..Default::default() },
+        &[],
+        "cli",
+    )
+    .unwrap();
+    rnet::leave(&c.store, Some(c.node()), &gc, &[], "cli").unwrap();
+    assert_eq!(a.store.reviewers(&r2.id).unwrap()[0].status, ReviewerStatus::Left);
+
+    // anna closes the first review: ben's exchange ends and his node hears of it
+    rnet::close(&a.store, Some(a.node()), &r, &[], "cli").unwrap();
+    wait(|| b.store.reviewing_by_exchange(g.exchange_id.as_deref().unwrap()).unwrap().filter(|g| g.status == ReviewingStatus::Closed));
+    assert!(rnet::view(&b.store, b.node(), &g, &[]).is_err());
+}
