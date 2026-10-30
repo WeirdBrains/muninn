@@ -81,11 +81,24 @@ fn network_window_is_off_and_empty_by_default_and_saves_settings() {
     assert!(a.network.msg.as_ref().unwrap().1);
     assert_eq!(a.prefs.net.port, crate::net::node::DEFAULT_PORT);
 
-    // dark shards never ask for keys here: the CLI does it
+    // accept-anyone and the web server with the node are settings too
+    a.network.sel = 6;
+    a.on_key(key(KeyCode::Enter));
+    assert!(a.prefs.hosting.autostart);
+    a.network.sel = 7;
+    a.on_key(key(KeyCode::Enter));
+    assert!(a.prefs.net.accept_anyone());
+    let saved = crate::prefs::Preferences::load_or_create(&a.paths).unwrap();
+    assert!(saved.hosting.autostart && saved.net.accept_anyone());
+    assert!(screen_text(&mut a).contains("web server with the node"));
+
+    // dark shards: the entrust form opens even with nobody to entrust to
     a.on_key(key(KeyCode::Char('6')));
     a.on_key(key(KeyCode::Char('e')));
-    assert!(screen_text(&mut a).contains("mnnn net shard entrust"));
+    assert!(a.network.entrust.is_some());
+    assert!(screen_text(&mut a).contains("no connected nodes"));
     a.on_key(key(KeyCode::Esc));
+    assert!(a.network.entrust.is_none());
     a.on_key(key(KeyCode::Esc));
     assert!(a.modal.is_none());
 }
@@ -100,7 +113,8 @@ fn offline_offer_and_sharing_from_the_window() {
     let xs = a.store.exchanges().unwrap();
     assert_eq!(xs.len(), 1);
     assert_eq!(xs[0].status, ExchangeStatus::Offered);
-    assert!(a.network.detail.iter().any(|l| l.starts_with("mnnn-x1-offer:")), "{:?}", a.network.detail);
+    assert!(a.network.detail.iter().any(|l| l.starts_with("muninn://join/")), "{:?}", a.network.detail);
+    assert!(screen_text(&mut a).contains("pending"));
     // an offer is not a channel yet: nothing to verify or share over it
     a.on_key(key(KeyCode::Char('v')));
     assert!(a.network.msg.as_ref().unwrap().1);
@@ -111,7 +125,7 @@ fn offline_offer_and_sharing_from_the_window() {
     typ(&mut a, "journal Lab book\n");
     let sh = a.store.shares().unwrap();
     assert_eq!((sh.len(), sh[0].name.as_str(), sh[0].exchange_id.is_none()), (1, "Lab book", true));
-    assert!(screen_text(&mut a).contains("with every exchange"));
+    assert!(screen_text(&mut a).contains("with every connection"));
     a.on_key(key(KeyCode::Char('a')));
     typ(&mut a, "gadget x\n");
     assert!(a.network.msg.as_ref().unwrap().1, "unknown kind");
@@ -138,9 +152,9 @@ fn two_windows_exchange_keys_share_import_search_and_revoke() {
     a.dispatch(Action::NetExchanges);
     a.on_key(key(KeyCode::Char('n')));
     typ(&mut a, "\n");
-    let token = a.network.detail.iter().find(|l| l.starts_with("mnnn-x1-offer:")).unwrap().clone();
+    let token = a.network.detail.iter().find(|l| l.starts_with("muninn://join/")).unwrap().clone();
     b.dispatch(Action::NetExchanges);
-    b.on_key(key(KeyCode::Char('a')));
+    b.on_key(key(KeyCode::Char('p')));
     typ(&mut b, &format!("{token}\n"));
     settle(&mut b);
     assert!(!b.network.msg.as_ref().unwrap().1, "{:?}", b.network.msg);
@@ -200,4 +214,112 @@ fn two_windows_exchange_keys_share_import_search_and_revoke() {
     assert!(crate::net::local::running(&a.paths.home).is_none());
     let k = kinds(&a);
     assert!(k.contains(&"net.node.start".into()) && k.contains(&"net.node.stop".into()));
+}
+
+/// An app whose home has keys (master key, words), so entrusting can check the key file.
+fn keyed_app() -> (tempfile::TempDir, App, std::path::PathBuf) {
+    let t = tempfile::tempdir().unwrap();
+    let paths = crate::paths::Paths::resolve(Some(t.path().join("h")), None).unwrap();
+    let pw = secrecy::SecretString::from("unlock");
+    let out = crate::crypto::keyring::init(&paths, &pw).unwrap();
+    let words = t.path().join("words.txt");
+    std::fs::write(&words, out.words.as_str()).unwrap();
+    let dek = crate::crypto::keyring::unlock_with_password(&paths, &pw).unwrap();
+    let store = crate::store::Store::open(&paths.db, Some(&dek.0)).unwrap();
+    let prefs = crate::prefs::Preferences::load_or_create(&paths).unwrap();
+    let a = App::new(paths, store, dek, prefs, Some(crate::prefs::ThemeMode::Dark)).unwrap();
+    (t, a, words)
+}
+
+fn addr(a: &App) -> String {
+    let h = a.network.hosted.as_ref().expect("node running");
+    let st = h.node.status();
+    format!("{}/p2p/{}", st.listening[0], h.node.peer_id())
+}
+
+#[test]
+fn connections_are_automatic_and_shards_go_to_picked_nodes() {
+    let (_ta, mut a, words) = keyed_app();
+    let (_tb, mut b) = app();
+    let (_tc, mut c) = app();
+    for (x, l) in [(&mut a, "anna"), (&mut b, "ben"), (&mut c, "cleo")] {
+        local_node(x, l);
+        x.dispatch(Action::NetStart);
+        assert!(x.network.node_running(), "{:?}", x.network.msg);
+    }
+    // A connects; B and C see a request and accept it: no tokens or codes anywhere
+    for x in [&mut b, &mut c] {
+        let to = addr(x);
+        a.dispatch(Action::NetExchanges);
+        a.on_key(key(KeyCode::Char('c')));
+        typ(&mut a, &format!("{to}\n"));
+        settle(&mut a);
+        let m = a.network.msg.clone().unwrap();
+        assert!(!m.1 && m.0.starts_with("pending"), "{m:?}");
+        x.dispatch(Action::NetExchanges);
+        let text = screen_text(x);
+        assert!(text.contains("anna") && text.contains("requested"), "{text}");
+        assert!(!text.contains("mnnn-x1-"));
+        x.on_key(key(KeyCode::Char('a')));
+        settle(x);
+        assert!(x.network.msg.as_ref().unwrap().0.starts_with("connected"), "{:?}", x.network.msg);
+    }
+    let t = Instant::now();
+    while a.store.exchanges().unwrap().iter().filter(|x| x.status.active()).count() < 2 {
+        assert!(t.elapsed() < Duration::from_secs(15), "answers not delivered");
+        std::thread::sleep(Duration::from_millis(50));
+        a.tick();
+    }
+    a.dispatch(Action::NetExchanges);
+    assert_eq!(screen_text(&mut a).matches("connected").count(), 2);
+
+    // entrust: pick both nodes, the threshold is suggested, passwords are masked
+    a.dispatch(Action::NetEntrust);
+    assert_eq!(a.network.entrust.as_ref().unwrap().peers.len(), 2);
+    a.on_key(key(KeyCode::Char(' ')));
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Char(' ')));
+    assert_eq!(a.network.entrust.as_ref().unwrap().form.get("threshold").as_deref(), Some("2"));
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Enter));
+    typ(&mut a, &format!("{}\n", words.display()));
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Enter));
+    typ(&mut a, "s3cret-shard-pw\n");
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Enter));
+    typ(&mut a, "s3cret-shard-pw\n");
+    let text = screen_text(&mut a);
+    assert!(!text.contains("s3cret") && !text.contains(&std::fs::read_to_string(&words).unwrap()[..12]), "{text}");
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Enter));
+    settle(&mut a);
+    let st = a.network.entrust.as_ref().unwrap().status.clone();
+    assert!(st[0].starts_with("entrusted: any 2 of 2"), "{st:?} {:?}", a.network.msg);
+    assert_eq!(st.iter().filter(|l| l.starts_with("✓")).count(), 2);
+    assert_eq!((b.store.held_shards().unwrap().len(), c.store.held_shards().unwrap().len()), (1, 1));
+    // the passwords were cleared and never reach history
+    assert!(a.network.entrust.as_ref().unwrap().form.get("shard pass").is_none());
+    for r in a.store.actions().unwrap() {
+        let all = format!("{} {}", r.summary, r.params);
+        assert!(!all.contains("s3cret"), "{all}");
+    }
+    // check restore: the shards rebuild this database's key
+    for _ in 0..3 {
+        a.on_key(key(KeyCode::Up));
+    }
+    a.on_key(key(KeyCode::Enter));
+    typ(&mut a, "s3cret-shard-pw\n");
+    for _ in 0..4 {
+        a.on_key(key(KeyCode::Down));
+    }
+    a.on_key(key(KeyCode::Enter));
+    settle(&mut a);
+    let st = a.network.entrust.as_ref().unwrap().status.clone();
+    assert!(st[0].starts_with("✓ your shards restore"), "{st:?} {:?}", a.network.msg);
+    for x in [&mut a, &mut b, &mut c] {
+        x.dispatch(Action::NetStop);
+    }
 }

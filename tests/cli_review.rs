@@ -45,7 +45,7 @@ fn start(e: &Env, label: &str) -> Daemon {
 }
 
 fn token(out: &str) -> String {
-    out.lines().find(|l| l.starts_with("mnnn-x1-")).expect("a token").to_string()
+    out.lines().find(|l| l.starts_with("muninn://join/")).expect("an invite link").to_string()
 }
 
 #[test]

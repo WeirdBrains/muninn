@@ -63,10 +63,13 @@ requests are authenticated by that exchange's key.
 - **Apply:** `mnnn org browse NODE [ORG]` lists the public orgs on a node;
   `mnnn org apply NODE ORG [--note TEXT]` asks to join. The owner or an admin approves
   (`mnnn org member approve ORG MEMBER [--role R]`) or rejects (`mnnn org member reject`).
-  Nothing is approved automatically. The applicant picks up the answer with
-  `mnnn org sync`.
-- **Invite:** `mnnn org member invite ORG [--peer P] [--label L] [--role R]` prints an
-  invitation token; the invitee runs `mnnn org join TOKEN`.
+  Nothing is approved automatically. The keys are exchanged on their own: the
+  applicant sees *pending*, then *connected* once approved (its running node picks up
+  the answer; `mnnn org sync` does it at once).
+- **Invite:** `mnnn org member invite ORG [--peer P] [--label L] [--role R]` delivers the
+  invitation to that node (it shows in `mnnn net requests` and the TUI), or prints an
+  invite link `muninn://join/…`; the invitee runs `mnnn org join LINK` or
+  `mnnn org join ORG` for one that arrived.
 - **Roles:** `mnnn org member role ORG MEMBER ROLE`.
 - **Kick:** `mnnn org member kick ORG MEMBER [--resources keep|archive|publish]` ends the
   membership and revokes its key exchange. What the member gave the org stays with the
@@ -75,7 +78,7 @@ requests are authenticated by that exchange's key.
 
 In the TUI: Members page `i` invite, Enter details (the token), `a` approve, `x` reject,
 `o` change role, `k` kick (asks what happens to their resources); Joined page `b` browse
-a node, `A` apply ("node org [note]"), `j` join with a token, `s` sync, `m` mirror,
+a node, `A` apply ("node org [note]"), `j` join with a link or the org's name, `s` sync, `m` mirror,
 `l` leave, Enter details.
 
 Member commands work on orgs of yours and on joined orgs through their node, as far as

@@ -17,7 +17,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 7 | [Decentralized Network](#decentralized-network) | v2.6.0 | ✅ Released |
 | 8 | [Organizations](#organizations) | v2.7.0 | ✅ Released |
 | 9 | [Reviews](#reviews) | v2.8.0 | ✅ Released |
-| 10 | [Automatic Key Exchanges](#automatic-key-exchanges): network on by default, hosting autostart, invite links, TUI dark shards | v2.9.0 | 🚧 In progress |
+| 10 | [Automatic Key Exchanges](#automatic-key-exchanges): network on by default, hosting autostart, invite links, TUI dark shards | v2.9.0 | ✅ Released |
 | 11 | [Users and Connections](#users-and-connections): user identities, linked nodes, user-owned orgs, connections with trust, unified invites | v2.10.0 | 📋 Planned |
 | 12 | [Linked-Node Sync](#linked-node-sync): all of a user's data on all of their nodes | v2.11.0 | 📋 Planned |
 | 13 | [Private Sites and Code Access](#private-sites-and-code-access): gated sites for private orgs, code-space role permissions | v2.12.0 | 📋 Planned |
@@ -243,7 +243,7 @@ Our work is better when we involve others. The reviews system allows us to share
 
 ## Automatic Key Exchanges
 
-> **Phase 10 · v2.9.0 · 🚧 In progress**
+> **Phase 10 · v2.9.0 · ✅ Released**
 
 Key exchanges happen between nodes by themselves. The user connects, applies, invites, reviews or shares, and sees what happens; there is nothing to copy back, read out or verify.
 

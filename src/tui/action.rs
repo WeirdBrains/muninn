@@ -72,6 +72,7 @@ pub enum Action {
     NetExchanges,
     NetShared,
     NetShards,
+    NetEntrust,
     NetSearch,
     NetSettings,
     // Organizations
@@ -182,6 +183,7 @@ impl Action {
             NetExchanges => "net.exchanges".into(),
             NetShared => "net.shared".into(),
             NetShards => "net.shards".into(),
+            NetEntrust => "net.entrust".into(),
             NetSearch => "net.search".into(),
             NetSettings => "net.settings".into(),
             Orgs => "org.list".into(),

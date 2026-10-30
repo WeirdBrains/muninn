@@ -46,6 +46,9 @@ fn prompts_parse_into_thread_items() {
     assert_eq!((a.body.as_str(), a.at.as_deref()), ("nice work", None));
     let a = parse_item(ReviewItemKind::Highlight, "nth=2 @hill");
     assert_eq!((a.nth, a.at.as_deref()), (2, Some("hill")));
+    // no @ needed: a highlight always names its text
+    let a = parse_item(ReviewItemKind::Highlight, "hill :: lovely");
+    assert_eq!((a.at.as_deref(), a.body.as_str()), (Some("hill"), "lovely"));
     let a = parse_item(ReviewItemKind::Vote, "up 1a2b");
     assert_eq!((a.value, a.reply_to.as_deref()), (Some(serde_json::json!("up")), Some("1a2b")));
 }
@@ -88,7 +91,7 @@ fn reviews_window_requests_comments_accepts_and_merges() {
     a.on_key(key(KeyCode::Char('e')));
     typ(&mut a, &format!("entry={} @the cat :: the comet\n", e.short_id()));
     a.on_key(key(KeyCode::Char('h')));
-    typ(&mut a, &format!("\x08entry={} @hill :: lovely\n", e.short_id()));
+    typ(&mut a, &format!("entry={} hill :: lovely\n", e.short_id()));
     assert!(!a.reviews.msg.as_ref().unwrap().1, "{:?}", a.reviews.msg);
     a.on_key(key(KeyCode::Char('v')));
     typ(&mut a, "approve\n");

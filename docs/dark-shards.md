@@ -35,5 +35,19 @@ the holders record `net.shard.hold`.
 ## In the TUI
 
 Network ▸ Dark shards… lists the shards you entrusted and those you hold for others
-(`d` drops one you hold). Entrusting and restoring need the words or the shard
-password, which never pass through the TUI: `e` and `r` show the commands.
+(`d` drops one you hold). `e` (or Network ▸ Entrust dark shards…) opens the entrust form:
+
+- **Nodes.** Every node you are connected to is listed; Space picks it. Each picked node
+  gets one shard.
+- **Key file.** The master key is never stored, so the form reads it from a file:
+  `master.key.age` or `words.txt.age` from `mnnn keys export --out DIR --only
+  master,words`, or your 24 words saved to a plain file (*file pass* opens `.age`
+  files). It is checked against this database. The words are never typed in or shown
+  by the TUI.
+- **Shard password** (twice) and **threshold**: suggested as a majority (at least 2)
+  and editable. Passwords are masked, cleared after use and never logged.
+- **Entrust** first checks that every picked node is online (so a set is never half
+  placed), then shows each node's status: `✓ ben: holds shard 1/3`.
+- **Check restore** asks your connections for their shards with the shard password
+  and tells you whether they rebuild this database's key. It changes nothing; to
+  actually recover, use `mnnn net shard restore`.

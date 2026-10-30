@@ -373,6 +373,31 @@ pub fn accept(s: &Store, node: Option<&Node>, kp: &Keypair, key: &str, my_label:
     Ok(Link { status, peer, peer_id: a.exchange.peer_id.clone(), exchange: Some(a.exchange), detail, warning: None })
 }
 
+/// Use an invite link (`muninn://join/…`, or a pasted token): answer it and deliver the
+/// answer. When their node cannot be reached now, it is delivered later ([`settle`]) and a
+/// link that finishes it by hand is given too.
+#[allow(clippy::too_many_arguments)]
+pub fn use_link(
+    s: &Store,
+    node: Option<&Node>,
+    kp: &Keypair,
+    link: &str,
+    label: &str,
+    my_label: &str,
+    addrs: Vec<String>,
+    origin: &str,
+) -> Result<Link> {
+    let a: Accepted = client::accept(s, node, kp, link, label, my_label, addrs, origin)?;
+    let peer = a.exchange.title();
+    let detail = match (&a.answer, &a.delivered) {
+        (Some(t), d) if !d.as_ref().is_some_and(|d| d.is_ok()) => {
+            format!("connected to {peer}; their node is told when it is reachable (or send them {})", exchange::link(t))
+        }
+        _ => format!("connected to {peer}"),
+    };
+    Ok(Link { status: status_of(&a.exchange), peer, peer_id: a.exchange.peer_id.clone(), exchange: Some(a.exchange), detail, warning: None })
+}
+
 /// Turn a request down; the other node learns it when it asks.
 pub fn decline(s: &Store, key: &str, origin: &str) -> Result<Exchange> {
     let x = incoming(s, key)?;

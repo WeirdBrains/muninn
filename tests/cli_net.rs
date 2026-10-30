@@ -98,6 +98,18 @@ fn connecting_asks_once_and_then_just_works() {
     b.ok(&["journal", "new", "field notes"]);
     b.ok(&["net", "share", "journal", "field notes", "--with", "anna"]);
     assert!(a.ok(&["net", "list", "ben"]).contains("field notes"));
+    // an invite link: whoever uses it connects, no request needed
+    let c = Env::new();
+    c.ok(&["net", "config", "--label", "cleo", "--mdns", "off"]);
+    let link = a.ok(&["net", "invite"]);
+    assert!(link.trim().starts_with("muninn://join/"), "{link}");
+    let used = c.ok(&["net", "connect", link.trim()]);
+    assert!(used.contains("connected"), "{used}");
+    let t = Instant::now();
+    while !a.ok(&["net", "peers"]).lines().any(|l| l.contains("cleo") && l.contains("connected")) {
+        assert!(t.elapsed() < Duration::from_secs(15), "{}", a.ok(&["net", "peers"]));
+        std::thread::sleep(Duration::from_millis(100));
+    }
     // disconnect ends it on both sides
     a.ok(&["net", "disconnect", "ben"]);
     let t = Instant::now();

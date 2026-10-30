@@ -1,10 +1,12 @@
-//! Network ▸ … (K): the node, peers, relays, key exchanges, shared data, dark shards,
+//! Network ▸ … (K): the node, peers, relays, connections, shared data, dark shards,
 //! network searches and settings. Thin over [`crate::net`]; anything that talks to
 //! other nodes runs on a worker thread so the window stays usable.
+use super::forms::{Form, FormEvent, expand};
+use super::widgets::Input;
 use super::workspace::{Ask, Typed, View, ask_key, draw_view, muted, record, row_style};
 use super::{App, Hit};
 use crate::net::proto::{Item, SharedItem};
-use crate::net::{Node, client, identity, local};
+use crate::net::{Node, auto, client, exchange, identity, local};
 use crate::store::{Entrusted, Exchange, ExchangeStatus, Held, LiveSearch, NetPeer, Share, ShareKind, Store};
 use libp2p::identity::Keypair;
 use ratatui::Frame;
@@ -37,7 +39,7 @@ impl Tab {
             Tab::Node => "Node",
             Tab::Peers => "Peers",
             Tab::Relays => "Relays",
-            Tab::Exchanges => "Key exchanges",
+            Tab::Exchanges => "Connections",
             Tab::Shared => "Shared",
             Tab::Shards => "Dark shards",
             Tab::Search => "Search",
@@ -81,11 +83,22 @@ pub enum Setting {
     Mdns,
     RelayServer,
     Autostart,
+    HostAutostart,
+    Accept,
     Bootstrap,
 }
 
-const SETTINGS: [Setting; 7] =
-    [Setting::Label, Setting::Port, Setting::Listen, Setting::Mdns, Setting::RelayServer, Setting::Autostart, Setting::Bootstrap];
+const SETTINGS: [Setting; 9] = [
+    Setting::Label,
+    Setting::Port,
+    Setting::Listen,
+    Setting::Mdns,
+    Setting::RelayServer,
+    Setting::Autostart,
+    Setting::HostAutostart,
+    Setting::Accept,
+    Setting::Bootstrap,
+];
 
 /// A worker's result.
 pub enum Done {
@@ -128,11 +141,13 @@ pub struct NetState {
     pub entrusted: Vec<Entrusted>,
     pub held: Vec<Held>,
     pub searches: Vec<LiveSearch>,
+    /// Dark shards ▸ entrust (e): open while picking nodes and typing passwords.
+    pub entrust: Option<EntrustForm>,
 }
 
 impl NetState {
     pub fn typing(&self) -> bool {
-        self.ask.is_some()
+        self.ask.is_some() || self.entrust.is_some()
     }
     pub fn node_running(&self) -> bool {
         self.hosted.as_ref().is_some_and(|h| h.node.running())
@@ -155,6 +170,7 @@ pub fn open(app: &mut App, tab: Tab) {
     st.msg = None;
     st.detail.clear();
     st.remote = None;
+    st.entrust = None;
     if st.tab != tab {
         st.sel = 0;
     }
@@ -278,13 +294,20 @@ pub fn poll(app: &mut App) {
     match r {
         Err(e) => {
             app.set_status(format!("{what}: {e}"));
+            if let Some(f) = app.network.entrust.as_mut() {
+                f.status = vec![format!("✗ {e}")];
+            }
             err(app, format!("{what}: {e}"));
         }
         Ok(Done::Lines(lines)) => {
             let first = lines.first().cloned().unwrap_or_else(|| format!("{what}: done"));
             app.set_status(first.clone());
             ok(app, first);
-            app.network.detail = lines;
+            if let Some(e) = app.network.entrust.as_mut() {
+                e.status = lines;
+            } else {
+                app.network.detail = lines;
+            }
         }
         Ok(Done::Remote { exchange, title, items }) => {
             let n = items.len();
@@ -356,29 +379,18 @@ fn selected_exchange(app: &App) -> Option<Exchange> {
 
 fn exchange_lines(x: &Exchange, shares: &[Share]) -> Vec<String> {
     let mut v = vec![
-        format!("{} · {} · {}", x.title(), x.status.as_str(), x.role),
-        format!("id      {}", x.id),
-        format!("peer    {} {}", x.peer_id.as_deref().unwrap_or("-"), x.peer_label),
+        format!("{} · {} · {}", x.title(), auto::status_of(x).as_str(), auto::purpose(x)),
+        format!("node    {}", x.peer_id.as_deref().unwrap_or("(not known yet)")),
     ];
-    if let Some(c) = &x.short_code {
-        v.push(format!("code    {c}  (compare with the other person, then v verifies)"));
-    }
     if let Some(f) = &x.fingerprint {
-        v.push(format!("key     {f}"));
+        v.push(format!("key     {f}  (pinned the first time; a changed key is refused)"));
     }
     let shared: Vec<String> = shares.iter().filter(|s| s.applies_to(&x.id)).map(|s| format!("{} {}", s.kind.label(), s.name)).collect();
     v.push(format!("shared  {}", if shared.is_empty() { "nothing".into() } else { shared.join(", ") }));
-    if x.status == ExchangeStatus::Offered {
+    if x.status == ExchangeStatus::Offered && x.peer_id.is_none() {
         v.push(String::new());
-        v.push("Offer token (give it to the other person; it holds no secret):".into());
-        v.push(x.offer.clone());
-    }
-    if let (Some(a), "answerer") = (&x.answer, x.role.as_str())
-        && x.status.active()
-    {
-        v.push(String::new());
-        v.push("Answer token (if the offerer has not got it yet):".into());
-        v.push(a.clone());
+        v.push("Invite link (send it to them; it holds no secret):".into());
+        v.push(exchange::link(&x.offer));
     }
     v
 }
@@ -405,6 +417,8 @@ fn setting_value(app: &App, s: Setting) -> String {
         Setting::Mdns => onoff(p.mdns),
         Setting::RelayServer => onoff(p.relay_server),
         Setting::Autostart => onoff(p.autostart),
+        Setting::HostAutostart => onoff(app.prefs.hosting.autostart),
+        Setting::Accept => if p.accept_anyone() { "anyone (no request)" } else { "known nodes (others ask first)" }.into(),
         Setting::Bootstrap => {
             if p.bootstrap.is_empty() {
                 "(none)".into()
@@ -423,6 +437,8 @@ fn setting_name(s: Setting) -> &'static str {
         Setting::Mdns => "local discovery (mDNS)",
         Setting::RelayServer => "relay for others",
         Setting::Autostart => "start with the TUI",
+        Setting::HostAutostart => "web server with the node",
+        Setting::Accept => "connect at once",
         Setting::Bootstrap => "bootstrap nodes",
     }
 }
@@ -446,10 +462,7 @@ fn finish_ask(app: &mut App, kind: NAsk, v: String) {
             if v.is_empty() {
                 return;
             }
-            spawn(app, "connect", move |s, n| {
-                let p = client::hello(s, n, &v, None, &relays)?;
-                Ok(Done::Lines(vec![format!("{} ({}) says hello: {}", p.label, p.short_id(), p.agent)]))
-            });
+            connect(app, v);
         }
         NAsk::PeerLabel => {
             let Some(p) = app.network.peers.get(app.network.sel).cloned() else { return };
@@ -480,6 +493,9 @@ fn finish_ask(app: &mut App, kind: NAsk, v: String) {
             save_net(app, "relays");
         }
         NAsk::Offer => {
+            if !v.is_empty() {
+                return connect(app, v);
+            }
             let kp = match keypair(app) {
                 Ok(k) => k,
                 Err(e) => return err(app, e.to_string()),
@@ -487,25 +503,15 @@ fn finish_ask(app: &mut App, kind: NAsk, v: String) {
             let my = label(app);
             let node = app.network.hosted.as_ref().map(|h| h.node.clone());
             let addrs = local::offer_addrs(&app.paths.home, &app.store, node.as_deref());
-            if v.is_empty() {
-                match client::create(&app.store, None, &kp, "", &my, addrs, None, client::DEFAULT_TTL_MS, &relays, ORIGIN) {
-                    Ok(c) => {
-                        reload(app);
-                        app.refresh_history(true);
-                        app.network.sel = app.network.exchanges.iter().position(|x| x.id == c.exchange.id).unwrap_or(0);
-                        app.network.detail = vec!["Offer token (give it to the other person; it holds no secret):".into(), c.token];
-                        ok(app, "offer made: send the token; a pasted answer (a) completes it");
-                    }
-                    Err(e) => err(app, e.to_string()),
+            match client::create(&app.store, None, &kp, "", &my, addrs, None, client::DEFAULT_TTL_MS, &relays, ORIGIN) {
+                Ok(c) => {
+                    reload(app);
+                    app.refresh_history(true);
+                    app.network.sel = app.network.exchanges.iter().position(|x| x.id == c.exchange.id).unwrap_or(0);
+                    app.network.detail = vec!["Invite link (send it to them; it holds no secret):".into(), exchange::link(&c.token)];
+                    ok(app, "invite link made: when they use it, the nodes connect on their own");
                 }
-            } else {
-                spawn(app, "offer", move |s, n| {
-                    let c = client::create(s, Some(n), &kp, "", &my, addrs, Some(&v), client::DEFAULT_TTL_MS, &relays, ORIGIN)?;
-                    let mut l = vec![client::describe_delivery(&c.delivered).unwrap_or_else(|| "offer made".into())];
-                    l.push("Offer token (if it was not delivered):".into());
-                    l.push(c.token);
-                    Ok(Done::Lines(l))
-                });
+                Err(e) => err(app, e.to_string()),
             }
         }
         NAsk::Accept => {
@@ -581,6 +587,23 @@ fn finish_ask(app: &mut App, kind: NAsk, v: String) {
     }
 }
 
+/// Connect to a node by address, peer id or name: the keys are exchanged on their own.
+fn connect(app: &mut App, target: String) {
+    let kp = match keypair(app) {
+        Ok(k) => k,
+        Err(e) => return err(app, e.to_string()),
+    };
+    let my = label(app);
+    let relays = app.prefs.net.relays.clone();
+    let node = app.network.hosted.as_ref().map(|h| h.node.clone());
+    let addrs = local::offer_addrs(&app.paths.home, &app.store, node.as_deref());
+    spawn(app, "connect", move |s, n| {
+        let l = auto::connect(s, n, &kp, &target, None, &my, addrs, &relays, ORIGIN)?;
+        Ok(Done::Lines(l.lines()))
+    });
+}
+
+/// Accept a request (selected) or use a pasted invite link.
 fn accept(app: &mut App, input: String) {
     let kp = match keypair(app) {
         Ok(k) => k,
@@ -589,27 +612,19 @@ fn accept(app: &mut App, input: String) {
     let my = label(app);
     let node = app.network.hosted.as_ref().map(|h| h.node.clone());
     let addrs = local::offer_addrs(&app.paths.home, &app.store, node.as_deref());
+    let pasted = exchange::is_token(&exchange::unlink(&input));
     spawn(app, "accept", move |s, n| {
-        let a = client::accept(s, Some(n), &kp, &input, "", &my, addrs, ORIGIN)?;
-        let x = &a.exchange;
-        let mut l = vec![format!("exchange with {} is {}", x.title(), x.status.as_str())];
-        if let Some(c) = &x.short_code {
-            l.push(format!("code {c}: compare it with the other person, then v verifies"));
+        if !pasted {
+            return Ok(Done::Lines(auto::accept(s, Some(n), &kp, &input, &my, addrs, ORIGIN)?.lines()));
         }
-        if let Some(d) = client::describe_delivery(&a.delivered) {
-            l.push(format!("answer {d}"));
-        }
-        if let Some(t) = a.answer
-            && !a.delivered.as_ref().is_some_and(|d| d.is_ok())
-        {
-            l.push("Answer token (give it to the offerer):".into());
-            l.push(t);
-        }
-        Ok(Done::Lines(l))
+        Ok(Done::Lines(auto::use_link(s, Some(n), &kp, &input, "", &my, addrs, ORIGIN)?.lines()))
     });
 }
 
 pub fn on_key(app: &mut App, k: KeyEvent) {
+    if app.network.entrust.is_some() {
+        return entrust_key(app, k);
+    }
     if let Some(a) = app.network.ask.as_mut() {
         match ask_key(a, k) {
             Typed::Cancel => app.network.ask = None,
@@ -679,8 +694,12 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 start(app)
             }
         }
-        (Tab::Node, KeyCode::Char('c')) | (Tab::Peers, KeyCode::Char('c')) => {
-            ask(app, NAsk::Connect, "Connect to (address …/p2p/ID or a peer id)", "")
+        (Tab::Node, KeyCode::Char('c')) | (Tab::Exchanges, KeyCode::Char('c')) => {
+            ask(app, NAsk::Connect, "Connect to (address …/p2p/ID, peer id or name)", "")
+        }
+        (Tab::Peers, KeyCode::Char('c')) => {
+            let v = app.network.peers.get(app.network.sel).map(|p| p.peer_id.clone()).unwrap_or_default();
+            ask(app, NAsk::Connect, "Connect to (address …/p2p/ID, peer id or name)", &v)
         }
         (Tab::Peers, KeyCode::Enter) => {
             if let Some(p) = app.network.peers.get(app.network.sel) {
@@ -730,10 +749,22 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 });
             }
         }
-        (Tab::Exchanges, KeyCode::Char('n')) => ask(app, NAsk::Offer, "Offer to (address or peer; empty: just make a token)", ""),
+        (Tab::Exchanges, KeyCode::Char('n')) => ask(app, NAsk::Offer, "Invite link (Enter) or connect to (address, peer id)", ""),
         (Tab::Exchanges, KeyCode::Char('a')) => match selected_exchange(app) {
             Some(x) if x.status == ExchangeStatus::Incoming => accept(app, x.id),
-            _ => ask(app, NAsk::Accept, "Paste an offer or answer token", ""),
+            _ => err(app, "select a request to accept (p pastes an invite link)"),
+        },
+        (Tab::Exchanges, KeyCode::Char('p')) => ask(app, NAsk::Accept, "Paste an invite link (muninn://…)", ""),
+        (Tab::Exchanges, KeyCode::Char('d')) => match selected_exchange(app) {
+            Some(x) if x.status == ExchangeStatus::Incoming => match auto::decline(&app.store, &x.id, ORIGIN) {
+                Ok(x) => {
+                    reload(app);
+                    app.refresh_history(true);
+                    ok(app, format!("declined {}", x.title()));
+                }
+                Err(e) => err(app, e.to_string()),
+            },
+            _ => err(app, "only a request can be declined (r disconnects)"),
         },
         (Tab::Exchanges, KeyCode::Enter) => {
             if let Some(x) = selected_exchange(app) {
@@ -750,21 +781,21 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         }
         (Tab::Exchanges, KeyCode::Char('l')) => {
             if let Some(x) = selected_exchange(app) {
-                ask(app, NAsk::ExchangeLabel, "Exchange label", &x.label)
+                ask(app, NAsk::ExchangeLabel, "Connection label", &x.label)
             }
         }
         (Tab::Exchanges, KeyCode::Char('r')) => {
             if let Some(x) = selected_exchange(app) {
                 let t = x.title();
                 app.network.confirm = Some(Confirm::Revoke(x.id));
-                ok(app, format!("revoke the exchange with {t}? Nothing more is shared over it. y/n"));
+                ok(app, format!("disconnect from {t}? Nothing more is shared with them. y/n"));
             }
         }
         (Tab::Exchanges, KeyCode::Char('s')) => {
             if selected_exchange(app).is_some_and(|x| x.status.active()) {
-                ask(app, NAsk::Share(true), "Share with this exchange (kind name: journal Field notes)", "")
+                ask(app, NAsk::Share(true), "Share with this connection (kind name: journal Field notes)", "")
             } else {
-                err(app, "only a complete exchange can carry shares")
+                err(app, "only a connected node can be shared with")
             }
         }
         (Tab::Exchanges, KeyCode::Char('L')) => {
@@ -797,18 +828,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 Err(e) => err(app, e.to_string()),
             }
         }
-        (Tab::Shards, KeyCode::Char('e')) => {
-            app.network.detail = super::modal::cli_hint(
-                "net shard entrust --to PEER --to PEER [--threshold K]",
-                "Entrusting needs your master key (words or password), which never passes through the TUI.",
-            );
-        }
-        (Tab::Shards, KeyCode::Char('r')) => {
-            app.network.detail = super::modal::cli_hint(
-                "net shard restore [--backup EXCHANGES.age]",
-                "Restoring gathers shards from your peers with your shard password, outside the TUI.",
-            );
-        }
+        (Tab::Shards, KeyCode::Char('e') | KeyCode::Char('r')) => open_entrust(app),
         (Tab::Shards, KeyCode::Char('d')) => {
             let i = app.network.sel.checked_sub(app.network.entrusted.len());
             if let Some(h) = i.and_then(|i| app.network.held.get(i)) {
@@ -834,6 +854,19 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 Setting::Mdns => p.mdns = !p.mdns,
                 Setting::RelayServer => p.relay_server = !p.relay_server,
                 Setting::Autostart => p.autostart = !p.autostart,
+                Setting::Accept => p.accept = if p.accept_anyone() { "known".into() } else { "anyone".into() },
+                Setting::HostAutostart => {
+                    app.prefs.hosting.autostart = !app.prefs.hosting.autostart;
+                    app.save_prefs();
+                    let on = app.prefs.hosting.autostart;
+                    record(
+                        app,
+                        "org.host.config",
+                        format!("web server with the node: {}", if on { "on" } else { "off" }),
+                        serde_json::json!({ "autostart": on }),
+                    );
+                    return ok(app, "saved web server with the node");
+                }
                 _ => {
                     let v = match s {
                         Setting::Label => p.label.clone(),
@@ -869,7 +902,7 @@ fn confirmed(app: &mut App, c: Confirm) {
                     Some(Err(e)) => format!("they could not be told ({e})"),
                     None => "nothing to tell".into(),
                 };
-                Ok(Done::Lines(vec![format!("revoked the exchange with {}; {t}", x.title())]))
+                Ok(Done::Lines(vec![format!("disconnected from {}; {t}", x.title())]))
             });
         }
         Confirm::DropHeld(id) => match app.store.drop_held_shard(&id) {
@@ -968,6 +1001,17 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
     v.head.push(Line::styled(tabs.join(" "), Style::new().fg(t.accent)));
     v.head.push(Line::raw(""));
     let fg = Style::new().fg(t.fg);
+    if let Some(e) = &st.entrust {
+        entrust_lines(e, &t, &mut v.head);
+        v.msg = st.msg.clone();
+        v.keys = vec![
+            ("Space pick", KeyCode::Char(' ')),
+            ("Tab nodes/form", KeyCode::Tab),
+            ("Enter edit/run", KeyCode::Enter),
+            ("Esc close", KeyCode::Esc),
+        ];
+        return draw_view(f, r, v, &t, hits);
+    }
     match st.tab {
         Tab::Node => {
             for l in node_lines(app) {
@@ -980,8 +1024,21 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
             }
             for (i, p) in st.peers.iter().enumerate() {
                 let name = if p.label.is_empty() { "-" } else { &p.label };
+                let link = st
+                    .exchanges
+                    .iter()
+                    .filter(|x| x.peer_id.as_deref() == Some(p.peer_id.as_str()))
+                    .map(auto::status_of)
+                    .min_by_key(|s| match s {
+                        auto::LinkStatus::Connected => 0,
+                        auto::LinkStatus::Requested => 1,
+                        auto::LinkStatus::Pending => 2,
+                        _ => 3,
+                    })
+                    .map(|s| s.as_str())
+                    .unwrap_or("-");
                 v.rows.push(Line::from(vec![
-                    Span::styled(format!(" {:<18} {:<9}", name, p.short_id()), row_style(&t, i == st.sel)),
+                    Span::styled(format!(" {:<18} {:<9} {:<10}", name, p.short_id(), link), row_style(&t, i == st.sel)),
                     Span::styled(format!(" {:<9} {}", p.source, client::caps_text(&p.caps)), Style::new().fg(t.muted)),
                 ]));
             }
@@ -1018,30 +1075,33 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 }
             } else {
                 if st.exchanges.is_empty() {
-                    v.head.push(muted(&t, " no key exchanges yet: n makes an offer, a accepts one"));
+                    v.head.push(muted(&t, " no connections yet: c connects to a node, n makes an invite link, p uses one"));
+                } else {
+                    v.head.push(muted(&t, " keys are exchanged by the nodes on their own; requests from others wait for a (accept) or d (decline)"));
                 }
                 for (i, x) in st.exchanges.iter().enumerate() {
-                    let mark = match x.status {
-                        ExchangeStatus::Verified => "✓",
-                        ExchangeStatus::Complete => "●",
-                        ExchangeStatus::Revoked => "✗",
-                        _ => "○",
+                    let ls = auto::status_of(x);
+                    let mark = match ls {
+                        auto::LinkStatus::Connected => "●",
+                        auto::LinkStatus::Requested => "?",
+                        auto::LinkStatus::Pending => "○",
+                        _ => "✗",
                     };
                     v.rows.push(Line::from(vec![
                         Span::styled(format!(" {mark} "), Style::new().fg(if x.status.active() { t.accent } else { t.muted })),
-                        Span::styled(format!("{:<20} {:<9}", x.title(), x.status.as_str()), row_style(&t, i == st.sel)),
-                        Span::styled(format!(" {} {}", x.short_id(), x.short_code.as_deref().unwrap_or("")), Style::new().fg(t.muted)),
+                        Span::styled(format!("{:<20} {:<10}", x.title(), ls.as_str()), row_style(&t, i == st.sel)),
+                        Span::styled(format!(" {}", auto::purpose(x)), Style::new().fg(t.muted)),
                     ]));
                 }
             }
         }
         Tab::Shared => {
             if st.shares.is_empty() {
-                v.head.push(muted(&t, " nothing is shared: a shares an item with every exchange (s on an exchange: just that one)"));
+                v.head.push(muted(&t, " nothing is shared: a shares an item with every connection (s on a connection: just that one)"));
             }
             for (i, s) in st.shares.iter().enumerate() {
                 let with = match &s.exchange_id {
-                    None => "every exchange".to_string(),
+                    None => "every connection".to_string(),
                     Some(e) => st.exchanges.iter().find(|x| &x.id == e).map(|x| x.title()).unwrap_or_else(|| e.clone()),
                 };
                 v.rows.push(Line::from(vec![
@@ -1053,7 +1113,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         Tab::Shards => {
             v.head.push(muted(&t, " Shards of your master key, sealed with your shard password; peers never see them in plain."));
             if st.entrusted.is_empty() && st.held.is_empty() {
-                v.head.push(muted(&t, " none yet: e shows how to entrust shards to peers you verified"));
+                v.head.push(muted(&t, " none yet: e entrusts shards to nodes you are connected to"));
             }
             let mut i = 0;
             for e in &st.entrusted {
@@ -1120,17 +1180,18 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         Tab::Exchanges if st.remote.is_some() => vec![("Enter import", KeyCode::Enter)],
         Tab::Exchanges => vec![
             ("Enter show", KeyCode::Enter),
-            ("n offer", KeyCode::Char('n')),
+            ("c connect", KeyCode::Char('c')),
             ("a accept", KeyCode::Char('a')),
-            ("v verify", KeyCode::Char('v')),
+            ("d decline", KeyCode::Char('d')),
+            ("n invite link", KeyCode::Char('n')),
+            ("p paste link", KeyCode::Char('p')),
             ("s share", KeyCode::Char('s')),
             ("L their items", KeyCode::Char('L')),
             ("l label", KeyCode::Char('l')),
-            ("r revoke", KeyCode::Char('r')),
-            ("e export", KeyCode::Char('e')),
+            ("r disconnect", KeyCode::Char('r')),
         ],
         Tab::Shared => vec![("a share", KeyCode::Char('a')), ("d unshare", KeyCode::Char('d'))],
-        Tab::Shards => vec![("e entrust", KeyCode::Char('e')), ("r restore", KeyCode::Char('r')), ("d drop held", KeyCode::Char('d'))],
+        Tab::Shards => vec![("e entrust / check", KeyCode::Char('e')), ("d drop held", KeyCode::Char('d'))],
         Tab::Search => vec![("Enter run", KeyCode::Enter)],
         Tab::Settings => vec![("Enter edit", KeyCode::Enter)],
     });
@@ -1150,5 +1211,244 @@ pub fn autostart(app: &mut App) {
 pub fn shutdown(app: &mut App) {
     if let Some(h) = app.network.hosted.take() {
         h.stop(&app.store, ORIGIN);
+    }
+}
+
+// ---------------- Dark shards: entrust and check ----------------
+
+/// Network ▸ Dark shards ▸ e: pick connected nodes, give the key file and a shard password.
+/// The master key is never stored, so it is read from a key file (`mnnn keys export` or
+/// the recovery words saved to a file, plain or .age). Passwords are masked, cleared after
+/// use and never logged.
+pub struct EntrustForm {
+    /// Connected nodes and whether each gets a shard.
+    pub peers: Vec<(Exchange, bool)>,
+    pub on_peers: bool,
+    pub psel: usize,
+    pub form: Form,
+    threshold_edited: bool,
+    /// Per-node outcome of the last run.
+    pub status: Vec<String>,
+}
+
+const F_FILE: &str = "key file";
+const F_FILEPW: &str = "file pass";
+const F_PW: &str = "shard pass";
+const F_REPEAT: &str = "repeat";
+const F_K: &str = "threshold";
+
+/// Open the entrust form (Network ▸ Entrust dark shards…).
+pub fn open_entrust(app: &mut App) {
+    if app.network.tab != Tab::Shards || app.modal.is_none() {
+        open(app, Tab::Shards);
+    }
+    reload(app);
+    let mut peers: Vec<(Exchange, bool)> = vec![];
+    for x in app.network.exchanges.iter().filter(|x| x.status.active() && x.peer_id.is_some()) {
+        if !peers.iter().any(|(y, _)| y.peer_id == x.peer_id) {
+            peers.push((x.clone(), false));
+        }
+    }
+    let form = Form::new(
+        vec![Input::new(F_FILE), Input::masked(F_FILEPW), Input::masked(F_PW), Input::masked(F_REPEAT), Input::new(F_K)],
+        vec!["Entrust", "Check restore", "Close"],
+    );
+    let none = peers.is_empty();
+    app.network.entrust = Some(EntrustForm { peers, on_peers: !none, psel: 0, form, threshold_edited: false, status: vec![] });
+    if none {
+        ok(app, "no connected nodes yet: connect to two or more (Connections ▸ c) to entrust shards; Check restore still works");
+    } else {
+        ok(app, "Space picks nodes; then the key file and a shard password");
+    }
+}
+
+fn suggest_threshold(e: &mut EntrustForm) {
+    if e.threshold_edited {
+        return;
+    }
+    let n = e.peers.iter().filter(|(_, on)| *on).count();
+    let k = if n >= 2 { n.div_ceil(2).max(2).min(n).to_string() } else { String::new() };
+    if let Some(f) = e.form.fields.iter_mut().find(|f| f.label == F_K) {
+        f.value = k;
+    }
+}
+
+fn entrust_key(app: &mut App, k: KeyEvent) {
+    let Some(e) = app.network.entrust.as_mut() else { return };
+    if e.on_peers {
+        match k.code {
+            KeyCode::Esc => app.network.entrust = None,
+            KeyCode::Up | KeyCode::Char('k') => e.psel = e.psel.saturating_sub(1),
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab | KeyCode::BackTab => {
+                if k.code == KeyCode::Down && e.psel + 1 < e.peers.len() {
+                    e.psel += 1;
+                } else {
+                    e.on_peers = false;
+                    e.form.sel = 0;
+                }
+            }
+            KeyCode::Char(' ') | KeyCode::Enter => {
+                if let Some(p) = e.peers.get_mut(e.psel) {
+                    p.1 = !p.1;
+                }
+                suggest_threshold(e);
+            }
+            _ => {}
+        }
+        return;
+    }
+    if !e.form.editing {
+        match k.code {
+            KeyCode::Esc => return app.network.entrust = None,
+            KeyCode::Tab | KeyCode::BackTab if !e.peers.is_empty() => return e.on_peers = true,
+            KeyCode::Up | KeyCode::Char('k') if e.form.sel == 0 && !e.peers.is_empty() => {
+                e.on_peers = true;
+                e.psel = e.peers.len() - 1;
+                return;
+            }
+            _ => {}
+        }
+    }
+    match e.form.key(k) {
+        FormEvent::Changed => {
+            if e.form.fields.get(e.form.sel).is_some_and(|f| f.label == F_K) {
+                e.threshold_edited = true;
+            }
+        }
+        FormEvent::Action(0) => entrust_run(app),
+        FormEvent::Action(1) => check_run(app),
+        FormEvent::Action(_) => app.network.entrust = None,
+        FormEvent::None => {}
+    }
+}
+
+/// Take a masked field's value and clear it.
+fn take(e: &mut EntrustForm, label: &str) -> Option<String> {
+    let f = e.form.fields.iter_mut().find(|f| f.label == label)?;
+    let v = f.opt();
+    f.value.clear();
+    v
+}
+
+fn missing(app: &mut App, field: &str, m: &str) {
+    if let Some(e) = app.network.entrust.as_mut() {
+        e.form.focus(field);
+    }
+    err(app, m.to_string());
+}
+
+/// The master key from a key file: 64 hex digits (`mnnn keys export`) or the 24 words,
+/// plain or age-encrypted; checked against this database.
+fn master_from_file(paths: &crate::paths::Paths, file: &str, pass: Option<String>) -> crate::Result<crate::crypto::Key32> {
+    let text = crate::crypto::keyring::read_maybe_age(&expand(file), || {
+        pass.map(Into::into).ok_or_else(|| crate::Error::missing(F_FILEPW, "this key file is encrypted: type its password"))
+    })?;
+    let t = text.trim();
+    let m =
+        if t.len() == 64 && t.chars().all(|c| c.is_ascii_hexdigit()) { crate::crypto::Key32::from_hex(t)? } else { crate::crypto::from_words(t)? };
+    crate::crypto::keyring::verify_master(paths, &m)?;
+    Ok(m)
+}
+
+fn entrust_run(app: &mut App) {
+    let Some(e) = app.network.entrust.as_mut() else { return };
+    let to: Vec<Exchange> = e.peers.iter().filter(|(_, on)| *on).map(|(x, _)| x.clone()).collect();
+    let (file, filepw, pw, repeat) = (e.form.get(F_FILE), take(e, F_FILEPW), take(e, F_PW), take(e, F_REPEAT));
+    let k = e.form.get(F_K).unwrap_or_default();
+    if to.len() < 2 {
+        return err(app, "pick at least two connected nodes (Space): each holds one shard");
+    }
+    let Some(file) = file else { return missing(app, F_FILE, "the key file: `mnnn keys export` or your 24 words saved to a file") };
+    let Some(pw) = pw else { return missing(app, F_PW, "type a shard password: you need it again to restore") };
+    if repeat.as_deref() != Some(pw.as_str()) {
+        return missing(app, F_PW, "the two shard passwords differ: type both again");
+    }
+    let n = to.len();
+    let threshold = match k.trim() {
+        "" => 0,
+        v => match v.parse::<usize>() {
+            Ok(t) if (2..=n).contains(&t) => t,
+            _ => return missing(app, F_K, &format!("the threshold is how many of the {n} shards restore the key: 2 to {n}")),
+        },
+    };
+    let master = match master_from_file(&app.paths, &file, filepw) {
+        Ok(m) => m,
+        Err(crate::Error::Missing { what, hint }) => return missing(app, what, &hint),
+        Err(e) => return err(app, format!("key file: {e}")),
+    };
+    if let Some(e) = app.network.entrust.as_mut() {
+        e.status = to.iter().map(|x| format!("… {}: sending", x.title())).collect();
+    }
+    let relays = app.prefs.net.relays.clone();
+    spawn(app, "entrust", move |s, node| {
+        // every node must answer before any shard leaves, so a set is never half placed
+        let mut lines = vec![];
+        let mut down = false;
+        for x in &to {
+            let p = x.peer_id.clone().unwrap_or_default();
+            match client::hello(s, node, &p, None, &relays) {
+                Ok(_) => lines.push(format!("✓ {}: reachable", x.title())),
+                Err(e) => {
+                    down = true;
+                    lines.push(format!("✗ {}: {e}", x.title()));
+                }
+            }
+        }
+        if down {
+            lines.insert(0, "nothing was sent: every picked node has to be online".into());
+            return Ok(Done::Lines(lines));
+        }
+        let ids: Vec<String> = to.iter().map(|x| x.id.clone()).collect();
+        let r = client::entrust(s, node, &master, &pw.into(), &ids, threshold, &relays, ORIGIN)?;
+        let mut l =
+            vec![format!("entrusted: any {} of {} shards restore your key (set {})", r.threshold, r.placed.len(), crate::store::short(&r.set))];
+        for p in &r.placed {
+            let who = to.iter().find(|x| x.id == p.exchange_id).map(|x| x.title()).unwrap_or_default();
+            l.push(format!("✓ {who}: holds shard {}/{}", p.index, p.total));
+        }
+        Ok(Done::Lines(l))
+    });
+}
+
+fn check_run(app: &mut App) {
+    let Some(e) = app.network.entrust.as_mut() else { return };
+    take(e, F_REPEAT);
+    take(e, F_FILEPW);
+    let Some(pw) = take(e, F_PW) else { return missing(app, F_PW, "type your shard password to check the shards restore your key") };
+    e.status = vec!["… asking your connections for their shards".into()];
+    let (paths, relays) = (app.paths.clone(), app.prefs.net.relays.clone());
+    spawn(app, "restore check", move |s, node| {
+        let (key, g) = client::gather(s, node, &pw.into(), None, &[], &relays, ORIGIN)?;
+        crate::crypto::keyring::verify_master(&paths, &key)?;
+        let mut l = vec![format!("✓ your shards restore this database's key ({} answered, {} needed: {})", g.got, g.threshold, g.from.join(", "))];
+        l.extend(g.errors.iter().map(|e| format!("✗ {e}")));
+        Ok(Done::Lines(l))
+    });
+}
+
+fn entrust_lines(e: &EntrustForm, t: &crate::theme::Theme, out: &mut Vec<Line<'static>>) {
+    let fg = Style::new().fg(t.fg);
+    out.push(muted(t, " Split your master key into shards, each sealed with the shard password, one per node."));
+    out.push(muted(t, " Nodes you connect to are listed; nothing about the key is stored or logged here."));
+    out.push(Line::raw(""));
+    if e.peers.is_empty() {
+        out.push(muted(t, " (no connected nodes)"));
+    }
+    for (i, (x, on)) in e.peers.iter().enumerate() {
+        let sel = e.on_peers && i == e.psel;
+        out.push(Line::from(vec![
+            Span::styled(format!(" [{}] {:<20}", if *on { "x" } else { " " }, x.title()), row_style(t, sel)),
+            Span::styled(format!(" {}", x.peer_id.as_deref().map(crate::store::short).unwrap_or_default()), Style::new().fg(t.muted)),
+        ]));
+    }
+    let n = e.peers.iter().filter(|(_, on)| *on).count();
+    out.push(muted(t, format!(" {n} picked · empty threshold: suggested · file pass only for .age files")));
+    out.push(Line::raw(""));
+    out.extend(e.form.lines(t));
+    if !e.status.is_empty() {
+        out.push(Line::raw(""));
+        for s in &e.status {
+            out.push(Line::styled(format!(" {s}"), fg));
+        }
     }
 }

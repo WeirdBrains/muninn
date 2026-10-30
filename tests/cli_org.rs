@@ -168,9 +168,9 @@ fn members_apply_join_by_invitation_give_fetch_and_get_kicked() {
     assert_eq!(j["status"], "member");
     assert_eq!(j["role"], "admin");
 
-    // cleo is invited and joins with the token
+    // cleo is invited and joins with the link
     let out = a.ok(&["org", "member", "invite", "comet-lab", "--label", "cleo", "--role", "viewer"]);
-    let token = out.lines().find(|l| l.starts_with("mnnn-x1-")).expect("a token").to_string();
+    let token = out.lines().find(|l| l.starts_with("muninn://join/")).expect("an invite link").to_string();
     c.ok(&["org", "join", &token]);
     wait("cleo did not become a member", || {
         let m = json(&a.ok(&["org", "member", "list", "comet-lab", "--json"]));

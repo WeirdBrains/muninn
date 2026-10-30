@@ -1732,6 +1732,7 @@ short-code commands are still there, under `mnnn net exchange` (advanced).
 Examples:
   mnnn net start --for 3600
   mnnn net connect /ip4/192.0.2.7/tcp/4741/p2p/12D3Koo… --label ben
+  mnnn net invite                       # a link; they run `mnnn net connect LINK`
   mnnn net requests
   mnnn net accept ben
   mnnn net share journal \"field notes\" --with ben
@@ -1776,8 +1777,8 @@ pub enum NetCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Connect to a node (`…/p2p/ID`, a peer id or a known name): keys are exchanged
-    /// automatically; a node that does not know you yet asks its owner first.
+    /// Connect to a node (`…/p2p/ID`, a peer id, a known name or an invite link): keys are
+    /// exchanged automatically; a node that does not know you yet asks its owner first.
     Connect {
         target: String,
         /// Call it this.
@@ -1786,6 +1787,15 @@ pub enum NetCommand {
         /// Only say hello and remember it (no key exchange).
         #[arg(long)]
         hello: bool,
+    },
+    /// Make an invite link for another node: when they use it (`mnnn net connect LINK`, or
+    /// paste it in the TUI), the two nodes connect. It holds no secret and expires in 7 days.
+    Invite {
+        /// Call the node that uses it this.
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long)]
+        json: bool,
     },
     /// Requests waiting for you: nodes that want to connect, apply or invite you.
     Requests {

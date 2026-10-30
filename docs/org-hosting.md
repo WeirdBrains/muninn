@@ -1,8 +1,10 @@
 # Org hosting
 
 Any node can serve the sites of its organizations over HTTPS: HTML pages, a JSON API,
-template assets and gRPC, all on one port. **Nothing listens until you start it**, and by
-default only on `127.0.0.1`. Which orgs are served is each org's *hosted* flag
+template assets and gRPC, all on one port. **Nothing listens until you start it** (or
+turn on `hosting.autostart`: `mnnn org host autostart on`, TUI Network ▸ Settings ▸ *web
+server with the node*, so it comes up whenever the node does), and by default only on
+`127.0.0.1`. Which orgs are served is each org's *hosted* flag
 (`mnnn org edit ORG --hosted on`), plus mirrors of joined orgs.
 
 | | CLI | TUI (Organizations ▸ Site & certificate…) |

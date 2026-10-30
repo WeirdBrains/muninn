@@ -230,7 +230,9 @@ pub fn parse_item(kind: ReviewItemKind, v: &str) -> review::Ask {
         }
         rest = more.trim_start();
     }
-    let rest = if let Some(r) = rest.strip_prefix('@') {
+    // a highlight is always of some text: the leading @ is optional
+    let at = rest.strip_prefix('@').or((kind == ReviewItemKind::Highlight && !rest.is_empty()).then_some(rest));
+    let rest = if let Some(r) = at {
         let (at, body) = r.split_once(" :: ").unwrap_or((r, ""));
         a.at = Some(at.to_string());
         body.trim().to_string()
@@ -254,7 +256,7 @@ fn hint(kind: ReviewItemKind) -> &'static str {
     match kind {
         ReviewItemKind::Comment => "Comment (`@text :: comment` anchors it; field=… entry=… first)",
         ReviewItemKind::Suggestion => "Suggest (`@old text :: new text`, or the whole field's new value; field=… entry=…)",
-        ReviewItemKind::Highlight => "Highlight (`@text :: note`; field=… entry=…)",
+        ReviewItemKind::Highlight => "Highlight (`text :: note`; field=… entry=…)",
         ReviewItemKind::Vote => "Vote: approve, changes or reject (or `up ITEM` / `down ITEM`)",
     }
 }
@@ -509,7 +511,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         }
         (Tab::Thread | Tab::Joined, KeyCode::Char('c')) => ask(app, item(ReviewItemKind::Comment), hint(ReviewItemKind::Comment), ""),
         (Tab::Thread | Tab::Joined, KeyCode::Char('e')) => ask(app, item(ReviewItemKind::Suggestion), hint(ReviewItemKind::Suggestion), ""),
-        (Tab::Thread | Tab::Joined, KeyCode::Char('h')) => ask(app, item(ReviewItemKind::Highlight), hint(ReviewItemKind::Highlight), "@"),
+        (Tab::Thread | Tab::Joined, KeyCode::Char('h')) => ask(app, item(ReviewItemKind::Highlight), hint(ReviewItemKind::Highlight), ""),
         (Tab::Thread | Tab::Joined, KeyCode::Char('v')) => ask(app, item(ReviewItemKind::Vote), hint(ReviewItemKind::Vote), ""),
         (Tab::Thread, KeyCode::Char('r')) => {
             if app.reviews.items.get(app.reviews.sel).is_some() {

@@ -24,8 +24,15 @@ mdns = true
 relay_server = false
 relays = []
 bootstrap = []
+autostart = true
+accept = "known"
+
+[hosting]
 autostart = false
 ```
+
+A `version` key records the file's format; older files are upgraded on load (2.9 turns
+`net.autostart` on once, as the new default).
 
 | key | default | meaning |
 |-----|---------|---------|
@@ -44,7 +51,9 @@ autostart = false
 | `net.mdns` | `true` | find peers on the local network while the node runs |
 | `net.relay_server` | `false` | relay traffic for other nodes |
 | `net.relays`, `net.bootstrap` | `[]` | relays to reserve a slot on; nodes to join the wide network through |
-| `net.autostart` | `false` | start the node when the TUI opens |
+| `net.autostart` | `true` | start the node when the TUI opens (`mnnn net config --autostart off`) |
+| `net.accept` | `known` | `known`: nodes you were never connected to ask first; `anyone`: connect at once ([key exchanges](key-exchanges.md)) |
+| `hosting.autostart` | `false` | start the [org web server](org-hosting.md) with the node (`mnnn org host autostart on`) |
 | `hosting.bind` | `127.0.0.1` | address [org sites](org-hosting.md) listen on (`0.0.0.0` or `::`: other machines) |
 | `hosting.port` | `8443` | HTTPS port for pages, JSON and gRPC |
 | `hosting.names`, `hosting.cert_days` | `[]`, `7` | extra self-signed certificate names; its life in days |

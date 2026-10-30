@@ -16,8 +16,10 @@ mnnn review invite "field notes" --label cleo
 
 `request` takes a kind (`entry`, `journal`, `project`, `search` or `live-search`,
 `record`; plurals work too) and a name or id; a record is `MODEL/RECORD`. It makes the
-first link unless `--no-link`; `invite` makes more. With `--peer` the link is delivered
-to that node, otherwise the token (`mnnn-x1-offer:…`) is printed to pass on.
+first link unless `--no-link`; `invite` makes more. With `--peer` the invitation is
+delivered to that node (the reviewer sees it in `mnnn net requests`), otherwise an
+invite link (`muninn://join/…`) is printed to pass on. The keys are exchanged on their
+own either way.
 
 - **A link is a [key exchange](key-exchanges.md)** scoped to the review
   (`{"kind":"resource","as":"review"}`): good for one reviewer, for 7 days. A used link
@@ -31,7 +33,7 @@ to that node, otherwise the token (`mnnn-x1-offer:…`) is printed to pass on.
 ## Reviewing
 
 ```
-mnnn review join mnnn-x1-offer:…        # or `-` to read it from stdin
+mnnn review join muninn://join/…        # the link, the review's title or the request id; `-` reads stdin
 mnnn review view "field notes"
 mnnn review comment "field notes" "a fine start"
 mnnn review suggest "field notes" --entry 3f2a --at "the cat" --to "the comet" --why "it is a comet"

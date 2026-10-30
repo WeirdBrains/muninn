@@ -99,9 +99,10 @@ In the model designer: `m` design, `r` records, `h` history, `f` rules; in the d
 delete all matching.
 In the network window: Tab / ← → / `1`–`8` change page, `S` start and `X` stop the
 node, `g` refresh; Peers `c` connect, `l` label, `d` forget; Relays `a` add, `d` remove,
-`r` serve; Key exchanges `n` offer, `a` accept, `v` verify, `s` share, `L` their items
-(Enter imports), `l` label, `r` revoke, `e` export; Shared `a` share, `d` unshare; Dark
-shards `d` drop a held shard; Search Enter runs a saved search across peers; Settings
+`r` serve; Connections `c` connect, `a` accept and `d` decline a request, `n` invite
+link, `p` paste a link, `s` share, `L` their items (Enter imports), `l` label, `r`
+disconnect (`v` checks a short code by hand); Shared `a` share, `d` unshare; Dark shards
+`e` entrust or check (Space picks nodes), `d` drop a held shard; Search Enter runs a saved search across peers; Settings
 Enter edits or toggles.
 In the organizations window: Tab / ← → / `1`–`6` change page, `g` refresh; Orgs `n` new,
 Enter pick, `r` rename, `v` visibility, `o` access, `h` hosted, `m` member sign-in, `d`

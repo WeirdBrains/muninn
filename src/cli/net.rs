@@ -187,12 +187,45 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                 ctx.io.info(format!("{} ({}) says hello: {}", p.label, p.short_id(), p.agent));
                 return Ok(());
             }
-            ctx.io.note(format!("connecting to {target}…"));
             let addrs = n.addrs();
+            if net::exchange::is_token(&net::exchange::unlink(&target)) {
+                let l = auto::use_link(&n.store, n.node.as_ref(), &n.kp, &target, label.as_deref().unwrap_or(""), &n.label, addrs, ORIGIN)?;
+                print_link(ctx, &l);
+                return Ok(());
+            }
+            ctx.io.note(format!("connecting to {target}…"));
             let l = auto::connect(&n.store, n.node.as_ref().expect("node"), &n.kp, &target, label.as_deref(), &n.label, addrs, &relays, ORIGIN)?;
             print_link(ctx, &l);
             if l.status == auto::LinkStatus::Failed {
                 return Err(anyhow!("{}", l.detail));
+            }
+            Ok(())
+        }
+        NetCommand::Invite { label, json } => {
+            let n = Net::open(ctx)?;
+            let relays = n.relays();
+            let addrs = n.addrs();
+            let c = client::create(
+                &n.store,
+                None,
+                &n.kp,
+                label.as_deref().unwrap_or(""),
+                &n.label,
+                addrs,
+                None,
+                client::DEFAULT_TTL_MS,
+                &relays,
+                ORIGIN,
+            )?;
+            let link = net::exchange::link(&c.token);
+            if json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({ "link": link, "id": c.exchange.id, "expires_at": c.exchange.expires_at }))?
+                );
+            } else {
+                println!("{link}");
+                ctx.io.note("send it to them; when they use it the nodes connect (it holds no secret)");
             }
             Ok(())
         }
@@ -219,7 +252,11 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
             let mut n = Net::open(ctx)?;
             n.node()?;
             let addrs = n.addrs();
-            let l = auto::accept(&n.store, n.node.as_ref(), &n.kp, &request, &n.label, addrs, ORIGIN)?;
+            let l = if net::exchange::is_token(&net::exchange::unlink(&request)) {
+                auto::use_link(&n.store, n.node.as_ref(), &n.kp, &request, "", &n.label, addrs, ORIGIN)?
+            } else {
+                auto::accept(&n.store, n.node.as_ref(), &n.kp, &request, &n.label, addrs, ORIGIN)?
+            };
             print_link(ctx, &l);
             Ok(())
         }

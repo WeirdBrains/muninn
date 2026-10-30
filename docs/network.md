@@ -5,9 +5,10 @@ journals, projects, reports, models (their records, and the imported bars), live
 searches and code spaces. A search can run across every peer at once, and the master
 key can be split into [dark shards](dark-shards.md) held by peers.
 
-**Nothing runs and nothing is shared by default.** The node starts only when you start
-it (or turn on *start with the TUI*), and a peer sees an item only after a completed
-[key exchange](key-exchanges.md) and after you share that item.
+**Nothing is shared by default.** The node starts with the TUI (turn off *start with
+the TUI* to stop that), and a peer sees an item only once your nodes are connected —
+the [key exchange](key-exchanges.md) happens on its own — and after you share that
+item. A node you do not know asks before it is connected.
 
 ## The node
 
@@ -22,9 +23,10 @@ id (`12D3KooW…`) is how others know it.
 | Start | `mnnn net start [--port N] [--listen ADDR] [--no-mdns] [--relay-server] [--for SECS]` | Network ▸ Start node, or `S` in the Network window |
 | Stop | `mnnn net stop` (or Ctrl-C) | Network ▸ Stop node, or `X` |
 | Status | `mnnn net status [--json]` | Network ▸ Node status… (`K`) |
-| Peers | `mnnn net peers`, `connect ADDR`, `forget PEER` | Peers page: `c` connect, `l` label, `d` forget |
+| Peers | `mnnn net peers`, `forget PEER` | Peers page: `c` connect, `l` label, `d` forget |
+| Connections | `mnnn net connect X`, `invite`, `requests`, `accept X`, `decline X`, `disconnect X` | Connections page: `c` `n` `p` `a` `d` `r` |
 | Relays | `mnnn net relay list/add/remove/serve on\|off` | Relays page: `a` add, `d` remove, `r` serve |
-| Settings | `mnnn net config [--label] [--port] [--listen] [--mdns] [--autostart] [--bootstrap]` | Settings page |
+| Settings | `mnnn net config [--label] [--port] [--listen] [--mdns] [--autostart] [--accept] [--bootstrap]` | Settings page |
 
 `mnnn net start` runs in the foreground. While it runs it writes
 `MUNINN_HOME/net/node.json` (no secrets: pid, label, addresses), so other commands and
@@ -34,7 +36,14 @@ same identity that dials out but does not listen.
 
 Settings live in [preferences](preferences.md) under `net`: `label` (empty: the
 current [author](authors.md)), `port` (4741; 0 picks one), `listen`, `mdns` (on),
-`relay_server` (off), `relays`, `bootstrap`, `autostart` (off).
+`relay_server` (off), `relays`, `bootstrap`, `autostart` (on: the TUI starts the
+node), `accept` (`known`: nodes you do not know ask first; `anyone`). With
+`hosting.autostart` (off; `mnnn org host autostart on`, TUI Settings ▸ *web server with
+the node*) the [org web server](org-hosting.md) starts with the node too.
+
+A running node (the TUI's or `mnnn net start`) also settles exchanges in the background:
+it asks for answers to requests you made, notices declines, and re-delivers answers its
+peers missed. Muninn has no separate daemon: the TUI or `mnnn net start` is the node.
 
 ### Behind NAT
 
@@ -61,9 +70,9 @@ archive, or a document format with `--format`); `--import` adds journals, projec
 code spaces and live searches to your database, under a free name, recorded in the
 [history](history.md) as `net.import`.
 
-In the TUI: Shared page `a` shares with every exchange, `d` stops; on the Key exchanges
-page `s` shares with the selected exchange, `L` lists what that peer shares, and Enter
-imports an item.
+`--with NAME` connects to that node first if needed. In the TUI: Shared page `a` shares
+with every connection, `d` stops; on the Connections page `s` shares with the selected
+one, `L` lists what that node shares, and Enter imports an item.
 
 ## Searching across the network
 
@@ -79,8 +88,8 @@ the TUI the Search page runs a saved [live search](live-searches.md) across the 
 
 ## The Network menu
 
-Node status… (`K`) · Start node · Stop node · Peers… · Relays… · Key exchanges… ·
-Shared data… · Dark shards… · Network search… · Settings…
+Node status… (`K`) · Start node · Stop node · Peers… · Relays… · Connections… ·
+Shared data… · Dark shards… · Entrust dark shards… · Network search… · Settings…
 
 All open one window with eight pages: Tab (or ← →, or `1`–`8`) moves between them.
 Work that talks to other nodes runs in the background; the title shows it, and the
@@ -91,7 +100,9 @@ window stays usable. `g` refreshes. See [keybindings](keybindings.md).
 - Requests between nodes travel inside libp2p's Noise channel **and** are sealed with
   the exchange key (XChaCha20-Poly1305, bound to the exchange id and both peer ids);
   a node answers sealed requests only from the peer of that exchange.
-- Offer and answer tokens hold only public keys and signatures.
+- Invite links (and the tokens behind them) hold only public keys and signatures.
+- A node's key is pinned the first time; a node with another key using a known name
+  gets a warning and is a stranger (see [trust on first use](key-exchanges.md#who-is-who-trust-on-first-use)).
 - Secrets (node key, exchange keys, words, shards, passwords) are never logged or
   written outside the encrypted database and encrypted backups.
 - Every network action is in the [history](history.md) (`net.*`) under the current
