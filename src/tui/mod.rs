@@ -18,6 +18,7 @@ pub mod layout;
 pub mod menu;
 pub mod modal;
 pub mod models;
+pub mod network;
 pub mod picker;
 pub mod projects;
 pub mod reports;
@@ -131,6 +132,7 @@ pub struct App {
     pub history: history::HistoryPane,
     pub searches: searches::SearchesState,
     pub rules: rules::RulesState,
+    pub network: network::NetState,
     pub code: code::CodeState,
     pub models: models::ModelsState,
     pub projects: projects::ProjectsState,
@@ -171,6 +173,7 @@ impl App {
             history: Default::default(),
             searches: Default::default(),
             rules: Default::default(),
+            network: Default::default(),
             code: Default::default(),
             models: Default::default(),
             projects: Default::default(),
@@ -273,6 +276,7 @@ impl App {
             KeyCode::Char('J') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Journals),
             KeyCode::Char('O') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reports),
             KeyCode::Char('R') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Rules),
+            KeyCode::Char('K') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::NetStatus),
             KeyCode::Char('C') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Code),
             KeyCode::Char('D') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Models),
             KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
@@ -357,6 +361,22 @@ impl App {
             Reports => reports::open(self),
             NewReport => reports::open_new(self),
             Rules => rules::open(self),
+            NetStatus => network::open(self, network::Tab::Node),
+            NetStart => {
+                network::start(self);
+                network::open(self, network::Tab::Node);
+            }
+            NetStop => {
+                network::stop(self);
+                network::open(self, network::Tab::Node);
+            }
+            NetPeers => network::open(self, network::Tab::Peers),
+            NetRelays => network::open(self, network::Tab::Relays),
+            NetExchanges => network::open(self, network::Tab::Exchanges),
+            NetShared => network::open(self, network::Tab::Shared),
+            NetShards => network::open(self, network::Tab::Shards),
+            NetSearch => network::open(self, network::Tab::Search),
+            NetSettings => network::open(self, network::Tab::Settings),
             Code => code::open(self),
             Models => models::open(self),
             AddToProject => match projects::selected_series(self) {
@@ -1096,6 +1116,7 @@ pub fn run(mut app: App) -> crate::Result<()> {
         event::{DisableMouseCapture, EnableMouseCapture},
         execute,
     };
+    network::autostart(&mut app);
     let mut terminal = ratatui::init();
     let _ = execute!(std::io::stdout(), EnableMouseCapture);
     let res = (|| -> crate::Result<()> {
@@ -1119,6 +1140,7 @@ pub fn run(mut app: App) -> crate::Result<()> {
     })();
     let _ = execute!(std::io::stdout(), DisableMouseCapture);
     ratatui::restore();
+    network::shutdown(&mut app);
     res
 }
 
@@ -1128,6 +1150,7 @@ impl App {
     pub fn tick(&mut self) {
         rules::poll(self);
         code::poll(self);
+        network::poll(self);
     }
 }
 
@@ -1135,6 +1158,8 @@ impl App {
 mod code_tests;
 #[cfg(test)]
 mod models_tests;
+#[cfg(test)]
+mod network_tests;
 #[cfg(test)]
 mod reports_tests;
 #[cfg(test)]

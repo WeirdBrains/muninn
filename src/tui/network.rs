@@ -1,0 +1,1148 @@
+//! Network ▸ … (K): the node, peers, relays, key exchanges, shared data, dark shards,
+//! network searches and settings. Thin over [`crate::net`]; anything that talks to
+//! other nodes runs on a worker thread so the window stays usable.
+use super::workspace::{Ask, Typed, View, ask_key, draw_view, muted, record, row_style};
+use super::{App, Hit};
+use crate::net::proto::{Item, SharedItem};
+use crate::net::{Node, client, identity, local};
+use crate::store::{Entrusted, Exchange, ExchangeStatus, Held, LiveSearch, NetPeer, Share, ShareKind, Store};
+use libp2p::identity::Keypair;
+use ratatui::Frame;
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use ratatui::layout::Rect;
+use ratatui::style::Style;
+use ratatui::text::{Line, Span};
+use std::sync::{Arc, mpsc};
+
+const ORIGIN: &str = "tui";
+
+/// The window's pages, in order (Tab / ← → / 1-8 switch).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Tab {
+    #[default]
+    Node,
+    Peers,
+    Relays,
+    Exchanges,
+    Shared,
+    Shards,
+    Search,
+    Settings,
+}
+
+impl Tab {
+    pub const ALL: [Tab; 8] = [Tab::Node, Tab::Peers, Tab::Relays, Tab::Exchanges, Tab::Shared, Tab::Shards, Tab::Search, Tab::Settings];
+    pub fn title(self) -> &'static str {
+        match self {
+            Tab::Node => "Node",
+            Tab::Peers => "Peers",
+            Tab::Relays => "Relays",
+            Tab::Exchanges => "Key exchanges",
+            Tab::Shared => "Shared",
+            Tab::Shards => "Dark shards",
+            Tab::Search => "Search",
+            Tab::Settings => "Settings",
+        }
+    }
+    fn index(self) -> usize {
+        Tab::ALL.iter().position(|t| *t == self).unwrap_or(0)
+    }
+}
+
+/// What a prompt is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NAsk {
+    Connect,
+    PeerLabel,
+    RelayAdd,
+    Offer,
+    Accept,
+    Verify,
+    ExchangeLabel,
+    /// Share with every exchange (false) or the selected one (true).
+    Share(bool),
+    Setting(Setting),
+}
+
+/// Something that needs `y` first.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Confirm {
+    Forget(String),
+    Revoke(String),
+    DropHeld(String),
+}
+
+/// The editable settings, in the order shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Setting {
+    Label,
+    Port,
+    Listen,
+    Mdns,
+    RelayServer,
+    Autostart,
+    Bootstrap,
+}
+
+const SETTINGS: [Setting; 7] =
+    [Setting::Label, Setting::Port, Setting::Listen, Setting::Mdns, Setting::RelayServer, Setting::Autostart, Setting::Bootstrap];
+
+/// A worker's result.
+pub enum Done {
+    Lines(Vec<String>),
+    Remote { exchange: String, title: String, items: Vec<SharedItem> },
+    Fetched { from: String, item: Item },
+    Searched { name: String, results: Vec<client::Origin> },
+}
+
+pub struct Job {
+    pub what: String,
+    rx: mpsc::Receiver<Result<Done, String>>,
+}
+
+/// What another node shares with us (from `L` on an exchange).
+pub struct Remote {
+    pub exchange: String,
+    pub title: String,
+    pub items: Vec<SharedItem>,
+    pub sel: usize,
+}
+
+#[derive(Default)]
+pub struct NetState {
+    pub tab: Tab,
+    pub sel: usize,
+    /// The node this TUI runs (Start node).
+    pub hosted: Option<local::Hosted>,
+    kp: Option<Keypair>,
+    pub ask: Option<Ask<NAsk>>,
+    pub confirm: Option<Confirm>,
+    pub msg: Option<(String, bool)>,
+    /// Lines above the list: a token, details, search results.
+    pub detail: Vec<String>,
+    pub job: Option<Job>,
+    pub remote: Option<Remote>,
+    pub peers: Vec<NetPeer>,
+    pub exchanges: Vec<Exchange>,
+    pub shares: Vec<Share>,
+    pub entrusted: Vec<Entrusted>,
+    pub held: Vec<Held>,
+    pub searches: Vec<LiveSearch>,
+}
+
+impl NetState {
+    pub fn typing(&self) -> bool {
+        self.ask.is_some()
+    }
+    pub fn node_running(&self) -> bool {
+        self.hosted.as_ref().is_some_and(|h| h.node.running())
+    }
+}
+
+fn ok(app: &mut App, m: impl Into<String>) {
+    app.network.msg = Some((m.into(), false));
+}
+
+fn err(app: &mut App, m: impl Into<String>) {
+    app.network.msg = Some((m.into(), true));
+}
+
+/// Open the window on a page.
+pub fn open(app: &mut App, tab: Tab) {
+    let st = &mut app.network;
+    st.ask = None;
+    st.confirm = None;
+    st.msg = None;
+    st.detail.clear();
+    st.remote = None;
+    if st.tab != tab {
+        st.sel = 0;
+    }
+    st.tab = tab;
+    reload(app);
+    app.modal = Some(super::modal::Modal::Network);
+}
+
+fn reload(app: &mut App) {
+    let s = &app.store;
+    let st = &mut app.network;
+    st.peers = s.net_peers().unwrap_or_default();
+    st.exchanges = s.exchanges().unwrap_or_default();
+    st.shares = s.shares().unwrap_or_default();
+    st.entrusted = s.entrusted().unwrap_or_default();
+    st.held = s.held_shards().unwrap_or_default();
+    st.searches = s.live_searches().unwrap_or_default();
+    let n = rows(app);
+    app.network.sel = app.network.sel.min(n.saturating_sub(1));
+}
+
+fn rows(app: &App) -> usize {
+    let st = &app.network;
+    match st.tab {
+        Tab::Node => 0,
+        Tab::Peers => st.peers.len(),
+        Tab::Relays => app.prefs.net.relays.len(),
+        Tab::Exchanges => match &st.remote {
+            Some(r) => r.items.len(),
+            None => st.exchanges.len(),
+        },
+        Tab::Shared => st.shares.len(),
+        Tab::Shards => st.entrusted.len() + st.held.len(),
+        Tab::Search => st.searches.len(),
+        Tab::Settings => SETTINGS.len(),
+    }
+}
+
+fn keypair(app: &mut App) -> crate::Result<Keypair> {
+    if let Some(k) = &app.network.kp {
+        return Ok(k.clone());
+    }
+    let k = identity::load_or_create(&app.store)?;
+    app.network.kp = Some(k.clone());
+    Ok(k)
+}
+
+fn label(app: &App) -> String {
+    local::my_label(&app.store, &app.prefs.net)
+}
+
+/// Start the node with the saved settings (Network ▸ Start node).
+pub fn start(app: &mut App) {
+    if app.network.node_running() {
+        ok(app, "the node is already running");
+        return;
+    }
+    let r = (|| -> crate::Result<local::Hosted> {
+        let kp = keypair(app)?;
+        let service = Store::open(&app.paths.db, Some(&app.dek.0))?;
+        let label = label(app);
+        local::Hosted::start(&app.paths.home, &app.store, service, &kp, &label, &app.prefs.net, ORIGIN)
+    })();
+    match r {
+        Ok(h) => {
+            let m = format!("node {} running as {}", h.label, h.node.peer_id());
+            app.network.hosted = Some(h);
+            app.refresh_history(true);
+            app.set_status(m.clone());
+            ok(app, m);
+        }
+        Err(e) => {
+            app.set_status(format!("node: {e}"));
+            err(app, e.to_string());
+        }
+    }
+}
+
+/// Stop the node this TUI runs, or ask the one another process runs to stop.
+pub fn stop(app: &mut App) {
+    if let Some(h) = app.network.hosted.take() {
+        h.stop(&app.store, ORIGIN);
+        app.refresh_history(true);
+        app.set_status("node stopped");
+        ok(app, "node stopped");
+    } else if local::running(&app.paths.home).is_some() {
+        match local::request_stop(&app.paths.home) {
+            Ok(()) => ok(app, "asked the running node to stop"),
+            Err(e) => err(app, e.to_string()),
+        }
+    } else {
+        ok(app, "no node is running");
+    }
+}
+
+/// Between frames: keep the node's file fresh and take finished work.
+pub fn poll(app: &mut App) {
+    if let Some(h) = app.network.hosted.as_mut()
+        && !h.tick(&app.store)
+    {
+        let h = app.network.hosted.take().expect("hosted");
+        h.stop(&app.store, ORIGIN);
+        app.set_status("node stopped");
+        app.refresh_history(true);
+    }
+    let Some(job) = app.network.job.as_ref() else { return };
+    let r = match job.rx.try_recv() {
+        Ok(r) => r,
+        Err(mpsc::TryRecvError::Empty) => return,
+        Err(mpsc::TryRecvError::Disconnected) => Err("the network task stopped".into()),
+    };
+    let what = app.network.job.take().map(|j| j.what).unwrap_or_default();
+    app.refresh_history(true);
+    reload(app);
+    match r {
+        Err(e) => {
+            app.set_status(format!("{what}: {e}"));
+            err(app, format!("{what}: {e}"));
+        }
+        Ok(Done::Lines(lines)) => {
+            let first = lines.first().cloned().unwrap_or_else(|| format!("{what}: done"));
+            app.set_status(first.clone());
+            ok(app, first);
+            app.network.detail = lines;
+        }
+        Ok(Done::Remote { exchange, title, items }) => {
+            let n = items.len();
+            app.network.remote = Some(Remote { exchange, title: title.clone(), items, sel: 0 });
+            app.network.detail.clear();
+            ok(app, format!("{title} shares {n} item(s) with you: Enter imports one, Esc goes back"));
+        }
+        Ok(Done::Fetched { from, item }) => match client::import_item(&mut app.store, &item, &from, ORIGIN) {
+            Ok(m) => {
+                app.refresh_history(true);
+                app.set_status(m.clone());
+                ok(app, m);
+            }
+            Err(e) => err(app, format!("import: {e}")),
+        },
+        Ok(Done::Searched { name, results }) => {
+            let total: usize = results.iter().map(|o| o.found.len()).sum();
+            let nodes = results.iter().filter(|o| o.error.is_none()).count();
+            let mut lines = vec![];
+            for o in &results {
+                if let Some(e) = &o.error {
+                    lines.push(format!("{}: {e}", o.origin));
+                }
+                for f in &o.found {
+                    lines.push(format!("{:<12} {}", o.origin, f.line()));
+                }
+                if o.truncated {
+                    lines.push(format!("{}: more results than the limit", o.origin));
+                }
+            }
+            app.network.detail = lines;
+            ok(app, format!("{name}: {total} match(es) from {nodes} node(s)"));
+        }
+    }
+}
+
+/// Run network work on a worker thread with its own store connection and the TUI's
+/// node (else a short-lived one with the same identity).
+fn spawn(app: &mut App, what: &str, f: impl FnOnce(&mut Store, &Node) -> crate::Result<Done> + Send + 'static) {
+    if app.network.job.is_some() {
+        err(app, "still working on the last request");
+        return;
+    }
+    let kp = match keypair(app) {
+        Ok(k) => k,
+        Err(e) => return err(app, e.to_string()),
+    };
+    let node = app.network.hosted.as_ref().filter(|h| h.node.running()).map(|h| h.node.clone());
+    let (db, dek, label, prefs) = (app.paths.db.clone(), app.dek.clone(), label(app), app.prefs.net.clone());
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let r = (|| -> crate::Result<Done> {
+            let mut s = Store::open(&db, Some(&dek.0))?;
+            let node = match node {
+                Some(n) => n,
+                None => Arc::new(local::ephemeral(&kp, Store::open(&db, Some(&dek.0))?, &label, &prefs)?),
+            };
+            f(&mut s, &node)
+        })();
+        let _ = tx.send(r.map_err(|e| e.to_string()));
+    });
+    app.network.job = Some(Job { what: what.to_string(), rx });
+    ok(app, format!("{what}… (the window stays usable)"));
+}
+
+fn selected_exchange(app: &App) -> Option<Exchange> {
+    (app.network.tab == Tab::Exchanges && app.network.remote.is_none()).then(|| app.network.exchanges.get(app.network.sel).cloned()).flatten()
+}
+
+fn exchange_lines(x: &Exchange, shares: &[Share]) -> Vec<String> {
+    let mut v = vec![
+        format!("{} · {} · {}", x.title(), x.status.as_str(), x.role),
+        format!("id      {}", x.id),
+        format!("peer    {} {}", x.peer_id.as_deref().unwrap_or("-"), x.peer_label),
+    ];
+    if let Some(c) = &x.short_code {
+        v.push(format!("code    {c}  (compare with the other person, then v verifies)"));
+    }
+    if let Some(f) = &x.fingerprint {
+        v.push(format!("key     {f}"));
+    }
+    let shared: Vec<String> = shares.iter().filter(|s| s.applies_to(&x.id)).map(|s| format!("{} {}", s.kind.label(), s.name)).collect();
+    v.push(format!("shared  {}", if shared.is_empty() { "nothing".into() } else { shared.join(", ") }));
+    if x.status == ExchangeStatus::Offered {
+        v.push(String::new());
+        v.push("Offer token (give it to the other person; it holds no secret):".into());
+        v.push(x.offer.clone());
+    }
+    if let (Some(a), "answerer") = (&x.answer, x.role.as_str())
+        && x.status.active()
+    {
+        v.push(String::new());
+        v.push("Answer token (if the offerer has not got it yet):".into());
+        v.push(a.clone());
+    }
+    v
+}
+
+fn setting_value(app: &App, s: Setting) -> String {
+    let p = &app.prefs.net;
+    let onoff = |b: bool| if b { "on" } else { "off" }.to_string();
+    match s {
+        Setting::Label => {
+            if p.label.is_empty() {
+                format!("(author: {})", label(app))
+            } else {
+                p.label.clone()
+            }
+        }
+        Setting::Port => p.port.to_string(),
+        Setting::Listen => {
+            if p.listen.is_empty() {
+                "(all interfaces, TCP + QUIC)".into()
+            } else {
+                p.listen.join(" ")
+            }
+        }
+        Setting::Mdns => onoff(p.mdns),
+        Setting::RelayServer => onoff(p.relay_server),
+        Setting::Autostart => onoff(p.autostart),
+        Setting::Bootstrap => {
+            if p.bootstrap.is_empty() {
+                "(none)".into()
+            } else {
+                p.bootstrap.join(" ")
+            }
+        }
+    }
+}
+
+fn setting_name(s: Setting) -> &'static str {
+    match s {
+        Setting::Label => "label",
+        Setting::Port => "port",
+        Setting::Listen => "listen",
+        Setting::Mdns => "local discovery (mDNS)",
+        Setting::RelayServer => "relay for others",
+        Setting::Autostart => "start with the TUI",
+        Setting::Bootstrap => "bootstrap nodes",
+    }
+}
+
+fn save_net(app: &mut App, what: &str) {
+    app.save_prefs();
+    let p = serde_json::to_value(&app.prefs.net).unwrap_or_default();
+    record(app, "net.config", format!("network settings: {what}"), p);
+    let later = if app.network.node_running() { " (applies when the node starts again)" } else { "" };
+    ok(app, format!("saved {what}{later}"));
+}
+
+fn split_list(v: &str) -> Vec<String> {
+    v.split([' ', ',']).map(str::trim).filter(|s| !s.is_empty()).map(str::to_string).collect()
+}
+
+fn finish_ask(app: &mut App, kind: NAsk, v: String) {
+    let relays = app.prefs.net.relays.clone();
+    match kind {
+        NAsk::Connect => {
+            if v.is_empty() {
+                return;
+            }
+            spawn(app, "connect", move |s, n| {
+                let p = client::hello(s, n, &v, None, &relays)?;
+                Ok(Done::Lines(vec![format!("{} ({}) says hello: {}", p.label, p.short_id(), p.agent)]))
+            });
+        }
+        NAsk::PeerLabel => {
+            let Some(p) = app.network.peers.get(app.network.sel).cloned() else { return };
+            match app.store.label_net_peer(&p.peer_id, &v) {
+                Ok(()) => {
+                    reload(app);
+                    ok(app, format!("peer {} is now {v}", p.short_id()));
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
+        NAsk::RelayAdd => {
+            if v.is_empty() {
+                return;
+            }
+            if let Err(e) = v.parse::<libp2p::Multiaddr>() {
+                return err(app, format!("not an address: {e}"));
+            }
+            if crate::net::node::addr_peer(&v.parse().expect("parsed")).is_none() {
+                return err(app, "a relay address ends in /p2p/PEER_ID");
+            }
+            if !app.prefs.net.relays.contains(&v) {
+                app.prefs.net.relays.push(v.clone());
+            }
+            if let Some(h) = &app.network.hosted {
+                let _ = h.node.add_relay(v.parse().expect("parsed"));
+            }
+            save_net(app, "relays");
+        }
+        NAsk::Offer => {
+            let kp = match keypair(app) {
+                Ok(k) => k,
+                Err(e) => return err(app, e.to_string()),
+            };
+            let my = label(app);
+            let node = app.network.hosted.as_ref().map(|h| h.node.clone());
+            let addrs = local::offer_addrs(&app.paths.home, &app.store, node.as_deref());
+            if v.is_empty() {
+                match client::create(&app.store, None, &kp, "", &my, addrs, None, client::DEFAULT_TTL_MS, &relays, ORIGIN) {
+                    Ok(c) => {
+                        reload(app);
+                        app.refresh_history(true);
+                        app.network.sel = app.network.exchanges.iter().position(|x| x.id == c.exchange.id).unwrap_or(0);
+                        app.network.detail = vec!["Offer token (give it to the other person; it holds no secret):".into(), c.token];
+                        ok(app, "offer made: send the token; a pasted answer (a) completes it");
+                    }
+                    Err(e) => err(app, e.to_string()),
+                }
+            } else {
+                spawn(app, "offer", move |s, n| {
+                    let c = client::create(s, Some(n), &kp, "", &my, addrs, Some(&v), client::DEFAULT_TTL_MS, &relays, ORIGIN)?;
+                    let mut l = vec![client::describe_delivery(&c.delivered).unwrap_or_else(|| "offer made".into())];
+                    l.push("Offer token (if it was not delivered):".into());
+                    l.push(c.token);
+                    Ok(Done::Lines(l))
+                });
+            }
+        }
+        NAsk::Accept => {
+            if v.is_empty() {
+                return;
+            }
+            accept(app, v);
+        }
+        NAsk::Verify => {
+            let Some(x) = selected_exchange(app) else { return };
+            match client::verify(&app.store, &x.id, &v, ORIGIN) {
+                Ok(x) => {
+                    reload(app);
+                    app.refresh_history(true);
+                    ok(app, format!("{} verified", x.title()));
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
+        NAsk::ExchangeLabel => {
+            let Some(x) = selected_exchange(app) else { return };
+            match app.store.label_exchange(&x.id, &v) {
+                Ok(()) => {
+                    reload(app);
+                    ok(app, "label saved");
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
+        NAsk::Share(one) => {
+            let (k, name) = v.split_once(' ').map(|(a, b)| (a.trim(), b.trim())).unwrap_or((v.as_str(), ""));
+            let Some(kind) = ShareKind::parse(k) else {
+                return err(app, format!("what kind is {k:?}? model, search, journal, project, report or code"));
+            };
+            if name.is_empty() {
+                return err(app, "name the item after its kind, e.g. journal Field notes");
+            }
+            let with: Vec<String> = if one { selected_exchange(app).map(|x| vec![x.id]).unwrap_or_default() } else { vec![] };
+            match client::share(&app.store, kind, name, &with, ORIGIN) {
+                Ok(v) => {
+                    reload(app);
+                    app.refresh_history(true);
+                    let new = v.iter().filter(|(_, n)| *n).count();
+                    let to = if one { "this exchange" } else { "every exchange" };
+                    ok(app, if new > 0 { format!("shared {} {name} with {to}", kind.label()) } else { "already shared".into() });
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
+        NAsk::Setting(s) => {
+            let p = &mut app.prefs.net;
+            match s {
+                Setting::Label => p.label = v,
+                Setting::Port => match v.parse() {
+                    Ok(n) => p.port = n,
+                    Err(_) => return err(app, "a port is a number from 0 to 65535 (0: any)"),
+                },
+                Setting::Listen | Setting::Bootstrap => {
+                    let list = split_list(&v);
+                    if let Some(bad) = list.iter().find(|a| a.parse::<libp2p::Multiaddr>().is_err()) {
+                        return err(app, format!("not an address: {bad}"));
+                    }
+                    if s == Setting::Listen {
+                        p.listen = list;
+                    } else {
+                        p.bootstrap = list;
+                    }
+                }
+                _ => return,
+            }
+            save_net(app, setting_name(s));
+        }
+    }
+}
+
+fn accept(app: &mut App, input: String) {
+    let kp = match keypair(app) {
+        Ok(k) => k,
+        Err(e) => return err(app, e.to_string()),
+    };
+    let my = label(app);
+    let node = app.network.hosted.as_ref().map(|h| h.node.clone());
+    let addrs = local::offer_addrs(&app.paths.home, &app.store, node.as_deref());
+    spawn(app, "accept", move |s, n| {
+        let a = client::accept(s, Some(n), &kp, &input, "", &my, addrs, ORIGIN)?;
+        let x = &a.exchange;
+        let mut l = vec![format!("exchange with {} is {}", x.title(), x.status.as_str())];
+        if let Some(c) = &x.short_code {
+            l.push(format!("code {c}: compare it with the other person, then v verifies"));
+        }
+        if let Some(d) = client::describe_delivery(&a.delivered) {
+            l.push(format!("answer {d}"));
+        }
+        if let Some(t) = a.answer
+            && !a.delivered.as_ref().is_some_and(|d| d.is_ok())
+        {
+            l.push("Answer token (give it to the offerer):".into());
+            l.push(t);
+        }
+        Ok(Done::Lines(l))
+    });
+}
+
+pub fn on_key(app: &mut App, k: KeyEvent) {
+    if let Some(a) = app.network.ask.as_mut() {
+        match ask_key(a, k) {
+            Typed::Cancel => app.network.ask = None,
+            Typed::Done(v) => {
+                let kind = a.kind;
+                app.network.ask = None;
+                finish_ask(app, kind, v);
+            }
+            Typed::Editing => {}
+        }
+        return;
+    }
+    if let Some(c) = app.network.confirm.take() {
+        if matches!(k.code, KeyCode::Char('y') | KeyCode::Char('Y')) {
+            confirmed(app, c);
+        } else {
+            ok(app, "left as it was");
+        }
+        return;
+    }
+    let n = rows(app);
+    match k.code {
+        KeyCode::Esc => {
+            if app.network.remote.is_some() {
+                app.network.remote = None;
+                app.network.msg = None;
+            } else if !app.network.detail.is_empty() {
+                app.network.detail.clear();
+            } else {
+                app.modal = None;
+            }
+            return;
+        }
+        KeyCode::Tab | KeyCode::Right => return switch(app, (app.network.tab.index() + 1) % Tab::ALL.len()),
+        KeyCode::BackTab | KeyCode::Left => return switch(app, (app.network.tab.index() + Tab::ALL.len() - 1) % Tab::ALL.len()),
+        KeyCode::Char(c @ '1'..='8') => return switch(app, c as usize - '1' as usize),
+        KeyCode::Down | KeyCode::Char('j') => {
+            if let Some(r) = app.network.remote.as_mut() {
+                r.sel = (r.sel + 1).min(r.items.len().saturating_sub(1));
+            } else {
+                app.network.sel = (app.network.sel + 1).min(n.saturating_sub(1));
+            }
+            return;
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            if let Some(r) = app.network.remote.as_mut() {
+                r.sel = r.sel.saturating_sub(1);
+            } else {
+                app.network.sel = app.network.sel.saturating_sub(1);
+            }
+            return;
+        }
+        KeyCode::Char('S') => return start(app),
+        KeyCode::Char('X') => return stop(app),
+        KeyCode::Char('g') => {
+            reload(app);
+            return ok(app, "refreshed");
+        }
+        _ => {}
+    }
+    let ask = |app: &mut App, kind: NAsk, title: &str, v: &str| app.network.ask = Some(Ask::new(kind, title, v));
+    match (app.network.tab, k.code) {
+        (Tab::Node, KeyCode::Char('s') | KeyCode::Enter) => {
+            if app.network.node_running() {
+                stop(app)
+            } else {
+                start(app)
+            }
+        }
+        (Tab::Node, KeyCode::Char('c')) | (Tab::Peers, KeyCode::Char('c')) => {
+            ask(app, NAsk::Connect, "Connect to (address …/p2p/ID or a peer id)", "")
+        }
+        (Tab::Peers, KeyCode::Enter) => {
+            if let Some(p) = app.network.peers.get(app.network.sel) {
+                app.network.detail = vec![
+                    format!("{} · {}", if p.label.is_empty() { p.short_id() } else { &p.label }, p.peer_id),
+                    format!("found by {} · {} · offers {}", p.source, p.agent, client::caps_text(&p.caps)),
+                    format!("first seen {} · last seen {}", fmt_ms(p.first_seen), fmt_ms(p.last_seen)),
+                ];
+                app.network.detail.extend(p.addrs.iter().map(|a| format!("  {a}")));
+            }
+        }
+        (Tab::Peers, KeyCode::Char('l')) => {
+            if let Some(p) = app.network.peers.get(app.network.sel) {
+                let v = p.label.clone();
+                ask(app, NAsk::PeerLabel, "Peer label", &v)
+            }
+        }
+        (Tab::Peers, KeyCode::Char('d')) => {
+            if let Some(p) = app.network.peers.get(app.network.sel) {
+                let (id, short) = (p.peer_id.clone(), p.short_id().to_string());
+                app.network.confirm = Some(Confirm::Forget(id));
+                ok(app, format!("forget peer {short}? (exchanges stay) y/n"));
+            }
+        }
+        (Tab::Relays, KeyCode::Char('a')) => ask(app, NAsk::RelayAdd, "Relay address (…/p2p/ID)", ""),
+        (Tab::Relays, KeyCode::Char('d')) => {
+            let i = app.network.sel;
+            if i < app.prefs.net.relays.len() {
+                app.prefs.net.relays.remove(i);
+                save_net(app, "relays");
+                app.network.sel = i.min(app.prefs.net.relays.len().saturating_sub(1));
+            }
+        }
+        (Tab::Relays, KeyCode::Char('r')) => {
+            app.prefs.net.relay_server = !app.prefs.net.relay_server;
+            save_net(app, "relay for others");
+        }
+        (Tab::Exchanges, _) if app.network.remote.is_some() => {
+            if k.code == KeyCode::Enter {
+                let r = app.network.remote.as_ref().expect("remote");
+                let Some(it) = r.items.get(r.sel).cloned() else { return };
+                let Some(x) = app.network.exchanges.iter().find(|x| x.id == r.exchange).cloned() else { return };
+                let relays = app.prefs.net.relays.clone();
+                spawn(app, "fetch", move |s, n| {
+                    let item = client::fetch(s, n, &x, &it.id, None, &relays, ORIGIN)?;
+                    Ok(Done::Fetched { from: x.title(), item })
+                });
+            }
+        }
+        (Tab::Exchanges, KeyCode::Char('n')) => ask(app, NAsk::Offer, "Offer to (address or peer; empty: just make a token)", ""),
+        (Tab::Exchanges, KeyCode::Char('a')) => match selected_exchange(app) {
+            Some(x) if x.status == ExchangeStatus::Incoming => accept(app, x.id),
+            _ => ask(app, NAsk::Accept, "Paste an offer or answer token", ""),
+        },
+        (Tab::Exchanges, KeyCode::Enter) => {
+            if let Some(x) = selected_exchange(app) {
+                app.network.detail = exchange_lines(&x, &app.network.shares);
+            }
+        }
+        (Tab::Exchanges, KeyCode::Char('v')) => {
+            if let Some(x) = selected_exchange(app) {
+                if !x.status.active() {
+                    return err(app, format!("{} is {}: nothing to verify yet", x.title(), x.status.as_str()));
+                }
+                ask(app, NAsk::Verify, "Short code the other person reads you", "")
+            }
+        }
+        (Tab::Exchanges, KeyCode::Char('l')) => {
+            if let Some(x) = selected_exchange(app) {
+                ask(app, NAsk::ExchangeLabel, "Exchange label", &x.label)
+            }
+        }
+        (Tab::Exchanges, KeyCode::Char('r')) => {
+            if let Some(x) = selected_exchange(app) {
+                let t = x.title();
+                app.network.confirm = Some(Confirm::Revoke(x.id));
+                ok(app, format!("revoke the exchange with {t}? Nothing more is shared over it. y/n"));
+            }
+        }
+        (Tab::Exchanges, KeyCode::Char('s')) => {
+            if selected_exchange(app).is_some_and(|x| x.status.active()) {
+                ask(app, NAsk::Share(true), "Share with this exchange (kind name: journal Field notes)", "")
+            } else {
+                err(app, "only a complete exchange can carry shares")
+            }
+        }
+        (Tab::Exchanges, KeyCode::Char('L')) => {
+            let Some(x) = selected_exchange(app) else { return };
+            if !x.status.active() {
+                return err(app, format!("{} is {}", x.title(), x.status.as_str()));
+            }
+            let relays = app.prefs.net.relays.clone();
+            spawn(app, "list", move |s, n| {
+                let items = client::remote_list(s, n, &x, &relays)?;
+                Ok(Done::Remote { exchange: x.id.clone(), title: x.title(), items })
+            });
+        }
+        (Tab::Exchanges, KeyCode::Char('e')) => {
+            app.network.detail = super::modal::cli_hint(
+                "net exchange export --out FILE",
+                "Exchange backups are encrypted with your export password, which the TUI never asks for.",
+            );
+        }
+        (Tab::Shared, KeyCode::Char('a')) => ask(app, NAsk::Share(false), "Share with every exchange (kind name: journal Field notes)", ""),
+        (Tab::Shared, KeyCode::Char('d')) => {
+            let Some(sh) = app.network.shares.get(app.network.sel).cloned() else { return };
+            let with: Vec<String> = sh.exchange_id.clone().into_iter().collect();
+            match client::unshare(&app.store, sh.kind, &sh.ref_id, &with, ORIGIN) {
+                Ok(_) => {
+                    reload(app);
+                    app.refresh_history(true);
+                    ok(app, format!("stopped sharing {} {}", sh.kind.label(), sh.name));
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
+        (Tab::Shards, KeyCode::Char('e')) => {
+            app.network.detail = super::modal::cli_hint(
+                "net shard entrust --to PEER --to PEER [--threshold K]",
+                "Entrusting needs your master key (words or password), which never passes through the TUI.",
+            );
+        }
+        (Tab::Shards, KeyCode::Char('r')) => {
+            app.network.detail = super::modal::cli_hint(
+                "net shard restore [--backup EXCHANGES.age]",
+                "Restoring gathers shards from your peers with your shard password, outside the TUI.",
+            );
+        }
+        (Tab::Shards, KeyCode::Char('d')) => {
+            let i = app.network.sel.checked_sub(app.network.entrusted.len());
+            if let Some(h) = i.and_then(|i| app.network.held.get(i)) {
+                let (id, who) = (h.id.clone(), h.owner_label.clone());
+                app.network.confirm = Some(Confirm::DropHeld(id));
+                ok(app, format!("drop the shard you hold for {who}? They may need it to recover. y/n"));
+            } else {
+                err(app, "only shards you hold for others can be dropped here");
+            }
+        }
+        (Tab::Search, KeyCode::Enter) => {
+            let Some(ls) = app.network.searches.get(app.network.sel).cloned() else { return };
+            let relays = app.prefs.net.relays.clone();
+            spawn(app, "search", move |s, n| {
+                let results = client::search(s, Some(n), &ls.spec, &[], true, 200, &relays, ORIGIN)?;
+                Ok(Done::Searched { name: ls.name, results })
+            });
+        }
+        (Tab::Settings, KeyCode::Enter | KeyCode::Char(' ')) => {
+            let s = SETTINGS[app.network.sel.min(SETTINGS.len() - 1)];
+            let p = &mut app.prefs.net;
+            match s {
+                Setting::Mdns => p.mdns = !p.mdns,
+                Setting::RelayServer => p.relay_server = !p.relay_server,
+                Setting::Autostart => p.autostart = !p.autostart,
+                _ => {
+                    let v = match s {
+                        Setting::Label => p.label.clone(),
+                        Setting::Port => p.port.to_string(),
+                        Setting::Listen => p.listen.join(" "),
+                        _ => p.bootstrap.join(" "),
+                    };
+                    let title = format!("{} (empty: default)", setting_name(s));
+                    return ask(app, NAsk::Setting(s), &title, &v);
+                }
+            }
+            save_net(app, setting_name(s));
+        }
+        _ => {}
+    }
+}
+
+fn confirmed(app: &mut App, c: Confirm) {
+    match c {
+        Confirm::Forget(id) => match app.store.remove_net_peer(&id) {
+            Ok(_) => {
+                reload(app);
+                ok(app, "peer forgotten");
+            }
+            Err(e) => err(app, e.to_string()),
+        },
+        Confirm::Revoke(id) => {
+            let relays = app.prefs.net.relays.clone();
+            spawn(app, "revoke", move |s, n| {
+                let (x, told) = client::revoke(s, Some(n), &id, &relays, ORIGIN)?;
+                let t = match told {
+                    Some(Ok(())) => "they were told".to_string(),
+                    Some(Err(e)) => format!("they could not be told ({e})"),
+                    None => "nothing to tell".into(),
+                };
+                Ok(Done::Lines(vec![format!("revoked the exchange with {}; {t}", x.title())]))
+            });
+        }
+        Confirm::DropHeld(id) => match app.store.drop_held_shard(&id) {
+            Ok(_) => {
+                record(app, "net.shard.drop", "dropped a held shard".into(), serde_json::json!({ "shard": id }));
+                reload(app);
+                ok(app, "shard dropped");
+            }
+            Err(e) => err(app, e.to_string()),
+        },
+    }
+}
+
+fn switch(app: &mut App, i: usize) {
+    let tab = Tab::ALL[i.min(Tab::ALL.len() - 1)];
+    open(app, tab);
+}
+
+pub fn on_click(app: &mut App, i: usize) {
+    if app.network.ask.is_some() {
+        return;
+    }
+    if let Some(r) = app.network.remote.as_mut() {
+        if r.sel == i {
+            on_key(app, KeyEvent::from(KeyCode::Enter));
+        } else if i < r.items.len() {
+            r.sel = i;
+        }
+        return;
+    }
+    if app.network.sel == i {
+        on_key(app, KeyEvent::from(KeyCode::Enter));
+    } else if i < rows(app) {
+        app.network.sel = i;
+        app.network.detail.clear();
+    }
+}
+
+fn fmt_ms(ms: i64) -> String {
+    crate::ingest::time::fmt_ts(ms)
+}
+
+fn node_lines(app: &App) -> Vec<String> {
+    let mut v = vec![];
+    let other = local::running(&app.paths.home).filter(|f| f.pid != std::process::id());
+    let st = match (&app.network.hosted, &other) {
+        (Some(h), _) => {
+            v.push(format!("● running here as {}", h.label));
+            Some(h.node.status())
+        }
+        (None, Some(f)) => {
+            v.push(format!("● running in another process (pid {}) as {}", f.pid, f.label));
+            Some(f.status.clone())
+        }
+        (None, None) => {
+            v.push("○ stopped: S starts it (nothing is shared until you share it)".into());
+            None
+        }
+    };
+    let id = identity::peer_id(&app.store).ok().flatten();
+    match &id {
+        Some(p) => v.push(format!("peer id   {p}")),
+        None => v.push("peer id   (made when the node first starts)".into()),
+    }
+    if let Some(s) = st {
+        v.push(format!("NAT       {}", if s.nat.is_empty() { "unknown" } else { &s.nat }));
+        v.push(format!("peers     {} connected", s.connected.len()));
+        v.push(format!(
+            "relay     {}{}",
+            if s.relay_server { "serving others" } else { "not serving" },
+            if s.reservations.is_empty() { String::new() } else { format!(" · reserved on {}", s.reservations.len()) }
+        ));
+        v.push(format!("mDNS      {}", if s.mdns { "on" } else { "off" }));
+        v.push("reachable at:".into());
+        let addrs = local::reachable(&s);
+        if addrs.is_empty() {
+            v.push("  (no address others can dial yet)".into());
+        }
+        v.extend(addrs.into_iter().map(|a| format!("  {a}")));
+    }
+    let active = app.network.exchanges.iter().filter(|x| x.status.active()).count();
+    v.push(format!("exchanges {active} active · shared items {} · shards held for others {}", app.network.shares.len(), app.network.held.len()));
+    v
+}
+
+pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) {
+    let t = app.theme.clone();
+    let st = &app.network;
+    let tabs: Vec<String> = Tab::ALL
+        .iter()
+        .enumerate()
+        .map(|(i, x)| if *x == st.tab { format!("[{} {}]", i + 1, x.title()) } else { format!(" {} {} ", i + 1, x.title()) })
+        .collect();
+    let busy = st.job.as_ref().map(|j| format!(" · {}…", j.what)).unwrap_or_default();
+    let mut v = View::new(format!("Network · {}{busy}", st.tab.title()));
+    v.head.push(Line::styled(tabs.join(" "), Style::new().fg(t.accent)));
+    v.head.push(Line::raw(""));
+    let fg = Style::new().fg(t.fg);
+    match st.tab {
+        Tab::Node => {
+            for l in node_lines(app) {
+                v.head.push(Line::styled(format!(" {l}"), fg));
+            }
+        }
+        Tab::Peers => {
+            if st.peers.is_empty() {
+                v.head.push(muted(&t, " no peers yet: start the node (S) to find some nearby, or c connects to an address"));
+            }
+            for (i, p) in st.peers.iter().enumerate() {
+                let name = if p.label.is_empty() { "-" } else { &p.label };
+                v.rows.push(Line::from(vec![
+                    Span::styled(format!(" {:<18} {:<9}", name, p.short_id()), row_style(&t, i == st.sel)),
+                    Span::styled(format!(" {:<9} {}", p.source, client::caps_text(&p.caps)), Style::new().fg(t.muted)),
+                ]));
+            }
+        }
+        Tab::Relays => {
+            v.head.push(Line::styled(
+                format!(" relay for others: {} (r toggles; applies at the next start)", if app.prefs.net.relay_server { "on" } else { "off" }),
+                fg,
+            ));
+            let known: Vec<&NetPeer> = st.peers.iter().filter(|p| p.is_relay()).collect();
+            if !known.is_empty() {
+                v.head.push(muted(&t, format!(" known relays: {}", known.iter().map(|p| p.short_id()).collect::<Vec<_>>().join(", "))));
+            }
+            if app.prefs.net.relays.is_empty() {
+                v.head.push(muted(&t, " no relays configured: a adds one (…/p2p/ID) so nodes behind NAT can reach you"));
+            } else {
+                v.head.push(muted(&t, " relays used for reservations:"));
+            }
+            for (i, a) in app.prefs.net.relays.iter().enumerate() {
+                v.rows.push(Line::styled(format!(" {a}"), row_style(&t, i == st.sel)));
+            }
+        }
+        Tab::Exchanges => {
+            if let Some(rm) = &st.remote {
+                v.head.push(Line::styled(format!(" shared by {}:", rm.title), fg));
+                if rm.items.is_empty() {
+                    v.head.push(muted(&t, " nothing shared with you yet"));
+                }
+                for (i, it) in rm.items.iter().enumerate() {
+                    v.rows.push(Line::from(vec![
+                        Span::styled(format!(" {:<11} {}", it.kind.label(), it.name), row_style(&t, i == rm.sel)),
+                        Span::styled(format!("  {}", it.about), Style::new().fg(t.muted)),
+                    ]));
+                }
+            } else {
+                if st.exchanges.is_empty() {
+                    v.head.push(muted(&t, " no key exchanges yet: n makes an offer, a accepts one"));
+                }
+                for (i, x) in st.exchanges.iter().enumerate() {
+                    let mark = match x.status {
+                        ExchangeStatus::Verified => "✓",
+                        ExchangeStatus::Complete => "●",
+                        ExchangeStatus::Revoked => "✗",
+                        _ => "○",
+                    };
+                    v.rows.push(Line::from(vec![
+                        Span::styled(format!(" {mark} "), Style::new().fg(if x.status.active() { t.accent } else { t.muted })),
+                        Span::styled(format!("{:<20} {:<9}", x.title(), x.status.as_str()), row_style(&t, i == st.sel)),
+                        Span::styled(format!(" {} {}", x.short_id(), x.short_code.as_deref().unwrap_or("")), Style::new().fg(t.muted)),
+                    ]));
+                }
+            }
+        }
+        Tab::Shared => {
+            if st.shares.is_empty() {
+                v.head.push(muted(&t, " nothing is shared: a shares an item with every exchange (s on an exchange: just that one)"));
+            }
+            for (i, s) in st.shares.iter().enumerate() {
+                let with = match &s.exchange_id {
+                    None => "every exchange".to_string(),
+                    Some(e) => st.exchanges.iter().find(|x| &x.id == e).map(|x| x.title()).unwrap_or_else(|| e.clone()),
+                };
+                v.rows.push(Line::from(vec![
+                    Span::styled(format!(" {:<11} {:<24}", s.kind.label(), s.name), row_style(&t, i == st.sel)),
+                    Span::styled(format!(" with {with}"), Style::new().fg(t.muted)),
+                ]));
+            }
+        }
+        Tab::Shards => {
+            v.head.push(muted(&t, " Shards of your master key, sealed with your shard password; peers never see them in plain."));
+            if st.entrusted.is_empty() && st.held.is_empty() {
+                v.head.push(muted(&t, " none yet: e shows how to entrust shards to peers you verified"));
+            }
+            let mut i = 0;
+            for e in &st.entrusted {
+                let to = st.exchanges.iter().find(|x| x.id == e.exchange_id).map(|x| x.title()).unwrap_or_else(|| e.peer_id.clone());
+                v.rows.push(Line::from(vec![
+                    Span::styled(
+                        format!(" entrusted  {}/{} of set {} ", e.index, e.total, crate::store::short(&e.set_id)),
+                        row_style(&t, i == st.sel),
+                    ),
+                    Span::styled(format!(" to {to} · any {} restore", e.threshold), Style::new().fg(t.muted)),
+                ]));
+                i += 1;
+            }
+            for h in &st.held {
+                v.rows.push(Line::from(vec![
+                    Span::styled(
+                        format!(" holding    {}/{} of set {} ", h.index, h.total, crate::store::short(&h.set_id)),
+                        row_style(&t, i == st.sel),
+                    ),
+                    Span::styled(format!(" for {} · since {}", h.owner_label, fmt_ms(h.stored_at)), Style::new().fg(t.muted)),
+                ]));
+                i += 1;
+            }
+        }
+        Tab::Search => {
+            if st.searches.is_empty() {
+                v.head.push(muted(&t, " no saved live searches: save one (B) and run it here across your peers"));
+            } else {
+                v.head.push(muted(&t, " Enter runs a saved search here and on every peer; each peer searches only what it shares with you"));
+            }
+            for (i, s) in st.searches.iter().enumerate() {
+                v.rows.push(Line::styled(format!(" {}", s.name), row_style(&t, i == st.sel)));
+            }
+        }
+        Tab::Settings => {
+            v.head.push(muted(&t, " Enter edits or toggles · saved to preferences · the node uses them when it starts"));
+            for (i, s) in SETTINGS.iter().enumerate() {
+                v.rows.push(Line::from(vec![
+                    Span::styled(format!(" {:<24}", setting_name(*s)), row_style(&t, i == st.sel)),
+                    Span::styled(format!(" {}", setting_value(app, *s)), Style::new().fg(t.muted)),
+                ]));
+            }
+        }
+    }
+    if !st.detail.is_empty() {
+        v.head.push(Line::raw(""));
+        for d in &st.detail {
+            v.head.push(Line::styled(format!(" {d}"), fg));
+        }
+    }
+    v.sel = match &st.remote {
+        Some(r) if st.tab == Tab::Exchanges => (!r.items.is_empty()).then_some(r.sel),
+        _ => (!v.rows.is_empty()).then_some(st.sel),
+    };
+    v.ask = st.ask.as_ref().map(|a| (a.title.clone(), a.value.clone()));
+    v.msg = st.msg.clone();
+    let mut keys: Vec<(&'static str, KeyCode)> = vec![("Tab page", KeyCode::Tab)];
+    keys.extend(match st.tab {
+        Tab::Node => vec![("S start", KeyCode::Char('S')), ("X stop", KeyCode::Char('X')), ("c connect", KeyCode::Char('c'))],
+        Tab::Peers => {
+            vec![("Enter show", KeyCode::Enter), ("c connect", KeyCode::Char('c')), ("l label", KeyCode::Char('l')), ("d forget", KeyCode::Char('d'))]
+        }
+        Tab::Relays => vec![("a add", KeyCode::Char('a')), ("d remove", KeyCode::Char('d')), ("r serve", KeyCode::Char('r'))],
+        Tab::Exchanges if st.remote.is_some() => vec![("Enter import", KeyCode::Enter)],
+        Tab::Exchanges => vec![
+            ("Enter show", KeyCode::Enter),
+            ("n offer", KeyCode::Char('n')),
+            ("a accept", KeyCode::Char('a')),
+            ("v verify", KeyCode::Char('v')),
+            ("s share", KeyCode::Char('s')),
+            ("L their items", KeyCode::Char('L')),
+            ("l label", KeyCode::Char('l')),
+            ("r revoke", KeyCode::Char('r')),
+            ("e export", KeyCode::Char('e')),
+        ],
+        Tab::Shared => vec![("a share", KeyCode::Char('a')), ("d unshare", KeyCode::Char('d'))],
+        Tab::Shards => vec![("e entrust", KeyCode::Char('e')), ("r restore", KeyCode::Char('r')), ("d drop held", KeyCode::Char('d'))],
+        Tab::Search => vec![("Enter run", KeyCode::Enter)],
+        Tab::Settings => vec![("Enter edit", KeyCode::Enter)],
+    });
+    keys.push(("Esc", KeyCode::Esc));
+    v.keys = keys;
+    draw_view(f, r, v, &t, hits);
+}
+
+/// Start the node when the TUI opens, if asked to in the settings.
+pub fn autostart(app: &mut App) {
+    if app.prefs.net.autostart && local::running(&app.paths.home).is_none() {
+        start(app);
+    }
+}
+
+/// Stop our node when the TUI closes.
+pub fn shutdown(app: &mut App) {
+    if let Some(h) = app.network.hosted.take() {
+        h.stop(&app.store, ORIGIN);
+    }
+}

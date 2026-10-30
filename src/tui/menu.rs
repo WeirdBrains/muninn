@@ -157,6 +157,24 @@ pub fn menus() -> Vec<Menu> {
             ],
         },
         Menu {
+            title: "Network",
+            mnemonic: 'n',
+            items: vec![
+                a("Node status…", 'n', "K", NetStatus),
+                a("Start node", 's', "", NetStart),
+                a("Stop node", 't', "", NetStop),
+                sep(),
+                a("Peers…", 'p', "", NetPeers),
+                a("Relays…", 'r', "", NetRelays),
+                a("Key exchanges…", 'k', "", NetExchanges),
+                a("Shared data…", 'd', "", NetShared),
+                a("Dark shards…", 'h', "", NetShards),
+                a("Network search…", 'e', "", NetSearch),
+                sep(),
+                a("Settings…", 'g', "", NetSettings),
+            ],
+        },
+        Menu {
             title: "Keys",
             mnemonic: 'k',
             items: vec![
