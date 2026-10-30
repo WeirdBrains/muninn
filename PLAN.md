@@ -291,7 +291,7 @@ Preferences (`preferences.toml`) are not synced yet; each node keeps its own. Ot
 
 ## Python in Rust
 
-> **Phase 13 · v2.12.0 · 📋 Planned**
+> **Phase 13 · v2.12.0 · ✅ Released**
 
 Python code spaces need nothing but Muninn.
 
