@@ -22,6 +22,12 @@ name = "muninn"
 path = "src/lib.rs"
 
 [dependencies]
+# Python code spaces: parsed in pure Rust (ruff, pinned) and translated with the vendored
+# python-ast code generation (no pyo3, no libpython); see vendor/python-ast/VENDORED.md
+ruff_python_parser = "=0.0.20"
+ruff_python_ast = "=0.0.20"
+ruff_text_size = "=0.0.20"
+python-ast = { path = "vendor/python-ast" }
 clap = { version = "4.6", features = ["env", "string", "unicode", "derive", "cargo"] }
 clap_mangen = "0.2"
 polars = { version = "0.55", features = ["lazy", "csv", "json", "parquet", "dtype-datetime", "strings", "temporal"] }
@@ -139,3 +145,6 @@ assets = [
 # Release binaries ship without symbols (smaller; packagers need not strip).
 [profile.release]
 strip = "symbols"
+
+[workspace]
+exclude = ["vendor/python-ast"]

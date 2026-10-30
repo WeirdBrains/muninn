@@ -1,0 +1,167 @@
+//! Options for Python compilation.
+
+use std::{
+    collections::{BTreeMap, HashSet},
+    default::Default,
+};
+use std::ffi::CString;
+
+/// Supported async runtimes for Python async code generation
+#[derive(Clone, Debug, PartialEq)]
+pub enum AsyncRuntime {
+    /// Tokio runtime (default)
+    Tokio,
+    /// async-std runtime
+    AsyncStd,
+    /// smol runtime
+    Smol,
+    /// Custom runtime with specified attribute and import
+    Custom {
+        /// The attribute to use (e.g., "tokio::main", "async_std::main")
+        attribute: String,
+        /// The import to add (e.g., "tokio", "async_std")
+        import: String,
+    },
+}
+
+impl Default for AsyncRuntime {
+    fn default() -> Self {
+        AsyncRuntime::Tokio
+    }
+}
+
+impl AsyncRuntime {
+    /// Get the attribute string for the async main function
+    pub fn main_attribute(&self) -> &str {
+        match self {
+            AsyncRuntime::Tokio => "tokio::main",
+            AsyncRuntime::AsyncStd => "async_std::main",
+            AsyncRuntime::Smol => "smol::main",
+            AsyncRuntime::Custom { attribute, .. } => attribute,
+        }
+    }
+
+    /// Get the import string for the runtime
+    pub fn import(&self) -> &str {
+        match self {
+            AsyncRuntime::Tokio => "tokio",
+            AsyncRuntime::AsyncStd => "async_std",
+            AsyncRuntime::Smol => "smol",
+            AsyncRuntime::Custom { import, .. } => import,
+        }
+    }
+}
+
+
+/// The global context for Python compilation.
+#[derive(Clone, Debug)]
+pub struct PythonOptions {
+    /// Python imports are mapped into a given namespace that can be changed.
+    pub python_namespace: String,
+
+    /// The default path we will search for Python modules.
+    pub python_path: Vec<String>,
+
+    /// Collects all of the things we need to compile imports[module][asnames]
+    pub imports: BTreeMap<String, HashSet<String>>,
+
+
+    pub stdpython: String,
+    pub with_std_python: bool,
+
+    pub allow_unsafe: bool,
+
+    /// The async runtime to use for async Python code
+    pub async_runtime: AsyncRuntime,
+
+    /// Emit #[deprecated] notes on generated items whose conversion was
+    /// lossy (dropped parameter defaults, ignored return annotations, ...).
+    /// On by default: silent semantic divergence from the Python source is
+    /// exactly what these warnings exist to surface. Tools may disable this
+    /// to suppress the warnings at the user's explicit request.
+    pub lossy_warnings: bool,
+
+    /// Names in the CURRENT scope that hold an Option (assigned None on
+    /// some path, or annotated Optional): non-None stores into them wrap
+    /// in Some. Set per scope by the function/module generators.
+    pub optional_names: std::rc::Rc<std::collections::HashSet<String>>,
+
+    /// Whether the CURRENT function's return annotation is `str`: returning
+    /// an attribute chain then clones the String field out of the shared
+    /// receiver. Python strings are immutable, so the clone reproduces
+    /// Python's aliasing semantics exactly. Set per function.
+    pub clone_str_attribute_returns: bool,
+
+    /// Statically-known types of names in the CURRENT scope (parameter
+    /// annotations and literal assignments), as canonical Python type
+    /// names ("int", "float", "str", "bool"). Set per function; consumed
+    /// by isinstance(), which lowers to a constant.
+    pub local_types:
+        std::rc::Rc<std::collections::HashMap<String, String>>,
+
+    /// Target stdpython's no_std (alloc) tier. Python constructs that need
+    /// the OS — print/input/open, imports of os/datetime/random/…, and
+    /// `__main__` entry points — fail loudly at conversion time instead of
+    /// surfacing as resolution errors when the generated crate builds.
+    pub no_std: bool,
+}
+
+impl Default for PythonOptions {
+    fn default() -> Self {
+        Self {
+            python_namespace: String::from("__python_namespace__"),
+            // no embedded interpreter: there is no sys.path to ask
+            python_path: Vec::new(),
+            imports: BTreeMap::new(),
+
+            stdpython: "stdpython".to_string(),
+            with_std_python: true,
+            allow_unsafe: false,
+            async_runtime: AsyncRuntime::default(),
+            lossy_warnings: true,
+            optional_names: std::rc::Rc::new(std::collections::HashSet::new()),
+            clone_str_attribute_returns: false,
+            local_types: std::rc::Rc::new(std::collections::HashMap::new()),
+            no_std: false,
+        }
+    }
+}
+
+impl PythonOptions {
+    /// Create PythonOptions with tokio runtime (default)
+    pub fn with_tokio() -> Self {
+        let mut options = Self::default();
+        options.async_runtime = AsyncRuntime::Tokio;
+        options
+    }
+
+    /// Create PythonOptions with async-std runtime
+    pub fn with_async_std() -> Self {
+        let mut options = Self::default();
+        options.async_runtime = AsyncRuntime::AsyncStd;
+        options
+    }
+
+    /// Create PythonOptions with smol runtime
+    pub fn with_smol() -> Self {
+        let mut options = Self::default();
+        options.async_runtime = AsyncRuntime::Smol;
+        options
+    }
+
+    /// Create PythonOptions with a custom async runtime
+    pub fn with_custom_runtime(attribute: impl Into<String>, import: impl Into<String>) -> Self {
+        let mut options = Self::default();
+        options.async_runtime = AsyncRuntime::Custom {
+            attribute: attribute.into(),
+            import: import.into(),
+        };
+        options
+    }
+
+    /// Set the async runtime for these options
+    pub fn set_async_runtime(&mut self, runtime: AsyncRuntime) -> &mut Self {
+        self.async_runtime = runtime;
+        self
+    }
+}

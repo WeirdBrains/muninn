@@ -1,0 +1,453 @@
+use proc_macro2::TokenStream;
+use quote::quote;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    CodeGen, CodeGenContext, ExprType, Node, PythonOptions, Statement, SymbolTableScopes,
+    };
+
+/// Try statement (try/except/else/finally)
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Try {
+    /// The main body of the try block
+    pub body: Vec<Statement>,
+    /// Exception handlers (except clauses)
+    pub handlers: Vec<ExceptHandler>,
+    /// Optional else clause body (executed when no exception occurs)
+    pub orelse: Vec<Statement>,
+    /// Optional finally clause body (always executed)
+    pub finalbody: Vec<Statement>,
+    /// Position information
+    pub lineno: Option<usize>,
+    pub col_offset: Option<usize>,
+    pub end_lineno: Option<usize>,
+    pub end_col_offset: Option<usize>,
+}
+
+/// Exception handler (except clause)
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ExceptHandler {
+    /// The exception type to catch (None means catch all)
+    pub exception_type: Option<ExprType>,
+    /// Variable name to bind the exception to (optional)
+    pub name: Option<String>,
+    /// Body of the except clause
+    pub body: Vec<Statement>,
+    /// Position information
+    pub lineno: Option<usize>,
+    pub col_offset: Option<usize>,
+    pub end_lineno: Option<usize>,
+    pub end_col_offset: Option<usize>,
+}
+
+
+
+impl Node for Try {
+    fn lineno(&self) -> Option<usize> { self.lineno }
+    fn col_offset(&self) -> Option<usize> { self.col_offset }
+    fn end_lineno(&self) -> Option<usize> { self.end_lineno }
+    fn end_col_offset(&self) -> Option<usize> { self.end_col_offset }
+}
+
+impl Node for ExceptHandler {
+    fn lineno(&self) -> Option<usize> { self.lineno }
+    fn col_offset(&self) -> Option<usize> { self.col_offset }
+    fn end_lineno(&self) -> Option<usize> { self.end_lineno }
+    fn end_col_offset(&self) -> Option<usize> { self.end_col_offset }
+}
+
+impl CodeGen for Try {
+    type Context = CodeGenContext;
+    type Options = PythonOptions;
+    type SymbolTable = SymbolTableScopes;
+
+    fn find_symbols(self, symbols: Self::SymbolTable) -> Self::SymbolTable {
+        // Process body, handlers, orelse, and finalbody
+        let symbols = self.body.into_iter().fold(symbols, |acc, stmt| stmt.find_symbols(acc));
+        let symbols = self.handlers.into_iter().fold(symbols, |acc, handler| {
+            let symbols = handler.body.into_iter().fold(acc, |acc, stmt| stmt.find_symbols(acc));
+            if let Some(exception_type) = handler.exception_type {
+                exception_type.find_symbols(symbols)
+            } else {
+                symbols
+            }
+        });
+        let symbols = self.orelse.into_iter().fold(symbols, |acc, stmt| stmt.find_symbols(acc));
+        self.finalbody.into_iter().fold(symbols, |acc, stmt| stmt.find_symbols(acc))
+    }
+
+    fn to_rust(
+        self,
+        ctx: Self::Context,
+        options: Self::Options,
+        symbols: Self::SymbolTable,
+    ) -> Result<TokenStream, Box<dyn std::error::Error>> {
+        // The try body runs inside an immediately-invoked closure; `raise`
+        // (and failed `assert`) inside it lower to `return Err(...)`. When
+        // the body contains function-level returns, the closure's Ok value
+        // is a PyFlow carrying the returned value out (Return), a
+        // break/continue signal, or normal completion (Normal).
+        let has_return = crate::body_contains_function_return(&self.body);
+        // A `break`/`continue` in the try body targets a loop OUTSIDE the
+        // body's closure, so it cannot be emitted as a Rust jump — it is
+        // threaded out as a PyFlow signal and replayed below.
+        let body_escapes = crate::body_breaks_outward(&self.body);
+        // Handler and else bodies run inline UNLESS there is a finally
+        // clause, which wraps them in their own closure; a break there
+        // would escape that closure with no signal path back. Refuse at
+        // conversion time rather than emit Rust that cannot compile.
+        if !self.finalbody.is_empty() {
+            let where_ = if self.handlers.iter().any(|h| crate::body_breaks_outward(&h.body)) {
+                Some("except handler")
+            } else if crate::body_breaks_outward(&self.orelse) {
+                Some("else clause")
+            } else {
+                None
+            };
+            if let Some(where_) = where_ {
+                return Err(format!(
+                    "`break`/`continue` in a try statement's {} is not supported when the \
+                     statement also has a `finally` clause; move the loop control out of the \
+                     handler, or drop the finally clause",
+                    where_
+                )
+                .into());
+            }
+        }
+        let body_for_guarantee = self.body.clone();
+        let body_ctx = CodeGenContext::TryBlock {
+            parent: Box::new(ctx.clone()),
+        };
+        let try_body_tokens: Result<Vec<TokenStream>, Box<dyn std::error::Error>> = self
+            .body
+            .into_iter()
+            .map(|stmt| stmt.to_rust(body_ctx.clone(), options.clone(), symbols.clone()))
+            .collect();
+        let try_body_tokens = try_body_tokens?;
+
+        // A return that broke out of any of the closures below runs the
+        // finally body, then returns from the function — re-wrapped as
+        // another Break when this try is itself inside an enclosing try's
+        // closure.
+        let break_return = if ctx.in_try_block() {
+            quote!(return Ok(PyFlow::Return(__rython_ret));)
+        } else {
+            quote!(return Ok(__rython_ret);)
+        };
+
+        let has_finally = !self.finalbody.is_empty();
+        let finally_tokens = if has_finally {
+            let finally_body_tokens: Result<Vec<TokenStream>, Box<dyn std::error::Error>> = self
+                .finalbody
+                .clone()
+                .into_iter()
+                .map(|stmt| stmt.to_rust(ctx.clone(), options.clone(), symbols.clone()))
+                .collect();
+            let finally_body_tokens = finally_body_tokens?;
+            quote! { #(#finally_body_tokens;)* }
+        } else {
+            quote!()
+        };
+
+        // Handler bodies run outside the try closure (their exceptions are
+        // not caught by this try), with the caught exception in scope. When
+        // a finally clause exists, each handler body runs in its own
+        // closure so a return or raise inside it still executes the finally
+        // body before leaving the function, as Python requires.
+        let handler_ctx = CodeGenContext::ExceptHandler {
+            parent: Box::new(ctx.clone()),
+        };
+        let mut arms: Vec<TokenStream> = Vec::new();
+        let mut has_catch_all = false;
+        for handler in self.handlers {
+            let guard = match &handler.exception_type {
+                None => None,
+                Some(t) => exception_match_guard(t)?,
+            };
+            let bind = match &handler.name {
+                Some(name) => {
+                    let ident = crate::safe_ident(name);
+                    quote! {
+                        #[allow(unused_variables, unused_mut)]
+                        let mut #ident = __rython_exc.clone();
+                    }
+                }
+                None => quote!(),
+            };
+            let arm_body = lower_finally_guarded_body(
+                handler.body,
+                handler_ctx.clone(),
+                &options,
+                &symbols,
+                has_finally,
+                &finally_tokens,
+                &break_return,
+                "handler body terminates on every path",
+            )?;
+            match guard {
+                Some(g) => arms.push(quote! {
+                    Err(__rython_exc) if #g => { #bind #arm_body }
+                }),
+                None => {
+                    has_catch_all = true;
+                    arms.push(quote! {
+                        Err(__rython_exc) => { #bind #arm_body }
+                    });
+                    break; // later handlers are unreachable, as in Python
+                }
+            }
+        }
+
+        // Else clause: runs only when the body completed without raising;
+        // its own exceptions are not caught by this try's handlers — but a
+        // return or raise in it must still run the finally body first.
+        let else_tokens = if !self.orelse.is_empty() {
+            lower_finally_guarded_body(
+                self.orelse,
+                ctx.clone(),
+                &options,
+                &symbols,
+                has_finally,
+                &finally_tokens,
+                &break_return,
+                "else clause terminates on every path",
+            )?
+        } else {
+            quote!()
+        };
+
+        // When the try body terminates on every path (return/raise), the
+        // completed-normally arm is provably dead — mark it unreachable so
+        // the surrounding function (which emits no fall-through tail when
+        // all paths terminate) still typechecks.
+        let ok_arm_body = if crate::guarantees_return(&body_for_guarantee) {
+            quote!(unreachable!("try body terminates on every path"))
+        } else {
+            else_tokens
+        };
+
+        // An exception no handler matched propagates as an Err — to the
+        // enclosing try's closure when there is one, otherwise out of the
+        // function, as in Python. The finally body still runs first.
+        if !has_catch_all {
+            arms.push(quote! {
+                Err(__rython_exc) => { #finally_tokens return Err(__rython_exc); }
+            });
+        }
+
+        if has_return || body_escapes {
+            // The Return arm carries a value, so the parameter needs a
+            // type; a body with no `return` never constructs one, so pin
+            // it to () rather than leave it uninferable.
+            let flow_type = if has_return {
+                quote!(PyFlow<_>)
+            } else {
+                quote!(PyFlow<()>)
+            };
+            let return_arm = if has_return {
+                quote! {
+                    Ok(PyFlow::Return(__rython_ret)) => {
+                        #finally_tokens
+                        #break_return
+                    }
+                }
+            } else {
+                quote! { Ok(PyFlow::Return(_)) => unreachable!("try body has no return"), }
+            };
+            // Replay a signalled break/continue at the try statement's own
+            // position, AFTER the finally clause — Python's ordering. If
+            // this try is itself inside another try's closure, the signal
+            // is re-raised outward instead of becoming a Rust loop jump.
+            let (break_arm, continue_arm) = if body_escapes {
+                let replay_break = if ctx.break_crosses_try_closure() {
+                    quote!(return Ok(PyFlow::Break);)
+                } else if ctx.break_target_has_else() {
+                    quote!({ __rython_broke = true; break; })
+                } else {
+                    quote!(break;)
+                };
+                let replay_continue = if ctx.break_crosses_try_closure() {
+                    quote!(return Ok(PyFlow::Continue);)
+                } else {
+                    quote!(continue;)
+                };
+                (
+                    quote! { Ok(PyFlow::Break) => { #finally_tokens #replay_break } },
+                    quote! { Ok(PyFlow::Continue) => { #finally_tokens #replay_continue } },
+                )
+            } else {
+                (
+                    quote! { Ok(PyFlow::Break) => unreachable!("try body has no break"), },
+                    quote! { Ok(PyFlow::Continue) => unreachable!("try body has no continue"), },
+                )
+            };
+            Ok(quote! {
+                {
+                    #[allow(unreachable_code)]
+                    let __rython_try_result: std::result::Result<
+                        #flow_type,
+                        PyException,
+                    > = (|| {
+                        #(#try_body_tokens;)*
+                        Ok(PyFlow::Normal)
+                    })();
+                    match __rython_try_result {
+                        #return_arm
+                        #break_arm
+                        #continue_arm
+                        Ok(PyFlow::Normal) => { #ok_arm_body }
+                        #(#arms)*
+                    }
+                    #finally_tokens
+                }
+            })
+        } else {
+            Ok(quote! {
+                {
+                    #[allow(unreachable_code)]
+                    let __rython_try_result: std::result::Result<(), PyException> = (|| {
+                        #(#try_body_tokens;)*
+                        Ok(())
+                    })();
+                    match __rython_try_result {
+                        Ok(()) => { #ok_arm_body }
+                        #(#arms)*
+                    }
+                    #finally_tokens
+                }
+            })
+        }
+    }
+}
+
+/// Lower an except-handler or else-clause body. Without a finally clause
+/// the statements run inline. With one, the body runs in its own closure —
+/// like the try body — so a `return` (threaded out as PyFlow::Return)
+/// or a raise (an Err) still executes the finally body before leaving the
+/// function, as Python guarantees.
+#[allow(clippy::too_many_arguments)]
+fn lower_finally_guarded_body(
+    body: Vec<Statement>,
+    base_ctx: CodeGenContext,
+    options: &PythonOptions,
+    symbols: &SymbolTableScopes,
+    has_finally: bool,
+    finally_tokens: &TokenStream,
+    break_return: &TokenStream,
+    unreachable_note: &str,
+) -> Result<TokenStream, Box<dyn std::error::Error>> {
+    if !has_finally {
+        let tokens: Result<Vec<TokenStream>, Box<dyn std::error::Error>> = body
+            .into_iter()
+            .map(|stmt| stmt.to_rust(base_ctx.clone(), options.clone(), symbols.clone()))
+            .collect();
+        let tokens = tokens?;
+        return Ok(quote! { #(#tokens;)* });
+    }
+
+    let guarantees = crate::guarantees_return(&body);
+    let has_ret = crate::body_contains_function_return(&body);
+    let inner_ctx = CodeGenContext::TryBlock {
+        parent: Box::new(base_ctx),
+    };
+    let tokens: Result<Vec<TokenStream>, Box<dyn std::error::Error>> = body
+        .into_iter()
+        .map(|stmt| stmt.to_rust(inner_ctx.clone(), options.clone(), symbols.clone()))
+        .collect();
+    let tokens = tokens?;
+
+    let completed_arm = if guarantees {
+        quote!(unreachable!(#unreachable_note))
+    } else {
+        quote!()
+    };
+
+    if has_ret {
+        Ok(quote! {
+            #[allow(unreachable_code)]
+            let __rython_inner: std::result::Result<
+                PyFlow<_>,
+                PyException,
+            > = (|| {
+                #(#tokens;)*
+                Ok(PyFlow::Normal)
+            })();
+            match __rython_inner {
+                Ok(PyFlow::Return(__rython_ret)) => {
+                    #finally_tokens
+                    #break_return
+                }
+                // A break/continue in a closure-wrapped handler or else
+                // clause is rejected at conversion time, so these are
+                // structurally unreachable.
+                Ok(PyFlow::Break) => unreachable!("handler body has no break"),
+                Ok(PyFlow::Continue) => unreachable!("handler body has no continue"),
+                Ok(PyFlow::Normal) => { #completed_arm }
+                Err(__rython_reraise) => {
+                    #finally_tokens
+                    return Err(__rython_reraise);
+                }
+            }
+        })
+    } else {
+        Ok(quote! {
+            #[allow(unreachable_code)]
+            let __rython_inner: std::result::Result<(), PyException> = (|| {
+                #(#tokens;)*
+                Ok(())
+            })();
+            match __rython_inner {
+                Ok(()) => { #completed_arm }
+                Err(__rython_reraise) => {
+                    #finally_tokens
+                    return Err(__rython_reraise);
+                }
+            }
+        })
+    }
+}
+
+/// The match guard testing whether the caught exception matches an except
+/// clause's type expression: a name (`except ValueError`), a dotted name
+/// (`except os.error` — matched by its final attribute), or a tuple of
+/// either (`except (ValueError, TypeError)`).
+fn exception_match_guard(
+    exception_type: &ExprType,
+) -> Result<Option<TokenStream>, Box<dyn std::error::Error>> {
+    match exception_type {
+        ExprType::Name(name) => {
+            let n = &name.id;
+            Ok(Some(quote!(__rython_exc.matches(#n))))
+        }
+        ExprType::Attribute(attr) => {
+            let n = &attr.attr;
+            Ok(Some(quote!(__rython_exc.matches(#n))))
+        }
+        ExprType::Tuple(tuple) => {
+            let mut guards = Vec::new();
+            for elt in &tuple.elts {
+                match exception_match_guard(elt)? {
+                    Some(g) => guards.push(g),
+                    None => return Ok(None),
+                }
+            }
+            if guards.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(quote!(#(#guards)||*)))
+            }
+        }
+        other => Err(format!(
+            "unsupported exception type in except clause: {:?} (use a name, \
+             dotted name, or tuple of names)",
+            other
+        )
+        .into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Tests would go here - currently commented out as they need full AST infrastructure
+    // create_parse_test!(test_simple_try, "try:\n    pass\nexcept:\n    pass", "test.py");
+}

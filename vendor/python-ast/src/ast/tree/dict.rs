@@ -1,0 +1,71 @@
+use proc_macro2::TokenStream;
+use quote::quote;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    CodeGen, CodeGenContext, ExprType, PythonOptions, SymbolTableScopes,
+    Node, impl_node_with_positions
+};
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Dict {
+    pub keys: Vec<Option<ExprType>>,
+    pub values: Vec<ExprType>,
+    pub lineno: Option<usize>,
+    pub col_offset: Option<usize>,
+    pub end_lineno: Option<usize>,
+    pub end_col_offset: Option<usize>,
+}
+
+
+impl_node_with_positions!(Dict { lineno, col_offset, end_lineno, end_col_offset });
+
+impl CodeGen for Dict {
+    type Context = CodeGenContext;
+    type Options = PythonOptions;
+    type SymbolTable = SymbolTableScopes;
+
+    fn to_rust(
+        self,
+        ctx: Self::Context,
+        options: Self::Options,
+        symbols: Self::SymbolTable,
+    ) -> Result<TokenStream, Box<dyn std::error::Error>> {
+        let mut pairs = Vec::new();
+        
+        for (key, value) in self.keys.iter().zip(self.values.iter()) {
+            match key {
+                Some(k) => {
+                    let key_tokens = k.clone().to_rust(ctx.clone(), options.clone(), symbols.clone())?;
+                    let value_tokens = value.clone().to_rust(ctx.clone(), options.clone(), symbols.clone())?;
+                    pairs.push(quote! { (#key_tokens, #value_tokens) });
+                }
+                None => {
+                    // `{**other}` has no direct HashMap-literal equivalent;
+                    // fail the conversion rather than emitting invalid Rust.
+                    return Err("dictionary unpacking (`{**other}`) is not yet supported \
+                                in dict literals"
+                        .to_string()
+                        .into());
+                }
+            }
+        }
+        
+        // PyDict (an insertion-ordered map) rather than HashMap: Python
+        // dicts preserve insertion order, and keys()/items()/iteration
+        // must match.
+        Ok(quote! {
+            PyDict::from([#(#pairs),*])
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::create_parse_test;
+
+    create_parse_test!(test_empty_dict, "{}", "dict_test.py");
+    create_parse_test!(test_simple_dict, "{'a': 1, 'b': 2}", "dict_test.py");
+    create_parse_test!(test_dict_with_variables, "{x: y, z: w}", "dict_test.py");
+}

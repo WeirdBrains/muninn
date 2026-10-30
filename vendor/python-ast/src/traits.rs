@@ -1,0 +1,116 @@
+use proc_macro2::TokenStream;
+use quote::quote;
+use crate::{CodeGen, CodeGenContext, ExprType, PythonOptions, SymbolTableScopes};
+
+/// Common trait for Python operators that can be converted to Rust tokens.
+pub trait PythonOperator: Clone + std::fmt::Debug {
+    /// Convert the operator to its Rust equivalent TokenStream.
+    ///
+    /// The error type is `Box<dyn std::error::Error>` to remain compatible
+    /// with the upstream `to_tokenstream::CodeGen` trait. Implementors
+    /// should still construct structured [`crate::Error`] values
+    /// (`anyhow_tracing::Error`) underneath — those flow transparently into
+    /// the boxed return type and remain downcast-able.
+    fn to_rust_op(&self) -> Result<TokenStream, Box<dyn std::error::Error>>;
+
+    /// Check if this operator is unknown/unimplemented.
+    fn is_unknown(&self) -> bool;
+}
+
+/// Common trait for binary operations (binary ops, bool ops, comparisons).
+pub trait BinaryOperation: Clone + std::fmt::Debug {
+    type OperatorType: PythonOperator;
+
+    /// Get the operator type.
+    fn operator(&self) -> &Self::OperatorType;
+
+    /// Get the left operand.
+    fn left(&self) -> &ExprType;
+
+    /// Get the right operand.
+    fn right(&self) -> &ExprType;
+
+    /// Generate Rust code for this binary operation.
+    fn generate_rust_code(
+        &self,
+        ctx: CodeGenContext,
+        options: PythonOptions,
+        symbols: SymbolTableScopes,
+    ) -> Result<TokenStream, Box<dyn std::error::Error>> {
+        let left = self
+            .left()
+            .clone()
+            .to_rust(ctx.clone(), options.clone(), symbols.clone())?;
+        let right = self.right().clone().to_rust(ctx, options, symbols)?;
+        let op = self.operator().to_rust_op()?;
+
+        Ok(quote!((#left) #op (#right)))
+    }
+}
+
+/// Trait for consistent handling of position information in AST nodes.
+pub trait PositionInfo {
+    /// Get all position fields as a tuple (lineno, col_offset, end_lineno, end_col_offset).
+    fn position_info(&self) -> (Option<usize>, Option<usize>, Option<usize>, Option<usize>);
+    
+    /// Check if this node has position information.
+    fn has_position(&self) -> bool {
+        let (lineno, col_offset, _, _) = self.position_info();
+        lineno.is_some() && col_offset.is_some()
+    }
+}
+
+/// Trait for AST nodes that can provide debugging information.
+pub trait DebugInfo {
+    /// Get a human-readable description of this node.
+    fn debug_description(&self) -> String;
+    
+    /// Get the node type name.
+    fn node_type(&self) -> &'static str;
+}
+
+/// Trait for operations that can be chained (like comparison operations).
+pub trait ChainableOperation {
+    type Operand;
+    type Operator;
+    
+    /// Get all operands in the chain.
+    fn operands(&self) -> Vec<&Self::Operand>;
+    
+    /// Get all operators in the chain.
+    fn operators(&self) -> Vec<&Self::Operator>;
+    
+    /// Generate chained Rust code.
+    fn generate_chained_rust(
+        &self,
+        ctx: CodeGenContext,
+        options: PythonOptions,
+        symbols: SymbolTableScopes,
+    ) -> Result<TokenStream, Box<dyn std::error::Error>>;
+}
+
+/// Helper trait for converting Python string literals to enum variants.
+pub trait FromPythonString: Sized {
+    /// Convert a Python operator string to the enum variant.
+    fn from_python_string(s: &str) -> Option<Self>;
+    
+    /// Get the unknown/default variant.
+    fn unknown() -> Self;
+    
+    /// Parse from string with fallback to unknown.
+    fn parse_or_unknown(s: &str) -> Self {
+        Self::from_python_string(s).unwrap_or_else(Self::unknown)
+    }
+}
+
+/// Trait for generating consistent error messages across the codebase.
+pub trait ErrorContext {
+    /// Generate a standardized error message with context.
+    fn with_context(&self, operation: &str) -> String;
+}
+
+impl<T: std::fmt::Debug> ErrorContext for T {
+    fn with_context(&self, operation: &str) -> String {
+        format!("Error during {}: {:?}", operation, self)
+    }
+}

@@ -1,0 +1,256 @@
+use proc_macro2::TokenStream;
+use quote::quote;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    CodeGen, CodeGenContext, ExprType, Node, PythonOptions, SymbolTableScopes,
+    };
+
+/// Joined string (f-string, e.g., f"Hello {name}")
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct JoinedStr {
+    /// The values that make up the f-string (mix of strings and expressions)
+    pub values: Vec<ExprType>,
+    /// Position information
+    pub lineno: Option<usize>,
+    pub col_offset: Option<usize>,
+    pub end_lineno: Option<usize>,
+    pub end_col_offset: Option<usize>,
+}
+
+/// Formatted value within an f-string (e.g., the {name} part)
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct FormattedValue {
+    /// The expression to be formatted
+    pub value: Box<ExprType>,
+    /// Conversion flag (None, 's', 'r', 'a') - represented as optional integer
+    pub conversion: Option<i32>,
+    /// Format specifier (optional)
+    pub format_spec: Option<Box<ExprType>>,
+    /// Position information
+    pub lineno: Option<usize>,
+    pub col_offset: Option<usize>,
+    pub end_lineno: Option<usize>,
+    pub end_col_offset: Option<usize>,
+}
+
+
+
+impl Node for JoinedStr {
+    fn lineno(&self) -> Option<usize> { self.lineno }
+    fn col_offset(&self) -> Option<usize> { self.col_offset }
+    fn end_lineno(&self) -> Option<usize> { self.end_lineno }
+    fn end_col_offset(&self) -> Option<usize> { self.end_col_offset }
+}
+
+impl Node for FormattedValue {
+    fn lineno(&self) -> Option<usize> { self.lineno }
+    fn col_offset(&self) -> Option<usize> { self.col_offset }
+    fn end_lineno(&self) -> Option<usize> { self.end_lineno }
+    fn end_col_offset(&self) -> Option<usize> { self.end_col_offset }
+}
+
+impl CodeGen for JoinedStr {
+    type Context = CodeGenContext;
+    type Options = PythonOptions;
+    type SymbolTable = SymbolTableScopes;
+
+    fn find_symbols(self, symbols: Self::SymbolTable) -> Self::SymbolTable {
+        self.values.into_iter().fold(symbols, |acc, val| val.find_symbols(acc))
+    }
+
+    fn to_rust(
+        self,
+        ctx: Self::Context,
+        options: Self::Options,
+        symbols: Self::SymbolTable,
+    ) -> Result<TokenStream, Box<dyn std::error::Error>> {
+        // Build a single format! call: literal parts go into the format
+        // string (with `{`/`}` escaped), interpolated parts each get a
+        // placeholder and become an argument.
+        let mut fmt = String::new();
+        let mut args: Vec<TokenStream> = Vec::new();
+
+        for val in self.values {
+            match val {
+                ExprType::Constant(c) => {
+                    fmt.push_str(&escape_format_braces(&constant_text(&c)));
+                }
+                ExprType::FormattedValue(fv) => {
+                    let expr = (*fv.value)
+                        .clone()
+                        .to_rust(ctx.clone(), options.clone(), symbols.clone())?;
+                    let (placeholder, expr) = fv.rust_placeholder(expr)?;
+                    fmt.push_str(&placeholder);
+                    args.push(expr);
+                }
+                other => {
+                    let expr = other.to_rust(ctx.clone(), options.clone(), symbols.clone())?;
+                    fmt.push_str("{}");
+                    args.push(quote!(py_display(&(#expr))));
+                }
+            }
+        }
+
+        if fmt.is_empty() && args.is_empty() {
+            Ok(quote! { String::new() })
+        } else {
+            Ok(quote! { format!(#fmt #(, #args)*) })
+        }
+    }
+}
+
+/// Recover the unescaped text of a string constant (its stored form is a
+/// quoted, escaped Rust literal).
+fn constant_text(c: &crate::Constant) -> String {
+    match &c.0 {
+        Some(litrs::Literal::String(s)) => s.value().to_string(),
+        Some(other) => other.to_string(),
+        None => String::new(),
+    }
+}
+
+/// Escape literal braces so they survive inside a format! string.
+fn escape_format_braces(s: &str) -> String {
+    s.replace('{', "{{").replace('}', "}}")
+}
+
+impl FormattedValue {
+    /// The Rust format placeholder for this interpolation, plus a wrapper
+    /// applied to the value expression when the spec demands it (f64
+    /// coercion for `f` types, the runtime radix formatter for x/X/o/b —
+    /// Rust would print negative values as two's complement). `!r`/`!a`
+    /// conversions map to `{:?}`. Specs Rust cannot reproduce exactly (or
+    /// that interpolate other values) are LOUD conversion errors — falling
+    /// back to `{}` would silently change the output.
+    fn rust_placeholder(
+        &self,
+        value: TokenStream,
+    ) -> Result<(String, TokenStream), Box<dyn std::error::Error>> {
+        // Python conversion codes are the ASCII values of 's', 'r', 'a'.
+        let is_repr = matches!(self.conversion, Some(114) | Some(97));
+
+        let spec_text = match &self.format_spec {
+            None => String::new(),
+            Some(spec) => match static_spec_text(spec) {
+                None => {
+                    return Err(
+                        "f-string format specs that interpolate other values (e.g. \
+                         f\"{x:{width}}\") are not supported yet"
+                            .to_string()
+                            .into(),
+                    );
+                }
+                Some(text) => text.trim().to_string(),
+            },
+        };
+
+        use crate::pyformat::SpecLowering;
+        // `!r` renders the repr STRING first and lets the spec pad or
+        // align that string, exactly as Python does — Rust's `{:?}`
+        // would print its own Debug form ("abc" with double quotes,
+        // `true` for a bool) and silently diverge.
+        if is_repr {
+            let lowering = crate::pyformat::translate_format_spec(&spec_text)
+                .map_err(|e| format!("f-string: {}", e))?;
+            let SpecLowering::Inline(suffix) = lowering else {
+                return Err("numeric presentation types cannot combine with !r/!a (Python \
+                            applies the spec to the repr string and raises)"
+                    .to_string()
+                    .into());
+            };
+            let placeholder = if suffix.is_empty() {
+                "{}".to_string()
+            } else {
+                format!("{{:{}}}", suffix)
+            };
+            return Ok((placeholder, quote!(repr(&(#value)))));
+        }
+        let lowering = crate::pyformat::translate_format_spec(&spec_text)
+            .map_err(|e| format!("f-string: {}", e))?;
+        match lowering {
+            // A bare `{x}` is Python's str(), which is NOT Rust's
+            // Display: Display prints `1` for 1.0 and `true` for True.
+            SpecLowering::Inline(suffix) if suffix.is_empty() => {
+                Ok(("{}".to_string(), quote!(py_display(&(#value)))))
+            }
+            SpecLowering::Inline(suffix) => Ok((format!("{{:{}}}", suffix), value)),
+            SpecLowering::CastF64(suffix) => Ok((
+                if suffix.is_empty() {
+                    "{}".to_string()
+                } else {
+                    format!("{{:{}}}", suffix)
+                },
+                quote!(((#value) as f64)),
+            )),
+            SpecLowering::IntRadix {
+                fill,
+                align,
+                plus,
+                alternate,
+                zero,
+                width,
+                radix,
+            } => Ok((
+                "{}".to_string(),
+                quote!(py_int_radix_format(
+                    #value, #fill, #align, #plus, #alternate, #zero, #width,
+                    #radix,
+                )),
+            )),
+        }
+    }
+}
+
+/// If a format spec is a purely constant expression, return its text.
+fn static_spec_text(spec: &ExprType) -> Option<String> {
+    match spec {
+        ExprType::Constant(c) => Some(constant_text(c)),
+        ExprType::JoinedStr(js) => {
+            let mut out = String::new();
+            for part in &js.values {
+                if let ExprType::Constant(c) = part {
+                    out.push_str(&constant_text(c));
+                } else {
+                    return None;
+                }
+            }
+            Some(out)
+        }
+        _ => None,
+    }
+}
+
+impl CodeGen for FormattedValue {
+    type Context = CodeGenContext;
+    type Options = PythonOptions;
+    type SymbolTable = SymbolTableScopes;
+
+    fn find_symbols(self, symbols: Self::SymbolTable) -> Self::SymbolTable {
+        let symbols = (*self.value).find_symbols(symbols);
+        if let Some(format_spec) = self.format_spec {
+            (*format_spec).find_symbols(symbols)
+        } else {
+            symbols
+        }
+    }
+
+    fn to_rust(
+        self,
+        ctx: Self::Context,
+        options: Self::Options,
+        symbols: Self::SymbolTable,
+    ) -> Result<TokenStream, Box<dyn std::error::Error>> {
+        let value_tokens = (*self.value).clone().to_rust(ctx, options, symbols)?;
+        let (placeholder, value_tokens) = self.rust_placeholder(value_tokens)?;
+        Ok(quote! {
+            format!(#placeholder, #value_tokens)
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Tests would go here - currently commented out as they need full AST infrastructure
+    // create_parse_test!(test_simple_fstring, "f'Hello {name}'", "test.py");
+}

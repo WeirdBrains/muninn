@@ -1,0 +1,60 @@
+use proc_macro2::TokenStream;
+use quote::quote;
+use serde::{Deserialize, Serialize};
+
+use crate::{CodeGen, CodeGenContext, ExprType, PythonOptions, SymbolTableScopes};
+
+/// A keyword argument, gnerally used in function calls.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct NamedExpr {
+    pub left: Box<ExprType>,
+    pub right: Box<ExprType>,
+}
+
+
+impl CodeGen for NamedExpr {
+    type Context = CodeGenContext;
+    type Options = PythonOptions;
+    type SymbolTable = SymbolTableScopes;
+
+    fn to_rust(
+        self,
+        ctx: Self::Context,
+        options: Self::Options,
+        symbols: Self::SymbolTable,
+    ) -> Result<TokenStream, Box<dyn std::error::Error>> {
+        let left = self
+            .left
+            .clone()
+            .to_rust(ctx.clone(), options.clone(), symbols.clone())?;
+        let right = self.right.clone().to_rust(ctx, options, symbols)?;
+        Ok(quote!(#left = #right))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{Constant, ExprType, Name};
+    use litrs::*;
+
+    #[test]
+    fn test_named_expression() {
+        let named_expression = NamedExpr {
+            left: Box::new(ExprType::Name(Name {
+                id: "a".to_string(),
+            })),
+            right: Box::new(ExprType::Constant(Constant(Some(Literal::Integer(
+                IntegerLit::parse("1".to_string()).unwrap(),
+            ))))),
+        };
+        let rust = named_expression
+            .to_rust(
+                CodeGenContext::Module("test".to_string()),
+                PythonOptions::default(),
+                SymbolTableScopes::new(),
+            )
+            .unwrap();
+        assert_eq!(rust.to_string(), "a = 1");
+    }
+}
