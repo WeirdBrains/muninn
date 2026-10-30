@@ -296,6 +296,7 @@ Private organizations can still have a front door.
 4. Each org node defines which of the org's code spaces it executes as part of hosting (per-node config), served through hosting, endpoints and gRPC, gated by those code-space permissions
 5. Members give their code spaces to an org with a clear action (CLI `mnnn org give … code`, TUI); every org node syncs the source, builds it itself (builds cached) and asks before the first run of new or changed code
 6. Executables are described in protobuf (`muninn.code.v1.Executable`: id, name, language, version hash, typed inputs, output shape) with a discovery call listing what an org node serves, filtered by the caller's role; each served code space gets generated message and service definitions from its declared inputs and outputs, exposed over gRPC with reflection and downloadable `.proto` files, plus JSON, all generated in pure Rust
+7. A built-in global code space ships with Muninn on every node, versioned with it, fully viewable and editable or overridable (asking first on changes), and served through the same executable descriptors; web invite redemption and web membership registration and apply are executables in it, called by the gated sign-in and apply pages of org hosting
 
 ## Review Copies
 
