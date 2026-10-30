@@ -4,7 +4,7 @@
 class Muninn < Formula
   desc "Local, encrypted store for OHLCV market bars"
   homepage "https://github.com/kommandosaldat/muninn"
-  version "2.11.0"
+  version "2.11.1"
   license "MIT"
 
   base = "https://github.com/kommandosaldat/muninn/releases/download/v#{version}"

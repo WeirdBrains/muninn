@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.11.1] - 2026-10-30
+
+### Added
+- Peers are named after their user, and a connection name works wherever a peer is asked for
+- Entrusting shards to a trusted connection no longer asks about short codes
+- Piping output into head no longer panics
+- Journal entry times show local time
+- Invite links leave out IPv6 link-local addresses
+
 ## [2.11.0] - 2026-10-30
 
 ### Added
@@ -364,7 +373,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.11.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.11.1...HEAD
+[2.11.1]: https://github.com/kommandosaldat/muninn/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/kommandosaldat/muninn/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/kommandosaldat/muninn/compare/v2.9.2...v2.10.0
 [2.9.2]: https://github.com/kommandosaldat/muninn/compare/v2.9.1...v2.9.2
