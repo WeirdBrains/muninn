@@ -33,6 +33,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 ## Network
 
 - [Network](network.md): the node, peers, relays, sharing and searching across peers; the Net menu
+- [Users and connections](users.md): your user identity, linked nodes, trusted connections, invites
 - [Key exchanges](key-exchanges.md): offers, answers, short codes, verifying, revoking, backups
 - [Dark shards](dark-shards.md): the master key split among peers, sealed so they cannot read it
 - [Organizations](organizations.md): roles, members, resources, endpoints and templates; the Orgs menu

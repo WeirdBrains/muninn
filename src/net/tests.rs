@@ -720,6 +720,19 @@ fn a_node_links_to_my_user_after_approval_and_can_be_revoked() {
     auto::settle(&a.store, a.node(), &[], "cli");
     wait(|| b.store.user_of_node(&c.peer_id()).unwrap());
 
+    // ben's org knows the laptop as a member: the phone, the same user, acts with that role
+    let o = crate::org::create(&b.store, "cli", "Comet lab", None, "").unwrap();
+    let role = b.store.find_role(&o.id, crate::org::USER).unwrap();
+    b.store.upsert_member(&o.id, &a.peer_id(), "laptop", Some(&role.id), crate::store::MemberStatus::Member, None, "", Some("owner")).unwrap();
+    b.store.tag_members(&a.peer_id(), &me.id).unwrap();
+    let bx = auto::node_link(&b.store, &a.peer_id()).unwrap().unwrap();
+    let mut bs = Store::open(&b.db(), None).unwrap();
+    let phone: libp2p::PeerId = c.peer_id().parse().unwrap();
+    let st = crate::org::net::serve(&mut bs, &bx, &phone, &o.id, crate::org::net::OrgReq::Status);
+    assert!(st.is_ok(), "{:?}", st.err());
+    let stranger: libp2p::PeerId = Keypair::generate_ed25519().public().to_peer_id();
+    assert!(crate::org::net::serve(&mut bs, &bx, &stranger, &o.id, crate::org::net::OrgReq::Status).is_err());
+
     // revoke the phone from the laptop: ben learns it, and the phone's card is refused
     user::revoke_node(&a.store, &c.peer_id(), "cli").unwrap();
     assert!(user::revoke_node(&a.store, &a.peer_id(), "cli").is_err(), "not the node you are on");
@@ -727,6 +740,8 @@ fn a_node_links_to_my_user_after_approval_and_can_be_revoked() {
     wait(|| b.store.user_of_node(&c.peer_id()).unwrap().is_none().then_some(()));
     let card = user::my_card(&c.store).unwrap();
     assert!(user::take_card(&b.store, &c.peer_id(), &card, "cli").is_err());
+    // and a revoked node no longer acts for the user in orgs
+    assert!(crate::org::net::serve(&mut bs, &bx, &phone, &o.id, crate::org::net::OrgReq::Status).is_err());
 }
 
 #[test]

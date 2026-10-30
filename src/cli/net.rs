@@ -870,6 +870,22 @@ fn shard(ctx: &Ctx, cmd: NetShardCommand) -> anyhow::Result<()> {
             {
                 return Err(anyhow!("cancelled: verify the exchanges first (`mnnn net exchange verify`)"));
             }
+            // shards belong with people you trust: untrusted connections need a yes
+            let untrusted: Vec<String> = to
+                .iter()
+                .filter_map(|k| client::exchange_for(&n.store, k).ok())
+                .filter(|x| !x.peer_id.as_deref().is_some_and(|p| crate::net::user::trusted_peer(&n.store, p).unwrap_or(false)))
+                .map(|x| x.title())
+                .collect();
+            if !untrusted.is_empty()
+                && !ctx.io.confirm(&format!(
+                    "{} {} not a trusted connection. Entrust shards anyway?",
+                    untrusted.join(", "),
+                    if untrusted.len() == 1 { "is" } else { "are" }
+                ))?
+            {
+                return Err(anyhow!("cancelled: trust the connection first (`mnnn connection trust USER`)"));
+            }
             let key = super::keys::master(ctx, &master)?;
             let pw = shard_password(ctx)?;
             n.node()?;

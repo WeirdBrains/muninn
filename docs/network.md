@@ -24,7 +24,8 @@ id (`12D3KooW…`) is how others know it.
 | Stop | `mnnn net stop` (or Ctrl-C) | Net ▸ Node ▸ Stop node, or `X` |
 | Status | `mnnn net status [--json]` | Net ▸ Node ▸ Status… (`K`) |
 | Peers | `mnnn net peers`, `forget PEER` | Peers page: `c` connect, `l` label, `d` forget |
-| Connections | `mnnn net connect X`, `invite`, `requests`, `accept X`, `decline X`, `disconnect X` | Connections page: `c` `n` `p` `a` `d` `r` |
+| Nodes | `mnnn net connect X`, `invite`, `requests`, `accept X`, `decline X`, `disconnect X` | Nodes page: `c` `n` `p` `a` `d` `r` |
+| Users, invites | `mnnn user …`, `mnnn connection …`, `mnnn invite …` ([users](users.md)) | Connections and Invites pages |
 | Relays | `mnnn net relay list/add/remove/serve on\|off` | Relays page: `a` add, `d` remove, `r` serve |
 | Settings | `mnnn net config [--label] [--port] [--listen] [--mdns] [--autostart] [--accept] [--bootstrap]` | Settings page |
 
@@ -71,7 +72,7 @@ code spaces and live searches to your database, under a free name, recorded in t
 [history](history.md) as `net.import`.
 
 `--with NAME` connects to that node first if needed. In the TUI: Shared page `a` shares
-with every connection, `d` stops; on the Connections page `s` shares with the selected
+with every connection, `d` stops; on the Nodes page `s` shares with the selected
 one, `L` lists what that node shares, and Enter imports an item.
 
 ## Searching across the network
@@ -88,11 +89,12 @@ the TUI the Search page runs a saved [live search](live-searches.md) across the 
 
 ## The Net menu
 
-Node ▸ (Status… `K`, Start node, Stop node, Settings…) · Connections… · Invite or
-connect… · Peers… · Relays… · Shared data… · Network search… · Dark shards ▸ (Held &
+Node ▸ (Status… `K`, Start node, Stop node, Settings…) · Connections… · Invites… ·
+Invite or connect… · Nodes… · Peers… · Relays… · Shared data… · Network search… · Dark shards ▸ (Held &
 entrusted…, Entrust…)
 
-All open one window with eight pages: Tab (or ← →, or `1`–`8`) moves between them.
+All open one window with ten pages: Tab (or ← →, or `1`–`9`, `0` for the tenth) moves
+between them.
 Work that talks to other nodes runs in the background; the title shows it, and the
 window stays usable. `g` refreshes. See [keybindings](keybindings.md).
 

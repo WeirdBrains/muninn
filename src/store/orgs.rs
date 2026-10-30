@@ -823,6 +823,20 @@ impl Store {
             .optional()?)
     }
 
+    /// The member a user is in an org (any of their nodes acts with it), when known.
+    pub fn member_by_user(&self, org: &str, user: &str) -> Result<Option<Member>> {
+        Ok(self
+            .conn
+            .query_row(
+                &format!(
+                    "SELECT {MEMBER_COLS} FROM org_members WHERE org_id = ?1 AND user_id = ?2 ORDER BY status = 'member' DESC, created_at LIMIT 1"
+                ),
+                [org, user],
+                row_member,
+            )
+            .optional()?)
+    }
+
     pub fn member_by_exchange(&self, exchange: &str) -> Result<Option<Member>> {
         Ok(self.conn.query_row(&format!("SELECT {MEMBER_COLS} FROM org_members WHERE exchange_id = ?1"), [exchange], row_member).optional()?)
     }

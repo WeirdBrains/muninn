@@ -1760,6 +1760,7 @@ author. It certifies each node that acts for you; peers check those certificates
 a second computer is recognised as you. Linking: on the new node run `mnnn user link TARGET`
 (an address, peer or invite link of one of your nodes), then approve it there with
 `mnnn user approve`. A revoked node stays revoked; peers learn it the next time they talk.
+See `mnnn help users`.
 
 Examples:
   mnnn user show
@@ -1774,6 +1775,7 @@ pub const CONNECTION_NOTES: &str = "\
 Connecting to a node (an invite link or `mnnn net connect`) also tells both sides whom the
 other node acts for; that user becomes a connection, untrusted until you trust it. Trust
 changes are kept in history. Dark shards only go to trusted connections.
+See `mnnn help users`.
 
 Examples:
   mnnn connection list
@@ -1787,10 +1789,11 @@ An invite is a signed, expiring link (`muninn://join/…`) that holds no secret.
 to connect (default), to join an org (--org) or to review (--review). The other side uses it
 with `mnnn invite accept LINK`. `list` shows the links you made and the requests waiting for
 you; `revoke` withdraws an unused one.
+See `mnnn help users`.
 
 Examples:
   mnnn invite create --label ben
-  mnnn invite create --org research --role member
+  mnnn invite create --org research --role viewer
   mnnn invite create --review draft-1
   mnnn invite list
   mnnn invite revoke 3f2a

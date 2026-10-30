@@ -1,7 +1,9 @@
 # Dark shards
 
 The master key can be split among peers you exchanged keys with, so that losing every
-copy of the [24 words and paper shards](keys.md) is not the end.
+copy of the [24 words and paper shards](keys.md) is not the end. Shards go to nodes of
+[trusted connections](users.md) (and your own nodes): `mnnn net shard entrust` asks
+before using a node whose user you have not trusted, and the TUI lists only trusted ones.
 
 ```
 mnnn net shard entrust --to ben --to cleo --to dev --threshold 2
@@ -38,7 +40,8 @@ the holders record `net.shard.hold`.
 Net ▸ Dark shards ▸ Held & entrusted… lists the shards you entrusted and those you hold for others
 (`d` drops one you hold). `e` (or Net ▸ Dark shards ▸ Entrust…) opens the entrust form:
 
-- **Nodes.** Every node you are connected to is listed; Space picks it. Each picked node
+- **Nodes.** Every node of a trusted connection is listed (the others are counted as
+  hidden; trust one under Net ▸ Connections…, `t`); Space picks it. Each picked node
   gets one shard.
 - **Key file.** The master key is never stored, so the form reads it from a file:
   `master.key.age` or `words.txt.age` from `mnnn keys export --out DIR --only

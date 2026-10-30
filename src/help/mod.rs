@@ -200,6 +200,7 @@ mod tests {
             "network",
             "key-exchanges",
             "dark-shards",
+            "users",
         ] {
             assert!(topic(id).is_some(), "missing docs/{id}.md");
         }

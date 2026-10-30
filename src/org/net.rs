@@ -363,6 +363,15 @@ fn body(v: Value) -> Resp {
 pub fn serve(s: &mut Store, x: &Exchange, from: &PeerId, org_key: &str, req: OrgReq) -> Result<Resp> {
     let org = s.find_org(org_key)?;
     let m = s.member_by_exchange(&x.id)?.filter(|m| m.org_id == org.id && m.peer_id == from.to_string());
+    // another node of a member's user acts with the member's role (its certificate is checked
+    // when the user's card is taken, and a revoked node no longer maps to the user)
+    let m = match m {
+        Some(m) => Some(m),
+        None => match crate::net::user::user_of_peer(s, &from.to_string())? {
+            Some(u) if !u.mine => s.member_by_user(&org.id, &u.id)?,
+            _ => None,
+        },
+    };
     let m = m.ok_or_else(|| Error::invalid("organization", format!("this key exchange is not a membership of {}", org.name)))?;
     let a = super::actor_for(s, &m).unwrap_or(Actor::Guest);
     let role = super::role_name(s, &m);

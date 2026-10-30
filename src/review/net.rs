@@ -49,8 +49,16 @@ fn sv(v: &Value, k: &str) -> String {
     v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
 }
 
+/// How we introduce ourselves to a review: the user's name when it has one (2.10),
+/// otherwise the node's.
 fn me(s: &Store, node: Option<&Node>) -> (String, Vec<String>) {
-    (crate::net::local::my_label(s, &crate::prefs::NetPrefs::default()), client::my_addrs(s, node))
+    let name = s.users().ok().and_then(|u| u.into_iter().find(|u| u.mine)).map(|u| u.label).filter(|l| !l.trim().is_empty());
+    (name.unwrap_or_else(|| crate::net::local::my_label(s, &crate::prefs::NetPrefs::default())), client::my_addrs(s, node))
+}
+
+/// A reviewer's name from their user identity, once their node has introduced it.
+fn user_name(s: &Store, peer: &str) -> Option<String> {
+    crate::net::user::user_of_peer(s, peer).ok().flatten().filter(|u| !u.mine).map(|u| u.label).filter(|l| !l.trim().is_empty())
 }
 
 // ---------- the author's node ----------
@@ -105,7 +113,7 @@ pub fn answered(s: &Store, x: &Exchange) -> Result<()> {
         if let Some(v) = s.reviewer_by_exchange(&x.id)?
             && v.status == ReviewerStatus::Invited
         {
-            let label = if v.label.is_empty() { x.peer_label.clone() } else { v.label.clone() };
+            let label = if !v.label.is_empty() { v.label.clone() } else { user_name(s, &peer).unwrap_or_else(|| x.peer_label.clone()) };
             let v = s.set_reviewer(&v.id, Some(ReviewerStatus::Joined), Some(&peer), Some(&label))?;
             let title = s.review(&v.review_id)?.map(|r| r.title()).unwrap_or_default();
             super::record(

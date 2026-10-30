@@ -9,10 +9,10 @@ it stands: *pending*, *requested*, *connected*, *ended* or *failed*.
 
 | You want to | CLI | TUI |
 |---|---|---|
-| Connect to a node | `mnnn net connect ADDR\|PEER\|NAME` | Net ▸ Connections, `c` |
-| Invite a node | `mnnn net invite` (prints `muninn://join/…`) | Connections, `n` |
-| Use an invite link | `mnnn net connect LINK` | Connections, `p` (paste) |
-| See requests | `mnnn net requests` | Connections: rows marked *requested* |
+| Connect to a node | `mnnn net connect ADDR\|PEER\|NAME` | Net ▸ Nodes, `c` |
+| Invite a node | `mnnn invite create` or `mnnn net invite` (prints `muninn://join/…`) | Net ▸ Invites, `n` |
+| Use an invite link | `mnnn invite accept LINK` or `mnnn net connect LINK` | Invites, `p` (paste) |
+| See requests | `mnnn invite list`, `mnnn net requests` | Invites, or Nodes: rows marked *requested* |
 | Accept / decline | `mnnn net accept X`, `mnnn net decline X` | `a` / `d` on a request |
 | Disconnect | `mnnn net disconnect X` | `r`, then `y` |
 

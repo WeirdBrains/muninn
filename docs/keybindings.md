@@ -97,9 +97,11 @@ In the model designer: `m` design, `r` records, `h` history, `f` rules; in the d
 `a` add, `e` edit, `x` drop, `u` undo, `K` / `J` move, `A` apply, `z` discard; in history
 `b` rolls back; in records `w` where, `/` text, `s` sort, `g` group, `U` / `D` update /
 delete all matching.
-In the network window: Tab / ← → / `1`–`8` change page, `S` start and `X` stop the
+In the network window: Tab / ← → / `1`–`9`, `0` change page, `S` start and `X` stop the
 node, `g` refresh; Peers `c` connect, `l` label, `d` forget; Relays `a` add, `d` remove,
-`r` serve; Connections `c` connect, `a` accept and `d` decline a request, `n` invite
+`r` serve; Connections Enter shows a user's nodes, `t` trust or untrust, `d` forget;
+Invites `n` invite link, `p` paste a link, `a` accept and `d` decline a request, `r`
+withdraw an invite; Nodes `c` connect, `a` accept and `d` decline a request, `n` invite
 link, `p` paste a link, `s` share, `L` their items (Enter imports), `l` label, `r`
 disconnect (`v` checks a short code by hand); Shared `a` share, `d` unshare; Dark shards
 `e` entrust or check (Space picks nodes), `d` drop a held shard; Search Enter runs a saved search across peers; Settings
