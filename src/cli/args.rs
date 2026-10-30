@@ -1729,7 +1729,9 @@ Examples:
   mnnn net search --journals --query comet
   mnnn net fetch ben \"field notes\" --import
   mnnn net shard entrust --to ben --to cleo --to dev --threshold 2
-  mnnn net shard restore --backup net-backup.age --recover";
+  mnnn net shard restore --backup net-backup.age --recover
+
+See `mnnn help network`, `mnnn help key-exchanges` and `mnnn help dark-shards`.";
 
 /// Network commands.
 #[allow(clippy::large_enum_variant)]

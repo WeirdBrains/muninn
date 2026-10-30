@@ -42,7 +42,8 @@ fn help_command() {
     let out = e.ok(&["help", "keys"]);
     assert!(out.starts_with("# Keys"));
     let out = e.ok(&["help", "--search", "shard"]);
-    assert!(out.lines().next().unwrap().starts_with("keys"));
+    assert!(out.lines().next().unwrap().starts_with("dark-shards"));
+    assert!(out.lines().take(2).any(|l| l.starts_with("keys")));
     assert!(!e.run(&["help", "nope"]).status.success());
     assert!(e.ok(&["help", "install"]).starts_with("# Install"));
     assert!(e.ok(&["--help"]).contains("mnnn help install"));

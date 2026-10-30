@@ -64,6 +64,9 @@ Re-issues a new 3-of-5 set. A new set cannot be mixed with shards from an older 
 key, so destroy them if they may be compromised. Without `--out` the shards are
 printed; with `--out` they are written as `shard-N.age`.
 
+Shards can also be entrusted to peers over the network, sealed so they cannot read
+them: see [dark shards](dark-shards.md).
+
 Shard text format: `muninn-shard-v1:<set>:<threshold>:<index>:<hex>:<checksum>`.
 
 ## export

@@ -12,6 +12,7 @@
       interface.toml      # palette + role mapping, [dark] and [light]
       assets/             # optional extras
   preferences.toml        # active theme and mode, ingest defaults
+  net/                    # node.json while a node runs (pid, label, addresses; no secrets)
   prints/                 # PDFs made by `journal print` (and P in the TUI)
   code/                   # code space builds (safe to delete; rebuilt when needed)
     sdk/                  # the muninn-plugin SDK the builds use

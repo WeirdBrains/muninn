@@ -83,6 +83,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `R` | the [rules](rules.md) window (`n` new, `e` edit, Space on/off, `t` test, `x` dry run) |
 | `D` | the [model designer](models.md) |
 | `C` | the [code spaces](code-spaces.md) window (`n` new, Enter edit, `r` run) |
+| `K` | the [network](network.md) window (node status first) |
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
@@ -94,6 +95,12 @@ In the model designer: `m` design, `r` records, `h` history, `f` rules; in the d
 `a` add, `e` edit, `x` drop, `u` undo, `K` / `J` move, `A` apply, `z` discard; in history
 `b` rolls back; in records `w` where, `/` text, `s` sort, `g` group, `U` / `D` update /
 delete all matching.
+In the network window: Tab / ← → / `1`–`8` change page, `S` start and `X` stop the
+node, `g` refresh; Peers `c` connect, `l` label, `d` forget; Relays `a` add, `d` remove,
+`r` serve; Key exchanges `n` offer, `a` accept, `v` verify, `s` share, `L` their items
+(Enter imports), `l` label, `r` revoke, `e` export; Shared `a` share, `d` unshare; Dark
+shards `d` drop a held shard; Search Enter runs a saved search across peers; Settings
+Enter edits or toggles.
 In a code space's editor: `e` edits the source (Esc stops), `s` / Ctrl-S saves, `b`
 builds, `r` / Ctrl-R runs, `c` checks, `i` sets the input, `t` widens the result tile.
 Full tables: [code spaces](code-spaces.md), [models](models.md), [live searches](live-searches.md),

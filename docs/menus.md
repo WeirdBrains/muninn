@@ -1,13 +1,13 @@
 # Menus
 
-The menu bar sits under the header: **File, View, Data, Projects, Keys, Theme, Help**.
+The menu bar sits under the header: **File, View, Data, Projects, Network, Keys, Theme, Help**.
 
 ## Opening and moving
 
 | input | effect |
 |-------|--------|
 | F10 | open the first menu (File) |
-| Alt+letter | open the menu with that underlined letter (Alt+F File, Alt+V View, Alt+D Data, Alt+P Projects, Alt+K Keys, Alt+T Theme, Alt+H Help) |
+| Alt+letter | open the menu with that underlined letter (Alt+F File, Alt+V View, Alt+D Data, Alt+P Projects, Alt+N Network, Alt+K Keys, Alt+T Theme, Alt+H Help) |
 | mouse click | click a menu title to open or close it, click an item to run it |
 | ← → / h l | previous / next menu; ← also closes a submenu |
 | ↑ ↓ / k j | move inside a dropdown |
@@ -30,6 +30,7 @@ Every menu item runs a named action. The same actions are bound to keys
 | View | New tile ▸ · Split ▸ · Close tile · Zoom tile · Equalize · Change view · Link tile · Chart layers… · Container ▸ · Layouts ▸ · Toggle sidebar · History ▸ (Show/hide history bar, Step back, Step forward) |
 | Data | Sources… · Symbols… · Filters ▸ (Source, Symbol, Time range…, Price, Period, Year, Clear all) · Sort ▸ · Coverage & gaps · Model designer… · Refresh |
 | Projects | Projects… · New project… · Live searches… · Save search as live search… · Journals… · New journal… · Reports… · New report… · Rules… · Code spaces… · Add selected series to project… |
+| Network | Node status… · Start node · Stop node · Peers… · Relays… · Key exchanges… · Shared data… · Dark shards… · Network search… · Settings… ([network](network.md)) |
 | Keys | Initialize… · Lock · Rotate service key · Rekey database · Export… · Recover ▸ · Re-issue shards |
 | Theme | Select… · Mode ▸ (Light, Dark, System) · Edit current… · New from current… · Import… · Export… |
 | Help | Help topics · Search help… · Keybindings · About Muninn |

@@ -48,6 +48,8 @@ backup was made. If you lost it, use `mnnn keys recover` with the words or 3 sha
 | service keys | re-derived from the master + version (`keys rotate` / `keys recover`) |
 | shards | re-issued from the master (`keys shards`, a new set) |
 | database / preferences / themes | `mnnn backup restore` |
+| node identity and key exchanges | `mnnn net exchange restore FILE` ([key exchanges](key-exchanges.md#backups)) |
+| master key, with no words or shards at hand | `mnnn net shard restore` from peers ([dark shards](dark-shards.md)) |
 
 ## Example
 

@@ -30,6 +30,12 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Code spaces](code-spaces.md): math, Polars, Rust or Python compiled to native plugins over your data
 - [Export formats](export-formats.md): PDF, HTML, Word, LaTeX, JSON, CSV; printing; project archives and import
 
+## Network
+
+- [Network](network.md): the node, peers, relays, sharing and searching across peers; the Network menu
+- [Key exchanges](key-exchanges.md): offers, answers, short codes, verifying, revoking, backups
+- [Dark shards](dark-shards.md): the master key split among peers, sealed so they cannot read it
+
 ## Getting data in and out
 
 - [CSV ingest](ingest-csv.md)

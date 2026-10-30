@@ -194,6 +194,9 @@ mod tests {
             "rules",
             "models",
             "code-spaces",
+            "network",
+            "key-exchanges",
+            "dark-shards",
         ] {
             assert!(topic(id).is_some(), "missing docs/{id}.md");
         }
@@ -211,7 +214,8 @@ mod tests {
     #[test]
     fn search_ranks_and_fuzzy() {
         let r = search("shard");
-        assert_eq!(r[0].id, "keys", "{:?}", r.iter().map(|t| t.id).collect::<Vec<_>>());
+        assert_eq!(r[0].id, "dark-shards", "{:?}", r.iter().map(|t| t.id).collect::<Vec<_>>());
+        assert!(r.iter().take(2).any(|t| t.id == "keys"));
         assert!(search("postgres").iter().take(2).any(|t| t.id == "services/postgres"));
         assert!(search("zzzzqqq").is_empty());
         assert!(search("bckprcv").iter().any(|t| t.id == "backup-recovery"));

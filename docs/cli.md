@@ -50,6 +50,7 @@ never invents a missing source, symbol or duration.
 |----------|---------|
 | `MUNINN_PASSWORD` | password that unlocks the service key (else a hidden prompt) |
 | `MUNINN_EXPORT_PASSWORD` | password for key exports and encrypted backups (falls back to `MUNINN_PASSWORD`) |
+| `MUNINN_SHARD_PASSWORD` | password that seals [dark shards](dark-shards.md) (else asked for) |
 | `MUNINN_LOG` | tracing filter, e.g. `debug` |
 | `MUNINN_RAW_DATA` | folder with the full raw CSVs for the ignored full-file tests |
 | `MUNINN_CARGO` | cargo used to build [code spaces](code-spaces.md) (default: `cargo` on `PATH`) |
