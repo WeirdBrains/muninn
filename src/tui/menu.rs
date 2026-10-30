@@ -150,6 +150,17 @@ pub fn menus() -> Vec<Menu> {
                 a("Reports…", 'r', "O", Reports),
                 a("New report…", 'w', "", NewReport),
                 sep(),
+                sub(
+                    "Reviews",
+                    'v',
+                    vec![
+                        a("Reviews…", 'v', "V", Reviews),
+                        a("Ask for a review…", 'a', "", ReviewNew),
+                        a("Thread…", 't', "", ReviewThread),
+                        a("Reviewing (joined)…", 'j', "", ReviewsJoined),
+                    ],
+                ),
+                sep(),
                 a("Rules…", 'u', "R", Rules),
                 a("Code spaces…", 'c', "C", Code),
                 sep(),

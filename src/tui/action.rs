@@ -84,6 +84,11 @@ pub enum Action {
     OrgSite,
     OrgHostStart,
     OrgHostStop,
+    // Reviews
+    Reviews,
+    ReviewNew,
+    ReviewThread,
+    ReviewsJoined,
     // View
     NewTile(ViewKind),
     SplitRight,
@@ -188,6 +193,10 @@ impl Action {
             OrgSite => "org.site".into(),
             OrgHostStart => "org.host.start".into(),
             OrgHostStop => "org.host.stop".into(),
+            Reviews => "review.list".into(),
+            ReviewNew => "review.new".into(),
+            ReviewThread => "review.thread".into(),
+            ReviewsJoined => "review.joined".into(),
             Quit => "quit".into(),
             NewTile(v) => format!("tile.new.{}", if v == ViewKind::List { "list" } else { "chart" }),
             SplitRight => "tile.split-right".into(),

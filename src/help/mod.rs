@@ -170,6 +170,7 @@ mod tests {
             "README",
             "cli",
             "organizations",
+            "reviews",
             "org-hosting",
             "ingest-csv",
             "ingest-json",

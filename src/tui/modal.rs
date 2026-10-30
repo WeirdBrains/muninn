@@ -51,6 +51,7 @@ pub enum Modal {
     Network,
     /// Organizations ▸ …
     Orgs,
+    Reviews,
     /// Data ▸ Model designer…
     Models,
     /// Export a journal, entry, report or project as a document.
@@ -114,6 +115,7 @@ impl Modal {
             Modal::Rules => "rules",
             Modal::Network => "network",
             Modal::Orgs => "organizations",
+            Modal::Reviews => "reviews",
             Modal::Code => "code-spaces",
             Modal::Models => "models",
             Modal::DocExport => "export-formats",
@@ -148,6 +150,7 @@ impl Modal {
             Modal::Rules => app.rules.typing(),
             Modal::Network => app.network.typing(),
             Modal::Orgs => app.orgs.typing(),
+            Modal::Reviews => app.reviews.typing(),
             Modal::Code => app.code.typing(),
             Modal::Models => app.models.typing(),
             Modal::DocExport => app.doc_export.typing(),
@@ -262,6 +265,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             Some(Modal::Rules) => super::rules::on_click(app, i),
             Some(Modal::Network) => super::network::on_click(app, i),
             Some(Modal::Orgs) => super::orgs::on_click(app, i),
+            Some(Modal::Reviews) => super::reviews::on_click(app, i),
             Some(Modal::Code) => super::code::on_click(app, i),
             Some(Modal::Models) => super::models::on_click(app, i),
             Some(Modal::DocExport) => super::docexport::on_click(app, i),
@@ -336,6 +340,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Rules => super::rules::on_key(app, k),
         Modal::Network => super::network::on_key(app, k),
         Modal::Orgs => super::orgs::on_key(app, k),
+        Modal::Reviews => super::reviews::on_key(app, k),
         Modal::Code => super::code::on_key(app, k),
         Modal::Models => super::models::on_key(app, k),
         Modal::DocExport => super::docexport::on_key(app, k),
@@ -641,6 +646,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Rules => super::rules::draw(app, f, r, &mut extra),
         Modal::Network => super::network::draw(app, f, r, &mut extra),
         Modal::Orgs => super::orgs::draw(app, f, r, &mut extra),
+        Modal::Reviews => super::reviews::draw(app, f, r, &mut extra),
         Modal::Code => super::code::draw(app, f, r, &mut extra),
         Modal::Models => super::models::draw(app, f, r, &mut extra),
         Modal::DocExport => super::docexport::draw(app, f, r, &mut extra),

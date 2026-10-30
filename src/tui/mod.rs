@@ -23,6 +23,7 @@ pub mod orgs;
 pub mod picker;
 pub mod projects;
 pub mod reports;
+pub mod reviews;
 pub mod rules;
 pub mod searches;
 pub mod sidebar;
@@ -135,6 +136,7 @@ pub struct App {
     pub rules: rules::RulesState,
     pub network: network::NetState,
     pub orgs: orgs::OrgsState,
+    pub reviews: reviews::ReviewsState,
     pub code: code::CodeState,
     pub models: models::ModelsState,
     pub projects: projects::ProjectsState,
@@ -177,6 +179,7 @@ impl App {
             rules: Default::default(),
             network: Default::default(),
             orgs: Default::default(),
+            reviews: Default::default(),
             code: Default::default(),
             models: Default::default(),
             projects: Default::default(),
@@ -281,6 +284,7 @@ impl App {
             KeyCode::Char('R') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Rules),
             KeyCode::Char('K') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::NetStatus),
             KeyCode::Char('G') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Orgs),
+            KeyCode::Char('V') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reviews),
             KeyCode::Char('C') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Code),
             KeyCode::Char('D') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Models),
             KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
@@ -388,6 +392,10 @@ impl App {
             OrgResources => orgs::open(self, orgs::Tab::Resources),
             OrgJoined => orgs::open(self, orgs::Tab::Joined),
             OrgSite => orgs::open(self, orgs::Tab::Site),
+            Reviews => reviews::open(self, reviews::Tab::Reviews),
+            ReviewNew => reviews::open_new(self),
+            ReviewThread => reviews::open(self, reviews::Tab::Thread),
+            ReviewsJoined => reviews::open(self, reviews::Tab::Joined),
             OrgHostStart => {
                 orgs::start_host(self);
                 orgs::open(self, orgs::Tab::Site);
@@ -1172,6 +1180,7 @@ impl App {
         code::poll(self);
         network::poll(self);
         orgs::poll(self);
+        reviews::poll(self);
     }
 }
 
@@ -1185,6 +1194,8 @@ mod network_tests;
 mod orgs_tests;
 #[cfg(test)]
 mod reports_tests;
+#[cfg(test)]
+mod reviews_tests;
 #[cfg(test)]
 mod rules_tests;
 #[cfg(test)]
