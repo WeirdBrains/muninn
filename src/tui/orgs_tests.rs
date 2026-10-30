@@ -38,7 +38,7 @@ fn settle(a: &mut App) {
 fn organizations_window_makes_and_runs_an_org_and_serves_its_site() {
     let (_t, mut a) = app();
     local_node(&mut a, "anna");
-    assert!(menu::menus().iter().any(|m| m.title == "Organizations"));
+    assert!(menu::menus().iter().any(|m| m.title == "Orgs"));
     a.on_key(key(KeyCode::Char('G')));
     assert!(matches!(a.modal, Some(Modal::Orgs)));
     assert_eq!(a.help_topic(), "organizations");

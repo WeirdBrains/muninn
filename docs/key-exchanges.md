@@ -9,7 +9,7 @@ it stands: *pending*, *requested*, *connected*, *ended* or *failed*.
 
 | You want to | CLI | TUI |
 |---|---|---|
-| Connect to a node | `mnnn net connect ADDR\|PEER\|NAME` | Network ▸ Connections, `c` |
+| Connect to a node | `mnnn net connect ADDR\|PEER\|NAME` | Net ▸ Connections, `c` |
 | Invite a node | `mnnn net invite` (prints `muninn://join/…`) | Connections, `n` |
 | Use an invite link | `mnnn net connect LINK` | Connections, `p` (paste) |
 | See requests | `mnnn net requests` | Connections: rows marked *requested* |

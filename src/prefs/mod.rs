@@ -103,7 +103,7 @@ pub struct Preferences {
     pub ingest: IngestPrefs,
     #[serde(default)]
     pub tui: TuiPrefs,
-    /// The network node (`mnnn net config`, Network ▸ Settings).
+    /// The network node (`mnnn net config`, Net ▸ Node ▸ Settings).
     #[serde(default)]
     pub net: NetPrefs,
     /// Organization web hosting (`mnnn org host`, `[hosting]`).

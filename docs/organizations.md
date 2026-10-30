@@ -11,7 +11,7 @@ invitation, then act with the role they were given. Every change is recorded in 
 
 ## Creating and changing an org
 
-| | CLI | TUI (`G`, Organizations menu) |
+| | CLI | TUI (`G`, Orgs menu) |
 |---|---|---|
 | Create | `mnnn org create NAME [--slug S] [--description D] [--public] [--open]` | Orgs page `n` |
 | Change | `mnnn org edit ORG [--name] [--slug] [--description] [--visibility public\|private] [--access members\|open] [--hosted on\|off] [--member-auth on\|off] [--template T]` | `r` rename, `v` visibility, `o` access, `h` hosted, `m` member sign-in |

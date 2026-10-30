@@ -73,7 +73,7 @@ fn header_large_and_compact() {
 fn menu_opens_with_f10_alt_and_mouse() {
     let (_t, mut a) = app();
     let s = screen_text(&mut a);
-    for m in ["File", "View", "Data", "Projects", "Network", "Organizations", "Keys", "Theme", "Help"] {
+    for m in ["File", "View", "Data", "Projects", "Net", "Orgs", "Keys", "Theme", "Help"] {
         assert!(s.contains(m), "{m}");
     }
     a.on_key(key(KeyCode::F(10)));
@@ -97,6 +97,55 @@ fn menu_opens_with_f10_alt_and_mouse() {
     a.on_mouse(click(r.x + 2, r.y));
     assert_eq!(a.last_action, Some(Action::About));
     assert!(screen_text(&mut a).contains("Local, encrypted store"));
+}
+
+#[test]
+fn every_category_fits_at_80_columns_and_dropdowns_stay_below_the_bar() {
+    let (_t, mut a) = app();
+    for w in [80u16, 100, 160] {
+        let s = render(&mut a, w, 24);
+        let bar = s.lines().find(|l| l.contains("File") && l.contains("Help")).unwrap_or_else(|| panic!("no menu bar at {w}: {s}"));
+        let mut at = 0;
+        for m in menu::menus() {
+            let i = bar[at..].find(m.title).map(|i| i + at).unwrap_or_else(|| panic!("{} missing at {w}: {bar}", m.title));
+            at = i + m.title.len();
+        }
+        assert_eq!(bar.contains("Alt+letter"), w >= 100, "{w}: {bar}");
+    }
+    // each dropdown opens right below its own category, also on a short screen
+    for (i, m) in menu::menus().iter().enumerate() {
+        a.menu.open_top(i);
+        for h in [12u16, 24] {
+            let s = render(&mut a, 80, h);
+            let (top, _) = *a.hits.iter().find(|(_, x)| *x == Hit::MenuTop(i)).unwrap();
+            let first =
+                a.hits.iter().find(|(_, x)| *x == Hit::MenuItem(0, 0)).map(|(r, _)| *r).unwrap_or_else(|| panic!("{}: no items {s}", m.title));
+            assert!(first.y > top.y, "{} covers the bar at height {h}", m.title);
+            assert!(first.x <= top.x + 1 || first.x + first.width >= 79, "{} not under its category", m.title);
+            assert!(s.lines().nth(top.y as usize).unwrap().contains(m.title), "{} bar hidden: {s}", m.title);
+        }
+        a.menu.close();
+    }
+    // every window and feature is reachable from a menu
+    let all = menu::all_actions();
+    for x in [
+        Action::NetExchanges,
+        Action::NetInvite,
+        Action::NetEntrust,
+        Action::NetShards,
+        Action::NetSettings,
+        Action::Orgs,
+        Action::OrgSite,
+        Action::Reviews,
+        Action::Code,
+        Action::Models,
+        Action::Rules,
+        Action::Authors,
+        Action::Preferences,
+        Action::KeysExport,
+    ] {
+        assert!(all.contains(&x), "{x:?}");
+    }
 }
 
 #[test]

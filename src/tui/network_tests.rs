@@ -37,7 +37,7 @@ fn settle(a: &mut App) {
 #[test]
 fn network_window_is_off_and_empty_by_default_and_saves_settings() {
     let (_t, mut a) = app();
-    assert!(menu::menus().iter().any(|m| m.title == "Network"));
+    assert!(menu::menus().iter().any(|m| m.title == "Net"));
     a.on_key(key(KeyCode::Char('K')));
     assert!(matches!(a.modal, Some(Modal::Network)));
     assert_eq!(a.help_topic(), "network");

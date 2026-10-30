@@ -2,15 +2,15 @@
 
 Any node can serve the sites of its organizations over HTTPS: HTML pages, a JSON API,
 template assets and gRPC, all on one port. **Nothing listens until you start it** (or
-turn on `hosting.autostart`: `mnnn org host autostart on`, TUI Network ▸ Settings ▸ *web
+turn on `hosting.autostart`: `mnnn org host autostart on`, TUI Net ▸ Node ▸ Settings ▸ *web
 server with the node*, so it comes up whenever the node does), and by default only on
 `127.0.0.1`. Which orgs are served is each org's *hosted* flag
 (`mnnn org edit ORG --hosted on`), plus mirrors of joined orgs.
 
-| | CLI | TUI (Organizations ▸ Site & certificate…) |
+| | CLI | TUI (Orgs ▸ Site & certificate…) |
 |---|---|---|
-| Start | `mnnn org host start [--bind ADDR] [--port N] [--for SECS]` (foreground, Ctrl-C stops) | `S` / Enter, or Organizations ▸ Start site |
-| Stop | `mnnn org host stop` | `S` again or `X`, or Organizations ▸ Stop site |
+| Start | `mnnn org host start [--bind ADDR] [--port N] [--for SECS]` (foreground, Ctrl-C stops) | `S` / Enter, or Orgs ▸ Start site |
+| Stop | `mnnn org host stop` | `S` again or `X`, or Orgs ▸ Stop site |
 | Status | `mnnn org host status [--json]` | the Site page |
 | Certificate | `mnnn org cert status [--json]`, `mnnn org cert renew` | the Site page |
 | ACME | `mnnn org cert acme --domain D --email E [--directory] [--profile] [--http-port]`, `--off` | `e` "domain email" or "off" |

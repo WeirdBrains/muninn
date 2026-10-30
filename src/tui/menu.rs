@@ -168,26 +168,33 @@ pub fn menus() -> Vec<Menu> {
             ],
         },
         Menu {
-            title: "Network",
+            title: "Net",
             mnemonic: 'n',
             items: vec![
-                a("Node status…", 'n', "K", NetStatus),
-                a("Start node", 's', "", NetStart),
-                a("Stop node", 't', "", NetStop),
+                sub(
+                    "Node",
+                    'n',
+                    vec![
+                        a("Status…", 's', "K", NetStatus),
+                        a("Start node", 't', "", NetStart),
+                        a("Stop node", 'p', "", NetStop),
+                        a("Settings…", 'g', "", NetSettings),
+                    ],
+                ),
                 sep(),
+                a("Connections…", 'c', "", NetExchanges),
+                a("Invite or connect…", 'i', "", NetInvite),
                 a("Peers…", 'p', "", NetPeers),
                 a("Relays…", 'r', "", NetRelays),
-                a("Connections…", 'c', "", NetExchanges),
+                sep(),
                 a("Shared data…", 'd', "", NetShared),
-                a("Dark shards…", 'h', "", NetShards),
-                a("Entrust dark shards…", 'u', "", NetEntrust),
                 a("Network search…", 'e', "", NetSearch),
                 sep(),
-                a("Settings…", 'g', "", NetSettings),
+                sub("Dark shards", 'h', vec![a("Held & entrusted…", 'h', "", NetShards), a("Entrust…", 'e', "", NetEntrust)]),
             ],
         },
         Menu {
-            title: "Organizations",
+            title: "Orgs",
             mnemonic: 'o',
             items: vec![
                 a("Organizations…", 'o', "G", Orgs),
@@ -428,7 +435,13 @@ pub fn draw_bar(state: &MenuState, f: &mut Frame, area: Rect, t: &Theme, hits: &
         spans.push(Span::styled(" ", base));
         x += w + 1;
     }
-    spans.push(Span::styled("  F10 menu · Alt+letter", Style::new().fg(t.muted).bg(t.selection_bg)));
+    // the hint only when it fits; the categories always do
+    for hint in ["  F10 menu · Alt+letter", "  F10"] {
+        if x + hint.chars().count() as u16 <= area.right() {
+            spans.push(Span::styled(hint, Style::new().fg(t.muted).bg(t.selection_bg)));
+            break;
+        }
+    }
     f.render_widget(Paragraph::new(Line::from(spans)), area);
     xs
 }
@@ -456,8 +469,10 @@ pub fn draw_dropdowns(
         let width = (lw + sw + 7) as u16;
         let height = items.len() as u16 + 2;
         let rx = x.min(screen.right().saturating_sub(width));
-        let ry = y.min(screen.bottom().saturating_sub(height));
-        let r = Rect { x: rx, y: ry, width: width.min(screen.width), height: height.min(screen.height) };
+        // below the bar, always: shift up only as far as the row under it, then clip
+        let top_row = bar.bottom();
+        let ry = y.min(screen.bottom().saturating_sub(height)).max(top_row);
+        let r = Rect { x: rx, y: ry, width: width.min(screen.width), height: height.min(screen.bottom().saturating_sub(ry)) };
         f.render_widget(Clear, r);
         let block = Block::bordered().border_style(Style::new().fg(t.border_focus)).style(Style::new().bg(t.bg).fg(t.fg));
         let inner = block.inner(r);

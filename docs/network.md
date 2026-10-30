@@ -20,9 +20,9 @@ id (`12D3KooW…`) is how others know it.
 
 | | CLI | TUI |
 |---|---|---|
-| Start | `mnnn net start [--port N] [--listen ADDR] [--no-mdns] [--relay-server] [--for SECS]` | Network ▸ Start node, or `S` in the Network window |
-| Stop | `mnnn net stop` (or Ctrl-C) | Network ▸ Stop node, or `X` |
-| Status | `mnnn net status [--json]` | Network ▸ Node status… (`K`) |
+| Start | `mnnn net start [--port N] [--listen ADDR] [--no-mdns] [--relay-server] [--for SECS]` | Net ▸ Node ▸ Start node, or `S` in the Network window |
+| Stop | `mnnn net stop` (or Ctrl-C) | Net ▸ Node ▸ Stop node, or `X` |
+| Status | `mnnn net status [--json]` | Net ▸ Node ▸ Status… (`K`) |
 | Peers | `mnnn net peers`, `forget PEER` | Peers page: `c` connect, `l` label, `d` forget |
 | Connections | `mnnn net connect X`, `invite`, `requests`, `accept X`, `decline X`, `disconnect X` | Connections page: `c` `n` `p` `a` `d` `r` |
 | Relays | `mnnn net relay list/add/remove/serve on\|off` | Relays page: `a` add, `d` remove, `r` serve |
@@ -86,10 +86,11 @@ Each result line starts with where it came from (`local` or the peer's label). A
 runs the search only over what it shares with you and never returns anything else. In
 the TUI the Search page runs a saved [live search](live-searches.md) across the network.
 
-## The Network menu
+## The Net menu
 
-Node status… (`K`) · Start node · Stop node · Peers… · Relays… · Connections… ·
-Shared data… · Dark shards… · Entrust dark shards… · Network search… · Settings…
+Node ▸ (Status… `K`, Start node, Stop node, Settings…) · Connections… · Invite or
+connect… · Peers… · Relays… · Shared data… · Network search… · Dark shards ▸ (Held &
+entrusted…, Entrust…)
 
 All open one window with eight pages: Tab (or ← →, or `1`–`8`) moves between them.
 Work that talks to other nodes runs in the background; the title shows it, and the

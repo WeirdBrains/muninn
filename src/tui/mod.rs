@@ -384,6 +384,7 @@ impl App {
             NetShared => network::open(self, network::Tab::Shared),
             NetShards => network::open(self, network::Tab::Shards),
             NetEntrust => network::open_entrust(self),
+            NetInvite => network::open_invite(self),
             NetSearch => network::open(self, network::Tab::Search),
             NetSettings => network::open(self, network::Tab::Settings),
             Orgs => orgs::open(self, orgs::Tab::Orgs),

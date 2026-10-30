@@ -1,4 +1,4 @@
-//! Network ▸ … (K): the node, peers, relays, connections, shared data, dark shards,
+//! Net ▸ … (K): the node, peers, relays, connections, shared data, dark shards,
 //! network searches and settings. Thin over [`crate::net`]; anything that talks to
 //! other nodes runs on a worker thread so the window stays usable.
 use super::forms::{Form, FormEvent, expand};
@@ -179,6 +179,12 @@ pub fn open(app: &mut App, tab: Tab) {
     app.modal = Some(super::modal::Modal::Network);
 }
 
+/// Open Connections with the invite-or-connect prompt (menu: Net ▸ Invite or connect…).
+pub fn open_invite(app: &mut App) {
+    open(app, Tab::Exchanges);
+    app.network.ask = Some(Ask::new(NAsk::Offer, "Invite link (Enter) or connect to (address, peer id)", ""));
+}
+
 fn reload(app: &mut App) {
     let s = &app.store;
     let st = &mut app.network;
@@ -222,7 +228,7 @@ fn label(app: &App) -> String {
     local::my_label(&app.store, &app.prefs.net)
 }
 
-/// Start the node with the saved settings (Network ▸ Start node).
+/// Start the node with the saved settings (Net ▸ Node ▸ Start node).
 pub fn start(app: &mut App) {
     if app.network.node_running() {
         ok(app, "the node is already running");
@@ -1216,7 +1222,7 @@ pub fn shutdown(app: &mut App) {
 
 // ---------------- Dark shards: entrust and check ----------------
 
-/// Network ▸ Dark shards ▸ e: pick connected nodes, give the key file and a shard password.
+/// Net ▸ Dark shards ▸ Held & entrusted, e: pick connected nodes, give the key file and a shard password.
 /// The master key is never stored, so it is read from a key file (`mnnn keys export` or
 /// the recovery words saved to a file, plain or .age). Passwords are masked, cleared after
 /// use and never logged.
@@ -1237,7 +1243,7 @@ const F_PW: &str = "shard pass";
 const F_REPEAT: &str = "repeat";
 const F_K: &str = "threshold";
 
-/// Open the entrust form (Network ▸ Entrust dark shards…).
+/// Open the entrust form (Net ▸ Dark shards ▸ Entrust…).
 pub fn open_entrust(app: &mut App) {
     if app.network.tab != Tab::Shards || app.modal.is_none() {
         open(app, Tab::Shards);

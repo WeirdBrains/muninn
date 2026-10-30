@@ -1,4 +1,4 @@
-//! Organizations ▸ … (G): my orgs, their members, roles and resources, the orgs I joined
+//! Orgs ▸ … (G): my orgs, their members, roles and resources, the orgs I joined
 //! and the site. Thin over [`crate::org`]; anything that talks to other nodes runs on a
 //! worker thread so the window stays usable.
 use super::workspace::{Ask, Typed, View, ask_key, draw_view, muted, record, row_style};
@@ -237,7 +237,7 @@ pub fn poll(app: &mut App) {
     }
 }
 
-/// Serve the hosted orgs (Organizations ▸ Start site).
+/// Serve the hosted orgs (Orgs ▸ Start site).
 pub fn start_host(app: &mut App) {
     if app.orgs.host.is_some() {
         return ok(app, "the site is already being served");

@@ -27,7 +27,7 @@ fn record(s: &Store, origin: &str, kind: &str, summary: String, params: serde_js
 
 /// The error for operations that need a running node.
 pub fn no_node() -> Error {
-    Error::Other("network: no node (start one with `mnnn net start`, or the TUI's Network ▸ Start node)".into())
+    Error::Other("network: no node (start one with `mnnn net start`, or the TUI's Net ▸ Node ▸ Start node)".into())
 }
 
 /// Addresses we know for a peer: from sightings, its exchange tokens, and through relays.

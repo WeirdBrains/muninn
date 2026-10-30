@@ -34,8 +34,8 @@ the holders record `net.shard.hold`.
 
 ## In the TUI
 
-Network ▸ Dark shards… lists the shards you entrusted and those you hold for others
-(`d` drops one you hold). `e` (or Network ▸ Entrust dark shards…) opens the entrust form:
+Net ▸ Dark shards ▸ Held & entrusted… lists the shards you entrusted and those you hold for others
+(`d` drops one you hold). `e` (or Net ▸ Dark shards ▸ Entrust…) opens the entrust form:
 
 - **Nodes.** Every node you are connected to is listed; Space picks it. Each picked node
   gets one shard.
