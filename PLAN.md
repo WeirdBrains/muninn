@@ -16,7 +16,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 6 | [Code Spaces](#code-spaces) | v2.5.0 | ✅ Released |
 | 7 | [Decentralized Network](#decentralized-network) | v2.6.0 | ✅ Released |
 | 8 | [Organizations](#organizations) | v2.7.0 | ✅ Released |
-| 9 | [Reviews](#reviews) | v2.8.0 | 📋 Planned |
+| 9 | [Reviews](#reviews) | v2.8.0 | ✅ Released |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
 
 **2.0 launch wrap-up:** snapshot to `docs/historical/2.0` with this plan, the announcement, and the full changelog; then clear `PLAN.md`.
