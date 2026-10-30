@@ -6,6 +6,16 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-10-30
+
+### Added
+- Linked nodes sync all of a user's data end to end encrypted (`mnnn sync status|now`), about once a minute while a node runs
+- Conflicts keep the newer row and save the other (`mnnn sync conflicts|show|resolve`); an edit beats a delete
+- Bars sync on request (`mnnn sync bars`); revoked nodes are not served
+
+### Changed
+- Other nodes' history is added under local ids; a linking node drops its old identity
+
 ## [2.10.0] - 2026-10-30
 
 ### Added
@@ -354,7 +364,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/kommandosaldat/muninn/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/kommandosaldat/muninn/compare/v2.9.2...v2.10.0
 [2.9.2]: https://github.com/kommandosaldat/muninn/compare/v2.9.1...v2.9.2
 [2.9.1]: https://github.com/kommandosaldat/muninn/compare/v2.9.0...v2.9.1

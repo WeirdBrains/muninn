@@ -3765,7 +3765,7 @@ dependencies = [
 
 [[package]]
 name = "muninn"
-version = "2.10.0"
+version = "2.11.0"
 dependencies = [
  "age",
  "anyhow",
