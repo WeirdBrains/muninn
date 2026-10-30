@@ -76,6 +76,33 @@ impl Lang {
     }
 }
 
+/// Where a code space belongs: the built-in global one, the user's own, or an organization
+/// it was given to. Shown and filtered in the CLI and TUI, carried in executable
+/// descriptors and used in permission checks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CodeScope {
+    Global,
+    User,
+    Organization { org_id: String },
+}
+
+impl CodeScope {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            CodeScope::Global => "global",
+            CodeScope::User => "user",
+            CodeScope::Organization { .. } => "organization",
+        }
+    }
+    pub fn org_id(&self) -> Option<&str> {
+        match self {
+            CodeScope::Organization { org_id } => Some(org_id),
+            _ => None,
+        }
+    }
+}
+
 /// The records a code space gets as its input (`host.input()`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CodeInput {
@@ -337,6 +364,25 @@ impl Store {
         self.conn.execute("DELETE FROM project_items WHERE kind = 'code' AND ref_id = ?1", [&c.id])?;
         self.conn.execute("DELETE FROM code_spaces WHERE id = ?1", [&c.id])?;
         Ok(c)
+    }
+}
+
+impl Store {
+    /// The scope of each code space here (by id): organization when it is an active
+    /// resource of an org, else user.
+    pub fn code_scopes(&self) -> Result<std::collections::HashMap<String, CodeScope>> {
+        let mut st = self.conn.prepare("SELECT ref_id, org_id FROM org_resources WHERE kind = 'code' AND state = 'active'")?;
+        let mut m = std::collections::HashMap::new();
+        for r in st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
+            let (id, org_id) = r?;
+            m.insert(id, CodeScope::Organization { org_id });
+        }
+        Ok(m)
+    }
+
+    /// One code space's scope.
+    pub fn code_scope(&self, id: &str) -> Result<CodeScope> {
+        Ok(self.code_scopes()?.remove(id).unwrap_or(CodeScope::User))
     }
 }
 

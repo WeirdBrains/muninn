@@ -4,15 +4,15 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-code\-list \- List code spaces
+mnnn\-code\-list \- List code spaces, with their scope (user, organization or global)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn code list\fR [\fB\-\-home\fR] [\fB\-\-json\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn code list\fR [\fB\-\-home\fR] [\fB\-\-scope\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-List code spaces
+List code spaces, with their scope (user, organization or global)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -23,14 +23,17 @@ Muninn home directory (default ~/.muninn)
 May also be specified with the \fBMUNINN_HOME\fR environment variable. 
 .RE
 .TP
-\fB\-\-json\fR
-
+\fB\-\-scope\fR \fI<SCOPE>\fR
+Only this scope: user, org (any organization), org:NAME, or global
 .TP
 \fB\-\-db\fR \fI<PATH>\fR
 Database file (default <home>/storage/muninn.database)
 .RS
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
+.TP
+\fB\-\-json\fR
+
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors

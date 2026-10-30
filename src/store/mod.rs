@@ -23,7 +23,7 @@ pub mod searches;
 pub mod sync;
 pub mod users;
 pub use authors::{Author, AuthorChange};
-pub use code::{CodeChange, CodeInput, CodeSpace, Lang, RunInfo};
+pub use code::{CodeChange, CodeInput, CodeScope, CodeSpace, Lang, RunInfo};
 pub use history::{ActionRecord, Move, NewAction, TreeRow};
 pub use journals::{Annotation, AnnotationKind, Attachment, Entry, EntryFormat, Journal, JournalDoc, Span};
 pub use models::{ApplyOpts, Design, Field, FieldOp, FieldType, Model, ModelVersion, Plan, Step};

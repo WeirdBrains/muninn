@@ -42,7 +42,7 @@ fn code_spaces_are_managed_reported_and_carried_in_archives() {
     assert!(!o.status.success(), "names are unique");
 
     let list = e.ok(&["code", "list"]);
-    assert!(list.contains("fast\tmath\tnot approved\tnever run"), "{list}");
+    assert!(list.contains("fast\tmath\tuser\tnot approved\tnever run"), "{list}");
     let show = e.ok(&["code", "show", "fast"]);
     assert!(show.contains("input:       bars where symbol = BTC/USDT sort timestamp limit 5") && show.contains("author:      Ada"), "{show}");
     assert!(show.contains("double = close * 2"), "{show}");
@@ -86,7 +86,7 @@ fn code_spaces_are_managed_reported_and_carried_in_archives() {
     let msg = e.ok(&["project", "import", pack.to_str().unwrap(), "--name", "Copy"]);
     assert!(msg.contains("2 code spaces (to approve)"), "{msg}");
     let list = e.ok(&["code", "list"]);
-    assert!(list.contains("fast (imported)\tmath\tnot approved"), "{list}");
+    assert!(list.contains("fast (imported)\tmath\tuser\tnot approved"), "{list}");
     let pre = e.ok(&["report", "preview", "Weekly (imported)"]);
     assert!(pre.contains("Code space fast (imported)") && pre.contains("Not run yet"), "the copy points at the copied space: {pre}");
 
@@ -152,4 +152,25 @@ fn a_math_code_space_builds_runs_and_runs_from_a_rule() {
     assert!(o.status.success() && err(&o).contains("rule Recalc: code space fast:"), "{}", err(&o));
     let h = e.ok(&["history", "list"]);
     assert!(h.matches("run code space fast").count() >= 3, "{h}");
+}
+
+#[test]
+fn code_spaces_have_a_scope() {
+    let e = Env::new();
+    e.ok(&["author", "add", "--name", "Ada"]);
+    e.ok(&["code", "create", "mine", "--lang", "math", "--source", "x = close"]);
+    e.ok(&["code", "create", "shared", "--lang", "math", "--source", "y = close"]);
+    e.ok(&["org", "create", "Comet Lab"]);
+    e.ok(&["org", "resource", "add", "comet-lab", "code", "shared"]);
+    let all = e.ok(&["code", "list"]);
+    assert!(all.lines().any(|l| l.contains("\tmine\t") && l.contains("\tuser\t")), "{all}");
+    assert!(all.lines().any(|l| l.contains("\tshared\t") && l.contains("\torg:comet-lab\t")), "{all}");
+    let user = e.ok(&["code", "list", "--scope", "user"]);
+    assert!(user.contains("mine") && !user.contains("shared"), "{user}");
+    let org = e.ok(&["code", "list", "--scope", "org:comet-lab"]);
+    assert!(org.contains("shared") && !org.contains("mine"), "{org}");
+    let j: serde_json::Value = serde_json::from_str(&e.ok(&["code", "list", "--scope", "org", "--json"])).unwrap();
+    assert_eq!(j[0]["scope"]["kind"], "organization");
+    assert!(e.ok(&["code", "list", "--scope", "global"]).contains("no code spaces"));
+    assert!(!e.run(&["code", "list", "--scope", "galaxy"]).status.success());
 }

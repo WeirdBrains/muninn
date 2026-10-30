@@ -2352,9 +2352,12 @@ pub enum CodeCommand {
         #[arg(long, conflicts_with = "model")]
         no_input: bool,
     },
-    /// List code spaces.
+    /// List code spaces, with their scope (user, organization or global).
     #[command(alias = "ls")]
     List {
+        /// Only this scope: user, org (any organization), org:NAME, or global.
+        #[arg(long)]
+        scope: Option<String>,
         #[arg(long)]
         json: bool,
     },

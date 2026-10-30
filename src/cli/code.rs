@@ -178,19 +178,30 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
             let n = code::edit(&store, "cli", &c.id, &ch)?;
             ctx.io.info(format!("updated code space {} ({})", n.name, status_of(&n)));
         }
-        CodeCommand::List { json } => {
-            let v = store.code_spaces()?;
+        CodeCommand::List { scope, json } => {
+            let scopes = store.code_scopes()?;
+            let want = scope.as_deref().map(|f| scope_filter(&store, f)).transpose()?;
+            let scope_of = |c: &crate::store::CodeSpace| scopes.get(&c.id).cloned().unwrap_or(crate::store::CodeScope::User);
+            let v: Vec<_> = store.code_spaces()?.into_iter().filter(|c| want.as_ref().is_none_or(|w| w.matches(&scope_of(c)))).collect();
+            let label = |sc: &crate::store::CodeScope| match sc.org_id() {
+                Some(o) => format!("org:{}", store.org(o).ok().flatten().map(|o| o.slug).unwrap_or_else(|| o.to_string())),
+                None => sc.kind().to_string(),
+            };
             if json {
                 let out: Vec<_> = v
                     .iter()
-                    .map(|c| json!({ "id": c.id, "name": c.name, "lang": c.lang.as_str(), "approved": code::approved(c), "input": c.input, "last_run": c.last_run.as_ref().map(|r| json!({ "at": r.at, "status": r.status })) }))
+                    .map(|c| json!({ "id": c.id, "name": c.name, "lang": c.lang.as_str(), "scope": scope_of(c), "approved": code::approved(c), "input": c.input, "last_run": c.last_run.as_ref().map(|r| json!({ "at": r.at, "status": r.status })) }))
                     .collect();
                 println!("{}", serde_json::to_string_pretty(&out)?);
             } else if v.is_empty() {
-                ctx.io.info("no code spaces yet; create one with `mnnn code create NAME --lang math`");
+                ctx.io.info(if scope.is_some() {
+                    "no code spaces in that scope".to_string()
+                } else {
+                    "no code spaces yet; create one with `mnnn code create NAME --lang math`".to_string()
+                });
             } else {
                 for c in &v {
-                    println!("{}\t{}\t{}\t{}\t{}", c.short_id(), c.name, c.lang.as_str(), status_of(c), last_run(c));
+                    println!("{}\t{}\t{}\t{}\t{}\t{}", c.short_id(), c.name, c.lang.as_str(), label(&scope_of(c)), status_of(c), last_run(c));
                 }
             }
         }
@@ -287,4 +298,32 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
         CodeCommand::Check { space: None } | CodeCommand::Sdk { .. } => {}
     }
     Ok(())
+}
+
+/// A `--scope` filter.
+enum ScopeFilter {
+    Kind(&'static str),
+    Org(String),
+}
+
+impl ScopeFilter {
+    fn matches(&self, s: &crate::store::CodeScope) -> bool {
+        match self {
+            ScopeFilter::Kind(k) => s.kind() == *k,
+            ScopeFilter::Org(id) => s.org_id() == Some(id.as_str()),
+        }
+    }
+}
+
+fn scope_filter(store: &Store, f: &str) -> crate::error::Result<ScopeFilter> {
+    let f = f.trim();
+    Ok(match f.to_ascii_lowercase().as_str() {
+        "user" | "personal" => ScopeFilter::Kind("user"),
+        "global" | "builtin" | "built-in" => ScopeFilter::Kind("global"),
+        "org" | "orgs" | "organization" => ScopeFilter::Kind("organization"),
+        _ => match f.split_once(':') {
+            Some((k, name)) if matches!(k.to_ascii_lowercase().as_str(), "org" | "organization") => ScopeFilter::Org(store.find_org(name)?.id),
+            _ => return Err(crate::error::Error::invalid("scope", format!("{f}: use user, org, org:NAME or global"))),
+        },
+    })
 }

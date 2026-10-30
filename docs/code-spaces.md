@@ -267,7 +267,7 @@ every build, and `mnnn code sdk --out DIR` writes a copy to build prebuilt plugi
 ## Command line
 
 ```
-mnnn code list [--json]
+mnnn code list [--scope user|org|org:NAME|global] [--json]   # scope: an org resource is org:SLUG
 mnnn code create NAME --lang math|polars|rust|python|plugin [--file F | --source S | --editor]
                  [--model M --where C… --matching T --group F --sort F --limit N]
                  [--description D] [--project P]          # no source: a starting template
