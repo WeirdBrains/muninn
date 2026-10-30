@@ -89,8 +89,14 @@ pub struct TuiPrefs {
     pub layouts: std::collections::BTreeMap<String, crate::tui::layout::TileLayout>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+/// The preferences format. Older files are brought forward once when loaded.
+pub const PREFS_VERSION: u32 = 2;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Preferences {
+    /// Format version (missing in files written before 2.9).
+    #[serde(default)]
+    pub version: u32,
     #[serde(default)]
     pub theme: ThemePrefs,
     #[serde(default)]
@@ -103,6 +109,19 @@ pub struct Preferences {
     /// Organization web hosting (`mnnn org host`, `[hosting]`).
     #[serde(default)]
     pub hosting: HostingPrefs,
+}
+
+impl Default for Preferences {
+    fn default() -> Self {
+        Preferences {
+            version: PREFS_VERSION,
+            theme: ThemePrefs::default(),
+            ingest: IngestPrefs::default(),
+            tui: TuiPrefs::default(),
+            net: NetPrefs::default(),
+            hosting: HostingPrefs::default(),
+        }
+    }
 }
 
 /// Organization web hosting. Nothing is served until `mnnn org host start`, and then only
@@ -120,11 +139,13 @@ pub struct HostingPrefs {
     pub cert_days: u32,
     /// Let's Encrypt (or another ACME CA), off until enabled with a domain and an email.
     pub acme: AcmePrefs,
+    /// Start hosting whenever the node starts (off by default).
+    pub autostart: bool,
 }
 
 impl Default for HostingPrefs {
     fn default() -> Self {
-        HostingPrefs { bind: "127.0.0.1".into(), port: 8443, names: vec![], cert_days: 7, acme: AcmePrefs::default() }
+        HostingPrefs { bind: "127.0.0.1".into(), port: 8443, names: vec![], cert_days: 7, acme: AcmePrefs::default(), autostart: false }
     }
 }
 
@@ -187,8 +208,11 @@ pub struct NetPrefs {
     pub relays: Vec<String>,
     /// Nodes to join the wide network through (`…/p2p/ID`).
     pub bootstrap: Vec<String>,
-    /// Start the node when the TUI opens.
+    /// Start the node when the TUI opens (on by default since 2.9).
     pub autostart: bool,
+    /// Who the node connects with on its own: `known` (nodes it has a key exchange with,
+    /// or that we asked first) or `anyone`. Other requests wait for you to accept them.
+    pub accept: String,
 }
 
 impl Default for NetPrefs {
@@ -201,12 +225,18 @@ impl Default for NetPrefs {
             relay_server: false,
             relays: vec![],
             bootstrap: vec![],
-            autostart: false,
+            autostart: true,
+            accept: "known".into(),
         }
     }
 }
 
 impl NetPrefs {
+    /// Accept connection requests from any node.
+    pub fn accept_anyone(&self) -> bool {
+        self.accept.trim().eq_ignore_ascii_case("anyone")
+    }
+
     /// The node configuration these settings describe.
     pub fn node_config(&self, label: &str) -> Result<crate::net::NodeConfig> {
         let listen = if self.listen.is_empty() {
@@ -235,12 +265,30 @@ impl Preferences {
         let p = paths.preferences();
         if p.exists() {
             let s = std::fs::read_to_string(&p)?;
-            Ok(toml::from_str(&s)?)
+            let mut prefs: Preferences = toml::from_str(&s)?;
+            if prefs.upgrade() {
+                prefs.save(paths)?;
+            }
+            Ok(prefs)
         } else {
             let prefs = Preferences::default();
             prefs.save(paths)?;
             Ok(prefs)
         }
+    }
+
+    /// Bring an older file forward; true when something changed. Before 2.9 the node
+    /// was off unless asked for, so every older file says `autostart = false`: 2.9 turns
+    /// it on once (set it back to false to keep the node off).
+    pub fn upgrade(&mut self) -> bool {
+        if self.version >= PREFS_VERSION {
+            return false;
+        }
+        if self.version < 2 {
+            self.net.autostart = true;
+        }
+        self.version = PREFS_VERSION;
+        true
     }
 
     pub fn save(&self, paths: &Paths) -> Result<()> {
@@ -264,12 +312,29 @@ mod tests {
         let text = std::fs::read_to_string(paths.preferences()).unwrap();
         assert!(text.contains("name = \"tokyo-night\""));
         assert!(text.contains("mode = \"system\""));
-        // the network is off and shares nothing until asked
-        assert!(!p.net.autostart);
+        // the node starts by default but shares nothing until asked; hosting stays off
+        assert!(p.net.autostart && !p.hosting.autostart);
+        assert_eq!(p.version, PREFS_VERSION);
+        assert!(!p.net.accept_anyone());
         assert!(p.net.mdns && !p.net.relay_server);
         assert_eq!(p.net.port, 4741);
         // older files without [net] still load
         let old: Preferences = toml::from_str("[theme]\nname = \"x\"\nmode = \"dark\"\n").unwrap();
         assert_eq!(old.net, NetPrefs::default());
+    }
+
+    #[test]
+    fn older_files_turn_the_node_on_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(tmp.path().to_path_buf()), None).unwrap();
+        paths.ensure().unwrap();
+        std::fs::write(paths.preferences(), "[net]\nautostart = false\nport = 4800\n").unwrap();
+        let p = Preferences::load_or_create(&paths).unwrap();
+        assert!(p.net.autostart && p.net.port == 4800 && p.version == PREFS_VERSION);
+        // once upgraded, turning it off sticks
+        let mut q = p.clone();
+        q.net.autostart = false;
+        q.save(&paths).unwrap();
+        assert!(!Preferences::load_or_create(&paths).unwrap().net.autostart);
     }
 }

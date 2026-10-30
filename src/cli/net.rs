@@ -2,7 +2,8 @@
 use super::{Ctx, NetCommand, NetExchangeCommand, NetRelayCommand, NetShardCommand};
 use crate::crypto::{self, Key32, keyring};
 use crate::ingest::time::fmt_ts;
-use crate::net::{self, Node, client, identity, local};
+use crate::net::{self, Node, auto, client, identity, local};
+use crate::org::host;
 use crate::prefs::Preferences;
 use crate::store::{ExchangeStatus, NewAction, SearchSpec, ShareKind, Store};
 use anyhow::{Context, anyhow};
@@ -160,13 +161,13 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                 println!("{}", serde_json::to_string_pretty(&ps)?);
             } else {
                 for p in &ps {
-                    let xs = n.store.active_exchanges_with(&p.peer_id)?.len();
+                    let st = auto::node_link(&n.store, &p.peer_id)?.map(|x| auto::status_of(&x).as_str()).unwrap_or("-");
                     println!(
                         "{}\t{}\t{}\t{}\t{}\tseen {}",
                         p.short_id(),
                         if p.label.is_empty() { "-" } else { &p.label },
                         client::caps_text(&p.caps),
-                        if xs > 0 { "exchange" } else { "-" },
+                        st,
                         p.source,
                         fmt_ts(p.last_seen)
                     );
@@ -177,12 +178,70 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
             }
             Ok(())
         }
-        NetCommand::Connect { target, label } => {
+        NetCommand::Connect { target, label, hello } => {
             let mut n = Net::open(ctx)?;
             let relays = n.relays();
             n.node()?;
-            let p = client::hello(&n.store, n.node.as_ref().expect("node"), &target, label.as_deref(), &relays)?;
-            ctx.io.info(format!("{} ({}) says hello: {}", p.label, p.short_id(), p.agent));
+            if hello {
+                let p = client::hello(&n.store, n.node.as_ref().expect("node"), &target, label.as_deref(), &relays)?;
+                ctx.io.info(format!("{} ({}) says hello: {}", p.label, p.short_id(), p.agent));
+                return Ok(());
+            }
+            ctx.io.note(format!("connecting to {target}…"));
+            let addrs = n.addrs();
+            let l = auto::connect(&n.store, n.node.as_ref().expect("node"), &n.kp, &target, label.as_deref(), &n.label, addrs, &relays, ORIGIN)?;
+            print_link(ctx, &l);
+            if l.status == auto::LinkStatus::Failed {
+                return Err(anyhow!("{}", l.detail));
+            }
+            Ok(())
+        }
+        NetCommand::Requests { json } => {
+            let n = Net::open(ctx)?;
+            let reqs = auto::requests(&n.store)?;
+            if json {
+                let v: Vec<_> = reqs
+                    .iter()
+                    .map(|x| serde_json::json!({ "id": x.id, "from": x.title(), "peer": x.peer_id, "for": auto::purpose(x), "at": x.created_at }))
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&v)?);
+                return Ok(());
+            }
+            for x in &reqs {
+                println!("{}\t{}\t{}\t{}", &x.id[..8.min(x.id.len())], x.title(), auto::purpose(x), fmt_ts(x.created_at));
+            }
+            if reqs.is_empty() {
+                ctx.io.info("no requests waiting");
+            }
+            Ok(())
+        }
+        NetCommand::Accept { request } => {
+            let mut n = Net::open(ctx)?;
+            n.node()?;
+            let addrs = n.addrs();
+            let l = auto::accept(&n.store, n.node.as_ref(), &n.kp, &request, &n.label, addrs, ORIGIN)?;
+            print_link(ctx, &l);
+            Ok(())
+        }
+        NetCommand::Decline { request } => {
+            let n = Net::open(ctx)?;
+            let x = auto::decline(&n.store, &request, ORIGIN)?;
+            ctx.io.info(format!("declined {} ({})", x.title(), auto::purpose(&x)));
+            Ok(())
+        }
+        NetCommand::Disconnect { peer } => {
+            let mut n = Net::open(ctx)?;
+            let relays = n.relays();
+            let key = match n.store.find_net_peer(&peer).ok().and_then(|p| auto::node_link(&n.store, &p.peer_id).ok().flatten()) {
+                Some(x) => x.id,
+                None => peer.clone(),
+            };
+            n.node()?;
+            let (x, told) = client::revoke(&n.store, n.node.as_ref(), &key, &relays, ORIGIN)?;
+            ctx.io.info(format!("disconnected from {}", x.title()));
+            if let Some(Err(e)) = told {
+                ctx.io.warn(format!("{} was not reachable ({}); it will find out when it next asks", x.title(), auto::plain(&e)));
+            }
             Ok(())
         }
         NetCommand::Forget { peer } => {
@@ -193,7 +252,7 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
             Ok(())
         }
         NetCommand::Relay(c) => relay(ctx, c),
-        NetCommand::Config { label, port, listen, mdns, autostart, bootstrap, clear_bootstrap, json } => {
+        NetCommand::Config { label, port, listen, mdns, autostart, accept, bootstrap, clear_bootstrap, json } => {
             let mut prefs = ctx.prefs()?;
             let before = prefs.net.clone();
             let n = &mut prefs.net;
@@ -211,6 +270,13 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
             }
             if let Some(a) = autostart {
                 n.autostart = a.on();
+            }
+            if let Some(a) = accept {
+                let a = a.trim().to_ascii_lowercase();
+                if a != "known" && a != "anyone" {
+                    return Err(anyhow!("--accept: `known` or `anyone`"));
+                }
+                n.accept = a;
             }
             if clear_bootstrap {
                 n.bootstrap.clear();
@@ -239,12 +305,27 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                 println!("relays:       {}", if n.relays.is_empty() { "-".to_string() } else { n.relays.join(" ") });
                 println!("bootstrap:    {}", if n.bootstrap.is_empty() { "-".to_string() } else { n.bootstrap.join(" ") });
                 println!("autostart:    {}", if n.autostart { "on (TUI)" } else { "off" });
+                println!("accept:       {}", if n.accept_anyone() { "anyone" } else { "known nodes (others ask first)" });
             }
             Ok(())
         }
         NetCommand::Exchange(c) => exchange(ctx, c),
         NetCommand::Share { kind: k, item, with } => {
-            let n = Net::open(ctx)?;
+            let mut n = Net::open(ctx)?;
+            // not connected yet: connect first (it may wait for the other side)
+            for w in &with {
+                if auto::link_for(&n.store, w).is_err() {
+                    let relays = n.relays();
+                    let addrs = n.addrs();
+                    n.node()?;
+                    ctx.io.note(format!("connecting to {w}…"));
+                    let l = auto::connect(&n.store, n.node.as_ref().expect("node"), &n.kp, w, None, &n.label, addrs, &relays, ORIGIN)?;
+                    print_link(ctx, &l);
+                    if l.status == auto::LinkStatus::Failed {
+                        return Err(anyhow!("{}", l.detail));
+                    }
+                }
+            }
             let made = client::share(&n.store, kind(&k)?, &item, &with, ORIGIN)?;
             let fresh = made.iter().filter(|(_, new)| *new).count();
             let s = &made[0].0;
@@ -408,22 +489,72 @@ fn start(ctx: &Ctx, port: Option<u16>, listen: Vec<String>, no_mdns: bool, relay
         p.relay_server = true;
     }
     let home = ctx.paths.home.clone();
-    let mut h = local::Hosted::start(&home, &n.store, n.second_store()?, &n.kp, &n.label, &p, ORIGIN)?;
+    let mut h = local::Hosted::start(&home, &n.store, n.second_store()?, &n.kp, &n.label, &p, ORIGIN)?.settle_with(n.second_store()?, n.relays());
     println!("node {} running as {}", n.label, h.node.peer_id());
     for a in h.node.reachable_addrs() {
         println!("  {a}");
     }
+    // the web server comes up with the node when `hosting.autostart` is on
+    let site = if n.prefs.hosting.autostart && host::running(&home).is_none() {
+        let spare = n.second_store()?;
+        match host::HostOptions::from_prefs(&n.prefs.hosting).and_then(|o| host::Host::start(spare, o)) {
+            Ok(site) => {
+                let st = site.status();
+                host::write_status(&home, &st)?;
+                n.store
+                    .note_action(&NewAction::new("org.host.start", ORIGIN, format!("site served at {}", st.url)).params(
+                        serde_json::json!({ "addr": st.addr, "orgs": st.orgs, "mirrors": st.mirrors, "cert": st.cert.source, "auto": true }),
+                    ));
+                println!("site at {}", st.url);
+                Some(site)
+            }
+            Err(e) => {
+                ctx.io.warn(format!("site not started: {e}"));
+                None
+            }
+        }
+    } else {
+        None
+    };
     ctx.io.note("Ctrl-C (or `mnnn net stop`) stops it.");
     let stop = Arc::new(AtomicBool::new(false));
     let s2 = stop.clone();
     let _ = ctrlc::set_handler(move || s2.store(true, Ordering::SeqCst));
     let deadline = for_secs.map(|s| Instant::now() + Duration::from_secs(s));
+    let mut site = site;
+    let mut last_site = Instant::now();
     while !stop.load(Ordering::SeqCst) && deadline.is_none_or(|d| Instant::now() < d) && h.tick(&n.store) {
+        if let Some(st) = &site
+            && last_site.elapsed() >= Duration::from_secs(5)
+        {
+            let _ = host::write_status(&home, &st.status());
+            last_site = Instant::now();
+        }
+        if site.is_some() && host::stop_requested(&home) {
+            stop_site(&n.store, &home, site.take());
+        }
         std::thread::sleep(Duration::from_millis(250));
     }
+    stop_site(&n.store, &home, site);
     h.stop(&n.store, ORIGIN);
     ctx.io.note("node stopped");
     Ok(())
+}
+
+/// One line of status, a warning if the node is not the one we know by that name.
+fn print_link(ctx: &Ctx, l: &auto::Link) {
+    if let Some(w) = &l.warning {
+        ctx.io.warn(w.clone());
+    }
+    ctx.io.info(format!("{}: {}", l.status.as_str(), l.detail));
+}
+
+fn stop_site(store: &Store, home: &std::path::Path, site: Option<host::Host>) {
+    if let Some(h) = site {
+        h.stop();
+        host::clear(home);
+        store.note_action(&NewAction::new("org.host.stop", ORIGIN, "site stopped"));
+    }
 }
 
 fn relay(ctx: &Ctx, cmd: NetRelayCommand) -> anyhow::Result<()> {

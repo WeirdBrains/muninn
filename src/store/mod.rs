@@ -136,6 +136,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     orgs::MIGRATION,
     // 2.8: reviews
     reviews::MIGRATION,
+    // 2.9: automatic key exchanges
+    net::MIGRATION_2_9,
 ];
 
 /// A new random id (32 hex characters).

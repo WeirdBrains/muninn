@@ -4,7 +4,7 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-net \- The network: run a node, exchange keys with other nodes, share data with them, search across them and entrust them with dark shards. Off and sharing nothing until you ask
+mnnn\-net \- The network: run a node, exchange keys with other nodes, share data with them, search across them and entrust them with dark shards. On with the TUI by default; nothing is shared until you ask
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ mnnn\-net \- The network: run a node, exchange keys with other nodes, share data
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-The network: run a node, exchange keys with other nodes, share data with them, search across them and entrust them with dark shards. Off and sharing nothing until you ask
+The network: run a node, exchange keys with other nodes, share data with them, search across them and entrust them with dark shards. On with the TUI by default; nothing is shared until you ask
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -72,19 +72,20 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 Print help (see a summary with \*(Aq\-h\*(Aq)
 .SH NOTES
 .PP
-The node starts only when you run `mnnn net start` (or Network ▸ Start node in the TUI); the
-other commands bring up a short\-lived node with the same identity when they need to talk.
-Nothing is shared until you `share` it, and peers only see it after a completed key exchange.
+The node starts with the TUI (turn that off with `mnnn net config \-\-autostart off`) or with
+`mnnn net start`; other commands bring up a short\-lived node with the same identity when they
+need to talk. Nothing is shared until you `share` it, and only with nodes you are connected to.
 .PP
-Key exchange: one side makes an offer (a token, or sent straight to a peer with \-\-peer); the
-other accepts it and both get the same key and a short code. Compare the codes out of band and
-`verify`. Revoking erases the key on both sides (the record stays in the history).
+Connecting exchanges keys automatically. A node that knows you (or that you both asked)
+connects at once; otherwise its owner sees a request to accept or decline. Keys are pinned to
+the node on first contact, and you are warned if another node uses a known name. The token and
+short\-code commands are still there, under `mnnn net exchange` (advanced).
 .PP
 Examples:
   mnnn net start \-\-for 3600
-  mnnn net exchange create \-\-label ben \-\-peer /ip4/192.0.2.7/tcp/4741/p2p/12D3Koo…
-  mnnn net exchange accept 3f2a                 # an incoming offer (or paste a token)
-  mnnn net exchange verify ben 12345\-67890
+  mnnn net connect /ip4/192.0.2.7/tcp/4741/p2p/12D3Koo… \-\-label ben
+  mnnn net requests
+  mnnn net accept ben
   mnnn net share journal "field notes" \-\-with ben
   mnnn net search \-\-journals \-\-query comet
   mnnn net fetch ben "field notes" \-\-import
@@ -109,7 +110,19 @@ mnnn\-net\-peers(1)
 Peers seen or known
 .TP
 mnnn\-net\-connect(1)
-Say hello to a node (`…/p2p/ID`, a peer id or a known peer) and remember it
+Connect to a node (`…/p2p/ID`, a peer id or a known name): keys are exchanged automatically; a node that does not know you yet asks its owner first
+.TP
+mnnn\-net\-requests(1)
+Requests waiting for you: nodes that want to connect, apply or invite you
+.TP
+mnnn\-net\-accept(1)
+Accept a request (its id or the node\*(Aqs name)
+.TP
+mnnn\-net\-decline(1)
+Decline a request (its id or the node\*(Aqs name)
+.TP
+mnnn\-net\-disconnect(1)
+End the connection with a node: keys are erased on both sides
 .TP
 mnnn\-net\-forget(1)
 Forget a known peer (exchanges with it are kept)
@@ -119,9 +132,6 @@ Relays
 .TP
 mnnn\-net\-config(1)
 Show or change network settings
-.TP
-mnnn\-net\-exchange(1)
-Key exchanges with other nodes
 .TP
 mnnn\-net\-share(1)
 Share an item: model, search, journal, project, report or code

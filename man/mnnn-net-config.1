@@ -8,7 +8,7 @@ mnnn\-net\-config \- Show or change network settings
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn net config\fR [\fB\-\-home\fR] [\fB\-\-label\fR] [\fB\-\-db\fR] [\fB\-\-port\fR] [\fB\-\-listen\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-mdns\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-autostart\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-bootstrap\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-clear\-bootstrap\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn net config\fR [\fB\-\-home\fR] [\fB\-\-label\fR] [\fB\-\-db\fR] [\fB\-\-port\fR] [\fB\-\-listen\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-mdns\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-autostart\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-accept\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-bootstrap\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-clear\-bootstrap\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -61,7 +61,7 @@ off
 More output (repeatable)
 .TP
 \fB\-\-autostart\fR \fI<on|off>\fR
-Start the node when the TUI opens
+Start the node when the TUI opens (on by default)
 .br
 
 .br
@@ -79,8 +79,8 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-bootstrap\fR \fI<ADDR>\fR
-Add a bootstrap node (repeatable)
+\fB\-\-accept\fR \fI<known|anyone>\fR
+Connect on its own with `known` nodes only (default) or `anyone`
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -88,8 +88,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-clear\-bootstrap\fR
-Remove all bootstrap nodes first
+\fB\-\-bootstrap\fR \fI<ADDR>\fR
+Add a bootstrap node (repeatable)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -108,6 +108,9 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-clear\-bootstrap\fR
+Remove all bootstrap nodes first
 .TP
 \fB\-\-json\fR
 

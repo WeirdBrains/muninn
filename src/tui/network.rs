@@ -216,7 +216,9 @@ pub fn start(app: &mut App) {
         let kp = keypair(app)?;
         let service = Store::open(&app.paths.db, Some(&app.dek.0))?;
         let label = label(app);
-        local::Hosted::start(&app.paths.home, &app.store, service, &kp, &label, &app.prefs.net, ORIGIN)
+        let spare = Store::open(&app.paths.db, Some(&app.dek.0))?;
+        Ok(local::Hosted::start(&app.paths.home, &app.store, service, &kp, &label, &app.prefs.net, ORIGIN)?
+            .settle_with(spare, app.prefs.net.relays.clone()))
     })();
     match r {
         Ok(h) => {
@@ -225,6 +227,10 @@ pub fn start(app: &mut App) {
             app.refresh_history(true);
             app.set_status(m.clone());
             ok(app, m);
+            // the web server comes up with the node when asked to
+            if app.prefs.hosting.autostart && app.orgs.host.is_none() && crate::org::host::running(&app.paths.home).is_none() {
+                super::orgs::start_host(app);
+            }
         }
         Err(e) => {
             app.set_status(format!("node: {e}"));

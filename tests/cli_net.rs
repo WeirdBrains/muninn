@@ -55,12 +55,15 @@ fn stop(e: &Env, mut c: Daemon) {
 }
 
 #[test]
-fn nothing_runs_or_is_shared_by_default() {
+fn nothing_is_shared_by_default() {
     let e = Env::new();
     let v = json(&e.ok(&["net", "status", "--json"]));
     assert!(v["running"].is_null());
     assert_eq!(v["shared"], 0);
-    assert_eq!(v["settings"]["autostart"], false);
+    // the node starts with the TUI by default; strangers ask first
+    assert_eq!(v["settings"]["autostart"], true);
+    assert_eq!(v["settings"]["accept"], "known");
+    assert!(e.ok(&["net", "requests"]).contains("no requests"));
     assert_eq!(e.ok(&["net", "shared", "--json"]).trim(), "[]");
     assert!(e.ok(&["net", "exchange", "list", "--json"]).trim() == "[]");
     // an offer can be made offline: a token to pass on
@@ -69,6 +72,41 @@ fn nothing_runs_or_is_shared_by_default() {
     // the events are known to rules
     let ev = e.ok(&["rule", "events"]);
     assert!(ev.contains("net.exchange.complete") && ev.contains("net.share"));
+}
+
+#[test]
+fn connecting_asks_once_and_then_just_works() {
+    let a = Env::new();
+    let b = Env::new();
+    let (ca, addr_a) = start(&a, "anna");
+    let (cb, addr_b) = start(&b, "ben");
+    let out = a.ok(&["net", "connect", &addr_b, "--label", "ben"]);
+    assert!(out.contains("pending"), "{out}");
+    assert!(!out.contains("mnnn-x1-") && !out.contains("code"), "no tokens or codes: {out}");
+    let reqs = b.ok(&["net", "requests"]);
+    assert!(reqs.contains("anna") && reqs.contains("node"), "{reqs}");
+    let acc = b.ok(&["net", "accept", "anna"]);
+    assert!(acc.contains("connected"), "{acc}");
+    let t = Instant::now();
+    while !a.ok(&["net", "peers"]).lines().any(|l| l.contains("ben") && l.contains("connected")) {
+        assert!(t.elapsed() < Duration::from_secs(15), "{}", a.ok(&["net", "peers"]));
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    // a known node connects at once from the other side too
+    assert!(b.ok(&["net", "connect", &addr_a]).contains("connected"));
+    // sharing with a name works without any exchange commands
+    b.ok(&["journal", "new", "field notes"]);
+    b.ok(&["net", "share", "journal", "field notes", "--with", "anna"]);
+    assert!(a.ok(&["net", "list", "ben"]).contains("field notes"));
+    // disconnect ends it on both sides
+    a.ok(&["net", "disconnect", "ben"]);
+    let t = Instant::now();
+    while b.ok(&["net", "peers"]).lines().any(|l| l.contains("anna") && l.contains("connected")) {
+        assert!(t.elapsed() < Duration::from_secs(15));
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    stop(&a, ca);
+    stop(&b, cb);
 }
 
 #[test]

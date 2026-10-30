@@ -98,7 +98,7 @@ pub enum Command {
     #[command(subcommand, alias = "codes", after_long_help = CODE_NOTES)]
     Code(CodeCommand),
     /// The network: run a node, exchange keys with other nodes, share data with them, search
-    /// across them and entrust them with dark shards. Off and sharing nothing until you ask.
+    /// across them and entrust them with dark shards. On with the TUI by default; nothing is shared until you ask.
     #[command(subcommand, alias = "network", after_long_help = NET_NOTES)]
     Net(NetCommand),
     /// Organizations: members with roles, shared resources and projects, rules and code
@@ -1720,19 +1720,20 @@ mod tests {
 }
 
 pub const NET_NOTES: &str = "\
-The node starts only when you run `mnnn net start` (or Network ▸ Start node in the TUI); the
-other commands bring up a short-lived node with the same identity when they need to talk.
-Nothing is shared until you `share` it, and peers only see it after a completed key exchange.
+The node starts with the TUI (turn that off with `mnnn net config --autostart off`) or with
+`mnnn net start`; other commands bring up a short-lived node with the same identity when they
+need to talk. Nothing is shared until you `share` it, and only with nodes you are connected to.
 
-Key exchange: one side makes an offer (a token, or sent straight to a peer with --peer); the
-other accepts it and both get the same key and a short code. Compare the codes out of band and
-`verify`. Revoking erases the key on both sides (the record stays in the history).
+Connecting exchanges keys automatically. A node that knows you (or that you both asked)
+connects at once; otherwise its owner sees a request to accept or decline. Keys are pinned to
+the node on first contact, and you are warned if another node uses a known name. The token and
+short-code commands are still there, under `mnnn net exchange` (advanced).
 
 Examples:
   mnnn net start --for 3600
-  mnnn net exchange create --label ben --peer /ip4/192.0.2.7/tcp/4741/p2p/12D3Koo…
-  mnnn net exchange accept 3f2a                 # an incoming offer (or paste a token)
-  mnnn net exchange verify ben 12345-67890
+  mnnn net connect /ip4/192.0.2.7/tcp/4741/p2p/12D3Koo… --label ben
+  mnnn net requests
+  mnnn net accept ben
   mnnn net share journal \"field notes\" --with ben
   mnnn net search --journals --query comet
   mnnn net fetch ben \"field notes\" --import
@@ -1775,13 +1776,28 @@ pub enum NetCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Say hello to a node (`…/p2p/ID`, a peer id or a known peer) and remember it.
+    /// Connect to a node (`…/p2p/ID`, a peer id or a known name): keys are exchanged
+    /// automatically; a node that does not know you yet asks its owner first.
     Connect {
         target: String,
         /// Call it this.
         #[arg(long)]
         label: Option<String>,
+        /// Only say hello and remember it (no key exchange).
+        #[arg(long)]
+        hello: bool,
     },
+    /// Requests waiting for you: nodes that want to connect, apply or invite you.
+    Requests {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Accept a request (its id or the node's name).
+    Accept { request: String },
+    /// Decline a request (its id or the node's name).
+    Decline { request: String },
+    /// End the connection with a node: keys are erased on both sides.
+    Disconnect { peer: String },
     /// Forget a known peer (exchanges with it are kept).
     Forget { peer: String },
     /// Relays.
@@ -1800,9 +1816,12 @@ pub enum NetCommand {
         /// Look for peers on the local network.
         #[arg(long, value_name = "on|off")]
         mdns: Option<OnOff>,
-        /// Start the node when the TUI opens.
+        /// Start the node when the TUI opens (on by default).
         #[arg(long, value_name = "on|off")]
         autostart: Option<OnOff>,
+        /// Connect on its own with `known` nodes only (default) or `anyone`.
+        #[arg(long, value_name = "known|anyone")]
+        accept: Option<String>,
         /// Add a bootstrap node (repeatable).
         #[arg(long = "bootstrap", value_name = "ADDR")]
         bootstrap: Vec<String>,
@@ -1812,8 +1831,8 @@ pub enum NetCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Key exchanges with other nodes.
-    #[command(subcommand, alias = "x")]
+    /// Advanced: key exchanges by hand (tokens, short codes). `connect` does this for you.
+    #[command(subcommand, alias = "x", hide = true)]
     Exchange(NetExchangeCommand),
     /// Share an item: model, search, journal, project, report or code.
     Share {
@@ -2482,7 +2501,7 @@ pub enum OrgCommand {
         #[arg(long, default_value = "")]
         note: String,
     },
-    /// Answer an invitation (the token you were given; `-` reads stdin).
+    /// Accept an invitation: the invite link, or the org name of one sent to this node (`-` reads stdin).
     Join { token: String },
     /// Check a joined org: an answer to your application, your role and permissions.
     Sync { org: String },
@@ -2744,6 +2763,10 @@ pub enum OrgHostCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Serve the site whenever the node starts (`on`), or only when asked (`off`, the default).
+    Autostart {
+        state: OnOff,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -2865,7 +2888,7 @@ pub enum ReviewCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Take a review link (the token you were given; `-` reads stdin).
+    /// Join a review: the review link, or the title of an invitation sent to this node (`-` reads stdin).
     Join {
         token: String,
         /// What to call it here.

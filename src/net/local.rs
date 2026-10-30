@@ -110,7 +110,20 @@ pub struct Hosted {
     home: PathBuf,
     last: Instant,
     last_addrs: Vec<String>,
+    settle: Settle,
 }
+
+/// Background upkeep of pending exchanges ([`super::auto::settle`]) on a spare store.
+#[derive(Default)]
+struct Settle {
+    spare: Option<Store>,
+    relays: Vec<String>,
+    running: Option<std::thread::JoinHandle<Store>>,
+    last: Option<Instant>,
+}
+
+/// How often a running node brings pending exchanges along.
+pub const SETTLE_EVERY: Duration = Duration::from_secs(20);
 
 impl Hosted {
     /// Start listening as configured. Refused while another process runs a node here.
@@ -119,7 +132,8 @@ impl Hosted {
             return Err(crate::error::Error::Other(format!("a node is already running here (pid {}); `mnnn net stop` stops it", f.pid)));
         }
         let cfg = prefs.node_config(label)?;
-        let node = Node::start(kp.clone(), cfg, Arc::new(Service::new(service, kp.public().to_peer_id(), label)))?;
+        let node =
+            Node::start(kp.clone(), cfg, Arc::new(Service::new(service, kp.public().to_peer_id(), label).accept_anyone(prefs.accept_anyone())))?;
         // a stale stop request must not stop the new node
         stop_requested(home);
         // let addresses settle
@@ -132,7 +146,21 @@ impl Hosted {
             &NewAction::new("net.node.start", origin, format!("node {label} started"))
                 .params(serde_json::json!({ "peer": st.peer_id, "listen": st.listening, "relay_server": prefs.relay_server, "mdns": prefs.mdns })),
         );
-        Ok(Hosted { node: Arc::new(node), label: label.to_string(), home: home.to_path_buf(), last: Instant::now(), last_addrs: addrs })
+        Ok(Hosted {
+            node: Arc::new(node),
+            label: label.to_string(),
+            home: home.to_path_buf(),
+            last: Instant::now(),
+            last_addrs: addrs,
+            settle: Settle::default(),
+        })
+    }
+
+    /// Keep pending exchanges moving in the background, on this store connection: ask
+    /// peers about our open requests and deliver answers that did not get through.
+    pub fn settle_with(mut self, store: Store, relays: Vec<String>) -> Hosted {
+        self.settle = Settle { spare: Some(store), relays, running: None, last: None };
+        self
     }
 
     /// Call often: every 2 s it refreshes `node.json` and the saved addresses.
@@ -149,6 +177,22 @@ impl Hosted {
                 let _ = store.set_setting(super::client::ADDRS_SETTING, Some(&serde_json::to_string(&addrs).unwrap_or_default()));
                 self.last_addrs = addrs;
             }
+        }
+        let st = &mut self.settle;
+        if st.running.as_ref().is_some_and(|h| h.is_finished())
+            && let Some(Ok(s)) = st.running.take().map(|h| h.join())
+        {
+            st.spare = Some(s);
+        }
+        if st.spare.is_some() && st.last.is_none_or(|l| l.elapsed() >= SETTLE_EVERY) {
+            st.last = Some(Instant::now());
+            let s = st.spare.take().expect("spare");
+            let node = self.node.clone();
+            let relays = st.relays.clone();
+            st.running = Some(std::thread::spawn(move || {
+                let _ = super::auto::settle(&s, &node, &relays, "network");
+                s
+            }));
         }
         true
     }
@@ -185,7 +229,7 @@ pub fn ephemeral(kp: &Keypair, service: Store, label: &str, prefs: &NetPrefs) ->
         memory: false,
         label: label.to_string(),
     };
-    Node::start(kp.clone(), cfg, Arc::new(Service::new(service, kp.public().to_peer_id(), label)))
+    Node::start(kp.clone(), cfg, Arc::new(Service::new(service, kp.public().to_peer_id(), label).accept_anyone(prefs.accept_anyone())))
 }
 
 #[cfg(test)]

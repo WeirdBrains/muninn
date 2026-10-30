@@ -1,5 +1,6 @@
 //! Several nodes in one process over the in-memory transport: exchanges, sharing,
 //! searches across nodes, relays and dark shards. No internet needed.
+use super::auto::{self, LinkStatus};
 use super::client;
 use super::identity;
 use super::node::{Node, NodeConfig};
@@ -19,6 +20,7 @@ struct Peer {
     node: Option<Node>,
     kp: Keypair,
     label: String,
+    anyone: bool,
 }
 
 impl Peer {
@@ -29,7 +31,7 @@ impl Peer {
     fn with(label: &str, relay_server: bool, dir: tempfile::TempDir) -> Peer {
         let store = Store::open(&dir.path().join("db"), None).unwrap();
         let kp = identity::load_or_create(&store).unwrap();
-        let mut p = Peer { dir, store, node: None, kp, label: label.into() };
+        let mut p = Peer { dir, store, node: None, kp, label: label.into(), anyone: false };
         p.start(relay_server, vec![]);
         p
     }
@@ -39,7 +41,7 @@ impl Peer {
     }
 
     fn start(&mut self, relay_server: bool, relays: Vec<libp2p::Multiaddr>) {
-        let svc = Service::new(Store::open(&self.db(), None).unwrap(), self.kp.public().to_peer_id(), &self.label);
+        let svc = Service::new(Store::open(&self.db(), None).unwrap(), self.kp.public().to_peer_id(), &self.label).accept_anyone(self.anyone);
         let cfg = NodeConfig {
             listen: vec!["/memory/0".parse().unwrap()],
             memory: true,
@@ -96,6 +98,24 @@ impl Peer {
         let mine = wait(|| self.store.exchange(&c.exchange.id).unwrap().filter(|x| x.status.active()));
         assert_eq!(mine.short_code, a.exchange.short_code);
         (c.exchange.id, mine.short_code.unwrap())
+    }
+}
+
+impl Peer {
+    /// The black-box connect: what `mnnn net connect` and the TUI do.
+    fn connect(&self, other: &Peer) -> auto::Link {
+        auto::connect(
+            &self.store,
+            self.node(),
+            &self.kp,
+            &other.addr(),
+            None,
+            &self.label,
+            client::my_addrs(&self.store, Some(self.node())),
+            &[],
+            "cli",
+        )
+        .unwrap()
     }
 }
 
@@ -533,4 +553,99 @@ fn reviewers_join_by_link_comment_suggest_vote_and_see_the_merge() {
     rnet::close(&a.store, Some(a.node()), &r, &[], "cli").unwrap();
     wait(|| b.store.reviewing_by_exchange(g.exchange_id.as_deref().unwrap()).unwrap().filter(|g| g.status == ReviewingStatus::Closed));
     assert!(rnet::view(&b.store, b.node(), &g, &[]).is_err());
+}
+
+#[test]
+fn connecting_is_a_request_the_other_side_accepts_and_then_it_just_works() {
+    let a = Peer::new("anna");
+    let b = Peer::new("ben");
+    let l = a.connect(&b);
+    assert_eq!(l.status, LinkStatus::Pending, "{}", l.detail);
+    assert!(l.warning.is_none());
+    // ben sees a request, not a token
+    let reqs = wait(|| Some(auto::requests(&b.store).unwrap()).filter(|r| !r.is_empty()));
+    assert_eq!(reqs[0].title(), "anna");
+    let ok = auto::accept(&b.store, Some(b.node()), &b.kp, "anna", &b.label, client::my_addrs(&b.store, Some(b.node())), "cli").unwrap();
+    assert_eq!(ok.status, LinkStatus::Connected, "{}", ok.detail);
+    let mine = wait(|| auto::node_link(&a.store, &b.peer_id()).unwrap().filter(|x| x.status.active()));
+    assert_eq!(auto::status_of(&mine), LinkStatus::Connected);
+    // asking again is a no-op
+    assert!(a.connect(&b).detail.contains("already connected"));
+    // nothing to settle
+    assert!(auto::settle(&a.store, a.node(), &[], "cli").is_empty());
+}
+
+#[test]
+fn asking_each_other_connects_and_open_nodes_answer_at_once() {
+    let a = Peer::new("anna");
+    let b = Peer::new("ben");
+    assert_eq!(a.connect(&b).status, LinkStatus::Pending);
+    wait(|| Some(auto::requests(&b.store).unwrap()).filter(|r| !r.is_empty()));
+    // ben connecting back is his yes
+    let l = b.connect(&a);
+    assert_eq!(l.status, LinkStatus::Connected, "{}", l.detail);
+    wait(|| auto::node_link(&a.store, &b.peer_id()).unwrap().filter(|x| x.status.active()));
+    // a node that accepts anyone answers on the spot
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(&dir.path().join("db"), None).unwrap();
+    let kp = identity::load_or_create(&store).unwrap();
+    let mut c = Peer { dir, store, node: None, kp, label: "cara".into(), anyone: true };
+    c.start(false, vec![]);
+    let l = a.connect(&c);
+    assert_eq!(l.status, LinkStatus::Connected, "{}", l.detail);
+    assert!(c.store.actions().unwrap().iter().any(|x| x.kind == "net.exchange.auto"));
+    // both ends agree on the key
+    let x = l.exchange.unwrap();
+    assert_eq!(a.store.exchange_key(&x.id).unwrap().unwrap().0, c.store.exchange_key(&x.id).unwrap().unwrap().0);
+}
+
+#[test]
+fn declined_requests_end_and_unreachable_nodes_fail_plainly() {
+    let a = Peer::new("anna");
+    let mut b = Peer::new("ben");
+    assert_eq!(a.connect(&b).status, LinkStatus::Pending);
+    wait(|| Some(auto::requests(&b.store).unwrap()).filter(|r| !r.is_empty()));
+    auto::decline(&b.store, "anna", "cli").unwrap();
+    assert!(auto::requests(&b.store).unwrap().is_empty());
+    let lines = auto::settle(&a.store, a.node(), &[], "cli");
+    assert!(lines.iter().any(|l| l.starts_with("declined")), "{lines:?}");
+    assert!(auto::node_link(&a.store, &b.peer_id()).unwrap().is_none(), "no open link");
+    let x = a.store.exchanges().unwrap().into_iter().find(|x| x.peer_id.as_deref() == Some(b.peer_id().as_str())).unwrap();
+    assert_eq!(auto::status_of(&x), LinkStatus::Ended);
+    // a node that is gone
+    let addr = b.addr();
+    b.node = None;
+    let l = auto::connect(&a.store, a.node(), &a.kp, &addr, None, "anna", vec![], &[], "cli").unwrap();
+    assert_eq!(l.status, LinkStatus::Failed);
+    assert!(!l.detail.is_empty());
+}
+
+#[test]
+fn answers_made_offline_are_delivered_by_settle() {
+    let a = Peer::new("anna");
+    let b = Peer::new("ben");
+    assert_eq!(a.connect(&b).status, LinkStatus::Pending);
+    let inc = wait(|| auto::requests(&b.store).unwrap().into_iter().next());
+    // accepted without a node: the answer stays here
+    let l = auto::accept(&b.store, None, &b.kp, &inc.id, "ben", vec![], "cli").unwrap();
+    assert_eq!(l.status, LinkStatus::Connected);
+    assert_eq!(b.store.undelivered_answers().unwrap().len(), 1);
+    let lines = auto::settle(&b.store, b.node(), &[], "cli");
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(b.store.undelivered_answers().unwrap().is_empty());
+    wait(|| auto::node_link(&a.store, &b.peer_id()).unwrap().filter(|x| x.status.active()));
+}
+
+#[test]
+fn a_new_node_using_a_known_name_is_flagged() {
+    let a = Peer::new("anna");
+    let b = Peer::new("ben");
+    a.exchange_with(&b);
+    let other = Peer::new("ben");
+    let l = a.connect(&other);
+    let w = l.warning.expect("warned");
+    assert!(w.contains("ben"), "{w}");
+    // names still mean the pinned node
+    let (p, _) = auto::resolve(&a.store, "ben", &[]).unwrap();
+    assert_eq!(p.to_string(), b.peer_id());
 }

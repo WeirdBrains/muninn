@@ -1,7 +1,7 @@
 //! What nodes say to each other over `/muninn/net/1` (request-response, CBOR).
 //!
-//! Only three things travel in the open: `Hello` (a label and capabilities), offers and
-//! answers (public keys and signatures). Everything else is a [`Req`] / [`Resp`] sealed
+//! Only a few things travel in the open: `Hello` (a label and capabilities), offers and
+//! answers (public keys and signatures), org listings and polls for an answer. Everything else is a [`Req`] / [`Resp`] sealed
 //! under the exchange key ([`Wire::Sealed`]), and the receiver checks that the
 //! Noise-authenticated peer is the exchange's peer before opening it.
 use crate::crypto::Sealed;
@@ -37,8 +37,15 @@ pub enum Wire {
         org: String,
     },
     /// Has my application (an offer to an org) been decided? Only its offerer may ask.
+    /// Since 2.9 any of our offers: the answer comes back once the other side took it.
     Poll {
         exchange: String,
+    },
+    /// 2.9: an offer delivered by the node that signed it, asking for the answer right away.
+    /// The receiving node answers on its own when it knows the peer (or is set to accept
+    /// anyone); otherwise it keeps the offer for its owner to accept, as `Offer` does.
+    Connect {
+        token: String,
     },
 }
 
@@ -62,10 +69,15 @@ pub enum WireResp {
     Orgs {
         orgs: Vec<crate::org::OrgCard>,
     },
-    /// `applied`, `member` (with the answer token), `rejected` or `kicked`.
+    /// `applied`, `member` (with the answer token), `rejected` or `kicked`; for other
+    /// exchanges `pending`, `connected` (with the answer token) or `declined`.
     Poll {
         status: String,
         answer: Option<String>,
+    },
+    /// 2.9: the answer to a `Connect`, made on the spot.
+    Answered {
+        token: String,
     },
 }
 

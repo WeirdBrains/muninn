@@ -26,11 +26,20 @@ pub struct Service {
     store: Mutex<Store>,
     local: PeerId,
     label: String,
+    /// Answer every node's connection request on our own (`net.accept = "anyone"`);
+    /// otherwise only known nodes are answered and the rest wait for the owner.
+    accept_anyone: bool,
 }
 
 impl Service {
     pub fn new(store: Store, local: PeerId, label: &str) -> Self {
-        Service { store: Mutex::new(store), local, label: label.to_string() }
+        Service { store: Mutex::new(store), local, label: label.to_string(), accept_anyone: false }
+    }
+
+    /// Accept connection requests from any node, not only known ones.
+    pub fn accept_anyone(mut self, on: bool) -> Self {
+        self.accept_anyone = on;
+        self
     }
 
     fn with<T>(&self, f: impl FnOnce(&mut Store) -> Result<T>) -> Result<T> {
@@ -48,8 +57,9 @@ impl Service {
             Wire::Orgs => self.with(|s| crate::org::net::listed(s)).map(|orgs| WireResp::Orgs { orgs }),
             Wire::OrgInfo { org } => self.with(|s| crate::org::net::info(s, &org)).map(|o| WireResp::Orgs { orgs: vec![o] }),
             Wire::Poll { exchange } => {
-                self.with(|s| crate::org::net::poll(s, from, &exchange)).map(|(status, answer)| WireResp::Poll { status, answer })
+                self.with(|s| super::auto::poll_in(s, from, &exchange)).map(|(status, answer)| WireResp::Poll { status, answer })
             }
+            Wire::Connect { token } => self.with(|s| super::auto::connect_in(s, from, &token, &self.label, self.accept_anyone)),
             Wire::Sealed { exchange, sealed } => self.with(|s| {
                 let x = s.exchange(&exchange)?.ok_or_else(|| Error::invalid("exchange", "unknown exchange"))?;
                 if !x.status.active() {

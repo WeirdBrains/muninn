@@ -88,6 +88,14 @@ CREATE TABLE net_custody (
 );
 "#;
 
+/// 2.9: automatic exchanges. When an answer we made reached its offerer (until then the
+/// node keeps trying to deliver it).
+/// Answers made before 2.9 count as delivered (they went by hand or over the network).
+pub const MIGRATION_2_9: &str = r#"
+ALTER TABLE net_exchanges ADD COLUMN delivered_at INTEGER;
+UPDATE net_exchanges SET delivered_at = updated_at WHERE answer IS NOT NULL;
+"#;
+
 /// A peer this node has seen or was told about.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NetPeer {
@@ -543,6 +551,22 @@ impl Store {
             ],
         )?;
         self.exchange(&id)?.ok_or_else(|| Error::Other("exchange vanished".into()))
+    }
+
+    /// Our answer reached the offerer (or the offerer already had it).
+    pub fn mark_answer_delivered(&self, id: &str) -> Result<()> {
+        self.conn.execute("UPDATE net_exchanges SET delivered_at = ?2 WHERE id = ?1 AND delivered_at IS NULL", params![id, now_ms()])?;
+        Ok(())
+    }
+
+    /// Active exchanges we answered whose answer has not reached the offerer yet.
+    pub fn undelivered_answers(&self) -> Result<Vec<Exchange>> {
+        let mut st = self.conn.prepare(&format!(
+            "SELECT {EX_COLS} FROM net_exchanges WHERE role = 'answerer' AND status IN ('complete', 'verified') AND answer IS NOT NULL
+             AND delivered_at IS NULL ORDER BY created_at DESC, id"
+        ))?;
+        let v = st.query_map([], Self::row_exchange)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(v)
     }
 
     /// The ephemeral X25519 secret of an offer we made (until it completes).

@@ -1,6 +1,7 @@
 //! The decentralized network (2.6): nodes, key exchanges, sharing, searches across
 //! peers and dark shards. See `docs/network.md`, `docs/key-exchanges.md` and
 //! `docs/dark-shards.md`.
+pub mod auto;
 pub mod backup;
 pub mod client;
 pub mod exchange;

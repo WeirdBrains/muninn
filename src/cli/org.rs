@@ -246,6 +246,8 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
         OrgCommand::Join { token } => {
             let mut n = Net::open(ctx)?;
             let token = read_token(&token)?;
+            // an invitation that came over the network: by org name, slug or request id
+            let token = if crate::net::exchange::is_token(&token) { token } else { invitation(&n.store, &token)?.id };
             let addrs = n.addrs();
             let label = n.label.clone();
             n.node()?;
@@ -257,8 +259,8 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
             if let Some(ans) = &a.answer
                 && !matches!(a.delivered, Some(Ok(_)))
             {
-                ctx.io.note("Their node was not reachable; give this answer back (they run `mnnn net exchange accept TOKEN`):");
-                println!("{ans}");
+                ctx.io.note("Their node was not reachable; you are connected once it is (or give them this link):");
+                println!("{}", crate::net::exchange::link(ans));
             }
             Ok(())
         }
@@ -523,8 +525,8 @@ fn member(ctx: &Ctx, cmd: OrgMemberCommand) -> anyhow::Result<()> {
                     if let Some(Err(e)) = other {
                         ctx.io.warn(format!("could not reach them ({e})"));
                     }
-                    ctx.io.note("Give them this token (they run `mnnn org join TOKEN`):");
-                    println!("{}", c.token);
+                    ctx.io.note("Send them this invite link (single use, expires in 7 days; they run `mnnn org join LINK`):");
+                    println!("{}", crate::net::exchange::link(&c.token));
                 }
             }
             Ok(())
@@ -783,6 +785,23 @@ fn template(ctx: &Ctx, cmd: OrgTemplateCommand) -> anyhow::Result<()> {
     }
 }
 
+/// An org invitation waiting here, by org name or slug, request id or inviter.
+fn invitation(s: &crate::store::Store, key: &str) -> anyhow::Result<crate::store::Exchange> {
+    let reqs: Vec<_> = crate::net::auto::requests(s)?
+        .into_iter()
+        .filter(|x| {
+            x.scope.get("kind").and_then(|v| v.as_str()) == Some("organization") && x.scope.get("as").and_then(|v| v.as_str()) == Some("invite")
+        })
+        .collect();
+    let k = key.trim().to_lowercase();
+    let field = |x: &crate::store::Exchange, f: &str| x.scope.get(f).and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
+    reqs.iter()
+        .find(|x| field(x, "name") == k || field(x, "slug") == k)
+        .or_else(|| reqs.iter().find(|x| x.id.starts_with(&k) || x.title().to_lowercase() == k))
+        .cloned()
+        .ok_or_else(|| anyhow!("no invitation to `{key}` here (`mnnn net requests` lists them; or pass the invite link)"))
+}
+
 fn host_cmd(ctx: &Ctx, cmd: OrgHostCommand) -> anyhow::Result<()> {
     let home = ctx.paths.home.clone();
     match cmd {
@@ -840,6 +859,21 @@ fn host_cmd(ctx: &Ctx, cmd: OrgHostCommand) -> anyhow::Result<()> {
             host::clear(&home);
             n.store.note_action(&NewAction::new("org.host.stop", ORIGIN, "site stopped"));
             ctx.io.note("site stopped");
+            Ok(())
+        }
+        OrgHostCommand::Autostart { state } => {
+            let mut prefs = ctx.prefs()?;
+            if prefs.hosting.autostart != state.on() {
+                prefs.hosting.autostart = state.on();
+                prefs.save(&ctx.paths)?;
+                if let Some(s) = ctx.store_if_unlocked() {
+                    s.note_action(
+                        &NewAction::new("org.host.config", ORIGIN, format!("site autostart {}", if state.on() { "on" } else { "off" }))
+                            .params(json!({ "autostart": state.on() })),
+                    );
+                }
+            }
+            ctx.io.info(if state.on() { "the site starts with the node" } else { "the site starts only when asked (`mnnn org host start`)" });
             Ok(())
         }
         OrgHostCommand::Stop => match host::running(&home) {

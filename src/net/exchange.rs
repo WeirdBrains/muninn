@@ -293,8 +293,41 @@ pub enum Token {
 }
 
 /// Read an offer or answer token (whitespace and line breaks are ignored).
+/// Links carry offers (invitations) and answers: `muninn://join/…` and `muninn://answer/…`.
+pub const JOIN_LINK: &str = "muninn://join/";
+pub const ANSWER_LINK: &str = "muninn://answer/";
+
+/// The link form of a token (what the user passes on: one address, nothing to verify).
+pub fn link(token: &str) -> String {
+    if let Some(b) = token.strip_prefix(OFFER_PREFIX) {
+        format!("{JOIN_LINK}{b}")
+    } else if let Some(b) = token.strip_prefix(ANSWER_PREFIX) {
+        format!("{ANSWER_LINK}{b}")
+    } else {
+        token.to_string()
+    }
+}
+
+/// A token from a link or a token (whitespace and line breaks dropped).
+pub fn unlink(input: &str) -> String {
+    let s: String = input.split_whitespace().collect();
+    if let Some(b) = s.strip_prefix(JOIN_LINK) {
+        format!("{OFFER_PREFIX}{}", b.trim_end_matches('/'))
+    } else if let Some(b) = s.strip_prefix(ANSWER_LINK) {
+        format!("{ANSWER_PREFIX}{}", b.trim_end_matches('/'))
+    } else {
+        s
+    }
+}
+
+/// Does this look like a token or a link (rather than an id or a name)?
+pub fn is_token(input: &str) -> bool {
+    let t = input.trim();
+    t.starts_with("mnnn-x1-") || t.starts_with("muninn://")
+}
+
 pub fn parse_token(s: &str) -> Result<Token> {
-    let s: String = s.split_whitespace().collect();
+    let s: String = unlink(s);
     let (body, offer) = if let Some(b) = s.strip_prefix(OFFER_PREFIX) {
         (b, true)
     } else if let Some(b) = s.strip_prefix(ANSWER_PREFIX) {
@@ -334,6 +367,16 @@ pub fn open_msg(key: &Key32, exchange: &str, from: &PeerId, to: &PeerId, s: &cra
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn links_round_trip() {
+        let t = format!("{}abc_-", super::OFFER_PREFIX);
+        let l = super::link(&t);
+        assert!(l.starts_with("muninn://join/"));
+        assert_eq!(super::unlink(&l), t);
+        assert_eq!(super::unlink(&t), t);
+        assert!(super::is_token(&l) && super::is_token(&t) && !super::is_token("ben"));
+    }
+
     use super::*;
 
     #[test]

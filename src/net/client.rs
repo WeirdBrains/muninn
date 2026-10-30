@@ -168,11 +168,10 @@ pub fn create_scoped(
         Some(&secret[..]),
     )?;
     let delivered = match (&target, node) {
-        (Some((p, a)), Some(n)) => Some(match n.request(*p, a, Wire::Offer { token: token.clone() }) {
-            Ok(WireResp::Ok { msg }) => Ok(msg),
-            Ok(WireResp::Error { msg }) => Err(msg),
-            Ok(_) => Err("unexpected answer".into()),
-            Err(e) => Err(e.to_string()),
+        (Some((p, a)), Some(n)) => Some(match super::auto::deliver(s, n, *p, a, &token) {
+            Ok(super::auto::Delivered::Kept(msg)) => Ok(msg),
+            Ok(super::auto::Delivered::Answered(_)) => Ok("connected".into()),
+            Err(e) => Err(e),
         }),
         (Some(_), None) => Some(Err("no node running".into())),
         _ => None,
@@ -184,6 +183,7 @@ pub fn create_scoped(
         format!("key exchange offered{}", if label.is_empty() { String::new() } else { format!(" ({label})") }),
         serde_json::json!({ "exchange": x.id, "label": label, "peer": x.peer_id, "delivered": delivered.as_ref().map(|d| d.is_ok()) }),
     );
+    let x = s.exchange(&x.id)?.unwrap_or(x);
     Ok(Created { exchange: x, token, delivered })
 }
 
@@ -208,8 +208,8 @@ pub fn accept(
     addrs: Vec<String>,
     origin: &str,
 ) -> Result<Accepted> {
-    let token = if input.trim().starts_with("mnnn-x1-") {
-        input.split_whitespace().collect::<String>()
+    let token = if exchange::is_token(input) {
+        exchange::unlink(input)
     } else {
         let x = s.find_exchange(input)?;
         match x.status {
@@ -273,9 +273,12 @@ pub fn accept(
                     Ok(WireResp::Ok { msg }) => Ok(msg),
                     Ok(WireResp::Error { msg }) => Err(msg),
                     Ok(_) => Err("unexpected answer".into()),
-                    Err(e) => Err(e.to_string()),
+                    Err(e) => Err(super::auto::plain(&e.to_string())),
                 }
             });
+            if matches!(delivered, Some(Ok(_))) {
+                s.mark_answer_delivered(&x.id)?;
+            }
             record(
                 s,
                 origin,
@@ -505,7 +508,7 @@ pub fn share(s: &Store, kind: ShareKind, key: &str, with: &[String], origin: &st
         out.push(s.add_share(kind, &id, &name, None)?);
     } else {
         for w in with {
-            let x = exchange_for(s, w)?;
+            let x = super::auto::link_for(s, w)?;
             if x.status == ExchangeStatus::Revoked {
                 return Err(Error::invalid("exchange", format!("{} is revoked", x.title())));
             }

@@ -4,15 +4,15 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-net\-connect \- Say hello to a node (`…/p2p/ID`, a peer id or a known peer) and remember it
+mnnn\-net\-connect \- Connect to a node (`…/p2p/ID`, a peer id or a known name): keys are exchanged automatically; a node that does not know you yet asks its owner first
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn net connect\fR [\fB\-\-home\fR] [\fB\-\-label\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fITARGET\fR> 
+\fBmnnn net connect\fR [\fB\-\-home\fR] [\fB\-\-label\fR] [\fB\-\-db\fR] [\fB\-\-hello\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fITARGET\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-Say hello to a node (`…/p2p/ID`, a peer id or a known peer) and remember it
+Connect to a node (`…/p2p/ID`, a peer id or a known name): keys are exchanged automatically; a node that does not know you yet asks its owner first
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -31,6 +31,9 @@ Database file (default <home>/storage/muninn.database)
 .RS
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
+.TP
+\fB\-\-hello\fR
+Only say hello and remember it (no key exchange)
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors

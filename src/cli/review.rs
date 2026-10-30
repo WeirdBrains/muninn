@@ -74,13 +74,13 @@ fn add(ctx: &Ctx, key: &str, ask: Ask) -> anyhow::Result<()> {
 /// Print a link for a reviewer (or that it was sent).
 fn link(ctx: &Ctx, c: &crate::net::client::Created) {
     match &c.delivered {
-        Some(Ok(_)) => ctx.io.note("Sent; they join with `mnnn review join` (or the TUI)."),
+        Some(Ok(_)) => ctx.io.note("Sent; they see it as a request and join with `mnnn review join TITLE` (or the TUI)."),
         other => {
             if let Some(Err(e)) = other {
                 ctx.io.warn(format!("could not reach them ({e})"));
             }
-            ctx.io.note("Give them this link (they run `mnnn review join TOKEN`; it is good for one reviewer for a week):");
-            println!("{}", c.token);
+            ctx.io.note("Send them this review link (they run `mnnn review join LINK`; it is good for one reviewer for a week):");
+            println!("{}", crate::net::exchange::link(&c.token));
         }
     }
 }
@@ -236,14 +236,35 @@ pub fn run(ctx: &Ctx, cmd: ReviewCommand) -> anyhow::Result<()> {
         ReviewCommand::Join { token, label } => {
             let mut n = Net::open(ctx)?;
             let token = read_token(&token)?;
+            // an invitation that came over the network: by review title or request id
+            let token = if crate::net::exchange::is_token(&token) {
+                token
+            } else {
+                let k = token.trim().to_lowercase();
+                let reqs: Vec<_> = crate::net::auto::requests(&n.store)?
+                    .into_iter()
+                    .filter(|x| {
+                        x.scope.get("kind").and_then(|v| v.as_str()) == Some("resource")
+                            && x.scope.get("as").and_then(|v| v.as_str()) == Some("review")
+                    })
+                    .collect();
+                let title = |x: &crate::store::Exchange| x.scope.get("title").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
+                reqs.iter()
+                    .find(|x| title(x) == k)
+                    .or_else(|| reqs.iter().find(|x| x.id.starts_with(&k) || title(x).contains(&k)))
+                    .map(|x| x.offer.clone())
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("no review invitation `{}` here (`mnnn net requests` lists them; or pass the review link)", token.trim())
+                    })?
+            };
             n.node()?;
             let (g, a) = rnet::join(&n.store, n.node.as_ref(), &n.kp, &token, &label, ORIGIN)?;
             ctx.io.info(format!("reviewing {} ({} {}); you may {}", g.title(), g.kind, g.name, g.allow.join(", ")));
             if let Some(ans) = &a.answer
                 && !matches!(a.delivered, Some(Ok(_)))
             {
-                ctx.io.note("Their node was not reachable; give this answer back (they run `mnnn net exchange accept TOKEN`):");
-                println!("{ans}");
+                ctx.io.note("Their node was not reachable; you are connected once it is (or give them this link):");
+                println!("{}", crate::net::exchange::link(ans));
             }
             Ok(())
         }
