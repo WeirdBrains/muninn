@@ -1,0 +1,1 @@
+use stdpython :: * ; fn __module_init__ () -> Result < () , PyException > { test () ; Ok (()) } fn main () { if let Err (e) = __module_init__ () { eprintln ! ("{}" , e) ; std :: process :: exit (1) ; } }

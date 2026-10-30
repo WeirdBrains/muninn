@@ -1,0 +1,1 @@
+use stdpython :: * ; fn main () -> Result < () , PyException > { let result ; result = { let __rython_or = os :: path :: dirname (__file__) ; if (__rython_or) . is_truthy () { Some (__rython_or) } else { None } } ; ; print (& (result)) ; Ok (()) } pub fn another_function () -> Result < () , PyException > { ; Ok (()) }

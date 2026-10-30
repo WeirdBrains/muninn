@@ -1,0 +1,1 @@
+use stdpython :: * ; pub fn foo () -> Result < () , PyException > { let bar ; bar = 7 ; ; Ok (()) }

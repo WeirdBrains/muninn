@@ -1,0 +1,1 @@
+use stdpython :: * ; pub static x : i64 = 42 ; fn __module_init__ () -> Result < () , PyException > { print (& (x)) ; Ok (()) } fn main () { if let Err (e) = __module_init__ () { eprintln ! ("{}" , e) ; std :: process :: exit (1) ; } }

@@ -1,0 +1,1 @@
+use stdpython :: * ; use baz as splunk ; use crate :: foo :: Bar ;

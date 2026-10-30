@@ -1,0 +1,1 @@
+use stdpython :: * ; # [deprecated (note = "rython: Python default value(s) for parameter(s) `a` were dropped (Rust has no default arguments); every argument must be passed explicitly")] pub fn foo (a : impl Into < PyObject >) -> Result < () , PyException > { return Ok (((7) as i64) . py_add (& (a))) ; } pub fn bar () -> Result < () , PyException > { foo (6) ? ; Ok (()) }

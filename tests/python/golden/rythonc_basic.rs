@@ -1,0 +1,1 @@
+use stdpython :: * ; pub fn foo () -> Result < i64 , PyException > { let a ; a = 7 ; ; return Ok (a) ; }

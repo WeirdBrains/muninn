@@ -1,0 +1,1 @@
+use stdpython :: * ; pub fn python_main () -> Result < i64 , PyException > { print (& ("Hello from main")) ; return Ok (42) ; } fn main () { let __rython_result = (|| -> Result < () , PyException > { python_main () ? ; Ok (()) }) () ; if let Err (e) = __rython_result { eprintln ! ("{}" , e) ; std :: process :: exit (1) ; } }
