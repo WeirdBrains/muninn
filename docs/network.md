@@ -53,6 +53,8 @@ AutoNAT tells the node whether others can reach it. A node that cannot be reache
 reserves a slot on a relay (`mnnn net relay add /ip4/…/tcp/4741/p2p/ID`, or one it
 learns about) and is reachable through it; DCUtR then tries a direct connection. Any
 node can serve as a relay for others with `--relay-server` (or `relay serve on`).
+A peer reached through a relay is dialed over one circuit per relay, the most reachable
+one (a relay you added first, then a DNS name, a public, LAN, VPN and loopback address).
 
 ### Reaching a node from outside
 
