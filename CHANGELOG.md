@@ -6,6 +6,21 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-10-30
+
+### Added
+- User identities: each node acts for a user, linked nodes are approved and can be revoked (mnnn user show|link|approve|nodes|revoke)
+- Connections with trust, recorded in history (mnnn connection list|trust|remove; TUI Net ▸ Connections…, t)
+- One invite system for connections, orgs and reviews (mnnn invite create|list|revoke|accept|decline; TUI Net ▸ Invites…)
+
+### Changed
+- Orgs belong to users (existing orgs move to the current user) and a member's linked nodes act with the member's role
+- Dark shards go only to trusted connections (the TUI lists only those; mnnn net shard entrust asks first); reviewer names come from the user
+- The Net window's Connections page is now Nodes; pages 1–9 and 0
+
+### Fixed
+- A withdrawn or used invite link now fails for whoever uses it instead of looking connected
+
 ## [2.9.2] - 2026-10-30
 
 ### Fixed
@@ -339,7 +354,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.9.2...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/kommandosaldat/muninn/compare/v2.9.2...v2.10.0
 [2.9.2]: https://github.com/kommandosaldat/muninn/compare/v2.9.1...v2.9.2
 [2.9.1]: https://github.com/kommandosaldat/muninn/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/kommandosaldat/muninn/compare/v2.8.0...v2.9.0
