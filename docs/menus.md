@@ -28,7 +28,7 @@ Every menu item runs a named action. The same actions are bound to keys
 |------|-------|
 | File | Import… · Export… · Backup ▸ (Create, Restore) · Authors… · Preferences… · Quit |
 | View | New tile ▸ · Split ▸ · Close tile · Zoom tile · Equalize · Change view · Link tile · Chart layers… · Container ▸ · Layouts ▸ · Toggle sidebar · History ▸ (Show/hide history bar, Step back, Step forward) |
-| Data | Sources… · Symbols… · Filters ▸ (Source, Symbol, Time range…, Price, Period, Year, Clear all) · Sort ▸ · Coverage & gaps · Refresh |
+| Data | Sources… · Symbols… · Filters ▸ (Source, Symbol, Time range…, Price, Period, Year, Clear all) · Sort ▸ · Coverage & gaps · Model designer… · Refresh |
 | Projects | Projects… · New project… · Live searches… · Save search as live search… · Journals… · New journal… · Reports… · New report… · Rules… · Add selected series to project… |
 | Keys | Initialize… · Lock · Rotate service key · Rekey database · Export… · Recover ▸ · Re-issue shards |
 | Theme | Select… · Mode ▸ (Light, Dark, System) · Edit current… · New from current… · Import… · Export… |

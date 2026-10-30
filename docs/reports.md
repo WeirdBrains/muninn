@@ -13,6 +13,7 @@ exported to PDF, HTML, Word (.docx), LaTeX, JSON, CSV or plain text (see
 | `series` | every series a [live search](live-searches.md) matches now, or every series, one summary row each |
 | `journal` | a [journal](journals.md), or some of its entries, with notes as footnotes and highlights marked |
 | `project` | a project's contents: live searches, results, journals and reports |
+| `model` | the records of a [model](models.md), optionally only those meeting `--where` conditions, as a table of its fields (`--rows`, default 20, 0 = all) |
 | `authors` | who created the report, added its sections or entries, and later edited it |
 | `code` | output of a code space; a placeholder until code spaces arrive |
 
@@ -31,6 +32,7 @@ mnnn report add REPORT [--title T] [--at N] (
     | --series [SEARCH]                                 # no SEARCH: every series
     | --journal JOURNAL [--entry ENTRY]...
     | --project PROJECT
+    | --model MODEL [--where "FIELD OP VALUE"]... [--rows N]
     | --authors
     | --code SPACE )
 mnnn report edit-section REPORT SECTION [--title T] [--text T | --file F] [--format F] [--rows N]

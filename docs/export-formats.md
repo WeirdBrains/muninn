@@ -87,7 +87,8 @@ mnnn journal import FILE [--project PROJECT] [--name NAME]
 A project archive (`.mnnp`, a zstd-compressed tar) holds `muninn-project.json` (the
 project, its live searches, results, journals with entries, notes and highlights,
 reports with their sections, its [rules](rules.md) and its journals' and live
-searches' rules, and the authors involved), the images under
+searches' rules, its [models](models.md) with their versions, records and rules,
+and the authors involved), the images under
 `attachments/`, the bars the project refers to under `data/` as CSV (result ranges,
 what its live searches match and the series its report sections show; `--no-data`
 leaves them out), and `project.html` to read without Muninn. `--format json` writes
@@ -96,7 +97,9 @@ the same project as one JSON file with images and bars inline.
 Import restores everything as new items with new ids, so it can sit next to the
 original: a project or journal of the same name is imported as "NAME (imported)"
 unless `--name` is given, and so are a project's journals and reports whose names are
-taken. Rules are imported switched off. Bars are added like an ingest (existing bars are kept),
+taken. Rules are imported switched off. Models keep their record ids; one whose name is
+taken is imported as `NAME_imported`, a local draft is kept, and only the fields added
+to bars travel (as optional fields, with their values). Bars are added like an ingest (existing bars are kept),
 authors are matched by id and added when missing, and references between the
 project's journals, live searches, reports and images are rewritten. An import is all
 or nothing. Recorded as `project.import` / `journal.import`.

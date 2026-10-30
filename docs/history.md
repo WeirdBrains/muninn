@@ -92,6 +92,8 @@ entry, because they never ask for the password.
 | `journal.print` | CLI, TUI | the PDF and the print command (or none) |
 | `journal.import`, `project.import` | CLI | the file and what was restored |
 | `rule.create`, `rule.edit`, `rule.remove`, `rule.enable`, `rule.disable` | CLI, TUI | the [rule](rules.md) |
+| `model.create`, `model.edit`, `model.apply`, `model.rollback`, `model.remove` | CLI, TUI, rules | the [model](models.md), its version, plan steps and values lost |
+| `record.create`, `record.update`, `record.delete` | CLI, TUI, rules | the model and record, or the filter and how many |
 | `rule.run` | rules | the rule, the action that triggered it, its status (`ok`, `failed`, `blocked`); what it did is recorded under it |
 
 Stepping back over these actions moves the head only; it does not undo the change

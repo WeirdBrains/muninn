@@ -30,6 +30,7 @@ mnnn project add PROJECT --journal JOURNAL
 mnnn project add PROJECT --result SOURCE:SYMBOL:PERIOD [--from TIME] [--to TIME]
 mnnn project add PROJECT --report REPORT
 mnnn project add PROJECT --rule RULE
+mnnn project add PROJECT --model MODEL
 mnnn project drop PROJECT ITEM                       # ITEM: the number `show` prints
 mnnn project export PROJECT [--format archive|json|pdf|html|docx|latex|csv|text] [--out PATH] [--rows N] [--no-data]
 mnnn project import FILE [--name NAME]               # an archive (.mnnp) or JSON export

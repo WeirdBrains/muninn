@@ -13,16 +13,16 @@ mnnn rule create "Weekly after import" --on import --if "inserted > 0" \
 
 ## Where rules live
 
-A rule lives in one place, its **home**: standalone, a [journal](journals.md) or a
-[live search](live-searches.md). Independently, it can be in any number of
+A rule lives in one place, its **home**: standalone, a [journal](journals.md), a
+[live search](live-searches.md) or a [model](models.md). Independently, it can be in any number of
 [projects](projects.md); a project's rules are its **rule set** (`project add --rule`,
 or `--project` on `rule create`). The home is also the default target: a then-action
-without a journal, live search or project uses the rule's own.
+without a journal, live search, model or project uses the rule's own.
 
 `--related` (or "Lives in" with a journal or live search) makes the rule only react to
 actions that mention its home, for example entries written in its journal.
 
-Removing a journal or live search keeps its rules, as standalone rules that are
+Removing a journal, live search or model keeps its rules, as standalone rules that are
 switched off. Removing a rule takes it out of every project.
 
 ## When: events and fields
@@ -55,13 +55,26 @@ its values does.
 | `add-to-project [PROJECT] [item=subject\|search:S\|journal:J\|report:R]` | adds an item to a project; `subject` is what the action was about |
 | `entry [JOURNAL] "TEXT" [title=T]` | writes a journal entry |
 | `note [JOURNAL] "TEXT"` | adds a note to a journal |
+| `model-create NAME fields="a:text; b:real" [about=T] [draft=yes]` | creates a [model](models.md) (applied as v1 unless `draft=yes`; nothing happens if it exists) |
+| `model-edit [MODEL] add=SPEC change=SPEC drop=F rename=A:B move=F:N [apply=yes] [destructive=yes]` | changes a model's draft, in the order given; `apply=yes` applies it |
+| `model-apply [MODEL] [destructive=yes]` | applies a model's draft |
+| `model-remove [MODEL] [destructive=yes]` | removes a model (with records: `destructive=yes`) |
+| `record-create [MODEL] FIELD=VALUE…` | adds a record |
+| `record-update [MODEL] id=ID\|where="F OP V; …" FIELD=VALUE…` | changes one record, or all that match |
+| `record-delete [MODEL] id=ID\|where="F OP V; …"` | deletes one record, or all that match |
 
 The format comes from the file extension unless `format=` says otherwise
 ([export formats](export-formats.md)); `~/` is your home folder. Texts, titles and
 paths take templates: `{kind}`, `{summary}`, `{origin}`, `{author}`, `{action}`,
 `{rule}`, `{date}` (2026-10-29), `{time}` (143005), `{now}` (2026-10-29 14:30) and
-any field, like `{inserted}` or `{name}`. Separate several then-actions in one
-string with `;`.
+any field, like `{inserted}` or `{name}`; so do record values and `where=` values.
+Separate several then-actions in one string with `;`.
+
+Migrations a rule applies are noted `rule NAME` in the model's history. One that would
+throw values away fails unless it says `destructive=yes`, and a refused `model-edit …
+apply=yes` leaves the draft as it was. A model's own **Rules** screen (`D`, then `f`)
+makes rules that live in the model, starting from a `record-create` that copies the
+trigger's fields.
 
 What a rule does is recorded like anything else: a `rule.run` action under the action
 that triggered it, with the then-actions as its children (origin `rule`, the current
@@ -83,9 +96,9 @@ A stopped run is recorded as a `rule.run` with status `blocked`.
 ```
 mnnn rule list [--json]
 mnnn rule create NAME --on KIND [--if COND]... --then ACTION... [--description TEXT]
-                [--journal J | --search S] [--project P] [--related] [--disabled]
+                [--journal J | --search S | --model M] [--project P] [--related] [--disabled]
 mnnn rule edit RULE [--name N] [--on ...] [--if ...] [--clear-if] [--then ...]
-                [--journal J | --search S | --standalone] [--related | --unrelated]
+                [--journal J | --search S | --model M | --standalone] [--related | --unrelated]
 mnnn rule show RULE [--json]                 # spec, home, projects, recent runs
 mnnn rule enable RULE / disable RULE
 mnnn rule remove RULE                        # asks first; -y skips
@@ -117,14 +130,14 @@ that rule.
 | `d` | delete (`y` confirms) |
 | Esc | close the details, then the window |
 
-"Lives in" takes `journal:NAME`, `search:NAME`, `project:NAME` (stays standalone and
+"Lives in" takes `journal:NAME`, `search:NAME`, `model:NAME`, `project:NAME` (stays standalone and
 joins the project) or nothing. Rule messages appear on the status line as rules run,
 also after background imports.
 
 ## Archives
 
 Project archives (`.mnnp`, [export formats](export-formats.md)) carry the project's
-rules and the rules owned by its journals and live searches. Imported rules come in
+rules and the rules owned by its journals, live searches and models. Imported rules come in
 **switched off**, so a file from someone else never acts until you turn it on.
 
 ## Rule specs

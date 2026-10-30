@@ -10,6 +10,8 @@ A search has a **target**:
   text, source, symbol, period, year, time range and price filters, plus a sort.
 - **journals**: fuzzy text over the title and text of every [journal](journals.md)
   entry.
+- **records**: the records of a designed [model](models.md) (or of every model but
+  bars): fuzzy text over their text fields plus `FIELD OP VALUE` conditions.
 
 Live searches live in the encrypted database. They can be added to
 [projects](projects.md).
@@ -40,7 +42,9 @@ mnnn search remove SEARCH                       # asks first; -y skips (alias: r
 | option | meaning |
 |--------|---------|
 | `--query TEXT` | fuzzy text, words in any order |
-| `--series` / `--journals` | the target (default: series) |
+| `--series` / `--journals` / `--records` | the target (default: series) |
+| `--model MODEL` | records of one model (`all`: every model but bars); implies `--records` |
+| `--where "FIELD OP VALUE"` | records meeting a condition, as in [rules](rules.md) (`= != ~ !~ > >= < <= ? !?`); repeatable; implies `--records` |
 | `--source NAME`, `--symbol SYM`, `--period 5m`, `--year 2024` | repeatable filters |
 | `--from TIME`, `--to TIME` | time range (UTC date or date and time) |
 | `--price METRIC --min X --max Y` | price filter (open, high, low, close, typical, median, ohlc, vwap) |
@@ -58,6 +62,7 @@ mnnn search run "eth 5m"
 mnnn search fork "eth 5m" --name "eth 2024" --year 2024
 mnnn search edit "eth 2024" --price close --min 1000
 mnnn search find --journals --query "breakout" --save breakouts
+mnnn search save big --model trades --where "price > 3000"
 ```
 
 ## Terminal UI

@@ -81,6 +81,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `J` | the [journals](journals.md) list |
 | `O` | the [reports](reports.md) list |
 | `R` | the [rules](rules.md) window (`n` new, `e` edit, Space on/off, `t` test, `x` dry run) |
+| `D` | the [model designer](models.md) |
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
@@ -88,7 +89,11 @@ project, Enter open, Esc back. In an entry: ← → move by word, `v` select, `m
 highlight, `n` note, `i` image; the editor saves with Ctrl-S and switches Markdown ↔
 LaTeX with Ctrl-T. `E` exports (journals, entries, reports, projects) and `P` prints
 (journals, entries); `I` in the projects list imports an archive; in a report `a` adds a section, `J` / `K` move it, `v` previews.
-Full tables: [live searches](live-searches.md),
+In the model designer: `m` design, `r` records, `h` history, `f` rules; in the design
+`a` add, `e` edit, `x` drop, `u` undo, `K` / `J` move, `A` apply, `z` discard; in history
+`b` rolls back; in records `w` where, `/` text, `s` sort, `g` group, `U` / `D` update /
+delete all matching.
+Full tables: [models](models.md), [live searches](live-searches.md),
 [projects](projects.md), [journals](journals.md), [reports](reports.md), [rules](rules.md),
 [export formats](export-formats.md).
 

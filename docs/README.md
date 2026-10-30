@@ -25,7 +25,8 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Projects](projects.md): live searches, results and journals together
 - [Journals](journals.md): Markdown or LaTeX entries with images, notes and highlights
 - [Reports](reports.md): sections built from records, journals, projects and authors
-- [Rules](rules.md): when an action happens, run searches, export, write entries or notes
+- [Rules](rules.md): when an action happens, run searches, export, write entries or notes, feed models
+- [Models](models.md): design record tables, migrate them with previews and roll back; records
 - [Export formats](export-formats.md): PDF, HTML, Word, LaTeX, JSON, CSV; printing; project archives and import
 
 ## Getting data in and out
@@ -37,7 +38,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 
 ## Data and storage
 
-- [Data model](data-model.md): bars, sources, symbols, bar ids
+- [Data model](data-model.md): bars, sources, symbols, bar ids, models and records
 - [Storage layout](storage-layout.md): the `~/.muninn` folder
 - [Preferences](preferences.md)
 

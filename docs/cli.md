@@ -18,6 +18,8 @@ mnnn [GLOBAL FLAGS] <COMMAND>
            note|highlight|edit-note|remove-note|attach|image|export|import|print
   report   list|create|show|edit|remove|add|edit-section|remove-section|move|export|preview
   rule     list|create|show|edit|remove|enable|disable|test|dry-run|events
+  model    list|types|create|edit|show|plan|apply|discard|history|rollback|remove|
+           record create|update|list|show|delete
   tui
   help     [TOPIC] [--search TEXT]
 ```
@@ -63,6 +65,8 @@ mnnn -q export --format csv --out - --symbol BTC/USDT --from 2026-10-01 | head
 mnnn sources list
 mnnn author add --name "Ada Lovelace" --email ada@example.org
 mnnn history tree
+mnnn model create trades --fields "symbol:text!; price:real; side:text choices=buy|sell"
+mnnn model record list trades --where "price > 3000" --sort -price
 mnnn help keys
 mnnn help --search shard
 ```

@@ -11,8 +11,8 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 1 | Foundations: [Authorship](#authorship) + [Action History](#action-history) | v2.0.0 | ✅ Released |
 | 2 | [Live Searches](#live-searches), [Projects](#projects), [Journals](#journals) | v2.1.0 | ✅ Released |
 | 3 | [Reports](#reports) + exports (HTML, JSON, CSV, LaTeX, PDF, Docx) + project archives | v2.2.0 | ✅ Released |
-| 4 | [Rule Sets](#rule-sets) | v2.3.0 | 🚧 In progress |
-| 5 | [Model Designer](#model-designer) | v2.4.0 | 📋 Planned |
+| 4 | [Rule Sets](#rule-sets) | v2.3.0 | ✅ Released |
+| 5 | [Model Designer](#model-designer) | v2.4.0 | ✅ Released |
 | 6 | [Code Spaces](#code-spaces) | v2.5.0 | 📋 Planned |
 | 7 | [Decentralized Network](#decentralized-network) | v2.6.0 | 📋 Planned |
 | 8 | [Organizations](#organizations) | v2.7.0 | 📋 Planned |

@@ -1,7 +1,8 @@
 # Data model
 
 Everything Muninn ingests becomes **bars** (OHLCV candles) stored in one SQLite
-database (encrypted, see [encryption](encryption.md)).
+database (encrypted, see [encryption](encryption.md)). Your own record tables are
+[models](#models-and-records).
 
 ## Bars
 
@@ -62,11 +63,11 @@ mnnn symbols add FOO/USD --alias FO
 - `actions`: the [action history](history.md) tree (parent, kind, summary, params,
   origin, author, time, view state before and after).
 - `settings`: small key/value pairs (current author, history head).
-- `live_searches`: name, target (series or journals), the search as JSON, the search it
+- `live_searches`: name, target (series, journals or records), the search as JSON, the search it
   was forked from, author, times ([live searches](live-searches.md)). Results are never
   stored; a live search runs on the current data.
 - `projects` and `project_items`: a project's name and description, and its items by
-  kind (`live_search`, `result`, `journal`, `report`, `rule_set`) and reference; a result's series and time range are in the item's payload
+  kind (`live_search`, `result`, `journal`, `report`, `rule_set`, `model`) and reference; a result's series and time range are in the item's payload
   ([projects](projects.md)).
 - `journals`, `journal_entries`, `journal_annotations`, `journal_attachments`: journals
   (standalone or in a project, default format, forked from), entries (title, text,
@@ -75,16 +76,31 @@ mnnn symbols add FOO/USD --alias FO
   rest of the database) ([journals](journals.md)). Every row carries its author.
 - `reports` and `report_sections`: a report's name and description, and its sections in
   order with their kind (`text`, `records`, `series`, `journal`, `project`, `authors`,
-  `code`), title, text and format, and what they show as JSON (series and range, live
-  search, journal and entries, project, code space) ([reports](reports.md)).
-- `rules`: name, description, home (standalone, journal or live search), on/off, the
+  `code`, `model`), title, text and format, and what they show as JSON (series and range, live
+  search, journal and entries, project, code space, model and filter) ([reports](reports.md)).
+- `rules`: name, description, home (standalone, journal, live search or model), on/off, the
   spec as JSON (on, if, then), author, times, and run count, last run and status
   ([rules](rules.md)).
 - `schema_version`: migrations, applied automatically on open. Version 4 adds
   `authors` and `settings`, version 5 `actions`, version 6 `live_searches`, version 7
   `projects` and `project_items`, version 8 the journal tables, version 9 `reports` and
-  `report_sections`; project items may now be reports; version 10 `rules`. All of them only add
+  `report_sections`; project items may now be reports; version 10 `rules`; version 11
+  `models` and `model_versions` (with the built-in bars model). All of them only add
   tables, so older databases upgrade in place on the first open.
+
+## Models and records
+
+[Models](models.md) are record tables you design. `models` holds each model's name,
+description, applied version, design and draft as JSON, author and times. `model_versions`
+holds every applied version's design, migration steps, note, the rule that made it (if
+any), author and time. A model's records live in their own table, `m_NAME`, with `id`,
+`_version`, `_created_at`, `_updated_at`, `_author` and one column per field. Text, JSON
+and refs are TEXT; integers, bools and timestamps (epoch ms) are INTEGER; reals are REAL.
+Required fields are `NOT NULL`, and unique and indexed fields get their own indexes.
+These tables are created and rebuilt only by migrations.
+
+The built-in `bars` model reads the `bars` table. Fields added to it live in `mx_bars`,
+keyed by the bar id; removing a bar removes those values too.
 
 ## Decisions
 
