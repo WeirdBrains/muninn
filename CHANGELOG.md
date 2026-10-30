@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-10-30
+
+### Changed
+- The Net menu groups node actions under Node and dark shards under Dark shards, and adds Invite or connect
+
+### Fixed
+- The menu bar fits in 80 columns (Network and Organizations are now Net and Orgs; the hint shows only when there is room)
+- Dropdowns open below their category and never cover the menu bar on short terminals
+
 ## [2.9.0] - 2026-10-30
 
 ### Added
@@ -324,7 +333,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.9.1...HEAD
+[2.9.1]: https://github.com/kommandosaldat/muninn/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/kommandosaldat/muninn/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/kommandosaldat/muninn/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/kommandosaldat/muninn/compare/v2.6.0...v2.7.0
