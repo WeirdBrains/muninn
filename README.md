@@ -81,6 +81,18 @@ mnnn help ingest-csv
 mnnn help --search shard
 ```
 
+## Research
+
+Projects, live searches, journals, reports, rules and models are described in
+[docs/README.md](docs/README.md). Code spaces run your own math, Polars, Rust or
+Python over the data, compiled to native plugins ([docs/code-spaces.md](docs/code-spaces.md)):
+
+```sh
+mnnn code check                                # which languages can build here
+mnnn code create fast --lang math --model bars --group symbol --source "fast = sma(close, 10)"
+mnnn code run fast                             # asks before the first run of new code
+```
+
 ## Man pages
 
 Pages are pre-generated in `man/`. Install for your user:

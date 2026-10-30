@@ -82,6 +82,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `O` | the [reports](reports.md) list |
 | `R` | the [rules](rules.md) window (`n` new, `e` edit, Space on/off, `t` test, `x` dry run) |
 | `D` | the [model designer](models.md) |
+| `C` | the [code spaces](code-spaces.md) window (`n` new, Enter edit, `r` run) |
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
@@ -93,7 +94,9 @@ In the model designer: `m` design, `r` records, `h` history, `f` rules; in the d
 `a` add, `e` edit, `x` drop, `u` undo, `K` / `J` move, `A` apply, `z` discard; in history
 `b` rolls back; in records `w` where, `/` text, `s` sort, `g` group, `U` / `D` update /
 delete all matching.
-Full tables: [models](models.md), [live searches](live-searches.md),
+In a code space's editor: `e` edits the source (Esc stops), `s` / Ctrl-S saves, `b`
+builds, `r` / Ctrl-R runs, `c` checks, `i` sets the input, `t` widens the result tile.
+Full tables: [code spaces](code-spaces.md), [models](models.md), [live searches](live-searches.md),
 [projects](projects.md), [journals](journals.md), [reports](reports.md), [rules](rules.md),
 [export formats](export-formats.md).
 

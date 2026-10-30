@@ -15,7 +15,7 @@ exported to PDF, HTML, Word (.docx), LaTeX, JSON, CSV or plain text (see
 | `project` | a project's contents: live searches, results, journals and reports |
 | `model` | the records of a [model](models.md), optionally only those meeting `--where` conditions, as a table of its fields (`--rows`, default 20, 0 = all) |
 | `authors` | who created the report, added its sections or entries, and later edited it |
-| `code` | output of a code space; a placeholder until code spaces arrive |
+| `code` | a [code space](code-spaces.md): its last result (tables, charts as images, text) and its source |
 
 ## Command line
 

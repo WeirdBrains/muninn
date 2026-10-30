@@ -193,6 +193,7 @@ mod tests {
             "import",
             "rules",
             "models",
+            "code-spaces",
         ] {
             assert!(topic(id).is_some(), "missing docs/{id}.md");
         }

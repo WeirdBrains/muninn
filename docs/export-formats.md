@@ -88,7 +88,8 @@ A project archive (`.mnnp`, a zstd-compressed tar) holds `muninn-project.json` (
 project, its live searches, results, journals with entries, notes and highlights,
 reports with their sections, its [rules](rules.md) and its journals' and live
 searches' rules, its [models](models.md) with their versions, records, their rules and the rules
-that migrated them,
+that migrated them, the [code spaces](code-spaces.md) of the project, its report sections and
+its rules (source and input only; they arrive not approved),
 and the authors involved), the images under
 `attachments/`, the bars the project refers to under `data/` as CSV (result ranges,
 what its live searches match and the series its report sections show; `--no-data`

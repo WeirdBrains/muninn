@@ -9,7 +9,9 @@ A project collects the things you work on together:
 - **journals** ([journals](journals.md)): a journal can belong to one project (a
   *project journal*), and any journal can also be linked into other projects;
 - **reports** ([reports](reports.md));
-- **rules** ([rules](rules.md)): the project's *rule set*.
+- **rules** ([rules](rules.md)): the project's *rule set*;
+- **models** ([models](models.md));
+- **code spaces** ([code spaces](code-spaces.md)), shown with their language and last run.
 
 Items are references: a project never copies data, so everything in it reflects the
 current data. Taking an item out of a project keeps the item. Removing a project keeps
@@ -31,6 +33,7 @@ mnnn project add PROJECT --result SOURCE:SYMBOL:PERIOD [--from TIME] [--to TIME]
 mnnn project add PROJECT --report REPORT
 mnnn project add PROJECT --rule RULE
 mnnn project add PROJECT --model MODEL
+mnnn project add PROJECT --code SPACE
 mnnn project drop PROJECT ITEM                       # ITEM: the number `show` prints
 mnnn project export PROJECT [--format archive|json|pdf|html|docx|latex|csv|text] [--out PATH] [--rows N] [--no-data]
 mnnn project import FILE [--name NAME]               # an archive (.mnnp) or JSON export

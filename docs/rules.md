@@ -62,6 +62,7 @@ its values does.
 | `record-create [MODEL] FIELD=VALUE…` | adds a record |
 | `record-update [MODEL] id=ID\|where="F OP V; …" FIELD=VALUE…` | changes one record, or all that match |
 | `record-delete [MODEL] id=ID\|where="F OP V; …"` | deletes one record, or all that match |
+| `run-code SPACE` | runs an approved [code space](code-spaces.md) (building it if needed); a changed or unapproved one fails |
 
 The format comes from the file extension unless `format=` says otherwise
 ([export formats](export-formats.md)); `~/` is your home folder. Texts, titles and

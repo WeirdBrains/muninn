@@ -20,6 +20,7 @@ mnnn [GLOBAL FLAGS] <COMMAND>
   rule     list|create|show|edit|remove|enable|disable|test|dry-run|events
   model    list|types|create|edit|show|plan|apply|discard|history|rollback|remove|
            record create|update|list|show|delete
+  code     list|create|edit|show|remove|approve|build|run|check|sdk
   tui
   help     [TOPIC] [--search TEXT]
 ```
@@ -51,6 +52,9 @@ never invents a missing source, symbol or duration.
 | `MUNINN_EXPORT_PASSWORD` | password for key exports and encrypted backups (falls back to `MUNINN_PASSWORD`) |
 | `MUNINN_LOG` | tracing filter, e.g. `debug` |
 | `MUNINN_RAW_DATA` | folder with the full raw CSVs for the ignored full-file tests |
+| `MUNINN_CARGO` | cargo used to build [code spaces](code-spaces.md) (default: `cargo` on `PATH`) |
+| `MUNINN_CODE_TARGET` | cargo target directory for code space builds (default: `<home>/code/target`) |
+| `MUNINN_RYTHONC` | the `rythonc` binary for Python code spaces (default: `rythonc` on `PATH`) |
 
 ## Exit status
 
@@ -67,6 +71,8 @@ mnnn author add --name "Ada Lovelace" --email ada@example.org
 mnnn history tree
 mnnn model create trades --fields "symbol:text!; price:real; side:text choices=buy|sell"
 mnnn model record list trades --where "price > 3000" --sort -price
+mnnn code create fast --lang math --model bars --group symbol --source "fast = sma(close, 10)"
+mnnn code run fast -y
 mnnn help keys
 mnnn help --search shard
 ```

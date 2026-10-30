@@ -13,7 +13,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 3 | [Reports](#reports) + exports (HTML, JSON, CSV, LaTeX, PDF, Docx) + project archives | v2.2.0 | ✅ Released |
 | 4 | [Rule Sets](#rule-sets) | v2.3.0 | ✅ Released |
 | 5 | [Model Designer](#model-designer) | v2.4.0 | ✅ Released |
-| 6 | [Code Spaces](#code-spaces) | v2.5.0 | 📋 Planned |
+| 6 | [Code Spaces](#code-spaces) | v2.5.0 | ✅ Released |
 | 7 | [Decentralized Network](#decentralized-network) | v2.6.0 | 📋 Planned |
 | 8 | [Organizations](#organizations) | v2.7.0 | 📋 Planned |
 | 9 | [Reviews](#reviews) | v2.8.0 | 📋 Planned |

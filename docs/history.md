@@ -2,7 +2,7 @@
 
 Muninn records what you do in the encrypted database: imports, exports, filter and
 time range changes, theme and theme mode changes, source and symbol changes, author
-changes, and work on live searches, projects, journals, reports and rules. Each action has an id, a kind, a summary, when it ran, where it came from
+changes, and work on live searches, projects, journals, reports, rules, models and code spaces. Each action has an id, a kind, a summary, when it ran, where it came from
 (`cli`, `tui`, or `rule` for what a [rule](rules.md) did) and the [author](authors.md) who was current.
 
 ## A tree, not a list
@@ -94,6 +94,9 @@ entry, because they never ask for the password.
 | `rule.create`, `rule.edit`, `rule.remove`, `rule.enable`, `rule.disable` | CLI, TUI | the [rule](rules.md) |
 | `model.create`, `model.edit`, `model.apply`, `model.rollback`, `model.remove` | CLI, TUI, rules | the [model](models.md), its version, plan steps and values lost |
 | `record.create`, `record.update`, `record.delete` | CLI, TUI, rules | the model and record, or the filter and how many |
+| `code.create`, `code.edit`, `code.remove`, `code.approve` | CLI, TUI | the [code space](code-spaces.md) and what changed (a removal keeps its source) |
+| `code.build` | CLI, TUI, rules | the code space and its build key (cached builds are not recorded) |
+| `code.run` | CLI, TUI, rules | the code space, its input, status, writes, duration and error; the model and record changes it made follow it |
 | `rule.run` | rules | the rule, the action that triggered it, its status (`ok`, `failed`, `blocked`); what it did is recorded under it |
 
 Stepping back over these actions moves the head only; it does not undo the change
