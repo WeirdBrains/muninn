@@ -39,7 +39,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 - **Users own things, nodes carry them.** A user identity (its own signing key) certifies the nodes it links; orgs, memberships, reviews and connections belong to users, so any linked node can act with the user's role. Revoking a node ends its access.
 - **All of a user's data is on all of their nodes.** Linked nodes sync everything end to end encrypted with keys only the user's nodes hold. Conflicts never lose data: every record keeps its versions in history, the newest wins and conflicts are shown for the user to settle. Bars sync lazily.
 - **Connections replace friends.** A connection is mutual user-to-user trust made through an invite; each is trusted or untrusted (default untrusted). Shares and reviews may use any connection; dark shards go only to trusted ones.
-- **In-process Python (python-ast) is proposed, not approved.**
+- **Python stays on the external `rythonc`.** Python code spaces are translated by the Rython compiler run as a separate program (`MUNINN_RYTHONC`, else `rythonc` on `PATH`); Muninn does not embed a Python parser or link libpython. Packages do not bundle `rythonc`; the install docs say how to get a Rython release or `cargo install rythonc`.
 
 ---
 

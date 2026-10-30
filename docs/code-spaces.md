@@ -129,7 +129,10 @@ def spread(high: float, low: float) -> float:
     return high - low
 ```
 
-Install Rython with `cargo install rythonc`, or point `MUNINN_RYTHONC` at a `rythonc`
+Rython runs as a separate program: Muninn looks for `MUNINN_RYTHONC` first, then
+`rythonc` on `PATH`, and never embeds Python or links libpython. Muninn's packages do
+not bundle it: install it with `cargo install rythonc` (building code spaces needs cargo
+anyway), or download a Rython release and point `MUNINN_RYTHONC` at its `rythonc`
 binary. `mnnn code check` shows whether it is found.
 
 ## Prebuilt plugins

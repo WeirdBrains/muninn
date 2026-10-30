@@ -6,6 +6,11 @@ dependencies are the C runtime: glibc and libgcc (Linux), the system libraries (
 nothing extra (Windows). Downloads are on the GitHub Releases page with a `SHA256SUMS`
 file. Packaging files live in `packaging/`.
 
+Building code spaces is optional and needs extra tools that the packages do not bundle:
+`cargo` (from [rustup](https://rustup.rs)) for math, Polars and Rust, plus Rython's
+`rythonc` for Python (`cargo install rythonc`, or a Rython release binary named by
+`MUNINN_RYTHONC`). See [code spaces](code-spaces.md#python-through-rython).
+
 > The prebuilt downloads (release tarballs, `muninn-bin`, Homebrew, winget) only work
 > after a release has been published by the release workflow and is publicly
 > downloadable. Until then use the Arch checkout build below or *From source*.
