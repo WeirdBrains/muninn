@@ -10,6 +10,7 @@ pub mod local;
 pub mod node;
 pub mod proto;
 pub mod service;
+pub mod user;
 
 pub use node::{Handler, Node, NodeConfig, Sighting, Status};
 

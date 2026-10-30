@@ -20,6 +20,7 @@ pub mod reviews;
 pub mod rules;
 pub mod runs;
 pub mod searches;
+pub mod users;
 pub use authors::{Author, AuthorChange};
 pub use code::{CodeChange, CodeInput, CodeSpace, Lang, RunInfo};
 pub use history::{ActionRecord, Move, NewAction, TreeRow};
@@ -138,6 +139,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     reviews::MIGRATION,
     // 2.9: automatic key exchanges
     net::MIGRATION_2_9,
+    // 2.10: users, linked nodes and connections
+    users::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
