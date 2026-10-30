@@ -6,6 +6,21 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-10-30
+
+### Added
+- Key exchanges run automatically between nodes: connect, org apply/join/invite, reviews and shares show only the action and its status
+- Connect requests with accept/decline (mnnn net requests|accept|decline), trust on first use pinned to the node key, and a warning when a known label changes key
+- Invite links (mnnn net invite, muninn://join/...) usable from the CLI, a TUI paste or a link
+- Net.autostart (default on) and hosting.autostart (default off), settable in prefs, CLI and TUI
+- TUI dark-shard entrust form: pick peers, set the threshold, masked shard password, per-peer status and a restore check
+
+### Changed
+- The low-level token exchange stays under mnnn net exchange as an advanced command
+
+### Fixed
+- The TUI highlight prompt no longer prefills @
+
 ## [2.8.0] - 2026-10-30
 
 ### Added
@@ -309,7 +324,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/kommandosaldat/muninn/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/kommandosaldat/muninn/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/kommandosaldat/muninn/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/kommandosaldat/muninn/compare/v2.5.1...v2.6.0
