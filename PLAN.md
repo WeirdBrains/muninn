@@ -218,6 +218,7 @@ Organizations allow us to compartmentalize our work. They act as a publishing ho
     - Members, if configured that way, can gain access using their shared key to authorize them
     - Organizations can select which artifacts they want published
     - Each organization node can define and execute code from code spaces
+      - Members share (give) their code spaces to an organization; org nodes then choose which to execute, gated by code-space role permissions, built per node from source (builds cached) and asking before the first run of new or changed code
     - The end result is gRPC, JSON, HTML, and shared assets servable
 12. Organizations can design templates to change the look and feel of their public web hosting
     - All assets used for the template will be stored with the templates and made accessible via hosting
@@ -293,6 +294,7 @@ Private organizations can still have a front door.
 2. Private orgs stay invisible to guests otherwise, and invite users through links that start the key exchange
 3. Roles include access to the org's published code spaces (view source, run, edit or manage), enforced on every node and endpoint
 4. Each org node defines which of the org's code spaces it executes as part of hosting (per-node config), served through hosting, endpoints and gRPC, gated by those code-space permissions
+5. Members give their code spaces to an org with a clear action (CLI `mnnn org give … code`, TUI); every org node syncs the source, builds it itself (builds cached) and asks before the first run of new or changed code
 
 ## Review Copies
 
