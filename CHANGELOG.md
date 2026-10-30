@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-10-30
+
+### Added
+- Peer-to-peer node over TCP and QUIC with Noise encryption, local discovery (mDNS), a wide network (Kademlia) and relays with hole punching; off until started - mnnn net start|status|stop, or K (Network menu) in the TUI
+- Key exchanges authenticated by signed offer/answer tokens and a short code to compare; verify, label, revoke and back up (age-encrypted) - mnnn net exchange create|accept|verify|revoke|export|restore
+- Opt-in sharing per exchange or with all exchanges; list, fetch and import a peer's shared items, and run live searches across peers - mnnn net share|list|fetch|search
+- Dark shards: the master key split among peers, each shard sealed with your password so holders cannot read it; recover from peers - mnnn net shard entrust|restore
+- Peers, relays, settings and history of every network action (never keys, words, shards or passwords) - mnnn net peers|relay|config, Network window pages 1-8
+
 ## [2.5.1] - 2026-10-29
 
 ### Changed
@@ -277,7 +286,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.5.1...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/kommandosaldat/muninn/compare/v2.5.1...v2.6.0
 [2.5.1]: https://github.com/kommandosaldat/muninn/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/kommandosaldat/muninn/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/kommandosaldat/muninn/compare/v2.3.0...v2.4.0
