@@ -1,11 +1,11 @@
 //! Running live searches against the data stored now. See `docs/live-searches.md`.
 use crate::store::{BarFilter, Entry, Journal, SearchSpec, SearchTarget, SeriesInfo, Store};
 use crate::tui::sidebar::{self, SidebarPrefs};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// One match.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Found {
     Series { series: SeriesInfoOut },
@@ -14,7 +14,7 @@ pub enum Found {
 }
 
 /// A series match (serializable copy of [`SeriesInfo`]).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SeriesInfoOut {
     pub source: String,
     pub symbol: String,

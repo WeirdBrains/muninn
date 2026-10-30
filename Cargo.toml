@@ -71,6 +71,12 @@ png = "0.18"
 flate2 = "1"
 crc32fast = "1"
 libloading = "0.8"
+# Decentralized network (2.6): libp2p over TCP and QUIC with Noise + Yamux, mDNS, Kademlia,
+# identify, ping, relay + DCUtR, AutoNAT and request-response; QUIC brings rustls with aws-lc-rs.
+libp2p = { version = "0.57", default-features = false, features = ["tokio", "tcp", "quic", "dns", "noise", "yamux", "mdns", "kad", "identify", "ping", "relay", "dcutr", "autonat", "request-response", "cbor", "macros", "ed25519"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+futures = "0.3"
+x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
 
 
 # Crypto (scrypt/argon2), SQLCipher and Polars are very slow unoptimized; optimize deps in dev/test.

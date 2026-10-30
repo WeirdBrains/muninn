@@ -172,7 +172,39 @@ pub const EVENTS: &[Event] = &[
         about: "a rule ran (never triggers rules)",
         fields: &["rule: rule id", "trigger: action id", "status: ok, failed or blocked", "results: per then-action"],
     },
+    Event { kind: "net.node.start", about: "this node started on the network", fields: &["peer: our peer id", "listen: addresses"] },
+    Event { kind: "net.config", about: "network settings changed", fields: &["label: node label", "port: port", "mdns: on or off"] },
+    Event { kind: "net.node.stop", about: "this node left the network", fields: &["peer: our peer id"] },
+    Event { kind: "net.exchange.create", about: "a key exchange offered", fields: NET_X },
+    Event { kind: "net.exchange.incoming", about: "a peer offered a key exchange", fields: NET_X },
+    Event { kind: "net.exchange.accept", about: "a peer's key exchange offer accepted", fields: NET_X },
+    Event { kind: "net.exchange.complete", about: "a key exchange completed", fields: NET_X },
+    Event { kind: "net.exchange.verify", about: "a key exchange's short code checked", fields: NET_X },
+    Event { kind: "net.exchange.revoke", about: "a key exchange ended (by: me or peer)", fields: NET_X },
+    Event { kind: "net.exchange.restore", about: "key exchanges restored from a backup", fields: &["count: exchanges restored"] },
+    Event { kind: "net.share", about: "an item shared on the network", fields: NET_SHARE },
+    Event { kind: "net.unshare", about: "an item no longer shared", fields: NET_SHARE },
+    Event {
+        kind: "net.serve",
+        about: "a peer fetched a shared item",
+        fields: &["exchange: exchange id", "peer: peer id", "kind: item kind", "name: item name"],
+    },
+    Event { kind: "net.fetch", about: "a shared item fetched from a peer", fields: &["exchange: exchange id", "kind: item kind", "name: item name"] },
+    Event { kind: "net.import", about: "a fetched item added to this database", fields: &["kind: item kind", "name: item name", "from: peer"] },
+    Event { kind: "net.search", about: "a search run across the network", fields: &["spec: the search", "peers: peers asked", "matches: matches"] },
+    Event {
+        kind: "net.shard.entrust",
+        about: "dark shards of the master key entrusted to peers",
+        fields: &["set: shard set", "threshold: shards needed", "total: shards"],
+    },
+    Event { kind: "net.shard.restore", about: "the master key restored from dark shards", fields: &["set: shard set", "shards: shards used"] },
+    Event { kind: "net.shard.hold", about: "a peer's dark shard taken into custody", fields: &["peer: owner peer id", "set: shard set"] },
+    Event { kind: "net.shard.release", about: "a held dark shard returned to its owner", fields: &["peer: peer id", "set: shard set"] },
+    Event { kind: "net.shard.drop", about: "a held dark shard dropped", fields: &["peer: owner peer id", "set: shard set"] },
 ];
+
+const NET_X: &[&str] = &["exchange: exchange id", "peer: peer id", "label: label"];
+const NET_SHARE: &[&str] = &["kind: item kind", "item: item id", "name: item name", "with: exchanges, or everyone"];
 
 /// Fields every action has (besides its params).
 pub const COMMON_FIELDS: &[&str] =
@@ -1590,7 +1622,19 @@ mod tests {
         exec(&s, &rm, &a, &rm.spec.then[0]).unwrap();
         assert!(s.find_model("notes").is_err());
         let ev: Vec<&str> = EVENTS.iter().map(|e| e.kind).collect();
-        for k in ["model.create", "model.edit", "model.apply", "model.rollback", "model.remove", "record.create", "record.update", "record.delete"] {
+        for k in [
+            "net.exchange.complete",
+            "net.share",
+            "net.shard.hold",
+            "model.create",
+            "model.edit",
+            "model.apply",
+            "model.rollback",
+            "model.remove",
+            "record.create",
+            "record.update",
+            "record.delete",
+        ] {
             assert!(ev.contains(&k), "{k}");
         }
         assert_eq!(subject(&made[0]).unwrap(), (ItemKind::Model, sig.id.clone()));

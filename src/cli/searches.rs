@@ -149,7 +149,11 @@ pub fn run(ctx: &Ctx, cmd: SearchCommand) -> anyhow::Result<()> {
                 }
             }
         }
-        SearchCommand::Run { search, json } => {
+        SearchCommand::Run { search, network: true, json } => {
+            drop(store);
+            return super::net::search_network(ctx, &search, json);
+        }
+        SearchCommand::Run { search, network: false, json } => {
             let s = store.find_live_search(&search)?;
             print_results(&store, &s.spec, json)?;
         }

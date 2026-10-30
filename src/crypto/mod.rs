@@ -70,18 +70,31 @@ const SHARD_PREFIX: &str = "muninn-shard-v1";
 /// Split the master key into 5 shards (any 3 recover it). Text form:
 /// `muninn-shard-v1:<set id>:<threshold>:<index>:<share hex>:<checksum>`.
 pub fn split_shards(master: &Key32) -> Result<Vec<Zeroizing<String>>> {
+    split_shards_k(master, SHARD_THRESHOLD, SHARD_COUNT)
+}
+
+/// Split the master key into `n` shards, any `k` of which recover it (2 <= k <= n <= 255).
+pub fn split_shards_k(master: &Key32, k: usize, n: usize) -> Result<Vec<Zeroizing<String>>> {
+    if k < 2 || k > n || n > 255 {
+        return Err(Error::invalid("shards", format!("need 2 <= threshold <= shards <= 255 (got {k} of {n})")));
+    }
     let set: [u8; 4] = random_bytes()?;
     let set = hex::encode(set);
-    let shares = vsss_rs::Gf256::split_array(SHARD_THRESHOLD, SHARD_COUNT, master.0, rand_core::OsRng)
-        .map_err(|e| Error::Crypto(format!("shard split failed: {e:?}")))?;
-    let mut out = Vec::with_capacity(SHARD_COUNT);
+    let shares = vsss_rs::Gf256::split_array(k, n, master.0, rand_core::OsRng).map_err(|e| Error::Crypto(format!("shard split failed: {e:?}")))?;
+    let mut out = Vec::with_capacity(n);
     for (i, sh) in shares.into_iter().enumerate() {
         let sh = Zeroizing::new(sh);
-        let body = format!("{SHARD_PREFIX}:{set}:{SHARD_THRESHOLD}:{}:{}", i + 1, hex::encode(&*sh));
+        let body = format!("{SHARD_PREFIX}:{set}:{k}:{}:{}", i + 1, hex::encode(&*sh));
         let chk = &blake3::hash(body.as_bytes()).to_hex()[..8];
         out.push(Zeroizing::new(format!("{body}:{chk}")));
     }
     Ok(out)
+}
+
+/// The set id, threshold and index of a shard (no secret parts).
+pub fn shard_meta(s: &str) -> Result<(String, usize, u32)> {
+    let p = parse_shard(s)?;
+    Ok((p.set, p.threshold, p.index))
 }
 
 struct ParsedShard {
@@ -197,6 +210,16 @@ fn argon2_key(password: &SecretString, salt: &[u8], m: u32, t: u32, p: u32) -> R
     Ok(Key32(out))
 }
 
+/// A tag derived from a password alone (Argon2id with a fixed salt): lets a custodian find
+/// the dark shards it holds for someone who lost everything but the shard password.
+pub fn shard_claim(password: &SecretString) -> Result<String> {
+    if password.expose_secret().is_empty() {
+        return Err(Error::invalid("password", "must not be empty"));
+    }
+    let k = argon2_key(password, b"muninn/net/shard-claim/v1", 19 * 1024, 2, 1)?;
+    Ok(hex::encode(blake3::keyed_hash(&k.0, b"claim").as_bytes()))
+}
+
 pub fn password_seal(password: &SecretString, plaintext: &[u8], aad: &[u8]) -> Result<PasswordSealed> {
     if password.expose_secret().is_empty() {
         return Err(Error::invalid("password", "must not be empty"));
@@ -260,6 +283,23 @@ mod tests {
         let mut bad = s[0].clone();
         bad.replace_range(30..31, if &bad[30..31] == "a" { "b" } else { "a" });
         assert!(combine_shards(&[bad, s[1].clone(), s[2].clone()]).is_err());
+    }
+
+    #[test]
+    fn shards_k_of_n_and_claims() {
+        let k = Key32::random().unwrap();
+        let s: Vec<String> = split_shards_k(&k, 2, 3).unwrap().iter().map(|z| z.to_string()).collect();
+        assert_eq!(s.len(), 3);
+        assert_eq!(combine_shards(&s[1..]).unwrap(), k);
+        assert!(combine_shards(&s[..1]).is_err());
+        let (set, t, i) = shard_meta(&s[2]).unwrap();
+        assert_eq!((set.len(), t, i), (8, 2, 3));
+        assert!(split_shards_k(&k, 1, 3).is_err() && split_shards_k(&k, 4, 3).is_err());
+        let p = SecretString::from("shard pass");
+        let c = shard_claim(&p).unwrap();
+        assert_eq!(c, shard_claim(&p).unwrap());
+        assert_ne!(c, shard_claim(&SecretString::from("other")).unwrap());
+        assert!(shard_claim(&SecretString::from("")).is_err());
     }
 
     #[test]

@@ -16,6 +16,7 @@ pub mod history;
 pub mod ingest;
 pub mod live;
 pub mod model;
+pub mod net;
 pub mod render;
 pub mod rules;
 pub mod store;

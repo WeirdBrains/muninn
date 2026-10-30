@@ -97,6 +97,69 @@ pub struct Preferences {
     pub ingest: IngestPrefs,
     #[serde(default)]
     pub tui: TuiPrefs,
+    /// The network node (`mnnn net config`, Network ▸ Settings).
+    #[serde(default)]
+    pub net: NetPrefs,
+}
+
+/// Network node settings. Nothing starts or is shared until you say so.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct NetPrefs {
+    /// How this node introduces itself to peers (empty: the author's name, else "muninn").
+    pub label: String,
+    /// TCP and QUIC port (0: let the system pick).
+    pub port: u16,
+    /// Listen addresses replacing the default (all interfaces on `port`).
+    pub listen: Vec<String>,
+    /// Find peers on the local network.
+    pub mdns: bool,
+    /// Relay traffic for other nodes and announce it.
+    pub relay_server: bool,
+    /// Relays to reserve a slot on (`…/p2p/ID`).
+    pub relays: Vec<String>,
+    /// Nodes to join the wide network through (`…/p2p/ID`).
+    pub bootstrap: Vec<String>,
+    /// Start the node when the TUI opens.
+    pub autostart: bool,
+}
+
+impl Default for NetPrefs {
+    fn default() -> Self {
+        NetPrefs {
+            label: String::new(),
+            port: crate::net::node::DEFAULT_PORT,
+            listen: vec![],
+            mdns: true,
+            relay_server: false,
+            relays: vec![],
+            bootstrap: vec![],
+            autostart: false,
+        }
+    }
+}
+
+impl NetPrefs {
+    /// The node configuration these settings describe.
+    pub fn node_config(&self, label: &str) -> Result<crate::net::NodeConfig> {
+        let listen = if self.listen.is_empty() {
+            crate::net::NodeConfig::default_listen(self.port)
+        } else {
+            self.listen.iter().map(|a| a.parse().map_err(|e| crate::error::Error::invalid("listen", format!("{a}: {e}")))).collect::<Result<_>>()?
+        };
+        let addrs = |v: &[String], what: &'static str| -> Result<Vec<libp2p::Multiaddr>> {
+            v.iter().map(|a| a.parse().map_err(|e| crate::error::Error::invalid(what, format!("{a}: {e}")))).collect()
+        };
+        Ok(crate::net::NodeConfig {
+            listen,
+            mdns: self.mdns,
+            relay_server: self.relay_server,
+            bootstrap: addrs(&self.bootstrap, "bootstrap")?,
+            relays: addrs(&self.relays, "relay")?,
+            memory: false,
+            label: label.to_string(),
+        })
+    }
 }
 
 impl Preferences {
@@ -134,5 +197,12 @@ mod tests {
         let text = std::fs::read_to_string(paths.preferences()).unwrap();
         assert!(text.contains("name = \"tokyo-night\""));
         assert!(text.contains("mode = \"system\""));
+        // the network is off and shares nothing until asked
+        assert!(!p.net.autostart);
+        assert!(p.net.mdns && !p.net.relay_server);
+        assert_eq!(p.net.port, 4741);
+        // older files without [net] still load
+        let old: Preferences = toml::from_str("[theme]\nname = \"x\"\nmode = \"dark\"\n").unwrap();
+        assert_eq!(old.net, NetPrefs::default());
     }
 }

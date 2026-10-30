@@ -37,7 +37,7 @@ pub fn master(ctx: &Ctx, m: &MasterInput) -> anyhow::Result<Key32> {
     Ok(key)
 }
 
-fn new_password(ctx: &Ctx, question: &str) -> anyhow::Result<SecretString> {
+pub(super) fn new_password(ctx: &Ctx, question: &str) -> anyhow::Result<SecretString> {
     if let Ok(p) = std::env::var("MUNINN_PASSWORD") {
         return Ok(p.into());
     }

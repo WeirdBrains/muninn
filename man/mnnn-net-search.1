@@ -1,0 +1,163 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-net-search 1  "mnnn-net-search 2.5.1" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-net\-search \- Search here and on every peer that shares with you; results say where they came from
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn net search\fR [\fB\-\-home\fR] [\fB\-\-query\fR] [\fB\-\-db\fR] [\fB\-\-journals\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-series\fR] [\fB\-\-records\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-model\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-where\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-source\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-symbol\fR] [\fB\-\-period\fR] [\fB\-\-year\fR] [\fB\-\-from\fR] [\fB\-\-to\fR] [\fB\-\-price\fR] [\fB\-\-min\fR] [\fB\-\-max\fR] [\fB\-\-sort\fR] [\fB\-\-desc\fR] [\fB\-\-asc\fR] [\fB\-\-from\-view\fR] [\fB\-\-clear\fR] [\fB\-\-saved\fR] [\fB\-\-only\fR] [\fB\-\-remote\-only\fR] [\fB\-\-limit\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Search here and on every peer that shares with you; results say where they came from
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-query\fR \fI<QUERY>\fR
+Search text (fuzzy; words in any order), like the sidebar search
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-journals\fR
+Search journal entries (title and text) instead of series
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-series\fR
+Search series (the default)
+.TP
+\fB\-\-records\fR
+Search the records of designed models (every model but bars, or \-\-model)
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR
+Only this model\*(Aqs records (implies \-\-records; `all` searches every model again)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-where\fR \fI<COND>\fR
+Records meeting a condition, FIELD OP VALUE (implies \-\-records). Repeatable
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-source\fR \fI<NAME>\fR
+Only these sources. Repeatable
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-symbol\fR \fI<SYMBOL>\fR
+Only these symbols, e.g. BTC/USDT or btc\-usdt. Repeatable
+.TP
+\fB\-\-period\fR \fI<DURATION>\fR
+Only these bar periods, e.g. 5m, 1h. Repeatable
+.TP
+\fB\-\-year\fR \fI<YEARS>\fR
+Only series covering these years. Repeatable
+.TP
+\fB\-\-from\fR \fI<TIME>\fR
+Time range start (date or date and time, UTC)
+.TP
+\fB\-\-to\fR \fI<TIME>\fR
+Time range end
+.TP
+\fB\-\-price\fR \fI<METRIC>\fR
+Price filter metric: open, high, low, close, typical, median, ohlc, vwap
+.TP
+\fB\-\-min\fR \fI<MIN>\fR
+Price filter minimum
+.TP
+\fB\-\-max\fR \fI<MAX>\fR
+Price filter maximum
+.TP
+\fB\-\-sort\fR \fI<SORT>\fR
+Sort series by year or name
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+year
+.IP \(bu 2
+name
+.RE
+.TP
+\fB\-\-desc\fR
+Sort descending
+.TP
+\fB\-\-asc\fR
+Sort ascending
+.TP
+\fB\-\-from\-view\fR
+Start from the filters and sort the TUI shows now
+.TP
+\fB\-\-clear\fR
+Start with no filters (edit and fork: drop the existing ones first)
+.TP
+\fB\-\-saved\fR \fI<SEARCH>\fR
+A saved live search to run instead of the options
+.TP
+\fB\-\-only\fR \fI<EXCHANGE>\fR
+Only these exchanges or peers
+.TP
+\fB\-\-remote\-only\fR
+Leave out local results
+.TP
+\fB\-\-limit\fR \fI<LIMIT>\fR [default: 200]
+At most this many results per peer
+.TP
+\fB\-\-json\fR
+
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.5.1
+.SH SEE ALSO
+\fBmnnn\fR(1)

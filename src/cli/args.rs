@@ -97,6 +97,10 @@ pub enum Command {
     /// plugin that reads and writes your data and shows a result.
     #[command(subcommand, alias = "codes", after_long_help = CODE_NOTES)]
     Code(CodeCommand),
+    /// The network: run a node, exchange keys with other nodes, share data with them, search
+    /// across them and entrust them with dark shards. Off and sharing nothing until you ask.
+    #[command(subcommand, alias = "network", after_long_help = NET_NOTES)]
+    Net(NetCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -722,6 +726,9 @@ pub enum SearchCommand {
     #[command(alias = "results")]
     Run {
         search: String,
+        /// Also run it on every peer that shares with you (results say where they came from).
+        #[arg(long)]
+        network: bool,
         #[arg(long)]
         json: bool,
     },
@@ -1702,6 +1709,289 @@ mod tests {
         }
         assert!(parse(&["ingest", "service", "http", "--url", "http://x", "-X", "POST", "--body", "{}"]).is_ok());
     }
+}
+
+pub const NET_NOTES: &str = "\
+The node starts only when you run `mnnn net start` (or Network ▸ Start node in the TUI); the
+other commands bring up a short-lived node with the same identity when they need to talk.
+Nothing is shared until you `share` it, and peers only see it after a completed key exchange.
+
+Key exchange: one side makes an offer (a token, or sent straight to a peer with --peer); the
+other accepts it and both get the same key and a short code. Compare the codes out of band and
+`verify`. Revoking erases the key on both sides (the record stays in the history).
+
+Examples:
+  mnnn net start --for 3600
+  mnnn net exchange create --label ben --peer /ip4/192.0.2.7/tcp/4741/p2p/12D3Koo…
+  mnnn net exchange accept 3f2a                 # an incoming offer (or paste a token)
+  mnnn net exchange verify ben 12345-67890
+  mnnn net share journal \"field notes\" --with ben
+  mnnn net search --journals --query comet
+  mnnn net fetch ben \"field notes\" --import
+  mnnn net shard entrust --to ben --to cleo --to dev --threshold 2
+  mnnn net shard restore --backup net-backup.age --recover";
+
+/// Network commands.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Subcommand)]
+pub enum NetCommand {
+    /// Run this node in the foreground until Ctrl-C (or --for SECS, or `mnnn net stop`).
+    Start {
+        /// TCP and QUIC port (default from settings: 4741; 0 picks one).
+        #[arg(long)]
+        port: Option<u16>,
+        /// Listen on these addresses instead (multiaddr, repeatable).
+        #[arg(long = "listen", value_name = "ADDR")]
+        listen: Vec<String>,
+        /// Do not look for peers on the local network.
+        #[arg(long)]
+        no_mdns: bool,
+        /// Relay traffic for other nodes (and say so).
+        #[arg(long)]
+        relay_server: bool,
+        /// Stop after this many seconds.
+        #[arg(long = "for", value_name = "SECS")]
+        for_secs: Option<u64>,
+    },
+    /// Ask a node started with `mnnn net start` to stop.
+    Stop,
+    /// This node: identity, addresses, connections, NAT, relays.
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Peers seen or known.
+    Peers {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Say hello to a node (`…/p2p/ID`, a peer id or a known peer) and remember it.
+    Connect {
+        target: String,
+        /// Call it this.
+        #[arg(long)]
+        label: Option<String>,
+    },
+    /// Forget a known peer (exchanges with it are kept).
+    Forget { peer: String },
+    /// Relays.
+    #[command(subcommand)]
+    Relay(NetRelayCommand),
+    /// Show or change network settings.
+    Config {
+        /// How this node introduces itself.
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long)]
+        port: Option<u16>,
+        /// Replace the listen addresses (repeatable; \"default\" for all interfaces).
+        #[arg(long = "listen", value_name = "ADDR")]
+        listen: Vec<String>,
+        /// Look for peers on the local network.
+        #[arg(long, value_name = "on|off")]
+        mdns: Option<OnOff>,
+        /// Start the node when the TUI opens.
+        #[arg(long, value_name = "on|off")]
+        autostart: Option<OnOff>,
+        /// Add a bootstrap node (repeatable).
+        #[arg(long = "bootstrap", value_name = "ADDR")]
+        bootstrap: Vec<String>,
+        /// Remove all bootstrap nodes first.
+        #[arg(long)]
+        clear_bootstrap: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Key exchanges with other nodes.
+    #[command(subcommand, alias = "x")]
+    Exchange(NetExchangeCommand),
+    /// Share an item: model, search, journal, project, report or code.
+    Share {
+        /// model, search, journal, project, report or code.
+        kind: String,
+        /// Id, id prefix or name.
+        item: String,
+        /// Only with these exchanges or peers (default: every exchange).
+        #[arg(long = "with", value_name = "EXCHANGE")]
+        with: Vec<String>,
+    },
+    /// Stop sharing an item (everywhere, or with --with).
+    Unshare {
+        kind: String,
+        item: String,
+        #[arg(long = "with", value_name = "EXCHANGE")]
+        with: Vec<String>,
+    },
+    /// What this node shares, and with whom.
+    Shared {
+        #[arg(long)]
+        json: bool,
+    },
+    /// What a peer shares with us (all peers with an exchange when none is given).
+    List {
+        exchange: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Fetch an item a peer shares.
+    Fetch {
+        /// Exchange or peer.
+        exchange: String,
+        /// Shared item: id, kind/name or name.
+        item: String,
+        /// json (default), md, html, latex, pdf, docx, csv, mnnp (projects).
+        #[arg(long)]
+        format: Option<String>,
+        /// Write to this file (default: print, or a file named after the item for binary formats).
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Add it to this database (journals, projects, code spaces, live searches).
+        #[arg(long)]
+        import: bool,
+    },
+    /// Search here and on every peer that shares with you; results say where they came from.
+    Search {
+        #[command(flatten)]
+        spec: SpecArgs,
+        /// A saved live search to run instead of the options.
+        #[arg(long, value_name = "SEARCH")]
+        saved: Option<String>,
+        /// Only these exchanges or peers.
+        #[arg(long = "only", value_name = "EXCHANGE")]
+        only: Vec<String>,
+        /// Leave out local results.
+        #[arg(long)]
+        remote_only: bool,
+        /// At most this many results per peer.
+        #[arg(long, default_value_t = 200)]
+        limit: usize,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Dark shards: the master key split among peers you exchanged keys with.
+    #[command(subcommand)]
+    Shard(NetShardCommand),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum OnOff {
+    On,
+    Off,
+}
+
+impl OnOff {
+    pub fn on(self) -> bool {
+        self == OnOff::On
+    }
+}
+
+#[derive(Debug, Subcommand)]
+pub enum NetRelayCommand {
+    /// Relays known (configured, and seen announcing it).
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Use a relay (`…/p2p/ID`): reachable through it when behind NAT.
+    Add { addr: String },
+    /// Stop using a relay.
+    Remove { relay: String },
+    /// Be a relay for others (on|off).
+    Serve { state: OnOff },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum NetExchangeCommand {
+    /// Offer a key exchange: prints a token to pass on, or sends it with --peer.
+    Create {
+        /// What to call this exchange.
+        #[arg(long, default_value = "")]
+        label: String,
+        /// Send the offer to this node (`…/p2p/ID`, peer id or known peer).
+        #[arg(long)]
+        peer: Option<String>,
+        /// Hours the offer stays valid.
+        #[arg(long, default_value_t = 168)]
+        hours: u64,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Accept an offer (incoming exchange id or token), or complete ours with an answer token.
+    Accept {
+        /// Exchange id, `-` to read a token from stdin, or the token.
+        input: String,
+        #[arg(long, default_value = "")]
+        label: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Key exchanges.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// One exchange, with its short code and fingerprint.
+    Show {
+        exchange: String,
+        /// Print the offer and answer tokens too.
+        #[arg(long)]
+        tokens: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Confirm the short code the other side read out.
+    Verify { exchange: String, code: String },
+    /// End an exchange: the key is erased here and the peer is told.
+    Revoke { exchange: String },
+    /// Rename an exchange.
+    Label { exchange: String, label: String },
+    /// Write an encrypted backup of the node identity and all exchanges.
+    Export {
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Restore exchanges (and the node identity) from a backup.
+    Restore { file: PathBuf },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum NetShardCommand {
+    /// Split the master key among peers: one sealed shard each, any THRESHOLD restore it.
+    Entrust {
+        /// Exchanges or peers (at least two different nodes).
+        #[arg(long = "to", value_name = "EXCHANGE", required = true)]
+        to: Vec<String>,
+        /// Shards needed to restore (default: a majority, at least 2).
+        #[arg(long, default_value_t = 0)]
+        threshold: usize,
+        #[command(flatten)]
+        master: MasterInput,
+    },
+    /// Shards we entrusted, and shards we hold for others.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Gather shards back from peers and rebuild the master key.
+    Restore {
+        /// Use this exchange backup (when the database cannot be opened).
+        #[arg(long)]
+        backup: Option<PathBuf>,
+        /// Only this shard set.
+        #[arg(long)]
+        set: Option<String>,
+        /// Only these exchanges or peers.
+        #[arg(long = "from", value_name = "EXCHANGE")]
+        from: Vec<String>,
+        /// Set a new Muninn password with the restored key (default with --backup).
+        #[arg(long)]
+        recover: bool,
+        /// Print the 24 recovery words.
+        #[arg(long)]
+        print_words: bool,
+    },
+    /// Stop holding a shard for someone.
+    Drop { id: String },
 }
 
 pub const CODE_NOTES: &str = "\

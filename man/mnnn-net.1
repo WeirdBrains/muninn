@@ -1,0 +1,149 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-net 1  "mnnn-net 2.5.1" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-net \- The network: run a node, exchange keys with other nodes, share data with them, search across them and entrust them with dark shards. Off and sharing nothing until you ask
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn net\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+The network: run a node, exchange keys with other nodes, share data with them, search across them and entrust them with dark shards. Off and sharing nothing until you ask
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH NOTES
+.PP
+The node starts only when you run `mnnn net start` (or Network ▸ Start node in the TUI); the
+other commands bring up a short\-lived node with the same identity when they need to talk.
+Nothing is shared until you `share` it, and peers only see it after a completed key exchange.
+.PP
+Key exchange: one side makes an offer (a token, or sent straight to a peer with \-\-peer); the
+other accepts it and both get the same key and a short code. Compare the codes out of band and
+`verify`. Revoking erases the key on both sides (the record stays in the history).
+.PP
+Examples:
+  mnnn net start \-\-for 3600
+  mnnn net exchange create \-\-label ben \-\-peer /ip4/192.0.2.7/tcp/4741/p2p/12D3Koo…
+  mnnn net exchange accept 3f2a                 # an incoming offer (or paste a token)
+  mnnn net exchange verify ben 12345\-67890
+  mnnn net share journal "field notes" \-\-with ben
+  mnnn net search \-\-journals \-\-query comet
+  mnnn net fetch ben "field notes" \-\-import
+  mnnn net shard entrust \-\-to ben \-\-to cleo \-\-to dev \-\-threshold 2
+  mnnn net shard restore \-\-backup net\-backup.age \-\-recover
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-net\-start(1)
+Run this node in the foreground until Ctrl\-C (or \-\-for SECS, or `mnnn net stop`)
+.TP
+mnnn\-net\-stop(1)
+Ask a node started with `mnnn net start` to stop
+.TP
+mnnn\-net\-status(1)
+This node: identity, addresses, connections, NAT, relays
+.TP
+mnnn\-net\-peers(1)
+Peers seen or known
+.TP
+mnnn\-net\-connect(1)
+Say hello to a node (`…/p2p/ID`, a peer id or a known peer) and remember it
+.TP
+mnnn\-net\-forget(1)
+Forget a known peer (exchanges with it are kept)
+.TP
+mnnn\-net\-relay(1)
+Relays
+.TP
+mnnn\-net\-config(1)
+Show or change network settings
+.TP
+mnnn\-net\-exchange(1)
+Key exchanges with other nodes
+.TP
+mnnn\-net\-share(1)
+Share an item: model, search, journal, project, report or code
+.TP
+mnnn\-net\-unshare(1)
+Stop sharing an item (everywhere, or with \-\-with)
+.TP
+mnnn\-net\-shared(1)
+What this node shares, and with whom
+.TP
+mnnn\-net\-list(1)
+What a peer shares with us (all peers with an exchange when none is given)
+.TP
+mnnn\-net\-fetch(1)
+Fetch an item a peer shares
+.TP
+mnnn\-net\-search(1)
+Search here and on every peer that shares with you; results say where they came from
+.TP
+mnnn\-net\-shard(1)
+Dark shards: the master key split among peers you exchanged keys with
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.5.1
+.SH SEE ALSO
+\fBmnnn\fR(1)

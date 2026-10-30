@@ -8,7 +8,7 @@ mnnn\-search\-run \- Run a live search on the current data
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn search run\fR [\fB\-\-home\fR] [\fB\-\-json\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISEARCH\fR> 
+\fBmnnn search run\fR [\fB\-\-home\fR] [\fB\-\-network\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISEARCH\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -23,14 +23,17 @@ Muninn home directory (default ~/.muninn)
 May also be specified with the \fBMUNINN_HOME\fR environment variable. 
 .RE
 .TP
-\fB\-\-json\fR
-
+\fB\-\-network\fR
+Also run it on every peer that shares with you (results say where they came from)
 .TP
 \fB\-\-db\fR \fI<PATH>\fR
 Database file (default <home>/storage/muninn.database)
 .RS
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
+.TP
+\fB\-\-json\fR
+
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
