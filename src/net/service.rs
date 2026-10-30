@@ -479,6 +479,7 @@ pub fn answer(s: &Store, x: &Exchange, from: &PeerId, req: Req, label: &str) -> 
             let keypair = base64::engine::general_purpose::STANDARD.encode(&kp[..]);
             Resp::Linked { card, keypair }
         }
+        Req::Sync { req } => super::sync::serve(s, from, req)?,
         Req::Revoke => {
             let x = s.set_exchange_status(&x.id, ExchangeStatus::Revoked, Some("peer"))?;
             crate::org::net::ended(s, &x)?;

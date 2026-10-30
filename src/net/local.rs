@@ -113,7 +113,8 @@ pub struct Hosted {
     settle: Settle,
 }
 
-/// Background upkeep of pending exchanges ([`super::auto::settle`]) on a spare store.
+/// Background upkeep of pending exchanges ([`super::auto::settle`]) and linked-node sync
+/// ([`super::sync::tick`]) on a spare store.
 #[derive(Default)]
 struct Settle {
     spare: Option<Store>,
@@ -191,6 +192,8 @@ impl Hosted {
             let relays = st.relays.clone();
             st.running = Some(std::thread::spawn(move || {
                 let _ = super::auto::settle(&s, &node, &relays, "network");
+                // linked nodes: pull what changed (each about once a minute)
+                let _ = super::sync::tick(&s, &node, &relays, "network");
                 s
             }));
         }

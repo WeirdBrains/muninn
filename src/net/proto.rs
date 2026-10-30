@@ -164,6 +164,10 @@ pub enum Req {
     LinkFetch {
         label: String,
     },
+    /// 2.11: linked-node sync (only between nodes of the same user).
+    Sync {
+        req: crate::net::sync::SyncReq,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -206,6 +210,10 @@ pub enum Resp {
     Linked {
         card: crate::net::user::Card,
         keypair: String,
+    },
+    /// 2.11: a sync answer, sealed again with the user's sync key.
+    Sync {
+        sealed: crate::crypto::Sealed,
     },
 }
 

@@ -758,3 +758,71 @@ fn cards_need_a_certificate_for_the_sending_node() {
     bad.key = user::my_card(&b.store).unwrap().key;
     assert!(user::take_card(&b.store, &a.peer_id(), &bad, "cli").is_err());
 }
+
+#[test]
+fn linked_nodes_sync_everything_keep_conflicts_fetch_bars_and_stop_when_revoked() {
+    use super::sync;
+    use crate::model::{Bar, Duration as BarDuration, Symbol};
+    let a = Peer::new("laptop");
+    let c = Peer::new("phone");
+    let stranger = Peer::new("ben");
+    // the phone links to the laptop's user
+    auto::link_to(&c.store, c.node(), &c.kp, &a.addr(), "phone", vec![], &[], "cli").unwrap();
+    wait(|| Some(auto::requests(&a.store).unwrap()).filter(|r| !r.is_empty()));
+    auto::accept(&a.store, Some(a.node()), &a.kp, "phone", &a.label, vec![], "cli").unwrap();
+    wait(|| auto::kind_link(&c.store, &a.peer_id(), "link").unwrap().filter(|x| x.status.active()));
+    auto::settle(&c.store, c.node(), &[], "cli");
+    assert!(c.store.self_user().unwrap().is_some());
+
+    // what the laptop has reaches the phone, sealed with the user's sync key
+    let j = a.store.create_journal("notes", None, EntryFormat::Markdown).unwrap();
+    let mut a_bars = Store::open(&a.db(), None).unwrap();
+    let src = a_bars.get_or_create_source("binance", "api", None).unwrap();
+    let sym = Symbol { base: "BTC".into(), quote: "USDT".into() };
+    let bars: Vec<Bar> = (0..5).map(|i| Bar { ts: 60_000 * i, open: 1.0, high: 2.0, low: 0.5, close: 1.5, volume: 10.0, flags: 0 }).collect();
+    a_bars.upsert_bars(&src, &sym, BarDuration(60), &bars).unwrap();
+    let nodes = sync::linked(&c.store).unwrap();
+    assert_eq!(nodes.len(), 1, "{nodes:?}");
+    let x = nodes[0].1.clone().expect("exchange");
+    let got = sync::pull(&c.store, c.node(), &x, &[], "cli").unwrap();
+    assert!(got.taken >= 1, "{got:?}");
+    assert_eq!(c.store.journal(&j.id).unwrap().unwrap().name, "notes");
+    // bars stay put until asked for
+    assert!(c.store.series().unwrap().is_empty());
+    let mut c_bars = Store::open(&c.db(), None).unwrap();
+    let series = sync::remote_series(&c.store, c.node(), &x, &[]).unwrap();
+    assert_eq!(series.len(), 1, "{series:?}");
+    assert_eq!(sync::pull_bars(&mut c_bars, c.node(), &x, &series[0], &[]).unwrap(), 5);
+    assert_eq!(sync::pull_bars(&mut c_bars, c.node(), &x, &series[0], &[]).unwrap(), 0);
+
+    // the laptop pulls back what the phone added (the assets the bars made), with no conflicts,
+    // and the echo of that is quiet
+    let ax = sync::linked(&a.store).unwrap().into_iter().find_map(|(n, x)| (n.peer_id == c.peer_id()).then_some(x).flatten()).unwrap();
+    let back = sync::pull(&a.store, a.node(), &ax, &[], "cli").unwrap();
+    assert_eq!(back.conflicts, 0, "{back:?}");
+    let echo = sync::pull(&c.store, c.node(), &x, &[], "cli").unwrap();
+    assert_eq!((echo.changed(), echo.conflicts), (0, 0), "{echo:?}");
+
+    // both rename it: the newer is kept, the other saved as a conflict
+    a.store.update_journal(&j.id, Some("from laptop"), None).unwrap();
+    std::thread::sleep(Duration::from_millis(5));
+    c.store.update_journal(&j.id, Some("from phone"), None).unwrap();
+    let r = sync::pull(&a.store, a.node(), &ax, &[], "cli").unwrap();
+    assert_eq!(r.conflicts, 1, "{r:?}");
+    assert_eq!(a.store.journal(&j.id).unwrap().unwrap().name, "from phone");
+    let open = a.store.sync_conflicts(false).unwrap();
+    assert_eq!(open.len(), 1);
+    assert!(open[0].mine.as_deref().unwrap_or_default().contains("from laptop"));
+    let done = a.store.sync_resolve(&open[0].id, true).unwrap();
+    assert!(done.resolved_at.is_some());
+    assert_eq!(a.store.journal(&j.id).unwrap().unwrap().name, "from laptop");
+    assert!(a.store.sync_conflicts(false).unwrap().is_empty());
+
+    // a stranger is not served
+    let sp: libp2p::PeerId = stranger.peer_id().parse().unwrap();
+    let as_ = Store::open(&a.db(), None).unwrap();
+    assert!(sync::serve(&as_, &sp, sync::SyncReq::Series).is_err());
+    // a revoked node is not served any more
+    user::revoke_node(&a.store, &c.peer_id(), "cli").unwrap();
+    assert!(sync::pull(&c.store, c.node(), &x, &[], "cli").is_err());
+}
