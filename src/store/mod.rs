@@ -6,6 +6,7 @@ use std::path::Path;
 
 pub mod archive;
 pub mod authors;
+pub mod code;
 pub mod history;
 pub mod journals;
 pub mod models;
@@ -17,6 +18,7 @@ pub mod rules;
 pub mod runs;
 pub mod searches;
 pub use authors::{Author, AuthorChange};
+pub use code::{CodeChange, CodeInput, CodeSpace, Lang, RunInfo};
 pub use history::{ActionRecord, Move, NewAction, TreeRow};
 pub use journals::{Annotation, AnnotationKind, Attachment, Entry, EntryFormat, Journal, JournalDoc, Span};
 pub use models::{ApplyOpts, Design, Field, FieldOp, FieldType, Model, ModelVersion, Plan, Step};
@@ -114,6 +116,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     rules::MIGRATION,
     // 2.4: model designer
     models::MIGRATION,
+    // 2.5: code spaces
+    code::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
@@ -783,7 +787,7 @@ mod tests {
 
     #[test]
     fn a_2_2_database_migrates_and_gains_rules() {
-        let upto = MIGRATIONS.len() - 2;
+        let upto = MIGRATIONS.len() - 3;
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join("v22.database");
         let key = [3u8; 32];
@@ -820,7 +824,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
             s.upsert_bars(&src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0)]).unwrap();
             let spec = RuleSpec { on: vec!["*".into()], then: vec![Then::Status { text: "x".into() }], ..Default::default() };
@@ -837,6 +841,29 @@ mod tests {
         drop(s);
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.find_model("trades").unwrap().version, 1);
+    }
+
+    #[test]
+    fn a_2_4_database_migrates_and_gains_code_spaces() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v24.database");
+        let key = [5u8; 32];
+        {
+            // a v2.4 database: everything up to models
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store::wrap(conn);
+            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.create_model("trades", "", Design { fields: vec![Field::new("note", FieldType::Text)] }, true).unwrap();
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        assert_eq!(s.find_model("trades").unwrap().version, 1);
+        assert!(s.code_spaces().unwrap().is_empty());
+        s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
+        drop(s);
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.code_spaces().unwrap().len(), 1);
     }
 
     #[test]

@@ -36,7 +36,6 @@ pub enum RAsk {
     Describe,
     Title,
     Rows,
-    Code,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -206,11 +205,6 @@ fn answer(app: &mut App, kind: RAsk, v: String) {
                 Err(e) => err(app, e),
             }
         }
-        (RAsk::Code, Some(r)) => {
-            let mut s = NewSection::new(SectionKind::Code);
-            s.params.space = Some(v);
-            add(app, &r, s);
-        }
         (_, None) => {}
     }
 }
@@ -260,11 +254,7 @@ fn kind_chosen(app: &mut App, r: &Report, kind: SectionKind) {
             }
         },
         SectionKind::Authors => add(app, r, NewSection::new(SectionKind::Authors)),
-        SectionKind::Code => {
-            st.screen = RScreen::Report(r.id.clone());
-            st.ask = Some(Ask::new(RAsk::Code, "Code space name (output arrives with code spaces)", ""));
-        }
-        SectionKind::Series | SectionKind::Journal | SectionKind::Project | SectionKind::Model => {
+        SectionKind::Series | SectionKind::Journal | SectionKind::Project | SectionKind::Model | SectionKind::Code => {
             let choices: Vec<(String, Option<String>)> = match kind {
                 SectionKind::Series => std::iter::once(("(every series)".to_string(), None))
                     .chain(app.store.live_searches().unwrap_or_default().into_iter().map(|s| (format!("live search {}", s.name), Some(s.id))))
@@ -277,6 +267,13 @@ fn kind_chosen(app: &mut App, r: &Report, kind: SectionKind) {
                     .into_iter()
                     .filter(|m| m.version > 0)
                     .map(|m| (format!("model {}", m.name), Some(m.id)))
+                    .collect(),
+                SectionKind::Code => app
+                    .store
+                    .code_spaces()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| (format!("{} ({})", c.name, c.lang.as_str()), Some(c.id)))
                     .collect(),
                 _ => app.store.projects().unwrap_or_default().into_iter().map(|p| (p.name, Some(p.id))).collect(),
             };
@@ -299,6 +296,7 @@ fn choice_made(app: &mut App, r: &Report, kind: SectionKind) {
         SectionKind::Series => s.params.search = id,
         SectionKind::Journal => s.params.journal = id,
         SectionKind::Model => s.params.model = id,
+        SectionKind::Code => s.params.space = id,
         _ => s.params.project = id,
     }
     add(app, r, s);

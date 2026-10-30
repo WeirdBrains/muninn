@@ -70,7 +70,7 @@ fn new_section(store: &Store, a: &SectionArgs) -> anyhow::Result<NewSection> {
         NewSection::new(SectionKind::Authors)
     } else if let Some(c) = &a.code {
         let mut s = NewSection::new(SectionKind::Code);
-        s.params.space = Some(c.clone());
+        s.params.space = Some(store.find_code_space(c)?.id);
         s
     } else {
         return Err(anyhow!("say what the section shows: --text/--file, --records, --series, --journal, --project, --model, --authors or --code"));

@@ -61,6 +61,7 @@ fn reports_are_built_edited_and_exported_in_every_format() {
     e.ok(&["report", "add", "Weekly", "--series"]);
     e.ok(&["report", "add", "Weekly", "--journal", "Desk", "--entry", &entry]);
     e.ok(&["report", "add", "Weekly", "--project", "Breakouts"]);
+    e.ok(&["code", "create", "momentum", "--lang", "math", "--model", "bars", "--source", "fast = sma(close, 3)"]);
     e.ok(&["report", "add", "Weekly", "--code", "momentum"]);
     e.ok(&["report", "add", "Weekly", "--authors", "--at", "1"]);
     let o = e.run(&["report", "add", "Weekly", "--journal", "Nope"]);
@@ -74,7 +75,7 @@ fn reports_are_built_edited_and_exported_in_every_format() {
     assert!(show.contains("records BTC/USDT binance 5m · latest 5 bars"), "{show}");
     assert!(show.contains("series matching live search btc") && show.contains("every series"), "{show}");
     assert!(show.contains("journal Desk · 1 entry") && show.contains("project Breakouts"), "{show}");
-    assert!(show.contains("code space momentum (placeholder)") && show.contains("· Ada"), "{show}");
+    assert!(show.contains("code space momentum") && show.contains("· Ada"), "{show}");
     e.ok(&["report", "move", "Weekly", "1", "--to", "8"]);
     e.ok(&["report", "edit-section", "Weekly", "1", "--title", "Overview", "--text", "BTC *held*."]);
     e.ok(&["report", "edit-section", "Weekly", "2", "--rows", "3"]);
@@ -92,7 +93,7 @@ fn reports_are_built_edited_and_exported_in_every_format() {
 
     let preview = e.ok(&["report", "preview", "Week 12"]);
     assert!(preview.contains("Week 12") && preview.contains("Overview") && preview.contains("BTC/USDT"), "{preview}");
-    assert!(preview.contains("Code space momentum") || preview.contains("momentum"), "{preview}");
+    assert!(preview.contains("momentum") && preview.contains("Not run yet") && preview.contains("sma(close, 3)"), "{preview}");
     let dir = e.dir.path().join("out");
     std::fs::create_dir_all(&dir).unwrap();
     for f in ["pdf", "html", "docx", "latex", "json", "csv", "text"] {

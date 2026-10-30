@@ -93,6 +93,10 @@ pub enum Command {
     /// versioned migrations you preview, apply and roll back; and their records.
     #[command(subcommand, alias = "models", after_long_help = MODEL_NOTES)]
     Model(ModelCommand),
+    /// Code spaces: math, Polars, Rust or Python (or a prebuilt plugin) compiled into a native
+    /// plugin that reads and writes your data and shows a result.
+    #[command(subcommand, alias = "codes", after_long_help = CODE_NOTES)]
+    Code(CodeCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -791,9 +795,9 @@ pub enum ProjectCommand {
     /// Remove a project. Its journals stay, as standalone journals.
     #[command(alias = "rm")]
     Remove { project: String },
-    /// Add a live search, a journal, a report, a rule or a result (a series, optionally a
-    /// time range) to a project.
-    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "rule", "model", "result"])))]
+    /// Add a live search, a journal, a report, a rule, a model, a code space or a result (a
+    /// series, optionally a time range) to a project.
+    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "rule", "model", "code", "result"])))]
     Add {
         project: String,
         /// Live search id or name.
@@ -811,6 +815,9 @@ pub enum ProjectCommand {
         /// Model id or name.
         #[arg(long)]
         model: Option<String>,
+        /// Code space id or name.
+        #[arg(long)]
+        code: Option<String>,
         /// A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m.
         #[arg(long, value_name = "SERIES")]
         result: Option<String>,
@@ -898,7 +905,7 @@ pub struct SectionArgs {
     /// Everyone who contributed to the report.
     #[arg(long)]
     pub authors: bool,
-    /// Output of a code space (a placeholder until code spaces arrive).
+    /// A code space (name or id): its last result and its source.
     #[arg(long, value_name = "SPACE")]
     pub code: Option<String>,
     /// Put the section at this position (1 = first; default: last).
@@ -1540,6 +1547,48 @@ mod tests {
     }
 
     #[test]
+    fn code_commands() {
+        match parse(&[
+            "code",
+            "create",
+            "f",
+            "--lang",
+            "python",
+            "--model",
+            "bars",
+            "--where",
+            "a = 1",
+            "--where",
+            "b > 2",
+            "--sort",
+            "-timestamp",
+            "--limit",
+            "3",
+        ])
+        .unwrap()
+        .command
+        {
+            Command::Code(CodeCommand::Create { name, lang, input, source, .. }) => {
+                assert_eq!((name.as_str(), lang), ("f", CodeLang::Python));
+                assert_eq!(input.filter, vec!["a = 1", "b > 2"]);
+                assert_eq!(input.sort, vec!["-timestamp"]);
+                assert_eq!(input.limit, Some(3));
+                assert!(source.file.is_none() && !source.editor);
+            }
+            c => panic!("{c:?}"),
+        }
+        assert!(matches!(parse(&["codes", "run", "f", "--json"]).unwrap().command, Command::Code(CodeCommand::Run { json: true, rows: 30, .. })));
+        assert!(matches!(parse(&["code", "check"]).unwrap().command, Command::Code(CodeCommand::Check { space: None })));
+        assert!(parse(&["code", "create", "f", "--lang", "cobol"]).is_err());
+        assert!(parse(&["code", "create", "f", "--lang", "math", "--file", "a", "--source", "b"]).is_err(), "one source");
+        assert!(parse(&["code", "edit", "f", "--no-input", "--model", "bars"]).is_err());
+        assert!(matches!(
+            parse(&["project", "add", "P", "--code", "f"]).unwrap().command,
+            Command::Project(ProjectCommand::Add { code: Some(_), .. })
+        ));
+    }
+
+    #[test]
     fn author_and_history_commands() {
         match parse(&["author", "add", "--name", "Ada", "--email", "a@x.io", "--detail", "org=X", "--current"]).unwrap().command {
             Command::Author(AuthorCommand::Add { name, email, details, current }) => {
@@ -1653,6 +1702,163 @@ mod tests {
         }
         assert!(parse(&["ingest", "service", "http", "--url", "http://x", "-X", "POST", "--body", "{}"]).is_ok());
     }
+}
+
+pub const CODE_NOTES: &str = "\
+Every language becomes a native plugin (a Rust cdylib built with cargo, cached by content hash
+under MUNINN_HOME/code); a prebuilt plugin (--lang plugin, the source is its path) loads as is.
+Python goes through Rython (rythonc on PATH or MUNINN_RYTHONC). Without a Rust toolchain only
+prebuilt plugins run; `mnnn code check` says what is missing.
+
+A code space runs as native code with your rights. Before its first run, and after every change,
+review it and approve it (`approve`, or `run -y`). Imported code spaces need approving again.
+
+Input: --model MODEL [--where \"FIELD OP VALUE\"]… [--matching TEXT] [--group F] [--sort F|-F]
+[--limit N]; plugins can load, create and update any model (bars too), and create models.
+
+Examples:
+  mnnn code create fast --lang math --model bars --where \"symbol = BTC/USDT\" --group symbol --file fast.mth
+  mnnn code run fast -y
+  mnnn code create spread --lang python --source $'def spread(high: float, low: float) -> float:\\n    return high - low'
+  mnnn rule create on-import --on import --then \"run-code fast\"";
+
+/// A code space language.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum CodeLang {
+    Math,
+    Polars,
+    Rust,
+    Python,
+    /// A prebuilt plugin (the source is the path of the library).
+    Plugin,
+}
+
+impl CodeLang {
+    pub fn lang(self) -> crate::store::Lang {
+        use crate::store::Lang;
+        match self {
+            CodeLang::Math => Lang::Math,
+            CodeLang::Polars => Lang::Polars,
+            CodeLang::Rust => Lang::Rust,
+            CodeLang::Python => Lang::Python,
+            CodeLang::Plugin => Lang::Plugin,
+        }
+    }
+}
+
+/// Where a code space's source comes from (none: a starting template, or the editor with --editor).
+#[derive(Debug, Clone, Default, Args)]
+pub struct CodeSourceArgs {
+    /// Read the source from a file (`-` reads standard input).
+    #[arg(long, short = 'f', conflicts_with_all = ["source", "editor"])]
+    pub file: Option<PathBuf>,
+    /// The source itself.
+    #[arg(long, conflicts_with = "editor")]
+    pub source: Option<String>,
+    /// Write the source in $VISUAL or $EDITOR.
+    #[arg(long)]
+    pub editor: bool,
+}
+
+/// The records a code space gets as input.
+#[derive(Debug, Clone, Default, Args)]
+pub struct CodeInputArgs {
+    /// Model to read (`bars` or a designed model).
+    #[arg(long)]
+    pub model: Option<String>,
+    /// Condition FIELD OP VALUE (repeatable; `;` separates several).
+    #[arg(long = "where")]
+    pub filter: Vec<String>,
+    /// Records whose text fields contain this.
+    #[arg(long)]
+    pub matching: Option<String>,
+    /// Group by these fields (math computes per group; repeatable or comma-separated).
+    #[arg(long)]
+    pub group: Vec<String>,
+    /// Sort by these fields (`-F` descending; repeatable or comma-separated).
+    #[arg(long, allow_hyphen_values = true)]
+    pub sort: Vec<String>,
+    /// At most this many records.
+    #[arg(long)]
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CodeCommand {
+    /// Create a code space (not approved to run yet).
+    #[command(alias = "new")]
+    Create {
+        name: String,
+        #[arg(long, value_enum)]
+        lang: CodeLang,
+        #[command(flatten)]
+        source: CodeSourceArgs,
+        #[command(flatten)]
+        input: CodeInputArgs,
+        #[arg(long, default_value = "")]
+        description: String,
+        /// Add it to a project.
+        #[arg(long)]
+        project: Option<String>,
+    },
+    /// Change a code space; a new source needs approving again.
+    Edit {
+        space: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long, value_enum)]
+        lang: Option<CodeLang>,
+        #[command(flatten)]
+        source: CodeSourceArgs,
+        /// Replace the input (with --model and friends).
+        #[command(flatten)]
+        input: CodeInputArgs,
+        /// Take the input away (the plugin loads what it needs itself).
+        #[arg(long, conflicts_with = "model")]
+        no_input: bool,
+    },
+    /// List code spaces.
+    #[command(alias = "ls")]
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show a code space: its source, input, approval and last run.
+    Show {
+        space: String,
+        #[arg(long)]
+        json: bool,
+        /// Print only the source.
+        #[arg(long, conflicts_with = "json")]
+        source: bool,
+    },
+    /// Remove a code space (asks first).
+    #[command(alias = "rm")]
+    Remove { space: String },
+    /// Approve a code space's current source to run.
+    Approve { space: String },
+    /// Compile a code space (cached: nothing happens when it is built already).
+    Build { space: String },
+    /// Run a code space: build if needed, then run it and show its result.
+    Run {
+        space: String,
+        /// Print the run (status, view, logs) as JSON.
+        #[arg(long)]
+        json: bool,
+        /// Table rows to print (0: all).
+        #[arg(long, default_value_t = 30)]
+        rows: usize,
+    },
+    /// Check a code space (or, without one, the toolchains) without running anything.
+    Check { space: Option<String> },
+    /// Write the plugin SDK (the `muninn-plugin` crate) to build prebuilt plugins with.
+    Sdk {
+        /// Directory to write it to.
+        #[arg(long, default_value = "muninn-plugin")]
+        out: PathBuf,
+    },
 }
 
 pub const MODEL_NOTES: &str = "\

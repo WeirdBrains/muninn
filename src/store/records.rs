@@ -524,7 +524,8 @@ impl Store {
         self.update_ids(m, &ids, values)
     }
 
-    fn update_ids(&self, m: &Model, ids: &[String], values: &Map<String, Value>) -> Result<usize> {
+    /// Change fields of records known to exist (full ids).
+    pub(crate) fn update_ids(&self, m: &Model, ids: &[String], values: &Map<String, Value>) -> Result<usize> {
         let given = self.values_for(m, values)?;
         if given.is_empty() {
             return Err(Error::invalid("record", "give at least one FIELD=VALUE to set"));

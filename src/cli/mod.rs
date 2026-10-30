@@ -3,6 +3,7 @@ mod args;
 mod authors;
 mod backup;
 mod catalog;
+mod code;
 mod export;
 mod history;
 mod ingest;
@@ -108,6 +109,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
     }
     let ctx = Ctx::new(cli.global)?;
     ctx.prefs()?;
+    crate::code::set_home(&ctx.paths.home);
     match cli.command {
         Command::Ingest(c) => ingest::run(&ctx, c),
         Command::Export(a) => export::run(&ctx, a),
@@ -124,6 +126,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Report(c) => reports::run(&ctx, c),
         Command::Rule(c) => rules::run(&ctx, c),
         Command::Model(c) => models::run(&ctx, c),
+        Command::Code(c) => code::run(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }

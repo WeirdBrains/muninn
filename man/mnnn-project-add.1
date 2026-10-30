@@ -4,15 +4,15 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-project\-add \- Add a live search, a journal, a report, a rule or a result (a series, optionally a time range) to a project
+mnnn\-project\-add \- Add a live search, a journal, a report, a rule, a model, a code space or a result (a series, optionally a time range) to a project
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn project add\fR [\fB\-\-home\fR] [\fB\-\-search\fR] [\fB\-\-db\fR] [\fB\-\-rule\fR] [\fB\-\-journal\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-report\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-model\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-result\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-from\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-to\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPROJECT\fR> 
+\fBmnnn project add\fR [\fB\-\-home\fR] [\fB\-\-search\fR] [\fB\-\-db\fR] [\fB\-\-rule\fR] [\fB\-\-journal\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-report\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-model\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-code\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-result\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-from\fR] [\fB\-\-to\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPROJECT\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-Add a live search, a journal, a report, a rule or a result (a series, optionally a time range) to a project
+Add a live search, a journal, a report, a rule, a model, a code space or a result (a series, optionally a time range) to a project
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -59,8 +59,8 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-result\fR \fI<SERIES>\fR
-A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m
+\fB\-\-code\fR \fI<CODE>\fR
+Code space id or name
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -68,8 +68,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-from\fR \fI<TIME>\fR
-Result time range start
+\fB\-\-result\fR \fI<SERIES>\fR
+A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -88,6 +88,9 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-from\fR \fI<TIME>\fR
+Result time range start
 .TP
 \fB\-\-to\fR \fI<TIME>\fR
 Result time range end

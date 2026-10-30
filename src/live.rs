@@ -220,6 +220,16 @@ pub fn describe_item(store: &Store, it: &crate::store::ProjectItem) -> (String, 
             }
             None => ("(removed model)".into(), String::new()),
         },
+        crate::store::ItemKind::Code => match store.code_space(&it.ref_id).ok().flatten() {
+            Some(c) => {
+                let run = match &c.last_run {
+                    Some(r) => format!("{} {}", r.status, crate::ingest::time::fmt_ts(r.at)),
+                    None => "not run yet".into(),
+                };
+                (c.name.clone(), format!("{} · {run}", c.lang.as_str()))
+            }
+            None => ("(removed code space)".into(), String::new()),
+        },
     }
 }
 

@@ -53,6 +53,11 @@ pub fn num(v: f64) -> String {
     }
 }
 
+/// A report's code space: by id (or, for sections made before 2.5, by name).
+pub fn code_space_of(store: &Store, key: &str) -> Option<crate::store::CodeSpace> {
+    store.find_code_space(key).ok()
+}
+
 /// Builds documents; collects images and who contributed.
 pub struct Builder<'a> {
     pub store: &'a Store,
@@ -478,11 +483,82 @@ impl<'a> Builder<'a> {
                 Some(id) => self.model_records(id, &p.conditions, p.rows.unwrap_or(crate::store::reports::DEFAULT_ROWS))?,
                 None => vec![meta("(no model chosen)")],
             },
-            SectionKind::Code => vec![meta(format!(
-                "Output from code space {} will appear here once code spaces arrive.",
-                p.space.clone().unwrap_or_else(|| "(not chosen)".into())
-            ))],
+            SectionKind::Code => match p.space.as_deref().and_then(|k| code_space_of(self.store, k)) {
+                Some(c) => self.code_blocks(&c)?,
+                None => vec![meta(format!("(code space {} not found)", p.space.clone().unwrap_or_else(|| "not chosen".into())))],
+            },
         })
+    }
+
+    /// A code space: what it is, its last run's result (tables as tables, charts as images
+    /// with their numbers), and its source.
+    pub fn code_blocks(&mut self, c: &crate::store::CodeSpace) -> Result<Vec<Block>> {
+        let mut out = vec![];
+        if !c.description.is_empty() {
+            out.push(para(c.description.clone()));
+        }
+        out.push(meta(format!("{} code by {} · input: {}", c.lang.as_str(), self.who(c.author_id.as_deref()), c.input.text())));
+        match &c.last_run {
+            None => out.push(meta(format!("Not run yet (`mnnn code run {}`).", c.name))),
+            Some(r) => {
+                let writes = if r.writes > 0 { format!(" · {} record(s) written", r.writes) } else { String::new() };
+                out.push(meta(format!("Last run {} ({} ms){writes}", crate::ingest::time::fmt_ts(r.at), r.ms)));
+                if let Some(e) = &r.error {
+                    out.push(Block::Para(vec![Inline::Bold(vec![t("The last run failed: ")]), t(e.clone())]));
+                }
+                if let Some(v) = crate::code::run_view(r) {
+                    for (i, leaf) in v.leaves().into_iter().enumerate() {
+                        if !leaf.title().is_empty() {
+                            out.push(Block::Para(vec![Inline::Bold(vec![t(leaf.title().to_string())])]));
+                        }
+                        out.extend(self.view_blocks(&c.id, i, leaf));
+                    }
+                }
+            }
+        }
+        out.push(meta(format!("Source ({})", c.lang.as_str())));
+        out.push(Block::Code(c.source.clone()));
+        Ok(out)
+    }
+
+    fn view_blocks(&mut self, id: &str, i: usize, v: &crate::code::view::ResultView) -> Vec<Block> {
+        use crate::code::view::ResultView;
+        const ROWS: usize = 200;
+        match v {
+            ResultView::Text { text, .. } => markdown::parse(text),
+            ResultView::Table { .. } => {
+                let (head, mut rows) = v.as_table();
+                let n = rows.len();
+                rows.truncate(ROWS);
+                let mut out = vec![Block::Table { head, rows }];
+                if n > ROWS {
+                    out.push(meta(format!("The first {ROWS} of {n} rows.")));
+                }
+                out
+            }
+            ResultView::Chart { x, series, .. } => {
+                let mut out = vec![];
+                if let Some(data) = crate::code::png::chart(x, series, 900, 320) {
+                    let key = format!("code-{}-{i}", crate::store::short(id));
+                    self.images.insert(key.clone(), Image { name: format!("{key}.png"), mime: "image/png".into(), data });
+                    out.push(Block::Image { key, caption: crate::code::png::legend(series) });
+                }
+                // the numbers behind it: first, last, low and high of each line
+                let rows = series
+                    .iter()
+                    .map(|s| {
+                        let vals: Vec<f64> = s.values.iter().flatten().copied().filter(|v| v.is_finite()).collect();
+                        let f = |o: Option<f64>| o.map(num).unwrap_or_default();
+                        let lo = vals.iter().copied().fold(None, |a: Option<f64>, v| Some(a.map_or(v, |a| a.min(v))));
+                        let hi = vals.iter().copied().fold(None, |a: Option<f64>, v| Some(a.map_or(v, |a| a.max(v))));
+                        vec![s.name.clone(), f(vals.first().copied()), f(vals.last().copied()), f(lo), f(hi), vals.len().to_string()]
+                    })
+                    .collect();
+                out.push(Block::Table { head: ["line", "first", "last", "low", "high", "points"].map(String::from).to_vec(), rows });
+                out
+            }
+            ResultView::Tiles { .. } => vec![],
+        }
     }
 
     /// All sections of a report, each under a level-1 heading with who added it.
@@ -490,7 +566,11 @@ impl<'a> Builder<'a> {
         let sections = self.store.sections(&r.id)?;
         let mut out = vec![];
         for s in &sections {
-            out.push(Block::Heading(level, vec![t(s.heading())]));
+            let heading = match s.params.space.as_deref().and_then(|k| code_space_of(self.store, k)) {
+                Some(c) if s.kind == SectionKind::Code => format!("Code space {}", c.name),
+                _ => s.heading(),
+            };
+            out.push(Block::Heading(level, vec![t(heading)]));
             let by = self.who(s.author_id.as_deref());
             let mut m = format!("Added by {by} on {}", day(s.created_at));
             if s.updated_at > s.created_at + 60_000 {
@@ -688,7 +768,10 @@ pub fn section_summary(store: &Store, s: &Section) -> String {
             format!("project {}", name(p.project.as_deref().map(|x| store.project(x).map(|o| o.map(|p| p.name))).unwrap_or(Ok(None)), "(removed)"))
         }
         SectionKind::Authors => "authors of the report".into(),
-        SectionKind::Code => format!("code space {} (placeholder)", p.space.clone().unwrap_or_default()),
+        SectionKind::Code => match p.space.as_deref().and_then(|k| code_space_of(store, k)) {
+            Some(c) => format!("code space {} ({})", c.name, c.lang.as_str()),
+            None => format!("code space {} (not found)", p.space.clone().unwrap_or_default()),
+        },
         SectionKind::Model => {
             let m = name(p.model.as_deref().map(|x| store.model(x).map(|o| o.map(|m| m.name))).unwrap_or(Ok(None)), "(removed)");
             let w = if p.conditions.is_empty() {
@@ -781,6 +864,12 @@ pub fn project(store: &Store, id: &str, rows: usize) -> Result<Doc> {
                 if store.model(&it.ref_id)?.is_some() {
                     blocks.push(Block::Heading(1, vec![t(format!("Model: {name}"))]));
                     blocks.extend(b.model_records(&it.ref_id, &[], rows)?);
+                }
+            }
+            ItemKind::Code => {
+                if let Some(c) = store.code_space(&it.ref_id)? {
+                    blocks.push(Block::Heading(1, vec![t(format!("Code space: {}", c.name))]));
+                    blocks.extend(b.code_blocks(&c)?);
                 }
             }
             ItemKind::RuleSet => {
@@ -954,6 +1043,42 @@ mod tests {
         assert!(rows.iter().any(|r| r[0] == "BTC/USDT binance 5m" && r.get(1).map(String::as_str) == Some("30")), "{csv}");
         assert!(rows.iter().any(|r| r.first().map(String::as_str) == Some("section") && r.get(1).map(String::as_str) == Some("time (UTC)")));
         assert_eq!(rows.iter().filter(|r| r.len() == 7 && r[1].starts_with("1970")).count(), 5);
+    }
+
+    #[test]
+    fn code_sections_show_the_last_result_and_the_source() {
+        let s = store_with_data();
+        let c =
+            crate::code::create(&s, "cli", "fast", "doubles", crate::store::Lang::Math, "@title Doubled\ndouble = close * 2\n", Default::default())
+                .unwrap();
+        let r = s.create_report("Weekly", "").unwrap();
+        let mut sec = NewSection::new(SectionKind::Code);
+        sec.params.space = Some(c.id.clone());
+        s.add_section(&r.id, &sec).unwrap();
+        let txt = crate::render::text::write(&report(&s, &r.id).unwrap(), 120);
+        assert!(txt.contains("Code space fast") && txt.contains("Not run yet") && txt.contains("double = close * 2"), "{txt}");
+        let view = serde_json::json!({ "kind": "tiles", "tiles": [
+            { "kind": "text", "title": "Notes", "text": "All **good**" },
+            { "kind": "table", "title": "Rows", "columns": ["a", "b"], "rows": [[1, "x"], [2, "y"]] },
+            { "kind": "chart", "title": "Close", "x": { "name": "row", "values": [0.0, 1.0, 2.0] }, "series": [{ "name": "close", "values": [1.0, 3.0, 2.0] }] },
+        ] });
+        let run = crate::store::RunInfo { at: 1_704_067_200_000, status: "ok".into(), view: Some(view), writes: 3, ms: 12, ..Default::default() };
+        s.set_code_run(&c.id, &run).unwrap();
+        let d = report(&s, &r.id).unwrap();
+        let txt = crate::render::text::write(&d, 120);
+        assert!(txt.contains("Last run") && txt.contains("12 ms") && txt.contains("3 record(s) written"), "{txt}");
+        assert!(txt.contains("Notes") && txt.contains("good") && txt.contains("Rows") && txt.contains("Close"), "{txt}");
+        assert_eq!(d.images.len(), 1, "the chart is an image");
+        assert!(d.images.values().next().unwrap().data.starts_with(b"\x89PNG"));
+        // a failed run says so
+        let run = crate::store::RunInfo { status: "error".into(), error: Some("boom".into()), ..run };
+        s.set_code_run(&c.id, &run).unwrap();
+        let txt = crate::render::text::write(&report(&s, &r.id).unwrap(), 120);
+        assert!(txt.contains("The last run failed") && txt.contains("boom"), "{txt}");
+        // a removed space leaves a note
+        s.remove_code_space(&c.id).unwrap();
+        let txt = crate::render::text::write(&report(&s, &r.id).unwrap(), 120);
+        assert!(txt.contains("not found"), "{txt}");
     }
 
     #[test]

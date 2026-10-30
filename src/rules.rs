@@ -64,6 +64,7 @@ const RECORD: &[&str] = &[
 ];
 
 /// Every action kind in the history, with its fields. `mnnn rule events` prints this.
+const CODE: &[&str] = &["id: code space id", "name: name", "lang: language"];
 pub const EVENTS: &[Event] = &[
     Event {
         kind: "import",
@@ -143,6 +144,24 @@ pub const EVENTS: &[Event] = &[
     Event { kind: "record.create", about: "a model record created", fields: RECORD },
     Event { kind: "record.update", about: "model records changed", fields: RECORD },
     Event { kind: "record.delete", about: "model records deleted", fields: RECORD },
+    Event { kind: "code.create", about: "a code space created", fields: CODE },
+    Event { kind: "code.edit", about: "a code space changed", fields: &["id: code space id", "name: name", "changed: what changed"] },
+    Event { kind: "code.remove", about: "a code space removed", fields: CODE },
+    Event { kind: "code.approve", about: "a code space approved to run", fields: CODE },
+    Event { kind: "code.build", about: "a code space compiled", fields: CODE },
+    Event {
+        kind: "code.run",
+        about: "a code space ran",
+        fields: &[
+            "id: code space id",
+            "name: name",
+            "lang: language",
+            "status: ok or error",
+            "writes: records written",
+            "ms: run time",
+            "error: error",
+        ],
+    },
     Event { kind: "rule.create", about: "a rule created (never triggers rules)", fields: RULE },
     Event { kind: "rule.edit", about: "a rule changed (never triggers rules)", fields: RULE },
     Event { kind: "rule.remove", about: "a rule removed (never triggers rules)", fields: RULE },
@@ -448,9 +467,13 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
                 Then::RecordDelete { model, id, filter }
             }
         }
+        "run-code" | "code" => match pos.as_slice() {
+            [n] => Then::RunCode { space: store.find_code_space(n)?.id },
+            _ => return Err(bad("run-code takes one code space".into())),
+        },
         v => {
             return Err(bad(format!(
-                "unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete)"
+                "unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code)"
             )));
         }
     };
@@ -475,6 +498,7 @@ fn name_of(store: &Store, kind: ItemKind, id: &str) -> String {
         ItemKind::Report => store.report(id).ok().flatten().map(|r| r.name),
         ItemKind::RuleSet => store.rule(id).ok().flatten().map(|r| r.name),
         ItemKind::Model => store.model(id).ok().flatten().map(|m| m.name),
+        ItemKind::Code => store.code_space(id).ok().flatten().map(|c| c.name),
         ItemKind::Result => None,
     };
     n.unwrap_or_else(|| crate::store::short(id).to_string())
@@ -491,6 +515,7 @@ pub fn then_text(store: &Store, t: &Then) -> String {
     match t {
         Then::Status { text } => return format!("status {}", quote(text)),
         Then::RunSearch { search } => opt(ItemKind::LiveSearch, search),
+        Then::RunCode { space } => w.push(quote(&name_of(store, ItemKind::Code, space))),
         Then::ExportReport { report, to, format } => {
             w.push(quote(&name_of(store, ItemKind::Report, report)));
             w.push(format!("to={}", quote(to)));
@@ -843,12 +868,14 @@ fn subject(a: &ActionRecord) -> Result<(ItemKind, String)> {
         p("report").map(|i| (ItemKind::Report, i))
     } else if k.starts_with("model.") || k.starts_with("record.") {
         p("model").map(|i| (ItemKind::Model, i))
+    } else if k.starts_with("code.") {
+        p("id").map(|i| (ItemKind::Code, i))
     } else if ["journal.", "entry.", "note.", "highlight.", "image."].iter().any(|x| k.starts_with(x)) {
         p("journal").map(|i| (ItemKind::Journal, i))
     } else {
         None
     };
-    found.ok_or_else(|| Error::invalid("add-to-project", format!("a `{k}` action has no live search, journal, report or model to add")))
+    found.ok_or_else(|| Error::invalid("add-to-project", format!("a `{k}` action has no live search, journal, report, model or code space to add")))
 }
 
 /// What a then-action would do, in words (`mnnn rule dry-run`). Nothing is changed.
@@ -867,6 +894,15 @@ pub fn plan(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
                 .ok_or_else(|| Error::invalid("search", "name a live search, or put the rule in one"))?;
             let s = store.live_search(&id)?.ok_or_else(|| Error::invalid("live search", format!("`{id}` no longer exists")))?;
             format!("run live search {}", s.name)
+        }
+        Then::RunCode { space } => {
+            let c = code_space(store, space)?;
+            format!(
+                "run code space {} ({}){}",
+                c.name,
+                c.lang.as_str(),
+                if crate::code::approved(&c) { "" } else { " — not approved yet, so it would fail" }
+            )
         }
         Then::ExportReport { report, to, format } => {
             let rep = store.report(report)?.ok_or_else(|| Error::invalid("report", format!("`{report}` no longer exists")))?;
@@ -966,6 +1002,10 @@ fn note(store: &Store, a: crate::designer::Act) {
 }
 
 /// The model a then-action names, else the one the rule lives in.
+fn code_space(store: &Store, id: &str) -> Result<crate::store::CodeSpace> {
+    store.code_space(id)?.ok_or_else(|| Error::invalid("code space", format!("`{id}` no longer exists")))
+}
+
 fn model_of(store: &Store, r: &Rule, t: &Then, m: &Option<String>) -> Result<Model> {
     let id = m.clone().or_else(|| own(r, OwnerKind::Model)).ok_or_else(|| Error::invalid(t.verb(), "name a model, or put the rule in one"))?;
     store.model(&id)?.ok_or_else(|| Error::invalid("model", format!("`{id}` no longer exists")))
@@ -1030,6 +1070,18 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
             let s = store.live_search(&id)?.ok_or_else(|| Error::invalid("live search", format!("`{id}` no longer exists")))?;
             let n = crate::live::run(store, &s.spec)?.len();
             Ok(format!("live search {}: {}", s.name, crate::live::matches(n)))
+        }
+        Then::RunCode { space } => {
+            let c = code_space(store, space)?;
+            if !crate::code::approved(&c) {
+                return Err(Error::invalid("run-code", format!("code space {} is not approved to run (`mnnn code approve {}`)", c.name, c.name)));
+            }
+            let env = crate::code::CodeEnv::for_store(store)?;
+            let info = crate::code::run(store, &env, ORIGIN, &c, &mut |_| {})?;
+            match (&info.error, crate::code::run_view(&info)) {
+                (Some(e), _) => Err(Error::invalid("run-code", format!("code space {}: {e}", c.name))),
+                (None, v) => Ok(format!("code space {}: {}", c.name, v.map(|v| v.summary()).unwrap_or_default())),
+            }
         }
         Then::ExportReport { report, to, format } => {
             let rep = store.report(report)?.ok_or_else(|| Error::invalid("report", format!("`{report}` no longer exists")))?;

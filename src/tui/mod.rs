@@ -6,6 +6,7 @@ pub mod action;
 pub mod authors;
 pub mod chart;
 mod charting;
+mod code;
 pub mod data;
 pub mod docexport;
 pub mod forms;
@@ -130,6 +131,7 @@ pub struct App {
     pub history: history::HistoryPane,
     pub searches: searches::SearchesState,
     pub rules: rules::RulesState,
+    pub code: code::CodeState,
     pub models: models::ModelsState,
     pub projects: projects::ProjectsState,
     pub journals: journals::JournalsState,
@@ -169,6 +171,7 @@ impl App {
             history: Default::default(),
             searches: Default::default(),
             rules: Default::default(),
+            code: Default::default(),
             models: Default::default(),
             projects: Default::default(),
             journals: Default::default(),
@@ -270,6 +273,7 @@ impl App {
             KeyCode::Char('J') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Journals),
             KeyCode::Char('O') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reports),
             KeyCode::Char('R') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Rules),
+            KeyCode::Char('C') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Code),
             KeyCode::Char('D') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Models),
             KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
             KeyCode::Char('u') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryBack),
@@ -353,6 +357,7 @@ impl App {
             Reports => reports::open(self),
             NewReport => reports::open_new(self),
             Rules => rules::open(self),
+            Code => code::open(self),
             Models => models::open(self),
             AddToProject => match projects::selected_series(self) {
                 Some(r) => {
@@ -1122,9 +1127,12 @@ impl App {
     /// Every loop turn (about 10 a second): show what rules did.
     pub fn tick(&mut self) {
         rules::poll(self);
+        code::poll(self);
     }
 }
 
+#[cfg(test)]
+mod code_tests;
 #[cfg(test)]
 mod models_tests;
 #[cfg(test)]

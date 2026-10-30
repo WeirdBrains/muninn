@@ -240,6 +240,8 @@ pub enum Then {
         #[serde(default, rename = "where")]
         filter: Vec<Condition>,
     },
+    /// Run a code space (only once it is approved); its result becomes its last run (2.5+).
+    RunCode { space: String },
 }
 
 impl Then {
@@ -260,6 +262,7 @@ impl Then {
             Then::RecordCreate { .. } => "record-create",
             Then::RecordUpdate { .. } => "record-update",
             Then::RecordDelete { .. } => "record-delete",
+            Then::RunCode { .. } => "run-code",
         }
     }
 }

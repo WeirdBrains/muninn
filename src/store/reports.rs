@@ -52,7 +52,7 @@ pub enum SectionKind {
     Project,
     /// Who contributed to the report.
     Authors,
-    /// Output from a code space (Phase 6); a placeholder until then.
+    /// A code space: its last result and its source.
     Code,
     /// Records of a designed model (`mnnn model`): its fields and a table.
     Model,
@@ -94,7 +94,7 @@ impl SectionKind {
             SectionKind::Journal => "journal entries with notes and highlights",
             SectionKind::Project => "a project's contents",
             SectionKind::Authors => "who contributed",
-            SectionKind::Code => "code-space output (coming with code spaces)",
+            SectionKind::Code => "a code space: its last result and source",
             SectionKind::Model => "records of a designed model",
         }
     }
@@ -187,7 +187,11 @@ impl Section {
             SectionKind::Journal => "Journal".into(),
             SectionKind::Project => "Project".into(),
             SectionKind::Authors => "Authors".into(),
-            SectionKind::Code => format!("Code space {}", self.params.space.clone().unwrap_or_default()).trim().to_string(),
+            SectionKind::Code => match self.params.space.as_deref() {
+                // an id (the name is looked up when the report is read)
+                Some(s) if s.len() == 32 && s.bytes().all(|b| b.is_ascii_hexdigit()) => "Code space".into(),
+                s => format!("Code space {}", s.unwrap_or_default()).trim().to_string(),
+            },
             SectionKind::Model => "Records".into(),
         }
     }

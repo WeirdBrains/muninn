@@ -1,0 +1,131 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-code-create 1  "mnnn-code-create 2.4.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-code\-create \- Create a code space (not approved to run yet)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn code create\fR [\fB\-\-home\fR] <\fB\-\-lang\fR> [\fB\-\-db\fR] [\fB\-f\fR|\fB\-\-file\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-source\fR] [\fB\-\-editor\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-model\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-where\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-matching\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-group\fR] [\fB\-\-sort\fR] [\fB\-\-limit\fR] [\fB\-\-description\fR] [\fB\-\-project\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Create a code space (not approved to run yet)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-lang\fR \fI<LANG>\fR
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+math
+.IP \(bu 2
+polars
+.IP \(bu 2
+rust
+.IP \(bu 2
+python
+.IP \(bu 2
+plugin: A prebuilt plugin (the source is the path of the library)
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-f\fR, \fB\-\-file\fR \fI<FILE>\fR
+Read the source from a file (`\-` reads standard input)
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-source\fR \fI<SOURCE>\fR
+The source itself
+.TP
+\fB\-\-editor\fR
+Write the source in $VISUAL or $EDITOR
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR
+Model to read (`bars` or a designed model)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-where\fR \fI<FILTER>\fR
+Condition FIELD OP VALUE (repeatable; `;` separates several)
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-matching\fR \fI<MATCHING>\fR
+Records whose text fields contain this
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-group\fR \fI<GROUP>\fR
+Group by these fields (math computes per group; repeatable or comma\-separated)
+.TP
+\fB\-\-sort\fR \fI<SORT>\fR
+Sort by these fields (`\-F` descending; repeatable or comma\-separated)
+.TP
+\fB\-\-limit\fR \fI<LIMIT>\fR
+At most this many records
+.TP
+\fB\-\-description\fR \fI<DESCRIPTION>\fR [default: ]
+
+.TP
+\fB\-\-project\fR \fI<PROJECT>\fR
+Add it to a project
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+<\fINAME\fR>
+
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.4.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

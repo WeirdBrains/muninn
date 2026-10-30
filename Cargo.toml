@@ -70,6 +70,7 @@ subsetter = { version = "0.2", default-features = false }
 png = "0.18"
 flate2 = "1"
 crc32fast = "1"
+libloading = "0.8"
 
 
 # Crypto (scrypt/argon2), SQLCipher and Polars are very slow unoptimized; optimize deps in dev/test.

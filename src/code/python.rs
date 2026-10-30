@@ -1,0 +1,228 @@
+//! Python code spaces, compiled to Rust by Rython (`rythonc`) and then to a plugin.
+//!
+//! ```text
+//! # @title Range
+//! # @update spread = spread
+//! def _half(x: float) -> float:
+//!     return x / 2.0
+//!
+//! def spread(high: float, low: float) -> float:
+//!     return _half(high - low) * 2.0
+//! ```
+//!
+//! Every top-level public `def` is a column: it runs once per record, its parameters are
+//! the record's fields (by name) and it returns `float`, `int` or `bool`. Parameters are
+//! `float`, `int`, `bool` or `str`. `_private` functions are helpers. Directives are those
+//! of math code spaces, written as `# @…` comments.
+use super::math::{Directives, ident};
+use crate::error::{Error, Result};
+use std::path::PathBuf;
+
+/// The stdpython crate Rython output needs (no libpython: the `alloc` runtime only).
+pub const DEPENDENCY: &str = r#"stdpython = { version = "1.1", default-features = false, features = ["alloc"] }"#;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Func {
+    pub name: String,
+    pub params: Vec<(String, String)>,
+    pub ret: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Program {
+    pub funcs: Vec<Func>,
+    pub dirs: Directives,
+}
+
+const PARAM_TYPES: &[&str] = &["float", "int", "bool", "str"];
+const RETURN_TYPES: &[&str] = &["float", "int", "bool"];
+
+fn signature(l: &str) -> std::result::Result<Func, String> {
+    let rest = l.strip_prefix("def ").unwrap_or(l).trim();
+    let (name, rest) = rest.split_once('(').ok_or("def NAME(…) -> TYPE:")?;
+    let name = name.trim();
+    ident(name)?;
+    let (params, rest) = rest.rsplit_once(')').ok_or("def NAME(…) -> TYPE:")?;
+    let ret = rest.trim().strip_suffix(':').and_then(|r| r.trim().strip_prefix("->")).map(str::trim).unwrap_or("");
+    let public = !name.starts_with('_');
+    if public && !RETURN_TYPES.contains(&ret) {
+        return Err(format!("def {name}: annotate the return type (-> float, int or bool)"));
+    }
+    let mut ps = vec![];
+    for p in params.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+        let (n, t) = p.split_once(':').map(|(n, t)| (n.trim(), t.trim())).unwrap_or((p, ""));
+        let t = t.split_once('=').map(|(t, _)| t.trim()).unwrap_or(t);
+        ident(n)?;
+        if t.is_empty() {
+            return Err(format!("def {name}: annotate parameter `{n}` (Rython needs types)"));
+        }
+        if public && !PARAM_TYPES.contains(&t) {
+            return Err(format!("def {name}: parameter `{n}: {t}` must be float, int, bool or str"));
+        }
+        ps.push((n.to_string(), t.to_string()));
+    }
+    Ok(Func { name: name.to_string(), params: ps, ret: ret.to_string() })
+}
+
+/// Read the functions and directives of a Python source.
+pub fn parse(src: &str) -> Result<Program> {
+    let mut p = Program::default();
+    let mut lines = src.lines().enumerate().peekable();
+    while let Some((i, raw)) = lines.next() {
+        let err = |m: String| Error::invalid("python", format!("line {}: {m}", i + 1));
+        let t = raw.trim_end();
+        if let Some(d) = t.trim_start().strip_prefix('#').map(str::trim).and_then(|c| c.strip_prefix('@')) {
+            p.dirs.read(d).map_err(err)?;
+            continue;
+        }
+        if t.starts_with("def ") {
+            // a signature may wrap over lines until the `:`
+            let mut sig = t.to_string();
+            while !sig.ends_with(':') {
+                match lines.next() {
+                    Some((_, more)) => sig.push_str(more.trim()),
+                    None => return Err(err("the def line does not end with `:`".into())),
+                }
+            }
+            let f = signature(&sig).map_err(err)?;
+            if p.funcs.iter().any(|g| g.name == f.name) {
+                return Err(err(format!("`{}` is defined twice", f.name)));
+            }
+            p.funcs.push(f);
+        } else if t.starts_with("class ") || t.starts_with("async ") {
+            return Err(err("only functions are supported at the top level".into()));
+        }
+    }
+    if !p.funcs.iter().any(|f| !f.name.starts_with('_')) {
+        return Err(Error::invalid("python", "no public functions: write `def name(field: float) -> float:`"));
+    }
+    for (_, c) in &p.dirs.updates {
+        if !p.funcs.iter().any(|f| &f.name == c && !c.starts_with('_')) {
+            return Err(Error::invalid("python", format!("@update: `{c}` is not one of the public functions")));
+        }
+    }
+    Ok(p)
+}
+
+/// The Rython compiler: `MUNINN_RYTHONC`, or `rythonc` on the PATH.
+pub fn rythonc() -> Result<PathBuf> {
+    if let Some(p) = std::env::var_os("MUNINN_RYTHONC").filter(|p| !p.is_empty()) {
+        return Ok(PathBuf::from(p));
+    }
+    let exe = format!("rythonc{}", std::env::consts::EXE_SUFFIX);
+    std::env::var_os("PATH")
+        .into_iter()
+        .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+        .map(|d| d.join(&exe))
+        .find(|p| p.is_file())
+        .ok_or_else(|| {
+            Error::missing(
+                "Rython (rythonc)",
+                "Python code spaces compile through Rython: install it (`cargo install rythonc`) or set MUNINN_RYTHONC to the rythonc binary; see docs/code-spaces.md",
+            )
+        })
+}
+
+/// Translate Python to Rust (`py.rs`) with rythonc.
+pub fn transpile(src: &str, dir: &std::path::Path) -> Result<String> {
+    let rc = rythonc()?;
+    let input = dir.join("user.py");
+    let output = dir.join("py.rs");
+    std::fs::write(&input, src)?;
+    let out = std::process::Command::new(&rc)
+        .arg(&input)
+        .arg("-o")
+        .arg(&output)
+        .arg("-p")
+        .output()
+        .map_err(|e| Error::missing("Rython (rythonc)", format!("could not run {}: {e}", rc.display())))?;
+    if !out.status.success() {
+        let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let msg = if msg.is_empty() { String::from_utf8_lossy(&out.stdout).trim().to_string() } else { msg };
+        return Err(Error::invalid("python", format!("rythonc: {msg}")));
+    }
+    Ok(std::fs::read_to_string(&output)?)
+}
+
+/// The Rust `user.rs` wrapper calling the Rython output (`py.rs`) once per record.
+pub fn generate(src: &str) -> Result<String> {
+    let p = parse(src)?;
+    let public: Vec<&Func> = p.funcs.iter().filter(|f| !f.name.starts_with('_')).collect();
+    let mut body = String::new();
+    for (i, f) in public.iter().enumerate() {
+        let mut args = vec![];
+        let mut ok = vec![];
+        for (n, t) in &f.params {
+            let v = format!("frame.get(r, {n:?})");
+            args.push(match t.as_str() {
+                "float" => format!("{v}.as_f64().unwrap_or(f64::NAN)"),
+                "int" => {
+                    ok.push(format!("{v}.as_f64().is_some()"));
+                    format!("{v}.as_f64().map(|x| x as i64).unwrap_or(0)")
+                }
+                "bool" => format!("{v}.as_bool().or_else(|| {v}.as_f64().map(|x| x != 0.0)).unwrap_or(false)"),
+                _ => format!("{v}.text()"),
+            });
+        }
+        let call = format!("py::{}({})", f.name, args.join(", "));
+        let conv = match f.ret.as_str() {
+            "bool" => "if v { 1.0 } else { 0.0 }",
+            "int" => "v as f64",
+            _ => "v",
+        };
+        let guard = if ok.is_empty() { "true".to_string() } else { ok.join(" && ") };
+        body += &format!(
+            "        cols[{i}].1.push(if {guard} {{ match {call} {{ Ok(v) => {conv}, Err(e) => return Err(Error::new(format!(\"{name}: {{e}} (record {{}})\", frame.ids[r]))) }} }} else {{ f64::NAN }});\n",
+            name = f.name
+        );
+    }
+    for f in &public {
+        for (n, _) in &f.params {
+            body = format!("    if !frame.has({n:?}) {{ return Err(Error::new(\"{}: the input has no field `{n}`\")); }}\n", f.name) + &body;
+        }
+    }
+    let names: Vec<String> = public.iter().map(|f| format!("{:?}", f.name)).collect();
+    Ok(format!(
+        r#"// Generated by Muninn from a Python code space (via Rython). Do not edit.
+#![allow(unused, clippy::all)]
+use muninn_plugin::prelude::*;
+#[path = "py.rs"]
+mod py;
+
+const NAMES: &[&str] = &[{names}];
+
+pub fn run(host: &Host) -> Result<View> {{
+    let frame = host.input()?;
+    let mut cols: Vec<(String, Vec<f64>)> = NAMES.iter().map(|n| (n.to_string(), Vec::with_capacity(frame.len()))).collect();
+    for r in 0..frame.len() {{
+{body}    }}
+    muninn_plugin::columns::finish(host, &frame, &{dirs}, cols)
+}}
+"#,
+        names = names.join(", "),
+        dirs = p.dirs.output_rs()
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn python_signatures_are_checked() {
+        let src = "# @title T\n# @update s = spread\nimport math\ndef _h(x: float) -> float:\n    return x\n\ndef spread(high: float,\n           low: float, n: int) -> float:\n    return high - low\n\ndef up(close: float) -> bool:\n    return close > 1.0\n";
+        let p = parse(src).unwrap();
+        assert_eq!(p.funcs.len(), 3);
+        assert_eq!(p.funcs[1].params, vec![("high".into(), "float".into()), ("low".into(), "float".into()), ("n".into(), "int".into())]);
+        assert_eq!(p.dirs.title, "T");
+        let rs = generate(src).unwrap();
+        assert!(rs.contains("py::spread(frame.get(r, \"high\")"), "{rs}");
+        assert!(rs.contains("py::up("));
+        assert!(!rs.contains("py::_h"));
+        assert!(parse("def f(x) -> float:\n  return x").unwrap_err().to_string().contains("annotate parameter"));
+        assert!(parse("def f(x: float):\n  return x").unwrap_err().to_string().contains("return type"));
+        assert!(parse("def f(x: list) -> float:\n  return 1.0").unwrap_err().to_string().contains("must be float"));
+        assert!(parse("def _f(x: float) -> float:\n  return x").unwrap_err().to_string().contains("no public"));
+        assert!(parse("class A:\n  pass\ndef f(x: float) -> float:\n  return x").unwrap_err().to_string().contains("only functions"));
+    }
+}

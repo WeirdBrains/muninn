@@ -60,6 +60,7 @@ pub enum Action {
     Reports,
     NewReport,
     Rules,
+    Code,
     Models,
     AddToProject,
     // View
@@ -144,6 +145,7 @@ impl Action {
             Reports => "reports".into(),
             NewReport => "report.new".into(),
             Rules => "rules".into(),
+            Code => "code".into(),
             Models => "models".into(),
             AddToProject => "project.add-series".into(),
             Quit => "quit".into(),

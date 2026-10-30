@@ -45,6 +45,8 @@ pub enum Modal {
     Reports,
     /// Projects ▸ Rules…
     Rules,
+    /// Projects ▸ Code spaces…
+    Code,
     /// Data ▸ Model designer…
     Models,
     /// Export a journal, entry, report or project as a document.
@@ -106,6 +108,7 @@ impl Modal {
             Modal::Journals => "journals",
             Modal::Reports => "reports",
             Modal::Rules => "rules",
+            Modal::Code => "code-spaces",
             Modal::Models => "models",
             Modal::DocExport => "export-formats",
             Modal::Prefs { .. } => "preferences",
@@ -137,6 +140,7 @@ impl Modal {
             Modal::Journals => app.journals.typing(),
             Modal::Reports => app.reports.typing(),
             Modal::Rules => app.rules.typing(),
+            Modal::Code => app.code.typing(),
             Modal::Models => app.models.typing(),
             Modal::DocExport => app.doc_export.typing(),
             Modal::PickProject => app.pick_project.typing(),
@@ -248,6 +252,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             Some(Modal::Journals) => super::journals::on_click(app, i),
             Some(Modal::Reports) => super::reports::on_click(app, i),
             Some(Modal::Rules) => super::rules::on_click(app, i),
+            Some(Modal::Code) => super::code::on_click(app, i),
             Some(Modal::Models) => super::models::on_click(app, i),
             Some(Modal::DocExport) => super::docexport::on_click(app, i),
             Some(Modal::PickProject) => super::workspace::on_click(app, i),
@@ -319,6 +324,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Journals => super::journals::on_key(app, k),
         Modal::Reports => super::reports::on_key(app, k),
         Modal::Rules => super::rules::on_key(app, k),
+        Modal::Code => super::code::on_key(app, k),
         Modal::Models => super::models::on_key(app, k),
         Modal::DocExport => super::docexport::on_key(app, k),
         Modal::PickProject => super::workspace::on_key(app, k),
@@ -621,6 +627,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Journals => super::journals::draw(app, f, r, &mut extra),
         Modal::Reports => super::reports::draw(app, f, r, &mut extra),
         Modal::Rules => super::rules::draw(app, f, r, &mut extra),
+        Modal::Code => super::code::draw(app, f, r, &mut extra),
         Modal::Models => super::models::draw(app, f, r, &mut extra),
         Modal::DocExport => super::docexport::draw(app, f, r, &mut extra),
         Modal::PickProject => super::workspace::draw(app, f, r, &mut extra),

@@ -89,6 +89,9 @@ pub struct ProjectPack {
     /// Designed models the project uses, with their versions and records (2.4+).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub models: Vec<ModelPack>,
+    /// Code spaces it uses (2.5+): source only, never built plugins, approvals or results.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub code: Vec<super::code::CodeSpace>,
 }
 
 /// A model in a project pack. For the built-in bars model: only the fields added to it,
@@ -127,6 +130,8 @@ pub struct Restored {
     pub rules: usize,
     pub models: usize,
     pub records: usize,
+    /// Code spaces brought in (each needs approving before it runs).
+    pub code: usize,
     pub bars: u64,
     pub authors_added: usize,
 }
@@ -152,6 +157,9 @@ impl Restored {
             if self.models > 0 {
                 v.push(n(self.models as u64, "model", "models"));
                 v.push(n(self.records as u64, "record", "records"));
+            }
+            if self.code > 0 {
+                v.push(n(self.code as u64, "code space (to approve)", "code spaces (to approve)"));
             }
             v.push(n(self.bars, "new bar", "new bars"));
         }
@@ -400,6 +408,30 @@ impl Store {
             }
             models.push(m);
         }
+        // code spaces it uses (items, report sections, rules): their source
+        let mut code_ids: Vec<String> = items.iter().filter(|i| i.kind == ItemKind::Code).map(|i| i.ref_id.clone()).collect();
+        for s in reports.iter_mut().flat_map(|r| r.sections.iter_mut()).filter(|s| s.kind == SectionKind::Code) {
+            // sections from before 2.5 name the space; the pack names it by id
+            if let Some(c) = s.params.space.as_deref().and_then(|k| self.find_code_space(k).ok()) {
+                s.params.space = Some(c.id.clone());
+                code_ids.push(c.id);
+            }
+        }
+        code_ids.extend(rules.iter().flat_map(|r| r.spec.then.iter()).filter_map(|t| match t {
+            Then::RunCode { space } => Some(space.clone()),
+            _ => None,
+        }));
+        let mut code = vec![];
+        let mut seen_code = std::collections::BTreeSet::new();
+        for id in code_ids {
+            if seen_code.insert(id.clone())
+                && let Some(mut c) = self.code_space(&id)?
+            {
+                c.approved_hash = None;
+                c.last_run = None;
+                code.push(c);
+            }
+        }
         let mut model_packs = vec![];
         for m in models {
             if m.is_bars() {
@@ -420,6 +452,7 @@ impl Store {
         }
         ids.extend(items.iter().map(|i| i.author_id.clone()));
         ids.extend(rules.iter().map(|r| r.author_id.clone()));
+        ids.extend(code.iter().map(|c| c.author_id.clone()));
         ids.extend(live_searches.iter().map(|l| l.author_id.clone()));
         for j in &journals {
             ids.extend(journal_author_ids(j));
@@ -443,6 +476,7 @@ impl Store {
             rules,
             data: vec![],
             models: model_packs,
+            code,
         };
         if with_data {
             for r in data_refs(self, &pack)? {
@@ -654,6 +688,25 @@ impl Store {
                 ids.insert(mp.model.id.clone(), super::new_id());
             }
         }
+        for c in &p.code {
+            let mut nc = c.clone();
+            nc.id = super::new_id();
+            let names: Vec<String> = self.code_spaces()?.into_iter().map(|x| x.name.to_lowercase()).collect();
+            if names.contains(&nc.name.to_lowercase()) {
+                nc.name = format!("{} (imported)", nc.name);
+                let mut i = 2;
+                while names.contains(&nc.name.to_lowercase()) {
+                    nc.name = format!("{} (imported {i})", c.name);
+                    i += 1;
+                }
+            }
+            // an imported code space runs only after its new owner approves it
+            nc.approved_hash = None;
+            nc.last_run = None;
+            self.insert_code_space(&nc)?;
+            ids.insert(c.id.clone(), nc.id);
+            out.code += 1;
+        }
         for s in &p.live_searches {
             let nid = super::new_id();
             let mut s = s.clone();
@@ -692,6 +745,7 @@ impl Store {
                 ns.params.search = map(&s.params.search);
                 ns.params.project = map(&s.params.project);
                 ns.params.model = map(&s.params.model);
+                ns.params.space = map(&s.params.space);
                 ns.params.entries = s.params.entries.iter().map(|e| ids.get(e).cloned().unwrap_or_else(|| e.clone())).collect();
                 self.insert_section(&ns)?;
             }
@@ -876,6 +930,7 @@ fn remap_then(t: &mut Then, map: &dyn Fn(&str) -> String) {
     match t {
         Then::Status { .. } => {}
         Then::RunSearch { search } => opt(search),
+        Then::RunCode { space } => *space = map(space),
         Then::ExportReport { report, .. } => *report = map(report),
         Then::ExportJournal { journal, .. } | Then::WriteEntry { journal, .. } | Then::AddNote { journal, .. } => opt(journal),
         Then::AddToProject { project, item } => {
