@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-30
+
+### Added
+- Python code spaces are translated in process (ruff_python_parser 0.0.20 into vendored python-ast 1.1.0 codegen, Apache-2.0, no pyo3/libpython); MUNINN_RYTHONC is gone
+- Checked against Rython test files: output matches CPython-based rythonc 1.1.0 on all 44 (goldens made in dev only)
+
 ## [2.11.2] - 2026-10-30
 
 ### Added
@@ -379,7 +385,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.11.2...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/kommandosaldat/muninn/compare/v2.11.2...v2.12.0
 [2.11.2]: https://github.com/kommandosaldat/muninn/compare/v2.11.1...v2.11.2
 [2.11.1]: https://github.com/kommandosaldat/muninn/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/kommandosaldat/muninn/compare/v2.10.0...v2.11.0
