@@ -4,7 +4,7 @@
 # must exist and be downloadable (public repo); otherwise use ../PKGBUILD or
 # ../build-local.sh.
 pkgname=muninn-bin
-pkgver=2.2.0
+pkgver=2.3.0
 pkgrel=1
 pkgdesc="Local, encrypted store for OHLCV market bars (mnnn), prebuilt"
 arch=('x86_64' 'aarch64')
