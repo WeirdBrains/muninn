@@ -389,7 +389,10 @@ impl Store {
                     model_ids.push(t.clone());
                 }
             }
-            for r in self.owned_rules(OwnerKind::Model, &m.id)? {
+            // its own rules and the rules that created or migrated it
+            let authors_of = self.model_versions(&m.id)?.into_iter().filter_map(|v| v.rule_id);
+            let migrators = authors_of.filter_map(|id| self.rule(&id).transpose()).collect::<Result<Vec<_>>>()?;
+            for r in self.owned_rules(OwnerKind::Model, &m.id)?.into_iter().chain(migrators) {
                 if rule_ids.insert(r.id.clone()) {
                     model_ids.extend(r.spec.then.iter().filter_map(|t| then_model(t).cloned()));
                     rules.push(r);

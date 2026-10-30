@@ -169,7 +169,8 @@ mnnn rule create Grow --on record.create --if "name = notes" \
 - **Project archives** (`.mnnp`) carry:
   - the models used by their items, report sections, live searches and rules, plus the
     models those refer to;
-  - each model's versions, records (record ids are kept) and the rules that live in it.
+  - each model's versions, records (record ids are kept), the rules that live in it and the rules that
+    created or migrated it.
 
   On import:
   - a model whose name is taken is imported as `NAME_imported`;

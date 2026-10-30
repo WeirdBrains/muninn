@@ -87,7 +87,8 @@ mnnn journal import FILE [--project PROJECT] [--name NAME]
 A project archive (`.mnnp`, a zstd-compressed tar) holds `muninn-project.json` (the
 project, its live searches, results, journals with entries, notes and highlights,
 reports with their sections, its [rules](rules.md) and its journals' and live
-searches' rules, its [models](models.md) with their versions, records and rules,
+searches' rules, its [models](models.md) with their versions, records, their rules and the rules
+that migrated them,
 and the authors involved), the images under
 `attachments/`, the bars the project refers to under `data/` as CSV (result ranges,
 what its live searches match and the series its report sections show; `--no-data`

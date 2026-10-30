@@ -138,6 +138,8 @@ fn rules_feed_models_and_archives_carry_them() {
     assert!(e2.ok(&["model", "history", "notes"]).contains("v2"));
     let rules = e2.ok(&["rule", "list", "--model", "notes"]);
     assert!(rules.contains("Feed") && rules.contains("off"), "{rules}");
+    let all = e2.ok(&["rule", "list"]);
+    assert!(all.contains("Grow"), "the rule that migrated the model travels with it: {all}");
     // importing again gets a new name
     e2.ok(&["project", "import", pack.to_str().unwrap(), "--name", "P2"]);
     assert!(e2.ok(&["model", "list"]).contains("notes_imported"));
