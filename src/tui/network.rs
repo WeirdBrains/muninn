@@ -1316,6 +1316,9 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
             if let Some(me) = &st.me {
                 let mine = app.store.user_nodes(&me.id).map(|n| n.iter().filter(|x| x.active()).count()).unwrap_or(1);
                 v.head.push(Line::styled(format!(" you: {} ({}) · {mine} node(s)", me.name(), me.short_id()), fg));
+                if mine > 1 {
+                    v.head.push(muted(&t, sync_line(&app.store)));
+                }
             }
             if st.users.is_empty() {
                 v.head.push(muted(&t, " no connections yet: people you connect with appear here, untrusted until t trusts them"));
@@ -1673,4 +1676,20 @@ fn entrust_lines(e: &EntrustForm, t: &crate::theme::Theme, out: &mut Vec<Line<'s
             out.push(Line::styled(format!(" {s}"), fg));
         }
     }
+}
+
+/// Linked-node sync at a glance: the last sync and open conflicts.
+fn sync_line(s: &crate::store::Store) -> String {
+    let nodes = crate::net::sync::linked(s).unwrap_or_default();
+    let last = nodes.iter().filter_map(|(n, _)| crate::net::sync::state(s, &n.peer_id).at).max();
+    let failed = nodes.iter().filter(|(n, _)| crate::net::sync::state(s, &n.peer_id).error.is_some()).count();
+    let open = s.sync_conflicts(false).map(|c| c.len()).unwrap_or(0);
+    let mut out = format!(" sync: {}", last.map(|t| format!("last {}", fmt_ms(t))).unwrap_or_else(|| "not yet".into()));
+    if failed > 0 {
+        out.push_str(&format!(" · {failed} node(s) failed"));
+    }
+    if open > 0 {
+        out.push_str(&format!(" · {open} open conflict(s): mnnn sync conflicts"));
+    }
+    out
 }

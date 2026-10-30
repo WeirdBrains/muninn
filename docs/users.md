@@ -30,6 +30,8 @@ A revoked node stays revoked: its certificate is withdrawn with a signed revocat
 your peers learn it the next time your nodes talk to them, and it no longer acts for
 you anywhere (orgs included). You cannot revoke the node you are on.
 
+Linked nodes keep all of your data in step: see [linked-node sync](sync.md).
+
 ## Connections
 
 When two nodes connect ([invite link](key-exchanges.md) or `mnnn net connect`), they

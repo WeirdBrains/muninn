@@ -19,6 +19,7 @@ mod reports;
 mod review;
 mod rules;
 mod searches;
+mod sync;
 mod users;
 pub use args::*;
 
@@ -137,6 +138,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::User(c) => users::user(&ctx, c),
         Command::Connection(c) => users::connection(&ctx, c),
         Command::Invite(c) => users::invite(&ctx, c),
+        Command::Sync(c) => sync::run(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }

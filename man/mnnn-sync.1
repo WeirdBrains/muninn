@@ -1,0 +1,116 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-sync 1  "mnnn-sync 2.10.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-sync \- Sync: every node linked to your user keeps all of your data; conflicts are kept, never lost; bars on request
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn sync\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Sync: every node linked to your user keeps all of your data; conflicts are kept, never lost; bars on request
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH NOTES
+.PP
+A running node pulls what changed from each of your linked nodes about once a minute, over
+the key exchange and sealed with a key only your nodes hold. Rows changed on both nodes
+keep the newer one; the other is saved as a conflict (`mnnn sync conflicts`) and can be put
+back with `mnnn sync resolve ID \-\-take\-other`. A delete never wins over an edit. Bars are
+not synced on their own: `mnnn sync bars` fetches them. Revoked nodes are not answered.
+See `mnnn help sync`.
+.PP
+Examples:
+  mnnn sync status
+  mnnn sync now
+  mnnn sync conflicts
+  mnnn sync show 3f2a
+  mnnn sync resolve 3f2a \-\-take\-other
+  mnnn sync bars \-\-source binance \-\-symbol BTCUSDT
+
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-sync\-status(1)
+Your linked nodes: when each last synced, what it brought and open conflicts
+.TP
+mnnn\-sync\-now(1)
+Pull from your linked nodes now (all, or one by label or peer id)
+.TP
+mnnn\-sync\-conflicts(1)
+Rows changed on two nodes at once: which one was kept, and the other
+.TP
+mnnn\-sync\-show(1)
+Both sides of one conflict
+.TP
+mnnn\-sync\-resolve(1)
+Settle a conflict: keep what is there, or put the other row back (\-\-take\-other)
+.TP
+mnnn\-sync\-bars(1)
+Fetch bars from a linked node (all series, or some)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.10.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

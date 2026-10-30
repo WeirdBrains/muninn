@@ -120,6 +120,10 @@ pub enum Command {
     /// accept them.
     #[command(subcommand, alias = "invites", after_long_help = INVITE_NOTES)]
     Invite(InviteCommand),
+    /// Sync: every node linked to your user keeps all of your data; conflicts are kept, never
+    /// lost; bars on request.
+    #[command(subcommand, after_long_help = SYNC_NOTES)]
+    Sync(SyncCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -1844,6 +1848,60 @@ pub enum ConnectionCommand {
     },
     /// Forget a connection (the key exchange stays; trust is reset).
     Remove { user: String },
+}
+
+pub const SYNC_NOTES: &str = "\
+A running node pulls what changed from each of your linked nodes about once a minute, over
+the key exchange and sealed with a key only your nodes hold. Rows changed on both nodes
+keep the newer one; the other is saved as a conflict (`mnnn sync conflicts`) and can be put
+back with `mnnn sync resolve ID --take-other`. A delete never wins over an edit. Bars are
+not synced on their own: `mnnn sync bars` fetches them. Revoked nodes are not answered.
+See `mnnn help sync`.
+
+Examples:
+  mnnn sync status
+  mnnn sync now
+  mnnn sync conflicts
+  mnnn sync show 3f2a
+  mnnn sync resolve 3f2a --take-other
+  mnnn sync bars --source binance --symbol BTCUSDT
+";
+
+#[derive(Debug, Subcommand)]
+pub enum SyncCommand {
+    /// Your linked nodes: when each last synced, what it brought and open conflicts.
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Pull from your linked nodes now (all, or one by label or peer id).
+    Now { node: Option<String> },
+    /// Rows changed on two nodes at once: which one was kept, and the other.
+    Conflicts {
+        /// Resolved ones too.
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Both sides of one conflict.
+    Show { id: String },
+    /// Settle a conflict: keep what is there, or put the other row back (--take-other).
+    Resolve {
+        id: String,
+        #[arg(long)]
+        take_other: bool,
+    },
+    /// Fetch bars from a linked node (all series, or some).
+    Bars {
+        /// A linked node (label or peer id; default: all).
+        #[arg(long)]
+        from: Option<String>,
+        #[arg(long)]
+        source: Option<String>,
+        #[arg(long)]
+        symbol: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]

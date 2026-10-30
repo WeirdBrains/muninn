@@ -26,6 +26,7 @@ id (`12D3KooW…`) is how others know it.
 | Peers | `mnnn net peers`, `forget PEER` | Peers page: `c` connect, `l` label, `d` forget |
 | Nodes | `mnnn net connect X`, `invite`, `requests`, `accept X`, `decline X`, `disconnect X` | Nodes page: `c` `n` `p` `a` `d` `r` |
 | Users, invites | `mnnn user …`, `mnnn connection …`, `mnnn invite …` ([users](users.md)) | Connections and Invites pages |
+| Sync your nodes | `mnnn sync …` ([sync](sync.md)) | runs on its own with the node |
 | Relays | `mnnn net relay list/add/remove/serve on\|off` | Relays page: `a` add, `d` remove, `r` serve |
 | Settings | `mnnn net config [--label] [--port] [--listen] [--mdns] [--autostart] [--accept] [--bootstrap]` | Settings page |
 

@@ -201,6 +201,7 @@ mod tests {
             "key-exchanges",
             "dark-shards",
             "users",
+            "sync",
         ] {
             assert!(topic(id).is_some(), "missing docs/{id}.md");
         }
