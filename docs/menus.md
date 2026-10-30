@@ -29,7 +29,7 @@ Every menu item runs a named action. The same actions are bound to keys
 | File | Import… · Export… · Backup ▸ (Create, Restore) · Authors… · Preferences… · Quit |
 | View | New tile ▸ · Split ▸ · Close tile · Zoom tile · Equalize · Change view · Link tile · Chart layers… · Container ▸ · Layouts ▸ · Toggle sidebar · History ▸ (Show/hide history bar, Step back, Step forward) |
 | Data | Sources… · Symbols… · Filters ▸ (Source, Symbol, Time range…, Price, Period, Year, Clear all) · Sort ▸ · Coverage & gaps · Model designer… · Refresh |
-| Projects | Projects… · New project… · Live searches… · Save search as live search… · Journals… · New journal… · Reports… · New report… · Rules… · Code spaces… · Add selected series to project… |
+| Projects | Projects… · New project… · Live searches… · Save search as live search… · Journals… · New journal… · Reports… · New report… · Reviews ▸ (Reviews…, Ask for a review…, Thread…, Reviewing (joined)…) ([reviews](reviews.md)) · Rules… · Code spaces… · Add selected series to project… |
 | Network | Node status… · Start node · Stop node · Peers… · Relays… · Key exchanges… · Shared data… · Dark shards… · Network search… · Settings… ([network](network.md)) |
 | Organizations | Organizations… · New organization… · Members… · Roles… · Resources… · Joined & browse… · Site & certificate… · Start site · Stop site ([organizations](organizations.md), [org hosting](org-hosting.md)) |
 | Keys | Initialize… · Lock · Rotate service key · Rekey database · Export… · Recover ▸ · Re-issue shards |

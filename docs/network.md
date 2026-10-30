@@ -96,5 +96,5 @@ window stays usable. `g` refreshes. See [keybindings](keybindings.md).
   written outside the encrypted database and encrypted backups.
 - Every network action is in the [history](history.md) (`net.*`) under the current
   author, and [rules](rules.md) can react to them.
-- Scopes are carried in every exchange (`{"kind":"node"}` for now), ready for
-  organizations and reviews.
+- Scopes are carried in every exchange: `{"kind":"node"}`, an organization's, or
+  `{"kind":"resource","as":"review"}` for a [review](reviews.md) link.

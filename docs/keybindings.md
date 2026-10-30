@@ -85,6 +85,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `C` | the [code spaces](code-spaces.md) window (`n` new, Enter edit, `r` run) |
 | `K` | the [network](network.md) window (node status first) |
 | `G` | the [organizations](organizations.md) window |
+| `V` | the [reviews](reviews.md) window |
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
@@ -109,6 +110,11 @@ Roles `n` new, `e` / Enter permissions, `P` all permissions, `a` / `i` apply / i
 default, `d` remove; Resources `a` add, `p` / Enter publish, `z` archive, `d` release;
 Joined `b` browse, `A` apply, `j` join, `s` sync, `m` mirror, `l` leave; Site `S` / Enter
 start or stop, `X` stop, `e` ACME.
+In the reviews window: `1`–`3` / Tab / ← → change page, `g` refresh; My reviews `n`
+new, Enter thread, `i` link, `p` view, `H` revisions, `o` close / reopen, `d` delete;
+Thread `c` comment, `e` suggest, `h` highlight, `v` vote, `r` reply, `a` / `x` accept /
+reject, `A` / `X` all, `m` merge, `F` force, `w` withdraw, `D` drop; Reviewing `j` join,
+Enter view, `s` sync, `l` leave ([reviews](reviews.md)).
 In a code space's editor: `e` edits the source (Esc stops), `s` / Ctrl-S saves, `b`
 builds, `r` / Ctrl-R runs, `c` checks, `i` sets the input, `t` widens the result tile.
 Full tables: [code spaces](code-spaces.md), [models](models.md), [live searches](live-searches.md),

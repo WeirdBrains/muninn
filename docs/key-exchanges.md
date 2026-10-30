@@ -17,6 +17,8 @@ Diffie-Hellman between their Ed25519 node identities.
    `mnnn net exchange verify ben 12345-67890` (TUI: `v`). Matching codes rule out a
    man in the middle.
 
+A [review](reviews.md) link is an offer like this, scoped to one review and one reviewer.
+
 Tokens hold only public keys, addresses and signatures, so they are safe to paste in
 mail or chat. Offers expire after 7 days. Replayed or tampered tokens are refused.
 

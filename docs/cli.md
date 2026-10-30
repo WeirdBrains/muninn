@@ -26,6 +26,8 @@ mnnn [GLOBAL FLAGS] <COMMAND>
   org      create|edit|remove|list|show|role|member|resource|publish|unpublish|project|
            endpoint|call|template|browse|apply|join|sync|leave|fetch|give|mirror|sign|
            host start|stop|status|cert status|acme|renew
+  review   request|invite|list|show|view|join|sync|comment|suggest|highlight|vote|
+           withdraw|accept|reject|merge|close|reopen|drop|leave|remove|revisions
   tui
   help     [TOPIC] [--search TEXT]
 ```
@@ -81,6 +83,7 @@ mnnn code create fast --lang math --model bars --group symbol --source "fast = s
 mnnn code run fast -y
 mnnn org create "Comet Lab" --public
 mnnn org host start --port 8443
+mnnn review request journal "field notes" --allow comment,suggest
 mnnn help keys
 mnnn help --search shard
 ```

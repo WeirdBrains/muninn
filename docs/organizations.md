@@ -125,5 +125,6 @@ A template fills `{{title}}`, `{{org.name}}`, `{{org.description}}`, `{{org.slug
 
 ## Designed with reviews in mind
 
-Roles, ranks, published states and the history of who did what are the pieces the
-coming reviews phase builds on.
+Roles, ranks, published states and the history of who did what are the pieces
+[reviews](reviews.md) build on: a review link is its own key exchange scoped to the one
+thing under review, so a reviewer gets no other access to your node or orgs.

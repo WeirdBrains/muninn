@@ -108,6 +108,10 @@ entry, because they never ask for the password.
 | `org.resource.add`, `org.resource.state`, `org.resource.remove`, `org.publish`, `org.unpublish`, `org.transfer` | CLI, TUI, node | the resource, its state or where it is published |
 | `org.project.add`, `org.project.remove`, `org.project.member`, `org.endpoint.add`, `org.endpoint.remove`, `org.template.save`, `org.template.asset` | CLI, TUI | the org's projects, endpoints and templates |
 | `org.call`, `org.serve`, `org.mirror` | CLI, node, web | endpoint calls, what was served to whom, mirrors |
+| `review.request`, `review.invite`, `review.close`, `review.reopen`, `review.drop`, `review.remove` | CLI, TUI | the [review](reviews.md), its thing and reviewers (never keys) |
+| `review.join`, `review.joined`, `review.leave`, `review.closed`, `review.serve` | CLI, TUI, node | a reviewer taking a link, joining, leaving, being closed out, what was served |
+| `review.comment`, `review.suggest`, `review.highlight`, `review.vote`, `review.withdraw` | CLI, TUI, node | the item, its anchor and who made it |
+| `review.accept`, `review.reject`, `review.merge` | CLI, TUI | the suggestions decided, the revisions made and conflicts; the edits follow with a `review` param |
 | `org.host.start`, `org.host.stop`, `org.host.acme`, `org.host.cert` | CLI, TUI, host | the [site](org-hosting.md), its address and certificate (never keys) |
 | `rule.run` | rules | the rule, the action that triggered it, its status (`ok`, `failed`, `blocked`); what it did is recorded under it |
 
