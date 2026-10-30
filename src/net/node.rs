@@ -48,6 +48,9 @@ pub struct NodeConfig {
     pub memory: bool,
     /// This node's label (in identify; empty: none).
     pub label: String,
+    /// Addresses others reach us at from outside (a DNS name or public IP forwarded to
+    /// this node), announced and put in invites before the local ones.
+    pub external: Vec<Multiaddr>,
 }
 
 impl NodeConfig {
@@ -252,7 +255,12 @@ impl Node {
                 };
                 rt.block_on(async move {
                     let swarm = match build_swarm(key, &cfg) {
-                        Ok(s) => s,
+                        Ok(mut s) => {
+                            for a in &cfg.external {
+                                s.add_external_address(a.clone());
+                            }
+                            s
+                        }
                         Err(e) => {
                             let _ = ready_tx.send(Err(e));
                             return;

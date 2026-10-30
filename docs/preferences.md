@@ -26,6 +26,7 @@ relays = []
 bootstrap = []
 autostart = true
 accept = "known"
+external_addresses = []
 
 [hosting]
 autostart = false
@@ -53,6 +54,7 @@ A `version` key records the file's format; older files are upgraded on load (2.9
 | `net.relays`, `net.bootstrap` | `[]` | relays to reserve a slot on; nodes to join the wide network through |
 | `net.autostart` | `true` | start the node when the TUI opens (`mnnn net config --autostart off`) |
 | `net.accept` | `known` | `known`: nodes you were never connected to ask first; `anyone`: connect at once ([key exchanges](key-exchanges.md)) |
+| `net.external_addresses` | `[]` | how other hosts reach this node from outside: `host`, `host:port` or a multiaddr, e.g. `["alien.duckdns.org:4741"]` after forwarding TCP+UDP 4741 on the router; announced and listed first in invite links (DNS names resolve when dialed) |
 | `hosting.autostart` | `false` | start the [org web server](org-hosting.md) with the node (`mnnn org host autostart on`) |
 | `hosting.bind` | `127.0.0.1` | address [org sites](org-hosting.md) listen on (`0.0.0.0` or `::`: other machines) |
 | `hosting.port` | `8443` | HTTPS port for pages, JSON and gRPC |

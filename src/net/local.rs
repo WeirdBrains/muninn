@@ -99,11 +99,16 @@ pub fn offer_addrs(home: &Path, store: &Store, node: Option<&Node>) -> Vec<Strin
             None => super::client::my_addrs(store, None),
         },
     };
-    all.into_iter().filter(|a| !link_local(a)).collect()
+    all.into_iter().filter(|a| !link_local(a) && !docker(a)).collect()
 }
 
 fn link_local(a: &str) -> bool {
     a.strip_prefix("/ip6/").is_some_and(|r| r.get(..4).is_some_and(|p| p.eq_ignore_ascii_case("fe80")))
+}
+
+/// Docker's default bridge networks (172.17/16, 172.18/16): unreachable from other hosts.
+fn docker(a: &str) -> bool {
+    a.strip_prefix("/ip4/172.").is_some_and(|r| r.starts_with("17.") || r.starts_with("18."))
 }
 
 #[cfg(test)]
@@ -112,6 +117,8 @@ fn link_local_addresses_are_not_offered() {
     assert!(link_local("/ip6/fe80::1/udp/4741/quic-v1"));
     assert!(!link_local("/ip6/fd7a:115c::1/udp/4741/quic-v1"));
     assert!(!link_local("/ip4/100.75.141.6/tcp/4741"));
+    assert!(docker("/ip4/172.17.0.1/tcp/4741") && docker("/ip4/172.18.0.1/udp/4741/quic-v1"));
+    assert!(!docker("/ip4/172.16.0.1/tcp/4741") && !docker("/dns4/alien.example/tcp/4741"));
 }
 
 /// The node this process runs for the user (`mnnn net start` or the TUI): it keeps
@@ -243,6 +250,7 @@ pub fn ephemeral(kp: &Keypair, service: Store, label: &str, prefs: &NetPrefs) ->
         relays: vec![],
         memory: false,
         label: label.to_string(),
+        external: vec![],
     };
     Node::start(kp.clone(), cfg, Arc::new(Service::new(service, kp.public().to_peer_id(), label).accept_anyone(prefs.accept_anyone())))
 }

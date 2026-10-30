@@ -213,6 +213,10 @@ pub struct NetPrefs {
     /// Who the node connects with on its own: `known` (nodes it has a key exchange with,
     /// or that we asked first) or `anyone`. Other requests wait for you to accept them.
     pub accept: String,
+    /// Where other hosts reach this node from outside: `host`, `host:port` or a multiaddr
+    /// (e.g. `alien.duckdns.org:4741` after forwarding TCP+UDP on the router). Announced and
+    /// put first in invite links; DNS names are resolved by whoever dials.
+    pub external_addresses: Vec<String>,
 }
 
 impl Default for NetPrefs {
@@ -227,6 +231,7 @@ impl Default for NetPrefs {
             bootstrap: vec![],
             autostart: true,
             accept: "known".into(),
+            external_addresses: vec![],
         }
     }
 }
@@ -235,6 +240,35 @@ impl NetPrefs {
     /// Accept connection requests from any node.
     pub fn accept_anyone(&self) -> bool {
         self.accept.trim().eq_ignore_ascii_case("anyone")
+    }
+
+    /// The external addresses as multiaddrs: `host[:port]` becomes TCP and QUIC on that
+    /// port (default: ours), `/dns4/…` for names and `/ip4/…` or `/ip6/…` for IPs.
+    pub fn external(&self) -> Result<Vec<libp2p::Multiaddr>> {
+        let mut v = vec![];
+        for a in self.external_addresses.iter().map(|a| a.trim()).filter(|a| !a.is_empty()) {
+            if a.starts_with('/') {
+                v.push(a.parse().map_err(|e| crate::error::Error::invalid("external address", format!("{a}: {e}")))?);
+                continue;
+            }
+            let (host, port) = match a.rsplit_once(':') {
+                Some((h, p)) if !h.contains(':') || h.starts_with('[') => (
+                    h.trim_start_matches('[').trim_end_matches(']'),
+                    p.parse::<u16>().map_err(|_| crate::error::Error::invalid("external address", format!("{a}: bad port")))?,
+                ),
+                _ => (a.trim_start_matches('[').trim_end_matches(']'), if self.port == 0 { crate::net::node::DEFAULT_PORT } else { self.port }),
+            };
+            let base = match host.parse::<std::net::IpAddr>() {
+                Ok(std::net::IpAddr::V4(ip)) => format!("/ip4/{ip}"),
+                Ok(std::net::IpAddr::V6(ip)) => format!("/ip6/{ip}"),
+                Err(_) if !host.is_empty() && host.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.') => format!("/dns4/{host}"),
+                Err(_) => return Err(crate::error::Error::invalid("external address", format!("{a}: not a host name or IP"))),
+            };
+            for t in [format!("{base}/tcp/{port}"), format!("{base}/udp/{port}/quic-v1")] {
+                v.push(t.parse().map_err(|e| crate::error::Error::invalid("external address", format!("{a}: {e}")))?);
+            }
+        }
+        Ok(v)
     }
 
     /// The node configuration these settings describe.
@@ -255,6 +289,7 @@ impl NetPrefs {
             relays: addrs(&self.relays, "relay")?,
             memory: false,
             label: label.to_string(),
+            external: self.external()?,
         })
     }
 }
@@ -318,6 +353,21 @@ mod tests {
         assert!(!p.net.accept_anyone());
         assert!(p.net.mdns && !p.net.relay_server);
         assert_eq!(p.net.port, 4741);
+        let mut n = p.net.clone();
+        n.external_addresses = vec!["alien.duckdns.org".into(), "203.0.113.5:4800".into(), "/dns4/x.example/tcp/9".into()];
+        let ext: Vec<String> = n.external().unwrap().iter().map(|a| a.to_string()).collect();
+        assert_eq!(
+            ext,
+            [
+                "/dns4/alien.duckdns.org/tcp/4741",
+                "/dns4/alien.duckdns.org/udp/4741/quic-v1",
+                "/ip4/203.0.113.5/tcp/4800",
+                "/ip4/203.0.113.5/udp/4800/quic-v1",
+                "/dns4/x.example/tcp/9"
+            ]
+        );
+        n.external_addresses = vec!["bad host!".into()];
+        assert!(n.external().is_err());
         // older files without [net] still load
         let old: Preferences = toml::from_str("[theme]\nname = \"x\"\nmode = \"dark\"\n").unwrap();
         assert_eq!(old.net, NetPrefs::default());

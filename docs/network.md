@@ -54,6 +54,21 @@ reserves a slot on a relay (`mnnn net relay add /ip4/…/tcp/4741/p2p/ID`, or on
 learns about) and is reachable through it; DCUtR then tries a direct connection. Any
 node can serve as a relay for others with `--relay-server` (or `relay serve on`).
 
+### Reaching a node from outside
+
+Invite links carry the node's reachable addresses; IPv6 link-local (`fe80::`) and Docker
+bridge (172.17/16, 172.18/16) addresses are left out. To be reachable across the internet,
+forward TCP and UDP on `net.port` (4741) on the router and allow them in the host firewall
+(UDP 5353 too for local discovery), then name the public address:
+
+```toml
+[net]
+external_addresses = ["alien.duckdns.org:4741"]
+```
+
+A DNS name (dynamic DNS works) becomes `/dns4/NAME/tcp/PORT` and `/dns4/NAME/udp/PORT/quic-v1`;
+it is announced to peers and put first in invites.
+
 ## Sharing
 
 ```
