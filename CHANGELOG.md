@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-10-29
+
+### Added
+- Code spaces in math, Polars, Rust or Python (via Rython), compiled to native plugins - mnnn code create NAME --lang L, or C (Projects > Code spaces) in the TUI
+- Run over any model with filters, grouping and sorting; results are tables, charts, text or tiles - mnnn code run, or r in the code window
+- Plugins load, update and create records and models through the host API, recorded in history; new or changed code asks before its first run - mnnn code approve
+- Builds cached by content hash; prebuilt plugins load too; the SDK uses a stable C ABI (v1) - mnnn code build|check|sdk
+- Code spaces join projects, report sections, rules and archives (source only) - mnnn project add --code, mnnn report add --code, then-action run-code
+
 ## [2.4.0] - 2026-10-29
 
 ### Added
@@ -259,7 +268,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/kommandosaldat/muninn/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/kommandosaldat/muninn/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/kommandosaldat/muninn/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/kommandosaldat/muninn/compare/v2.1.0...v2.2.0
