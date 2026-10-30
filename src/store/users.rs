@@ -40,6 +40,14 @@ CREATE TABLE connections (
 );
 "#;
 
+/// 2.10: organizations and memberships belong to users. Existing orgs move to this
+/// node's user the first time it is made; members get their user once their card is known.
+pub const MIGRATION_ORGS: &str = r#"
+ALTER TABLE orgs ADD COLUMN owner_user TEXT;
+ALTER TABLE org_members ADD COLUMN user_id TEXT;
+CREATE INDEX org_members_user ON org_members(user_id);
+"#;
+
 const SELF_USER: &str = "self_user";
 
 /// A user this node knows: its own, or one met through a connection, org or review.
@@ -255,6 +263,21 @@ impl Store {
         )? > 0)
     }
 
+    /// Orgs this node owns (and not yet a user's) become this user's.
+    pub fn claim_orgs(&self, user_id: &str, peer_id: &str) -> Result<usize> {
+        Ok(self.conn.execute("UPDATE orgs SET owner_user = ?1 WHERE owner_user IS NULL AND owner_peer IN (?2, '')", params![user_id, peer_id])?)
+    }
+    /// Name the user of a member's node where it is known.
+    pub fn tag_members(&self, peer_id: &str, user_id: &str) -> Result<usize> {
+        Ok(self
+            .conn
+            .execute("UPDATE org_members SET user_id = ?2 WHERE peer_id = ?1 AND (user_id IS NULL OR user_id != ?2)", params![peer_id, user_id])?)
+    }
+    /// The user owning an org, when it is known.
+    pub fn org_owner_user(&self, org_id: &str) -> Result<Option<String>> {
+        Ok(self.conn.query_row("SELECT owner_user FROM orgs WHERE id = ?1", [org_id], |r| r.get(0)).optional()?.flatten())
+    }
+
     // ---------- connections ----------
 
     fn row_connection(r: &rusqlite::Row) -> rusqlite::Result<Connection> {
@@ -294,6 +317,13 @@ impl Store {
     pub fn remove_connection(&self, user_id: &str) -> Result<bool> {
         Ok(self.conn.execute("DELETE FROM connections WHERE user_id = ?1", [user_id])? > 0)
     }
+}
+
+/// After linking to another user: what the node's earlier user owned moves along.
+pub fn move_owned(s: &Store, from: &str, to: &str) -> Result<()> {
+    s.conn.execute("UPDATE orgs SET owner_user = ?2 WHERE owner_user = ?1", params![from, to])?;
+    s.conn.execute("UPDATE org_members SET user_id = ?2 WHERE user_id = ?1", params![from, to])?;
+    Ok(())
 }
 
 #[cfg(test)]

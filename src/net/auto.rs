@@ -76,6 +76,7 @@ pub fn purpose(x: &Exchange) -> String {
     match s("kind").as_str() {
         "organization" => format!("org {}", s("name")),
         "resource" => format!("review {}", s("title")),
+        "link" => "link node".into(),
         _ => "node".into(),
     }
 }
@@ -158,11 +159,13 @@ pub fn resolve(s: &Store, target: &str, relays: &[String]) -> Result<(PeerId, Ve
 
 /// The node-scoped exchange we have with a peer: active first, else pending either way.
 pub fn node_link(s: &Store, peer: &str) -> Result<Option<Exchange>> {
-    let xs: Vec<Exchange> = s
-        .exchanges()?
-        .into_iter()
-        .filter(|x| x.peer_id.as_deref() == Some(peer) && x.scope.get("kind").and_then(|k| k.as_str()) == Some("node"))
-        .collect();
+    kind_link(s, peer, "node")
+}
+
+/// The exchange of one scope kind (`node`, `link`) we have with a peer.
+pub fn kind_link(s: &Store, peer: &str, kind: &str) -> Result<Option<Exchange>> {
+    let xs: Vec<Exchange> =
+        s.exchanges()?.into_iter().filter(|x| x.peer_id.as_deref() == Some(peer) && exchange::scope_kind(&x.scope) == kind).collect();
     let pick = |f: &dyn Fn(&Exchange) -> bool| xs.iter().find(|x| f(x)).cloned();
     Ok(pick(&|x| x.status.active())
         .or_else(|| pick(&|x| x.status == ExchangeStatus::Incoming))
@@ -260,6 +263,48 @@ pub fn connect(
     relays: &[String],
     origin: &str,
 ) -> Result<Link> {
+    let l = connect_as(s, node, kp, target, label, my_label, addrs, relays, origin, "node")?;
+    if l.status == LinkStatus::Connected
+        && let Some(x) = &l.exchange
+    {
+        let _ = introduce(s, node, x, relays);
+    }
+    Ok(l)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn connect_as(
+    s: &Store,
+    node: &Node,
+    kp: &Keypair,
+    target: &str,
+    label: Option<&str>,
+    my_label: &str,
+    addrs: Vec<String>,
+    relays: &[String],
+    origin: &str,
+    kind: &str,
+) -> Result<Link> {
+    // an invite link names the node; for a node link we only need where it is
+    let target = match (kind, exchange::parse_token(target.trim())) {
+        ("link", Ok(Token::Offer(o))) => {
+            for a in &o.addrs {
+                if let Ok(m) = a.parse::<Multiaddr>() {
+                    let _ = s.upsert_net_peer(
+                        &o.peer,
+                        Some(&o.label).filter(|l| !l.is_empty()).map(|x| x.as_str()),
+                        &[m.to_string()],
+                        None,
+                        None,
+                        "manual",
+                    );
+                }
+            }
+            o.peer.clone()
+        }
+        _ => target.to_string(),
+    };
+    let target = target.as_str();
     let (p, dial) = resolve(s, target, relays)?;
     let pid = p.to_string();
     let fail = |detail: String| Link {
@@ -293,7 +338,7 @@ pub fn connect(
         detail,
         warning: hello.clone(),
     };
-    match node_link(s, &pid)? {
+    match kind_link(s, &pid, kind)? {
         Some(x) if x.status.active() => return Ok(link(LinkStatus::Connected, Some(x), format!("already connected to {peer}"))),
         // they asked first: connecting is our yes
         Some(x) if x.status == ExchangeStatus::Incoming => {
@@ -310,7 +355,8 @@ pub fn connect(
         }
         None => {}
     }
-    let x = offer_to(s, kp, &pid, exchange::node_scope(), label.unwrap_or(""), my_label, addrs, client::DEFAULT_TTL_MS, origin)?;
+    let scope = if kind == "link" { exchange::link_scope() } else { exchange::node_scope() };
+    let x = offer_to(s, kp, &pid, scope, label.unwrap_or(""), my_label, addrs, client::DEFAULT_TTL_MS, origin)?;
     Ok(match deliver(s, node, p, &dial, &x.offer) {
         Ok(Delivered::Answered(x)) => link(LinkStatus::Connected, Some(x), format!("connected to {peer}")),
         Ok(Delivered::Kept(_)) => link(LinkStatus::Pending, Some(x), format!("waiting for {peer} to accept")),
@@ -365,6 +411,15 @@ pub fn offer_to(
 pub fn accept(s: &Store, node: Option<&Node>, kp: &Keypair, key: &str, my_label: &str, addrs: Vec<String>, origin: &str) -> Result<Link> {
     let x = incoming(s, key)?;
     let a: Accepted = client::accept(s, node, kp, &x.id, "", my_label, addrs, origin)?;
+    if exchange::scope_kind(&a.exchange.scope) == "link" {
+        record(
+            s,
+            origin,
+            "user.node.approve",
+            format!("{} may link to your user", a.exchange.title()),
+            serde_json::json!({ "exchange": a.exchange.id, "peer": a.exchange.peer_id }),
+        );
+    }
     let peer = a.exchange.title();
     let (status, detail) = match &a.delivered {
         Some(Ok(_)) => (LinkStatus::Connected, format!("connected to {peer}")),
@@ -431,6 +486,80 @@ pub fn incoming(s: &Store, key: &str) -> Result<Exchange> {
 pub fn requests(s: &Store) -> Result<Vec<Exchange>> {
     let now = now_ms();
     Ok(s.exchanges()?.into_iter().filter(|x| x.status == ExchangeStatus::Incoming && x.expires_at.is_none_or(|e| e > now)).collect())
+}
+
+// ---------- users over exchanges (2.10) ----------
+
+/// How long to wait before telling a peer again whom we act for, after it did not take it.
+const INTRO_RETRY_MS: i64 = 10 * 60 * 1000;
+
+/// The setting remembering which card we last gave over an exchange.
+pub fn intro_key(exchange: &str) -> String {
+    format!("net.intro.{exchange}")
+}
+
+/// Tell the peer of an exchange whom we act for and learn whom they do (both cards
+/// are checked). Remembers the card given, so [`settle`] only repeats it after a change.
+pub fn introduce(s: &Store, node: &Node, x: &Exchange, relays: &[String]) -> Result<super::user::Met> {
+    let card = super::user::my_card(s)?;
+    let digest = card.digest();
+    let r = client::send(s, node, x, super::proto::Req::Introduce { card }, relays);
+    // given: not again until our card changes; not taken (an older node, or not
+    // reachable now): again in a while
+    let mark = if r.is_ok() { digest } else { format!("retry@{}", now_ms()) };
+    s.set_setting(&intro_key(&x.id), Some(&mark))?;
+    match r? {
+        super::proto::Resp::Introduced { card } => super::user::take_card(s, x.peer_id.as_deref().unwrap_or(""), &card, "network"),
+        _ => Err(Error::Other("peer: unexpected answer".into())),
+    }
+}
+
+/// Ask to act for the user of another node of mine (by address, peer, name or invite link).
+/// The other node's owner approves (`mnnn user approve`, or accepts the request); then this
+/// node takes the user's key ([`link_fetch`], also done by [`settle`]).
+#[allow(clippy::too_many_arguments)]
+pub fn link_to(
+    s: &Store,
+    node: &Node,
+    kp: &Keypair,
+    target: &str,
+    my_label: &str,
+    addrs: Vec<String>,
+    relays: &[String],
+    origin: &str,
+) -> Result<Link> {
+    let mut l = connect_as(s, node, kp, target, None, my_label, addrs, relays, origin, "link")?;
+    if l.status == LinkStatus::Connected
+        && let Some(x) = &l.exchange
+    {
+        match link_fetch(s, node, x, my_label, relays, origin) {
+            Ok(u) => l.detail = format!("this node now acts for {} (linked through {})", u.name(), l.peer),
+            Err(e) => {
+                l.status = LinkStatus::Failed;
+                l.detail = e.to_string();
+            }
+        }
+    } else if l.status == LinkStatus::Pending {
+        l.detail = format!("waiting for {} to approve the link (`mnnn user approve` there)", l.peer);
+    }
+    Ok(l)
+}
+
+/// Over a completed node-link exchange we offered: take the user's card and key.
+pub fn link_fetch(s: &Store, node: &Node, x: &Exchange, my_label: &str, relays: &[String], origin: &str) -> Result<crate::store::users::User> {
+    if exchange::scope_kind(&x.scope) != "link" || x.role != "offerer" {
+        return Err(Error::invalid("link", "not a node link we asked for"));
+    }
+    match client::send(s, node, x, super::proto::Req::LinkFetch { label: my_label.to_string() }, relays)? {
+        super::proto::Resp::Linked { card, keypair } => {
+            use base64::Engine;
+            let kp = zeroize::Zeroizing::new(
+                base64::engine::general_purpose::STANDARD.decode(keypair.as_bytes()).map_err(|_| Error::Crypto("link: bad key".into()))?,
+            );
+            super::user::adopt(s, x.peer_id.as_deref().unwrap_or(""), &card, &kp, origin)
+        }
+        _ => Err(Error::Other("peer: unexpected answer".into())),
+    }
 }
 
 // ---------- the receiving node ----------
@@ -557,6 +686,34 @@ pub fn settle(s: &Store, node: &Node, relays: &[String], origin: &str) -> Vec<St
                 out.push(format!("declined: {} ({})", x.title(), purpose(x)));
             }
             _ => {}
+        }
+    }
+    // 2.10: users. Finish node links we asked for, and tell peers whom we act for
+    // (again after our card changed: a node linked or revoked).
+    if let Ok(xs) = s.exchanges() {
+        let label = String::new();
+        for x in xs.iter().filter(|x| x.status.active()) {
+            let kind = exchange::scope_kind(&x.scope);
+            if kind == "link"
+                && x.role == "offerer"
+                && x.peer_id
+                    .as_deref()
+                    .is_some_and(|p| s.user_of_node(p).ok().flatten().is_none_or(|n| s.self_user().ok().flatten().is_none_or(|u| u.id != n.user_id)))
+            {
+                if let Ok(u) = link_fetch(s, node, x, &label, relays, origin) {
+                    out.push(format!("linked: this node now acts for {}", u.name()));
+                }
+                continue;
+            }
+            if kind != "node" && kind != "link" {
+                continue;
+            }
+            let Ok(card) = super::user::my_card(s) else { continue };
+            let given = s.setting(&intro_key(&x.id)).ok().flatten().unwrap_or_default();
+            if given == card.digest() || given.strip_prefix("retry@").and_then(|t| t.parse::<i64>().ok()).is_some_and(|t| now - t < INTRO_RETRY_MS) {
+                continue;
+            }
+            let _ = introduce(s, node, x, relays);
         }
     }
     if let Ok(xs) = s.undelivered_answers() {

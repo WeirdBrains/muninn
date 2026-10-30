@@ -40,9 +40,21 @@ pub fn node_scope() -> serde_json::Value {
     serde_json::json!({ "kind": "node" })
 }
 
+/// 2.10: a node asking to be linked to the user of the node it connects to.
+pub fn link_scope() -> serde_json::Value {
+    serde_json::json!({ "kind": "link" })
+}
+
+/// The kind of an exchange scope (`node`, `link`, `organization`, `resource`).
+pub fn scope_kind(scope: &serde_json::Value) -> &str {
+    scope.get("kind").and_then(|k| k.as_str()).unwrap_or("")
+}
+
 fn check_scope(scope: &serde_json::Value) -> Result<()> {
     match scope.get("kind").and_then(|k| k.as_str()) {
         Some("node") => Ok(()),
+        // 2.10: the offering node asks to act for the answering node's user
+        Some("link") => Ok(()),
         // a membership: `as` is `apply` (an applicant's offer to the org's node) or `invite`
         Some("organization") => {
             let org = scope.get("org").and_then(|v| v.as_str()).unwrap_or("");

@@ -462,6 +462,23 @@ pub fn answer(s: &Store, x: &Exchange, from: &PeerId, req: Req, label: &str) -> 
         }
         Req::Org { .. } => return Err(Error::Other("organization requests are answered by the org's node".into())),
         Req::Review { .. } => return Err(Error::Other("review requests are answered by the author's node".into())),
+        Req::Introduce { card } => {
+            let peer = from.to_string();
+            super::user::take_card(s, &peer, &card, "network")?;
+            let mine = super::user::my_card(s)?;
+            s.set_setting(&super::auto::intro_key(&x.id), Some(&mine.digest()))?;
+            Resp::Introduced { card: mine }
+        }
+        Req::LinkFetch { label } => {
+            if super::exchange::scope_kind(&x.scope) != "link" || x.role != "answerer" {
+                return Err(Error::invalid("link", "this exchange is not a node link approved here"));
+            }
+            let label = if label.trim().is_empty() { s.net_peer(&from.to_string())?.map(|p| p.label).unwrap_or_default() } else { label };
+            let (card, kp) = super::user::link_grant(s, &from.to_string(), &label, "network")?;
+            use base64::Engine;
+            let keypair = base64::engine::general_purpose::STANDARD.encode(&kp[..]);
+            Resp::Linked { card, keypair }
+        }
         Req::Revoke => {
             let x = s.set_exchange_status(&x.id, ExchangeStatus::Revoked, Some("peer"))?;
             crate::org::net::ended(s, &x)?;

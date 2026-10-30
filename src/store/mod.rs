@@ -141,6 +141,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     net::MIGRATION_2_9,
     // 2.10: users, linked nodes and connections
     users::MIGRATION,
+    // 2.10: user-owned orgs
+    users::MIGRATION_ORGS,
 ];
 
 /// A new random id (32 hex characters).

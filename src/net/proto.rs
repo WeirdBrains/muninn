@@ -156,6 +156,14 @@ pub enum Req {
         review: String,
         req: crate::review::net::ReviewReq,
     },
+    /// 2.10: whom I act for (my user's card); the answer is the other side's card.
+    Introduce {
+        card: crate::net::user::Card,
+    },
+    /// 2.10: over a node-link exchange the owner approved, ask for the user's key.
+    LinkFetch {
+        label: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,6 +197,15 @@ pub enum Resp {
     /// A review's answer.
     Review {
         body: serde_json::Value,
+    },
+    /// 2.10: the other side's card.
+    Introduced {
+        card: crate::net::user::Card,
+    },
+    /// 2.10: the user's card and signing key (protobuf, base64) for a node being linked.
+    Linked {
+        card: crate::net::user::Card,
+        keypair: String,
     },
 }
 

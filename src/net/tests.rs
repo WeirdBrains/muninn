@@ -5,6 +5,7 @@ use super::client;
 use super::identity;
 use super::node::{Node, NodeConfig};
 use super::service::Service;
+use super::user;
 use crate::crypto::Key32;
 use crate::live::Found;
 use crate::store::{EntryFormat, ExchangeStatus, SearchSpec, SearchTarget, ShareKind, Store};
@@ -648,4 +649,97 @@ fn a_new_node_using_a_known_name_is_flagged() {
     // names still mean the pinned node
     let (p, _) = auto::resolve(&a.store, "ben", &[]).unwrap();
     assert_eq!(p.to_string(), b.peer_id());
+}
+
+// ---------- users and connections (2.10) ----------
+
+#[test]
+fn connected_nodes_learn_each_others_users_as_untrusted_connections() {
+    let a = Peer::new("anna");
+    let b = Peer::new("ben");
+    assert_eq!(a.connect(&b).status, LinkStatus::Pending);
+    wait(|| Some(auto::requests(&b.store).unwrap()).filter(|r| !r.is_empty()));
+    auto::accept(&b.store, Some(b.node()), &b.kp, "anna", &b.label, vec![], "cli").unwrap();
+    wait(|| auto::node_link(&a.store, &b.peer_id()).unwrap().filter(|x| x.status.active()));
+    // the next settle introduces (quietly)
+    assert!(auto::settle(&a.store, a.node(), &[], "cli").is_empty());
+    let ua = user::my_card(&a.store).unwrap();
+    let ub = user::my_card(&b.store).unwrap();
+    let ca = wait(|| a.store.connection(&ub.id).unwrap());
+    assert!(!ca.trusted);
+    let cb = wait(|| b.store.connection(&ua.id).unwrap());
+    assert!(!cb.trusted);
+    assert_eq!(user::user_of_peer(&a.store, &b.peer_id()).unwrap().unwrap().id, ub.id);
+    assert!(a.store.actions().unwrap().iter().any(|x| x.kind == "connection.add"));
+    // not again until the card changes
+    assert!(a.store.setting(&auto::intro_key(&ca_exchange(&a, &b))).unwrap().is_some_and(|v| !v.starts_with("retry")));
+    // trust is recorded
+    assert!(!user::trusted_peer(&a.store, &b.peer_id()).unwrap());
+    let (_, changed) = user::set_trust(&a.store, &ub.id, true, "cli").unwrap();
+    assert!(changed);
+    assert!(user::trusted_peer(&a.store, &b.peer_id()).unwrap());
+    assert!(!user::set_trust(&a.store, &ub.id, true, "cli").unwrap().1);
+    assert!(a.store.actions().unwrap().iter().any(|x| x.kind == "connection.trust"));
+    user::remove_connection(&a.store, &ub.id, "cli").unwrap();
+    assert!(a.store.connection(&ub.id).unwrap().is_none());
+}
+
+fn ca_exchange(a: &Peer, b: &Peer) -> String {
+    auto::node_link(&a.store, &b.peer_id()).unwrap().unwrap().id
+}
+
+#[test]
+fn a_node_links_to_my_user_after_approval_and_can_be_revoked() {
+    let a = Peer::new("laptop");
+    let b = Peer::new("ben");
+    let c = Peer::new("phone");
+    // a and ben know each other
+    assert_eq!(a.connect(&b).status, LinkStatus::Pending);
+    wait(|| Some(auto::requests(&b.store).unwrap()).filter(|r| !r.is_empty()));
+    auto::accept(&b.store, Some(b.node()), &b.kp, "laptop", &b.label, vec![], "cli").unwrap();
+    wait(|| auto::node_link(&a.store, &b.peer_id()).unwrap().filter(|x| x.status.active()));
+    auto::settle(&a.store, a.node(), &[], "cli");
+    let me = user::my_card(&a.store).unwrap();
+    wait(|| b.store.connection(&me.id).unwrap());
+
+    // the phone asks to link; the laptop's owner has to approve
+    let l = auto::link_to(&c.store, c.node(), &c.kp, &a.addr(), "phone", vec![], &[], "cli").unwrap();
+    assert_eq!(l.status, LinkStatus::Pending, "{}", l.detail);
+    let reqs = wait(|| Some(auto::requests(&a.store).unwrap()).filter(|r| !r.is_empty()));
+    assert_eq!(auto::purpose(&reqs[0]), "link node");
+    assert_ne!(user::my_card(&c.store).unwrap().id, me.id);
+    auto::accept(&a.store, Some(a.node()), &a.kp, "phone", &a.label, vec![], "cli").unwrap();
+    wait(|| auto::kind_link(&c.store, &a.peer_id(), "link").unwrap().filter(|x| x.status.active()));
+    let lines = auto::settle(&c.store, c.node(), &[], "cli");
+    assert!(lines.iter().any(|l| l.starts_with("linked")), "{lines:?}");
+    let cu = c.store.self_user().unwrap().unwrap();
+    assert_eq!(cu.id, me.id);
+    assert!(c.store.self_user_keypair().unwrap().is_some());
+    assert!(a.store.user_nodes(&me.id).unwrap().iter().any(|n| n.peer_id == c.peer_id() && n.active()));
+    // the laptop's card changed: ben hears of the phone with the next settle
+    auto::settle(&a.store, a.node(), &[], "cli");
+    wait(|| b.store.user_of_node(&c.peer_id()).unwrap());
+
+    // revoke the phone from the laptop: ben learns it, and the phone's card is refused
+    user::revoke_node(&a.store, &c.peer_id(), "cli").unwrap();
+    assert!(user::revoke_node(&a.store, &a.peer_id(), "cli").is_err(), "not the node you are on");
+    auto::settle(&a.store, a.node(), &[], "cli");
+    wait(|| b.store.user_of_node(&c.peer_id()).unwrap().is_none().then_some(()));
+    let card = user::my_card(&c.store).unwrap();
+    assert!(user::take_card(&b.store, &c.peer_id(), &card, "cli").is_err());
+}
+
+#[test]
+fn cards_need_a_certificate_for_the_sending_node() {
+    let a = Peer::new("anna");
+    let b = Peer::new("ben");
+    let card = user::my_card(&a.store).unwrap();
+    // claimed by another node
+    assert!(user::take_card(&b.store, "12D3KooWnotanna", &card, "cli").is_err());
+    // the real sender
+    assert!(matches!(user::take_card(&b.store, &a.peer_id(), &card, "cli").unwrap(), user::Met::Connection { new: true, .. }));
+    // a key that is not the user's
+    let mut bad = card.clone();
+    bad.key = user::my_card(&b.store).unwrap().key;
+    assert!(user::take_card(&b.store, &a.peer_id(), &bad, "cli").is_err());
 }

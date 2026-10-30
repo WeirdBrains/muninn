@@ -18,7 +18,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 8 | [Organizations](#organizations) | v2.7.0 | ✅ Released |
 | 9 | [Reviews](#reviews) | v2.8.0 | ✅ Released |
 | 10 | [Automatic Key Exchanges](#automatic-key-exchanges): network on by default, hosting autostart, invite links, TUI dark shards | v2.9.0 | ✅ Released |
-| 11 | [Users and Connections](#users-and-connections): user identities, linked nodes, user-owned orgs, connections with trust, unified invites | v2.10.0 | 📋 Planned |
+| 11 | [Users and Connections](#users-and-connections): user identities, linked nodes, user-owned orgs, connections with trust, unified invites | v2.10.0 | 🚧 In progress |
 | 12 | [Linked-Node Sync](#linked-node-sync): all of a user's data on all of their nodes | v2.11.0 | 📋 Planned |
 | 13 | [Private Sites and Code Access](#private-sites-and-code-access): gated sites for private orgs, code-space role permissions | v2.12.0 | 📋 Planned |
 | 14 | [Review Copies](#review-copies): what is reviewed lives on the reviewer's node in review mode | v2.13.0 | 📋 Planned |
@@ -260,7 +260,7 @@ Key exchanges happen between nodes by themselves. The user connects, applies, in
 
 ## Users and Connections
 
-> **Phase 11 · v2.10.0 · 📋 Planned**
+> **Phase 11 · v2.10.0 · 🚧 In progress**
 
 People, not machines, own their work. A user identity ties a person's nodes together, so a phone or a second computer can see and manage everything the user can.
 
