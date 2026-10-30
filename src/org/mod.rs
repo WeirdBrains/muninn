@@ -9,6 +9,7 @@
 //! owner; a member reaching the node over the network or the web acts with their role; a
 //! guest (no identity) only reaches what is public, or what an open org lets anyone do.
 //! Every change is recorded in the action history. See `docs/organizations.md`.
+pub mod host;
 pub mod net;
 pub mod serve;
 

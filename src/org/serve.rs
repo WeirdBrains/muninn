@@ -409,6 +409,9 @@ fn live(s: &Store, org: &Org, method: &str, rest: &[&str], body: &[u8], exchange
             Ok(Page::json(&json!({ "endpoints": v })))
         }
         ("POST", ["api", "call", endpoint]) => {
+            if s.find_endpoint(&org.id, endpoint).is_err() {
+                return Ok(Page::not_found());
+            }
             let input: Value =
                 if body.is_empty() { json!({}) } else { serde_json::from_slice(body).map_err(|e| Error::invalid("input", e.to_string()))? };
             match super::call(s, "web", &a, org, endpoint, &input) {

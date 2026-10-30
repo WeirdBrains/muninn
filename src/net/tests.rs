@@ -443,4 +443,9 @@ fn an_admin_on_another_node_manages_members_remotely() {
     assert!(onet::request(&b.store, b.node(), &jb, onet::OrgReq::Manage { op: kick }, &[]).is_err());
     let snap = onet::request(&b.store, b.node(), &jb, onet::OrgReq::Snapshot, &[]).unwrap();
     assert_eq!(snap["org"]["slug"], "lab");
+    // an admin may mirror the public site; the copy is served here, read-only
+    onet::mirror(&b.store, b.node(), &jb, &[], "cli").unwrap();
+    assert!(matches!(crate::org::serve::site(&b.store, "lab").unwrap(), Some(crate::org::serve::Site::Mirror(_))));
+    assert_eq!(crate::org::serve::route(&b.store, "GET", "/o/lab/", b"", None).status, 200);
+    assert_eq!(crate::org::serve::route(&b.store, "POST", "/o/lab/api/call/x", b"{}", None).status, 405);
 }

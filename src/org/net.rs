@@ -679,3 +679,26 @@ pub fn leave(s: &Store, node: Option<&Node>, j: &Joined, relays: &[String], orig
     record(s, origin, "org.leave", format!("left {}", j.name), json!({ "org": j.org_id, "told": told.is_ok() }));
     Ok(j)
 }
+
+/// Copy a joined org's public site to this node, to serve it with `mnnn org host start`
+/// (needs the `host` permission). Run it again to refresh the copy.
+pub fn mirror(s: &Store, node: &Node, j: &Joined, relays: &[String], origin: &str) -> Result<crate::store::Mirror> {
+    let body = request(s, node, j, OrgReq::Snapshot, relays)?;
+    let snap: super::serve::Snapshot = serde_json::from_value(body).map_err(|e| Error::Other(format!("peer: bad snapshot: {e}")))?;
+    let m = crate::store::Mirror {
+        org_id: j.org_id.clone(),
+        slug: snap.org.slug.clone(),
+        node_peer: j.node_peer.clone(),
+        snapshot: serde_json::to_vec(&snap)?,
+        fetched_at: now_ms(),
+    };
+    s.save_mirror(&m)?;
+    record(
+        s,
+        origin,
+        "org.mirror",
+        format!("mirrored {} ({} artifacts)", j.name, snap.artifacts.len()),
+        json!({ "org": j.org_id, "slug": m.slug, "artifacts": snap.artifacts.len() }),
+    );
+    Ok(m)
+}

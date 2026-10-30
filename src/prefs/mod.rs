@@ -100,6 +100,73 @@ pub struct Preferences {
     /// The network node (`mnnn net config`, Network ▸ Settings).
     #[serde(default)]
     pub net: NetPrefs,
+    /// Organization web hosting (`mnnn org host`, `[hosting]`).
+    #[serde(default)]
+    pub hosting: HostingPrefs,
+}
+
+/// Organization web hosting. Nothing is served until `mnnn org host start`, and then only
+/// on this machine (`127.0.0.1`) unless `bind` says otherwise.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HostingPrefs {
+    /// Address to listen on (`0.0.0.0` or `::` to serve other machines).
+    pub bind: String,
+    /// HTTPS port (HTML, JSON and gRPC share it).
+    pub port: u16,
+    /// Extra names for the self-signed certificate (`localhost` and `bind` are always in it).
+    pub names: Vec<String>,
+    /// How long a self-signed certificate lasts, in days (a new one is made at each start).
+    pub cert_days: u32,
+    /// Let's Encrypt (or another ACME CA), off until enabled with a domain and an email.
+    pub acme: AcmePrefs,
+}
+
+impl Default for HostingPrefs {
+    fn default() -> Self {
+        HostingPrefs { bind: "127.0.0.1".into(), port: 8443, names: vec![], cert_days: 7, acme: AcmePrefs::default() }
+    }
+}
+
+/// ACME certificates (Let's Encrypt short-lived certificates by default).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AcmePrefs {
+    pub enabled: bool,
+    /// The public name the certificate is for (it must point at this machine).
+    pub domain: String,
+    /// Contact address given to the CA.
+    pub email: String,
+    /// `letsencrypt`, `letsencrypt-staging` or a directory URL.
+    pub directory: String,
+    /// Certificate profile (`shortlived`: about six days; empty: the CA's default).
+    pub profile: String,
+    /// Port the HTTP-01 challenge is answered on (the CA always asks port 80; forward it here).
+    pub http_port: u16,
+}
+
+impl Default for AcmePrefs {
+    fn default() -> Self {
+        AcmePrefs {
+            enabled: false,
+            domain: String::new(),
+            email: String::new(),
+            directory: "letsencrypt".into(),
+            profile: "shortlived".into(),
+            http_port: 80,
+        }
+    }
+}
+
+impl AcmePrefs {
+    /// The ACME directory URL.
+    pub fn directory_url(&self) -> String {
+        match self.directory.as_str() {
+            "" | "letsencrypt" => "https://acme-v02.api.letsencrypt.org/directory".into(),
+            "letsencrypt-staging" => "https://acme-staging-v02.api.letsencrypt.org/directory".into(),
+            u => u.to_string(),
+        }
+    }
 }
 
 /// Network node settings. Nothing starts or is shared until you say so.

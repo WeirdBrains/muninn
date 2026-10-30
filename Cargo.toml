@@ -74,10 +74,28 @@ libloading = "0.8"
 # Decentralized network (2.6): libp2p over TCP and QUIC with Noise + Yamux, mDNS, Kademlia,
 # identify, ping, relay + DCUtR, AutoNAT and request-response; QUIC brings rustls with aws-lc-rs.
 libp2p = { version = "0.57", default-features = false, features = ["tokio", "tcp", "quic", "dns", "noise", "yamux", "mdns", "kad", "identify", "ping", "relay", "dcutr", "autonat", "request-response", "cbor", "macros", "ed25519"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util"] }
 futures = "0.3"
 x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
+# Organization hosting (2.7): HTTPS (HTML, JSON and unary gRPC) with hyper and rustls,
+# self-signed certificates with rcgen, Let's Encrypt (ACME) with instant-acme.
+hyper = { version = "1", features = ["server", "http1", "http2"] }
+hyper-util = { version = "0.1", features = ["tokio", "server", "server-auto"] }
+http-body-util = "0.1"
+bytes = "1"
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12", "logging"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["aws_lc_rs", "tls12", "logging"] }
+rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs", "pem", "x509-parser"] }
+time = "0.3"
+instant-acme = "0.8"
+prost = { version = "0.14", features = ["derive"] }
+hmac = "0.12"
+x509-parser = "0.18"
 
+
+[dev-dependencies]
+# A gRPC (HTTP/2) client for the hosting tests.
+hyper = { version = "1", features = ["client", "http2"] }
 
 # Crypto (scrypt/argon2), SQLCipher and Polars are very slow unoptimized; optimize deps in dev/test.
 [profile.dev.package."*"]
