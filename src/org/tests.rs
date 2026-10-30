@@ -229,3 +229,20 @@ fn code_permissions_are_levels_and_old_roles_keep_their_reach() {
     open.access = Access::Open;
     assert!(!can(&s, &open, &Actor::Guest, "code.edit") && !can(&s, &open, &Actor::Guest, "code.manage"), "guests never edit code");
 }
+
+#[test]
+fn each_node_chooses_the_code_it_serves() {
+    let s = Store::open_in_memory().unwrap();
+    let (o, ben) = org_with_member(&s, "user");
+    let c = s.create_code_space("calc", "", crate::store::Lang::Math, "x = close", Default::default()).unwrap();
+    add_endpoint(&s, "cli", &Actor::Owner, &o, "calc", EndpointKind::Code, "calc", None, false).unwrap();
+    assert_eq!(served_code(&s, &o).unwrap().len(), 1, "exposing code serves it here");
+    let user = actor_for(&s, &ben).unwrap();
+    assert!(unserve_code(&s, "cli", &user, &o, "calc").is_err(), "serving needs code.manage");
+    unserve_code(&s, "cli", &Actor::Owner, &o, "calc").unwrap();
+    let err = call(&s, "cli", &Actor::Owner, &o, "calc", &serde_json::json!({})).unwrap_err().to_string();
+    assert!(err.contains("does not serve"), "{err}");
+    assert!(unserve_code(&s, "cli", &Actor::Owner, &o, "calc").is_err());
+    serve_code(&s, "cli", &Actor::Owner, &o, &c.id).unwrap();
+    assert_eq!(s.served_code(&o.id).unwrap(), vec![c.id]);
+}

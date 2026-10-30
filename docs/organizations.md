@@ -122,6 +122,10 @@ Requests to an org run rules or code, gated by roles:
 - `--perm` is the permission a caller needs (`call` by default); `--anyone` lets guests
   call it on public or open orgs.
 - `mnnn org call ORG ENDPOINT [--input JSON|-]` calls one, here or on a joined org's node.
+- Each node chooses which of the org's code spaces it runs: `mnnn org code list ORG`,
+  `mnnn org code serve ORG SPACE` and `mnnn org code stop ORG SPACE` (need `code.manage`).
+  Adding a code endpoint serves its space on that node; a code endpoint whose space the node
+  does not serve refuses calls there. Code endpoints from before 2.13 stay served.
 
 ## Templates and the site
 

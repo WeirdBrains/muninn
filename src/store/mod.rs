@@ -146,6 +146,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     users::MIGRATION_ORGS,
     // 2.11: linked-node sync
     sync::MIGRATION,
+    // 2.13: per-node served code
+    orgs::MIGRATION_2_13,
 ];
 
 /// A new random id (32 hex characters).
@@ -817,7 +819,7 @@ mod tests {
 
     #[test]
     fn a_2_2_database_migrates_and_gains_rules() {
-        let upto = MIGRATIONS.len() - 4;
+        let upto = MIGRATIONS.len() - 5;
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join("v22.database");
         let key = [3u8; 32];
@@ -854,7 +856,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 4).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 5).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
             s.upsert_bars(&src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0)]).unwrap();
             let spec = RuleSpec { on: vec!["*".into()], then: vec![Then::Status { text: "x".into() }], ..Default::default() };
@@ -883,7 +885,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 3).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 4).unwrap();
             s.create_model("trades", "", Design { fields: vec![Field::new("note", FieldType::Text)], ..Default::default() }, true).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -906,7 +908,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 3).unwrap();
             s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -932,7 +934,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 3).unwrap();
             s.set_node_identity(b"kp", "12D3KooWx").unwrap();
             s.create_project("p", "").unwrap();
         }
@@ -958,7 +960,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
             s.insert_org("Lab", None, "", "12D3KooWx").unwrap();
             let j = s.create_journal("Lab book", None, EntryFormat::Markdown).unwrap();
             s.add_entry(&j.id, "Day 1", "teh result", None).unwrap();
@@ -986,5 +988,25 @@ mod tests {
         s.upsert_bars(&src, &sym, Duration(60), &bars).unwrap();
         let f = BarFilter { from: Some(60_000), to: Some(180_000), ..Default::default() };
         assert_eq!(s.query_bars(&f).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn a_2_12_database_keeps_serving_its_code_endpoints() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v212.database");
+        let key = [7u8; 32];
+        let (org, code) = {
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store::wrap(conn);
+            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            let o = s.insert_org("Lab", None, "", "12D3KooWx").unwrap();
+            let c = s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
+            s.save_endpoint(&o.id, "calc", EndpointKind::Code, &c.id, "call", false).unwrap();
+            (o.id, c.id)
+        };
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        assert_eq!(s.served_code(&org).unwrap(), vec![code]);
     }
 }

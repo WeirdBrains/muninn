@@ -601,6 +601,10 @@ pub fn add_endpoint(
         _ => "call",
     }))?;
     let e = s.save_endpoint(&org.id, name, kind, &ref_id, &perm, anyone)?;
+    if kind == EndpointKind::Code {
+        // exposing code here means this node runs it
+        s.serve_code(&org.id, &ref_id)?;
+    }
     record(
         s,
         origin,
@@ -715,6 +719,9 @@ pub fn call(s: &Store, origin: &str, a: &Actor, org: &Org, endpoint: &str, input
         EndpointKind::Code => {
             may_call(s, org, a, &e, "code.run")?;
             let space = s.code_space(&e.ref_id)?.ok_or_else(|| Error::invalid("endpoint", "its code space is gone"))?;
+            if !s.serves_code(&org.id, &space.id)? {
+                return Err(Error::invalid("endpoint", format!("this node does not serve code space {} for {}", space.name, org.name)));
+            }
             if !crate::code::approved(&space) {
                 return Err(Error::invalid(
                     "endpoint",
@@ -734,6 +741,46 @@ pub fn call(s: &Store, origin: &str, a: &Actor, org: &Org, endpoint: &str, input
         }
     };
     Ok(out)
+}
+
+// ---------- code this node serves ----------
+
+/// The code spaces this node runs for an org (its own per-node choice).
+pub fn served_code(s: &Store, org: &Org) -> Result<Vec<crate::store::CodeSpace>> {
+    Ok(s.served_code(&org.id)?.into_iter().filter_map(|id| s.code_space(&id).ok().flatten()).collect())
+}
+
+/// Run a code space for an org on this node (needs `code.manage`).
+pub fn serve_code(s: &Store, origin: &str, a: &Actor, org: &Org, code: &str) -> Result<crate::store::CodeSpace> {
+    require(s, org, a, "code.manage")?;
+    let c = s.find_code_space(code)?;
+    if s.serve_code(&org.id, &c.id)? {
+        record(
+            s,
+            origin,
+            "org.code.serve",
+            format!("{} serves code space {} for {}", a.who(), c.name, org.name),
+            serde_json::json!({ "org": org.id, "code": c.id }),
+        );
+    }
+    Ok(c)
+}
+
+/// Stop running a code space for an org on this node (its endpoints then refuse calls).
+pub fn unserve_code(s: &Store, origin: &str, a: &Actor, org: &Org, code: &str) -> Result<crate::store::CodeSpace> {
+    require(s, org, a, "code.manage")?;
+    let c = s.find_code_space(code)?;
+    if !s.unserve_code(&org.id, &c.id)? {
+        return Err(Error::invalid("code", format!("{} is not served for {}", c.name, org.name)));
+    }
+    record(
+        s,
+        origin,
+        "org.code.unserve",
+        format!("{} stopped serving code space {} for {}", a.who(), c.name, org.name),
+        serde_json::json!({ "org": org.id, "code": c.id }),
+    );
+    Ok(c)
 }
 
 // ---------- templates ----------

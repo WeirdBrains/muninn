@@ -1,8 +1,8 @@
 //! `mnnn org`: organizations. Thin over [`crate::org`].
 use super::net::{Net, kind, read_token, sanitize};
 use super::{
-    Ctx, OrgCertCommand, OrgCommand, OrgEndpointCommand, OrgHostCommand, OrgMemberCommand, OrgProjectCommand, OrgResourceCommand, OrgRoleCommand,
-    OrgTemplateCommand,
+    Ctx, OrgCertCommand, OrgCodeCommand, OrgCommand, OrgEndpointCommand, OrgHostCommand, OrgMemberCommand, OrgProjectCommand, OrgResourceCommand,
+    OrgRoleCommand, OrgTemplateCommand,
 };
 use crate::ingest::time::fmt_ts;
 use crate::net::client;
@@ -196,6 +196,7 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
         OrgCommand::Unpublish { org: key, resource } => publish(ctx, &key, &resource, Published::No),
         OrgCommand::Project(c) => project(ctx, c),
         OrgCommand::Endpoint(c) => endpoint(ctx, c),
+        OrgCommand::Code(c) => served(ctx, c),
         OrgCommand::Call { org: key, endpoint, input } => {
             let input: Value = serde_json::from_str(&read_arg(&input)?).context("--input is not JSON")?;
             let n = Net::open(ctx)?;
@@ -741,6 +742,39 @@ fn endpoint(ctx: &Ctx, cmd: OrgEndpointCommand) -> anyhow::Result<()> {
             let o = mine(s, &key)?;
             let e = org::remove_endpoint(s, ORIGIN, &OWNER, &o, &name)?;
             ctx.io.info(format!("removed endpoint {}", e.name));
+            Ok(())
+        }
+    }
+}
+
+fn served(ctx: &Ctx, cmd: OrgCodeCommand) -> anyhow::Result<()> {
+    let n = Net::open(ctx)?;
+    let s = &n.store;
+    match cmd {
+        OrgCodeCommand::List { org: key, json } => {
+            let o = mine(s, &key)?;
+            let cs = org::served_code(s, &o)?;
+            if json {
+                return pretty(&cs.iter().map(|c| serde_json::json!({ "id": c.id, "name": c.name, "lang": c.lang })).collect::<Vec<_>>());
+            }
+            if cs.is_empty() {
+                ctx.io.info(format!("this node serves no code for {}", o.name));
+            }
+            for c in &cs {
+                println!("{}\t{}\t{}", c.short_id(), c.name, c.lang.as_str());
+            }
+            Ok(())
+        }
+        OrgCodeCommand::Serve { org: key, space } => {
+            let o = mine(s, &key)?;
+            let c = org::serve_code(s, ORIGIN, &OWNER, &o, &space)?;
+            ctx.io.info(format!("this node serves {} for {}", c.name, o.name));
+            Ok(())
+        }
+        OrgCodeCommand::Stop { org: key, space } => {
+            let o = mine(s, &key)?;
+            let c = org::unserve_code(s, ORIGIN, &OWNER, &o, &space)?;
+            ctx.io.info(format!("this node no longer serves {} for {}", c.name, o.name));
             Ok(())
         }
     }

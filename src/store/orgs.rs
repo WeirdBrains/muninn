@@ -6,6 +6,18 @@ use crate::error::{Error, Result};
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
+/// 2.13: the code spaces this node runs for each org (code endpoints served so far stay served).
+pub const MIGRATION_2_13: &str = r#"
+CREATE TABLE org_served_code (
+    org_id TEXT NOT NULL,
+    code_id TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (org_id, code_id)
+);
+INSERT OR IGNORE INTO org_served_code(org_id, code_id, added_at)
+    SELECT org_id, ref_id, created_at FROM org_endpoints WHERE kind = 'code';
+"#;
+
 pub const MIGRATION: &str = r#"
 CREATE TABLE orgs (
     id TEXT PRIMARY KEY,
@@ -1232,6 +1244,29 @@ impl Store {
 
     pub fn remove_org_node(&self, org: &str, peer: &str) -> Result<bool> {
         Ok(self.conn.execute("DELETE FROM org_nodes WHERE org_id = ?1 AND peer_id = ?2", [org, peer])? == 1)
+    }
+
+    // ---------- code this node serves ----------
+
+    /// The ids of the code spaces this node runs for an org.
+    pub fn served_code(&self, org: &str) -> Result<Vec<String>> {
+        let mut st = self.conn.prepare("SELECT code_id FROM org_served_code WHERE org_id = ?1 ORDER BY added_at")?;
+        let v = st.query_map([org], |r| r.get(0))?.collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(v)
+    }
+
+    pub fn serves_code(&self, org: &str, code: &str) -> Result<bool> {
+        Ok(self.conn.query_row("SELECT COUNT(*) FROM org_served_code WHERE org_id = ?1 AND code_id = ?2", [org, code], |r| r.get::<_, i64>(0))? > 0)
+    }
+
+    /// Serve a code space for an org (false when it already was).
+    pub fn serve_code(&self, org: &str, code: &str) -> Result<bool> {
+        Ok(self.conn.execute("INSERT OR IGNORE INTO org_served_code(org_id, code_id, added_at) VALUES (?1, ?2, ?3)", params![org, code, now_ms()])?
+            == 1)
+    }
+
+    pub fn unserve_code(&self, org: &str, code: &str) -> Result<bool> {
+        Ok(self.conn.execute("DELETE FROM org_served_code WHERE org_id = ?1 AND code_id = ?2", [org, code])? == 1)
     }
 
     // ---------- joined (orgs on other nodes) ----------

@@ -2691,6 +2691,9 @@ pub enum OrgCommand {
     /// Rules, code spaces and models that answer requests.
     #[command(subcommand)]
     Endpoint(OrgEndpointCommand),
+    /// The org's code spaces this node runs (each node chooses its own).
+    #[command(subcommand)]
+    Code(OrgCodeCommand),
     /// Call an endpoint (of your org, or of a joined org through its node).
     Call {
         org: String,
@@ -2932,6 +2935,20 @@ pub enum OrgEndpointCommand {
         org: String,
         name: String,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgCodeCommand {
+    /// The code spaces this node serves for the org.
+    List {
+        org: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Serve a code space for the org on this node.
+    Serve { org: String, space: String },
+    /// Stop serving it here (its endpoints then refuse calls on this node).
+    Stop { org: String, space: String },
 }
 
 #[derive(Debug, Subcommand)]
