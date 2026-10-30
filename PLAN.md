@@ -217,7 +217,7 @@ Organizations allow us to compartmentalize our work. They act as a publishing ho
     - Short-term certificates will be generated per node from Let's Encrypt
     - Members, if configured that way, can gain access using their shared key to authorize them
     - Organizations can select which artifacts they want published
-    - Each organization node … *(to be completed)*
+    - Each organization node can define and execute code from code spaces
     - The end result is gRPC, JSON, HTML, and shared assets servable
 12. Organizations can design templates to change the look and feel of their public web hosting
     - All assets used for the template will be stored with the templates and made accessible via hosting
@@ -292,6 +292,7 @@ Private organizations can still have a front door.
 1. A private org can host a public, gated site: a landing and sign-in page for guests, everything else for signed-in members only
 2. Private orgs stay invisible to guests otherwise, and invite users through links that start the key exchange
 3. Roles include access to the org's published code spaces (view source, run, edit or manage), enforced on every node and endpoint
+4. Each org node defines which of the org's code spaces it executes as part of hosting (per-node config), served through hosting, endpoints and gRPC, gated by those code-space permissions
 
 ## Review Copies
 
