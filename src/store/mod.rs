@@ -11,6 +11,7 @@ pub mod history;
 pub mod journals;
 pub mod models;
 pub mod net;
+pub mod orgs;
 pub mod projects;
 mod query;
 pub mod records;
@@ -24,6 +25,10 @@ pub use history::{ActionRecord, Move, NewAction, TreeRow};
 pub use journals::{Annotation, AnnotationKind, Attachment, Entry, EntryFormat, Journal, JournalDoc, Span};
 pub use models::{ApplyOpts, Design, Field, FieldOp, FieldType, Model, ModelVersion, Plan, Step};
 pub use net::{Entrusted, Exchange, ExchangeStatus, Held, NetPeer, NewExchange, Share, ShareKind};
+pub use orgs::{
+    Access, Endpoint, EndpointKind, Joined, Member, MemberStatus, Mirror, NewRole, Org, OrgChange, OrgNode, ProjectMember, Published, Resource,
+    ResourceState, Role, Template, TemplateAsset, Visibility,
+};
 pub use projects::{ItemKind, Project, ProjectItem, SeriesRef};
 pub use query::{BarSort, BarSummary};
 pub use records::{Group, Record, RecordQuery};
@@ -122,6 +127,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     code::MIGRATION,
     // 2.6: decentralized network
     net::MIGRATION,
+    // 2.7: organizations
+    orgs::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
@@ -828,7 +835,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 3).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 4).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
             s.upsert_bars(&src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0)]).unwrap();
             let spec = RuleSpec { on: vec!["*".into()], then: vec![Then::Status { text: "x".into() }], ..Default::default() };
@@ -857,7 +864,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 3).unwrap();
             s.create_model("trades", "", Design { fields: vec![Field::new("note", FieldType::Text)], ..Default::default() }, true).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -880,7 +887,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
             s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -894,6 +901,32 @@ mod tests {
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.node_identity().unwrap().unwrap().1, "12D3KooWx");
         assert_eq!(s.shares().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_2_6_database_migrates_and_gains_organizations() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v26.database");
+        let key = [7u8; 32];
+        {
+            // a v2.6 database: everything up to the network
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store::wrap(conn);
+            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.set_node_identity(b"kp", "12D3KooWx").unwrap();
+            s.create_project("p", "").unwrap();
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        assert_eq!(s.node_identity().unwrap().unwrap().1, "12D3KooWx");
+        assert!(s.orgs().unwrap().is_empty() && s.joined().unwrap().is_empty() && s.mirrors().unwrap().is_empty());
+        let o = s.insert_org("Lab", None, "", "12D3KooWx").unwrap();
+        let p = s.find_project("p").unwrap();
+        assert!(s.add_org_project(&o.id, &p.id).unwrap());
+        drop(s);
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.org_projects(&o.id).unwrap().len(), 1);
     }
 
     #[test]
