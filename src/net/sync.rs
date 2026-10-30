@@ -94,8 +94,8 @@ fn aad(peer: &str) -> Vec<u8> {
 
 /// Is this peer one of my user's nodes (certified and not revoked)?
 pub fn is_mine(s: &Store, peer: &str) -> bool {
-    let (Ok(Some(me)), Ok(Some(u))) = (s.self_user(), super::user::user_of_peer(s, peer)) else { return false };
-    me.id == u.id
+    let Ok(Some(me)) = s.self_user() else { return false };
+    s.user_nodes(&me.id).is_ok_and(|ns| ns.iter().any(|n| n.peer_id == peer && n.active()))
 }
 
 /// Answer a sync request from `from`.

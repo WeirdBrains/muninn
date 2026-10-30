@@ -184,7 +184,11 @@ impl Store {
         )?;
         if let Some(old) = self.setting(SELF_USER)?.filter(|o| o != id) {
             self.conn.execute("UPDATE users SET keypair = NULL WHERE id = ?1", [&old])?;
+            // the old identity no longer has nodes (its certificate for this one is void)
+            self.conn.execute("DELETE FROM user_nodes WHERE user_id = ?1", [&old])?;
         }
+        // you are not your own connection
+        self.conn.execute("DELETE FROM connections WHERE user_id = ?1", [id])?;
         self.set_setting(SELF_USER, Some(id))?;
         self.user(id)?.ok_or_else(|| Error::invalid("user", "not stored"))
     }
@@ -229,15 +233,15 @@ impl Store {
 
     /// The user a node acts for (its active certificate), if any.
     pub fn user_of_node(&self, peer_id: &str) -> Result<Option<UserNode>> {
-        Ok(self
-            .conn
-            .query_row(
-                "SELECT user_id, peer_id, label, cert, issued_at, revoked_at, revocation FROM user_nodes
-                 WHERE peer_id = ?1 AND revoked_at IS NULL ORDER BY issued_at DESC LIMIT 1",
-                [peer_id],
-                Self::row_user_node,
-            )
-            .optional()?)
+        let mut st = self.conn.prepare(
+            "SELECT user_id, peer_id, label, cert, issued_at, revoked_at, revocation FROM user_nodes
+             WHERE peer_id = ?1 AND revoked_at IS NULL ORDER BY issued_at DESC",
+        )?;
+        let all: Vec<UserNode> = st.query_map([peer_id], Self::row_user_node)?.collect::<rusqlite::Result<_>>()?;
+        // a node that linked to my user may still carry the user it had before (synced in)
+        let me = self.setting(SELF_USER)?;
+        let pos = all.iter().position(|n| Some(&n.user_id) == me.as_ref()).unwrap_or(0);
+        Ok(all.into_iter().nth(pos))
     }
 
     /// Record a (checked) certificate. A revoked node stays revoked.
@@ -285,8 +289,9 @@ impl Store {
     }
 
     pub fn connections(&self) -> Result<Vec<Connection>> {
-        let mut st = self.conn.prepare("SELECT user_id, trusted, created_at, updated_at FROM connections ORDER BY created_at")?;
-        Ok(st.query_map([], Self::row_connection)?.collect::<rusqlite::Result<Vec<_>>>()?)
+        let me = self.setting(SELF_USER)?.unwrap_or_default();
+        let mut st = self.conn.prepare("SELECT user_id, trusted, created_at, updated_at FROM connections WHERE user_id <> ?1 ORDER BY created_at")?;
+        Ok(st.query_map([me], Self::row_connection)?.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
     pub fn connection(&self, user_id: &str) -> Result<Option<Connection>> {

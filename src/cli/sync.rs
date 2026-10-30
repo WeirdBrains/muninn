@@ -14,7 +14,7 @@ fn short(p: &str) -> &str {
 }
 
 fn name(n: &crate::store::users::UserNode) -> String {
-    if n.label.is_empty() { short(&n.peer_id).to_string() } else { format!("{} ({})", n.label, short(&n.peer_id)) }
+    if n.label.is_empty() || n.label == "this node" { short(&n.peer_id).to_string() } else { format!("{} ({})", n.label, short(&n.peer_id)) }
 }
 
 fn pick(n: &Net, key: Option<&str>) -> anyhow::Result<Vec<(crate::store::users::UserNode, crate::store::Exchange)>> {

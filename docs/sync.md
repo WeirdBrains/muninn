@@ -17,7 +17,8 @@ nodes about once a minute; `mnnn sync now` does it right away.
 
 Journals and entries, models and their records, projects, live searches, reports, code
 spaces, rules, orgs, reviews, revisions, authors, assets, users and connections, and
-history. Each node keeps its own copy of:
+history. Your other nodes' history is added to each node's own (it does not move the
+history position, so `mnnn history back` still steps through what was done here). Each node keeps its own copy of:
 
 - secrets: your user key, the node's identity, key exchanges, shards and passwords;
 - settings and `preferences.toml`;

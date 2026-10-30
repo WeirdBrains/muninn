@@ -50,6 +50,12 @@ CREATE TABLE sync_conflicts (
     resolved_at INTEGER,
     resolution TEXT
 );
+CREATE TABLE sync_imported (
+    peer TEXT NOT NULL,
+    remote_id INTEGER NOT NULL,
+    local_id INTEGER NOT NULL,
+    PRIMARY KEY (peer, remote_id)
+);
 "#;
 
 /// Synced tables and their node-local columns (never sent, never overwritten).
@@ -212,6 +218,16 @@ fn json_value(v: &serde_json::Value) -> Value {
 pub fn row_hash(row: &Row) -> String {
     let b = serde_json::to_vec(row).unwrap_or_default();
     hex::encode(&Sha256::digest(&b)[..16])
+}
+
+/// The same row but for its times and blanks (one side empty, the other set).
+fn alike(a: &Row, b: &Row) -> bool {
+    let skip = |k: &str| matches!(k, "created_at" | "updated_at" | "_created_at" | "_updated_at");
+    let blank = |v: Option<&serde_json::Value>| v.is_none_or(|v| v.is_null() || v.as_str() == Some(""));
+    a.keys().chain(b.keys()).filter(|k| !skip(k)).all(|k| {
+        let (x, y) = (a.get(k), b.get(k));
+        x == y || blank(x) || blank(y)
+    })
 }
 
 /// When a row was last changed, for picking the newer one in a conflict.
@@ -474,6 +490,58 @@ impl Store {
         Ok(())
     }
 
+    /// Add (or update) an action of `peer` to this node's history under a local id.
+    fn import_action(&self, peer: &str, c: &Change) -> Result<bool> {
+        let Some(row) = c.row.as_ref() else { return Ok(false) };
+        let Some(rid) = c.pk.get(0).and_then(|v| v.as_i64()) else { return Ok(false) };
+        let local = |id: i64| -> Result<Option<i64>> {
+            Ok(self
+                .conn
+                .query_row("SELECT local_id FROM sync_imported WHERE peer = ?1 AND remote_id = ?2", params![peer, id], |r| r.get(0))
+                .optional()?)
+        };
+        let st = |k: &str| row.get(k).and_then(|v| v.as_str()).map(str::to_string);
+        let parent = match row.get("parent_id").and_then(|v| v.as_i64()) {
+            Some(p) => local(p)?,
+            None => None,
+        };
+        let vals = params![
+            parent,
+            st("kind").unwrap_or_default(),
+            st("summary").unwrap_or_default(),
+            st("params").unwrap_or_else(|| "{}".into()),
+            st("origin").unwrap_or_default(),
+            st("author_id"),
+            row.get("created_at").and_then(|v| v.as_i64()).unwrap_or(0),
+            st("state_before"),
+            st("state_after"),
+        ];
+        let known = local(rid)?;
+        let id = match known {
+            Some(id) => {
+                self.conn.execute(
+                    "UPDATE actions SET parent_id = ?1, kind = ?2, summary = ?3, params = ?4, origin = ?5, author_id = ?6, \
+                     created_at = ?7, state_before = ?8, state_after = ?9 WHERE id = ?10",
+                    rusqlite::params_from_iter(vals.iter().copied().chain(std::iter::once(&id as &dyn rusqlite::ToSql))),
+                )?;
+                id
+            }
+            None => {
+                self.conn.execute(
+                    "INSERT INTO actions(parent_id, kind, summary, params, origin, author_id, created_at, state_before, state_after) \
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    vals,
+                )?;
+                let id = self.conn.last_insert_rowid();
+                self.conn.execute("INSERT INTO sync_imported(peer, remote_id, local_id) VALUES (?1, ?2, ?3)", params![peer, rid, id])?;
+                id
+            }
+        };
+        // not this node's own: never sent on
+        self.conn.execute("DELETE FROM sync_log WHERE tbl = 'actions' AND pk = json_array(?1)", [id])?;
+        Ok(known.is_none())
+    }
+
     /// Write a row taken from a linked node; models also get their table.
     fn take(&self, t: &Target, c: &Change) -> Result<()> {
         if c.tbl != "models" {
@@ -528,6 +596,14 @@ impl Store {
             let mut order: Vec<&Change> = page.changes.iter().filter(|c| c.tbl == "models").collect();
             order.extend(page.changes.iter().filter(|c| c.tbl != "models"));
             for c in order {
+                // history is per node (local ids): another node's actions are added to it
+                if c.tbl == "actions" {
+                    let added = std::cell::Cell::new(false);
+                    if self.sp("sync_row", || self.import_action(peer, c).map(|n| added.set(n))).is_ok() && added.get() {
+                        out.history += 1;
+                    }
+                    continue;
+                }
                 let Some(t) = self.target(&c.tbl)? else { continue };
                 let pk = c.pk.to_string();
                 let mine = self.read_row(&t, &c.pk)?;
@@ -566,6 +642,16 @@ impl Store {
                     "keep" => {
                         out.kept += 1;
                         continue;
+                    }
+                    _ if base.is_none() && mine.as_ref().zip(c.row.as_ref()).is_some_and(|(a, b)| alike(a, b)) => {
+                        // made on both before they ever met, alike but for times and blanks: no conflict
+                        let (a, b) = (mine.as_ref().expect("mine"), c.row.as_ref().expect("theirs"));
+                        if row_time(b) > row_time(a) {
+                            self.sp("sync_row", || self.take(&t, c))?;
+                            out.taken += 1;
+                        } else {
+                            out.same += 1;
+                        }
                     }
                     _ => {
                         let theirs_wins = match (&mine, &c.row) {
@@ -795,5 +881,40 @@ mod tests {
         assert_eq!(kp, None);
         let p = a.sync_changes("B", 0, 1000, 1 << 20).unwrap();
         assert!(!serde_json::to_string(&p).unwrap().contains("keypair"));
+    }
+
+    #[test]
+    fn history_is_added_under_local_ids_and_not_sent_back() {
+        let a = Store::open_in_memory().unwrap();
+        let b = Store::open_in_memory().unwrap();
+        a.note_action(&crate::store::NewAction::new("test.a", "cli", "on a"));
+        b.note_action(&crate::store::NewAction::new("test.b", "cli", "on b"));
+        let r = pull(&a, &b, "A");
+        assert_eq!(r.conflicts, 0, "{r:?}");
+        let kinds = |s: &Store| -> Vec<String> {
+            let mut st = s.conn.prepare("SELECT kind FROM actions ORDER BY id").unwrap();
+            st.query_map([], |r| r.get(0)).unwrap().map(|k| k.unwrap()).collect()
+        };
+        assert_eq!(kinds(&b), vec!["test.b", "test.a"]);
+        let back = pull(&b, &a, "B");
+        assert_eq!(back.conflicts, 0, "{back:?}");
+        assert_eq!(kinds(&a), vec!["test.a", "test.b"]);
+        // nothing more travels, and again is the same
+        assert_eq!(pull(&a, &b, "A").history, 0);
+        assert_eq!(kinds(&b).len(), 2);
+    }
+
+    #[test]
+    fn rows_made_on_both_alike_but_for_times_are_no_conflict() {
+        let a = Store::open_in_memory().unwrap();
+        let b = Store::open_in_memory().unwrap();
+        a.conn
+            .execute("INSERT INTO users(id, label, public_key, author_id, created_at, updated_at) VALUES ('u1', 'ada', x'01', NULL, 1, 1)", [])
+            .unwrap();
+        b.conn
+            .execute("INSERT INTO users(id, label, public_key, author_id, created_at, updated_at) VALUES ('u1', 'ada', x'01', NULL, 2, 2)", [])
+            .unwrap();
+        let r = pull(&a, &b, "A");
+        assert_eq!(r.conflicts, 0, "{r:?}");
     }
 }
