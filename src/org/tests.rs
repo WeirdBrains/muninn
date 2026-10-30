@@ -210,3 +210,22 @@ fn the_site_serves_what_is_published_through_the_template() {
     assert_eq!(route(&m2, "POST", "/o/lab/api/call/signals", b"{}", None).status, 405);
     assert!(String::from_utf8(mget("/").body).unwrap().contains("(mirror)"));
 }
+
+#[test]
+fn code_permissions_are_levels_and_old_roles_keep_their_reach() {
+    let s = Store::open_in_memory().unwrap();
+    let (o, ben) = org_with_member(&s, "user");
+    let user = actor_for(&s, &ben).unwrap();
+    assert!(can(&s, &o, &user, "code.view") && can(&s, &o, &user, "code.run"));
+    assert!(!can(&s, &o, &user, "code.edit") && !can(&s, &o, &user, "code.manage"));
+    let editor = create_role(&s, "cli", &Actor::Owner, &o, "editor", 40, &["code.edit".into()]).unwrap();
+    assert!(role_has(&editor, "code.run") && role_has(&editor, "code.view") && !role_has(&editor, "code.manage"));
+    let old = create_role(&s, "cli", &Actor::Owner, &o, "old", 30, &["read".into(), "call".into()]).unwrap();
+    assert!(role_has(&old, "code.run") && !role_has(&old, "code.edit"), "roles from before code permissions still run code");
+    let viewer = s.find_role(&o.id, "viewer").unwrap();
+    assert!(role_has(&viewer, "code.view") && !role_has(&viewer, "code.run"));
+    assert!(role_has(&s.find_role(&o.id, "admin").unwrap(), "code.manage"));
+    let mut open = o.clone();
+    open.access = Access::Open;
+    assert!(!can(&s, &open, &Actor::Guest, "code.edit") && !can(&s, &open, &Actor::Guest, "code.manage"), "guests never edit code");
+}

@@ -39,6 +39,22 @@ pub const PERMS: &[(&str, &str)] = &[
     ("records.read", "query records through endpoints"),
     ("records.write", "create and change records through endpoints"),
     ("call", "call the org's endpoints (rules and code spaces)"),
+    ("code.view", "see the source of the org's code spaces"),
+    ("code.run", "run the org's code spaces (through endpoints and hosting)"),
+    ("code.edit", "change the source of the org's code spaces"),
+    ("code.manage", "approve, serve and remove the org's code spaces"),
+];
+
+/// A permission and the weaker ones it brings: each code level includes the ones below it,
+/// and roles made before code permissions existed keep what they could do (`read` sees
+/// sources, `call` runs them, `resources.manage` manages them).
+const IMPLIES: &[(&str, &[&str])] = &[
+    ("code.manage", &["code.edit", "code.run", "code.view"]),
+    ("code.edit", &["code.run", "code.view"]),
+    ("code.run", &["code.view"]),
+    ("resources.manage", &["code.manage", "code.edit", "code.run", "code.view"]),
+    ("call", &["code.run", "code.view"]),
+    ("read", &["code.view"]),
 ];
 
 /// Permissions guests never get, even in open orgs.
@@ -54,6 +70,8 @@ const MANAGING: &[&str] = &[
     "host",
     "projects.manage",
     "resources.manage",
+    "code.edit",
+    "code.manage",
 ];
 
 pub const OWNER: &str = "owner";
@@ -68,8 +86,8 @@ pub fn default_roles() -> Vec<(&'static str, i64, Vec<String>)> {
     vec![
         (OWNER, 100, vec!["*".into()]),
         (ADMIN, 80, all),
-        (USER, 50, s(&["members.list", "read", "records.read", "records.write", "call", "resources.transfer"])),
-        (VIEWER, 10, s(&["members.list", "read", "records.read"])),
+        (USER, 50, s(&["members.list", "read", "records.read", "records.write", "call", "resources.transfer", "code.view", "code.run"])),
+        (VIEWER, 10, s(&["members.list", "read", "records.read", "code.view"])),
     ]
 }
 
@@ -84,7 +102,7 @@ pub fn check_perm(p: &str) -> Result<String> {
 }
 
 pub fn role_has(r: &Role, perm: &str) -> bool {
-    r.perms.iter().any(|p| p == "*" || p == perm)
+    r.perms.iter().any(|p| p == "*" || p == perm || IMPLIES.iter().any(|(k, v)| k == p && v.contains(&perm)))
 }
 
 /// Who is acting.
@@ -480,6 +498,7 @@ pub fn visible(s: &Store, org: &Org, a: &Actor, r: &Resource) -> bool {
             Published::Public => org.visibility == Visibility::Public || org.access == Access::Open,
             Published::Members => org.access == Access::Open,
         },
+        _ if r.kind == ShareKind::Code => can(s, org, a, "read") && can(s, org, a, "code.view"),
         _ => can(s, org, a, "read"),
     }
 }
@@ -694,7 +713,7 @@ pub fn call(s: &Store, origin: &str, a: &Actor, org: &Org, endpoint: &str, input
             serde_json::json!({ "status": r.status, "messages": r.messages, "action": r.action })
         }
         EndpointKind::Code => {
-            may_call(s, org, a, &e, "call")?;
+            may_call(s, org, a, &e, "code.run")?;
             let space = s.code_space(&e.ref_id)?.ok_or_else(|| Error::invalid("endpoint", "its code space is gone"))?;
             if !crate::code::approved(&space) {
                 return Err(Error::invalid(

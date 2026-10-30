@@ -35,14 +35,20 @@ ranked below your own role (the owner is above everyone).
 |------|------|-------------|
 | owner | 100 | everything (`*`); cannot be changed or removed |
 | admin | 80 | every permission |
-| user | 50 | `members.list`, `read`, `records.read`, `records.write`, `call`, `resources.transfer` |
-| viewer | 10 | `members.list`, `read`, `records.read` |
+| user | 50 | `members.list`, `read`, `records.read`, `records.write`, `call`, `resources.transfer`, `code.view`, `code.run` |
+| viewer | 10 | `members.list`, `read`, `records.read`, `code.view` |
 
 Custom roles take any of these permissions (`mnnn org role perms` lists them):
 `org.edit`, `roles.manage`, `members.list`, `members.approve`, `members.invite`,
 `members.kick`, `members.role`, `members.defaults`, `publish`, `host`,
 `projects.manage`, `resources.transfer`, `resources.manage`, `read`, `records.read`,
-`records.write`, `call`.
+`records.write`, `call`, `code.view`, `code.run`, `code.edit`, `code.manage`.
+
+Code permissions are levels for the org's code spaces: `code.view` sees a source, `code.run`
+runs it (code endpoints need it besides the endpoint's own permission), `code.edit` changes
+it and `code.manage` approves, serves and removes it; each includes the ones before it.
+Roles made before 2.13 keep their reach: `read` brings `code.view`, `call` brings
+`code.run` and `resources.manage` brings `code.manage`. Guests never edit or manage code.
 
 | | CLI | TUI Roles page |
 |---|---|---|
