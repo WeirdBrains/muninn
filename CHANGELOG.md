@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-10-30
+
+### Added
+- Peers behind a relay stayed unreachable after connecting: each of the relay's addresses made its own circuit and the first failing one cancelled the rest; one circuit per relay is used now, the most reachable
+- Fe80 and Docker bridge addresses are never offered or announced, even inside relay circuits
+
 ## [2.12.0] - 2026-10-30
 
 ### Added
@@ -385,7 +391,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.12.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.12.1...HEAD
+[2.12.1]: https://github.com/kommandosaldat/muninn/compare/v2.12.0...v2.12.1
 [2.12.0]: https://github.com/kommandosaldat/muninn/compare/v2.11.2...v2.12.0
 [2.11.2]: https://github.com/kommandosaldat/muninn/compare/v2.11.1...v2.11.2
 [2.11.1]: https://github.com/kommandosaldat/muninn/compare/v2.11.0...v2.11.1
