@@ -838,7 +838,7 @@ impl Store {
     }
 
     /// Stored rows: (id, meta, values by field id) — what migrations work on.
-    fn raw_rows(&self, m: &Model) -> Result<Vec<RawRow>> {
+    pub(crate) fn raw_rows(&self, m: &Model) -> Result<Vec<RawRow>> {
         let t = m.table();
         if m.version == 0 || !self.table_exists(&t)? {
             return Ok(vec![]);
@@ -1086,6 +1086,8 @@ impl Store {
                 return Err(e);
             }
         }
+        // the new table logs its changes for linked nodes
+        self.sync_ensure()?;
         Ok((self.model_or_err(&m.id)?, plan))
     }
 

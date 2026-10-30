@@ -147,7 +147,7 @@ pub fn combine_shards(shards: &[String]) -> Result<Key32> {
 
 // ---------- HKDF ----------
 
-fn hkdf(master: &Key32, salt: &[u8], info: &str) -> Result<Key32> {
+pub(crate) fn hkdf(master: &Key32, salt: &[u8], info: &str) -> Result<Key32> {
     let hk = hkdf::Hkdf::<sha2::Sha256>::new(Some(salt), &master.0);
     let mut out = [0u8; 32];
     hk.expand(info.as_bytes(), &mut out).map_err(|e| Error::Crypto(e.to_string()))?;

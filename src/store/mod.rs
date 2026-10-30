@@ -20,6 +20,7 @@ pub mod reviews;
 pub mod rules;
 pub mod runs;
 pub mod searches;
+pub mod sync;
 pub mod users;
 pub use authors::{Author, AuthorChange};
 pub use code::{CodeChange, CodeInput, CodeSpace, Lang, RunInfo};
@@ -143,6 +144,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     users::MIGRATION,
     // 2.10: user-owned orgs
     users::MIGRATION_ORGS,
+    // 2.11: linked-node sync
+    sync::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
@@ -240,6 +243,7 @@ impl Store {
         }
         let mut s = Self::wrap(conn);
         s.migrate()?;
+        s.sync_ensure()?;
         Ok(s)
     }
 
@@ -255,6 +259,7 @@ impl Store {
     pub fn open_in_memory() -> Result<Self> {
         let mut s = Self::wrap(Connection::open_in_memory()?);
         s.migrate()?;
+        s.sync_ensure()?;
         Ok(s)
     }
 
