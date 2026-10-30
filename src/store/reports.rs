@@ -54,9 +54,11 @@ pub enum SectionKind {
     Authors,
     /// Output from a code space (Phase 6); a placeholder until then.
     Code,
+    /// Records of a designed model (`mnnn model`): its fields and a table.
+    Model,
 }
 
-pub const SECTION_KINDS: [SectionKind; 7] = [
+pub const SECTION_KINDS: [SectionKind; 8] = [
     SectionKind::Text,
     SectionKind::Records,
     SectionKind::Series,
@@ -64,6 +66,7 @@ pub const SECTION_KINDS: [SectionKind; 7] = [
     SectionKind::Project,
     SectionKind::Authors,
     SectionKind::Code,
+    SectionKind::Model,
 ];
 
 impl SectionKind {
@@ -76,6 +79,7 @@ impl SectionKind {
             SectionKind::Project => "project",
             SectionKind::Authors => "authors",
             SectionKind::Code => "code",
+            SectionKind::Model => "model",
         }
     }
     pub fn parse(s: &str) -> Option<Self> {
@@ -91,6 +95,7 @@ impl SectionKind {
             SectionKind::Project => "a project's contents",
             SectionKind::Authors => "who contributed",
             SectionKind::Code => "code-space output (coming with code spaces)",
+            SectionKind::Model => "records of a designed model",
         }
     }
 }
@@ -122,6 +127,12 @@ pub struct SectionParams {
     /// Code: the code space.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub space: Option<String>,
+    /// Model: the model (`rows` limits the records listed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Model: only records meeting these conditions.
+    #[serde(default, rename = "where", skip_serializing_if = "Vec::is_empty")]
+    pub conditions: Vec<super::Condition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -177,6 +188,7 @@ impl Section {
             SectionKind::Project => "Project".into(),
             SectionKind::Authors => "Authors".into(),
             SectionKind::Code => format!("Code space {}", self.params.space.clone().unwrap_or_default()).trim().to_string(),
+            SectionKind::Model => "Records".into(),
         }
     }
 }

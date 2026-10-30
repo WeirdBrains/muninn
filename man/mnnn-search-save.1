@@ -8,7 +8,7 @@ mnnn\-search\-save \- Save a search as a live search
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn search save\fR [\fB\-\-home\fR] [\fB\-\-query\fR] [\fB\-\-db\fR] [\fB\-\-journals\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-series\fR] [\fB\-\-source\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-symbol\fR] [\fB\-\-period\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-year\fR] [\fB\-\-from\fR] [\fB\-\-to\fR] [\fB\-\-price\fR] [\fB\-\-min\fR] [\fB\-\-max\fR] [\fB\-\-sort\fR] [\fB\-\-desc\fR] [\fB\-\-asc\fR] [\fB\-\-from\-view\fR] [\fB\-\-clear\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
+\fBmnnn search save\fR [\fB\-\-home\fR] [\fB\-\-query\fR] [\fB\-\-db\fR] [\fB\-\-journals\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-series\fR] [\fB\-\-records\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-model\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-where\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-source\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-symbol\fR] [\fB\-\-period\fR] [\fB\-\-year\fR] [\fB\-\-from\fR] [\fB\-\-to\fR] [\fB\-\-price\fR] [\fB\-\-min\fR] [\fB\-\-max\fR] [\fB\-\-sort\fR] [\fB\-\-desc\fR] [\fB\-\-asc\fR] [\fB\-\-from\-view\fR] [\fB\-\-clear\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -44,11 +44,14 @@ May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable
 \fB\-\-series\fR
 Search series (the default)
 .TP
-\fB\-\-source\fR \fI<NAME>\fR
-Only these sources. Repeatable
+\fB\-\-records\fR
+Search the records of designed models (every model but bars, or \-\-model)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR
+Only this model\*(Aqs records (implies \-\-records; `all` searches every model again)
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -56,17 +59,17 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-symbol\fR \fI<SYMBOL>\fR
-Only these symbols, e.g. BTC/USDT or btc\-usdt. Repeatable
-.TP
-\fB\-\-period\fR \fI<DURATION>\fR
-Only these bar periods, e.g. 5m, 1h. Repeatable
+\fB\-\-where\fR \fI<COND>\fR
+Records meeting a condition, FIELD OP VALUE (implies \-\-records). Repeatable
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
+.TP
+\fB\-\-source\fR \fI<NAME>\fR
+Only these sources. Repeatable
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -85,6 +88,12 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-symbol\fR \fI<SYMBOL>\fR
+Only these symbols, e.g. BTC/USDT or btc\-usdt. Repeatable
+.TP
+\fB\-\-period\fR \fI<DURATION>\fR
+Only these bar periods, e.g. 5m, 1h. Repeatable
 .TP
 \fB\-\-year\fR \fI<YEARS>\fR
 Only series covering these years. Repeatable

@@ -31,6 +31,9 @@ pub enum SearchTarget {
     Series,
     /// Journal entries (title and text; the time range applies to when they were written).
     Journals,
+    /// Records of designed models (`mnnn model`): text over their text fields, `where`
+    /// conditions on their fields, the time range on when they were created.
+    Records,
 }
 
 impl SearchTarget {
@@ -38,6 +41,7 @@ impl SearchTarget {
         match self {
             SearchTarget::Series => "series",
             SearchTarget::Journals => "journals",
+            SearchTarget::Records => "records",
         }
     }
 }
@@ -56,12 +60,21 @@ pub struct SearchSpec {
     pub sort: SortBy,
     #[serde(default)]
     pub desc: bool,
+    /// Records: the model (its id; `None`: every model but bars).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Records: conditions on fields (`price > 3`), all must hold.
+    #[serde(default, rename = "where", skip_serializing_if = "Vec::is_empty")]
+    pub conditions: Vec<super::Condition>,
 }
 
 impl SearchSpec {
     /// One line: `series "btc" · src:binance, 2024`.
     pub fn describe(&self) -> String {
         let mut parts = vec![self.target.label().to_string()];
+        if !self.conditions.is_empty() {
+            parts.push(self.conditions.iter().map(crate::rules::condition_text).collect::<Vec<_>>().join(", "));
+        }
         if !self.query.trim().is_empty() {
             parts.push(format!("\"{}\"", self.query.trim()));
         }

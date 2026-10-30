@@ -26,7 +26,7 @@ impl RAsk {
             RAsk::On => "On (action kinds: import, journal.*, *)",
             RAsk::If => "If (FIELD OP VALUE; …, empty: always)",
             RAsk::Then => "Then (status …; search …; export-report … to=…; entry …)",
-            RAsk::Home => "Lives in (project:NAME, journal:NAME, search:NAME or empty)",
+            RAsk::Home => "Lives in (project:NAME, journal:NAME, search:NAME, model:NAME or empty)",
         }
     }
     fn next(self) -> Option<RAsk> {
@@ -223,6 +223,7 @@ fn start(app: &mut App, edit: bool) {
             let home = match (r.owner_kind, &r.owner_id) {
                 (OwnerKind::Journal, Some(i)) => format!("journal:{}", s.journal(i).ok().flatten().map(|j| j.name).unwrap_or_default()),
                 (OwnerKind::LiveSearch, Some(i)) => format!("search:{}", s.live_search(i).ok().flatten().map(|l| l.name).unwrap_or_default()),
+                (OwnerKind::Model, Some(i)) => format!("model:{}", s.model(i).ok().flatten().map(|m| m.name).unwrap_or_default()),
                 _ => String::new(),
             };
             Draft {
@@ -256,7 +257,8 @@ fn home_of(app: &App, h: &str) -> crate::Result<Home> {
         Some(("project", n)) => Ok((None, Some(s.find_project(n)?))),
         Some(("journal", n)) => Ok((Some((OwnerKind::Journal, Some(s.find_journal(n)?.id))), None)),
         Some(("search", n)) => Ok((Some((OwnerKind::LiveSearch, Some(s.find_live_search(n)?.id))), None)),
-        _ => Err(crate::Error::invalid("lives in", format!("`{h}`: project:NAME, journal:NAME, search:NAME or empty"))),
+        Some(("model", n)) => Ok((Some((OwnerKind::Model, Some(s.find_model(n)?.id))), None)),
+        _ => Err(crate::Error::invalid("lives in", format!("`{h}`: project:NAME, journal:NAME, search:NAME, model:NAME or empty"))),
     }
 }
 

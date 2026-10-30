@@ -8,7 +8,7 @@ mnnn\-rule\-edit \- Change a rule: given \-\-on, \-\-if or \-\-then replace the 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn rule edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-on\fR] [\fB\-\-if\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-then\fR] [\fB\-\-clear\-if\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-journal\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-search\fR] [\fB\-\-standalone\fR] [\fB\-\-related\fR] [\fB\-\-unrelated\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIRULE\fR> 
+\fBmnnn rule edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-on\fR] [\fB\-\-if\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-then\fR] [\fB\-\-clear\-if\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-journal\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-search\fR] [\fB\-\-model\fR] [\fB\-\-standalone\fR] [\fB\-\-related\fR] [\fB\-\-unrelated\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIRULE\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -91,6 +91,9 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 .TP
 \fB\-\-search\fR \fI<SEARCH>\fR
 Move it into a live search
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR
+Move it into a model
 .TP
 \fB\-\-standalone\fR
 Take it out of its journal or live search (projects are kept)

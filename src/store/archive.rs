@@ -6,7 +6,9 @@
 //! the original), keeps authorship and times, and rewrites every reference inside the pack
 //! (attachments in entry text, project items, report sections) to the new ids.
 use super::journals::{Annotation, Attachment, Entry, Journal};
+use super::models::{ApplyOpts, BARS, Design, FieldType, Model, ModelVersion};
 use super::projects::{ItemKind, Project, ProjectItem, SeriesRef};
+use super::records::Record;
 use super::reports::{Report, Section, SectionKind};
 use super::rules::{ItemRef, OwnerKind, Rule, Then};
 use super::searches::{LiveSearch, SearchTarget};
@@ -84,6 +86,20 @@ pub struct ProjectPack {
     pub rules: Vec<Rule>,
     #[serde(default)]
     pub data: Vec<DataPack>,
+    /// Designed models the project uses, with their versions and records (2.4+).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<ModelPack>,
+}
+
+/// A model in a project pack. For the built-in bars model: only the fields added to it,
+/// and their values on the bars the pack carries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelPack {
+    pub model: Model,
+    #[serde(default)]
+    pub versions: Vec<ModelVersion>,
+    #[serde(default)]
+    pub records: Vec<Record>,
 }
 
 /// One journal on its own (`mnnn journal export --format json`).
@@ -109,6 +125,8 @@ pub struct Restored {
     pub reports: usize,
     /// Rules brought in (they arrive switched off).
     pub rules: usize,
+    pub models: usize,
+    pub records: usize,
     pub bars: u64,
     pub authors_added: usize,
 }
@@ -130,6 +148,10 @@ impl Restored {
             v.push(n(self.live_searches as u64, "live search", "live searches"));
             if self.rules > 0 {
                 v.push(n(self.rules as u64, "rule (off)", "rules (off)"));
+            }
+            if self.models > 0 {
+                v.push(n(self.models as u64, "model", "models"));
+                v.push(n(self.records as u64, "record", "records"));
             }
             v.push(n(self.bars, "new bar", "new bars"));
         }
@@ -350,7 +372,49 @@ impl Store {
                 rules.push(r);
             }
         }
+        // models it uses (items, report sections, live searches, rules), and what they refer to
+        let mut model_ids: Vec<String> = items.iter().filter(|i| i.kind == ItemKind::Model).map(|i| i.ref_id.clone()).collect();
+        model_ids.extend(reports.iter().flat_map(|r| r.sections.iter().filter_map(|s| s.params.model.clone())));
+        model_ids.extend(live_searches.iter().filter_map(|l| l.spec.model.clone()));
+        model_ids.extend(rules.iter().flat_map(|r| r.spec.then.iter().filter_map(|t| then_model(t).cloned())));
+        let mut models: Vec<Model> = vec![];
+        let mut seen_models = std::collections::BTreeSet::new();
+        while let Some(id) = model_ids.pop() {
+            if !seen_models.insert(id.clone()) {
+                continue;
+            }
+            let Some(m) = self.model(&id)? else { continue };
+            for f in m.design.fields.iter().chain(m.draft.iter().flat_map(|d| d.fields.iter())) {
+                if let FieldType::Ref(t) = &f.ty {
+                    model_ids.push(t.clone());
+                }
+            }
+            for r in self.owned_rules(OwnerKind::Model, &m.id)? {
+                if rule_ids.insert(r.id.clone()) {
+                    model_ids.extend(r.spec.then.iter().filter_map(|t| then_model(t).cloned()));
+                    rules.push(r);
+                }
+            }
+            models.push(m);
+        }
+        let mut model_packs = vec![];
+        for m in models {
+            if m.is_bars() {
+                if !m.design.fields.is_empty() {
+                    model_packs.push(ModelPack { model: m, versions: vec![], records: vec![] });
+                }
+                continue;
+            }
+            let versions = self.model_versions(&m.id)?;
+            let records = if m.version > 0 { self.records(&m, &Default::default())? } else { vec![] };
+            model_packs.push(ModelPack { model: m, versions, records });
+        }
         let mut ids: Vec<Option<String>> = vec![project.author_id.clone()];
+        for mp in &model_packs {
+            ids.push(mp.model.author_id.clone());
+            ids.extend(mp.versions.iter().map(|v| v.author_id.clone()));
+            ids.extend(mp.records.iter().map(|r| r.author_id.clone()));
+        }
         ids.extend(items.iter().map(|i| i.author_id.clone()));
         ids.extend(rules.iter().map(|r| r.author_id.clone()));
         ids.extend(live_searches.iter().map(|l| l.author_id.clone()));
@@ -375,12 +439,38 @@ impl Store {
             reports,
             rules,
             data: vec![],
+            models: model_packs,
         };
         if with_data {
             for r in data_refs(self, &pack)? {
                 let n = self.count_filtered(&r.filter())? as usize;
                 if n > 0 {
                     pack.data.push(DataPack { series: r, bars: n, file: None, rows: None });
+                }
+            }
+            // values of the fields added to bars, on the bars it carries
+            let data = pack.data.clone();
+            if let Some(mp) = pack.models.iter_mut().find(|m| m.model.is_bars())
+                && mp.model.version > 0
+            {
+                let names: Vec<String> = mp.model.design.fields.iter().map(|f| f.name.clone()).collect();
+                for d in &data {
+                    let s = &d.series;
+                    let c = |f: &str, op: super::Op, v: String| super::Condition { field: f.into(), op, value: v };
+                    let mut filter = vec![
+                        c("source", super::Op::Eq, s.source.clone()),
+                        c("base", super::Op::Eq, s.symbol.base.clone()),
+                        c("quote", super::Op::Eq, s.symbol.quote.clone()),
+                        c("period", super::Op::Eq, s.duration.to_string()),
+                    ];
+                    filter.extend(s.from.map(|f| c("timestamp", super::Op::Ge, f.to_string())));
+                    filter.extend(s.to.map(|t| c("timestamp", super::Op::Le, t.to_string())));
+                    for mut r in self.records(&mp.model, &super::RecordQuery { filter, ..Default::default() })? {
+                        r.values.retain(|k, v| names.contains(k) && !v.is_null());
+                        if !r.values.is_empty() {
+                            mp.records.push(r);
+                        }
+                    }
                 }
             }
         }
@@ -555,8 +645,17 @@ impl Store {
         )?;
         let mut ids: HashMap<String, String> = HashMap::new();
         ids.insert(p.project.id.clone(), np.id.clone());
+        // models get their new ids first: searches, sections, rules and other models name them
+        for mp in &p.models {
+            if !mp.model.is_bars() {
+                ids.insert(mp.model.id.clone(), super::new_id());
+            }
+        }
         for s in &p.live_searches {
             let nid = super::new_id();
+            let mut s = s.clone();
+            s.spec.model = s.spec.model.as_ref().map(|m| ids.get(m).cloned().unwrap_or_else(|| m.clone()));
+            let s = &s;
             self.conn.execute(
                 "INSERT INTO live_searches(id, name, spec, forked_from, author_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![nid, s.name, serde_json::to_string(&s.spec)?, s.forked_from, s.author_id, s.created_at, s.updated_at],
@@ -589,6 +688,7 @@ impl Store {
                 ns.params.journal = map(&s.params.journal);
                 ns.params.search = map(&s.params.search);
                 ns.params.project = map(&s.params.project);
+                ns.params.model = map(&s.params.model);
                 ns.params.entries = s.params.entries.iter().map(|e| ids.get(e).cloned().unwrap_or_else(|| e.clone())).collect();
                 self.insert_section(&ns)?;
             }
@@ -617,6 +717,11 @@ impl Store {
             ids.insert(r.id.clone(), nr.id);
             out.rules += 1;
         }
+        for mp in p.models.iter().filter(|m| !m.model.is_bars()) {
+            let n = self.restore_model(mp, &ids)?;
+            out.models += 1;
+            out.records += n;
+        }
         for it in &p.items {
             let ref_id = match it.kind {
                 ItemKind::Result => it.ref_id.clone(),
@@ -639,8 +744,122 @@ impl Store {
             let c = self.upsert_bars(&src, &d.series.symbol, d.series.duration, &bars)?;
             out.bars += c.inserted;
         }
+        if let Some(mp) = p.models.iter().find(|m| m.model.is_bars()) {
+            out.records += self.merge_bars_model(mp, &ids)?;
+        }
         out.project = Some(np);
         Ok(out)
+    }
+}
+
+impl Store {
+    /// A model from a pack, under its new id (a name in use gets `_imported`).
+    fn restore_model(&self, mp: &ModelPack, ids: &HashMap<String, String>) -> Result<usize> {
+        let mut m = mp.model.clone();
+        m.id = ids.get(&m.id).cloned().unwrap_or_else(super::new_id);
+        m.builtin = false;
+        let names: Vec<String> = self.models()?.into_iter().map(|x| x.name).collect();
+        if names.contains(&m.name) {
+            let base = format!("{}_imported", m.name);
+            m.name = base.clone();
+            let mut i = 2;
+            while names.contains(&m.name) {
+                m.name = format!("{base}{i}");
+                i += 1;
+            }
+        }
+        m.design = remap_design(&m.design, ids);
+        m.draft = m.draft.as_ref().map(|d| remap_design(d, ids));
+        self.insert_model(&m)?;
+        for v in &mp.versions {
+            let mut nv = v.clone();
+            nv.model_id = m.id.clone();
+            nv.design = remap_design(&v.design, ids);
+            nv.rule_id = v.rule_id.as_ref().and_then(|r| ids.get(r).cloned());
+            self.insert_model_version(&nv)?;
+        }
+        if m.version == 0 {
+            return Ok(0);
+        }
+        self.rebuild(&m, &m.design.clone(), m.version, &[])?;
+        let records: Vec<Record> = mp
+            .records
+            .iter()
+            .map(|r| {
+                // record ids are kept, so references between records still hold
+                let mut r = r.clone();
+                r.values.retain(|k, _| m.design.field(k).is_some());
+                r
+            })
+            .collect();
+        self.insert_raw_records(&m, &records)
+    }
+
+    /// Fields added to bars in the pack join this store's bars (as optional fields); their
+    /// values land on the bars both stores have.
+    fn merge_bars_model(&self, mp: &ModelPack, ids: &HashMap<String, String>) -> Result<usize> {
+        let Some(local) = self.model(BARS)? else { return Ok(0) };
+        let theirs = remap_design(&mp.model.design, ids);
+        let add: Vec<_> = theirs
+            .fields
+            .iter()
+            .filter(|f| local.pending().field(&f.name).is_none() && local.design.field(&f.name).is_none())
+            .map(|f| {
+                let mut f = f.clone();
+                f.id = super::models::new_field_id();
+                f.required = false;
+                f
+            })
+            .collect();
+        if !add.is_empty() {
+            let mut d = local.design.clone();
+            d.fields.extend(add.iter().cloned());
+            self.apply_design(&local, &d, &ApplyOpts { destructive: false, note: "import".into() })?;
+            if let Some(mut dr) = local.draft.clone() {
+                dr.fields.extend(add);
+                self.set_model_draft(BARS, Some(dr))?;
+            }
+        }
+        let local = self.model(BARS)?.ok_or_else(|| Error::invalid("model", "bars is missing"))?;
+        let mut n = 0;
+        for r in &mp.records {
+            if !self.record_exists(BARS, &r.id)? {
+                continue;
+            }
+            let vals: serde_json::Map<String, serde_json::Value> =
+                r.values.iter().filter(|(k, _)| local.design.field(k).is_some()).map(|(k, v)| (k.clone(), v.clone())).collect();
+            if !vals.is_empty() {
+                self.update_record(&local, &r.id, &vals)?;
+                n += 1;
+            }
+        }
+        Ok(n)
+    }
+}
+
+fn remap_design(d: &Design, ids: &HashMap<String, String>) -> Design {
+    let mut d = d.clone();
+    for f in &mut d.fields {
+        if let FieldType::Ref(t) = &mut f.ty
+            && let Some(n) = ids.get(t.as_str())
+        {
+            *t = n.clone();
+        }
+    }
+    d
+}
+
+/// The model a then-action names, if any.
+fn then_model(t: &Then) -> Option<&String> {
+    match t {
+        Then::ModelEdit { model, .. }
+        | Then::ModelApply { model, .. }
+        | Then::ModelRemove { model, .. }
+        | Then::RecordCreate { model, .. }
+        | Then::RecordUpdate { model, .. }
+        | Then::RecordDelete { model, .. } => model.as_ref(),
+        Then::AddToProject { item: ItemRef::Model(m), .. } => Some(m),
+        _ => None,
     }
 }
 
@@ -660,9 +879,16 @@ fn remap_then(t: &mut Then, map: &dyn Fn(&str) -> String) {
             opt(project);
             match item {
                 ItemRef::Subject => {}
-                ItemRef::LiveSearch(i) | ItemRef::Journal(i) | ItemRef::Report(i) => *i = map(i),
+                ItemRef::LiveSearch(i) | ItemRef::Journal(i) | ItemRef::Report(i) | ItemRef::Model(i) => *i = map(i),
             }
         }
+        Then::ModelCreate { .. } => {}
+        Then::ModelEdit { model, .. }
+        | Then::ModelApply { model, .. }
+        | Then::ModelRemove { model, .. }
+        | Then::RecordCreate { model, .. }
+        | Then::RecordUpdate { model, .. }
+        | Then::RecordDelete { model, .. } => opt(model),
     }
 }
 

@@ -89,6 +89,10 @@ pub enum Command {
     /// their own, in a journal, a live search or projects.
     #[command(subcommand, alias = "rules", after_long_help = RULE_NOTES)]
     Rule(RuleCommand),
+    /// Models: record tables you design (typed fields, references, constraints), changed by
+    /// versioned migrations you preview, apply and roll back; and their records.
+    #[command(subcommand, alias = "models", after_long_help = MODEL_NOTES)]
+    Model(ModelCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -638,11 +642,20 @@ pub struct SpecArgs {
     #[arg(long)]
     pub query: Option<String>,
     /// Search journal entries (title and text) instead of series.
-    #[arg(long, conflicts_with = "series")]
+    #[arg(long, conflicts_with_all = ["series", "records"])]
     pub journals: bool,
     /// Search series (the default).
-    #[arg(long)]
+    #[arg(long, conflicts_with = "records")]
     pub series: bool,
+    /// Search the records of designed models (every model but bars, or --model).
+    #[arg(long)]
+    pub records: bool,
+    /// Only this model's records (implies --records; `all` searches every model again).
+    #[arg(long)]
+    pub model: Option<String>,
+    /// Records meeting a condition, FIELD OP VALUE (implies --records). Repeatable.
+    #[arg(long = "where", value_name = "COND")]
+    pub conditions: Vec<String>,
     /// Only these sources. Repeatable.
     #[arg(long = "source", value_name = "NAME")]
     pub sources: Vec<String>,
@@ -780,7 +793,7 @@ pub enum ProjectCommand {
     Remove { project: String },
     /// Add a live search, a journal, a report, a rule or a result (a series, optionally a
     /// time range) to a project.
-    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "rule", "result"])))]
+    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "rule", "model", "result"])))]
     Add {
         project: String,
         /// Live search id or name.
@@ -795,6 +808,9 @@ pub enum ProjectCommand {
         /// Report id or name.
         #[arg(long)]
         report: Option<String>,
+        /// Model id or name.
+        #[arg(long)]
+        model: Option<String>,
         /// A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m.
         #[arg(long, value_name = "SERIES")]
         result: Option<String>,
@@ -838,7 +854,7 @@ pub enum ProjectCommand {
 
 /// What a new report section shows (choose one).
 #[derive(Debug, Clone, Args)]
-#[command(group(ArgGroup::new("kind").required(true).args(["text", "file", "records", "series", "journal", "project", "authors", "code"])))]
+#[command(group(ArgGroup::new("kind").required(true).args(["text", "file", "records", "series", "journal", "project", "authors", "code", "model"])))]
 pub struct SectionArgs {
     pub report: String,
     /// Section title (default: one from what it shows).
@@ -858,9 +874,15 @@ pub struct SectionArgs {
     /// Records time range end.
     #[arg(long, value_name = "TIME", requires = "records")]
     pub to: Option<String>,
-    /// Bars listed (the latest; 0: all). Default 20.
-    #[arg(long, requires = "records")]
+    /// Bars (the latest) or model records listed (0: all). Default 20.
+    #[arg(long)]
     pub rows: Option<usize>,
+    /// Records of a designed model (`mnnn model list`), with its fields.
+    #[arg(long, value_name = "MODEL")]
+    pub model: Option<String>,
+    /// Only --model records meeting a condition (`price > 3`). Repeatable.
+    #[arg(long = "where", value_name = "COND", requires = "model")]
+    pub conditions: Vec<String>,
     /// A table of series: what a live search matches now (id or name), or every series.
     #[arg(long, value_name = "SEARCH", num_args = 0..=1, default_missing_value = "")]
     pub series: Option<String>,
@@ -898,7 +920,14 @@ Then-actions (--then, run in order):
   add-to-project [PROJECT] [item=subject|search:S|journal:J|report:R]
   entry [JOURNAL] \"TEXT\" [title=T]          write a journal entry
   note [JOURNAL] \"TEXT\"                     add a note to a journal
-Left out, a target is the rule's own journal, live search or project. Texts and paths
+  model-create NAME fields=\"a:text; b:real\" [about=T] [draft=yes]
+  model-edit [MODEL] add=SPEC change=SPEC drop=F rename=A:B move=F:N [apply=yes] [destructive=yes]
+  model-apply [MODEL] [destructive=yes]     apply a model's draft
+  model-remove [MODEL] [destructive=yes]
+  record-create [MODEL] FIELD=VALUE…        add a record (values take {FIELD})
+  record-update [MODEL] id=ID|where=\"F OP V\" FIELD=VALUE…
+  record-delete [MODEL] id=ID|where=\"F OP V\"
+Left out, a target is the rule's own journal, live search, model or project. Texts and paths
 take {kind} {summary} {origin} {author} {action} {rule} {date} {time} {now} and {FIELD}.
 
 Examples:
@@ -936,8 +965,11 @@ pub enum RuleCommand {
         #[arg(long, conflicts_with = "search")]
         journal: Option<String>,
         /// Let it live in a live search (its default search).
-        #[arg(long)]
+        #[arg(long, conflicts_with = "model")]
         search: Option<String>,
+        /// Let it live in a model (its default model for record-… and model-… actions).
+        #[arg(long)]
+        model: Option<String>,
         /// Only react to actions about where it lives.
         #[arg(long)]
         related: bool,
@@ -963,8 +995,11 @@ pub enum RuleCommand {
         #[arg(long, conflicts_with_all = ["search", "standalone"])]
         journal: Option<String>,
         /// Move it into a live search.
-        #[arg(long, conflicts_with = "standalone")]
+        #[arg(long, conflicts_with_all = ["standalone", "model"])]
         search: Option<String>,
+        /// Move it into a model.
+        #[arg(long, conflicts_with = "standalone")]
+        model: Option<String>,
         /// Take it out of its journal or live search (projects are kept).
         #[arg(long)]
         standalone: bool,
@@ -987,6 +1022,9 @@ pub enum RuleCommand {
         /// Only the rules living in this live search.
         #[arg(long)]
         search: Option<String>,
+        /// Only the rules living in this model.
+        #[arg(long)]
+        model: Option<String>,
         #[arg(long)]
         json: bool,
     },
@@ -1032,6 +1070,7 @@ pub enum RuleCommand {
 }
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)]
 pub enum ReportCommand {
     /// List reports.
     List {
@@ -1614,4 +1653,197 @@ mod tests {
         }
         assert!(parse(&["ingest", "service", "http", "--url", "http://x", "-X", "POST", "--body", "{}"]).is_ok());
     }
+}
+
+pub const MODEL_NOTES: &str = "\
+Fields are NAME:TYPE with constraints: text, int, real, bool, timestamp, json, or ref:MODEL
+(a record of another model). A trailing ! means required. Constraints: required, unique,
+index, default=V, choices=a|b, about=\"…\"; to take one away: optional, -unique, -index,
+-default, -choices, -about.
+
+Changes go to a draft; `plan` shows the migration (+ add, - drop, ~ change), `apply` makes
+it the next version, `history` lists versions and `rollback` applies an old design as a new
+version. Steps that lose values ask first (-y says yes). The built-in bars model takes new
+fields (never required); its own fields stay as they are.
+
+Examples:
+  mnnn model create signals --fields \"symbol:text!; price:real!; side:text choices=buy|sell\"
+  mnnn model edit signals --add \"note:text\" --change \"price:real default=0\" --apply
+  mnnn model plan signals
+  mnnn model rollback signals 1
+  mnnn model record create signals symbol=BTC/USDT price=42000 side=buy
+  mnnn model record list signals --where \"price > 40000\" --sort -price
+  mnnn model record list signals --group side --agg avg:price
+  mnnn model record update signals --where \"side = buy\" note=checked";
+
+#[derive(Debug, Subcommand)]
+pub enum ModelCommand {
+    /// List models (the built-in bars model too).
+    #[command(alias = "ls")]
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// List the field types.
+    Types,
+    /// Create a model (applied as v1 unless --draft).
+    #[command(alias = "new")]
+    Create {
+        name: String,
+        /// Field specs, `;`-separated or repeated: NAME:TYPE [required] [unique] [default=V]…
+        #[arg(long = "fields", short = 'f', value_name = "SPECS")]
+        fields: Vec<String>,
+        #[arg(long, default_value = "")]
+        description: String,
+        /// Keep it as a draft (no table yet; `mnnn model apply` makes it v1).
+        #[arg(long)]
+        draft: bool,
+        /// Add it to a project.
+        #[arg(long)]
+        project: Option<String>,
+    },
+    /// Change a model's draft (renames, then changes, drops, adds and moves), its name or
+    /// description. --apply applies the draft right away.
+    Edit {
+        model: String,
+        /// Add a field: NAME:TYPE [constraints]. Repeatable.
+        #[arg(long, value_name = "SPEC")]
+        add: Vec<String>,
+        /// Change a field: NAME[:TYPE] [constraints] (what is not given stays). Repeatable.
+        #[arg(long, value_name = "SPEC")]
+        change: Vec<String>,
+        /// Drop a field. Repeatable.
+        #[arg(long, value_name = "FIELD")]
+        drop: Vec<String>,
+        /// Rename a field, OLD:NEW (values are kept). Repeatable.
+        #[arg(long, value_name = "OLD:NEW")]
+        rename: Vec<String>,
+        /// Move a field, FIELD:POSITION (1 is first). Repeatable.
+        #[arg(long = "move", value_name = "FIELD:N")]
+        moves: Vec<String>,
+        /// Rename the model (right away; not versioned).
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        /// Apply the draft afterwards.
+        #[arg(long)]
+        apply: bool,
+    },
+    /// Show a model: fields, draft, records and rules.
+    Show {
+        model: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show what applying the draft would do.
+    Plan {
+        model: String,
+        /// Print the draft as a model-edit then-action.
+        #[arg(long)]
+        then: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Apply the draft as the next version (a migration). -y allows losing values.
+    Apply {
+        model: String,
+        /// Only show the plan.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Throw the draft away.
+    Discard { model: String },
+    /// List the applied versions.
+    History {
+        model: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Apply the design of an earlier version as the next version.
+    Rollback {
+        model: String,
+        /// The version to go back to (2 or v2).
+        version: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Remove a model and its records (rules living in it become standalone, off).
+    #[command(alias = "rm")]
+    Remove { model: String },
+    /// Records of a model: create, update, list, show, delete.
+    #[command(subcommand, alias = "rec", alias = "records")]
+    Record(RecordCommand),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum RecordCommand {
+    /// Add a record: FIELD=VALUE… (defaults fill the rest).
+    #[command(alias = "add", alias = "new")]
+    Create {
+        model: String,
+        #[arg(value_name = "FIELD=VALUE")]
+        values: Vec<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Change one record (--id) or every record matching --where: FIELD=VALUE… (empty
+    /// value clears a field).
+    Update {
+        model: String,
+        #[arg(long, required_unless_present = "conditions")]
+        id: Option<String>,
+        /// FIELD OP VALUE (repeatable, all must hold).
+        #[arg(long = "where", value_name = "COND", conflicts_with = "id")]
+        conditions: Vec<String>,
+        #[arg(value_name = "FIELD=VALUE", required = true)]
+        values: Vec<String>,
+        /// Only count what would change.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// List records: filter, find text, sort, group and page.
+    #[command(alias = "ls")]
+    List {
+        model: String,
+        /// FIELD OP VALUE (repeatable; ops = != ~ !~ > >= < <=, ? present, !? missing).
+        #[arg(long = "where", value_name = "COND")]
+        conditions: Vec<String>,
+        /// Text found in any field.
+        #[arg(long)]
+        text: Option<String>,
+        /// FIELD, -FIELD or FIELD:desc (comma-separated or repeated).
+        #[arg(long, allow_hyphen_values = true)]
+        sort: Vec<String>,
+        /// Group by these fields (comma-separated or repeated).
+        #[arg(long)]
+        group: Vec<String>,
+        /// With --group: sum:F, avg:F, min:F or max:F (repeatable).
+        #[arg(long)]
+        agg: Vec<String>,
+        /// At most this many (bars: 50 unless given; 0 = all).
+        #[arg(long)]
+        limit: Option<usize>,
+        #[arg(long, default_value_t = 0)]
+        offset: usize,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show one record (id or id prefix).
+    Show {
+        model: String,
+        id: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Delete records by id, or every record matching --where (asks first).
+    #[command(alias = "rm")]
+    Delete {
+        model: String,
+        ids: Vec<String>,
+        #[arg(long = "where", value_name = "COND")]
+        conditions: Vec<String>,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }

@@ -160,6 +160,7 @@ fn open_item(app: &mut App) {
         ItemKind::Journal => super::journals::open_journal(app, &it.ref_id),
         ItemKind::Report => super::reports::open_report(app, &it.ref_id),
         ItemKind::RuleSet => super::rules::open_rule(app, &it.ref_id),
+        ItemKind::Model => super::models::open_model(app, &it.ref_id),
     }
 }
 
@@ -420,6 +421,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                     ItemKind::Journal => "✎",
                     ItemKind::RuleSet => "§",
                     ItemKind::Report => "▦",
+                    ItemKind::Model => "◇",
                 };
                 v.rows.push(Line::from(vec![
                     Span::styled(format!(" {icon} {name} "), row_style(&t, i == st.isel)),

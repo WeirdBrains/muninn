@@ -40,7 +40,14 @@ impl SearchesState {
 /// The search the sidebar shows now: its text, filters and sort.
 pub fn current_spec(app: &App) -> SearchSpec {
     let p = &app.prefs.tui.sidebar;
-    SearchSpec { target: SearchTarget::Series, query: app.sidebar.query.trim().to_string(), filters: p.filters.clone(), sort: p.sort, desc: p.desc }
+    SearchSpec {
+        target: SearchTarget::Series,
+        query: app.sidebar.query.trim().to_string(),
+        filters: p.filters.clone(),
+        sort: p.sort,
+        desc: p.desc,
+        ..Default::default()
+    }
 }
 
 fn params(s: &LiveSearch) -> serde_json::Value {
@@ -100,6 +107,7 @@ pub fn apply(app: &mut App, s: &LiveSearch) {
             app.set_status(format!("live search {}: {n} series ({})", s.name, s.spec.describe()));
         }
         SearchTarget::Journals => super::journals::open_found(app, s),
+        SearchTarget::Records => super::models::open_found(app, s),
     }
 }
 
@@ -267,7 +275,14 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         v.rows.push(Line::from(vec![
             Span::styled(format!(" {:<w$}{fork} ", s.name), row_style(&t, on)),
             Span::styled(
-                format!(" {n:>5} {} ", if s.spec.target == SearchTarget::Journals { "entries" } else { "series " }),
+                format!(
+                    " {n:>5} {} ",
+                    match s.spec.target {
+                        SearchTarget::Journals => "entries",
+                        SearchTarget::Records => "records",
+                        SearchTarget::Series => "series ",
+                    }
+                ),
                 Style::new().fg(t.accent),
             ),
             Span::styled(format!(" {}", s.spec.describe()), Style::new().fg(t.muted)),

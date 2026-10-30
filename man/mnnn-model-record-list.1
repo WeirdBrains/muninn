@@ -1,0 +1,105 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-model-record-list 1  "mnnn-model-record-list 2.3.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-model\-record\-list \- List records: filter, find text, sort, group and page
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn model record list\fR [\fB\-\-home\fR] [\fB\-\-where\fR] [\fB\-\-db\fR] [\fB\-\-text\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-sort\fR] [\fB\-\-group\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-agg\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-limit\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-offset\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIMODEL\fR> 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+List records: filter, find text, sort, group and page
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-where\fR \fI<COND>\fR
+FIELD OP VALUE (repeatable; ops = != ~ !~ > >= < <=, ? present, !? missing)
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-text\fR \fI<TEXT>\fR
+Text found in any field
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-sort\fR \fI<SORT>\fR
+FIELD, \-FIELD or FIELD:desc (comma\-separated or repeated)
+.TP
+\fB\-\-group\fR \fI<GROUP>\fR
+Group by these fields (comma\-separated or repeated)
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-agg\fR \fI<AGG>\fR
+With \-\-group: sum:F, avg:F, min:F or max:F (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-limit\fR \fI<LIMIT>\fR
+At most this many (bars: 50 unless given; 0 = all)
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-offset\fR \fI<OFFSET>\fR [default: 0]
+
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-json\fR
+
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fIMODEL\fR>
+
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.3.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

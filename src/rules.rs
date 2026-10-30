@@ -13,7 +13,7 @@
 use crate::error::{Error, Result};
 use crate::export::files::{OutFormat, Target};
 use crate::store::Store;
-use crate::store::{ActionRecord, Condition, ItemKind, ItemRef, NewAction, Op, OwnerKind, Rule, Then};
+use crate::store::{ActionRecord, ApplyOpts, Condition, FieldOp, ItemKind, ItemRef, Model, NewAction, Op, OwnerKind, Rule, Then};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -44,6 +44,24 @@ const SECTION: &[&str] = &["report: report id", "section: section id", "kind: se
 const DOC_EXPORT: &[&str] = &["format: output format", "out: output path", "files: files written"];
 const STATE: &[&str] = &["before.*: the state before", "after.*: the state after"];
 const RULE: &[&str] = &["rule: rule id", "name: rule name"];
+const MODEL: &[&str] = &["model: model id", "name: model name", "version: applied version"];
+const MIGRATE: &[&str] = &[
+    "model: model id",
+    "name: model name",
+    "from: version before",
+    "to: version after",
+    "steps: migration steps",
+    "lost: values lost",
+    "records: records migrated",
+];
+const RECORD: &[&str] = &[
+    "model: model id",
+    "name: model name",
+    "record: record id (one record)",
+    "count: records changed",
+    "where: the conditions used",
+    "values.FIELD: the values",
+];
 
 /// Every action kind in the history, with its fields. `mnnn rule events` prints this.
 pub const EVENTS: &[Event] = &[
@@ -113,6 +131,18 @@ pub const EVENTS: &[Event] = &[
     Event { kind: "filter.clear", about: "the TUI filters cleared", fields: STATE },
     Event { kind: "theme", about: "the theme changed", fields: STATE },
     Event { kind: "theme.mode", about: "light or dark mode changed", fields: STATE },
+    Event { kind: "model.create", about: "a model created", fields: MODEL },
+    Event {
+        kind: "model.edit",
+        about: "a model's draft or name changed",
+        fields: &["model: model id", "name: model name", "ops: field changes", "draft: a draft is waiting"],
+    },
+    Event { kind: "model.apply", about: "a model's design applied (a migration)", fields: MIGRATE },
+    Event { kind: "model.rollback", about: "a model rolled back to an earlier design", fields: MIGRATE },
+    Event { kind: "model.remove", about: "a model removed", fields: &["model: model id", "name: model name", "records: records removed"] },
+    Event { kind: "record.create", about: "a model record created", fields: RECORD },
+    Event { kind: "record.update", about: "model records changed", fields: RECORD },
+    Event { kind: "record.delete", about: "model records deleted", fields: RECORD },
     Event { kind: "rule.create", about: "a rule created (never triggers rules)", fields: RULE },
     Event { kind: "rule.edit", about: "a rule changed (never triggers rules)", fields: RULE },
     Event { kind: "rule.remove", about: "a rule removed (never triggers rules)", fields: RULE },
@@ -178,7 +208,7 @@ pub fn split_list(s: &str) -> Vec<String> {
 }
 
 /// A word, and whether it was `key=value` written without quotes before the `=`.
-fn tokenize(s: &str) -> Result<Vec<(String, Option<String>)>> {
+pub(crate) fn tokenize(s: &str) -> Result<Vec<(String, Option<String>)>> {
     let mut out = vec![];
     let mut it = s.chars().peekable();
     loop {
@@ -251,7 +281,7 @@ pub fn condition_text(c: &Condition) -> String {
     if c.op.unary() { format!("{} {}", c.field, c.op.as_str()) } else { format!("{} {} {}", c.field, c.op.as_str(), quote(&c.value)) }
 }
 
-fn quote(s: &str) -> String {
+pub(crate) fn quote(s: &str) -> String {
     if !s.is_empty() && !s.contains(|c: char| c.is_whitespace() || "\"';=".contains(c)) {
         s.to_string()
     } else if s.contains('"') {
@@ -272,7 +302,9 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
     let Some(((verb, None), rest)) = toks.split_first().map(|(a, b)| (a.clone(), b)) else {
         return Err(Error::invalid(
             "--then",
-            format!("`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note)"),
+            format!(
+                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete)"
+            ),
         ));
     };
     let mut pos: Vec<String> = vec![];
@@ -289,6 +321,16 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
         take(kv, "format").map(|f| OutFormat::parse(&f).map(|f| f.as_str().to_string())).transpose()
     };
     let journal = |n: &str| store.find_journal(n).map(|j| j.id);
+    let flag = |kv: &mut Vec<(String, String)>, k: &str| -> Result<bool> {
+        take(kv, k).map(|v| yes(&v).map_err(bad)).transpose().map(|b| b.unwrap_or(false))
+    };
+    let one_model = |pos: &[String], what: &str| -> Result<Option<String>> {
+        match pos {
+            [] => Ok(None),
+            [n] => Ok(Some(store.find_model(n)?.id)),
+            _ => Err(bad(format!("{what} takes one MODEL (quote values with spaces: field=\"a b\")"))),
+        }
+    };
     let t = match verb.to_ascii_lowercase().as_str() {
         "status" | "message" | "say" => {
             if pos.is_empty() {
@@ -328,7 +370,8 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
                     Some(("search", n)) => ItemRef::LiveSearch(store.find_live_search(n)?.id),
                     Some(("journal", n)) => ItemRef::Journal(journal(n)?),
                     Some(("report", n)) => ItemRef::Report(store.find_report(n)?.id),
-                    _ => return Err(bad(format!("item `{i}`: subject, search:NAME, journal:NAME or report:NAME"))),
+                    Some(("model", n)) => ItemRef::Model(store.find_model(n)?.id),
+                    _ => return Err(bad(format!("item `{i}`: subject, search:NAME, journal:NAME, report:NAME or model:NAME"))),
                 },
             };
             Then::AddToProject { project, item }
@@ -346,12 +389,83 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
             [j, t] => Then::AddNote { journal: Some(journal(j)?), text: t.clone() },
             _ => return Err(bad("note takes [JOURNAL] \"TEXT\" (quote the text)".into())),
         },
-        v => return Err(bad(format!("unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note)"))),
+        "model-create" | "create-model" => {
+            let [n] = pos.as_slice() else { return Err(bad("model-create takes one NAME (quote it if it has spaces)".into())) };
+            let fields = take(&mut kv, "fields").unwrap_or_default();
+            let about = take(&mut kv, "about").unwrap_or_default();
+            let draft = flag(&mut kv, "draft")?;
+            Then::ModelCreate { name: n.clone(), fields, about, draft }
+        }
+        "model-edit" | "edit-model" => {
+            let model = one_model(&pos, "model-edit")?;
+            let (mut ops, mut apply, mut destructive) = (vec![], false, false);
+            for (k, v) in std::mem::take(&mut kv) {
+                match k.as_str() {
+                    "add" => {
+                        if let Some(m) = model.as_ref().and_then(|m| store.model(m).ok().flatten()) {
+                            crate::designer::parse_field(store, &m, &v, None)?;
+                        }
+                        ops.push(FieldOp::Add { spec: v })
+                    }
+                    "change" => ops.push(FieldOp::Change { spec: v }),
+                    "drop" => ops.push(FieldOp::Drop { field: v }),
+                    "rename" => ops.push(crate::designer::parse_rename(&v)?),
+                    "move" => ops.push(crate::designer::parse_move(&v)?),
+                    "apply" => apply = yes(&v).map_err(bad)?,
+                    "destructive" => destructive = yes(&v).map_err(bad)?,
+                    _ => kv.push((k, v)),
+                }
+            }
+            if ops.is_empty() {
+                return Err(bad("model-edit needs add=, change=, drop=, rename= or move=".into()));
+            }
+            Then::ModelEdit { model, ops, apply, destructive }
+        }
+        "model-apply" | "apply-model" => Then::ModelApply { model: one_model(&pos, "model-apply")?, destructive: flag(&mut kv, "destructive")? },
+        "model-remove" | "remove-model" => Then::ModelRemove { model: one_model(&pos, "model-remove")?, destructive: flag(&mut kv, "destructive")? },
+        "record-create" | "create-record" | "record" => {
+            let model = one_model(&pos, "record-create")?;
+            if kv.iter().any(|(k, _)| k == "id" || k == "where") {
+                return Err(bad("record-create takes FIELD=VALUE (id= and where= are for record-update and record-delete)".into()));
+            }
+            Then::RecordCreate { model, values: std::mem::take(&mut kv).into_iter().map(|(k, v)| (k, Value::String(v))).collect() }
+        }
+        "record-update" | "update-record" | "record-delete" | "delete-record" => {
+            let update = verb.to_ascii_lowercase().contains("update");
+            let what = if update { "record-update" } else { "record-delete" };
+            let model = one_model(&pos, what)?;
+            let id = take(&mut kv, "id");
+            let filter = take(&mut kv, "where").map(|w| crate::designer::parse_where(&[w])).transpose()?.unwrap_or_default();
+            if id.is_none() && filter.is_empty() {
+                return Err(bad(format!("{what} needs id=RECORD or where=\"FIELD OP VALUE\"")));
+            }
+            if update {
+                if kv.is_empty() {
+                    return Err(bad("record-update needs FIELD=VALUE to set".into()));
+                }
+                Then::RecordUpdate { model, id, filter, values: std::mem::take(&mut kv).into_iter().map(|(k, v)| (k, Value::String(v))).collect() }
+            } else {
+                Then::RecordDelete { model, id, filter }
+            }
+        }
+        v => {
+            return Err(bad(format!(
+                "unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete)"
+            )));
+        }
     };
     if let Some((k, _)) = kv.first() {
         return Err(bad(format!("`{k}=` does not belong to {}", t.verb())));
     }
     Ok(t)
+}
+
+fn yes(v: &str) -> std::result::Result<bool, String> {
+    match v.trim().to_ascii_lowercase().as_str() {
+        "yes" | "y" | "true" | "on" | "1" => Ok(true),
+        "no" | "n" | "false" | "off" | "0" => Ok(false),
+        o => Err(format!("`{o}`: use yes or no")),
+    }
 }
 
 fn name_of(store: &Store, kind: ItemKind, id: &str) -> String {
@@ -360,6 +474,7 @@ fn name_of(store: &Store, kind: ItemKind, id: &str) -> String {
         ItemKind::Journal => store.journal(id).ok().flatten().map(|j| j.name),
         ItemKind::Report => store.report(id).ok().flatten().map(|r| r.name),
         ItemKind::RuleSet => store.rule(id).ok().flatten().map(|r| r.name),
+        ItemKind::Model => store.model(id).ok().flatten().map(|m| m.name),
         ItemKind::Result => None,
     };
     n.unwrap_or_else(|| crate::store::short(id).to_string())
@@ -395,6 +510,7 @@ pub fn then_text(store: &Store, t: &Then) -> String {
                 ItemRef::LiveSearch(i) => Some(format!("search:{}", name_of(store, ItemKind::LiveSearch, i))),
                 ItemRef::Journal(i) => Some(format!("journal:{}", name_of(store, ItemKind::Journal, i))),
                 ItemRef::Report(i) => Some(format!("report:{}", name_of(store, ItemKind::Report, i))),
+                ItemRef::Model(i) => Some(format!("model:{}", name_of(store, ItemKind::Model, i))),
             };
             w.extend(it.map(|i| format!("item={}", quote(&i))));
         }
@@ -409,6 +525,53 @@ pub fn then_text(store: &Store, t: &Then) -> String {
             opt(ItemKind::Journal, journal);
             w.push(format!("\"{}\"", text.replace('"', "'")));
         }
+        Then::ModelCreate { name, fields, about, draft } => {
+            w.push(quote(name));
+            if !fields.is_empty() {
+                w.push(format!("fields={}", quote(fields)));
+            }
+            if !about.is_empty() {
+                w.push(format!("about={}", quote(about)));
+            }
+            if *draft {
+                w.push("draft=yes".into());
+            }
+        }
+        Then::ModelEdit { model, ops, apply, destructive } => {
+            opt(ItemKind::Model, model);
+            w.extend(ops.iter().map(crate::designer::op_arg));
+            if *apply {
+                w.push("apply=yes".into());
+            }
+            if *destructive {
+                w.push("destructive=yes".into());
+            }
+        }
+        Then::ModelApply { model, destructive } | Then::ModelRemove { model, destructive } => {
+            opt(ItemKind::Model, model);
+            if *destructive {
+                w.push("destructive=yes".into());
+            }
+        }
+        Then::RecordCreate { model, values } => {
+            opt(ItemKind::Model, model);
+            w.extend(values.iter().map(|(k, v)| format!("{k}={}", quote(&crate::designer::value_text(v)))));
+        }
+        Then::RecordUpdate { model, id, filter, values } => {
+            opt(ItemKind::Model, model);
+            w.extend(id.iter().map(|i| format!("id={}", quote(i))));
+            if !filter.is_empty() {
+                w.push(format!("where={}", quote(&filter.iter().map(condition_text).collect::<Vec<_>>().join("; "))));
+            }
+            w.extend(values.iter().map(|(k, v)| format!("{k}={}", quote(&crate::designer::value_text(v)))));
+        }
+        Then::RecordDelete { model, id, filter } => {
+            opt(ItemKind::Model, model);
+            w.extend(id.iter().map(|i| format!("id={}", quote(i))));
+            if !filter.is_empty() {
+                w.push(format!("where={}", quote(&filter.iter().map(condition_text).collect::<Vec<_>>().join("; "))));
+            }
+        }
     }
     w.join(" ")
 }
@@ -418,6 +581,7 @@ pub fn home(store: &Store, r: &Rule) -> String {
     let mut s = match (r.owner_kind, &r.owner_id) {
         (OwnerKind::Journal, Some(i)) => format!("journal {}", name_of(store, ItemKind::Journal, i)),
         (OwnerKind::LiveSearch, Some(i)) => format!("search {}", name_of(store, ItemKind::LiveSearch, i)),
+        (OwnerKind::Model, Some(i)) => format!("model {}", name_of(store, ItemKind::Model, i)),
         _ => String::new(),
     };
     let ps: Vec<String> = store.projects_with(ItemKind::RuleSet, &r.id).unwrap_or_default().into_iter().map(|p| p.name).collect();
@@ -545,7 +709,7 @@ pub fn compare(actual: Option<&Value>, op: Op, want: &str) -> bool {
 
 /// Ids the action is about (journal, search, report, project, item ref, …).
 fn mentions(a: &ActionRecord) -> Vec<String> {
-    ["journal", "search", "report", "project", "ref", "entry"]
+    ["journal", "search", "report", "project", "ref", "entry", "model", "record"]
         .iter()
         .filter_map(|k| a.params.get(*k).and_then(Value::as_str).map(str::to_string))
         .collect()
@@ -677,12 +841,14 @@ fn subject(a: &ActionRecord) -> Result<(ItemKind, String)> {
         p("search").map(|i| (ItemKind::LiveSearch, i))
     } else if k.starts_with("report.") {
         p("report").map(|i| (ItemKind::Report, i))
+    } else if k.starts_with("model.") || k.starts_with("record.") {
+        p("model").map(|i| (ItemKind::Model, i))
     } else if ["journal.", "entry.", "note.", "highlight.", "image."].iter().any(|x| k.starts_with(x)) {
         p("journal").map(|i| (ItemKind::Journal, i))
     } else {
         None
     };
-    found.ok_or_else(|| Error::invalid("add-to-project", format!("a `{k}` action has no live search, journal or report to add")))
+    found.ok_or_else(|| Error::invalid("add-to-project", format!("a `{k}` action has no live search, journal, report or model to add")))
 }
 
 /// What a then-action would do, in words (`mnnn rule dry-run`). Nothing is changed.
@@ -721,6 +887,51 @@ pub fn plan(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
             format!("write entry {}in {}: {}", if t.is_empty() { String::new() } else { format!("\"{t}\" ") }, journal(j)?, expand(store, r, a, text))
         }
         Then::AddNote { journal: j, text } => format!("add a note to {}: {}", journal(j)?, expand(store, r, a, text)),
+        Then::ModelCreate { name, fields, draft, .. } => {
+            let name = expand(store, r, a, name);
+            if store.models()?.iter().any(|m| m.name == crate::store::models::slug(&name)) {
+                format!("model {name} exists; nothing to do")
+            } else {
+                let n = split_list(fields).len();
+                format!("create model {name} with {n} field{}{}", if n == 1 { "" } else { "s" }, if *draft { " as a draft" } else { "" })
+            }
+        }
+        Then::ModelEdit { model: m, ops, apply, .. } => {
+            let m = model_of(store, r, t, m)?;
+            let d = crate::designer::apply_ops(store, &m, m.pending(), ops)?;
+            let what = ops.iter().map(crate::designer::op_text).collect::<Vec<_>>().join(", ");
+            if *apply {
+                let p = store.plan_model(&m, &d)?;
+                format!(
+                    "edit model {}: {what}; then apply: {}",
+                    m.name,
+                    crate::designer::plan_lines(store, &p)[1..].iter().map(|l| l.trim()).collect::<Vec<_>>().join("; ")
+                )
+            } else {
+                format!("edit the draft of model {}: {what}", m.name)
+            }
+        }
+        Then::ModelApply { model: m, .. } => {
+            let m = model_of(store, r, t, m)?;
+            let p = store.plan_model(&m, m.pending())?;
+            crate::designer::plan_lines(store, &p).iter().map(|l| l.trim()).collect::<Vec<_>>().join("; ")
+        }
+        Then::ModelRemove { model: m, .. } => {
+            let m = model_of(store, r, t, m)?;
+            format!("remove model {} and its {} records", m.name, store.count_records(&m)?)
+        }
+        Then::RecordCreate { model: m, values } => {
+            let m = model_of(store, r, t, m)?;
+            format!("create a {} record: {}", m.name, values_text(&filled(store, r, a, values)))
+        }
+        Then::RecordUpdate { model: m, id, filter, values } => {
+            let m = model_of(store, r, t, m)?;
+            format!("update {}: {}", which(store, r, a, &m, id, filter)?, values_text(&filled(store, r, a, values)))
+        }
+        Then::RecordDelete { model: m, id, filter } => {
+            let m = model_of(store, r, t, m)?;
+            format!("delete {}", which(store, r, a, &m, id, filter)?)
+        }
     })
 }
 
@@ -742,11 +953,64 @@ fn item_of(a: &ActionRecord, item: &ItemRef) -> Result<(ItemKind, String)> {
         ItemRef::LiveSearch(i) => (ItemKind::LiveSearch, i.clone()),
         ItemRef::Journal(i) => (ItemKind::Journal, i.clone()),
         ItemRef::Report(i) => (ItemKind::Report, i.clone()),
+        ItemRef::Model(i) => (ItemKind::Model, i.clone()),
     })
 }
 
 fn record(store: &Store, kind: &str, summary: String, params: Value) {
     store.note_action(&NewAction::new(kind, ORIGIN, summary).params(params));
+}
+
+fn note(store: &Store, a: crate::designer::Act) {
+    record(store, a.kind, a.summary, a.params);
+}
+
+/// The model a then-action names, else the one the rule lives in.
+fn model_of(store: &Store, r: &Rule, t: &Then, m: &Option<String>) -> Result<Model> {
+    let id = m.clone().or_else(|| own(r, OwnerKind::Model)).ok_or_else(|| Error::invalid(t.verb(), "name a model, or put the rule in one"))?;
+    store.model(&id)?.ok_or_else(|| Error::invalid("model", format!("`{id}` no longer exists")))
+}
+
+/// Values with their templates filled.
+fn filled(store: &Store, r: &Rule, a: &ActionRecord, v: &serde_json::Map<String, Value>) -> serde_json::Map<String, Value> {
+    v.iter()
+        .map(|(k, x)| {
+            let x = match x {
+                Value::String(s) => Value::String(expand(store, r, a, s)),
+                o => o.clone(),
+            };
+            (k.clone(), x)
+        })
+        .collect()
+}
+
+fn values_text(v: &serde_json::Map<String, Value>) -> String {
+    if v.is_empty() {
+        return "(defaults)".into();
+    }
+    v.iter().map(|(k, x)| format!("{k}={}", quote(&crate::designer::value_text(x)))).collect::<Vec<_>>().join(" ")
+}
+
+fn conds(store: &Store, r: &Rule, a: &ActionRecord, f: &[Condition]) -> Vec<Condition> {
+    f.iter().map(|c| Condition { value: expand(store, r, a, &c.value), ..c.clone() }).collect()
+}
+
+/// `trades record 1a2b3c4d` or `3 trades records`.
+fn which(store: &Store, r: &Rule, a: &ActionRecord, m: &Model, id: &Option<String>, f: &[Condition]) -> Result<String> {
+    if let Some(i) = id {
+        let rec = store.find_record(m, &expand(store, r, a, i))?;
+        return Ok(format!("{} record {}", m.name, rec.short_id()));
+    }
+    let n = store.records(m, &crate::store::RecordQuery { filter: conds(store, r, a, f), ..Default::default() })?.len();
+    Ok(format!("{n} {} record{}", m.name, if n == 1 { "" } else { "s" }))
+}
+
+/// A refused migration says how to allow it in a rule.
+fn in_rule(e: Error) -> Error {
+    match e {
+        Error::NeedsConfirmation(m) => Error::invalid("model", format!("{m}; add destructive=yes to allow it")),
+        o => o,
+    }
 }
 
 /// Do one then-action; the message says what happened.
@@ -814,6 +1078,93 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
             let n = store.add_note(&jr.id, None, None, &expand(store, r, a, text))?;
             record(store, "note.add", format!("add note to {}", jr.name), json!({ "journal": jr.id, "entry": null, "note": n.id }));
             Ok(format!("added a note to {}", jr.name))
+        }
+        Then::ModelCreate { name, fields, about, draft } => {
+            let name = expand(store, r, a, name);
+            if let Some(m) = store.models()?.into_iter().find(|m| m.name == crate::store::models::slug(&name)) {
+                return Ok(format!("model {} exists", m.name));
+            }
+            let (m, _) = store.create_model(&name, &expand(store, r, a, about), crate::store::Design::default(), false)?;
+            let design = match crate::designer::parse_fields(store, &m, fields)
+                .and_then(|f| store.set_model_draft(&m.id, Some(crate::store::Design { fields: f })))
+            {
+                Ok(m) => m,
+                Err(e) => {
+                    let _ = store.remove_model(&m.id, true);
+                    return Err(e);
+                }
+            };
+            note(store, crate::designer::act_model_create(&design));
+            if *draft {
+                return Ok(format!("created model {} (draft)", design.name));
+            }
+            let (m, p) = store.apply_model(&m.id, &ApplyOpts { note: format!("rule {}", r.name), ..Default::default() })?;
+            note(store, crate::designer::act_model_apply(store, &m, &p, false));
+            Ok(format!("created model {} v{}", m.name, m.version))
+        }
+        Then::ModelEdit { model: m, ops, apply, destructive } => {
+            let m = model_of(store, r, t, m)?;
+            let before = m.draft.clone();
+            let m = store.edit_model(&m.id, ops)?;
+            if !*apply || m.draft.is_none() {
+                note(store, crate::designer::act_model_edit(&m, ops, None));
+                return Ok(format!("edited the draft of model {}", m.name));
+            }
+            // edit and apply go together: a refused migration leaves the draft as it was
+            let (n, p) = match store.apply_model(&m.id, &ApplyOpts { destructive: *destructive, note: format!("rule {}", r.name) }) {
+                Ok(done) => done,
+                Err(e) => {
+                    let _ = store.set_model_draft(&m.id, before);
+                    return Err(in_rule(e));
+                }
+            };
+            note(store, crate::designer::act_model_edit(&m, ops, None));
+            let m = n;
+            note(store, crate::designer::act_model_apply(store, &m, &p, false));
+            Ok(format!("model {} is now v{} ({} steps)", m.name, m.version, p.steps.len()))
+        }
+        Then::ModelApply { model: m, destructive } => {
+            let m = model_of(store, r, t, m)?;
+            let (m, p) = store.apply_model(&m.id, &ApplyOpts { destructive: *destructive, note: format!("rule {}", r.name) }).map_err(in_rule)?;
+            note(store, crate::designer::act_model_apply(store, &m, &p, false));
+            Ok(format!("model {} is now v{} ({} steps)", m.name, m.version, p.steps.len()))
+        }
+        Then::ModelRemove { model: m, destructive } => {
+            let m = model_of(store, r, t, m)?;
+            let (m, n) = store.remove_model(&m.id, *destructive).map_err(in_rule)?;
+            note(store, crate::designer::act_model_remove(&m, n));
+            Ok(format!("removed model {} ({n} records)", m.name))
+        }
+        Then::RecordCreate { model: m, values } => {
+            let m = model_of(store, r, t, m)?;
+            let rec = store.create_record(&m, &filled(store, r, a, values))?;
+            note(store, crate::designer::act_record_create(&m, &rec));
+            Ok(format!("created {} record {}", m.name, rec.short_id()))
+        }
+        Then::RecordUpdate { model: m, id, filter, values } => {
+            let m = model_of(store, r, t, m)?;
+            let v = filled(store, r, a, values);
+            if let Some(i) = id {
+                let rec = store.update_record(&m, &expand(store, r, a, i), &v)?;
+                note(store, crate::designer::act_record_update(&m, Some(&rec), 1, &[], &v));
+                return Ok(format!("updated {} record {}", m.name, rec.short_id()));
+            }
+            let f = conds(store, r, a, filter);
+            let n = store.update_records(&m, &f, &v)?;
+            note(store, crate::designer::act_record_update(&m, None, n, &f, &v));
+            Ok(format!("updated {n} {} record{}", m.name, if n == 1 { "" } else { "s" }))
+        }
+        Then::RecordDelete { model: m, id, filter } => {
+            let m = model_of(store, r, t, m)?;
+            if let Some(i) = id {
+                let rec = store.delete_record(&m, &expand(store, r, a, i))?;
+                note(store, crate::designer::act_record_delete(&m, Some(&rec), 1, &[]));
+                return Ok(format!("deleted {} record {}", m.name, rec.short_id()));
+            }
+            let f = conds(store, r, a, filter);
+            let n = store.delete_records(&m, &f)?;
+            note(store, crate::designer::act_record_delete(&m, None, n, &f));
+            Ok(format!("deleted {n} {} record{}", m.name, if n == 1 { "" } else { "s" }))
         }
     }
 }
@@ -1102,5 +1453,94 @@ mod tests {
         assert!(dir.path().join(format!("weekly-{}.html", a.id)).exists());
         let exp = s.actions_of_kind("report.export").unwrap();
         assert_eq!((exp.len(), exp[0].origin.as_str(), exp[0].params["report"].as_str()), (1, "rule", Some(rep.id.as_str())));
+    }
+
+    #[test]
+    fn model_then_actions_parse_plan_and_run() {
+        let s = Store::open_in_memory().unwrap();
+        s.create_model("signals", "", Default::default(), true).unwrap();
+        let sig = s.find_model("signals").unwrap();
+        s.edit_model(&sig.id, &[FieldOp::Add { spec: "symbol:text!".into() }, FieldOp::Add { spec: "price:real".into() }]).unwrap();
+        s.apply_model(&sig.id, &ApplyOpts::default()).unwrap();
+        for t in [
+            "model-create notes fields=\"text:text!; n:integer default=0\" about=\"from rules\"",
+            "model-create drafts fields=\"a:text\" draft=yes",
+            "model-edit signals add=\"note:text\" rename=\"price:cost\" apply=yes",
+            "model-edit signals drop=price destructive=yes",
+            "model-apply signals",
+            "model-remove signals destructive=yes",
+            "record-create signals symbol={symbol} price=1",
+            "record-update signals id=abc price=2",
+            "record-update signals where=\"symbol = BTC*\" price=",
+            "record-delete signals where=\"price < 1\"",
+        ] {
+            let parsed = parse_then(&s, t).unwrap_or_else(|e| panic!("{t}: {e}"));
+            assert_eq!(parse_then(&s, &then_text(&s, &parsed)).unwrap(), parsed, "{t}");
+        }
+        assert!(parse_then(&s, "record-update signals price=2").is_err(), "needs id= or where=");
+        assert!(parse_then(&s, "record-update signals id=x").is_err(), "needs values");
+        assert!(parse_then(&s, "record-delete signals").is_err());
+        assert!(parse_then(&s, "model-edit signals add=\"nope\"").is_err(), "checked against the model");
+        assert!(parse_then(&s, "model-edit nosuch add=\"a:text\"").is_err());
+        assert!(check_pattern("model.apply").is_ok() && check_pattern("record.*").is_ok());
+
+        // a rule living in the model feeds it; dry runs say what would happen
+        let r = s
+            .create_rule(&NewRule {
+                name: "feed".into(),
+                owner_kind: OwnerKind::Model,
+                owner_id: Some(sig.id.clone()),
+                spec: RuleSpec {
+                    on: vec!["import".into()],
+                    then: vec![parse_then(&s, "record-create symbol={symbol} price={price}").unwrap()],
+                    ..Default::default()
+                },
+                // off: only the explicit runs below (an enabled rule fires on `act` too)
+                enabled: false,
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(home(&s, &r), "model signals");
+        let a = act(&s, "import", json!({ "symbol": "BTC/USDT", "price": 42 }));
+        let p = plan(&s, &r, &a, &r.spec.then[0]).unwrap();
+        assert!(p.contains("signals") && p.contains("BTC/USDT"), "{p}");
+        let out = run(&s, &r, &a);
+        assert_eq!(out.status, "ok", "{:?}", out.messages);
+        let rs = s.records(&s.model(&sig.id).unwrap().unwrap(), &Default::default()).unwrap();
+        assert_eq!((rs.len(), rs[0].values["price"].clone()), (1, json!(42.0)));
+        let made = s.actions_of_kind("record.create").unwrap();
+        assert_eq!((made.len(), made[0].origin.as_str()), (1, "rule"));
+
+        // migrations from rules: destructive ones need destructive=yes
+        let mk = |t: &str| Rule { spec: RuleSpec { then: vec![parse_then(&s, t).unwrap()], ..Default::default() }, ..r.clone() };
+        let drop = mk("model-edit drop=price apply=yes");
+        let e = exec(&s, &drop, &a, &drop.spec.then[0]).unwrap_err().to_string();
+        assert!(e.contains("destructive=yes"), "{e}");
+        let ok = mk("model-edit drop=price apply=yes destructive=yes");
+        let out = run(&s, &ok, &a);
+        assert_eq!(out.status, "ok", "{:?}", out.messages);
+        let m = s.model(&sig.id).unwrap().unwrap();
+        assert!(m.design.field("price").is_none() && m.version == 3, "{m:?}");
+        let v = s.model_versions(&sig.id).unwrap();
+        assert_eq!((v[2].note.as_str(), v[2].rule_id.as_deref()), ("rule feed", Some(r.id.as_str())));
+
+        // updates and deletes by filter; model-create is idempotent
+        let up = mk("record-update where=\"symbol = btc*\" symbol=done");
+        assert!(exec(&s, &up, &a, &up.spec.then[0]).unwrap().contains('1'));
+        let del = mk("record-delete where=\"symbol = done\"");
+        exec(&s, &del, &a, &del.spec.then[0]).unwrap();
+        assert_eq!(s.count_records(&m).unwrap(), 0);
+        let c = mk("model-create notes fields=\"text:text\"");
+        exec(&s, &c, &a, &c.spec.then[0]).unwrap();
+        assert!(exec(&s, &c, &a, &c.spec.then[0]).unwrap().contains("exists"));
+        assert_eq!(s.find_model("notes").unwrap().version, 1);
+        let rm = mk("model-remove notes");
+        exec(&s, &rm, &a, &rm.spec.then[0]).unwrap();
+        assert!(s.find_model("notes").is_err());
+        let ev: Vec<&str> = EVENTS.iter().map(|e| e.kind).collect();
+        for k in ["model.create", "model.edit", "model.apply", "model.rollback", "model.remove", "record.create", "record.update", "record.delete"] {
+            assert!(ev.contains(&k), "{k}");
+        }
+        assert_eq!(subject(&made[0]).unwrap(), (ItemKind::Model, sig.id.clone()));
     }
 }

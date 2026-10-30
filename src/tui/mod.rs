@@ -16,6 +16,7 @@ pub mod journals;
 pub mod layout;
 pub mod menu;
 pub mod modal;
+pub mod models;
 pub mod picker;
 pub mod projects;
 pub mod reports;
@@ -129,6 +130,7 @@ pub struct App {
     pub history: history::HistoryPane,
     pub searches: searches::SearchesState,
     pub rules: rules::RulesState,
+    pub models: models::ModelsState,
     pub projects: projects::ProjectsState,
     pub journals: journals::JournalsState,
     pub reports: reports::ReportsState,
@@ -167,6 +169,7 @@ impl App {
             history: Default::default(),
             searches: Default::default(),
             rules: Default::default(),
+            models: Default::default(),
             projects: Default::default(),
             journals: Default::default(),
             reports: Default::default(),
@@ -267,6 +270,7 @@ impl App {
             KeyCode::Char('J') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Journals),
             KeyCode::Char('O') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reports),
             KeyCode::Char('R') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Rules),
+            KeyCode::Char('D') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Models),
             KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
             KeyCode::Char('u') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryBack),
             KeyCode::Char('U') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryForward),
@@ -349,6 +353,7 @@ impl App {
             Reports => reports::open(self),
             NewReport => reports::open_new(self),
             Rules => rules::open(self),
+            Models => models::open(self),
             AddToProject => match projects::selected_series(self) {
                 Some(r) => {
                     let label = r.label();
@@ -1120,6 +1125,8 @@ impl App {
     }
 }
 
+#[cfg(test)]
+mod models_tests;
 #[cfg(test)]
 mod reports_tests;
 #[cfg(test)]

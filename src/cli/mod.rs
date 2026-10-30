@@ -10,6 +10,7 @@ mod journals;
 mod keys;
 pub mod man;
 mod misc;
+mod models;
 mod projects;
 mod reports;
 mod rules;
@@ -122,6 +123,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Journal(c) => journals::run(&ctx, c),
         Command::Report(c) => reports::run(&ctx, c),
         Command::Rule(c) => rules::run(&ctx, c),
+        Command::Model(c) => models::run(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }

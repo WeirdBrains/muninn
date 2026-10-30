@@ -85,7 +85,14 @@ Then\-actions (\-\-then, run in order):
   add\-to\-project [PROJECT] [item=subject|search:S|journal:J|report:R]
   entry [JOURNAL] "TEXT" [title=T]          write a journal entry
   note [JOURNAL] "TEXT"                     add a note to a journal
-Left out, a target is the rule's own journal, live search or project. Texts and paths
+  model\-create NAME fields="a:text; b:real" [about=T] [draft=yes]
+  model\-edit [MODEL] add=SPEC change=SPEC drop=F rename=A:B move=F:N [apply=yes] [destructive=yes]
+  model\-apply [MODEL] [destructive=yes]     apply a model's draft
+  model\-remove [MODEL] [destructive=yes]
+  record\-create [MODEL] FIELD=VALUE…        add a record (values take {FIELD})
+  record\-update [MODEL] id=ID|where="F OP V" FIELD=VALUE…
+  record\-delete [MODEL] id=ID|where="F OP V"
+Left out, a target is the rule's own journal, live search, model or project. Texts and paths
 take {kind} {summary} {origin} {author} {action} {rule} {date} {time} {now} and {FIELD}.
 .PP
 Examples:

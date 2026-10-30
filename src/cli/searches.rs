@@ -30,6 +30,15 @@ impl SpecArgs {
         if self.series {
             base.target = SearchTarget::Series;
         }
+        if self.records || self.model.is_some() || !self.conditions.is_empty() {
+            base.target = SearchTarget::Records;
+        }
+        if let Some(m) = &self.model {
+            base.model = if m.eq_ignore_ascii_case("all") { None } else { Some(store.find_model(m)?.id) };
+        }
+        if !self.conditions.is_empty() {
+            base.conditions = crate::designer::parse_where(&self.conditions)?;
+        }
         if let Some(q) = &self.query {
             base.query = q.trim().to_string();
         }

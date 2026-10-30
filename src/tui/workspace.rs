@@ -141,6 +141,7 @@ pub enum Back {
     Journals,
     Reports,
     Rules,
+    Models,
 }
 
 #[derive(Debug, Default)]
@@ -179,6 +180,7 @@ fn go_back(app: &mut App) {
         Back::Journals => super::journals::reopen(app),
         Back::Reports => super::reports::reopen(app),
         Back::Rules => super::rules::reopen(app),
+        Back::Models => super::models::reopen(app),
     }
 }
 

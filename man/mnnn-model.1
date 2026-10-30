@@ -1,0 +1,138 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-model 1  "mnnn-model 2.3.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-model \- Models: record tables you design (typed fields, references, constraints), changed by versioned migrations you preview, apply and roll back; and their records
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn model\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Models: record tables you design (typed fields, references, constraints), changed by versioned migrations you preview, apply and roll back; and their records
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH NOTES
+.PP
+Fields are NAME:TYPE with constraints: text, int, real, bool, timestamp, json, or ref:MODEL
+(a record of another model). A trailing ! means required. Constraints: required, unique,
+index, default=V, choices=a|b, about="…"; to take one away: optional, \-unique, \-index,
+\-default, \-choices, \-about.
+.PP
+Changes go to a draft; `plan` shows the migration (+ add, \- drop, ~ change), `apply` makes
+it the next version, `history` lists versions and `rollback` applies an old design as a new
+version. Steps that lose values ask first (\-y says yes). The built\-in bars model takes new
+fields (never required); its own fields stay as they are.
+.PP
+Examples:
+  mnnn model create signals \-\-fields "symbol:text!; price:real!; side:text choices=buy|sell"
+  mnnn model edit signals \-\-add "note:text" \-\-change "price:real default=0" \-\-apply
+  mnnn model plan signals
+  mnnn model rollback signals 1
+  mnnn model record create signals symbol=BTC/USDT price=42000 side=buy
+  mnnn model record list signals \-\-where "price > 40000" \-\-sort \-price
+  mnnn model record list signals \-\-group side \-\-agg avg:price
+  mnnn model record update signals \-\-where "side = buy" note=checked
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-model\-list(1)
+List models (the built\-in bars model too)
+.TP
+mnnn\-model\-types(1)
+List the field types
+.TP
+mnnn\-model\-create(1)
+Create a model (applied as v1 unless \-\-draft)
+.TP
+mnnn\-model\-edit(1)
+Change a model\*(Aqs draft (renames, then changes, drops, adds and moves), its name or description. \-\-apply applies the draft right away
+.TP
+mnnn\-model\-show(1)
+Show a model: fields, draft, records and rules
+.TP
+mnnn\-model\-plan(1)
+Show what applying the draft would do
+.TP
+mnnn\-model\-apply(1)
+Apply the draft as the next version (a migration). \-y allows losing values
+.TP
+mnnn\-model\-discard(1)
+Throw the draft away
+.TP
+mnnn\-model\-history(1)
+List the applied versions
+.TP
+mnnn\-model\-rollback(1)
+Apply the design of an earlier version as the next version
+.TP
+mnnn\-model\-remove(1)
+Remove a model and its records (rules living in it become standalone, off)
+.TP
+mnnn\-model\-record(1)
+Records of a model: create, update, list, show, delete
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.3.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

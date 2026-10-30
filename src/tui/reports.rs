@@ -264,12 +264,20 @@ fn kind_chosen(app: &mut App, r: &Report, kind: SectionKind) {
             st.screen = RScreen::Report(r.id.clone());
             st.ask = Some(Ask::new(RAsk::Code, "Code space name (output arrives with code spaces)", ""));
         }
-        SectionKind::Series | SectionKind::Journal | SectionKind::Project => {
+        SectionKind::Series | SectionKind::Journal | SectionKind::Project | SectionKind::Model => {
             let choices: Vec<(String, Option<String>)> = match kind {
                 SectionKind::Series => std::iter::once(("(every series)".to_string(), None))
                     .chain(app.store.live_searches().unwrap_or_default().into_iter().map(|s| (format!("live search {}", s.name), Some(s.id))))
                     .collect(),
                 SectionKind::Journal => app.store.journals().unwrap_or_default().into_iter().map(|j| (j.name, Some(j.id))).collect(),
+                SectionKind::Model => app
+                    .store
+                    .models()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|m| m.version > 0)
+                    .map(|m| (format!("model {}", m.name), Some(m.id)))
+                    .collect(),
                 _ => app.store.projects().unwrap_or_default().into_iter().map(|p| (p.name, Some(p.id))).collect(),
             };
             if choices.is_empty() {
@@ -290,6 +298,7 @@ fn choice_made(app: &mut App, r: &Report, kind: SectionKind) {
     match kind {
         SectionKind::Series => s.params.search = id,
         SectionKind::Journal => s.params.journal = id,
+        SectionKind::Model => s.params.model = id,
         _ => s.params.project = id,
     }
     add(app, r, s);
@@ -503,9 +512,10 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                         st.editor = Some(REditor { report: id, section: Some(s.id), title: s.title, body: s.body, format: s.format, field: 1 });
                         st.screen = RScreen::Edit;
                     }
-                    Some(s) if s.kind == SectionKind::Records => {
+                    Some(s) if matches!(s.kind, SectionKind::Records | SectionKind::Model) => {
                         let v = s.params.rows.unwrap_or(crate::store::reports::DEFAULT_ROWS).to_string();
-                        st.ask = Some(Ask::new(RAsk::Rows, "Latest bars to list (0 = every bar)", v));
+                        let what = if s.kind == SectionKind::Model { "Records to list (0 = all)" } else { "Latest bars to list (0 = every bar)" };
+                        st.ask = Some(Ask::new(RAsk::Rows, what, v));
                     }
                     Some(s) => st.ask = Some(Ask::new(RAsk::Title, "Section title (empty: from what it shows)", s.title)),
                     None => {}

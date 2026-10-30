@@ -8,6 +8,7 @@ pub mod prefs;
 pub use error::{Error, Result};
 pub mod backup;
 pub mod crypto;
+pub mod designer;
 pub mod export;
 pub mod help;
 pub mod history;

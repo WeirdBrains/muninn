@@ -260,6 +260,79 @@ impl<'a> Builder<'a> {
         Ok(out)
     }
 
+    /// A model's design and records (those matching `filter`; `rows` 0 lists all).
+    pub fn model_records(&mut self, id: &str, filter: &[crate::store::Condition], rows: usize) -> Result<Vec<Block>> {
+        let Some(m) = self.store.model(id)? else { return Ok(vec![meta("(removed model)")]) };
+        let mut out = vec![];
+        if !m.description.is_empty() {
+            out.push(Block::Para(vec![Inline::Italic(vec![t(m.description.clone())])]));
+        }
+        let ty = |f: &crate::store::Field| crate::designer::type_text(self.store, &f.ty);
+        out.push(Block::Table {
+            head: vec!["field".into(), "type".into(), "constraints".into(), "about".into()],
+            rows: m
+                .design
+                .fields
+                .iter()
+                .map(|f| {
+                    let mut c = vec![];
+                    if f.required {
+                        c.push("required".to_string());
+                    }
+                    if f.unique {
+                        c.push("unique".into());
+                    }
+                    if let Some(d) = &f.default {
+                        c.push(format!("default {}", crate::designer::value_text(d)));
+                    }
+                    if !f.choices.is_empty() {
+                        c.push(f.choices.join(" | "));
+                    }
+                    vec![f.name.clone(), ty(f), c.join(", "), f.about.clone()]
+                })
+                .collect(),
+        });
+        if m.version == 0 {
+            out.push(meta(format!("{} has not been applied yet.", m.name)));
+            return Ok(out);
+        }
+        let q = crate::store::RecordQuery { filter: filter.to_vec(), ..Default::default() };
+        let all = if m.is_bars() {
+            self.store.records(
+                &m,
+                &crate::store::RecordQuery { limit: Some(if rows == 0 { crate::store::reports::DEFAULT_ROWS } else { rows }), ..q.clone() },
+            )?
+        } else {
+            self.store.records(&m, &q)?
+        };
+        let total = if m.is_bars() { self.store.count_records(&m)? } else { all.len() };
+        let shown: Vec<_> = if rows == 0 { all } else { all.into_iter().take(rows).collect() };
+        let mut cond = String::new();
+        if !filter.is_empty() {
+            cond = format!(" where {}", filter.iter().map(crate::rules::condition_text).collect::<Vec<_>>().join(", "));
+        }
+        out.push(meta(format!("{} v{}: {} of {} record{}{cond}.", m.name, m.version, shown.len(), total, if total == 1 { "" } else { "s" })));
+        let names = crate::store::records::field_names(&m);
+        let mut head: Vec<String> = vec!["id".into()];
+        head.extend(names.iter().cloned());
+        out.push(Block::Table {
+            head,
+            rows: shown
+                .iter()
+                .map(|r| {
+                    let mut row = vec![r.short_id().to_string()];
+                    row.extend(names.iter().map(|n| match (crate::store::records::field_type(&m, n), r.values.get(n)) {
+                        (Some(crate::store::FieldType::Timestamp), Some(v)) if v.is_i64() => fmt_ts(v.as_i64().unwrap_or(0)),
+                        (_, Some(v)) => crate::designer::value_text(v),
+                        _ => String::new(),
+                    }));
+                    row
+                })
+                .collect(),
+        });
+        Ok(out)
+    }
+
     /// What a live search matches now (series or entries), or every series.
     pub fn series(&mut self, search: Option<&str>) -> Result<Vec<Block>> {
         let mut out = vec![];
@@ -267,6 +340,17 @@ impl<'a> Builder<'a> {
             Some(id) => {
                 let Some(s) = self.store.live_search(id)? else { return Ok(vec![meta("(removed live search)")]) };
                 out.push(meta(format!("Live search {}: {}", s.name, s.spec.describe())));
+                if s.spec.target == SearchTarget::Records {
+                    let found = crate::live::record_matches(self.store, &s.spec)?;
+                    out.push(Block::Table {
+                        head: vec!["model".into(), "record".into(), "values".into(), "created".into()],
+                        rows: found
+                            .iter()
+                            .map(|(m, r)| vec![m.name.clone(), r.short_id().to_string(), crate::live::record_brief(r), day(r.created_at)])
+                            .collect(),
+                    });
+                    return Ok(out);
+                }
                 if s.spec.target == SearchTarget::Journals {
                     let found = crate::live::entry_matches(self.store, &s.spec)?;
                     out.push(Block::Table {
@@ -390,6 +474,10 @@ impl<'a> Builder<'a> {
                 None => vec![meta("(no project chosen)")],
             },
             SectionKind::Authors => self.authors_table(r, all)?,
+            SectionKind::Model => match &p.model {
+                Some(id) => self.model_records(id, &p.conditions, p.rows.unwrap_or(crate::store::reports::DEFAULT_ROWS))?,
+                None => vec![meta("(no model chosen)")],
+            },
             SectionKind::Code => vec![meta(format!(
                 "Output from code space {} will appear here once code spaces arrive.",
                 p.space.clone().unwrap_or_else(|| "(not chosen)".into())
@@ -601,6 +689,15 @@ pub fn section_summary(store: &Store, s: &Section) -> String {
         }
         SectionKind::Authors => "authors of the report".into(),
         SectionKind::Code => format!("code space {} (placeholder)", p.space.clone().unwrap_or_default()),
+        SectionKind::Model => {
+            let m = name(p.model.as_deref().map(|x| store.model(x).map(|o| o.map(|m| m.name))).unwrap_or(Ok(None)), "(removed)");
+            let w = if p.conditions.is_empty() {
+                String::new()
+            } else {
+                format!(" where {}", p.conditions.iter().map(crate::rules::condition_text).collect::<Vec<_>>().join(", "))
+            };
+            format!("model {m} records{w}")
+        }
     }
 }
 
@@ -678,6 +775,12 @@ pub fn project(store: &Store, id: &str, rows: usize) -> Result<Doc> {
                 if store.live_search(&it.ref_id)?.is_some() {
                     blocks.push(Block::Heading(1, vec![t(format!("Live search: {name}"))]));
                     blocks.extend(b.series(Some(&it.ref_id))?);
+                }
+            }
+            ItemKind::Model => {
+                if store.model(&it.ref_id)?.is_some() {
+                    blocks.push(Block::Heading(1, vec![t(format!("Model: {name}"))]));
+                    blocks.extend(b.model_records(&it.ref_id, &[], rows)?);
                 }
             }
             ItemKind::RuleSet => {
@@ -875,5 +978,28 @@ mod tests {
     #[test]
     fn numbers_read_well() {
         assert_eq!((num(42000.0), num(42000.456), num(0.000123), num(1.5)), ("42000".into(), "42000.46".into(), "0.000123".into(), "1.5".into()));
+    }
+
+    #[test]
+    fn reports_list_model_records() {
+        use crate::store::{Design, FieldOp};
+        let s = store_with_data();
+        let (m, _) = s.create_model("signals", "trade ideas", Design::default(), false).unwrap();
+        s.edit_model(&m.id, &[FieldOp::Add { spec: "symbol:text!".into() }, FieldOp::Add { spec: "price:real".into() }]).unwrap();
+        let (m, _) = s.apply_model(&m.id, &Default::default()).unwrap();
+        for (sym, p) in [("BTC/USDT", 42000), ("ETH/USDT", 2500)] {
+            s.create_record(&m, &serde_json::json!({ "symbol": sym, "price": p }).as_object().unwrap().clone()).unwrap();
+        }
+        let r = s.create_report("Ideas", "").unwrap();
+        let mut sec = NewSection::new(SectionKind::Model);
+        sec.params.model = Some(m.id.clone());
+        sec.params.conditions = vec![crate::rules::parse_condition("price > 10000").unwrap()];
+        s.add_section(&r.id, &sec).unwrap();
+        let d = report(&s, &r.id).unwrap();
+        let txt = crate::render::text::write(&d, 120);
+        assert!(txt.contains("BTC/USDT") && !txt.contains("ETH/USDT"), "{txt}");
+        assert!(txt.contains("symbol") && txt.contains("price"), "{txt}");
+        let csv = tables_csv(&d);
+        assert!(csv.contains("BTC/USDT"), "{csv}");
     }
 }

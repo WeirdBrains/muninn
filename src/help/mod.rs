@@ -192,6 +192,7 @@ mod tests {
             "sidebar",
             "import",
             "rules",
+            "models",
         ] {
             assert!(topic(id).is_some(), "missing docs/{id}.md");
         }

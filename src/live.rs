@@ -10,6 +10,7 @@ use std::collections::HashMap;
 pub enum Found {
     Series { series: SeriesInfoOut },
     Entry { journal: String, journal_name: String, entry: Entry },
+    Record { model: String, model_name: String, record: crate::store::Record },
 }
 
 /// A series match (serializable copy of [`SeriesInfo`]).
@@ -45,6 +46,7 @@ impl Found {
                 format!("{}\t{}\t{}\t{} bars\t{} → {}", s.symbol, s.source, s.duration, s.bars, &s.first[..10], &s.last[..10])
             }
             Found::Entry { journal_name, entry, .. } => format!("{}\t{journal_name}\t{}", entry.short_id(), entry.heading()),
+            Found::Record { model_name, record, .. } => format!("{}\t{model_name}\t{}", record.short_id(), record_brief(record)),
         }
     }
 }
@@ -95,12 +97,64 @@ pub fn entry_matches(store: &Store, spec: &SearchSpec) -> crate::Result<Vec<(Jou
     Ok(v.into_iter().filter_map(|(_, e)| journals.get(&e.journal_id).cloned().map(|j| (j, e))).collect())
 }
 
+/// A record's values on one line: `price=1.5 side=buy`.
+pub fn record_brief(r: &crate::store::Record) -> String {
+    r.values
+        .iter()
+        .filter(|(_, v)| !v.is_null())
+        .take(6)
+        .map(|(k, v)| {
+            let s = crate::designer::value_text(v);
+            let s: String = if s.chars().count() > 40 { format!("{}…", s.chars().take(39).collect::<String>()) } else { s };
+            format!("{k}={s}")
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Records matching a spec: one model (or every model but bars), newest first (`desc`
+/// flips), best matches first with a query. Models lacking a field the conditions name
+/// are skipped.
+pub fn record_matches(store: &Store, spec: &SearchSpec) -> crate::Result<Vec<(crate::store::Model, crate::store::Record)>> {
+    let models = match &spec.model {
+        Some(id) => vec![store.model(id)?.ok_or_else(|| crate::Error::invalid("model", format!("`{id}` no longer exists")))?],
+        None => store.models()?.into_iter().filter(|m| !m.is_bars()).collect(),
+    };
+    let mut filter = spec.conditions.clone();
+    if let Some(f) = spec.filters.from {
+        filter.push(crate::store::Condition { field: "_created_at".into(), op: crate::store::Op::Ge, value: f.to_string() });
+    }
+    if let Some(t) = spec.filters.to {
+        filter.push(crate::store::Condition { field: "_created_at".into(), op: crate::store::Op::Le, value: t.to_string() });
+    }
+    let sort = if spec.query.trim().is_empty() { vec![("_created_at".to_string(), !spec.desc)] } else { vec![] };
+    let mut out = vec![];
+    for m in models.into_iter().filter(|m| m.version > 0) {
+        let q = crate::store::RecordQuery { filter: filter.clone(), text: spec.query.clone(), sort: sort.clone(), ..Default::default() };
+        match store.records(&m, &q) {
+            Ok(v) => out.extend(v.into_iter().map(|r| (m.clone(), r))),
+            Err(e) if spec.model.is_none() => tracing::debug!("live search skips model {}: {e}", m.name),
+            Err(e) => return Err(e),
+        }
+    }
+    if spec.query.trim().is_empty() && spec.model.is_none() {
+        out.sort_by_key(|(_, r)| std::cmp::Reverse(r.created_at));
+        if spec.desc {
+            out.reverse();
+        }
+    }
+    Ok(out)
+}
+
 /// Run a spec on the current data.
 pub fn run(store: &Store, spec: &SearchSpec) -> crate::Result<Vec<Found>> {
     Ok(match spec.target {
         SearchTarget::Series => series_matches(store, spec)?.iter().map(|s| Found::Series { series: s.into() }).collect(),
         SearchTarget::Journals => {
             entry_matches(store, spec)?.into_iter().map(|(j, e)| Found::Entry { journal: j.id, journal_name: j.name, entry: e }).collect()
+        }
+        SearchTarget::Records => {
+            record_matches(store, spec)?.into_iter().map(|(m, r)| Found::Record { model: m.id, model_name: m.name, record: r }).collect()
         }
     })
 }
@@ -149,6 +203,22 @@ pub fn describe_item(store: &Store, it: &crate::store::ProjectItem) -> (String, 
         crate::store::ItemKind::RuleSet => match store.rule(&it.ref_id).ok().flatten() {
             Some(r) => (r.name.clone(), crate::rules::brief(&r)),
             None => ("(removed rule)".into(), String::new()),
+        },
+        crate::store::ItemKind::Model => match store.model(&it.ref_id).ok().flatten() {
+            Some(m) => {
+                let n = store.count_records(&m).unwrap_or(0);
+                (
+                    m.name.clone(),
+                    format!(
+                        "v{} · {} field{} · {n} record{}",
+                        m.version,
+                        m.design.fields.len(),
+                        if m.design.fields.len() == 1 { "" } else { "s" },
+                        if n == 1 { "" } else { "s" }
+                    ),
+                )
+            }
+            None => ("(removed model)".into(), String::new()),
         },
     }
 }
@@ -205,6 +275,36 @@ mod tests {
         assert_eq!(v.len(), 1);
         assert!(v[0].line().contains("Breakout"));
         let all = SearchSpec { target: SearchTarget::Journals, ..Default::default() };
+        assert_eq!(count(&s, &all), 2);
+    }
+
+    #[test]
+    fn record_searches() {
+        use crate::store::{Design, FieldOp};
+        let s = Store::open_in_memory().unwrap();
+        let (m, _) = s.create_model("signals", "", Design::default(), false).unwrap();
+        s.edit_model(&m.id, &[FieldOp::Add { spec: "symbol:text!".into() }, FieldOp::Add { spec: "price:real".into() }]).unwrap();
+        let (m, _) = s.apply_model(&m.id, &Default::default()).unwrap();
+        let (n, _) = s.create_model("notes", "", Design::default(), false).unwrap();
+        s.edit_model(&n.id, &[FieldOp::Add { spec: "text:text".into() }]).unwrap();
+        let (n, _) = s.apply_model(&n.id, &Default::default()).unwrap();
+        for (sym, p) in [("BTC/USDT", "42000"), ("ETH/USDT", "2500")] {
+            s.create_record(&m, &serde_json::json!({ "symbol": sym, "price": p }).as_object().unwrap().clone()).unwrap();
+        }
+        s.create_record(&n, &serde_json::json!({ "text": "btc looks strong" }).as_object().unwrap().clone()).unwrap();
+        // text over every model (not bars)
+        let spec = SearchSpec { target: SearchTarget::Records, query: "btc".into(), ..Default::default() };
+        let v = run(&s, &spec).unwrap();
+        assert_eq!(v.len(), 2, "{:?}", v.iter().map(Found::line).collect::<Vec<_>>());
+        // one model with conditions; models without the field are skipped when searching all
+        let cond = vec![crate::rules::parse_condition("price > 10000").unwrap()];
+        let one = SearchSpec { target: SearchTarget::Records, model: Some(m.id.clone()), conditions: cond.clone(), ..Default::default() };
+        let v = run(&s, &one).unwrap();
+        assert!(v.len() == 1 && v[0].line().contains("BTC/USDT"));
+        let all = SearchSpec { target: SearchTarget::Records, conditions: cond, ..Default::default() };
+        assert_eq!(count(&s, &all), 1);
+        // results follow the data
+        s.create_record(&m, &serde_json::json!({ "symbol": "SOL/USDT", "price": 20000 }).as_object().unwrap().clone()).unwrap();
         assert_eq!(count(&s, &all), 2);
     }
 }

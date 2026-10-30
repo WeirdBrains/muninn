@@ -47,6 +47,8 @@ pub enum OwnerKind {
     Standalone,
     Journal,
     LiveSearch,
+    /// A designed model (`docs/models.md`).
+    Model,
 }
 
 impl OwnerKind {
@@ -55,12 +57,14 @@ impl OwnerKind {
             OwnerKind::Standalone => "standalone",
             OwnerKind::Journal => "journal",
             OwnerKind::LiveSearch => "live_search",
+            OwnerKind::Model => "model",
         }
     }
     pub fn parse(s: &str) -> Self {
         match s {
             "journal" => OwnerKind::Journal,
             "live_search" => OwnerKind::LiveSearch,
+            "model" => OwnerKind::Model,
             _ => OwnerKind::Standalone,
         }
     }
@@ -131,6 +135,7 @@ pub enum ItemRef {
     LiveSearch(String),
     Journal(String),
     Report(String),
+    Model(String),
 }
 
 /// One then-action. Targets are ids; `None` means "the rule's own" (its journal, live
@@ -175,6 +180,66 @@ pub enum Then {
         journal: Option<String>,
         text: String,
     },
+    /// Create a model (fields in the designer syntax, applied unless `draft`); nothing
+    /// happens if one with the name exists. The name is a template.
+    ModelCreate {
+        name: String,
+        #[serde(default)]
+        fields: String,
+        #[serde(default)]
+        about: String,
+        #[serde(default)]
+        draft: bool,
+    },
+    /// Change a model's design: the changes go into its draft, applied at once with `apply`.
+    ModelEdit {
+        #[serde(default)]
+        model: Option<String>,
+        ops: Vec<super::FieldOp>,
+        #[serde(default)]
+        apply: bool,
+        #[serde(default)]
+        destructive: bool,
+    },
+    /// Apply a model's draft (a migration); `destructive` allows losing values.
+    ModelApply {
+        #[serde(default)]
+        model: Option<String>,
+        #[serde(default)]
+        destructive: bool,
+    },
+    /// Remove a model; `destructive` allows it when it has records.
+    ModelRemove {
+        #[serde(default)]
+        model: Option<String>,
+        #[serde(default)]
+        destructive: bool,
+    },
+    /// Create a record; values are templates (`price={close}`).
+    RecordCreate {
+        #[serde(default)]
+        model: Option<String>,
+        values: serde_json::Map<String, serde_json::Value>,
+    },
+    /// Change one record (`id`) or every record meeting `where`.
+    RecordUpdate {
+        #[serde(default)]
+        model: Option<String>,
+        #[serde(default)]
+        id: Option<String>,
+        #[serde(default, rename = "where")]
+        filter: Vec<Condition>,
+        values: serde_json::Map<String, serde_json::Value>,
+    },
+    /// Delete one record (`id`) or every record meeting `where`.
+    RecordDelete {
+        #[serde(default)]
+        model: Option<String>,
+        #[serde(default)]
+        id: Option<String>,
+        #[serde(default, rename = "where")]
+        filter: Vec<Condition>,
+    },
 }
 
 impl Then {
@@ -188,6 +253,13 @@ impl Then {
             Then::AddToProject { .. } => "add-to-project",
             Then::WriteEntry { .. } => "entry",
             Then::AddNote { .. } => "note",
+            Then::ModelCreate { .. } => "model-create",
+            Then::ModelEdit { .. } => "model-edit",
+            Then::ModelApply { .. } => "model-apply",
+            Then::ModelRemove { .. } => "model-remove",
+            Then::RecordCreate { .. } => "record-create",
+            Then::RecordUpdate { .. } => "record-update",
+            Then::RecordDelete { .. } => "record-delete",
         }
     }
 }
@@ -364,6 +436,7 @@ impl Store {
             (OwnerKind::Standalone, _) => Ok(None),
             (OwnerKind::Journal, Some(i)) if self.journal(i)?.is_some() => Ok(Some(i.to_string())),
             (OwnerKind::LiveSearch, Some(i)) if self.live_search(i)?.is_some() => Ok(Some(i.to_string())),
+            (OwnerKind::Model, Some(i)) if self.model(i)?.is_some() => Ok(Some(i.to_string())),
             (k, i) => Err(Error::invalid("rule owner", format!("{} `{}` not found", k.as_str(), i.unwrap_or("")))),
         }
     }

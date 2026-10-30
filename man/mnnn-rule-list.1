@@ -8,7 +8,7 @@ mnnn\-rule\-list \- List rules
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn rule list\fR [\fB\-\-home\fR] [\fB\-\-project\fR] [\fB\-\-db\fR] [\fB\-\-journal\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-search\fR] [\fB\-\-json\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn rule list\fR [\fB\-\-home\fR] [\fB\-\-project\fR] [\fB\-\-db\fR] [\fB\-\-journal\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-search\fR] [\fB\-\-model\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-json\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -44,11 +44,14 @@ May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable
 \fB\-\-search\fR \fI<SEARCH>\fR
 Only the rules living in this live search
 .TP
-\fB\-\-json\fR
-
+\fB\-\-model\fR \fI<MODEL>\fR
+Only the rules living in this model
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
+.TP
+\fB\-\-json\fR
+
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data

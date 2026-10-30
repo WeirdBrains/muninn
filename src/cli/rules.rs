@@ -26,8 +26,15 @@ impl RuleSpecArgs {
     }
 }
 
-fn owner(store: &Store, journal: &Option<String>, search: &Option<String>) -> anyhow::Result<Option<(OwnerKind, Option<String>)>> {
-    Ok(if let Some(j) = journal {
+fn owner(
+    store: &Store,
+    journal: &Option<String>,
+    search: &Option<String>,
+    model: &Option<String>,
+) -> anyhow::Result<Option<(OwnerKind, Option<String>)>> {
+    Ok(if let Some(m) = model {
+        Some((OwnerKind::Model, Some(store.find_model(m)?.id)))
+    } else if let Some(j) = journal {
         Some((OwnerKind::Journal, Some(store.find_journal(j)?.id)))
     } else if let Some(s) = search {
         Some((OwnerKind::LiveSearch, Some(store.find_live_search(s)?.id)))
@@ -70,9 +77,9 @@ fn print_check(store: &Store, r: &Rule, c: &rules::Check) {
 pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
     let store = ctx.open_store()?;
     match cmd {
-        RuleCommand::Create { name, spec, project, journal, search, related, disabled, description } => {
+        RuleCommand::Create { name, spec, project, journal, search, model, related, disabled, description } => {
             let (on, when, then) = spec.parts(&store)?;
-            let (kind, id) = owner(&store, &journal, &search)?.unwrap_or((OwnerKind::Standalone, None));
+            let (kind, id) = owner(&store, &journal, &search, &model)?.unwrap_or((OwnerKind::Standalone, None));
             let project = project.map(|p| store.find_project(&p)).transpose()?;
             let spec = RuleSpec {
                 on: on.unwrap_or_default(),
@@ -94,7 +101,7 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
             }
             ctx.io.info(format!("created rule {} ({}), {}, in {}", r.name, r.short_id(), rules::brief(&r), rules::home(&store, &r)));
         }
-        RuleCommand::Edit { rule, name, description, spec, clear_if, journal, search, standalone, related, unrelated } => {
+        RuleCommand::Edit { rule, name, description, spec, clear_if, journal, search, model, standalone, related, unrelated } => {
             let r = store.find_rule(&rule)?;
             let (on, when, then) = spec.parts(&store)?;
             let mut sp = r.spec.clone();
@@ -119,19 +126,21 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
                 sp.related = related;
                 spec_changed = true;
             }
-            let owner = if standalone { Some((OwnerKind::Standalone, None)) } else { owner(&store, &journal, &search)? };
+            let owner = if standalone { Some((OwnerKind::Standalone, None)) } else { owner(&store, &journal, &search, &model)? };
             let c = RuleChange { name, description, owner, spec: spec_changed.then_some(sp) };
             let n = store.update_rule(&r.id, &c)?;
             record(&store, "rule.edit", format!("edit rule {}", n.name), params(&n));
             ctx.io.info(format!("updated rule {}, {}, in {}", n.name, rules::brief(&n), rules::home(&store, &n)));
         }
-        RuleCommand::List { project, journal, search, json } => {
+        RuleCommand::List { project, journal, search, model, json } => {
             let all = if let Some(p) = project {
                 store.project_rules(&store.find_project(&p)?.id)?
             } else if let Some(j) = journal {
                 store.owned_rules(OwnerKind::Journal, &store.find_journal(&j)?.id)?
             } else if let Some(s) = search {
                 store.owned_rules(OwnerKind::LiveSearch, &store.find_live_search(&s)?.id)?
+            } else if let Some(m) = model {
+                store.owned_rules(OwnerKind::Model, &store.find_model(&m)?.id)?
             } else {
                 store.rules()?
             };

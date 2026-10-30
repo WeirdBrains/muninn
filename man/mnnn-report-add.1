@@ -8,7 +8,7 @@ mnnn\-report\-add \- Add a section: text, records, series, a journal, a project,
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn report add\fR [\fB\-\-home\fR] [\fB\-\-title\fR] [\fB\-\-db\fR] [\fB\-\-text\fR] [\fB\-\-file\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-format\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-records\fR] [\fB\-\-from\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-to\fR] [\fB\-\-rows\fR] [\fB\-\-series\fR] [\fB\-\-journal\fR] [\fB\-\-entry\fR] [\fB\-\-project\fR] [\fB\-\-authors\fR] [\fB\-\-code\fR] [\fB\-\-at\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIREPORT\fR> 
+\fBmnnn report add\fR [\fB\-\-home\fR] [\fB\-\-title\fR] [\fB\-\-db\fR] [\fB\-\-text\fR] [\fB\-\-file\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-format\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-records\fR] [\fB\-\-from\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-to\fR] [\fB\-\-rows\fR] [\fB\-\-model\fR] [\fB\-\-where\fR] [\fB\-\-series\fR] [\fB\-\-journal\fR] [\fB\-\-entry\fR] [\fB\-\-project\fR] [\fB\-\-authors\fR] [\fB\-\-code\fR] [\fB\-\-at\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIREPORT\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -100,7 +100,13 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 Records time range end
 .TP
 \fB\-\-rows\fR \fI<ROWS>\fR
-Bars listed (the latest; 0: all). Default 20
+Bars (the latest) or model records listed (0: all). Default 20
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR
+Records of a designed model (`mnnn model list`), with its fields
+.TP
+\fB\-\-where\fR \fI<COND>\fR
+Only \-\-model records meeting a condition (`price > 3`). Repeatable
 .TP
 \fB\-\-series\fR [\fI<SEARCH>\fR]
 A table of series: what a live search matches now (id or name), or every series

@@ -44,6 +44,8 @@ pub enum ItemKind {
     /// A rule (`mnnn rule`); a project's rules make up its rule set.
     RuleSet,
     Report,
+    /// A designed model (`mnnn model`): its design, versions and records.
+    Model,
 }
 
 impl ItemKind {
@@ -54,6 +56,7 @@ impl ItemKind {
             ItemKind::Journal => "journal",
             ItemKind::RuleSet => "rule_set",
             ItemKind::Report => "report",
+            ItemKind::Model => "model",
         }
     }
     pub fn parse(s: &str) -> Option<Self> {
@@ -63,6 +66,7 @@ impl ItemKind {
             "journal" => ItemKind::Journal,
             "rule_set" => ItemKind::RuleSet,
             "report" => ItemKind::Report,
+            "model" => ItemKind::Model,
             _ => return None,
         })
     }
@@ -73,6 +77,7 @@ impl ItemKind {
             ItemKind::Journal => "journal",
             ItemKind::RuleSet => "rule",
             ItemKind::Report => "report",
+            ItemKind::Model => "model",
         }
     }
     pub fn plural(self) -> &'static str {
@@ -82,6 +87,7 @@ impl ItemKind {
             ItemKind::Journal => "journals",
             ItemKind::RuleSet => "rules",
             ItemKind::Report => "reports",
+            ItemKind::Model => "models",
         }
     }
 }
@@ -283,6 +289,7 @@ impl Store {
             ItemKind::Result => true,
             ItemKind::Report => self.report(ref_id)?.is_some(),
             ItemKind::RuleSet => self.rule(ref_id)?.is_some(),
+            ItemKind::Model => self.model(ref_id)?.is_some(),
         };
         if !exists {
             return Err(Error::invalid(kind.label(), format!("`{ref_id}` not found")));

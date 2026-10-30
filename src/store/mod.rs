@@ -8,8 +8,10 @@ pub mod archive;
 pub mod authors;
 pub mod history;
 pub mod journals;
+pub mod models;
 pub mod projects;
 mod query;
+pub mod records;
 pub mod reports;
 pub mod rules;
 pub mod runs;
@@ -17,8 +19,10 @@ pub mod searches;
 pub use authors::{Author, AuthorChange};
 pub use history::{ActionRecord, Move, NewAction, TreeRow};
 pub use journals::{Annotation, AnnotationKind, Attachment, Entry, EntryFormat, Journal, JournalDoc, Span};
+pub use models::{ApplyOpts, Design, Field, FieldOp, FieldType, Model, ModelVersion, Plan, Step};
 pub use projects::{ItemKind, Project, ProjectItem, SeriesRef};
 pub use query::{BarSort, BarSummary};
+pub use records::{Group, Record, RecordQuery};
 pub use reports::{NewSection, Report, Section, SectionChange, SectionKind, SectionParams};
 pub use rules::{Condition, ItemRef, NewRule, Op, OwnerKind, Rule, RuleChange, RuleSpec, Then};
 pub use runs::{Artifact, ImportRun};
@@ -108,6 +112,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     reports::MIGRATION,
     // 2.3: rules
     rules::MIGRATION,
+    // 2.4: model designer
+    models::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
@@ -734,6 +740,11 @@ mod tests {
         assert_eq!(s.last_import_run().unwrap().unwrap().status, "completed");
         assert!(s.authors().unwrap().is_empty() && s.actions().unwrap().is_empty());
         assert!(s.live_searches().unwrap().is_empty() && s.projects().unwrap().is_empty() && s.journals().unwrap().is_empty());
+        // the bars are records of the built-in bars model
+        let bars = s.find_model("bars").unwrap();
+        assert!(bars.builtin);
+        assert_eq!(s.count_records(&bars).unwrap(), 2);
+        assert_eq!(s.records(&bars, &Default::default()).unwrap().len(), 2);
         s.add_author("Michael", None, &[]).unwrap();
         s.record_action(&NewAction::new("filter", "cli", "x")).unwrap();
         drop(s);
@@ -772,6 +783,7 @@ mod tests {
 
     #[test]
     fn a_2_2_database_migrates_and_gains_rules() {
+        let upto = MIGRATIONS.len() - 2;
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join("v22.database");
         let key = [3u8; 32];
@@ -781,7 +793,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.migrate_to(upto).unwrap();
             report = s.create_report("R", "").unwrap().id;
             s.record_action(&NewAction::new("report.create", "cli", "create report R")).unwrap();
         }
@@ -795,6 +807,36 @@ mod tests {
         drop(s);
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.rules().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_2_3_database_migrates_and_gains_models() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v23.database");
+        let key = [4u8; 32];
+        let rule;
+        {
+            // a v2.3 database: everything up to rules, with bars
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store::wrap(conn);
+            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            let src = s.add_source("binance", "file", None).unwrap();
+            s.upsert_bars(&src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0)]).unwrap();
+            let spec = RuleSpec { on: vec!["*".into()], then: vec![Then::Status { text: "x".into() }], ..Default::default() };
+            rule = s.create_rule(&NewRule { name: "r".into(), spec, enabled: true, ..Default::default() }).unwrap().id;
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        assert!(s.rule(&rule).unwrap().is_some());
+        let all = s.models().unwrap();
+        assert_eq!((all.len(), all[0].id.as_str(), all[0].builtin), (1, "bars", true));
+        assert_eq!(s.count_records(&all[0]).unwrap(), 1);
+        let d = Design { fields: vec![Field::new("note", FieldType::Text)] };
+        s.create_model("trades", "", d, true).unwrap();
+        drop(s);
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.find_model("trades").unwrap().version, 1);
     }
 
     #[test]

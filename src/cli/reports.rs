@@ -60,6 +60,12 @@ fn new_section(store: &Store, a: &SectionArgs) -> anyhow::Result<NewSection> {
         let mut s = NewSection::new(SectionKind::Project);
         s.params.project = Some(store.find_project(p)?.id);
         s
+    } else if let Some(m) = &a.model {
+        let mut s = NewSection::new(SectionKind::Model);
+        s.params.model = Some(store.find_model(m)?.id);
+        s.params.conditions = crate::designer::parse_where(&a.conditions)?;
+        s.params.rows = a.rows;
+        s
     } else if a.authors {
         NewSection::new(SectionKind::Authors)
     } else if let Some(c) = &a.code {
@@ -67,7 +73,7 @@ fn new_section(store: &Store, a: &SectionArgs) -> anyhow::Result<NewSection> {
         s.params.space = Some(c.clone());
         s
     } else {
-        return Err(anyhow!("say what the section shows: --text/--file, --records, --series, --journal, --project, --authors or --code"));
+        return Err(anyhow!("say what the section shows: --text/--file, --records, --series, --journal, --project, --model, --authors or --code"));
     };
     if a.format.is_some() && s.kind != SectionKind::Text {
         return Err(anyhow!("--format belongs to text sections"));
@@ -166,8 +172,8 @@ pub fn run(ctx: &Ctx, cmd: ReportCommand) -> anyhow::Result<()> {
             if (text.is_some() || format.is_some()) && s.kind != SectionKind::Text {
                 return Err(anyhow!("section {} shows {}; only text sections have text", s.position, s.kind.as_str()));
             }
-            if rows.is_some() && s.kind != SectionKind::Records {
-                return Err(anyhow!("--rows belongs to records sections"));
+            if rows.is_some() && !matches!(s.kind, SectionKind::Records | SectionKind::Model) {
+                return Err(anyhow!("--rows belongs to records and model sections"));
             }
             let params = rows.map(|n| {
                 let mut p = s.params.clone();
