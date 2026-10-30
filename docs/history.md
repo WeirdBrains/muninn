@@ -101,6 +101,14 @@ entry, because they never ask for the password.
 | `net.exchange.create`, `net.exchange.incoming`, `net.exchange.accept`, `net.exchange.complete`, `net.exchange.verify`, `net.exchange.revoke`, `net.exchange.restore` | CLI, TUI, node | the [key exchange](key-exchanges.md) and peer (never keys) |
 | `net.share`, `net.unshare`, `net.serve`, `net.fetch`, `net.import`, `net.search` | CLI, TUI, node | what was shared, served to or fetched from which peer |
 | `net.shard.entrust`, `net.shard.restore`, `net.shard.hold`, `net.shard.release`, `net.shard.drop` | CLI, TUI, node | the [dark shard](dark-shards.md) set and exchanges (never shards) |
+| `org.create`, `org.edit`, `org.remove` | CLI, TUI | the [organization](organizations.md) and what changed |
+| `org.role.create`, `org.role.edit`, `org.role.remove`, `org.defaults` | CLI, TUI, node | the role, its rank and permissions, or the default roles |
+| `org.member.apply`, `org.member.approve`, `org.member.reject`, `org.member.invite`, `org.member.join`, `org.member.role`, `org.member.kick`, `org.member.leave` | CLI, TUI, node | the member, their role and who acted (never keys) |
+| `org.apply`, `org.joined`, `org.leave`, `org.removed` | CLI, TUI, node | an org on another node: applying, joining, leaving, being removed |
+| `org.resource.add`, `org.resource.state`, `org.resource.remove`, `org.publish`, `org.unpublish`, `org.transfer` | CLI, TUI, node | the resource, its state or where it is published |
+| `org.project.add`, `org.project.remove`, `org.project.member`, `org.endpoint.add`, `org.endpoint.remove`, `org.template.save`, `org.template.asset` | CLI, TUI | the org's projects, endpoints and templates |
+| `org.call`, `org.serve`, `org.mirror` | CLI, node, web | endpoint calls, what was served to whom, mirrors |
+| `org.host.start`, `org.host.stop`, `org.host.acme`, `org.host.cert` | CLI, TUI, host | the [site](org-hosting.md), its address and certificate (never keys) |
 | `rule.run` | rules | the rule, the action that triggered it, its status (`ok`, `failed`, `blocked`); what it did is recorded under it |
 
 Stepping back over these actions moves the head only; it does not undo the change

@@ -18,7 +18,7 @@ Set up ACME (Let\*(Aqs Encrypt), or turn it off with \-\-off
 .SH OPTIONS
 .TP
 \fB\-\-domain\fR \fI<DOMAIN>\fR
-
+The public name the certificate is for (it must point at this machine)
 .TP
 \fB\-\-home\fR \fI<DIR>\fR
 Muninn home directory (default ~/.muninn)
@@ -33,7 +33,7 @@ May also be specified with the \fBMUNINN_DB\fR environment variable.
 .RE
 .TP
 \fB\-\-email\fR \fI<EMAIL>\fR
-
+Contact address given to the CA
 .TP
 \fB\-\-directory\fR \fI<DIRECTORY>\fR
 letsencrypt, letsencrypt\-staging or a directory URL
@@ -45,7 +45,7 @@ May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable
 .RE
 .TP
 \fB\-\-profile\fR \fI<PROFILE>\fR
-Certificate profile (shortlived; `\\"\\"` for the CA\*(Aqs default)
+Certificate profile (shortlived; an empty value for the CA\*(Aqs default)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
@@ -60,7 +60,7 @@ May also be specified with the \fBMUNINN_QUIET\fR environment variable.
 .RE
 .TP
 \fB\-\-off\fR
-
+Turn ACME off (back to self\-signed certificates)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation

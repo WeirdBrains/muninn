@@ -45,6 +45,11 @@ autostart = false
 | `net.relay_server` | `false` | relay traffic for other nodes |
 | `net.relays`, `net.bootstrap` | `[]` | relays to reserve a slot on; nodes to join the wide network through |
 | `net.autostart` | `false` | start the node when the TUI opens |
+| `hosting.bind` | `127.0.0.1` | address [org sites](org-hosting.md) listen on (`0.0.0.0` or `::`: other machines) |
+| `hosting.port` | `8443` | HTTPS port for pages, JSON and gRPC |
+| `hosting.names`, `hosting.cert_days` | `[]`, `7` | extra self-signed certificate names; its life in days |
+| `hosting.acme.enabled`, `.domain`, `.email` | off | Let's Encrypt, on with a domain and an email (`mnnn org cert acme`) |
+| `hosting.acme.directory`, `.profile`, `.http_port` | `letsencrypt`, `shortlived`, `80` | the CA, certificate profile and HTTP-01 port |
 | `tui.layout` | one list tile | the current [tiling layout](tiling.md), saved on every change |
 | `tui.layouts.<name>` | none | named layouts |
 

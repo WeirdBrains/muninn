@@ -84,6 +84,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `D` | the [model designer](models.md) |
 | `C` | the [code spaces](code-spaces.md) window (`n` new, Enter edit, `r` run) |
 | `K` | the [network](network.md) window (node status first) |
+| `G` | the [organizations](organizations.md) window |
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
@@ -101,6 +102,13 @@ node, `g` refresh; Peers `c` connect, `l` label, `d` forget; Relays `a` add, `d`
 (Enter imports), `l` label, `r` revoke, `e` export; Shared `a` share, `d` unshare; Dark
 shards `d` drop a held shard; Search Enter runs a saved search across peers; Settings
 Enter edits or toggles.
+In the organizations window: Tab / ← → / `1`–`6` change page, `g` refresh; Orgs `n` new,
+Enter pick, `r` rename, `v` visibility, `o` access, `h` hosted, `m` member sign-in, `d`
+delete; Members `i` invite, Enter details, `a` approve, `x` reject, `o` role, `k` kick;
+Roles `n` new, `e` / Enter permissions, `P` all permissions, `a` / `i` apply / invite
+default, `d` remove; Resources `a` add, `p` / Enter publish, `z` archive, `d` release;
+Joined `b` browse, `A` apply, `j` join, `s` sync, `m` mirror, `l` leave; Site `S` / Enter
+start or stop, `X` stop, `e` ACME.
 In a code space's editor: `e` edits the source (Esc stops), `s` / Ctrl-S saves, `b`
 builds, `r` / Ctrl-R runs, `c` checks, `i` sets the input, `t` widens the result tile.
 Full tables: [code spaces](code-spaces.md), [models](models.md), [live searches](live-searches.md),

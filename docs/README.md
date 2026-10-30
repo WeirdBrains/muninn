@@ -35,6 +35,8 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Network](network.md): the node, peers, relays, sharing and searching across peers; the Network menu
 - [Key exchanges](key-exchanges.md): offers, answers, short codes, verifying, revoking, backups
 - [Dark shards](dark-shards.md): the master key split among peers, sealed so they cannot read it
+- [Organizations](organizations.md): roles, members, resources, endpoints and templates; the Organizations menu
+- [Org hosting](org-hosting.md): HTTPS sites with HTML, JSON and gRPC, signed member requests, Let's Encrypt
 
 ## Getting data in and out
 

@@ -169,6 +169,8 @@ mod tests {
         for id in [
             "README",
             "cli",
+            "organizations",
+            "org-hosting",
             "ingest-csv",
             "ingest-json",
             "services/http",

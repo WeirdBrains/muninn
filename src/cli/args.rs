@@ -2751,19 +2751,22 @@ pub enum OrgCertCommand {
     },
     /// Set up ACME (Let's Encrypt), or turn it off with --off.
     Acme {
+        /// The public name the certificate is for (it must point at this machine).
         #[arg(long)]
         domain: Option<String>,
+        /// Contact address given to the CA.
         #[arg(long)]
         email: Option<String>,
         /// letsencrypt, letsencrypt-staging or a directory URL.
         #[arg(long)]
         directory: Option<String>,
-        /// Certificate profile (shortlived; `\"\"` for the CA's default).
+        /// Certificate profile (shortlived; an empty value for the CA's default).
         #[arg(long)]
         profile: Option<String>,
         /// Port the HTTP-01 challenge is answered on.
         #[arg(long)]
         http_port: Option<u16>,
+        /// Turn ACME off (back to self-signed certificates).
         #[arg(long)]
         off: bool,
     },

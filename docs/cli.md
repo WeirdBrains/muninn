@@ -21,6 +21,11 @@ mnnn [GLOBAL FLAGS] <COMMAND>
   model    list|types|create|edit|show|plan|apply|discard|history|rollback|remove|
            record create|update|list|show|delete
   code     list|create|edit|show|remove|approve|build|run|check|sdk
+  net      start|stop|status|peers|connect|forget|relay|config|exchange|share|unshare|
+           shared|list|fetch|search|shard
+  org      create|edit|remove|list|show|role|member|resource|publish|unpublish|project|
+           endpoint|call|template|browse|apply|join|sync|leave|fetch|give|mirror|sign|
+           host start|stop|status|cert status|acme|renew
   tui
   help     [TOPIC] [--search TEXT]
 ```
@@ -74,6 +79,8 @@ mnnn model create trades --fields "symbol:text!; price:real; side:text choices=b
 mnnn model record list trades --where "price > 3000" --sort -price
 mnnn code create fast --lang math --model bars --group symbol --source "fast = sma(close, 10)"
 mnnn code run fast -y
+mnnn org create "Comet Lab" --public
+mnnn org host start --port 8443
 mnnn help keys
 mnnn help --search shard
 ```
