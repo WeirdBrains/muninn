@@ -130,6 +130,8 @@ fn every_category_fits_at_80_columns_and_dropdowns_stay_below_the_bar() {
     let all = menu::all_actions();
     for x in [
         Action::NetExchanges,
+        Action::NetConnections,
+        Action::NetInvites,
         Action::NetInvite,
         Action::NetEntrust,
         Action::NetShards,

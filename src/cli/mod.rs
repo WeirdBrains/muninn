@@ -19,6 +19,7 @@ mod reports;
 mod review;
 mod rules;
 mod searches;
+mod users;
 pub use args::*;
 
 use crate::interact::Interact;
@@ -133,6 +134,9 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Net(c) => net::run(&ctx, c),
         Command::Org(c) => org::run(&ctx, c),
         Command::Review(c) => review::run(&ctx, c),
+        Command::User(c) => users::user(&ctx, c),
+        Command::Connection(c) => users::connection(&ctx, c),
+        Command::Invite(c) => users::invite(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }

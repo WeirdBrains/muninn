@@ -381,6 +381,8 @@ impl App {
             NetPeers => network::open(self, network::Tab::Peers),
             NetRelays => network::open(self, network::Tab::Relays),
             NetExchanges => network::open(self, network::Tab::Exchanges),
+            NetConnections => network::open(self, network::Tab::Users),
+            NetInvites => network::open(self, network::Tab::Invites),
             NetShared => network::open(self, network::Tab::Shared),
             NetShards => network::open(self, network::Tab::Shards),
             NetEntrust => network::open_entrust(self),

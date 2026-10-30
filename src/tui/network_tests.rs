@@ -273,6 +273,26 @@ fn connections_are_automatic_and_shards_go_to_picked_nodes() {
     a.dispatch(Action::NetExchanges);
     assert_eq!(screen_text(&mut a).matches("connected").count(), 2);
 
+    // they are untrusted connections: none is offered for shards until trusted
+    let t = Instant::now();
+    while a.store.connections().unwrap().len() < 2 {
+        assert!(t.elapsed() < Duration::from_secs(20), "users not introduced");
+        std::thread::sleep(Duration::from_millis(50));
+        a.tick();
+    }
+    a.dispatch(Action::NetEntrust);
+    assert!(a.network.entrust.as_ref().unwrap().peers.is_empty());
+    assert!(a.network.msg.as_ref().unwrap().0.contains("untrusted"), "{:?}", a.network.msg);
+    a.on_key(key(KeyCode::Esc));
+    a.dispatch(Action::NetConnections);
+    let text = screen_text(&mut a);
+    assert!(text.contains("untrusted") && text.contains("you:"), "{text}");
+    a.on_key(key(KeyCode::Char('t')));
+    a.on_key(key(KeyCode::Down));
+    a.on_key(key(KeyCode::Char('t')));
+    assert!(a.store.connections().unwrap().iter().all(|c| c.trusted));
+    assert!(kinds(&a).contains(&"connection.trust".to_string()));
+
     // entrust: pick both nodes, the threshold is suggested, passwords are masked
     a.dispatch(Action::NetEntrust);
     assert_eq!(a.network.entrust.as_ref().unwrap().peers.len(), 2);
@@ -322,4 +342,31 @@ fn connections_are_automatic_and_shards_go_to_picked_nodes() {
     for x in [&mut a, &mut b, &mut c] {
         x.dispatch(Action::NetStop);
     }
+}
+
+#[test]
+fn invites_page_lists_and_withdraws_invites() {
+    let (_t, mut a) = app();
+    a.dispatch(Action::NetInvites);
+    assert_eq!(a.network.tab, Tab::Invites);
+    assert!(screen_text(&mut a).contains("no open invites"));
+    a.on_key(key(KeyCode::Char('n')));
+    typ(&mut a, "\n");
+    a.dispatch(Action::NetInvites);
+    let text = screen_text(&mut a);
+    assert!(text.contains("invite") && text.contains("anyone with the link"), "{text}");
+    a.on_key(key(KeyCode::Enter));
+    assert!(a.network.detail.iter().any(|l| l.starts_with("muninn://join/")), "{:?}", a.network.detail);
+    a.on_key(key(KeyCode::Char('d')));
+    assert!(a.network.msg.as_ref().unwrap().1);
+    a.on_key(key(KeyCode::Char('r')));
+    a.on_key(key(KeyCode::Char('y')));
+    assert_eq!(a.store.exchanges().unwrap()[0].status, ExchangeStatus::Revoked);
+    assert!(screen_text(&mut a).contains("no open invites"));
+    // digits reach the new pages: 9 Connections, 0 Invites
+    a.on_key(key(KeyCode::Char('9')));
+    assert_eq!(a.network.tab, Tab::Users);
+    assert!(screen_text(&mut a).contains("no connections yet"));
+    a.on_key(key(KeyCode::Char('0')));
+    assert_eq!(a.network.tab, Tab::Invites);
 }

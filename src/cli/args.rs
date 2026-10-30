@@ -109,6 +109,17 @@ pub enum Command {
     /// entry, journal, project, live search or record; accept, reject and merge what they say.
     #[command(subcommand, alias = "reviews", after_long_help = REVIEW_NOTES)]
     Review(ReviewCommand),
+    /// You as a user: your identity across your nodes, linking another node to it and
+    /// revoking one.
+    #[command(subcommand, alias = "users", after_long_help = USER_NOTES)]
+    User(UserCommand),
+    /// Connections: the users your nodes know, trusted or untrusted (default untrusted).
+    #[command(subcommand, alias = "connections", after_long_help = CONNECTION_NOTES)]
+    Connection(ConnectionCommand),
+    /// Invites: links that connect, bring someone into an org or a review; list, revoke and
+    /// accept them.
+    #[command(subcommand, alias = "invites", after_long_help = INVITE_NOTES)]
+    Invite(InviteCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -1742,6 +1753,131 @@ Examples:
   mnnn net shard restore --backup net-backup.age --recover
 
 See `mnnn help network`, `mnnn help key-exchanges` and `mnnn help dark-shards`.";
+
+pub const USER_NOTES: &str = "\
+Your user identity is a signing key of its own, made on first use and named after the current
+author. It certifies each node that acts for you; peers check those certificates, so a phone or
+a second computer is recognised as you. Linking: on the new node run `mnnn user link TARGET`
+(an address, peer or invite link of one of your nodes), then approve it there with
+`mnnn user approve`. A revoked node stays revoked; peers learn it the next time they talk.
+
+Examples:
+  mnnn user show
+  mnnn user label \"Ada Lovelace\"
+  mnnn user link muninn://join/…
+  mnnn user approve phone
+  mnnn user nodes
+  mnnn user revoke phone
+";
+
+pub const CONNECTION_NOTES: &str = "\
+Connecting to a node (an invite link or `mnnn net connect`) also tells both sides whom the
+other node acts for; that user becomes a connection, untrusted until you trust it. Trust
+changes are kept in history. Dark shards only go to trusted connections.
+
+Examples:
+  mnnn connection list
+  mnnn connection trust ben
+  mnnn connection trust ben --off
+  mnnn connection remove ben
+";
+
+pub const INVITE_NOTES: &str = "\
+An invite is a signed, expiring link (`muninn://join/…`) that holds no secret. `create` makes one
+to connect (default), to join an org (--org) or to review (--review). The other side uses it
+with `mnnn invite accept LINK`. `list` shows the links you made and the requests waiting for
+you; `revoke` withdraws an unused one.
+
+Examples:
+  mnnn invite create --label ben
+  mnnn invite create --org research --role member
+  mnnn invite create --review draft-1
+  mnnn invite list
+  mnnn invite revoke 3f2a
+  mnnn invite accept muninn://join/…
+";
+
+#[derive(Debug, Subcommand)]
+pub enum UserCommand {
+    /// Your user: id, name and linked nodes.
+    Show {
+        #[arg(long)]
+        json: bool,
+    },
+    /// The users this node knows (you, connections, org members, reviewers).
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Rename your user (peers see it the next time they talk).
+    Label { name: String },
+    /// The nodes linked to a user (default: you), revoked ones too.
+    Nodes {
+        user: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Link this node to the user of another node of yours (address, peer, name or invite
+    /// link); that node's owner approves it.
+    Link { target: String },
+    /// Approve a node asking to link to you (default: the only request).
+    Approve { request: Option<String> },
+    /// Revoke one of your nodes (peer id, its end, or label); it no longer acts for you.
+    Revoke { node: String },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ConnectionCommand {
+    /// Your connections, with trust.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Trust a connection (or stop trusting it with --off).
+    Trust {
+        user: String,
+        #[arg(long)]
+        off: bool,
+    },
+    /// Forget a connection (the key exchange stays; trust is reset).
+    Remove { user: String },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum InviteCommand {
+    /// Make an invite link: to connect (default), to an org (--org) or a review (--review).
+    Create {
+        /// Call whoever uses it this.
+        #[arg(long, default_value = "")]
+        label: String,
+        #[arg(long, conflicts_with = "review")]
+        org: Option<String>,
+        /// The role for an org invite (default: the org's invite role).
+        #[arg(long, requires = "org")]
+        role: Option<String>,
+        #[arg(long)]
+        review: Option<String>,
+        /// Send it straight to a known peer instead of printing it.
+        #[arg(long)]
+        peer: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// The invites you made and the requests waiting for you.
+    List {
+        /// Expired, used and revoked ones too.
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Withdraw an invite you made (id or its start).
+    Revoke { invite: String },
+    /// Use an invite link, or accept a request (id or name).
+    Accept { invite: String },
+    /// Turn down a request.
+    Decline { request: String },
+}
 
 /// Network commands.
 #[allow(clippy::large_enum_variant)]

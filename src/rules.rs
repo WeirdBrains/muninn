@@ -182,6 +182,18 @@ pub const EVENTS: &[Event] = &[
     Event { kind: "net.exchange.verify", about: "a key exchange's short code checked", fields: NET_X },
     Event { kind: "net.exchange.revoke", about: "a key exchange ended (by: me or peer)", fields: NET_X },
     Event { kind: "net.exchange.restore", about: "key exchanges restored from a backup", fields: &["count: exchanges restored"] },
+    Event { kind: "net.exchange.decline", about: "a request turned down", fields: NET_X },
+    Event {
+        kind: "connection.add",
+        about: "a new user met over an exchange (untrusted)",
+        fields: &["user: user id", "peer: their node", "trusted: false"],
+    },
+    Event { kind: "connection.trust", about: "a connection trusted or untrusted", fields: &["user: user id", "trusted: true or false"] },
+    Event { kind: "connection.remove", about: "a connection forgotten", fields: &["user: user id"] },
+    Event { kind: "user.node.approve", about: "a node allowed to link to this user", fields: &["exchange: exchange id", "peer: peer id"] },
+    Event { kind: "user.node.link", about: "a node linked to this user", fields: &["user: user id", "peer: peer id"] },
+    Event { kind: "user.node.revoke", about: "a linked node revoked", fields: &["user: user id", "peer: peer id"] },
+    Event { kind: "user.link", about: "this node became part of another user", fields: &["user: user id", "by: the approving node"] },
     Event { kind: "net.share", about: "an item shared on the network", fields: NET_SHARE },
     Event { kind: "net.unshare", about: "an item no longer shared", fields: NET_SHARE },
     Event {

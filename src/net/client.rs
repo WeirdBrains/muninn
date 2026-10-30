@@ -267,11 +267,15 @@ pub fn accept(
             s.upsert_net_peer(&o.peer, Some(&o.label), &o.addrs, None, None, "exchange")?;
             crate::org::net::answered(s, &x)?;
             crate::review::net::answered(s, &x)?;
+            let mut refused: Option<String> = None;
             let delivered = node.map(|n| {
                 let addrs = peer_addrs(s, &from.to_string(), &[]);
                 match n.request(from, &addrs, Wire::Answer { token: atoken.clone() }) {
                     Ok(WireResp::Ok { msg }) => Ok(msg),
-                    Ok(WireResp::Error { msg }) => Err(msg),
+                    Ok(WireResp::Error { msg }) => {
+                        refused = Some(msg.clone());
+                        Err(msg)
+                    }
                     Ok(_) => Err("unexpected answer".into()),
                     Err(e) => Err(super::auto::plain(&e.to_string())),
                 }
@@ -286,6 +290,21 @@ pub fn accept(
                 format!("key exchange with {} accepted", x.title()),
                 serde_json::json!({ "exchange": x.id, "peer": x.peer_id, "fingerprint": x.fingerprint, "delivered": delivered.as_ref().map(|d| d.is_ok()) }),
             );
+            // their node turned the answer down (a revoked, used or unknown invite): it is over
+            let x = match refused {
+                Some(_) => {
+                    let x = s.set_exchange_status(&x.id, ExchangeStatus::Revoked, Some("peer"))?;
+                    record(
+                        s,
+                        origin,
+                        "net.exchange.revoke",
+                        format!("{} turned the invite down", x.title()),
+                        serde_json::json!({ "exchange": x.id, "peer": x.peer_id, "by": "peer" }),
+                    );
+                    x
+                }
+                None => x,
+            };
             Ok(Accepted { exchange: x, answer: Some(atoken), delivered })
         }
     }

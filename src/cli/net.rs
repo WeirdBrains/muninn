@@ -579,7 +579,7 @@ fn start(ctx: &Ctx, port: Option<u16>, listen: Vec<String>, no_mdns: bool, relay
 }
 
 /// One line of status, a warning if the node is not the one we know by that name.
-fn print_link(ctx: &Ctx, l: &auto::Link) {
+pub(super) fn print_link(ctx: &Ctx, l: &auto::Link) {
     if let Some(w) = &l.warning {
         ctx.io.warn(w.clone());
     }

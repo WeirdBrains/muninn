@@ -444,6 +444,11 @@ pub fn use_link(
 ) -> Result<Link> {
     let a: Accepted = client::accept(s, node, kp, link, label, my_label, addrs, origin)?;
     let peer = a.exchange.title();
+    if a.exchange.status == ExchangeStatus::Revoked
+        && let Some(Err(e)) = &a.delivered
+    {
+        return Err(Error::invalid("invite", format!("{peer} turned it down: {e}")));
+    }
     let detail = match (&a.answer, &a.delivered) {
         (Some(t), d) if !d.as_ref().is_some_and(|d| d.is_ok()) => {
             format!("connected to {peer}; their node is told when it is reachable (or send them {})", exchange::link(t))

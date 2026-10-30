@@ -6,7 +6,8 @@ use super::widgets::Input;
 use super::workspace::{Ask, Typed, View, ask_key, draw_view, muted, record, row_style};
 use super::{App, Hit};
 use crate::net::proto::{Item, SharedItem};
-use crate::net::{Node, auto, client, exchange, identity, local};
+use crate::net::{Node, auto, client, exchange, identity, local, user};
+use crate::store::users::User;
 use crate::store::{Entrusted, Exchange, ExchangeStatus, Held, LiveSearch, NetPeer, Share, ShareKind, Store};
 use libp2p::identity::Keypair;
 use ratatui::Frame;
@@ -30,20 +31,27 @@ pub enum Tab {
     Shards,
     Search,
     Settings,
+    /// The users your nodes know (2.10), trusted or not.
+    Users,
+    /// Invite links you made and requests waiting for you.
+    Invites,
 }
 
 impl Tab {
-    pub const ALL: [Tab; 8] = [Tab::Node, Tab::Peers, Tab::Relays, Tab::Exchanges, Tab::Shared, Tab::Shards, Tab::Search, Tab::Settings];
+    pub const ALL: [Tab; 10] =
+        [Tab::Node, Tab::Peers, Tab::Relays, Tab::Exchanges, Tab::Shared, Tab::Shards, Tab::Search, Tab::Settings, Tab::Users, Tab::Invites];
     pub fn title(self) -> &'static str {
         match self {
             Tab::Node => "Node",
             Tab::Peers => "Peers",
             Tab::Relays => "Relays",
-            Tab::Exchanges => "Connections",
+            Tab::Exchanges => "Nodes",
             Tab::Shared => "Shared",
             Tab::Shards => "Dark shards",
             Tab::Search => "Search",
             Tab::Settings => "Settings",
+            Tab::Users => "Connections",
+            Tab::Invites => "Invites",
         }
     }
     fn index(self) -> usize {
@@ -72,6 +80,12 @@ pub enum Confirm {
     Forget(String),
     Revoke(String),
     DropHeld(String),
+    /// Forget a connection (user id).
+    RemoveConnection(String),
+    /// Let a node that asks to link act as you (exchange id).
+    ApproveLink(String),
+    /// Withdraw an invite link you made (exchange id).
+    RevokeInvite(String),
 }
 
 /// The editable settings, in the order shown.
@@ -141,6 +155,12 @@ pub struct NetState {
     pub entrusted: Vec<Entrusted>,
     pub held: Vec<Held>,
     pub searches: Vec<LiveSearch>,
+    /// You, then your connections: (user, trusted, linked nodes).
+    pub me: Option<User>,
+    pub users: Vec<(User, bool, usize)>,
+    /// Open invites you made, then requests waiting for you.
+    pub invites: Vec<Exchange>,
+    pub requests: Vec<Exchange>,
     /// Dark shards ▸ entrust (e): open while picking nodes and typing passwords.
     pub entrust: Option<EntrustForm>,
 }
@@ -181,7 +201,7 @@ pub fn open(app: &mut App, tab: Tab) {
 
 /// Open Connections with the invite-or-connect prompt (menu: Net ▸ Invite or connect…).
 pub fn open_invite(app: &mut App) {
-    open(app, Tab::Exchanges);
+    open(app, Tab::Invites);
     app.network.ask = Some(Ask::new(NAsk::Offer, "Invite link (Enter) or connect to (address, peer id)", ""));
 }
 
@@ -194,6 +214,25 @@ fn reload(app: &mut App) {
     st.entrusted = s.entrusted().unwrap_or_default();
     st.held = s.held_shards().unwrap_or_default();
     st.searches = s.live_searches().unwrap_or_default();
+    st.me = user::load_or_create(s).ok().map(|(u, _)| u);
+    st.users = s
+        .connections()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|c| {
+            let u = s.user(&c.user_id).ok().flatten()?;
+            let n = s.user_nodes(&u.id).ok()?.iter().filter(|x| x.active()).count();
+            Some((u, c.trusted, n))
+        })
+        .collect();
+    let now = crate::store::now_ms();
+    st.invites = st
+        .exchanges
+        .iter()
+        .filter(|x| x.role == "offerer" && x.status == ExchangeStatus::Offered && x.expires_at.is_none_or(|e| e > now))
+        .cloned()
+        .collect();
+    st.requests = auto::requests(s).unwrap_or_default();
     let n = rows(app);
     app.network.sel = app.network.sel.min(n.saturating_sub(1));
 }
@@ -212,6 +251,18 @@ fn rows(app: &App) -> usize {
         Tab::Shards => st.entrusted.len() + st.held.len(),
         Tab::Search => st.searches.len(),
         Tab::Settings => SETTINGS.len(),
+        Tab::Users => st.users.len(),
+        Tab::Invites => st.invites.len() + st.requests.len(),
+    }
+}
+
+/// The selected row on the Invites page: one of yours (false) or a request (true).
+fn selected_invite(app: &App) -> Option<(Exchange, bool)> {
+    let st = &app.network;
+    let i = st.sel;
+    match st.invites.get(i) {
+        Some(x) => Some((x.clone(), false)),
+        None => st.requests.get(i - st.invites.len()).map(|x| (x.clone(), true)),
     }
 }
 
@@ -666,7 +717,8 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         }
         KeyCode::Tab | KeyCode::Right => return switch(app, (app.network.tab.index() + 1) % Tab::ALL.len()),
         KeyCode::BackTab | KeyCode::Left => return switch(app, (app.network.tab.index() + Tab::ALL.len() - 1) % Tab::ALL.len()),
-        KeyCode::Char(c @ '1'..='8') => return switch(app, c as usize - '1' as usize),
+        KeyCode::Char(c @ '1'..='9') => return switch(app, c as usize - '1' as usize),
+        KeyCode::Char('0') => return switch(app, 9),
         KeyCode::Down | KeyCode::Char('j') => {
             if let Some(r) = app.network.remote.as_mut() {
                 r.sel = (r.sel + 1).min(r.items.len().saturating_sub(1));
@@ -853,6 +905,80 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 Ok(Done::Searched { name: ls.name, results })
             });
         }
+        (Tab::Users, KeyCode::Enter) => {
+            if let Some((u, trusted, _)) = app.network.users.get(app.network.sel).cloned() {
+                let mut d = vec![format!("{} · user {} · {}", u.name(), u.id, if trusted { "trusted" } else { "untrusted" })];
+                for x in app.store.user_nodes(&u.id).unwrap_or_default() {
+                    let state = match x.revoked_at {
+                        Some(t) => format!("revoked {}", fmt_ms(t)),
+                        None => format!("linked {}", fmt_ms(x.issued_at)),
+                    };
+                    d.push(format!("  node {} {} · {state}", crate::store::net::short_peer(&x.peer_id), x.label));
+                }
+                app.network.detail = d;
+            }
+        }
+        (Tab::Users, KeyCode::Char('t')) => {
+            let Some((u, trusted, _)) = app.network.users.get(app.network.sel).cloned() else { return };
+            match user::set_trust(&app.store, &u.id, !trusted, ORIGIN) {
+                Ok((u, _)) => {
+                    reload(app);
+                    app.refresh_history(true);
+                    ok(app, format!("{} is now {}", u.name(), if trusted { "untrusted" } else { "trusted" }));
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
+        (Tab::Users, KeyCode::Char('d')) => {
+            if let Some((u, _, _)) = app.network.users.get(app.network.sel).cloned() {
+                app.network.confirm = Some(Confirm::RemoveConnection(u.id.clone()));
+                ok(app, format!("forget the connection with {}? (their nodes stay connected; trust is reset) y/n", u.name()));
+            }
+        }
+        (Tab::Invites, KeyCode::Char('n')) => ask(app, NAsk::Offer, "Invite link (Enter) or connect to (address, peer id)", ""),
+        (Tab::Invites, KeyCode::Char('p')) => ask(app, NAsk::Accept, "Paste an invite link (muninn://…)", ""),
+        (Tab::Invites, KeyCode::Char('a')) => match selected_invite(app) {
+            Some((x, true)) if exchange::scope_kind(&x.scope) == "link" => {
+                let t = x.title();
+                app.network.confirm = Some(Confirm::ApproveLink(x.id));
+                ok(app, format!("let {t} act as you? It gets your user key. y/n"));
+            }
+            Some((x, true)) => accept(app, x.id),
+            _ => err(app, "select a request to accept (p pastes an invite link)"),
+        },
+        (Tab::Invites, KeyCode::Char('d')) => match selected_invite(app) {
+            Some((x, true)) => match auto::decline(&app.store, &x.id, ORIGIN) {
+                Ok(x) => {
+                    reload(app);
+                    app.refresh_history(true);
+                    ok(app, format!("declined {}", x.title()));
+                }
+                Err(e) => err(app, e.to_string()),
+            },
+            _ => err(app, "only a request can be declined (r withdraws an invite)"),
+        },
+        (Tab::Invites, KeyCode::Char('r')) => match selected_invite(app) {
+            Some((x, false)) => {
+                app.network.confirm = Some(Confirm::RevokeInvite(x.id.clone()));
+                ok(app, format!("withdraw invite {}? The link stops working. y/n", x.short_id()));
+            }
+            _ => err(app, "select one of your invites (d declines a request)"),
+        },
+        (Tab::Invites, KeyCode::Enter) => {
+            if let Some((x, req)) = selected_invite(app) {
+                let mut d = vec![format!(
+                    "{} {} · for {} · {}",
+                    if req { "request from" } else { "invite" },
+                    if req { x.title() } else { x.short_id().to_string() },
+                    auto::purpose(&x),
+                    x.expires_at.map(|e| format!("expires {}", fmt_ms(e))).unwrap_or_default()
+                )];
+                if !req {
+                    d.push(exchange::link(&x.offer));
+                }
+                app.network.detail = d;
+            }
+        }
         (Tab::Settings, KeyCode::Enter | KeyCode::Char(' ')) => {
             let s = SETTINGS[app.network.sel.min(SETTINGS.len() - 1)];
             let p = &mut app.prefs.net;
@@ -911,6 +1037,23 @@ fn confirmed(app: &mut App, c: Confirm) {
                 Ok(Done::Lines(vec![format!("disconnected from {}; {t}", x.title())]))
             });
         }
+        Confirm::RemoveConnection(id) => match user::remove_connection(&app.store, &id, ORIGIN) {
+            Ok(u) => {
+                reload(app);
+                app.refresh_history(true);
+                ok(app, format!("connection with {} removed", u.name()));
+            }
+            Err(e) => err(app, e.to_string()),
+        },
+        Confirm::ApproveLink(id) => accept(app, id),
+        Confirm::RevokeInvite(id) => match client::revoke(&app.store, None, &id, &[], ORIGIN) {
+            Ok((x, _)) => {
+                reload(app);
+                app.refresh_history(true);
+                ok(app, format!("invite {} withdrawn", x.short_id()));
+            }
+            Err(e) => err(app, e.to_string()),
+        },
         Confirm::DropHeld(id) => match app.store.drop_held_shard(&id) {
             Ok(_) => {
                 record(app, "net.shard.drop", "dropped a held shard".into(), serde_json::json!({ "shard": id }));
@@ -1000,11 +1143,26 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
     let tabs: Vec<String> = Tab::ALL
         .iter()
         .enumerate()
-        .map(|(i, x)| if *x == st.tab { format!("[{} {}]", i + 1, x.title()) } else { format!(" {} {} ", i + 1, x.title()) })
+        .map(|(i, x)| {
+            let n = (i + 1) % 10;
+            if *x == st.tab { format!("[{n} {}]", x.title()) } else { format!(" {n} {} ", x.title()) }
+        })
         .collect();
     let busy = st.job.as_ref().map(|j| format!(" · {}…", j.what)).unwrap_or_default();
     let mut v = View::new(format!("Network · {}{busy}", st.tab.title()));
-    v.head.push(Line::styled(tabs.join(" "), Style::new().fg(t.accent)));
+    // the page names wrap onto a second line in narrow terminals
+    let room = (r.width as usize).saturating_sub(4).max(20);
+    let mut line = String::new();
+    for tb in &tabs {
+        if !line.is_empty() && line.chars().count() + 1 + tb.chars().count() > room {
+            v.head.push(Line::styled(std::mem::take(&mut line), Style::new().fg(t.accent)));
+        }
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(tb);
+    }
+    v.head.push(Line::styled(line, Style::new().fg(t.accent)));
     v.head.push(Line::raw(""));
     let fg = Style::new().fg(t.fg);
     if let Some(e) = &st.entrust {
@@ -1154,6 +1312,46 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 v.rows.push(Line::styled(format!(" {}", s.name), row_style(&t, i == st.sel)));
             }
         }
+        Tab::Users => {
+            if let Some(me) = &st.me {
+                let mine = app.store.user_nodes(&me.id).map(|n| n.iter().filter(|x| x.active()).count()).unwrap_or(1);
+                v.head.push(Line::styled(format!(" you: {} ({}) · {mine} node(s)", me.name(), me.short_id()), fg));
+            }
+            if st.users.is_empty() {
+                v.head.push(muted(&t, " no connections yet: people you connect with appear here, untrusted until t trusts them"));
+            } else {
+                v.head.push(muted(&t, " untrusted until you trust them (t); only trusted ones are offered for dark shards"));
+            }
+            for (i, (u, trusted, n)) in st.users.iter().enumerate() {
+                v.rows.push(Line::from(vec![
+                    Span::styled(format!(" {} ", if *trusted { "★" } else { "·" }), Style::new().fg(if *trusted { t.accent } else { t.muted })),
+                    Span::styled(format!("{:<20} {:<10}", u.name(), if *trusted { "trusted" } else { "untrusted" }), row_style(&t, i == st.sel)),
+                    Span::styled(format!(" {} · {n} node(s)", u.short_id()), Style::new().fg(t.muted)),
+                ]));
+            }
+        }
+        Tab::Invites => {
+            if st.invites.is_empty() && st.requests.is_empty() {
+                v.head.push(muted(&t, " no open invites or requests: n makes an invite link, p uses one"));
+            }
+            let mut i = 0;
+            for x in &st.invites {
+                let to = if x.peer_id.is_some() || !x.label.is_empty() { x.title() } else { "anyone with the link".into() };
+                let exp = x.expires_at.map(|e| format!(" · expires {}", fmt_ms(e))).unwrap_or_default();
+                v.rows.push(Line::from(vec![
+                    Span::styled(format!(" invite   {:<10} {:<20}", x.short_id(), to), row_style(&t, i == st.sel)),
+                    Span::styled(format!(" {}{exp}", auto::purpose(x)), Style::new().fg(t.muted)),
+                ]));
+                i += 1;
+            }
+            for x in &st.requests {
+                v.rows.push(Line::from(vec![
+                    Span::styled(format!(" request  {:<10} {:<20}", x.short_id(), x.title()), row_style(&t, i == st.sel)),
+                    Span::styled(format!(" {} · since {}", auto::purpose(x), fmt_ms(x.created_at)), Style::new().fg(t.muted)),
+                ]));
+                i += 1;
+            }
+        }
         Tab::Settings => {
             v.head.push(muted(&t, " Enter edits or toggles · saved to preferences · the node uses them when it starts"));
             for (i, s) in SETTINGS.iter().enumerate() {
@@ -1200,6 +1398,15 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         Tab::Shards => vec![("e entrust / check", KeyCode::Char('e')), ("d drop held", KeyCode::Char('d'))],
         Tab::Search => vec![("Enter run", KeyCode::Enter)],
         Tab::Settings => vec![("Enter edit", KeyCode::Enter)],
+        Tab::Users => vec![("Enter show", KeyCode::Enter), ("t trust", KeyCode::Char('t')), ("d forget", KeyCode::Char('d'))],
+        Tab::Invites => vec![
+            ("Enter show", KeyCode::Enter),
+            ("n invite link", KeyCode::Char('n')),
+            ("p paste link", KeyCode::Char('p')),
+            ("a accept", KeyCode::Char('a')),
+            ("d decline", KeyCode::Char('d')),
+            ("r withdraw", KeyCode::Char('r')),
+        ],
     });
     keys.push(("Esc", KeyCode::Esc));
     v.keys = keys;
@@ -1250,9 +1457,16 @@ pub fn open_entrust(app: &mut App) {
     }
     reload(app);
     let mut peers: Vec<(Exchange, bool)> = vec![];
+    let mut untrusted = 0;
     for x in app.network.exchanges.iter().filter(|x| x.status.active() && x.peer_id.is_some()) {
-        if !peers.iter().any(|(y, _)| y.peer_id == x.peer_id) {
+        if peers.iter().any(|(y, _)| y.peer_id == x.peer_id) {
+            continue;
+        }
+        // only nodes of trusted connections (or your own) are offered
+        if user::trusted_peer(&app.store, x.peer_id.as_deref().unwrap_or_default()).unwrap_or(false) {
             peers.push((x.clone(), false));
+        } else {
+            untrusted += 1;
         }
     }
     let form = Form::new(
@@ -1261,8 +1475,10 @@ pub fn open_entrust(app: &mut App) {
     );
     let none = peers.is_empty();
     app.network.entrust = Some(EntrustForm { peers, on_peers: !none, psel: 0, form, threshold_edited: false, status: vec![] });
-    if none {
-        ok(app, "no connected nodes yet: connect to two or more (Connections ▸ c) to entrust shards; Check restore still works");
+    if none && untrusted > 0 {
+        ok(app, format!("no trusted nodes: trust a connection first (Connections ▸ t); {untrusted} untrusted node(s) hidden"));
+    } else if none {
+        ok(app, "no connected nodes yet: connect to two or more (Nodes ▸ c) to entrust shards; Check restore still works");
     } else {
         ok(app, "Space picks nodes; then the key file and a shard password");
     }
@@ -1435,10 +1651,10 @@ fn check_run(app: &mut App) {
 fn entrust_lines(e: &EntrustForm, t: &crate::theme::Theme, out: &mut Vec<Line<'static>>) {
     let fg = Style::new().fg(t.fg);
     out.push(muted(t, " Split your master key into shards, each sealed with the shard password, one per node."));
-    out.push(muted(t, " Nodes you connect to are listed; nothing about the key is stored or logged here."));
+    out.push(muted(t, " Nodes of trusted connections are listed; nothing about the key is stored or logged here."));
     out.push(Line::raw(""));
     if e.peers.is_empty() {
-        out.push(muted(t, " (no connected nodes)"));
+        out.push(muted(t, " (no connected nodes of trusted connections)"));
     }
     for (i, (x, on)) in e.peers.iter().enumerate() {
         let sel = e.on_peers && i == e.psel;

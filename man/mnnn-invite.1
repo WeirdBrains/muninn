@@ -1,0 +1,111 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-invite 1  "mnnn-invite 2.9.2" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-invite \- Invites: links that connect, bring someone into an org or a review; list, revoke and accept them
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn invite\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Invites: links that connect, bring someone into an org or a review; list, revoke and accept them
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH NOTES
+.PP
+An invite is a signed, expiring link (`muninn://join/…`) that holds no secret. `create` makes one
+to connect (default), to join an org (\-\-org) or to review (\-\-review). The other side uses it
+with `mnnn invite accept LINK`. `list` shows the links you made and the requests waiting for
+you; `revoke` withdraws an unused one.
+.PP
+Examples:
+  mnnn invite create \-\-label ben
+  mnnn invite create \-\-org research \-\-role member
+  mnnn invite create \-\-review draft\-1
+  mnnn invite list
+  mnnn invite revoke 3f2a
+  mnnn invite accept muninn://join/…
+
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-invite\-create(1)
+Make an invite link: to connect (default), to an org (\-\-org) or a review (\-\-review)
+.TP
+mnnn\-invite\-list(1)
+The invites you made and the requests waiting for you
+.TP
+mnnn\-invite\-revoke(1)
+Withdraw an invite you made (id or its start)
+.TP
+mnnn\-invite\-accept(1)
+Use an invite link, or accept a request (id or name)
+.TP
+mnnn\-invite\-decline(1)
+Turn down a request
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.9.2
+.SH SEE ALSO
+\fBmnnn\fR(1)
