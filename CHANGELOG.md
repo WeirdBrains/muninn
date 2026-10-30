@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-10-29
+
+### Changed
+- Bars fields from imports can be renamed, retyped, re-constrained or dropped like any field, with plans, versions and rollback (v0 is the shipped design); the bars keep their imported values - mnnn model edit bars, or D > bars in the TUI
+- Bars records can be created, updated in any field and deleted, and the bars model renamed or removed (removing deletes every bar, after asking) - mnnn model record create|delete bars, mnnn -y model remove bars
+
+### Fixed
+- Imports, charts, filters, exports and archives keep working after bars fields change; searches naming a renamed or dropped field say so
+
 ## [2.5.0] - 2026-10-29
 
 ### Added
@@ -268,7 +277,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.5.1...HEAD
+[2.5.1]: https://github.com/kommandosaldat/muninn/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/kommandosaldat/muninn/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/kommandosaldat/muninn/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/kommandosaldat/muninn/compare/v2.2.0...v2.3.0
