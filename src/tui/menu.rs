@@ -175,6 +175,23 @@ pub fn menus() -> Vec<Menu> {
             ],
         },
         Menu {
+            title: "Organizations",
+            mnemonic: 'o',
+            items: vec![
+                a("Organizations…", 'o', "G", Orgs),
+                a("New organization…", 'n', "", OrgNew),
+                sep(),
+                a("Members…", 'm', "", OrgMembers),
+                a("Roles…", 'r', "", OrgRoles),
+                a("Resources…", 'e', "", OrgResources),
+                a("Joined & browse…", 'j', "", OrgJoined),
+                sep(),
+                a("Site & certificate…", 's', "", OrgSite),
+                a("Start site", 't', "", OrgHostStart),
+                a("Stop site", 'p', "", OrgHostStop),
+            ],
+        },
+        Menu {
             title: "Keys",
             mnemonic: 'k',
             items: vec![

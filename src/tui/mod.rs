@@ -19,6 +19,7 @@ pub mod menu;
 pub mod modal;
 pub mod models;
 pub mod network;
+pub mod orgs;
 pub mod picker;
 pub mod projects;
 pub mod reports;
@@ -133,6 +134,7 @@ pub struct App {
     pub searches: searches::SearchesState,
     pub rules: rules::RulesState,
     pub network: network::NetState,
+    pub orgs: orgs::OrgsState,
     pub code: code::CodeState,
     pub models: models::ModelsState,
     pub projects: projects::ProjectsState,
@@ -174,6 +176,7 @@ impl App {
             searches: Default::default(),
             rules: Default::default(),
             network: Default::default(),
+            orgs: Default::default(),
             code: Default::default(),
             models: Default::default(),
             projects: Default::default(),
@@ -277,6 +280,7 @@ impl App {
             KeyCode::Char('O') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reports),
             KeyCode::Char('R') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Rules),
             KeyCode::Char('K') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::NetStatus),
+            KeyCode::Char('G') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Orgs),
             KeyCode::Char('C') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Code),
             KeyCode::Char('D') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Models),
             KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
@@ -377,6 +381,21 @@ impl App {
             NetShards => network::open(self, network::Tab::Shards),
             NetSearch => network::open(self, network::Tab::Search),
             NetSettings => network::open(self, network::Tab::Settings),
+            Orgs => orgs::open(self, orgs::Tab::Orgs),
+            OrgNew => orgs::open_new(self),
+            OrgMembers => orgs::open(self, orgs::Tab::Members),
+            OrgRoles => orgs::open(self, orgs::Tab::Roles),
+            OrgResources => orgs::open(self, orgs::Tab::Resources),
+            OrgJoined => orgs::open(self, orgs::Tab::Joined),
+            OrgSite => orgs::open(self, orgs::Tab::Site),
+            OrgHostStart => {
+                orgs::start_host(self);
+                orgs::open(self, orgs::Tab::Site);
+            }
+            OrgHostStop => {
+                orgs::stop_host(self);
+                orgs::open(self, orgs::Tab::Site);
+            }
             Code => code::open(self),
             Models => models::open(self),
             AddToProject => match projects::selected_series(self) {
@@ -1141,6 +1160,7 @@ pub fn run(mut app: App) -> crate::Result<()> {
     let _ = execute!(std::io::stdout(), DisableMouseCapture);
     ratatui::restore();
     network::shutdown(&mut app);
+    orgs::shutdown(&mut app);
     res
 }
 
@@ -1151,6 +1171,7 @@ impl App {
         rules::poll(self);
         code::poll(self);
         network::poll(self);
+        orgs::poll(self);
     }
 }
 
@@ -1160,6 +1181,8 @@ mod code_tests;
 mod models_tests;
 #[cfg(test)]
 mod network_tests;
+#[cfg(test)]
+mod orgs_tests;
 #[cfg(test)]
 mod reports_tests;
 #[cfg(test)]
