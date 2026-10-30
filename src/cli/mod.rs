@@ -16,6 +16,7 @@ mod net;
 mod org;
 mod projects;
 mod reports;
+mod review;
 mod rules;
 mod searches;
 pub use args::*;
@@ -131,6 +132,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Code(c) => code::run(&ctx, c),
         Command::Net(c) => net::run(&ctx, c),
         Command::Org(c) => org::run(&ctx, c),
+        Command::Review(c) => review::run(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }

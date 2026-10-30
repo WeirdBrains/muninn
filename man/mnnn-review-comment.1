@@ -1,0 +1,99 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-review-comment 1  "mnnn-review-comment 2.7.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-review\-comment \- Comment (on the whole thing, a field, or text in it with \-\-at)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn review comment\fR [\fB\-\-field\fR] [\fB\-\-home\fR] [\fB\-\-at\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-nth\fR] [\fB\-\-entry\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-reply\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIREVIEW\fR> <\fITEXT\fR> 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Comment (on the whole thing, a field, or text in it with \-\-at)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-field\fR \fI<FIELD>\fR
+The field (body, title, name, description, query, a record field…)
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-at\fR \fI<AT>\fR
+Anchor on this text of the field
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-nth\fR \fI<NTH>\fR [default: 1]
+Which occurrence of \-\-at (1\-based)
+.TP
+\fB\-\-entry\fR \fI<ENTRY>\fR
+Journal reviews: the entry (an id or id prefix)
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-reply\fR \fI<REPLY>\fR
+Reply to a thread item
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fIREVIEW\fR>
+
+.TP
+<\fITEXT\fR>
+
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.7.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

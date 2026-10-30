@@ -1,0 +1,162 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-review 1  "mnnn-review 2.7.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-review \- Reviews: ask peers to view, comment on, suggest changes to, highlight and vote on an entry, journal, project, live search or record; accept, reject and merge what they say
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn review\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Reviews: ask peers to view, comment on, suggest changes to, highlight and vote on an entry, journal, project, live search or record; accept, reject and merge what they say
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH NOTES
+.PP
+A review request is about one thing of yours: an entry, a journal (and its entries), a
+project, a live search or a model record (MODEL/RECORD). Each link it makes is a key
+exchange scoped to that review, good for one reviewer for a week. Reviewers reach the
+review through your node while `mnnn net start` runs. Commands that take REVIEW act on a
+review of yours, or on one you joined (through its author's node).
+.PP
+Examples:
+  mnnn review request journal "field notes" \-\-note "before Friday" \-\-allow comment,suggest
+  mnnn review invite "field notes" \-\-label ben
+  mnnn review join mnnn\-x1\-…
+  mnnn review suggest "field notes" \-\-entry 3f2a \-\-at "the cat" \-\-to "the comet"
+  mnnn review vote "field notes" approve
+  mnnn review accept "field notes" \-\-all && mnnn review merge "field notes"
+  mnnn review revisions journal "field notes"
+.PP
+See `mnnn help reviews`.
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-review\-request(1)
+Ask for a review of an entry, journal, project, search or record (makes a link)
+.TP
+mnnn\-review\-invite(1)
+Make another link for a review (one per reviewer)
+.TP
+mnnn\-review\-list(1)
+Your reviews and the ones you joined
+.TP
+mnnn\-review\-show(1)
+One review: what it is about, its reviewers, votes and thread
+.TP
+mnnn\-review\-view(1)
+What is under review (its fields; journals: its entries)
+.TP
+mnnn\-review\-join(1)
+Take a review link (the token you were given; `\-` reads stdin)
+.TP
+mnnn\-review\-sync(1)
+Check a joined review: its title, what you may do, open or closed
+.TP
+mnnn\-review\-comment(1)
+Comment (on the whole thing, a field, or text in it with \-\-at)
+.TP
+mnnn\-review\-suggest(1)
+Suggest a change: replace the \-\-at text, or the whole field, with \-\-to
+.TP
+mnnn\-review\-highlight(1)
+Highlight text (\-\-at) of a field
+.TP
+mnnn\-review\-vote(1)
+Vote on the review (approve, changes, reject) or on an item with \-\-on (up, down)
+.TP
+mnnn\-review\-withdraw(1)
+Take back one of your items
+.TP
+mnnn\-review\-accept(1)
+Accept suggestions (items, or every open one with \-\-all)
+.TP
+mnnn\-review\-reject(1)
+Reject suggestions (items, or every open one with \-\-all)
+.TP
+mnnn\-review\-merge(1)
+Merge the accepted suggestions into the thing (a new revision)
+.TP
+mnnn\-review\-close(1)
+Close a review (reviewers\*(Aq links and exchanges end)
+.TP
+mnnn\-review\-reopen(1)
+Open a closed review again (reviewers need new links)
+.TP
+mnnn\-review\-drop(1)
+Take a reviewer off a review
+.TP
+mnnn\-review\-leave(1)
+Leave a review you joined
+.TP
+mnnn\-review\-remove(1)
+Delete a review and its thread (asks first; revisions stay)
+.TP
+mnnn\-review\-revisions(1)
+The revisions of a thing (merged reviews)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.7.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

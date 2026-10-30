@@ -105,6 +105,10 @@ pub enum Command {
     /// answering requests, and an HTTPS site (HTML, JSON, gRPC) for what you publish.
     #[command(subcommand, alias = "orgs", after_long_help = ORG_NOTES)]
     Org(OrgCommand),
+    /// Reviews: ask peers to view, comment on, suggest changes to, highlight and vote on an
+    /// entry, journal, project, live search or record; accept, reject and merge what they say.
+    #[command(subcommand, alias = "reviews", after_long_help = REVIEW_NOTES)]
+    Review(ReviewCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -2772,4 +2776,187 @@ pub enum OrgCertCommand {
     },
     /// Get an ACME certificate now (needs the challenge port reachable as port 80).
     Renew,
+}
+
+pub const REVIEW_NOTES: &str = "\
+A review request is about one thing of yours: an entry, a journal (and its entries), a
+project, a live search or a model record (MODEL/RECORD). Each link it makes is a key
+exchange scoped to that review, good for one reviewer for a week. Reviewers reach the
+review through your node while `mnnn net start` runs. Commands that take REVIEW act on a
+review of yours, or on one you joined (through its author's node).
+
+Examples:
+  mnnn review request journal \"field notes\" --note \"before Friday\" --allow comment,suggest
+  mnnn review invite \"field notes\" --label ben
+  mnnn review join mnnn-x1-…
+  mnnn review suggest \"field notes\" --entry 3f2a --at \"the cat\" --to \"the comet\"
+  mnnn review vote \"field notes\" approve
+  mnnn review accept \"field notes\" --all && mnnn review merge \"field notes\"
+  mnnn review revisions journal \"field notes\"
+
+See `mnnn help reviews`.";
+
+/// Where a comment, suggestion or highlight points.
+#[derive(Debug, Clone, Default, clap::Args)]
+pub struct ReviewAnchor {
+    /// The field (body, title, name, description, query, a record field…).
+    #[arg(long)]
+    pub field: Option<String>,
+    /// Anchor on this text of the field.
+    #[arg(long)]
+    pub at: Option<String>,
+    /// Which occurrence of --at (1-based).
+    #[arg(long, default_value_t = 1)]
+    pub nth: usize,
+    /// Journal reviews: the entry (an id or id prefix).
+    #[arg(long)]
+    pub entry: Option<String>,
+}
+
+/// Review commands.
+#[derive(Debug, Subcommand)]
+pub enum ReviewCommand {
+    /// Ask for a review of an entry, journal, project, search or record (makes a link).
+    Request {
+        /// entry, journal, project, search or record.
+        kind: String,
+        /// Its name or id (records: MODEL/RECORD).
+        target: String,
+        #[arg(long, default_value = "")]
+        title: String,
+        /// A word for reviewers.
+        #[arg(long, default_value = "")]
+        note: String,
+        /// What reviewers may do: view, comment, suggest, highlight, vote (default: all).
+        #[arg(long, value_delimiter = ',')]
+        allow: Vec<String>,
+        /// Who the first link is for.
+        #[arg(long, default_value = "")]
+        label: String,
+        /// Send the link to this peer (a known peer, peer id or address).
+        #[arg(long)]
+        peer: Option<String>,
+        /// Make no link yet (`mnnn review invite` makes them).
+        #[arg(long)]
+        no_link: bool,
+    },
+    /// Make another link for a review (one per reviewer).
+    Invite {
+        review: String,
+        #[arg(long, default_value = "")]
+        label: String,
+        #[arg(long)]
+        peer: Option<String>,
+    },
+    /// Your reviews and the ones you joined.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// One review: what it is about, its reviewers, votes and thread.
+    Show {
+        review: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// What is under review (its fields; journals: its entries).
+    View {
+        review: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Take a review link (the token you were given; `-` reads stdin).
+    Join {
+        token: String,
+        /// What to call it here.
+        #[arg(long, default_value = "")]
+        label: String,
+    },
+    /// Check a joined review: its title, what you may do, open or closed.
+    Sync { review: String },
+    /// Comment (on the whole thing, a field, or text in it with --at).
+    Comment {
+        review: String,
+        text: String,
+        #[command(flatten)]
+        anchor: ReviewAnchor,
+        /// Reply to a thread item.
+        #[arg(long)]
+        reply: Option<String>,
+    },
+    /// Suggest a change: replace the --at text, or the whole field, with --to.
+    Suggest {
+        review: String,
+        /// The new text (or value).
+        #[arg(long)]
+        to: String,
+        /// --to is JSON (a number, list…; for record fields).
+        #[arg(long)]
+        json: bool,
+        /// Why.
+        #[arg(long, default_value = "")]
+        why: String,
+        #[command(flatten)]
+        anchor: ReviewAnchor,
+    },
+    /// Highlight text (--at) of a field.
+    Highlight {
+        review: String,
+        #[command(flatten)]
+        anchor: ReviewAnchor,
+        /// A color or tag.
+        #[arg(long)]
+        color: Option<String>,
+        #[arg(long, default_value = "")]
+        note: String,
+    },
+    /// Vote on the review (approve, changes, reject) or on an item with --on (up, down).
+    Vote {
+        review: String,
+        vote: String,
+        #[arg(long)]
+        on: Option<String>,
+        #[arg(long, default_value = "")]
+        note: String,
+    },
+    /// Take back one of your items.
+    Withdraw { review: String, item: String },
+    /// Accept suggestions (items, or every open one with --all).
+    Accept {
+        review: String,
+        items: Vec<String>,
+        #[arg(long)]
+        all: bool,
+    },
+    /// Reject suggestions (items, or every open one with --all).
+    Reject {
+        review: String,
+        items: Vec<String>,
+        #[arg(long)]
+        all: bool,
+    },
+    /// Merge the accepted suggestions into the thing (a new revision).
+    Merge {
+        review: String,
+        /// Apply suggestions even where the field changed since.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Close a review (reviewers' links and exchanges end).
+    Close { review: String },
+    /// Open a closed review again (reviewers need new links).
+    Reopen { review: String },
+    /// Take a reviewer off a review.
+    Drop { review: String, reviewer: String },
+    /// Leave a review you joined.
+    Leave { review: String },
+    /// Delete a review and its thread (asks first; revisions stay).
+    Remove { review: String },
+    /// The revisions of a thing (merged reviews).
+    Revisions {
+        kind: String,
+        target: String,
+        #[arg(long)]
+        json: bool,
+    },
 }
