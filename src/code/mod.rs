@@ -8,7 +8,7 @@
 //! | `math` | formulas → generated Rust → cdylib |
 //! | `polars` | Polars expressions → generated Rust (polars crate) → cdylib |
 //! | `rust` | Rust against the SDK → cdylib |
-//! | `python` | typed Python → Rython (`rythonc`) → Rust → cdylib |
+//! | `python` | typed Python → ruff parser → python-ast → Rust → cdylib |
 //! | `plugin` | a library built elsewhere (the source is its path) |
 //!
 //! Builds are cached by content hash under `MUNINN_HOME/code/plugins`, and loaded with
@@ -27,6 +27,7 @@ pub mod host;
 pub mod math;
 pub mod png;
 pub mod polars;
+pub mod pyconv;
 pub mod python;
 pub mod view;
 
@@ -212,11 +213,8 @@ pub fn check(env: &CodeEnv, lang: Lang, source: &str) -> Result<Vec<String>> {
         Lang::Python => {
             let p = python::parse(source)?;
             let public: Vec<&str> = p.funcs.iter().filter(|f| !f.name.starts_with('_')).map(|f| f.name.as_str()).collect();
-            let mut notes = vec![format!("columns: {}", public.join(", "))];
-            if python::rythonc().is_err() {
-                notes.push("rythonc not found: building needs Rython (MUNINN_RYTHONC or rythonc on the PATH)".into());
-            }
-            notes
+            pyconv::to_rust(source, "user.py").map_err(|e| Error::invalid("python", e))?;
+            vec![format!("columns: {}", public.join(", "))]
         }
         Lang::Rust => {
             if !source.contains("fn run") {
@@ -624,10 +622,7 @@ pub fn toolchain_status() -> Vec<(String, std::result::Result<String, String>)> 
     let cargo = cargo().map(|c| {
         std::process::Command::new(&c).arg("--version").output().map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default()
     });
-    vec![
-        ("cargo".into(), cargo.map_err(|e| e.to_string())),
-        ("rythonc".into(), python::rythonc().map(|p| p.display().to_string()).map_err(|e| e.to_string())),
-    ]
+    vec![("cargo".into(), cargo.map_err(|e| e.to_string())), ("python".into(), Ok("built in (ruff_python_parser 0.0.20, python-ast 1.1.0)".into()))]
 }
 
 /// The last run as plain JSON (for `--json`).

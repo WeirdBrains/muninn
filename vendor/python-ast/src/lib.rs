@@ -1,3 +1,4 @@
+#![allow(unused)] // vendored: pyo3 removal leaves unused imports
 #[doc = include_str!("../README.md")]
 pub mod ast;
 pub use ast::*;

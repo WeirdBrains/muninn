@@ -12,7 +12,7 @@ fn code_spaces_are_managed_reported_and_carried_in_archives() {
     let e = Env::new();
     e.ok(&["author", "add", "--name", "Ada"]);
     let check = e.ok(&["code", "check"]);
-    assert!(check.contains("cargo") && check.contains("rythonc") && check.contains("ABI      1"), "{check}");
+    assert!(check.contains("cargo") && check.contains("python   built in") && check.contains("ABI      1"), "{check}");
     e.ok(&["project", "create", "Lab"]);
     e.ok(&[
         "code",

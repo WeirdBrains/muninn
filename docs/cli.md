@@ -62,7 +62,6 @@ never invents a missing source, symbol or duration.
 | `MUNINN_RAW_DATA` | folder with the full raw CSVs for the ignored full-file tests |
 | `MUNINN_CARGO` | cargo used to build [code spaces](code-spaces.md) (default: `cargo` on `PATH`) |
 | `MUNINN_CODE_TARGET` | cargo target directory for code space builds (default: `<home>/code/target`) |
-| `MUNINN_RYTHONC` | the `rythonc` binary for Python code spaces (default: `rythonc` on `PATH`) |
 
 ## Exit status
 

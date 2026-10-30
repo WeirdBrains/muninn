@@ -11,7 +11,7 @@ and runs.
 | Math | `math` | one formula per line: `fast = sma(close, 10)` | cargo |
 | Polars | `polars` | one Polars expression per line: `ret = col("close").pct_change(lit(1))` | cargo (first build compiles polars, a few minutes) |
 | Rust | `rust` | a `run(host)` function against the [SDK](#the-sdk) | cargo |
-| Python | `python` | typed functions, one column each | cargo and [Rython](#python-through-rython) |
+| Python | `python` | typed functions, one column each | cargo ([Python in Rust](#python-in-rust)) |
 | prebuilt | `plugin` | the path of a library built elsewhere | nothing |
 
 ```
@@ -114,10 +114,10 @@ pub fn run(host: &Host) -> Result<View> {
 }
 ```
 
-## Python through Rython
+## Python in Rust
 
-Python code spaces are translated to Rust by [Rython](https://crates.io/crates/rythonc)
-(`rythonc`), then built like the others; Python itself is never needed. Every top-level
+Python code spaces are translated to Rust inside Muninn, then built like the others;
+Python itself is never needed. Every top-level
 `def` without a leading `_` is a column: it runs once per record, its parameters are the
 record's fields by name (`float`, `int`, `bool` or `str`) and it returns `float`, `int`
 or `bool`. `_helpers` are plain functions. Directives are math's, as `# @…` comments.
@@ -129,11 +129,11 @@ def spread(high: float, low: float) -> float:
     return high - low
 ```
 
-Rython runs as a separate program: Muninn looks for `MUNINN_RYTHONC` first, then
-`rythonc` on `PATH`, and never embeds Python or links libpython. Muninn's packages do
-not bundle it: install it with `cargo install rythonc` (building code spaces needs cargo
-anyway), or download a Rython release and point `MUNINN_RYTHONC` at its `rythonc`
-binary. `mnnn code check` shows whether it is found.
+The source is parsed by `ruff_python_parser` (pure Rust, pinned to 0.0.20) and turned
+into Rust by the code generator of [python-ast](https://crates.io/crates/python-ast) 1.1.0,
+the engine behind Rython, vendored without its pyo3 parser (Apache-2.0, see
+`vendor/python-ast`). Muninn never embeds Python or links libpython; `mnnn code check`
+catches unsupported Python before a build.
 
 ## Prebuilt plugins
 
@@ -151,7 +151,7 @@ there:
 
 ```
 cargo    cargo 1.92.0
-rythonc  missing: …
+python   built in (ruff_python_parser 0.0.20, python-ast 1.1.0)
 ABI      1 (SDK 1.0.0)
 ```
 

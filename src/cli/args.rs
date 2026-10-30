@@ -2240,7 +2240,7 @@ pub enum NetShardCommand {
 pub const CODE_NOTES: &str = "\
 Every language becomes a native plugin (a Rust cdylib built with cargo, cached by content hash
 under MUNINN_HOME/code); a prebuilt plugin (--lang plugin, the source is its path) loads as is.
-Python goes through Rython (rythonc on PATH or MUNINN_RYTHONC). Without a Rust toolchain only
+Python is translated to Rust in process (no Python needed). Without a Rust toolchain only
 prebuilt plugins run; `mnnn code check` says what is missing.
 
 A code space runs as native code with your rights. Before its first run, and after every change,

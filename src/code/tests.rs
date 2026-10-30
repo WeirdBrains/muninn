@@ -1,5 +1,5 @@
-//! Building and loading real plugins (needs cargo; skipped without it). Python runs when
-//! `MUNINN_RYTHONC` is set; Polars is `#[ignore]`d (it compiles the polars crate).
+//! Building and loading real plugins (needs cargo; skipped without it). Polars is
+//! `#[ignore]`d (it compiles the polars crate).
 use super::*;
 use crate::model::{Bar, Duration, Symbol};
 use crate::store::{Design, Field, FieldType, RecordQuery};
@@ -254,9 +254,9 @@ fn approval_follows_the_source_and_no_toolchain_is_explained() {
 }
 
 #[test]
-fn python_compiles_through_rython() {
-    if !have_cargo() || std::env::var_os("MUNINN_RYTHONC").is_none() {
-        eprintln!("skipped: set MUNINN_RYTHONC to run");
+fn python_compiles_in_process() {
+    if !have_cargo() {
+        eprintln!("skipped: no cargo");
         return;
     }
     let dir = tempfile::tempdir().unwrap();

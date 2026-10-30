@@ -33,7 +33,7 @@ pub enum Lang {
     Polars,
     /// Rust against the `muninn-plugin` SDK.
     Rust,
-    /// Typed Python functions, compiled to Rust with Rython (`rythonc`).
+    /// Typed Python functions, translated to Rust in process (ruff parser, python-ast codegen).
     Python,
     /// A library built elsewhere (the source is its path).
     Plugin,
