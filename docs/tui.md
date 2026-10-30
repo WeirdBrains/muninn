@@ -61,8 +61,8 @@ line and every fork. `u` / `U` step back and forward, restoring filters and them
 ## Projects, live searches and journals
 
 The **Projects** menu (Alt+P) opens [projects](projects.md) (`P`),
-[live searches](live-searches.md) (`F`, save with `B`) and [journals](journals.md)
-(`J`). They open over the content area like other dialogs; opening a live search or a
+[live searches](live-searches.md) (`F`, save with `B`), [journals](journals.md)
+(`J`), [reports](reports.md) (`O`) and [rules](rules.md) (`R`). They open over the content area like other dialogs; opening a live search or a
 project's result changes the sidebar and tiles behind them.
 
 ## Dialogs

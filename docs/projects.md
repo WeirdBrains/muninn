@@ -7,14 +7,15 @@ A project collects the things you work on together:
 - **results**: a series (source, symbol, period), optionally with a time range,
   shown with how many bars it has now;
 - **journals** ([journals](journals.md)): a journal can belong to one project (a
-  *project journal*), and any journal can also be linked into other projects.
+  *project journal*), and any journal can also be linked into other projects;
+- **reports** ([reports](reports.md));
+- **rules** ([rules](rules.md)): the project's *rule set*.
 
 Items are references: a project never copies data, so everything in it reflects the
 current data. Taking an item out of a project keeps the item. Removing a project keeps
 its journals, as standalone journals.
 
-Projects are also where **rule sets** will go (a later release); the database already
-has a place for them.
+Removing a project keeps its rules too.
 
 ## Command line
 
@@ -28,6 +29,7 @@ mnnn project add PROJECT --search SEARCH
 mnnn project add PROJECT --journal JOURNAL
 mnnn project add PROJECT --result SOURCE:SYMBOL:PERIOD [--from TIME] [--to TIME]
 mnnn project add PROJECT --report REPORT
+mnnn project add PROJECT --rule RULE
 mnnn project drop PROJECT ITEM                       # ITEM: the number `show` prints
 mnnn project export PROJECT [--format archive|json|pdf|html|docx|latex|csv|text] [--out PATH] [--rows N] [--no-data]
 mnnn project import FILE [--name NAME]               # an archive (.mnnp) or JSON export

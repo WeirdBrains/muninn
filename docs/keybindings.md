@@ -80,6 +80,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `B` | save the sidebar's search as a live search |
 | `J` | the [journals](journals.md) list |
 | `O` | the [reports](reports.md) list |
+| `R` | the [rules](rules.md) window (`n` new, `e` edit, Space on/off, `t` test, `x` dry run) |
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
@@ -88,7 +89,7 @@ highlight, `n` note, `i` image; the editor saves with Ctrl-S and switches Markdo
 LaTeX with Ctrl-T. `E` exports (journals, entries, reports, projects) and `P` prints
 (journals, entries); `I` in the projects list imports an archive; in a report `a` adds a section, `J` / `K` move it, `v` previews.
 Full tables: [live searches](live-searches.md),
-[projects](projects.md), [journals](journals.md), [reports](reports.md),
+[projects](projects.md), [journals](journals.md), [reports](reports.md), [rules](rules.md),
 [export formats](export-formats.md).
 
 ## Import

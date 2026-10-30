@@ -2,8 +2,8 @@
 
 Muninn records what you do in the encrypted database: imports, exports, filter and
 time range changes, theme and theme mode changes, source and symbol changes, author
-changes, and work on live searches, projects and journals. Each action has an id, a kind, a summary, when it ran, where it came from
-(`cli` or `tui`) and the [author](authors.md) who was current.
+changes, and work on live searches, projects, journals, reports and rules. Each action has an id, a kind, a summary, when it ran, where it came from
+(`cli`, `tui`, or `rule` for what a [rule](rules.md) did) and the [author](authors.md) who was current.
 
 ## A tree, not a list
 
@@ -91,6 +91,8 @@ entry, because they never ask for the password.
 | `journal.export`, `entry.export`, `report.export`, `project.export` | CLI, TUI | what was exported, the format and file ([export formats](export-formats.md)) |
 | `journal.print` | CLI, TUI | the PDF and the print command (or none) |
 | `journal.import`, `project.import` | CLI | the file and what was restored |
+| `rule.create`, `rule.edit`, `rule.remove`, `rule.enable`, `rule.disable` | CLI, TUI | the [rule](rules.md) |
+| `rule.run` | rules | the rule, the action that triggered it, its status (`ok`, `failed`, `blocked`); what it did is recorded under it |
 
 Stepping back over these actions moves the head only; it does not undo the change
 (stepping back restores view state: filters, time range and theme).

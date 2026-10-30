@@ -66,8 +66,7 @@ mnnn symbols add FOO/USD --alias FO
   was forked from, author, times ([live searches](live-searches.md)). Results are never
   stored; a live search runs on the current data.
 - `projects` and `project_items`: a project's name and description, and its items by
-  kind (`live_search`, `result`, `journal`, and `rule_set` reserved for a later
-  release) and reference; a result's series and time range are in the item's payload
+  kind (`live_search`, `result`, `journal`, `report`, `rule_set`) and reference; a result's series and time range are in the item's payload
   ([projects](projects.md)).
 - `journals`, `journal_entries`, `journal_annotations`, `journal_attachments`: journals
   (standalone or in a project, default format, forked from), entries (title, text,
@@ -78,10 +77,13 @@ mnnn symbols add FOO/USD --alias FO
   order with their kind (`text`, `records`, `series`, `journal`, `project`, `authors`,
   `code`), title, text and format, and what they show as JSON (series and range, live
   search, journal and entries, project, code space) ([reports](reports.md)).
+- `rules`: name, description, home (standalone, journal or live search), on/off, the
+  spec as JSON (on, if, then), author, times, and run count, last run and status
+  ([rules](rules.md)).
 - `schema_version`: migrations, applied automatically on open. Version 4 adds
   `authors` and `settings`, version 5 `actions`, version 6 `live_searches`, version 7
   `projects` and `project_items`, version 8 the journal tables, version 9 `reports` and
-  `report_sections`; project items may now be reports. All of them only add
+  `report_sections`; project items may now be reports; version 10 `rules`. All of them only add
   tables, so older databases upgrade in place on the first open.
 
 ## Decisions

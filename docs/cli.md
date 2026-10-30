@@ -17,6 +17,7 @@ mnnn [GLOBAL FLAGS] <COMMAND>
   journal  list|new|show|edit|remove|fork|write|entry|edit-entry|remove-entry|copy|
            note|highlight|edit-note|remove-note|attach|image|export|import|print
   report   list|create|show|edit|remove|add|edit-section|remove-section|move|export|preview
+  rule     list|create|show|edit|remove|enable|disable|test|dry-run|events
   tui
   help     [TOPIC] [--search TEXT]
 ```
