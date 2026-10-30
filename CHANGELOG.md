@@ -6,6 +6,17 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-10-30
+
+### Added
+- Organizations owned by your node, private and members-only by default, public or open on request - mnnn org create|edit|remove|list|show, or G (Organizations menu) in the TUI
+- Roles with ranks and permissions (owner, admin, user, viewer, plus your own) and default roles for applicants and invitees - mnnn org role list|perms|create|edit|remove, mnnn org member defaults
+- Membership through org key exchanges: browse a node, apply, approve or reject, invite and join, change roles, kick (keeping, archiving or publishing what they gave) and leave - mnnn org browse|apply|sync|join|leave, mnnn org member approve|reject|invite|role|kick
+- Org resources and projects: add or give journals, projects, reports, models, searches and code, publish to members or everyone, archive, fetch - mnnn org resource|publish|unpublish|project|give|fetch
+- Endpoints that run rules, code spaces or record queries, gated by role - mnnn org endpoint add|list|remove, mnnn org call
+- HTTPS org sites with HTML, JSON and gRPC (muninn.org.v1.Org), templates with assets, member-signed requests and mirrors; off until started, localhost by default - mnnn org host start|stop|status, mnnn org template, mnnn org sign, mnnn org mirror
+- Short-lived certificates: self-signed at each start, or Let's Encrypt via ACME (opt-in with a domain and email) renewed automatically - mnnn org cert status|acme|renew
+
 ## [2.6.0] - 2026-10-30
 
 ### Added
@@ -286,7 +297,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/kommandosaldat/muninn/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/kommandosaldat/muninn/compare/v2.5.1...v2.6.0
 [2.5.1]: https://github.com/kommandosaldat/muninn/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/kommandosaldat/muninn/compare/v2.4.0...v2.5.0
