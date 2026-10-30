@@ -17,6 +17,11 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 7 | [Decentralized Network](#decentralized-network) | v2.6.0 | ✅ Released |
 | 8 | [Organizations](#organizations) | v2.7.0 | ✅ Released |
 | 9 | [Reviews](#reviews) | v2.8.0 | ✅ Released |
+| 10 | [Automatic Key Exchanges](#automatic-key-exchanges): network on by default, hosting autostart, invite links, TUI dark shards | v2.9.0 | 🚧 In progress |
+| 11 | [Users and Connections](#users-and-connections): user identities, linked nodes, user-owned orgs, connections with trust, unified invites | v2.10.0 | 📋 Planned |
+| 12 | [Linked-Node Sync](#linked-node-sync): all of a user's data on all of their nodes | v2.11.0 | 📋 Planned |
+| 13 | [Private Sites and Code Access](#private-sites-and-code-access): gated sites for private orgs, code-space role permissions | v2.12.0 | 📋 Planned |
+| 14 | [Review Copies](#review-copies): what is reviewed lives on the reviewer's node in review mode | v2.13.0 | 📋 Planned |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
 
 **2.0 launch wrap-up:** snapshot to `docs/historical/2.0` with this plan, the announcement, and the full changelog; then clear `PLAN.md`.
@@ -27,6 +32,14 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 - **Code Spaces languages:** mathematical algorithms, Polars, Rust, and Python.
   - Python goes through Rython, which compiles Python to Rust and can run Python in Rust.
   - Every language ends up as a compiled binary, loaded through a Rust FFI plugin approach.
+- **Key exchanges are a black box.** Nodes exchange keys by themselves when the user acts (connect, apply, invite, review, share); the user sees the action and its status (pending, connecting, connected, declined, failed). The cryptography is unchanged (Ed25519, X25519 + HKDF, XChaCha20-Poly1305, scoped exchanges, revocation).
+- **Identity is trust on first use, not compared codes.** Peer ids are hashes of node keys and every connection is authenticated by them; the first exchange pins a key to a name, and a different key under a known name is a warning. Invite links are signed by the inviter and single use. Short codes stay available as an advanced check (`mnnn net exchange`, hidden).
+- **Human decisions stay.** Owners approve applicants and people accept invitations; nobody handles keys. Unknown nodes ask first (`net.accept = "known"`); `anyone` connects at once.
+- **The network is on by default.** The node starts with the TUI (`net.autostart = true`, older files turned on once); sharing stays opt-in per item. The web server stays off unless `hosting.autostart` is on.
+- **Users own things, nodes carry them.** A user identity (its own signing key) certifies the nodes it links; orgs, memberships, reviews and connections belong to users, so any linked node can act with the user's role. Revoking a node ends its access.
+- **All of a user's data is on all of their nodes.** Linked nodes sync everything end to end encrypted with keys only the user's nodes hold. Conflicts never lose data: every record keeps its versions in history, the newest wins and conflicts are shown for the user to settle. Bars sync lazily.
+- **Connections replace friends.** A connection is mutual user-to-user trust made through an invite; each is trusted or untrusted (default untrusted). Shares and reviews may use any connection; dark shards go only to trusted ones.
+- **In-process Python (python-ast) is proposed, not approved.**
 
 ---
 
@@ -227,3 +240,66 @@ Our work is better when we involve others. The reviews system allows us to share
 2. Reviewers can view, comment on, suggest changes to, vote on, and highlight the resource
 3. Authors can accept or reject all changes, etc.
 4. Reviews can be merged into the model record changes as a versioned record
+
+## Automatic Key Exchanges
+
+> **Phase 10 · v2.9.0 · 🚧 In progress**
+
+Key exchanges happen between nodes by themselves. The user connects, applies, invites, reviews or shares, and sees what happens; there is nothing to copy back, read out or verify.
+
+1. Connecting to a node exchanges keys automatically
+    - A node that knows you, or that asked you too, connects at once; otherwise its owner sees a request to accept or decline
+    - Requests, answers and declines settle by themselves whenever the nodes can reach each other
+2. Keys are pinned to a node's name on first contact; another node using a known name is flagged
+3. Org applications and invitations, review links and shares ride on the same flow, with only the action and status shown
+4. Invitations that have to travel out of band are links (`muninn://join/…`): signed, single use, expiring and revocable
+5. The token and short-code commands stay, hidden and marked advanced
+6. The node is on by default with a preference to keep it off; the web server has its own start-with-the-node preference (off by default)
+7. The TUI entrusts dark shards to peers picked from those with a completed exchange, and checks that they restore the key
+
+## Users and Connections
+
+> **Phase 11 · v2.10.0 · 📋 Planned**
+
+People, not machines, own their work. A user identity ties a person's nodes together, so a phone or a second computer can see and manage everything the user can.
+
+1. A user identity has its own signing key, separate from node keys, and certifies each node it links
+2. Linking a node is an invite plus an approve on an existing node; linked nodes can be revoked
+3. Org ownership and membership belong to users; any linked node acts with the user's role (existing orgs move to the current user)
+4. Reviews and shares recognise a user across their nodes; reviewer names come from the user identity
+5. Connections are mutual user-to-user trust, made through invites, and are trusted or untrusted (default untrusted); trust changes are recorded in history
+6. One invite system covers connections, org membership, reviews and node links: signed, expiring, revocable, single or limited use links aimed at a user, accepted or declined with status shown
+7. Pickers use connections: shares and reviews any, dark shards only trusted ones
+
+## Linked-Node Sync
+
+> **Phase 12 · v2.11.0 · 📋 Planned**
+
+Every linked node has everything on all of the user's nodes.
+
+1. Journals, entries, models and records, projects, searches, reports, code spaces, rules, orgs, reviews, history and sensible preferences sync between linked nodes
+2. Sync is end to end encrypted with keys only the user's nodes hold
+3. Records keep their versions; the newest wins, conflicts are kept and surfaced, and nothing is lost silently
+4. Large data (bars) syncs lazily
+5. Revoking a node stops sync to it
+
+## Private Sites and Code Access
+
+> **Phase 13 · v2.12.0 · 📋 Planned**
+
+Private organizations can still have a front door.
+
+1. A private org can host a public, gated site: a landing and sign-in page for guests, everything else for signed-in members only
+2. Private orgs stay invisible to guests otherwise, and invite users through links that start the key exchange
+3. Roles include access to the org's published code spaces (view source, run, edit or manage), enforced on every node and endpoint
+
+## Review Copies
+
+> **Phase 14 · v2.13.0 · 📋 Planned**
+
+Reviewers work on their own node, even offline.
+
+1. Joining a review copies what is reviewed to the reviewer's node in review mode: not editable as such, but comments, suggestions, highlights and votes work against it
+2. Models and fields the records need are created or extended on the reviewer's node, additively and recorded in history as from the review
+3. Review work syncs back to the author when their node is reachable; new revisions refresh the copy
+4. Closing, dropping or leaving a review keeps the copy read-only and archived (removed only when asked)
