@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.9.2] - 2026-10-30
+
+### Fixed
+- Net status, peers, requests and exchanges show times in local time with the UTC offset (were UTC without a label)
+- Dark-shards docs: entrust takes the words, shards or an exported master key file, not the unlocked database
+
 ## [2.9.1] - 2026-10-30
 
 ### Changed
@@ -333,7 +339,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.9.1...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.9.2...HEAD
+[2.9.2]: https://github.com/kommandosaldat/muninn/compare/v2.9.1...v2.9.2
 [2.9.1]: https://github.com/kommandosaldat/muninn/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/kommandosaldat/muninn/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/kommandosaldat/muninn/compare/v2.7.0...v2.8.0
