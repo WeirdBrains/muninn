@@ -1869,8 +1869,9 @@ index, default=V, choices=a|b, about=\"…\"; to take one away: optional, -uniqu
 
 Changes go to a draft; `plan` shows the migration (+ add, - drop, ~ change), `apply` makes
 it the next version, `history` lists versions and `rollback` applies an old design as a new
-version. Steps that lose values ask first (-y says yes). The built-in bars model takes new
-fields (never required); its own fields stay as they are.
+version. Steps that lose values ask first (-y says yes). The built-in bars model is edited
+the same way: its fields from imports can be renamed, retyped, changed or dropped (the bars
+keep their imported values; rollback brings a dropped field back).
 
 Examples:
   mnnn model create signals --fields \"symbol:text!; price:real!; side:text choices=buy|sell\"

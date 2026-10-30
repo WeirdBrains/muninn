@@ -1,30 +1,58 @@
-//! Bars from code spaces. Muninn is a general research store: a code space may change any
-//! bars field, including the built-in ones (`open` … `flags`, and the key fields `source`,
-//! `symbol`, `period`, `timestamp`), and may create bars. Nothing is deleted or replaced:
-//! changing a key field re-keys the bar, and is refused when another bar already has that
-//! key. Previous values go into the history entry. Fields added with the model designer
-//! are written through the store as for any model.
+//! Writing bars (code spaces, model records, rules). Muninn is a general research store:
+//! any bars field may change, including the built-in ones (`open` … `flags`, and the key
+//! fields `source`, `symbol`, `period`, `timestamp`) under whatever names the bars model
+//! gives them, and bars may be created and deleted. Changing a key field re-keys the bar,
+//! and is refused when another bar already has that key. Previous values go into the
+//! history entry. Fields added with the model designer (and built-in ones given another
+//! type) are written through the store as for any model.
 use crate::error::{Error, Result};
 use crate::model::{BarId, Duration, Symbol};
-use crate::store::{Model, Store, models::FieldType};
+use crate::store::{Model, Store, models::FieldType, models::bar_key};
 use rusqlite::{OptionalExtension, params};
 use serde_json::{Map, Value, json};
 
-/// Built-in bars fields a code space can write.
+/// The bars columns (keys of the built-in fields as shipped).
 pub const FIELDS: &[&str] = &["source", "symbol", "base", "quote", "period", "timestamp", "open", "high", "low", "close", "volume", "flags"];
 
-/// Split values into built-in bars fields and the rest (added fields).
-pub fn split(values: &Map<String, Value>) -> (Map<String, Value>, Map<String, Value>) {
+/// Split values by the bars model's design: fields reading the bars columns (checked like
+/// any field, keyed by column) and the rest (stored fields, checked by the store).
+pub fn split(m: &Model, values: &Map<String, Value>) -> Result<(Map<String, Value>, Map<String, Value>)> {
     let mut core = Map::new();
     let mut rest = Map::new();
     for (k, v) in values {
-        if FIELDS.contains(&k.as_str()) {
-            core.insert(k.clone(), v.clone());
-        } else {
-            rest.insert(k.clone(), v.clone());
+        match m.design.field(k).and_then(|f| bar_key(f).map(|key| (f, key))) {
+            Some((f, key)) => {
+                let v = crate::store::models::coerce(f, v.clone())?;
+                if v.is_null() {
+                    return Err(Error::invalid("value", format!("{k}: give a value (every bar has one)")));
+                }
+                core.insert(key.to_string(), v);
+            }
+            None => {
+                rest.insert(k.clone(), v.clone());
+            }
         }
     }
-    (core, rest)
+    Ok((core, rest))
+}
+
+/// The name the bars model gives a column (the key itself when it has no field for it).
+fn name(m: &Model, key: &str) -> String {
+    m.design.bar_field(key).map(|f| f.name.clone()).unwrap_or_else(|| key.to_string())
+}
+
+/// Built-in fields made unique must stay so after a write.
+fn check_unique(s: &Store, m: &Model, core: &Map<String, Value>) -> Result<()> {
+    for key in core.keys() {
+        let Some(f) = m.design.bar_field(key).filter(|f| f.unique) else { continue };
+        let e = crate::store::models::bar_sql(key);
+        let dups: i64 =
+            s.conn.query_row(&format!("SELECT COUNT(*) - COUNT(DISTINCT {e}) FROM bars b JOIN sources s ON s.id = b.source_id"), [], |r| r.get(0))?;
+        if dups > 0 {
+            return Err(Error::invalid("value", format!("{}: another bar already has this value (it is unique)", f.name)));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -226,15 +254,23 @@ pub fn update(s: &Store, id: &str, core: &Map<String, Value>) -> Result<(String,
 }
 
 /// Create a bar from `source`, `symbol` (or `base` and `quote`), `period`, `timestamp`,
-/// `open`, `high`, `low`, `close` (and optionally `volume`, `flags`); returns its id.
-pub fn create(s: &Store, core: &Map<String, Value>) -> Result<String> {
+/// `open`, `high`, `low`, `close` (and optionally `volume`, `flags`), keyed by column;
+/// returns its id. `m` names the columns in errors.
+pub fn create(s: &Store, m: &Model, core: &Map<String, Value>) -> Result<String> {
+    let need_text = |key: &str| match m.design.bar_field(key) {
+        Some(f) => format!("a new bar needs {} (the bars' {key})", f.name),
+        None => format!(
+            "a new bar needs its {key}, and {} has no field for it (it was dropped or given another type); roll back to a version with it (`mnnn model history {}`)",
+            m.name, m.name
+        ),
+    };
     for need in ["source", "period", "timestamp", "open", "high", "low", "close"] {
         if !core.contains_key(need) {
-            return Err(Error::invalid("bar", format!("a new bar needs {need} (source, symbol, period, timestamp, open, high, low, close)")));
+            return Err(Error::invalid("bar", need_text(need)));
         }
     }
     if !core.contains_key("symbol") && !(core.contains_key("base") && core.contains_key("quote")) {
-        return Err(Error::invalid("bar", "a new bar needs symbol (BASE/QUOTE) or base and quote"));
+        return Err(Error::invalid("bar", format!("{} (BASE/QUOTE), or {} and {}", need_text("symbol"), name(m, "base"), name(m, "quote"))));
     }
     let mut row =
         Row { source_id: String::new(), source: String::new(), sym: Symbol::new("", ""), dur: Duration(60), ts: 0, ohlcv: [0.0; 5], flags: 0 };
@@ -256,27 +292,69 @@ pub fn create(s: &Store, core: &Map<String, Value>) -> Result<String> {
     Ok(id)
 }
 
-/// Update one bar: built-in fields here, added fields through the store. Returns the id and
+/// Update one bar: built-in fields here, stored fields through the store. Returns the id and
 /// the built-in values before (null when none changed).
 pub fn update_record(s: &Store, m: &Model, id: &str, values: &Map<String, Value>) -> Result<(String, Value)> {
     let id = id.trim().to_lowercase();
     if id.len() != 64 || !exists(s, &id)? {
         return Err(Error::invalid("bar", format!("no bar `{id}` (bars are named by their full id)")));
     }
-    let (core, rest) = split(values);
-    let (id, before) = if core.is_empty() { (id, Value::Null) } else { update(s, &id, &core)? };
+    let (core, rest) = split(m, values)?;
+    let (id, before) = if core.is_empty() {
+        (id, Value::Null)
+    } else {
+        let r = update(s, &id, &core)?;
+        check_unique(s, m, &core)?;
+        r
+    };
     if !rest.is_empty() {
-        s.update_ids(m, std::slice::from_ref(&id), &rest)?;
+        s.update_stored(m, std::slice::from_ref(&id), &rest)?;
     }
     Ok((id, before))
 }
 
-/// Create a bar with added fields too.
+/// Create a bar with stored fields too. Built-in fields left out get their defaults.
 pub fn create_record(s: &Store, m: &Model, values: &Map<String, Value>) -> Result<String> {
-    let (core, rest) = split(values);
-    let id = create(s, &core)?;
-    if !rest.is_empty() {
-        s.update_ids(m, std::slice::from_ref(&id), &rest)?;
+    let (mut core, rest) = split(m, values)?;
+    for f in &m.design.fields {
+        if let (Some(key), Some(d)) = (bar_key(f), &f.default)
+            && !core.contains_key(key)
+        {
+            core.insert(key.to_string(), crate::store::models::coerce(f, d.clone())?);
+        }
     }
-    Ok(id)
+    s.conn.execute_batch("SAVEPOINT bar_create")?;
+    let r = (|| -> Result<String> {
+        let id = create(s, m, &core)?;
+        check_unique(s, m, &core)?;
+        if !rest.is_empty() {
+            s.update_stored(m, std::slice::from_ref(&id), &rest)?;
+        }
+        Ok(id)
+    })();
+    match r {
+        Ok(id) => {
+            s.conn.execute_batch("RELEASE bar_create")?;
+            Ok(id)
+        }
+        Err(e) => {
+            let _ = s.conn.execute_batch("ROLLBACK TO bar_create; RELEASE bar_create");
+            Err(e)
+        }
+    }
+}
+
+/// Delete bars by id (their stored fields go with them); returns how many.
+pub fn delete(s: &Store, ids: &[String]) -> Result<usize> {
+    let mut series = std::collections::BTreeSet::new();
+    let mut n = 0;
+    for id in ids {
+        let Ok(row) = read(s, id) else { continue };
+        n += s.conn.execute("DELETE FROM bars WHERE id = ?1", [hex::decode(id).unwrap_or_default()])?;
+        series.insert((row.source_id, row.sym.base, row.sym.quote, row.dur.0));
+    }
+    for (src, base, quote, d) in series {
+        restat(s, &src, &Symbol { base, quote }, Duration(d))?;
+    }
+    Ok(n)
 }

@@ -7,8 +7,10 @@ record carries the version it was last written or migrated under. Rules can crea
 models, and they can feed records into them. Projects, `.mnnp` archives and backups carry
 models with their history, records and rules.
 
-Imported price bars are the records of the built-in **bars** model. Its own fields stay as
-they are, but you can add fields to it, for example a `flag` or a `note` on each bar.
+Imported bars are the records of the built-in **bars** model. It is designed like any other
+model: rename, retype, change or drop its fields (`source`, `symbol`, `period`, `timestamp`,
+`open` … `flags`, shown as *from imports*), add your own (a `flag` or a `note` on each bar),
+rename the model, or remove it. Muninn does not decide what your bars mean.
 
 ## Fields
 
@@ -58,10 +60,21 @@ and its steps. **Rolling back** to v*N* applies the design of v*N* as a new vers
 history only grows. The rollback has its own plan, because values written since v*N* may not
 fit.
 
-Rules for the built-in bars model:
-- it cannot be removed;
-- its own fields cannot be changed;
-- fields added to it are never required.
+How the built-in bars model changes:
+- the bars keep their imported values whatever the design says, so imports, charts, the
+  sidebar, symbol and time filters and bar ids work as before;
+- renaming a field from imports, or changing its about, default, index, required, unique or
+  choices, loses nothing (required, unique and choices are checked against the bars);
+- dropping one hides it from the model (nothing is lost: the bars keep the values, and a
+  rollback shows them again). Searches, rules and code that name it get an error saying it
+  was dropped, or what it is called now;
+- giving one another type copies its converted values into the model's own table, where
+  they can then hold anything; the plan counts values that do not convert, and changing the
+  type back reads the imported values again;
+- a field you make required needs a default (new bars from imports get it);
+- rolling back to v0 restores the design as shipped;
+- removing the bars model deletes every bar (it asks first) and starts the model again as
+  shipped.
 
 Models that other models refer to cannot be removed until those references are dropped.
 
@@ -111,8 +124,10 @@ mnnn model record delete signals 3f2a … | --where "side = sell" [--dry-run]
 
 In `edit`, the operations run in this order: renames, then changes, drops, adds and moves.
 Assignments are `FIELD=VALUE`, and an empty value clears a field. Changing or deleting
-records with `--where` asks first. Bars records cannot be created or deleted here (they
-come from imports), but their added fields can be updated. `model record list` on bars shows
+records with `--where` asks first. Bars are records like any other: create them (give the
+source, symbol, period, timestamp and prices, under the names the model gives them; fields
+left out get their defaults), update any field (a change to source, symbol, period or
+timestamp gives the bar a new id) and delete them. `model record list` on bars shows
 50 records unless `--limit` is given (`--limit 0` lists all).
 
 ## Terminal UI
@@ -176,5 +191,5 @@ mnnn rule create Grow --on record.create --if "name = notes" \
   - a model whose name is taken is imported as `NAME_imported`;
   - imported rules start switched off;
   - fields added to bars arrive as optional fields on the local bars model, with their
-    values on the archive's bars.
+    values on the archive's bars (the local names of the fields from imports stay).
 - **Backups** contain everything.

@@ -207,7 +207,8 @@ the TUI shows them in the result tile, and `mnnn code run` prints them as text
 Muninn is a general research store, so code spaces are not fenced in: they can change
 any field of any model, **including bars and their built-in fields** (`open` … `flags`,
 and the key fields `source`, `symbol`, `period`, `timestamp`), create records and bars,
-and create models. Nothing is deleted or silently replaced: changing a key field re-keys
+and create models. Bars fields go by the names the bars model gives them (see
+[models](models.md)). Nothing is deleted or silently replaced: changing a key field re-keys
 the bar, and is refused when another bar already has that key. Previous values are kept
 in the history entry of the change (up to 10,000 records per call).
 

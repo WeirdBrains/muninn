@@ -94,8 +94,8 @@ pub struct ProjectPack {
     pub code: Vec<super::code::CodeSpace>,
 }
 
-/// A model in a project pack. For the built-in bars model: only the fields added to it,
-/// and their values on the bars the pack carries.
+/// A model in a project pack. For the built-in bars model: its design (importing adds the
+/// fields it stores that this store lacks) and their values on the bars the pack carries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelPack {
     pub model: Model,
@@ -435,7 +435,7 @@ impl Store {
         let mut model_packs = vec![];
         for m in models {
             if m.is_bars() {
-                if !m.design.fields.is_empty() {
+                if m.design.stored().next().is_some() {
                     model_packs.push(ModelPack { model: m, versions: vec![], records: vec![] });
                 }
                 continue;
@@ -490,18 +490,19 @@ impl Store {
             if let Some(mp) = pack.models.iter_mut().find(|m| m.model.is_bars())
                 && mp.model.version > 0
             {
-                let names: Vec<String> = mp.model.design.fields.iter().map(|f| f.name.clone()).collect();
+                let names: Vec<String> = mp.model.design.stored().map(|f| f.name.clone()).collect();
                 for d in &data {
                     let s = &d.series;
                     let c = |f: &str, op: super::Op, v: String| super::Condition { field: f.into(), op, value: v };
+                    // `bar.KEY` names the bars columns whatever the model calls them
                     let mut filter = vec![
-                        c("source", super::Op::Eq, s.source.clone()),
-                        c("base", super::Op::Eq, s.symbol.base.clone()),
-                        c("quote", super::Op::Eq, s.symbol.quote.clone()),
-                        c("period", super::Op::Eq, s.duration.to_string()),
+                        c("bar.source", super::Op::Eq, s.source.clone()),
+                        c("bar.base", super::Op::Eq, s.symbol.base.clone()),
+                        c("bar.quote", super::Op::Eq, s.symbol.quote.clone()),
+                        c("bar.period", super::Op::Eq, s.duration.to_string()),
                     ];
-                    filter.extend(s.from.map(|f| c("timestamp", super::Op::Ge, f.to_string())));
-                    filter.extend(s.to.map(|t| c("timestamp", super::Op::Le, t.to_string())));
+                    filter.extend(s.from.map(|f| c("bar.timestamp", super::Op::Ge, f.to_string())));
+                    filter.extend(s.to.map(|t| c("bar.timestamp", super::Op::Le, t.to_string())));
                     for mut r in self.records(&mp.model, &super::RecordQuery { filter, ..Default::default() })? {
                         r.values.retain(|k, v| names.contains(k) && !v.is_null());
                         if !r.values.is_empty() {
@@ -858,8 +859,7 @@ impl Store {
         let Some(local) = self.model(BARS)? else { return Ok(0) };
         let theirs = remap_design(&mp.model.design, ids);
         let add: Vec<_> = theirs
-            .fields
-            .iter()
+            .stored()
             .filter(|f| local.pending().field(&f.name).is_none() && local.design.field(&f.name).is_none())
             .map(|f| {
                 let mut f = f.clone();
@@ -884,7 +884,7 @@ impl Store {
                 continue;
             }
             let vals: serde_json::Map<String, serde_json::Value> =
-                r.values.iter().filter(|(k, _)| local.design.field(k).is_some()).map(|(k, v)| (k.clone(), v.clone())).collect();
+                r.values.iter().filter(|(k, _)| local.design.stored().any(|f| &f.name == *k)).map(|(k, v)| (k.clone(), v.clone())).collect();
             if !vals.is_empty() {
                 self.update_record(&local, &r.id, &vals)?;
                 n += 1;

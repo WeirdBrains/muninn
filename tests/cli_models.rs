@@ -77,12 +77,25 @@ fn models_are_designed_migrated_and_rolled_back() {
         assert!(h.contains(k), "{k} missing");
     }
 
-    // built-in bars are protected but take new fields
-    let o = e.run(&["-y", "model", "remove", "bars"]);
-    assert!(!o.status.success() && err(&o).contains("built in"), "{}", err(&o));
-    let o = e.run(&["model", "edit", "bars", "--drop", "close"]);
-    assert!(!o.status.success(), "bars fields stay");
-    e.ok(&["model", "edit", "bars", "--add", "flag:text", "--apply"]);
+    // the bars model is designed like any other: rename and drop its fields from imports
+    e.ok(&["model", "edit", "bars", "--rename", "close:mid", "--drop", "volume", "--add", "flag:text", "--apply"]);
+    let f = fixture("BTCUSDT_5m.csv");
+    e.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
+    let rs = json(&e, &["model", "record", "list", "bars", "--json", "--where", "mid > 0", "--limit", "3"]);
+    assert_eq!(rs.as_array().unwrap().len(), 3);
+    assert!(rs[0].get("mid").is_some() && rs[0].get("close").is_none() && rs[0].get("volume").is_none(), "{rs}");
+    let o = e.run(&["model", "record", "list", "bars", "--where", "close > 0"]);
+    assert!(!o.status.success() && err(&o).contains("called `mid` now"), "{}", err(&o));
+    let out = e.home().join("bars.csv");
+    e.ok(&["export", "--format", "csv", "--out", out.to_str().unwrap()]);
+    assert!(std::fs::read_to_string(&out).unwrap().lines().count() > 5, "exports read the bars as imported");
+    // a rollback (v0: as shipped) brings volume back; removing bars deletes every bar, after asking
+    e.ok(&["-y", "model", "rollback", "bars", "0"]);
+    assert!(json(&e, &["model", "record", "list", "bars", "--json", "--limit", "1"])[0].get("volume").is_some());
+    let o = e.run(&["model", "remove", "bars"]);
+    assert!(!o.status.success() && err(&o).contains("deletes all"), "{}", err(&o));
+    e.ok(&["-y", "model", "remove", "bars"]);
+    assert_eq!(json(&e, &["model", "show", "bars", "--json"])["records"], 0);
 
     // delete by filter, then remove the model
     e.ok(&["-y", "model", "record", "delete", "signals", "--where", "symbol ~ eth"]);

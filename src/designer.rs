@@ -312,8 +312,8 @@ pub fn diff_ops(store: &Store, old: &Design, new: &Design) -> Vec<FieldOp> {
 /// `+` adds, `-` loses, `~` changes, `·` the rest (the TUI colors by this).
 pub fn step_mark(s: &Step) -> char {
     match s {
-        Step::CreateTable { .. } | Step::AddField { .. } => '+',
-        Step::DropField { .. } => '-',
+        Step::CreateTable { .. } | Step::AddField { .. } | Step::ShowField { .. } => '+',
+        Step::DropField { .. } | Step::HideField { .. } => '-',
         Step::ChangeType { lost, .. } if *lost > 0 => '-',
         Step::ChangeType { .. } | Step::RenameField { .. } => '~',
         _ => '·',
@@ -353,6 +353,8 @@ pub fn step_text(store: &Store, s: &Step) -> String {
         Step::Choices { field, choices } => format!("limit {field} to {}", choices.join(" | ")),
         Step::About { field } => format!("describe {field}"),
         Step::Order { fields } => format!("order fields: {}", fields.join(", ")),
+        Step::HideField { field } => format!("drop {field} from the model (the bars keep their imported values; rolling back shows them again)"),
+        Step::ShowField { field } => format!("show {field} (the bars' imported values)"),
     }
 }
 
@@ -569,7 +571,7 @@ mod tests {
     #[test]
     fn plans_read_well_and_values_parse() {
         let s = Store::open_in_memory().unwrap();
-        let d = Design { fields: vec![Field::new("price", FieldType::Real)] };
+        let d = Design { fields: vec![Field::new("price", FieldType::Real)], ..Default::default() };
         let (m, _) = s.create_model("signals", "", d, true).unwrap();
         let m = s.edit_model(&m.id, &[FieldOp::Drop { field: "price".into() }, FieldOp::Add { spec: "note:text default=hi".into() }]).unwrap();
         let p = s.plan_model(&m, m.pending()).unwrap();

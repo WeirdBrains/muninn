@@ -134,7 +134,7 @@ pub fn run(ctx: &Ctx, cmd: ModelCommand) -> anyhow::Result<()> {
             let rows: Vec<Vec<String>> = all
                 .iter()
                 .map(|m| {
-                    let n = if m.version > 0 { store.count_records(m).map(|n| n.to_string()).unwrap_or_default() } else { "-".into() };
+                    let n = if m.version > 0 || m.is_bars() { store.count_records(m).map(|n| n.to_string()).unwrap_or_default() } else { "-".into() };
                     vec![m.name.clone(), d::status_text(&store, m), m.pending().fields.len().to_string(), n, m.description.clone()]
                 })
                 .collect();
@@ -150,7 +150,7 @@ pub fn run(ctx: &Ctx, cmd: ModelCommand) -> anyhow::Result<()> {
             // parse against an empty model first so refs to the new model itself work
             let (m, _) = store.create_model(&name, &description, Default::default(), false)?;
             let set = (|| -> crate::Result<Model> {
-                let design = crate::store::Design { fields: d::parse_fields(&store, &m, &fields_of(&fields))? };
+                let design = crate::store::Design { fields: d::parse_fields(&store, &m, &fields_of(&fields))?, ..Default::default() };
                 store.set_model_draft(&m.id, Some(design))
             })();
             let m = match set {
@@ -221,7 +221,7 @@ pub fn run(ctx: &Ctx, cmd: ModelCommand) -> anyhow::Result<()> {
             let m = store.find_model(&model)?;
             if json {
                 let rules = store.owned_rules(OwnerKind::Model, &m.id)?;
-                let records = if m.version > 0 { Some(store.count_records(&m)?) } else { None };
+                let records = if m.version > 0 || m.is_bars() { Some(store.count_records(&m)?) } else { None };
                 println!("{}", serde_json::to_string_pretty(&json!({ "model": m, "records": records, "rules": rules }))?);
             } else {
                 print_model(&store, &m)?;
@@ -322,11 +322,13 @@ pub fn run(ctx: &Ctx, cmd: ModelCommand) -> anyhow::Result<()> {
         }
         ModelCommand::Remove { model } => {
             let m = store.find_model(&model)?;
-            if m.builtin {
-                return Err(anyhow!("{} is built in and cannot be removed (its added fields can be dropped)", m.name));
-            }
-            let n = if m.version > 0 { store.count_records(&m)? } else { 0 };
-            if !ctx.io.confirm(&format!("remove model {} with its {n} record(s)?", m.name))? {
+            let n = if m.version > 0 || m.is_bars() { store.count_records(&m)? } else { 0 };
+            let ask = if m.is_bars() {
+                format!("remove {}? this deletes all {n} bars (every imported bar) and the fields you added; it starts again as shipped", m.name)
+            } else {
+                format!("remove model {} with its {n} record(s)?", m.name)
+            };
+            if !ctx.io.confirm(&ask)? {
                 return Err(anyhow!("nothing removed"));
             }
             let (m, n) = store.remove_model(&m.id, true)?;

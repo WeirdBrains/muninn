@@ -224,7 +224,9 @@ impl<'a> Run<'a> {
                 let fields = req.get("fields").and_then(Value::as_str).unwrap_or_default();
                 let about = req.get("about").and_then(Value::as_str).unwrap_or_default();
                 let (m, _) = s.create_model(&name, about, crate::store::Design::default(), false)?;
-                let m = match d::parse_fields(s, &m, fields).and_then(|f| s.set_model_draft(&m.id, Some(crate::store::Design { fields: f }))) {
+                let m = match d::parse_fields(s, &m, fields)
+                    .and_then(|f| s.set_model_draft(&m.id, Some(crate::store::Design { fields: f, ..Default::default() })))
+                {
                     Ok(m) => m,
                     Err(e) => {
                         let _ = s.remove_model(&m.id, true);

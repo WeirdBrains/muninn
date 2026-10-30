@@ -155,7 +155,7 @@ fn a_math_plugin_computes_per_group_and_writes_fields() {
     let s = store();
     let mut f = Field::new("fast", FieldType::Real);
     f.default = None;
-    s.set_model_draft("bars", Some(Design { fields: vec![f] })).unwrap();
+    s.set_model_draft("bars", Some(Design { fields: vec![f], ..Default::default() })).unwrap();
     s.apply_model("bars", &Default::default()).unwrap();
     let src = "@title SMA\n@view value\nfast = sma(close, 5)\nup = if(close > fast, 1, 0)\n@update fast = fast\n";
     let input = CodeInput { group: vec!["symbol".into()], ..bars_input() };

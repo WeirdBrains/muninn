@@ -166,24 +166,41 @@ fn design_apply_roll_back_records_and_rules() {
 }
 
 #[test]
-fn bars_are_protected() {
+fn bars_fields_can_be_renamed_and_dropped() {
     let (_t, mut a) = app();
+    // the fixture bars are loaded
+    let n = a.store.count_records(&a.store.find_model("bars").unwrap()).unwrap();
+    assert!(n > 0);
     a.dispatch(Action::Models);
     a.models.sel = a.models.list.iter().position(|x| x.builtin).unwrap();
-    a.on_key(key(KeyCode::Char('d')));
-    assert!(a.models.msg.as_ref().unwrap().1, "built in");
     a.on_key(key(KeyCode::Enter));
     assert_eq!(a.models.screen, Screen::Design);
     let text = screen_text(&mut a);
-    assert!(text.contains("built in (fixed)") && text.contains("open"), "{text}");
-    a.models.fsel = 0;
+    assert!(text.contains("from imports") && text.contains("close"), "{text}");
+    // e renames close; x drops volume; A applies (no values lost)
+    a.models.fsel = a.store.find_model("bars").unwrap().design.fields.iter().position(|f| f.name == "close").unwrap();
+    a.on_key(key(KeyCode::Char('e')));
+    fill(&mut a, "mid:real");
+    a.models.fsel = a.store.find_model("bars").unwrap().pending().fields.iter().position(|f| f.name == "volume").unwrap();
     a.on_key(key(KeyCode::Char('x')));
-    assert!(a.models.msg.as_ref().map(|m| m.1).unwrap_or(false), "its own fields stay");
-    a.on_key(key(KeyCode::Char('a')));
-    fill(&mut a, "flag:text");
     a.on_key(key(KeyCode::Char('A')));
-    assert!(a.store.find_model("bars").unwrap().design.field("flag").is_some());
+    let m = a.store.find_model("bars").unwrap();
+    assert_eq!(m.version, 1, "{:?}", a.models.msg);
+    assert!(m.design.field("mid").is_some() && m.design.field("close").is_none() && m.design.field("volume").is_none());
+    // records, the chart and the sidebar still open
     a.on_key(key(KeyCode::Char('r')));
+    let text = screen_text(&mut a);
+    assert!(text.contains("mid") && !text.contains("volume"), "{text}");
+    a.on_key(key(KeyCode::Esc));
+    a.on_key(key(KeyCode::Esc));
+    a.on_key(key(KeyCode::Esc));
+    let _ = screen_text(&mut a);
+    // d asks before deleting the bars model
+    a.dispatch(Action::Models);
+    a.models.sel = a.models.list.iter().position(|x| x.builtin).unwrap();
+    a.on_key(key(KeyCode::Char('d')));
+    let (msg, is_err) = a.models.msg.clone().unwrap();
+    assert!(!is_err && msg.contains(&format!("deletes all {n} bars")), "{msg}");
     a.on_key(key(KeyCode::Char('n')));
-    assert!(a.models.msg.as_ref().unwrap().1, "bars come from imports");
+    assert_eq!(a.store.count_records(&a.store.find_model("bars").unwrap()).unwrap(), n, "any other key cancels");
 }

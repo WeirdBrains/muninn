@@ -301,8 +301,21 @@ fn design_rows(m: &Model) -> Vec<Row> {
     rows
 }
 
-fn builtin_field(m: &Model, name: &str) -> bool {
-    m.is_bars() && crate::store::records::field_names(&Model { design: Design::default(), draft: None, ..m.clone() }).iter().any(|f| f == name)
+/// A bars field that reads the imported bar values (shown as "from imports").
+fn builtin_field(m: &Model, f: &crate::store::models::Field) -> bool {
+    m.is_bars() && crate::store::models::bar_key(f).is_some()
+}
+
+/// What removing a model deletes, for the confirmation.
+fn remove_text(m: &Model, c: usize) -> String {
+    if m.is_bars() {
+        format!(
+            "remove {}? this deletes all {c} bars (every imported bar) and the fields you added; it starts again as shipped. y confirms, any other key cancels",
+            m.name
+        )
+    } else {
+        format!("remove model {} and its {c} records? y confirms, any other key cancels", m.name)
+    }
 }
 
 /// Save a new draft (recording what changed) and replan.
@@ -361,7 +374,9 @@ fn answer_step(app: &mut App, k: MAsk, v: String) -> crate::Result<()> {
             }
             MAsk::NewFields => {
                 let (m, _) = app.store.create_model(&app.models.new_name, "", Design::default(), false)?;
-                let fields = match dz::parse_fields(&app.store, &m, &v).and_then(|f| app.store.set_model_draft(&m.id, Some(Design { fields: f }))) {
+                let fields = match dz::parse_fields(&app.store, &m, &v)
+                    .and_then(|f| app.store.set_model_draft(&m.id, Some(Design { fields: f, ..Default::default() })))
+                {
                     Ok(m) => m,
                     Err(e) => {
                         let _ = app.store.remove_model(&m.id, true);
@@ -861,13 +876,10 @@ fn list_key(app: &mut App, k: KeyEvent) {
         KeyCode::Char('n') | KeyCode::Char('a') => ask(app, MAsk::NewModel, ""),
         KeyCode::Char('d') | KeyCode::Delete => {
             let Some(m) = st.list.get(st.sel).cloned() else { return };
-            if m.builtin {
-                return err(app, format!("{} is built in; open it (Enter) to drop the fields you added", m.name));
-            }
             let c = st.counts.get(st.sel).copied().unwrap_or(0);
             st.model = None;
             st.confirm = Some(Confirm::RemoveModel);
-            ok(app, format!("remove model {} and its {c} records? y confirms, any other key cancels", m.name));
+            ok(app, remove_text(&m, c));
         }
         _ => {
             common_key(app, k);
@@ -886,16 +898,12 @@ fn design_key(app: &mut App, k: KeyEvent) {
         KeyCode::Char('a') | KeyCode::Char('n') => ask(app, MAsk::AddField, ""),
         KeyCode::Enter | KeyCode::Char('e') => match row {
             Some(r) if r.dropped => ok(app, format!("{} is dropped in the draft; u restores it", r.field.name)),
-            Some(r) if builtin_field(&m, &r.field.name) => err(app, format!("{} is a built-in bars field", r.field.name)),
             Some(r) => {
                 let t = dz::field_text(&app.store, &r.field);
                 ask(app, MAsk::EditField(r.field.id.clone()), t)
             }
             None => ask(app, MAsk::AddField, ""),
         },
-        KeyCode::Char('x') | KeyCode::Delete if row.is_none() && m.is_bars() => {
-            err(app, "the built-in bars fields stay as they are (only fields you added can be dropped)");
-        }
         KeyCode::Char('x') | KeyCode::Delete => {
             if let Some(r) = row.filter(|r| !r.dropped) {
                 let mut d = m.pending().clone();
@@ -943,12 +951,9 @@ fn design_key(app: &mut App, k: KeyEvent) {
             ask(app, MAsk::ModelAbout, d)
         }
         KeyCode::Char('d') => {
-            if m.builtin {
-                return err(app, format!("{} is built in and stays", m.name));
-            }
             let c = app.store.count_records(&m).unwrap_or(0);
             app.models.confirm = Some(Confirm::RemoveModel);
-            ok(app, format!("remove model {} and its {c} records? y confirms, any other key cancels", m.name));
+            ok(app, remove_text(&m, c));
         }
         _ => {
             common_key(app, k);
@@ -1024,15 +1029,11 @@ fn records_key(app: &mut App, k: KeyEvent) {
             ok(app, "filter, sort and grouping cleared");
         }
         KeyCode::Char('n') | KeyCode::Char('a') => {
-            if m.is_bars() {
-                return err(app, "bars come from imports; e edits the fields you added to a bar");
-            }
             let t: Vec<String> = m.design.fields.iter().filter(|f| f.default.is_none()).map(|f| format!("{}=", f.name)).collect();
             ask(app, MAsk::NewRecord, t.join(" "))
         }
         KeyCode::Char('e') => {
             let Some(r) = selected_record(app) else { return };
-            // bars: only the fields added to them can change
             let t = m
                 .design
                 .fields
@@ -1049,17 +1050,11 @@ fn records_key(app: &mut App, k: KeyEvent) {
             ask(app, MAsk::UpdateMany, "")
         }
         KeyCode::Char('d') | KeyCode::Delete => {
-            if m.is_bars() {
-                return err(app, "bars are removed with their source (Data ▸ Sources…)");
-            }
             let Some(r) = selected_record(app) else { return };
             app.models.confirm = Some(Confirm::DeleteRecord(r.id.clone()));
             ok(app, format!("delete record {}? y confirms", r.short_id()));
         }
         KeyCode::Char('D') => {
-            if m.is_bars() {
-                return err(app, "bars are removed with their source (Data ▸ Sources…)");
-            }
             if app.models.query.filter.is_empty() && app.models.query.text.is_empty() {
                 return err(app, "set a filter first (w or /): D deletes every record it matches");
             }
@@ -1224,8 +1219,7 @@ fn draw_design(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)
         v.head.push(muted(&t, format!(" {}", m.description)));
     }
     if m.is_bars() {
-        let own = crate::store::records::field_names(&Model { design: Design::default(), draft: None, ..m.clone() });
-        v.head.push(muted(&t, format!(" built in (fixed): {}", own.join(", "))));
+        v.head.push(muted(&t, " fields marked \"from imports\" read the imported bars; rename, retype or drop any of them (x drops, u restores)"));
     }
     let w = rows.iter().map(|x| x.field.name.chars().count()).max().unwrap_or(4).clamp(6, 20);
     for (i, row) in rows.iter().enumerate() {
@@ -1259,12 +1253,12 @@ fn draw_design(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)
         if on {
             name = row_style(&t, true);
         }
-        let built = builtin_field(&m, &f0.name);
+        let built = builtin_field(&m, f0);
         v.rows.push(Line::from(vec![
             Span::styled(format!(" {} ", row.mark), mark_style(&t, row.mark).add_modifier(Modifier::BOLD)),
             Span::styled(format!("{:<w$} ", f0.name), name),
             Span::styled(format!(" {:<10}", dz::type_text(s, &f0.ty)), Style::new().fg(t.accent)),
-            Span::styled(format!(" {}{}", if built { "built in " } else { "" }, flags.join(" · ")), Style::new().fg(t.muted)),
+            Span::styled(format!(" {}{}", if built { "from imports " } else { "" }, flags.join(" · ")), Style::new().fg(t.muted)),
         ]));
     }
     if rows.is_empty() {

@@ -9,8 +9,11 @@
 //!
 //! Tables: model `name` keeps its records in `m_<name>` (`id`, `_version`, `_created_at`,
 //! `_updated_at`, `_author`, then one column per field). The built-in `bars` model is the
-//! bars table itself: its fields are read-only, and fields added to it live in `mx_bars`,
-//! one row per bar keyed by the bar id (following source renames and removals).
+//! bars table itself. Its built-in fields (ids `bar.KEY`) read the bars table's columns and
+//! can be renamed, moved, constrained, retyped and dropped like any field: a retyped one
+//! moves into `mx_bars` (converted), a dropped one leaves the model while the bars keep
+//! their imported values. Fields added to it live in `mx_bars`, one row per bar keyed by
+//! the bar id (following source renames and removals).
 //!
 //! Field ids stay the same across versions, so a renamed field keeps its values.
 use super::{Store, new_id, now_ms};
@@ -50,7 +53,7 @@ INSERT INTO models(id, name, description, builtin, version, design, created_at, 
 /// Id and name of the built-in bars model.
 pub const BARS: &str = "bars";
 
-/// The bars table's own fields (read-only in the bars model).
+/// The bars table's own fields (the built-in fields of the bars model, as shipped).
 pub const BAR_FIELDS: &[(&str, &str)] = &[
     ("source", "text"),
     ("symbol", "text"),
@@ -65,6 +68,61 @@ pub const BAR_FIELDS: &[(&str, &str)] = &[
     ("volume", "real"),
     ("flags", "integer"),
 ];
+
+/// Field ids of the built-in bars fields: `bar.` and the column key (`bar.close`).
+pub const BAR_ID_PREFIX: &str = "bar.";
+
+/// The built-in bars fields as shipped, as fields of the bars model.
+pub fn bar_builtins() -> Vec<Field> {
+    BAR_FIELDS
+        .iter()
+        .map(|(k, t)| Field {
+            required: true,
+            about: "from imports".into(),
+            id: format!("{BAR_ID_PREFIX}{k}"),
+            ..Field::new(k, FieldType::basic(t).expect("bar field types are basic"))
+        })
+        .collect()
+}
+
+/// The bars column a field reads: a built-in bars field with its shipped type. A built-in
+/// field given another type is stored in `mx_bars` like an added field.
+pub fn bar_key(f: &Field) -> Option<&'static str> {
+    let k = f.id.strip_prefix(BAR_ID_PREFIX)?;
+    BAR_FIELDS.iter().find(|(n, t)| *n == k && FieldType::basic(t).as_ref() == Some(&f.ty)).map(|(n, _)| *n)
+}
+
+/// The SQL expression of a bars column (`b` is bars, `s` its source).
+pub(crate) fn bar_sql(key: &str) -> &'static str {
+    match key {
+        "source" => "s.name",
+        "symbol" => "(b.base || '/' || b.quote)",
+        "base" => "b.base",
+        "quote" => "b.quote",
+        "period" => "b.duration_s",
+        "timestamp" => "b.timestamp",
+        "open" => "b.open",
+        "high" => "b.high",
+        "low" => "b.low",
+        "close" => "b.close",
+        "volume" => "b.volume",
+        _ => "b.flags",
+    }
+}
+
+/// A bars column value read with [`bar_sql`] as the field shows it (`period` as `5m`).
+pub(crate) fn bar_value(key: &str, v: rusqlite::types::Value) -> Value {
+    use rusqlite::types::Value as S;
+    match (key, v) {
+        ("period", S::Integer(d)) => Value::String(crate::model::Duration(d).to_string()),
+        (_, S::Null) => Value::Null,
+        (_, S::Integer(i)) if matches!(key, "open" | "high" | "low" | "close" | "volume") => Value::from(i as f64),
+        (_, S::Integer(i)) => Value::from(i),
+        (_, S::Real(f)) => Value::from(f),
+        (_, S::Text(t)) => Value::String(t),
+        (_, S::Blob(b)) => Value::String(hex::encode(b)),
+    }
+}
 
 /// Names a field cannot have (besides anything starting with `_`).
 pub const RESERVED: &[&str] = &["id", "where", "author"];
@@ -199,9 +257,33 @@ pub(crate) fn new_field_id() -> String {
 pub struct Design {
     #[serde(default)]
     pub fields: Vec<Field>,
+    /// bars only: the design lists the built-in fields itself (designs from before 2.5.1
+    /// did not; [`Design::with_builtins`] puts them in front).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub builtins: bool,
 }
 
 impl Design {
+    /// A bars design with its built-in fields listed (a no-op once they are).
+    pub fn with_builtins(mut self) -> Design {
+        if !self.builtins {
+            let mut f = bar_builtins();
+            f.retain(|b| !self.fields.iter().any(|o| o.name == b.name || o.id == b.id));
+            f.append(&mut self.fields);
+            self.fields = f;
+            self.builtins = true;
+        }
+        self
+    }
+    /// Fields kept in the model's own table (for bars: all but the built-in ones that read
+    /// the bars table).
+    pub fn stored(&self) -> impl Iterator<Item = &Field> {
+        self.fields.iter().filter(|f| bar_key(f).is_none())
+    }
+    /// The field reading a bars column, if the design has one.
+    pub fn bar_field(&self, key: &str) -> Option<&Field> {
+        self.fields.iter().find(|f| bar_key(f) == Some(key))
+    }
     pub fn field(&self, name: &str) -> Option<&Field> {
         self.fields.iter().find(|f| f.name == name)
     }
@@ -292,18 +374,66 @@ pub struct ModelVersion {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "step", rename_all = "snake_case")]
 pub enum Step {
-    CreateTable { table: String },
-    AddField { field: String, ty: String, filled: usize, with: Option<Value> },
-    DropField { field: String, ty: String, lost: usize },
-    RenameField { from: String, to: String },
-    ChangeType { field: String, from: String, to: String, lost: usize },
-    Require { field: String, on: bool, filled: usize, with: Option<Value> },
-    Unique { field: String, on: bool },
-    Index { field: String, on: bool },
-    Default { field: String, value: Option<Value> },
-    Choices { field: String, choices: Vec<String> },
-    About { field: String },
-    Order { fields: Vec<String> },
+    CreateTable {
+        table: String,
+    },
+    AddField {
+        field: String,
+        ty: String,
+        filled: usize,
+        with: Option<Value>,
+    },
+    DropField {
+        field: String,
+        ty: String,
+        lost: usize,
+    },
+    RenameField {
+        from: String,
+        to: String,
+    },
+    ChangeType {
+        field: String,
+        from: String,
+        to: String,
+        lost: usize,
+    },
+    Require {
+        field: String,
+        on: bool,
+        filled: usize,
+        with: Option<Value>,
+    },
+    Unique {
+        field: String,
+        on: bool,
+    },
+    Index {
+        field: String,
+        on: bool,
+    },
+    Default {
+        field: String,
+        value: Option<Value>,
+    },
+    Choices {
+        field: String,
+        choices: Vec<String>,
+    },
+    About {
+        field: String,
+    },
+    Order {
+        fields: Vec<String>,
+    },
+    /// bars: a built-in field leaves the model; the bars keep their imported values.
+    HideField {
+        field: String,
+    },
+    /// bars: a built-in field comes (back) into the model with the bars' values.
+    ShowField {
+        field: String,
+    },
 }
 
 impl Step {
@@ -507,14 +637,16 @@ impl Store {
     fn row_model(r: &rusqlite::Row) -> rusqlite::Result<Model> {
         let design: String = r.get(5)?;
         let draft: Option<String> = r.get(6)?;
+        let id: String = r.get(0)?;
+        let fix = |d: Design| if id == BARS { d.with_builtins() } else { d };
         Ok(Model {
-            id: r.get(0)?,
+            design: fix(serde_json::from_str(&design).unwrap_or_default()),
+            draft: draft.and_then(|d| serde_json::from_str(&d).ok()).map(fix),
+            id,
             name: r.get(1)?,
             description: r.get(2)?,
             builtin: r.get::<_, i64>(3)? != 0,
             version: r.get(4)?,
-            design: serde_json::from_str(&design).unwrap_or_default(),
-            draft: draft.and_then(|d| serde_json::from_str(&d).ok()),
             author_id: r.get(7)?,
             created_at: r.get(8)?,
             updated_at: r.get(9)?,
@@ -615,9 +747,6 @@ impl Store {
         if let Some(n) = name {
             let n = slug(n);
             if n != m.name {
-                if m.builtin {
-                    return Err(Error::invalid("model", format!("{} is built in and keeps its name", m.name)));
-                }
                 check_name("model name", &n)?;
                 if self.models()?.iter().any(|o| o.name == n) {
                     return Err(Error::invalid("model name", format!("`{n}` already exists")));
@@ -640,6 +769,8 @@ impl Store {
     /// Replace the draft (`None` discards it). The design is checked first.
     pub fn set_model_draft(&self, id: &str, draft: Option<Design>) -> Result<Model> {
         let mut m = self.model_or_err(id)?;
+        // a bars design without its built-in fields (as before 2.5.1) keeps them as they were shipped
+        let draft = draft.map(|d| if m.is_bars() { d.with_builtins() } else { d });
         if let Some(d) = &draft {
             self.check_design(&m, d)?;
         }
@@ -665,8 +796,8 @@ impl Store {
             if RESERVED.contains(&f.name.as_str()) {
                 return Err(Error::invalid("field name", format!("`{}` is reserved ({})", f.name, RESERVED.join(", "))));
             }
-            if m.is_bars() && BAR_FIELDS.iter().any(|(n, _)| *n == f.name) {
-                return Err(Error::invalid("field name", format!("`{}` is a built-in bars field", f.name)));
+            if !m.is_bars() && f.id.starts_with(BAR_ID_PREFIX) {
+                return Err(Error::invalid("design", format!("field `{}`: ids starting with `bar.` belong to the bars model", f.name)));
             }
             if !names.insert(f.name.clone()) {
                 return Err(Error::invalid("design", format!("two fields are named `{}`", f.name)));
@@ -674,8 +805,11 @@ impl Store {
             if f.id.is_empty() || !ids.insert(f.id.clone()) {
                 return Err(Error::invalid("design", format!("field `{}` has no id or a duplicate one", f.name)));
             }
-            if m.is_bars() && f.required {
-                return Err(Error::invalid("design", format!("{}: fields added to bars cannot be required (give a default)", f.name)));
+            if m.is_bars() && f.required && f.default.is_none() && bar_key(f).is_none() {
+                return Err(Error::invalid(
+                    "design",
+                    format!("{}: a required bars field kept beside the imported values needs a default (new bars from imports get it)", f.name),
+                ));
             }
             if let FieldType::Ref(t) = &f.ty
                 && t != &m.id
@@ -709,14 +843,15 @@ impl Store {
         if m.version == 0 || !self.table_exists(&t)? {
             return Ok(vec![]);
         }
-        let cols: Vec<String> = m.design.fields.iter().map(|f| q(&f.name)).collect();
+        let stored: Vec<&Field> = m.design.stored().collect();
+        let cols: Vec<String> = stored.iter().map(|f| q(&f.name)).collect();
         let sel = if cols.is_empty() { String::new() } else { format!(", {}", cols.join(", ")) };
         let mut st = self.conn.prepare(&format!("SELECT id, _created_at, _updated_at, _author{sel} FROM {}", q(&t)))?;
-        let n = m.design.fields.len();
+        let n = stored.len();
         let rows = st
             .query_map([], |r| {
                 let mut values = Vec::with_capacity(n);
-                for (i, f) in m.design.fields.iter().enumerate() {
+                for (i, f) in stored.iter().enumerate() {
                     values.push((f.id.clone(), from_sql(r.get(4 + i)?, &f.ty)));
                 }
                 let id = match r.get::<_, rusqlite::types::Value>(0)? {
@@ -733,7 +868,134 @@ impl Store {
     /// What applying `to` to a model would do (nothing is changed).
     pub fn plan_model(&self, m: &Model, to: &Design) -> Result<Plan> {
         let rows = self.raw_rows(m)?;
+        if m.is_bars() {
+            return self.plan_bars(m, to, &rows);
+        }
         Ok(plan_rows(m, to, &rows))
+    }
+
+    /// Distinct values of a bars column with how many bars hold each.
+    fn bar_column_values(&self, key: &str) -> Result<Vec<(Value, usize)>> {
+        let e = bar_sql(key);
+        let mut st = self.conn.prepare(&format!("SELECT {e}, COUNT(*) FROM bars b JOIN sources s ON s.id = b.source_id GROUP BY {e}"))?;
+        let v = st.query_map([], |r| Ok((bar_value(key, r.get(0)?), r.get::<_, i64>(1)? as usize)))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(v)
+    }
+
+    /// The plan for the bars model. Built-in fields that read the bars table cost nothing
+    /// to rename, move, describe or drop (the bars keep their imported values); retyping one
+    /// moves its converted values into `mx_bars`, and its type back shows the bars' values again.
+    fn plan_bars(&self, m: &Model, to: &Design, rows: &[RawRow]) -> Result<Plan> {
+        let bars = self.count_records(m)?;
+        let only_stored = |d: &Design| Design { fields: d.stored().cloned().collect(), builtins: d.builtins };
+        let inner = Model { design: only_stored(&m.design), ..m.clone() };
+        let mut plan = plan_rows(&inner, &only_stored(to), rows);
+        plan.rows = bars;
+        if to.stored().next().is_none() {
+            plan.steps.retain(|s| !matches!(s, Step::CreateTable { .. }));
+        }
+        plan.steps.retain(|s| !matches!(s, Step::Order { .. }));
+        for step in plan.steps.iter_mut() {
+            // a stored field added with a default fills every bar (they read it), not only those with a row
+            if let Step::AddField { filled, with: Some(_), .. } = step {
+                *filled = bars;
+            }
+        }
+        let from = &m.design;
+        let mut extra = vec![];
+        let mut blocked = vec![];
+        for f in &from.fields {
+            if to.by_id(&f.id).is_none()
+                && let Some(_k) = bar_key(f)
+            {
+                extra.push(Step::HideField { field: f.name.clone() });
+            }
+        }
+        for f in &to.fields {
+            let old = from.by_id(&f.id);
+            match (old, bar_key(f)) {
+                (None, Some(_)) => extra.push(Step::ShowField { field: f.name.clone() }),
+                (Some(o), Some(k)) => {
+                    if o.name != f.name {
+                        extra.push(Step::RenameField { from: o.name.clone(), to: f.name.clone() });
+                    }
+                    if bar_key(o).is_none() {
+                        // stored (retyped) → reading the bars again: the stored values go
+                        let lost = rows.iter().filter(|r| r.values.iter().any(|(id, v)| *id == f.id && !v.is_null())).count();
+                        plan.steps.retain(|s| !matches!(s, Step::DropField { field, .. } if *field == o.name));
+                        extra.push(Step::ChangeType { field: f.name.clone(), from: o.ty.code(), to: f.ty.code(), lost });
+                    } else {
+                        if o.required != f.required {
+                            extra.push(Step::Require { field: f.name.clone(), on: f.required, filled: 0, with: None });
+                        }
+                        if o.unique != f.unique {
+                            extra.push(Step::Unique { field: f.name.clone(), on: f.unique });
+                        }
+                        if o.index != f.index {
+                            extra.push(Step::Index { field: f.name.clone(), on: f.index });
+                        }
+                        if o.default != f.default {
+                            extra.push(Step::Default { field: f.name.clone(), value: f.default.clone() });
+                        }
+                        if o.choices != f.choices {
+                            extra.push(Step::Choices { field: f.name.clone(), choices: f.choices.clone() });
+                        }
+                        if o.about != f.about {
+                            extra.push(Step::About { field: f.name.clone() });
+                        }
+                    }
+                    debug_assert!(!k.is_empty());
+                }
+                (Some(o), None) if bar_key(o).is_some() => {
+                    // a built-in field retyped: its values are converted into mx_bars
+                    let key = bar_key(o).unwrap_or_default();
+                    plan.steps.retain(|s| !matches!(s, Step::AddField { field, .. } if *field == f.name));
+                    if o.name != f.name {
+                        extra.push(Step::RenameField { from: o.name.clone(), to: f.name.clone() });
+                    }
+                    let vals = self.bar_column_values(key)?;
+                    let lost: usize =
+                        vals.iter().filter(|(v, _)| !v.is_null() && convert(v, &f.ty).is_none_or(|c| c.is_null())).map(|(_, n)| n).sum();
+                    extra.push(Step::ChangeType { field: f.name.clone(), from: o.ty.code(), to: f.ty.code(), lost });
+                    if f.required && f.default.is_none() && lost > 0 {
+                        blocked.push(format!("{} is required but {lost} bar(s) would have no value: give it a default first", f.name));
+                    }
+                    if !plan.steps.iter().chain(&extra).any(|s| matches!(s, Step::CreateTable { .. })) && !self.table_exists(&m.table())? {
+                        extra.insert(0, Step::CreateTable { table: m.table() });
+                    }
+                }
+                _ => {}
+            }
+            // constraints on a field reading the bars are checked against the bars
+            if let Some(k) = bar_key(f) {
+                let old_on = |g: fn(&Field) -> bool| old.filter(|o| bar_key(o).is_some()).is_some_and(g);
+                if f.unique && !old_on(|o| o.unique) {
+                    let dups: usize = self.bar_column_values(k)?.iter().filter(|(_, n)| *n > 1).map(|(_, n)| n - 1).sum();
+                    if dups > 0 {
+                        blocked.push(format!("{} would be unique but {dups} bar(s) repeat a value", f.name));
+                    }
+                }
+                if !f.choices.is_empty() {
+                    let bad: usize = self
+                        .bar_column_values(k)?
+                        .iter()
+                        .filter(|(v, _)| v.as_str().is_some_and(|s| !f.choices.iter().any(|c| c.eq_ignore_ascii_case(s))))
+                        .map(|(_, n)| n)
+                        .sum();
+                    if bad > 0 {
+                        blocked.push(format!("{}: {bad} bar(s) hold a value that is not one of {}", f.name, f.choices.join(", ")));
+                    }
+                }
+            }
+        }
+        plan.steps.extend(extra);
+        let kept_old: Vec<&str> = from.fields.iter().filter(|f| to.by_id(&f.id).is_some()).map(|f| f.id.as_str()).collect();
+        let kept_new: Vec<&str> = to.fields.iter().filter(|f| from.by_id(&f.id).is_some()).map(|f| f.id.as_str()).collect();
+        if kept_old != kept_new {
+            plan.steps.push(Step::Order { fields: to.fields.iter().map(|f| f.name.clone()).collect() });
+        }
+        plan.blocked.extend(blocked);
+        Ok(plan)
     }
 
     /// Apply the draft as the next version.
@@ -751,34 +1013,50 @@ impl Store {
     /// Apply the design of an earlier version as the next version.
     pub fn rollback_model(&self, id: &str, to: i64, opts: &ApplyOpts) -> Result<(Model, Plan)> {
         let m = self.model_or_err(id)?;
-        if to < 1 || to >= m.version {
-            return Err(Error::invalid("version", format!("{} is at v{}; roll back to v1..v{}", m.name, m.version, m.version - 1)));
-        }
-        let v =
-            self.model_versions(id)?.into_iter().find(|v| v.version == to).ok_or_else(|| Error::invalid("version", format!("v{to} not found")))?;
+        let d = self.version_design(&m, to)?;
         let mut opts = opts.clone();
         if opts.note.is_empty() {
             opts.note = format!("rollback to v{to}");
         }
-        self.apply_design(&m, &v.design, &opts)
+        self.apply_design(&m, &d, &opts)
     }
 
     /// The plan for rolling back to a version (what `rollback --dry-run` shows).
     pub fn rollback_plan(&self, id: &str, to: i64) -> Result<Plan> {
         let m = self.model_or_err(id)?;
+        let d = self.version_design(&m, to)?;
+        self.plan_model(&m, &d)
+    }
+
+    /// The design of an earlier version to roll back to (bars: v0 is the design as shipped).
+    fn version_design(&self, m: &Model, to: i64) -> Result<Design> {
+        let first = if m.is_bars() { 0 } else { 1 };
+        if to < first || to >= m.version {
+            return Err(Error::invalid("version", format!("{} is at v{}; roll back to v{first}..v{}", m.name, m.version, m.version - 1)));
+        }
+        if to == 0 {
+            return Ok(Design::default().with_builtins());
+        }
         let v =
-            self.model_versions(id)?.into_iter().find(|v| v.version == to).ok_or_else(|| Error::invalid("version", format!("v{to} not found")))?;
-        self.plan_model(&m, &v.design)
+            self.model_versions(&m.id)?.into_iter().find(|v| v.version == to).ok_or_else(|| Error::invalid("version", format!("v{to} not found")))?;
+        Ok(v.design)
     }
 
     pub(crate) fn apply_design(&self, m: &Model, to: &Design, opts: &ApplyOpts) -> Result<(Model, Plan)> {
+        let fixed;
+        let to = if m.is_bars() && !to.builtins {
+            fixed = to.clone().with_builtins();
+            &fixed
+        } else {
+            to
+        };
         self.check_design(m, to)?;
         let rows = self.raw_rows(m)?;
-        let plan = plan_rows(m, to, &rows);
+        let plan = if m.is_bars() { self.plan_bars(m, to, &rows)? } else { plan_rows(m, to, &rows) };
         if !plan.blocked.is_empty() {
             return Err(Error::invalid("migration", plan.blocked.join("; ")));
         }
-        if plan.is_empty() && m.version > 0 {
+        if plan.is_empty() && (m.version > 0 || m.is_bars()) {
             return Err(Error::invalid("model", format!("{} already has this design (v{})", m.name, m.version)));
         }
         if plan.destructive() && !opts.destructive {
@@ -823,7 +1101,8 @@ impl Store {
             "_updated_at INTEGER NOT NULL".into(),
             "_author TEXT".into(),
         ];
-        for f in &to.fields {
+        let stored: Vec<Field> = to.stored().cloned().collect();
+        for f in &stored {
             let mut c = format!("{} {}", q(&f.name), f.ty.sql());
             if f.required {
                 c.push_str(" NOT NULL");
@@ -835,8 +1114,8 @@ impl Store {
         }
         self.conn.execute_batch(&format!("DROP TABLE IF EXISTS {}; CREATE TABLE {} ({})", q(&new), q(&new), cols.join(", ")))?;
         {
-            let names: Vec<String> = to.fields.iter().map(|f| q(&f.name)).collect();
-            let marks: Vec<String> = (0..5 + to.fields.len()).map(|i| format!("?{}", i + 1)).collect();
+            let names: Vec<String> = stored.iter().map(|f| q(&f.name)).collect();
+            let marks: Vec<String> = (0..5 + stored.len()).map(|i| format!("?{}", i + 1)).collect();
             let extra = if names.is_empty() { String::new() } else { format!(", {}", names.join(", ")) };
             let mut ins = self.conn.prepare(&format!(
                 "INSERT INTO {}(id, _version, _created_at, _updated_at, _author{extra}) VALUES ({})",
@@ -851,7 +1130,7 @@ impl Store {
                     r.updated_at.into(),
                     r.author.clone().map(Into::into).unwrap_or(rusqlite::types::Value::Null),
                 ];
-                for f in &to.fields {
+                for f in &stored {
                     let old = r.values.iter().find(|(id, _)| *id == f.id).map(|(_, v)| v.clone()).unwrap_or(Value::Null);
                     let mut v = convert(&old, &f.ty).unwrap_or(Value::Null);
                     if v.is_null()
@@ -866,9 +1145,54 @@ impl Store {
             }
         }
         self.conn.execute_batch(&format!("DROP TABLE IF EXISTS {}; ALTER TABLE {} RENAME TO {}", q(&t), q(&new), q(&t)))?;
-        for f in &to.fields {
+        for f in &stored {
             if f.index || matches!(f.ty, FieldType::Ref(_)) {
                 self.conn.execute_batch(&format!("CREATE INDEX {} ON {}({})", q(&format!("ix_{t}_{}", f.id)), q(&t), q(&f.name)))?;
+            }
+        }
+        if m.is_bars() {
+            self.rebuild_bars(m, to, version)?;
+        }
+        Ok(())
+    }
+
+    /// bars: copy the values of built-in fields given another type into `mx_bars`
+    /// (converted), and index the bars columns of indexed built-in fields.
+    fn rebuild_bars(&self, m: &Model, to: &Design, version: i64) -> Result<()> {
+        let t = q(&m.table());
+        let now = now_ms();
+        for f in to.stored() {
+            let Some(old) = m.design.by_id(&f.id) else { continue };
+            let Some(key) = bar_key(old) else { continue };
+            let mut read = self.conn.prepare(&format!("SELECT b.id, {} FROM bars b JOIN sources s ON s.id = b.source_id", bar_sql(key)))?;
+            let mut write = self.conn.prepare(&format!(
+                "INSERT INTO {t}(id, _version, _created_at, _updated_at, _author, {c}) VALUES (?1, ?2, ?3, ?3, NULL, ?4)
+                 ON CONFLICT(id) DO UPDATE SET {c} = excluded.{c}",
+                c = q(&f.name)
+            ))?;
+            let rows = read.query_map([], |r| Ok((r.get::<_, Vec<u8>>(0)?, bar_value(key, r.get(1)?))))?;
+            for row in rows {
+                let (id, v) = row?;
+                let v = convert(&v, &f.ty).unwrap_or(Value::Null);
+                let v = match (&v, &f.default) {
+                    (Value::Null, Some(d)) if f.required => coerce(f, d.clone())?,
+                    _ => v,
+                };
+                write.execute(params![id, version, now, to_sql(&v, &f.ty)])?;
+            }
+        }
+        for (k, _) in BAR_FIELDS {
+            let col = match *k {
+                "source" => "source_id",
+                "symbol" => "base, quote",
+                "period" => "duration_s",
+                o => o,
+            };
+            let ix = q(&format!("ix_bars_{k}"));
+            if to.bar_field(k).is_some_and(|f| f.index) {
+                self.conn.execute_batch(&format!("CREATE INDEX IF NOT EXISTS {ix} ON bars({col})"))?;
+            } else {
+                self.conn.execute_batch(&format!("DROP INDEX IF EXISTS {ix}"))?;
             }
         }
         Ok(())
@@ -883,10 +1207,11 @@ impl Store {
             .query_map([id], |r| {
                 let d: String = r.get(2)?;
                 let s: String = r.get(3)?;
+                let design: Design = serde_json::from_str(&d).unwrap_or_default();
                 Ok(ModelVersion {
                     model_id: r.get(0)?,
                     version: r.get(1)?,
-                    design: serde_json::from_str(&d).unwrap_or_default(),
+                    design: if id == BARS { design.with_builtins() } else { design },
                     steps: serde_json::from_str(&s).unwrap_or_default(),
                     note: r.get(4)?,
                     rule_id: r.get(5)?,
@@ -915,12 +1240,6 @@ impl Store {
     /// models other models refer to stay. Its rules become standalone (switched off).
     pub fn remove_model(&self, id: &str, destructive: bool) -> Result<(Model, usize)> {
         let m = self.model_or_err(id)?;
-        if m.builtin {
-            return Err(Error::invalid(
-                "model",
-                format!("{} is built in; drop the fields you added with `mnnn model edit {} --drop FIELD`", m.name, m.name),
-            ));
-        }
         let refs = self.models_referring_to(&m.id)?;
         if !refs.is_empty() {
             let n: Vec<String> = refs.into_iter().map(|r| r.name).collect();
@@ -928,14 +1247,30 @@ impl Store {
         }
         let rows = self.count_records(&m)?;
         if rows > 0 && !destructive {
-            return Err(Error::NeedsConfirmation(format!("removing {} deletes its {rows} record(s)", m.name)));
+            return Err(Error::NeedsConfirmation(if m.is_bars() {
+                format!("removing {} deletes all {rows} bars (every imported bar) and the values of the fields added to them", m.name)
+            } else {
+                format!("removing {} deletes its {rows} record(s)", m.name)
+            }));
         }
         self.conn.execute_batch("SAVEPOINT model_remove")?;
         let r = (|| -> Result<()> {
             self.conn.execute_batch(&format!("DROP TABLE IF EXISTS {}", q(&m.table())))?;
             self.conn.execute("DELETE FROM project_items WHERE kind = 'model' AND ref_id = ?1", [&m.id])?;
             self.orphan_rules(super::OwnerKind::Model, &m.id)?;
-            self.conn.execute("DELETE FROM models WHERE id = ?1", [&m.id])?;
+            if m.is_bars() {
+                // the bars go with their model; imports start it again as shipped
+                self.conn.execute_batch("DELETE FROM bars; DELETE FROM series_stats; DELETE FROM model_versions WHERE model_id = 'bars'")?;
+                for (k, _) in BAR_FIELDS {
+                    self.conn.execute_batch(&format!("DROP INDEX IF EXISTS {}", q(&format!("ix_bars_{k}"))))?;
+                }
+                self.conn.execute(
+                    "UPDATE models SET name = ?1, description = ?2, version = 0, design = ?3, draft = NULL, updated_at = ?4 WHERE id = ?1",
+                    params![BARS, "imported price bars (built in)", serde_json::to_string(&Design::default().with_builtins())?, now_ms()],
+                )?;
+            } else {
+                self.conn.execute("DELETE FROM models WHERE id = ?1", [&m.id])?;
+            }
             Ok(())
         })();
         match r {
@@ -1076,7 +1411,7 @@ mod tests {
         let mut price = f("price", FieldType::Real);
         price.required = true;
         let note = f("note", FieldType::Text);
-        let (m, plan) = s.create_model("Signals", "", Design { fields: vec![price.clone(), note.clone()] }, true).unwrap();
+        let (m, plan) = s.create_model("Signals", "", Design { fields: vec![price.clone(), note.clone()], ..Default::default() }, true).unwrap();
         assert_eq!((m.name.as_str(), m.version, m.draft.is_none()), ("signals", 1, true));
         assert!(matches!(plan.unwrap().steps[0], Step::CreateTable { .. }));
         assert!(s.table_exists("m_signals").unwrap());
@@ -1139,30 +1474,125 @@ mod tests {
     }
 
     #[test]
-    fn designs_are_checked_and_bars_is_protected() {
+    fn designs_are_checked_and_bars_is_editable() {
         let s = Store::open_in_memory().unwrap();
         let bars = s.find_model("bars").unwrap();
         assert!(bars.builtin && bars.version == 0);
-        assert!(s.remove_model("bars", true).is_err());
-        assert!(s.rename_model("bars", Some("x"), None).is_err());
-        let bad = Design { fields: vec![f("close", FieldType::Real)] };
-        assert!(s.set_model_draft("bars", Some(bad)).unwrap_err().to_string().contains("built-in"));
+        assert_eq!(bars.design.fields.len(), BAR_FIELDS.len(), "the built-in fields are in the design");
+        assert!(bars.design.fields.iter().all(|f| bar_key(f).is_some()));
+        // a field of another model may not pose as a bars column
+        let mut fake = f("close", FieldType::Real);
+        fake.id = "bar.close".into();
+        assert!(s.create_model("x", "", Design { fields: vec![fake], ..Default::default() }, false).is_err());
         let mut req = f("score", FieldType::Real);
         req.required = true;
-        assert!(s.set_model_draft("bars", Some(Design { fields: vec![req] })).is_err());
-        s.set_model_draft("bars", Some(Design { fields: vec![f("score", FieldType::Real)] })).unwrap();
+        assert!(s.set_model_draft("bars", Some(Design { fields: vec![req.clone()], ..Default::default() })).is_err(), "required needs a default");
+        req.default = Some(json!(0));
+        s.set_model_draft("bars", Some(Design { fields: vec![req], ..Default::default() })).unwrap();
         let (b, _) = s.apply_model("bars", &ApplyOpts::default()).unwrap();
         assert_eq!(b.version, 1);
         assert!(s.table_exists("mx_bars").unwrap());
 
-        assert!(s.create_model("x", "", Design { fields: vec![f("id", FieldType::Text)] }, false).is_err(), "reserved");
-        assert!(s.create_model("x", "", Design { fields: vec![f("a", FieldType::Ref("nope".into()))] }, false).is_err());
-        let (a, _) = s.create_model("a", "", Design { fields: vec![f("n", FieldType::Text)] }, true).unwrap();
-        let (_b, _) = s.create_model("b", "", Design { fields: vec![f("a", FieldType::Ref(a.id.clone()))] }, true).unwrap();
+        assert!(s.create_model("x", "", Design { fields: vec![f("id", FieldType::Text)], ..Default::default() }, false).is_err(), "reserved");
+        assert!(s.create_model("x", "", Design { fields: vec![f("a", FieldType::Ref("nope".into()))], ..Default::default() }, false).is_err());
+        let (a, _) = s.create_model("a", "", Design { fields: vec![f("n", FieldType::Text)], ..Default::default() }, true).unwrap();
+        let (_b, _) = s.create_model("b", "", Design { fields: vec![f("a", FieldType::Ref(a.id.clone()))], ..Default::default() }, true).unwrap();
         assert!(s.remove_model(&a.id, true).unwrap_err().to_string().contains("referred to by b"));
         assert!(s.create_model("a", "", Design::default(), false).is_err(), "name taken");
         let r = s.rename_model(&a.id, Some("Alpha"), Some("first")).unwrap();
         assert_eq!(r.name, "alpha");
         assert!(s.table_exists("m_alpha").unwrap() && !s.table_exists("m_a").unwrap());
+    }
+
+    fn bars_store() -> Store {
+        use crate::model::{Bar, Duration, Symbol};
+        let mut s = Store::open_in_memory().unwrap();
+        let src = s.add_source("bn", "csv", None).unwrap();
+        let bars: Vec<Bar> = (0..4)
+            .map(|i| Bar {
+                ts: 1_704_067_200_000 + i * 300_000,
+                open: 1.0 + i as f64,
+                high: 9.0,
+                low: 0.5,
+                close: 2.0 + i as f64,
+                volume: 10.0,
+                flags: 0,
+            })
+            .collect();
+        s.upsert_bars(&src, &Symbol::new("BTC", "USDT"), Duration(300), &bars).unwrap();
+        s
+    }
+
+    fn edit_bars(s: &Store, f: impl FnOnce(&mut Design)) -> Plan {
+        let m = s.find_model("bars").unwrap();
+        let mut d = m.pending().clone();
+        f(&mut d);
+        s.set_model_draft("bars", Some(d.clone())).unwrap();
+        s.plan_model(&m, &d).unwrap()
+    }
+
+    #[test]
+    fn bar_fields_rename_drop_retype_and_come_back() {
+        use crate::store::{BarFilter, RecordQuery};
+        let s = bars_store();
+        let cond = |c: &str| RecordQuery { filter: vec![crate::rules::parse_condition(c).unwrap()], ..Default::default() };
+        // rename close to mid: lossless, the bars keep working
+        let p = edit_bars(&s, |d| d.fields.iter_mut().find(|f| f.name == "close").unwrap().name = "mid".into());
+        assert_eq!(p.lost(), 0);
+        assert!(p.steps.contains(&Step::RenameField { from: "close".into(), to: "mid".into() }), "{:?}", p.steps);
+        let (m, _) = s.apply_model("bars", &ApplyOpts::default()).unwrap();
+        let r = s.records(&m, &cond("mid >= 4")).unwrap();
+        assert_eq!(r.len(), 2);
+        assert!(r[0].values.contains_key("mid") && !r[0].values.contains_key("close"));
+        let e = s.records(&m, &cond("close >= 4")).unwrap_err().to_string();
+        assert!(e.contains("called `mid` now"), "{e}");
+        assert_eq!(s.query_bars(&BarFilter::default()).unwrap().len(), 4, "charts read the bars as before");
+
+        // drop volume: hidden, the bars keep it (lossless), a rollback shows it again
+        let p = edit_bars(&s, |d| d.fields.retain(|f| f.name != "volume"));
+        assert_eq!((p.lost(), p.steps.clone()), (0, vec![Step::HideField { field: "volume".into() }]));
+        let (m, _) = s.apply_model("bars", &ApplyOpts::default()).unwrap();
+        assert!(!s.records(&m, &RecordQuery::default()).unwrap()[0].values.contains_key("volume"));
+        let e = s.records(&m, &cond("volume > 1")).unwrap_err().to_string();
+        assert!(e.contains("was dropped"), "{e}");
+        assert_eq!(s.query_bars(&BarFilter::default()).unwrap()[0].bar.volume, 10.0);
+
+        // retype open to text: values move into mx_bars, converted
+        // (required with a default, or not required: new bars from imports have no text open)
+        let p = edit_bars(&s, |d| {
+            let o = d.fields.iter_mut().find(|f| f.name == "open").unwrap();
+            (o.ty, o.required) = (FieldType::Text, false);
+        });
+        assert!(p.steps.iter().any(|x| matches!(x, Step::ChangeType { field, .. } if field == "open")), "{:?}", p.steps);
+        let (m, _) = s.apply_model("bars", &ApplyOpts { destructive: true, note: String::new() }).unwrap();
+        let r = s.records(&m, &RecordQuery { sort: vec![("timestamp".into(), false)], ..Default::default() }).unwrap();
+        assert_eq!(r[0].values["open"], json!("1.0"), "{:?}", r[0].values);
+        // a text open can be any text now; the imported price stays on the bar
+        s.update_record(&m, &r[0].id, &serde_json::Map::from_iter([("open".to_string(), json!("n/a"))])).unwrap();
+        assert_eq!(s.query_bars(&BarFilter::default()).unwrap()[0].bar.open, 1.0);
+
+        // roll back to v1 (close renamed only): volume and the real open come back
+        let (m, p) = s.rollback_model("bars", 1, &ApplyOpts { destructive: true, note: String::new() }).unwrap();
+        assert!(p.steps.contains(&Step::ShowField { field: "volume".into() }), "{:?}", p.steps);
+        let r = s.records(&m, &RecordQuery { sort: vec![("timestamp".into(), false)], ..Default::default() }).unwrap();
+        assert_eq!((r[0].values["volume"].clone(), r[0].values["open"].clone()), (json!(10.0), json!(1.0)));
+        assert_eq!(m.version, 4);
+
+        // bars can be created and deleted as records too
+        let v = json!({"source": "bn", "symbol": "ETH/USDT", "period": "5m", "timestamp": 1_704_067_200_000i64, "open": 1, "high": 2, "low": 0.5, "mid": 1.5});
+        let e = s.create_record(&m, v.as_object().unwrap()).unwrap();
+        assert_eq!(s.count_records(&m).unwrap(), 5);
+        s.delete_record(&m, &e.id).unwrap();
+        assert_eq!(s.count_records(&m).unwrap(), 4);
+
+        // renaming bars and removing it (all bars go; it starts again as shipped)
+        let m = s.rename_model("bars", Some("prices"), None).unwrap();
+        assert!(m.is_bars() && s.find_model("prices").unwrap().is_bars());
+        assert!(matches!(s.remove_model("bars", false), Err(crate::error::Error::NeedsConfirmation(_))));
+        let (_, n) = s.remove_model("bars", true).unwrap();
+        assert_eq!(n, 4);
+        let m = s.find_model("bars").unwrap();
+        assert_eq!((m.version, s.count_records(&m).unwrap(), m.design.fields.len()), (0, 0, BAR_FIELDS.len()));
+        assert!(s.query_bars(&BarFilter::default()).unwrap().is_empty());
     }
 }

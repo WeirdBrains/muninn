@@ -7,10 +7,11 @@
 //! fields, `id`, `_version`, `_created_at`, `_updated_at` and `author` can be filtered and
 //! sorted on.
 //!
-//! The built-in `bars` model lists the bars (read-only fields: source, symbol, period,
-//! timestamp, prices, …) with any fields added to it; only the added fields can be set,
-//! and bars are neither created nor deleted here (imports and `mnnn sources` do that).
-use super::models::{BAR_FIELDS, Field, FieldType, Model, coerce, from_sql, q, to_sql};
+//! The built-in `bars` model lists the bars with the fields its design gives them: the
+//! built-in ones (source, symbol, period, timestamp, prices, … as renamed, retyped or
+//! dropped) and the added ones. Bars are created, changed (a key field re-keys the bar)
+//! and deleted here like any record.
+use super::models::{Field, FieldType, Model, bar_key, bar_sql, bar_value, coerce, from_sql, q, to_sql};
 use super::{Condition, Op, Store, new_id, now_ms};
 use crate::error::{Error, Result};
 use rusqlite::params_from_iter;
@@ -88,22 +89,30 @@ pub struct Group {
 /// Fields every record has (for filters, sorting and listings).
 pub const META_FIELDS: &[&str] = &["id", "_version", "_created_at", "_updated_at", "author"];
 
-/// Field names of a model, in order (the bars fields first for `bars`).
+/// Field names of a model, in order.
 pub fn field_names(m: &Model) -> Vec<String> {
-    let mut v: Vec<String> = if m.is_bars() { BAR_FIELDS.iter().map(|(n, _)| n.to_string()).collect() } else { vec![] };
-    v.extend(m.design.fields.iter().map(|f| f.name.clone()));
-    v
+    m.design.fields.iter().map(|f| f.name.clone()).collect()
 }
 
-/// The type of a field (bars fields and meta fields too).
+/// The bars column a bars condition or sort names: a field reading one, or `bar.KEY` (the
+/// value as imported, whatever the model calls or keeps of it).
+fn bar_column(m: &Model, name: &str) -> Option<&'static str> {
+    if !m.is_bars() {
+        return None;
+    }
+    if let Some(k) = name.strip_prefix(super::models::BAR_ID_PREFIX) {
+        return super::models::BAR_FIELDS.iter().find(|(n, _)| *n == k).map(|(n, _)| *n);
+    }
+    m.design.field(name).and_then(bar_key)
+}
+
+/// The type of a field (meta fields too).
 pub fn field_type(m: &Model, name: &str) -> Option<FieldType> {
     if let Some(f) = m.design.field(name) {
         return Some(f.ty.clone());
     }
-    if m.is_bars()
-        && let Some((_, t)) = BAR_FIELDS.iter().find(|(n, _)| *n == name)
-    {
-        return FieldType::basic(t);
+    if let Some(k) = bar_column(m, name) {
+        return super::models::BAR_FIELDS.iter().find(|(n, _)| *n == k).and_then(|(_, t)| FieldType::basic(t));
     }
     match name {
         "_version" => Some(FieldType::Integer),
@@ -144,22 +153,11 @@ fn friendly(e: rusqlite::Error, m: &Model) -> Error {
     Error::Sqlite(e)
 }
 
-const BAR_SQL: &[(&str, &str)] = &[
-    ("source", "s.name"),
-    ("base", "b.base"),
-    ("quote", "b.quote"),
-    ("period", "b.duration_s"),
-    ("timestamp", "b.timestamp"),
-    ("open", "b.open"),
-    ("high", "b.high"),
-    ("low", "b.low"),
-    ("close", "b.close"),
-    ("volume", "b.volume"),
-    ("flags", "b.flags"),
-];
-
 impl Store {
     fn need_table(&self, m: &Model) -> Result<()> {
+        if m.is_bars() {
+            return Ok(());
+        }
         if m.version == 0 {
             return Err(Error::invalid(
                 "model",
@@ -186,7 +184,7 @@ impl Store {
 
     fn read_record(m: &Model, r: &rusqlite::Row, at: usize) -> rusqlite::Result<RawRecord> {
         let mut values = Map::new();
-        for (i, f) in m.design.fields.iter().enumerate() {
+        for (i, f) in m.design.stored().enumerate() {
             values.insert(f.name.clone(), from_sql(r.get(at + 4 + i)?, &f.ty));
         }
         Ok((
@@ -200,7 +198,7 @@ impl Store {
 
     fn ext_cols(m: &Model, alias: &str) -> String {
         let mut c = vec![format!("{alias}._version"), format!("{alias}._created_at"), format!("{alias}._updated_at"), format!("{alias}._author")];
-        c.extend(m.design.fields.iter().map(|f| format!("{alias}.{}", q(&f.name))));
+        c.extend(m.design.stored().map(|f| format!("{alias}.{}", q(&f.name))));
         c.join(", ")
     }
 
@@ -224,12 +222,12 @@ impl Store {
         let mut wh: Vec<String> = vec![];
         let mut args: Vec<Sql> = vec![];
         for c in &qy.filter {
-            if let Some((sql, arg)) = bar_condition(c) {
+            if let Some((sql, arg)) = bar_condition(m, c) {
                 wh.push(sql);
                 args.push(arg);
             }
         }
-        let ext = m.version > 0 && self.table_exists(&m.table())?;
+        let ext = m.design.stored().next().is_some() && self.table_exists(&m.table())?;
         let join = if ext { format!(" LEFT JOIN {} x ON x.id = b.id", q(&m.table())) } else { String::new() };
         let cols = if ext { format!(", {}", Self::ext_cols(m, "x")) } else { String::new() };
         let mut sql = format!(
@@ -238,11 +236,8 @@ impl Store {
         if !wh.is_empty() {
             sql.push_str(&format!(" WHERE {}", wh.join(" AND ")));
         }
-        let order: Vec<String> = qy
-            .sort
-            .iter()
-            .filter_map(|(f, d)| BAR_SQL.iter().find(|(n, _)| n == f).map(|(_, c)| format!("{c}{}", if *d { " DESC" } else { "" })))
-            .collect();
+        let order: Vec<String> =
+            qy.sort.iter().filter_map(|(f, d)| bar_column(m, f).map(|k| format!("{}{}", bar_sql(k), if *d { " DESC" } else { "" }))).collect();
         if all_sql && order.len() == qy.sort.len() {
             let mut o = order;
             o.extend(["b.timestamp", "s.name", "b.base", "b.quote", "b.duration_s"].map(String::from));
@@ -254,26 +249,34 @@ impl Store {
         let mut st = self.conn.prepare(&sql)?;
         let v = st
             .query_map(params_from_iter(args), |r| {
-                let mut values = Map::new();
+                let mut phys = Map::new();
                 let (base, quote): (String, String) = (r.get(2)?, r.get(3)?);
-                values.insert("source".into(), Value::String(r.get(1)?));
-                values.insert("symbol".into(), Value::String(format!("{base}/{quote}")));
-                values.insert("base".into(), Value::String(base));
-                values.insert("quote".into(), Value::String(quote));
-                values.insert("period".into(), Value::String(crate::model::Duration(r.get(4)?).to_string()));
-                values.insert("timestamp".into(), Value::from(r.get::<_, i64>(5)?));
-                for (i, k) in ["open", "high", "low", "close", "volume"].iter().enumerate() {
-                    values.insert(k.to_string(), Value::from(r.get::<_, f64>(6 + i)?));
+                phys.insert("source".into(), Value::String(r.get(1)?));
+                phys.insert("symbol".into(), Value::String(format!("{base}/{quote}")));
+                phys.insert("base".into(), Value::String(base));
+                phys.insert("quote".into(), Value::String(quote));
+                phys.insert("period".into(), bar_value("period", r.get(4)?));
+                for (i, k) in ["timestamp", "open", "high", "low", "close", "volume", "flags"].iter().enumerate() {
+                    phys.insert(k.to_string(), bar_value(k, r.get(5 + i)?));
                 }
-                values.insert("flags".into(), Value::from(r.get::<_, i64>(11)?));
                 let (mut version, mut created_at, mut updated_at, mut author_id) = (m.version, 0, 0, None);
+                let mut more = Map::new();
                 if ext {
-                    let (v, c, u, a, more) = Self::read_record(m, r, 12)?;
+                    let (v, c, u, a, stored) = Self::read_record(m, r, 12)?;
                     (version, created_at, updated_at, author_id) = (v, c, u, a);
-                    for (k, v) in more {
-                        let v = if v.is_null() { m.design.field(&k).and_then(|f| f.default.clone()).unwrap_or(Value::Null) } else { v };
-                        values.insert(k, v);
-                    }
+                    more = stored;
+                }
+                // in the design's order and names: built-in fields read the bars, the rest mx_bars
+                let mut values = Map::new();
+                for f in &m.design.fields {
+                    let v = match bar_key(f) {
+                        Some(k) => phys.get(k).cloned().unwrap_or(Value::Null),
+                        None => match more.remove(&f.name) {
+                            Some(v) if !v.is_null() => v,
+                            _ => f.default.clone().unwrap_or(Value::Null),
+                        },
+                    };
+                    values.insert(f.name.clone(), v);
                 }
                 Ok(Record { id: hex::encode(r.get::<_, Vec<u8>>(0)?), version, created_at, updated_at, author_id, values })
             })?
@@ -303,8 +306,8 @@ impl Store {
     fn check_query(&self, m: &Model, qy: &RecordQuery) -> Result<()> {
         let names = field_names(m);
         for f in qy.filter.iter().map(|c| &c.field).chain(qy.sort.iter().map(|(f, _)| f)) {
-            if !names.contains(f) && !META_FIELDS.contains(&f.as_str()) && f != "_author" {
-                return Err(Error::invalid("field", format!("{} has no field `{f}` (fields: {})", m.name, names.join(", "))));
+            if !names.contains(f) && !META_FIELDS.contains(&f.as_str()) && f != "_author" && bar_column(m, f).is_none() {
+                return Err(Error::invalid("field", format!("{} has no field `{f}`{} (fields: {})", m.name, bar_hint(m, f), names.join(", "))));
             }
         }
         Ok(())
@@ -314,10 +317,10 @@ impl Store {
     pub fn records(&self, m: &Model, qy: &RecordQuery) -> Result<Vec<Record>> {
         self.check_query(m, qy)?;
         let rest: Vec<Condition> =
-            if m.is_bars() { qy.filter.iter().filter(|c| bar_condition(c).is_none()).cloned().collect() } else { qy.filter.clone() };
+            if m.is_bars() { qy.filter.iter().filter(|c| bar_condition(m, c).is_none()).cloned().collect() } else { qy.filter.clone() };
         let all_sql = m.is_bars() && rest.is_empty() && qy.text.trim().is_empty();
         let mut v = if m.is_bars() { self.bar_records(m, qy, all_sql)? } else { self.all_records(m)? };
-        if all_sql && qy.sort.iter().all(|(f, _)| BAR_SQL.iter().any(|(n, _)| n == f)) {
+        if all_sql && qy.sort.iter().all(|(f, _)| bar_column(m, f).is_some()) {
             return Ok(v);
         }
         v.retain(|r| self.record_matches(m, r, &rest));
@@ -447,12 +450,9 @@ impl Store {
     fn values_for(&self, m: &Model, values: &Map<String, Value>) -> Result<Vec<(Field, Value)>> {
         let mut out = vec![];
         for (k, v) in values {
-            let Some(f) = m.design.field(k) else {
-                if m.is_bars() && BAR_FIELDS.iter().any(|(n, _)| n == k) {
-                    return Err(Error::invalid("field", format!("{k} is a built-in bars field and cannot be changed here")));
-                }
+            let Some(f) = m.design.field(k).filter(|f| bar_key(f).is_none()) else {
                 let names: Vec<&str> = m.design.fields.iter().map(|f| f.name.as_str()).collect();
-                return Err(Error::invalid("field", format!("{} has no field `{k}` (fields: {})", m.name, names.join(", "))));
+                return Err(Error::invalid("field", format!("{} has no field `{k}`{} (fields: {})", m.name, bar_hint(m, k), names.join(", "))));
             };
             let mut v = coerce(f, v.clone())?;
             if let (FieldType::Ref(t), Value::String(id)) = (&f.ty, &v) {
@@ -481,7 +481,8 @@ impl Store {
     pub fn create_record(&self, m: &Model, values: &Map<String, Value>) -> Result<Record> {
         self.need_table(m)?;
         if m.is_bars() {
-            return Err(Error::invalid("model", "bars come from imports; set the fields you added with `mnnn model record update bars`"));
+            let id = crate::code::bars::create_record(self, m, values)?;
+            return self.find_record(m, &id);
         }
         let given = self.values_for(m, values)?;
         let mut cols = vec!["id".to_string(), "_version".into(), "_created_at".into(), "_updated_at".into(), "_author".into()];
@@ -513,6 +514,10 @@ impl Store {
     pub fn update_record(&self, m: &Model, id: &str, values: &Map<String, Value>) -> Result<Record> {
         self.need_table(m)?;
         let r = self.find_record(m, id)?;
+        if m.is_bars() {
+            let (id, _) = crate::code::bars::update_record(self, m, &r.id, values)?;
+            return self.find_record(m, &id);
+        }
         self.update_ids(m, std::slice::from_ref(&r.id), values)?;
         self.find_record(m, &r.id)
     }
@@ -524,8 +529,35 @@ impl Store {
         self.update_ids(m, &ids, values)
     }
 
-    /// Change fields of records known to exist (full ids).
+    /// Change fields of records known to exist (full ids). On bars, built-in fields change
+    /// the bars (a key field re-keys the bar) and the rest go to `mx_bars`.
     pub(crate) fn update_ids(&self, m: &Model, ids: &[String], values: &Map<String, Value>) -> Result<usize> {
+        if m.is_bars() {
+            let (core, _) = crate::code::bars::split(m, values)?;
+            if !core.is_empty() {
+                self.conn.execute_batch("SAVEPOINT bars_update")?;
+                let r = ids.iter().try_for_each(|id| crate::code::bars::update_record(self, m, id, values).map(|_| ()));
+                match r {
+                    Ok(()) => self.conn.execute_batch("RELEASE bars_update")?,
+                    Err(e) => {
+                        let _ = self.conn.execute_batch("ROLLBACK TO bars_update; RELEASE bars_update");
+                        return Err(e);
+                    }
+                }
+                return Ok(ids.len());
+            }
+        }
+        self.update_stored(m, ids, values)
+    }
+
+    /// Change stored fields (not the bars' own columns) of records known to exist.
+    pub(crate) fn update_stored(&self, m: &Model, ids: &[String], values: &Map<String, Value>) -> Result<usize> {
+        if m.is_bars() && !self.table_exists(&m.table())? {
+            return Err(Error::invalid(
+                "model",
+                format!("no fields have been added to {} yet (`mnnn model edit {} --add NAME:TYPE --apply`)", m.name, m.name),
+            ));
+        }
         let given = self.values_for(m, values)?;
         if given.is_empty() {
             return Err(Error::invalid("record", "give at least one FIELD=VALUE to set"));
@@ -595,13 +627,13 @@ impl Store {
     /// Delete records by id; refused while other records refer to them.
     pub fn delete_records_by_id(&self, m: &Model, ids: &[String]) -> Result<usize> {
         self.need_table(m)?;
-        if m.is_bars() {
-            return Err(Error::invalid("model", "bars are not deleted here; remove a source with `mnnn sources remove`"));
-        }
         let refs = self.referrers(m, ids)?;
         if !refs.is_empty() {
             let r: Vec<String> = refs.into_iter().map(|(f, n)| format!("{n} in {f}")).collect();
             return Err(Error::invalid("record", format!("still referred to ({}); change those first", r.join(", "))));
+        }
+        if m.is_bars() {
+            return crate::code::bars::delete(self, ids);
         }
         let mut st = self.conn.prepare(&format!("DELETE FROM {} WHERE id = ?1", q(&m.table())))?;
         let mut n = 0;
@@ -630,7 +662,7 @@ impl Store {
         }
         self.need_table(m)?;
         let t = q(&m.table());
-        let names: Vec<String> = m.design.fields.iter().map(|f| q(&f.name)).collect();
+        let names: Vec<String> = m.design.stored().map(|f| q(&f.name)).collect();
         let marks: Vec<String> = (1..=5 + names.len()).map(|i| format!("?{i}")).collect();
         let extra = if names.is_empty() { String::new() } else { format!(", {}", names.join(", ")) };
         let mut st = self
@@ -644,7 +676,7 @@ impl Store {
             let key: Sql = if m.is_bars() { Sql::Blob(hex::decode(&r.id).unwrap_or_default()) } else { r.id.clone().into() };
             let mut args: Vec<Sql> =
                 vec![key, m.version.into(), r.created_at.into(), r.updated_at.into(), r.author_id.clone().map(Sql::from).unwrap_or(Sql::Null)];
-            for f in &m.design.fields {
+            for f in m.design.stored() {
                 let v = r.values.get(&f.name).cloned().unwrap_or(Value::Null);
                 args.push(to_sql(&super::models::convert(&v, &f.ty).unwrap_or(Value::Null), &f.ty));
             }
@@ -654,8 +686,23 @@ impl Store {
     }
 }
 
+/// Why a bars field name is not there, when it was a built-in one: renamed, retyped or dropped.
+pub fn bar_hint(m: &Model, name: &str) -> String {
+    if !m.is_bars() || !super::models::BAR_FIELDS.iter().any(|(n, _)| *n == name) {
+        return String::new();
+    }
+    let id = format!("{}{name}", super::models::BAR_ID_PREFIX);
+    match m.design.by_id(&id) {
+        Some(f) => format!(" (the built-in {name} is called `{}` now)", f.name),
+        None => {
+            format!(" (the built-in {name} was dropped from {}; `mnnn model history {}` shows when, and rolling back brings it back)", m.name, m.name)
+        }
+    }
+}
+
 /// A bars condition that SQL can do exactly (numbers and times, exact names), or `None`.
-fn bar_condition(c: &Condition) -> Option<(String, Sql)> {
+fn bar_condition(m: &Model, c: &Condition) -> Option<(String, Sql)> {
+    let key = bar_column(m, &c.field)?;
     let op = match c.op {
         Op::Gt => ">",
         Op::Ge => ">=",
@@ -665,18 +712,18 @@ fn bar_condition(c: &Condition) -> Option<(String, Sql)> {
         _ => return None,
     };
     let v = c.value.trim();
-    match c.field.as_str() {
+    match key {
         "timestamp" => {
             let t = v.parse::<i64>().ok().or_else(|| crate::ingest::time::parse_ts(v))?;
             Some((format!("b.timestamp {op} ?"), Sql::Integer(t)))
         }
         "open" | "high" | "low" | "close" | "volume" | "flags" => {
             let x: f64 = v.parse().ok()?;
-            Some((format!("b.{} {op} ?", c.field), Sql::Real(x)))
+            Some((format!("b.{key} {op} ?"), Sql::Real(x)))
         }
         "period" if c.op == Op::Eq => Some(("b.duration_s = ?".into(), Sql::Integer(crate::model::Duration::parse(v).ok()?.0))),
         "source" if c.op == Op::Eq && !v.contains('*') => Some(("s.name = ? COLLATE NOCASE".into(), Sql::Text(v.to_string()))),
-        "base" | "quote" if c.op == Op::Eq && !v.contains('*') => Some((format!("b.{} = ?", c.field), Sql::Text(v.to_uppercase()))),
+        "base" | "quote" if c.op == Op::Eq && !v.contains('*') => Some((format!("b.{key} = ?"), Sql::Text(v.to_uppercase()))),
         _ => None,
     }
 }
@@ -701,7 +748,7 @@ mod tests {
         let mut code = Field::new("code", FieldType::Text);
         code.unique = true;
         let at = Field::new("at", FieldType::Timestamp);
-        s.create_model("signals", "", Design { fields: vec![price, side, code, at] }, true).unwrap().0
+        s.create_model("signals", "", Design { fields: vec![price, side, code, at], ..Default::default() }, true).unwrap().0
     }
 
     #[test]
@@ -740,7 +787,10 @@ mod tests {
         assert!(s.records(&m, &RecordQuery { filter: vec![cond("zip = 1")], ..Default::default() }).is_err());
 
         // refs: a record that is referred to cannot be deleted
-        let r = s.create_model("notes", "", Design { fields: vec![Field::new("signal", FieldType::Ref(m.id.clone()))] }, true).unwrap().0;
+        let r = s
+            .create_model("notes", "", Design { fields: vec![Field::new("signal", FieldType::Ref(m.id.clone()))], ..Default::default() }, true)
+            .unwrap()
+            .0;
         assert!(s.create_record(&r, &map(json!({"signal": "nope"}))).is_err());
         let n = s.create_record(&r, &map(json!({"signal": a.short_id()}))).unwrap();
         assert_eq!(n.values["signal"], json!(a.id), "prefix resolved");
@@ -766,14 +816,21 @@ mod tests {
         assert!(s.update_records(&m, &[], &map(json!({"score": 1}))).is_err(), "no fields added yet");
         let mut score = Field::new("score", FieldType::Real);
         score.default = Some(json!(0));
-        s.set_model_draft("bars", Some(Design { fields: vec![score] })).unwrap();
+        s.set_model_draft("bars", Some(Design { fields: vec![score], ..Default::default() })).unwrap();
         let (m, _) = s.apply_model("bars", &Default::default()).unwrap();
         let n = s.update_records(&m, &[crate::rules::parse_condition("open > 2").unwrap()], &map(json!({"score": 5}))).unwrap();
         assert_eq!(n, 2);
         let v = s.records(&m, &RecordQuery { sort: vec![("score".into(), true), ("open".into(), false)], ..Default::default() }).unwrap();
         assert_eq!(v.iter().map(|r| r.values["score"].clone()).collect::<Vec<_>>(), vec![json!(5.0), json!(5.0), json!(0), json!(0)]);
-        assert!(s.update_records(&m, &[], &map(json!({"close": 1}))).unwrap_err().to_string().contains("built-in"));
-        assert!(s.create_record(&m, &map(json!({"score": 1}))).is_err());
+        // built-in fields change like any other (the bars change)
+        assert_eq!(s.update_records(&m, &[crate::rules::parse_condition("open = 1").unwrap()], &map(json!({"close": 1.25}))).unwrap(), 1);
+        assert_eq!(
+            s.records(&m, &RecordQuery { filter: vec![crate::rules::parse_condition("close < 1.5").unwrap()], ..Default::default() }).unwrap().len(),
+            1
+        );
+        let e = s.create_record(&m, &map(json!({"score": 1}))).unwrap_err().to_string();
+        assert!(e.contains("needs source"), "{e}");
+        s.update_records(&m, &[crate::rules::parse_condition("open = 1").unwrap()], &map(json!({"close": 1.5}))).unwrap();
         let first = &v[0];
         // added values follow a source rename (the bar id changes) and go with removals
         s.rename_source("bn", "binance").unwrap();

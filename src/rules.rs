@@ -1138,7 +1138,7 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
             }
             let (m, _) = store.create_model(&name, &expand(store, r, a, about), crate::store::Design::default(), false)?;
             let design = match crate::designer::parse_fields(store, &m, fields)
-                .and_then(|f| store.set_model_draft(&m.id, Some(crate::store::Design { fields: f })))
+                .and_then(|f| store.set_model_draft(&m.id, Some(crate::store::Design { fields: f, ..Default::default() })))
             {
                 Ok(m) => m,
                 Err(e) => {

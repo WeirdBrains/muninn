@@ -836,7 +836,7 @@ mod tests {
         let all = s.models().unwrap();
         assert_eq!((all.len(), all[0].id.as_str(), all[0].builtin), (1, "bars", true));
         assert_eq!(s.count_records(&all[0]).unwrap(), 1);
-        let d = Design { fields: vec![Field::new("note", FieldType::Text)] };
+        let d = Design { fields: vec![Field::new("note", FieldType::Text)], ..Default::default() };
         s.create_model("trades", "", d, true).unwrap();
         drop(s);
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -854,7 +854,7 @@ mod tests {
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
             s.migrate_to(MIGRATIONS.len() - 1).unwrap();
-            s.create_model("trades", "", Design { fields: vec![Field::new("note", FieldType::Text)] }, true).unwrap();
+            s.create_model("trades", "", Design { fields: vec![Field::new("note", FieldType::Text)], ..Default::default() }, true).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
