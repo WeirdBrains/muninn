@@ -28,7 +28,7 @@ id (`12D3KooW…`) is how others know it.
 | Users, invites | `mnnn user …`, `mnnn connection …`, `mnnn invite …` ([users](users.md)) | Connections and Invites pages |
 | Sync your nodes | `mnnn sync …` ([sync](sync.md)) | runs on its own with the node |
 | Relays | `mnnn net relay list/add/remove/serve on\|off` | Relays page: `a` add, `d` remove, `r` serve |
-| Settings | `mnnn net config [--label] [--port] [--listen] [--mdns] [--autostart] [--accept] [--bootstrap]` | Settings page |
+| Settings | `mnnn net config [--label] [--port] [--listen] [--mdns] [--autostart] [--accept] [--bootstrap] [--external]` | Settings page |
 
 `mnnn net start` runs in the foreground. While it runs it writes
 `MUNINN_HOME/net/node.json` (no secrets: pid, label, addresses), so other commands and
@@ -65,6 +65,8 @@ forward TCP and UDP on `net.port` (4741) on the router and allow them in the hos
 [net]
 external_addresses = ["alien.duckdns.org:4741"]
 ```
+
+or `mnnn net config --external alien.duckdns.org:4741` (`--clear-external` removes them).
 
 A DNS name (dynamic DNS works) becomes `/dns4/NAME/tcp/PORT` and `/dns4/NAME/udp/PORT/quic-v1`;
 it is announced to peers and put first in invites.

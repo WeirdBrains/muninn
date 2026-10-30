@@ -2035,6 +2035,13 @@ pub enum NetCommand {
         /// Remove all bootstrap nodes first.
         #[arg(long)]
         clear_bootstrap: bool,
+        /// Add an address other hosts reach this node at from outside: `host`, `host:port`
+        /// or a multiaddr (repeatable; DNS names are fine). Goes first in invite links.
+        #[arg(long = "external", value_name = "HOST[:PORT]")]
+        external: Vec<String>,
+        /// Remove all external addresses first.
+        #[arg(long)]
+        clear_external: bool,
         #[arg(long)]
         json: bool,
     },

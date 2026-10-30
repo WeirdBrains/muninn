@@ -8,7 +8,7 @@ mnnn\-net\-config \- Show or change network settings
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn net config\fR [\fB\-\-home\fR] [\fB\-\-label\fR] [\fB\-\-db\fR] [\fB\-\-port\fR] [\fB\-\-listen\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-mdns\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-autostart\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-accept\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-bootstrap\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-clear\-bootstrap\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn net config\fR [\fB\-\-home\fR] [\fB\-\-label\fR] [\fB\-\-db\fR] [\fB\-\-port\fR] [\fB\-\-listen\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-mdns\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-autostart\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-accept\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-bootstrap\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-clear\-bootstrap\fR] [\fB\-\-external\fR] [\fB\-\-clear\-external\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -111,6 +111,12 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 .TP
 \fB\-\-clear\-bootstrap\fR
 Remove all bootstrap nodes first
+.TP
+\fB\-\-external\fR \fI<HOST[:PORT]>\fR
+Add an address other hosts reach this node at from outside: `host`, `host:port` or a multiaddr (repeatable; DNS names are fine). Goes first in invite links
+.TP
+\fB\-\-clear\-external\fR
+Remove all external addresses first
 .TP
 \fB\-\-json\fR
 

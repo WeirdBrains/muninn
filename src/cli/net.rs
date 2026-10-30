@@ -291,7 +291,7 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
             Ok(())
         }
         NetCommand::Relay(c) => relay(ctx, c),
-        NetCommand::Config { label, port, listen, mdns, autostart, accept, bootstrap, clear_bootstrap, json } => {
+        NetCommand::Config { label, port, listen, mdns, autostart, accept, bootstrap, clear_bootstrap, external, clear_external, json } => {
             let mut prefs = ctx.prefs()?;
             let before = prefs.net.clone();
             let n = &mut prefs.net;
@@ -325,6 +325,15 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                     n.bootstrap.push(b);
                 }
             }
+            if clear_external {
+                n.external_addresses.clear();
+            }
+            for e in external {
+                let e = e.trim().to_string();
+                if !e.is_empty() && !n.external_addresses.contains(&e) {
+                    n.external_addresses.push(e);
+                }
+            }
             n.node_config("check")?;
             if prefs.net != before {
                 prefs.save(&ctx.paths)?;
@@ -343,6 +352,7 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                 println!("relay server: {}", if n.relay_server { "on" } else { "off" });
                 println!("relays:       {}", if n.relays.is_empty() { "-".to_string() } else { n.relays.join(" ") });
                 println!("bootstrap:    {}", if n.bootstrap.is_empty() { "-".to_string() } else { n.bootstrap.join(" ") });
+                println!("external:     {}", if n.external_addresses.is_empty() { "-".to_string() } else { n.external_addresses.join(" ") });
                 println!("autostart:    {}", if n.autostart { "on (TUI)" } else { "off" });
                 println!("accept:       {}", if n.accept_anyone() { "anyone" } else { "known nodes (others ask first)" });
             }
