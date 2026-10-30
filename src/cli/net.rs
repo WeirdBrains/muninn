@@ -16,18 +16,18 @@ use std::time::{Duration, Instant};
 const ORIGIN: &str = "cli";
 
 /// What most net commands need: the store, our identity and (made on first use) a node.
-struct Net<'a> {
+pub(super) struct Net<'a> {
     ctx: &'a Ctx,
     dek: Key32,
-    store: Store,
-    prefs: Preferences,
-    kp: Keypair,
-    label: String,
-    node: Option<Node>,
+    pub(super) store: Store,
+    pub(super) prefs: Preferences,
+    pub(super) kp: Keypair,
+    pub(super) label: String,
+    pub(super) node: Option<Node>,
 }
 
 impl<'a> Net<'a> {
-    fn open(ctx: &'a Ctx) -> anyhow::Result<Self> {
+    pub(super) fn open(ctx: &'a Ctx) -> anyhow::Result<Self> {
         let dek = ctx.unlock()?;
         let store = Store::open(&ctx.paths.db, Some(&dek.0))?;
         store.set_rule_echo(!ctx.global.quiet);
@@ -37,16 +37,16 @@ impl<'a> Net<'a> {
         Ok(Net { ctx, dek, store, prefs, kp, label, node: None })
     }
 
-    fn second_store(&self) -> anyhow::Result<Store> {
+    pub(super) fn second_store(&self) -> anyhow::Result<Store> {
         Ok(Store::open(&self.ctx.paths.db, Some(&self.dek.0))?)
     }
 
-    fn relays(&self) -> Vec<String> {
+    pub(super) fn relays(&self) -> Vec<String> {
         self.prefs.net.relays.clone()
     }
 
     /// A short-lived node for this command.
-    fn node(&mut self) -> anyhow::Result<&Node> {
+    pub(super) fn node(&mut self) -> anyhow::Result<&Node> {
         if self.node.is_none() {
             let svc = self.second_store()?;
             self.node = Some(local::ephemeral(&self.kp, svc, &self.label, &self.prefs.net)?);
@@ -54,16 +54,16 @@ impl<'a> Net<'a> {
         Ok(self.node.as_ref().expect("node"))
     }
 
-    fn addrs(&self) -> Vec<String> {
+    pub(super) fn addrs(&self) -> Vec<String> {
         local::offer_addrs(&self.ctx.paths.home, &self.store, None)
     }
 }
 
-fn kind(k: &str) -> anyhow::Result<ShareKind> {
+pub(super) fn kind(k: &str) -> anyhow::Result<ShareKind> {
     ShareKind::parse(k).ok_or_else(|| anyhow!("`{k}`: share a model, search, journal, project, report or code"))
 }
 
-fn read_token(input: &str) -> anyhow::Result<String> {
+pub(super) fn read_token(input: &str) -> anyhow::Result<String> {
     if input == "-" {
         let mut s = String::new();
         std::io::stdin().read_to_string(&mut s)?;
@@ -388,7 +388,7 @@ pub fn search_network(ctx: &Ctx, search: &str, json: bool) -> anyhow::Result<()>
     print_network_results(ctx, &res, json)
 }
 
-fn sanitize(name: &str) -> String {
+pub(super) fn sanitize(name: &str) -> String {
     name.chars().map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect()
 }
 

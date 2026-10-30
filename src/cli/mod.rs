@@ -13,6 +13,7 @@ pub mod man;
 mod misc;
 mod models;
 mod net;
+mod org;
 mod projects;
 mod reports;
 mod rules;
@@ -129,6 +130,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Model(c) => models::run(&ctx, c),
         Command::Code(c) => code::run(&ctx, c),
         Command::Net(c) => net::run(&ctx, c),
+        Command::Org(c) => org::run(&ctx, c),
         Command::Tui => misc::tui(&ctx),
         Command::Help { .. } | Command::Man { .. } => Ok(()),
     }

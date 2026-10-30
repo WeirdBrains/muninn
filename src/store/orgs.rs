@@ -322,6 +322,15 @@ pub enum ResourceState {
     Archived,
 }
 
+impl ResourceState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ResourceState::Active => "active",
+            ResourceState::Archived => "archived",
+        }
+    }
+}
+
 /// Who a resource is published to on the org's site.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

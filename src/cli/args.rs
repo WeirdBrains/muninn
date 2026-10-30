@@ -101,6 +101,10 @@ pub enum Command {
     /// across them and entrust them with dark shards. Off and sharing nothing until you ask.
     #[command(subcommand, alias = "network", after_long_help = NET_NOTES)]
     Net(NetCommand),
+    /// Organizations: members with roles, shared resources and projects, rules and code
+    /// answering requests, and an HTTPS site (HTML, JSON, gRPC) for what you publish.
+    #[command(subcommand, alias = "orgs", after_long_help = ORG_NOTES)]
+    Org(OrgCommand),
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -2345,4 +2349,424 @@ pub enum RecordCommand {
         #[arg(long)]
         dry_run: bool,
     },
+}
+
+pub const ORG_NOTES: &str = "\
+Orgs you create here are run by this node, and you are their owner. Orgs on other nodes
+are joined by applying (an owner or admin approves) or by answering an invitation; both
+are key exchanges scoped to the org. Commands that take ORG act on an org of yours, or
+on a joined org through its node when you have the permission there.
+
+Examples:
+  mnnn org create \"Comet Lab\" --public
+  mnnn org member invite comet-lab --peer ben --role user
+  mnnn org apply /ip4/10.0.0.2/tcp/4741/p2p/12D3Koo… comet-lab --note \"hi\"
+  mnnn org member approve comet-lab cleo --role viewer
+  mnnn org resource add comet-lab journal \"field notes\"
+  mnnn org publish comet-lab \"field notes\" --to public
+  mnnn org edit comet-lab --hosted on && mnnn org host start
+  mnnn org cert acme --domain lab.example.org --email me@example.org
+
+See `mnnn help organizations` and `mnnn help org-hosting`.";
+
+/// Organization commands.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Subcommand)]
+pub enum OrgCommand {
+    /// Create an organization (private, members only, until you say otherwise).
+    Create {
+        name: String,
+        /// Its name in web addresses (default: from the name).
+        #[arg(long)]
+        slug: Option<String>,
+        #[arg(long, default_value = "")]
+        description: String,
+        /// Listed and shown to anyone.
+        #[arg(long)]
+        public: bool,
+        /// Anyone may act with the apply role, without joining.
+        #[arg(long)]
+        open: bool,
+    },
+    /// Change an organization.
+    Edit {
+        org: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        slug: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        /// public or private.
+        #[arg(long)]
+        visibility: Option<String>,
+        /// members or open.
+        #[arg(long)]
+        access: Option<String>,
+        /// Serve its site with `mnnn org host start`.
+        #[arg(long, value_name = "on|off")]
+        hosted: Option<OnOff>,
+        /// Members may sign web requests with their exchange key.
+        #[arg(long, value_name = "on|off")]
+        member_auth: Option<OnOff>,
+        /// The site template (a template name, or `default`).
+        #[arg(long)]
+        template: Option<String>,
+    },
+    /// Delete an organization of yours (its resources stay here as they are).
+    Remove { org: String },
+    /// Your organizations and the ones you joined.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// One organization: settings, roles, members, resources, projects, endpoints.
+    Show {
+        org: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Roles and their permissions.
+    #[command(subcommand)]
+    Role(OrgRoleCommand),
+    /// Members: applications, invitations, roles and kicks.
+    #[command(subcommand)]
+    Member(OrgMemberCommand),
+    /// What an org holds (given to it, or added here).
+    #[command(subcommand)]
+    Resource(OrgResourceCommand),
+    /// Put a resource on the org's site.
+    Publish {
+        org: String,
+        resource: String,
+        /// public or members.
+        #[arg(long, default_value = "public")]
+        to: String,
+    },
+    /// Take a resource off the org's site.
+    Unpublish { org: String, resource: String },
+    /// Projects of the org and their members.
+    #[command(subcommand)]
+    Project(OrgProjectCommand),
+    /// Rules, code spaces and models that answer requests.
+    #[command(subcommand)]
+    Endpoint(OrgEndpointCommand),
+    /// Call an endpoint (of your org, or of a joined org through its node).
+    Call {
+        org: String,
+        endpoint: String,
+        /// JSON input (`-` reads stdin), e.g. '{\"op\":\"query\"}'.
+        #[arg(long, default_value = "{}")]
+        input: String,
+    },
+    /// Site templates and their assets.
+    #[command(subcommand)]
+    Template(OrgTemplateCommand),
+    /// The organizations a node lists (public ones), or one by slug or id.
+    Browse {
+        /// The node (`…/p2p/ID`, a peer id or a known peer).
+        target: String,
+        org: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Apply to an organization on another node.
+    Apply {
+        target: String,
+        org: String,
+        /// A word for whoever approves.
+        #[arg(long, default_value = "")]
+        note: String,
+    },
+    /// Answer an invitation (the token you were given; `-` reads stdin).
+    Join { token: String },
+    /// Check a joined org: an answer to your application, your role and permissions.
+    Sync { org: String },
+    /// Leave a joined org.
+    Leave { org: String },
+    /// Fetch a resource of a joined org.
+    Fetch {
+        org: String,
+        resource: String,
+        #[arg(long)]
+        format: Option<String>,
+        /// Write it here (default: stdout).
+        #[arg(long, short)]
+        out: Option<std::path::PathBuf>,
+    },
+    /// Give one of your things to a joined org (a copy, owned by the org).
+    Give {
+        org: String,
+        /// model, search, journal, project, report or code.
+        kind: String,
+        name: String,
+    },
+    /// Copy a joined org's public site here to serve it (needs the host permission).
+    Mirror { org: String },
+    /// The `Authorization` header for a signed web request to a joined org's site.
+    Sign {
+        org: String,
+        /// GET or POST.
+        method: String,
+        /// The path, e.g. /o/lab/api/artifacts.
+        path: String,
+        /// The request body (a file, `-` for stdin).
+        #[arg(long)]
+        body: Option<String>,
+    },
+    /// Serve hosted orgs over HTTPS.
+    #[command(subcommand)]
+    Host(OrgHostCommand),
+    /// The site's TLS certificate (self-signed, or ACME / Let's Encrypt).
+    #[command(subcommand)]
+    Cert(OrgCertCommand),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgRoleCommand {
+    List {
+        org: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// The permissions roles can have.
+    Perms,
+    Create {
+        org: String,
+        name: String,
+        /// Higher ranks manage lower ones (owner 100, admin 80, user 50, viewer 10).
+        #[arg(long, default_value_t = 30)]
+        rank: i64,
+        /// A permission (repeatable; `*` for all).
+        #[arg(long = "perm", value_name = "PERM")]
+        perms: Vec<String>,
+    },
+    Edit {
+        org: String,
+        role: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        rank: Option<i64>,
+        /// Replace the permissions (repeatable).
+        #[arg(long = "perm", value_name = "PERM")]
+        perms: Vec<String>,
+        /// Remove every permission.
+        #[arg(long, conflicts_with = "perms")]
+        no_perms: bool,
+    },
+    /// Remove a role (its members get the lowest remaining role).
+    Remove { org: String, role: String },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgMemberCommand {
+    List {
+        org: String,
+        #[arg(long)]
+        json: bool,
+    },
+    Approve {
+        org: String,
+        member: String,
+        /// Default: the org's apply role.
+        #[arg(long)]
+        role: Option<String>,
+    },
+    Reject {
+        org: String,
+        member: String,
+    },
+    /// Invite a node: prints the token to give them (or sends it with --peer).
+    Invite {
+        org: String,
+        #[arg(long)]
+        peer: Option<String>,
+        #[arg(long, default_value = "")]
+        label: String,
+        /// Default: the org's invite role.
+        #[arg(long)]
+        role: Option<String>,
+    },
+    /// Remove a member; what they gave stays with the org.
+    Kick {
+        org: String,
+        member: String,
+        /// keep, archive or publish what they gave.
+        #[arg(long, default_value = "keep")]
+        resources: String,
+    },
+    /// Change a member's role.
+    Role {
+        org: String,
+        member: String,
+        role: String,
+    },
+    /// The roles new members get.
+    Defaults {
+        org: String,
+        /// For approved applicants (and guests of open orgs).
+        #[arg(long)]
+        apply: Option<String>,
+        #[arg(long)]
+        invite: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgResourceCommand {
+    List {
+        org: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Give the org one of your things here (the original stays as it is).
+    Add {
+        org: String,
+        /// model, search, journal, project, report or code.
+        kind: String,
+        name: String,
+    },
+    Archive {
+        org: String,
+        resource: String,
+    },
+    Restore {
+        org: String,
+        resource: String,
+    },
+    /// No longer the org's (the thing itself stays here).
+    Release {
+        org: String,
+        resource: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgProjectCommand {
+    List {
+        org: String,
+    },
+    Add {
+        org: String,
+        project: String,
+    },
+    Remove {
+        org: String,
+        project: String,
+    },
+    /// Add a member to an org project (their role there never exceeds their org role).
+    Member {
+        org: String,
+        project: String,
+        member: String,
+        #[arg(long)]
+        role: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgEndpointCommand {
+    List {
+        org: String,
+        #[arg(long)]
+        json: bool,
+    },
+    Add {
+        org: String,
+        name: String,
+        /// records, rule or code.
+        #[arg(long)]
+        kind: String,
+        /// The model, rule or code space.
+        #[arg(long)]
+        target: String,
+        /// The permission callers need (default: records.read for records, else call).
+        #[arg(long)]
+        perm: Option<String>,
+        /// Callable without signing in (public or open orgs).
+        #[arg(long)]
+        anyone: bool,
+    },
+    Remove {
+        org: String,
+        name: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgTemplateCommand {
+    List {
+        org: String,
+    },
+    /// Save a template (placeholders: {{title}} {{org.name}} {{org.description}} {{content}} {{css}} {{assets}} {{base}}).
+    Save {
+        org: String,
+        name: String,
+        #[arg(long)]
+        html: std::path::PathBuf,
+        #[arg(long)]
+        css: Option<std::path::PathBuf>,
+        /// Use it for the org's site.
+        #[arg(long)]
+        r#use: bool,
+    },
+    /// Add an asset (image, font, script, style) to a template.
+    Asset {
+        org: String,
+        template: String,
+        file: std::path::PathBuf,
+        /// Its name under /assets/ (default: the file name).
+        #[arg(long)]
+        name: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgHostCommand {
+    /// Serve in the foreground until Ctrl-C (or --for SECS, or `mnnn org host stop`).
+    Start {
+        /// Listen address (default from settings: 127.0.0.1).
+        #[arg(long)]
+        bind: Option<String>,
+        /// HTTPS port (default from settings: 8443; 0 picks one).
+        #[arg(long)]
+        port: Option<u16>,
+        #[arg(long = "for", value_name = "SECS")]
+        for_secs: Option<u64>,
+    },
+    Stop,
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgCertCommand {
+    /// The certificate in use (or that would be).
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Set up ACME (Let's Encrypt), or turn it off with --off.
+    Acme {
+        #[arg(long)]
+        domain: Option<String>,
+        #[arg(long)]
+        email: Option<String>,
+        /// letsencrypt, letsencrypt-staging or a directory URL.
+        #[arg(long)]
+        directory: Option<String>,
+        /// Certificate profile (shortlived; `\"\"` for the CA's default).
+        #[arg(long)]
+        profile: Option<String>,
+        /// Port the HTTP-01 challenge is answered on.
+        #[arg(long)]
+        http_port: Option<u16>,
+        #[arg(long)]
+        off: bool,
+    },
+    /// Get an ACME certificate now (needs the challenge port reachable as port 80).
+    Renew,
 }
