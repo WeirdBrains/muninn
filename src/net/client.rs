@@ -129,11 +129,29 @@ pub fn create(
     relays: &[String],
     origin: &str,
 ) -> Result<Created> {
+    create_scoped(s, node, kp, label, my_label, addrs, to, ttl_ms, relays, exchange::node_scope(), origin)
+}
+
+/// [`create`] with a scope (a membership of an organization).
+#[allow(clippy::too_many_arguments)]
+pub fn create_scoped(
+    s: &Store,
+    node: Option<&Node>,
+    kp: &Keypair,
+    label: &str,
+    my_label: &str,
+    addrs: Vec<String>,
+    to: Option<&str>,
+    ttl_ms: i64,
+    relays: &[String],
+    scope: serde_json::Value,
+    origin: &str,
+) -> Result<Created> {
     let target = match to {
         Some(t) => Some(resolve(s, t, relays)?),
         None => None,
     };
-    let (offer, secret) = Offer::new(kp, my_label, addrs, exchange::node_scope(), now_ms(), ttl_ms)?;
+    let (offer, secret) = Offer::new(kp, my_label, addrs, scope, now_ms(), ttl_ms)?;
     let token = offer.token()?;
     let x = s.insert_exchange(
         &NewExchange {
@@ -247,6 +265,7 @@ pub fn accept(
             }
             let x = s.complete_exchange(&o.id, &o.peer, &o.label, &atoken, &d.key, &d.short_code, &d.fingerprint)?;
             s.upsert_net_peer(&o.peer, Some(&o.label), &o.addrs, None, None, "exchange")?;
+            crate::org::net::answered(s, &x)?;
             let delivered = node.map(|n| {
                 let addrs = peer_addrs(s, &from.to_string(), &[]);
                 match n.request(from, &addrs, Wire::Answer { token: atoken.clone() }) {
@@ -751,12 +770,19 @@ fn free_name(taken: impl Fn(&str) -> bool, name: &str, from: &str) -> String {
 /// searches and code spaces (which must be approved before they run). Names that are
 /// taken get " (from PEER)". Returns what was made, in words.
 pub fn import_item(s: &mut Store, it: &Item, from: &str, origin: &str) -> Result<String> {
+    Ok(import_item_as(s, it, from, origin)?.2)
+}
+
+/// [`import_item`], also giving the new thing's id and name.
+pub fn import_item_as(s: &mut Store, it: &Item, from: &str, origin: &str) -> Result<(String, String, String)> {
+    let made_id: (String, String);
     let made = match (it.kind, it.format.as_str()) {
         (ShareKind::Project, "mnnp" | "json") => {
             let (p, blobs) = crate::export::archive::read_project(&it.data)?;
             let names: Vec<String> = s.projects()?.into_iter().map(|p| p.name.to_lowercase()).collect();
             let name = free_name(|n| names.contains(&n.to_lowercase()), &p.project.name, from);
             let r = s.import_project(&p, Some(&name), blobs.as_ref())?;
+            made_id = (s.find_project(&name).map(|p| p.id).unwrap_or_default(), name.clone());
             format!("project {name} ({} journal(s), {} entr(ies))", r.journals.len(), r.entries)
         }
         (ShareKind::Journal, "json") => {
@@ -765,6 +791,7 @@ pub fn import_item(s: &mut Store, it: &Item, from: &str, origin: &str) -> Result
             let names: Vec<String> = s.journals()?.into_iter().map(|j| j.name.to_lowercase()).collect();
             let name = free_name(|n| names.contains(&n.to_lowercase()), &it.name, from);
             let r = s.import_journal(&f, None, Some(&name), &crate::store::archive::Inline)?;
+            made_id = (s.find_journal(&name).map(|j| j.id).unwrap_or_default(), name.clone());
             format!("journal {name} ({} entr(ies))", r.entries)
         }
         (ShareKind::LiveSearch, "json") => {
@@ -774,6 +801,7 @@ pub fn import_item(s: &mut Store, it: &Item, from: &str, origin: &str) -> Result
             let names: Vec<String> = s.live_searches()?.into_iter().map(|l| l.name.to_lowercase()).collect();
             let name = free_name(|n| names.contains(&n.to_lowercase()), &ls.name, from);
             s.save_live_search(&name, &ls.spec, None)?;
+            made_id = (s.find_live_search(&name).map(|l| l.id).unwrap_or_default(), name.clone());
             format!("live search {name}")
         }
         (ShareKind::Code, "json") => {
@@ -781,6 +809,7 @@ pub fn import_item(s: &mut Store, it: &Item, from: &str, origin: &str) -> Result
             let names: Vec<String> = s.code_spaces()?.into_iter().map(|c| c.name.to_lowercase()).collect();
             let name = free_name(|n| names.contains(&n.to_lowercase()), &c.name, from);
             let made = s.create_code_space(&name, &c.description, c.lang, &c.source, c.input.clone())?;
+            made_id = (made.id.clone(), made.name.clone());
             format!("code space {} (review and approve it before it runs)", made.name)
         }
         (k, f) => {
@@ -791,5 +820,5 @@ pub fn import_item(s: &mut Store, it: &Item, from: &str, origin: &str) -> Result
         }
     };
     record(s, origin, "net.import", format!("imported {made} from {from}"), serde_json::json!({ "kind": it.kind, "name": it.name, "from": from }));
-    Ok(made)
+    Ok((made_id.0, made_id.1, made))
 }

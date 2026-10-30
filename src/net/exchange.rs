@@ -42,9 +42,16 @@ pub fn node_scope() -> serde_json::Value {
 fn check_scope(scope: &serde_json::Value) -> Result<()> {
     match scope.get("kind").and_then(|k| k.as_str()) {
         Some("node") => Ok(()),
-        Some(k @ ("organization" | "resource")) => {
-            Err(Error::invalid("exchange", format!("`{k}` exchanges come with a later version of Muninn; this one only exchanges between nodes")))
+        // a membership: `as` is `apply` (an applicant's offer to the org's node) or `invite`
+        Some("organization") => {
+            let org = scope.get("org").and_then(|v| v.as_str()).unwrap_or("");
+            let how = scope.get("as").and_then(|v| v.as_str()).unwrap_or("");
+            if org.is_empty() || org.len() > 64 || !matches!(how, "apply" | "invite") {
+                return Err(Error::invalid("exchange", "an organization exchange names the org and whether it applies or invites"));
+            }
+            Ok(())
         }
+        Some("resource") => Err(Error::invalid("exchange", "`resource` exchanges come with a later version of Muninn")),
         _ => Err(Error::invalid("exchange", "unknown scope")),
     }
 }
@@ -352,6 +359,8 @@ mod tests {
         assert!(bad.verify(1_000).is_err());
         assert!(offer.verify(1_000 + 61_000).unwrap_err().to_string().contains("expired"));
         assert!(Offer::new(&a, "", vec![], serde_json::json!({"kind": "organization"}), 0, 60_000).is_err());
+        assert!(Offer::new(&a, "", vec![], serde_json::json!({"kind": "resource"}), 0, 60_000).is_err());
+        assert!(Offer::new(&a, "", vec![], serde_json::json!({"kind": "organization", "org": "o1", "as": "apply"}), 0, 60_000).is_ok());
         // own offer
         assert!(Answer::new(&a, &offer, "", vec![], 1_000).is_err());
         // an answer to another offer, or altered

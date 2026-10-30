@@ -9,12 +9,13 @@
 //! owner; a member reaching the node over the network or the web acts with their role; a
 //! guest (no identity) only reaches what is public, or what an open org lets anyone do.
 //! Every change is recorded in the action history. See `docs/organizations.md`.
-// pub mod net;
-// pub mod serve;
+pub mod net;
+pub mod serve;
 
 use crate::error::{Error, Result};
 use crate::store::{
-    Access, Member, MemberStatus, NewAction, NewRole, Org, OrgChange, Published, Resource, ResourceState, Role, ShareKind, Store, Visibility,
+    Access, Endpoint, EndpointKind, Member, MemberStatus, NewAction, NewRole, Org, OrgChange, Published, Resource, ResourceState, Role, ShareKind,
+    Store, Template, Visibility,
 };
 use serde::Serialize;
 
@@ -211,7 +212,7 @@ pub fn remove(s: &Store, origin: &str, a: &Actor, org: &Org) -> Result<Org> {
 
 // ---------- roles ----------
 
-fn check_grant(org: &Org, a: &Actor, role: &Role) -> Result<()> {
+pub(crate) fn check_grant(org: &Org, a: &Actor, role: &Role) -> Result<()> {
     if role.name == OWNER && role.builtin && !matches!(a, Actor::Owner) {
         return Err(Error::invalid("role", format!("only the owner of {} gives the owner role", org.name)));
     }
@@ -332,7 +333,7 @@ fn over(s: &Store, a: &Actor, m: &Member) -> Result<()> {
 }
 
 /// What happens to the resources a kicked member gave the org.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Leftovers {
     /// Leave them as they are (the org owns them).
@@ -366,7 +367,7 @@ pub fn settle_resources(s: &Store, org: &Org, member: &str, what: Leftovers) -> 
     Ok(v)
 }
 
-/// Mark a member kicked (the key exchange is revoked by the caller, who can tell the peer).
+/// Mark a member kicked ([`net::kick`] also ends the key exchange and tells their node).
 /// What they gave the org stays the org's: kept, archived or published.
 pub fn kick(s: &Store, origin: &str, a: &Actor, org: &Org, m: &Member, leftovers: Leftovers) -> Result<(Member, Vec<Resource>)> {
     require(s, org, a, "members.kick")?;
@@ -376,9 +377,6 @@ pub fn kick(s: &Store, origin: &str, a: &Actor, org: &Org, m: &Member, leftovers
         s.remove_project_member(&org.id, &pm.id, &m.id)?;
     }
     let res = settle_resources(s, org, &m.id, leftovers)?;
-    if let Some(x) = &m.exchange_id {
-        let _ = s.set_exchange_status(x, crate::store::ExchangeStatus::Revoked, Some("me"));
-    }
     record(
         s,
         origin,
@@ -551,6 +549,227 @@ pub fn project_role(s: &Store, org: &Org, project: &str, m: &Member) -> Result<O
         (Some(p), _) => Some(p),
         (None, o) => o,
     })
+}
+
+// ---------- endpoints ----------
+
+/// Expose a rule, code space or model's records as an endpoint.
+#[allow(clippy::too_many_arguments)]
+pub fn add_endpoint(
+    s: &Store,
+    origin: &str,
+    a: &Actor,
+    org: &Org,
+    name: &str,
+    kind: EndpointKind,
+    target: &str,
+    perm: Option<&str>,
+    anyone: bool,
+) -> Result<Endpoint> {
+    require(s, org, a, "publish")?;
+    let name = name.trim();
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        return Err(Error::invalid("endpoint", "a name of letters, digits, - and _ (it goes in URLs)"));
+    }
+    let ref_id = match kind {
+        EndpointKind::Rule => s.find_rule(target)?.id,
+        EndpointKind::Code => s.find_code_space(target)?.id,
+        EndpointKind::Records => s.find_model(target)?.id,
+    };
+    let perm = check_perm(perm.unwrap_or(match kind {
+        EndpointKind::Records => "records.read",
+        _ => "call",
+    }))?;
+    let e = s.save_endpoint(&org.id, name, kind, &ref_id, &perm, anyone)?;
+    record(
+        s,
+        origin,
+        "org.endpoint.add",
+        format!("endpoint {} ({}) in {}", e.name, kind.as_str(), org.name),
+        serde_json::json!({ "org": org.id, "endpoint": e.id, "kind": kind.as_str(), "ref": ref_id, "perm": perm, "anyone": anyone }),
+    );
+    Ok(e)
+}
+
+pub fn remove_endpoint(s: &Store, origin: &str, a: &Actor, org: &Org, name: &str) -> Result<Endpoint> {
+    require(s, org, a, "publish")?;
+    let e = s.find_endpoint(&org.id, name)?;
+    s.delete_endpoint(&e.id)?;
+    record(
+        s,
+        origin,
+        "org.endpoint.remove",
+        format!("endpoint {} removed from {}", e.name, org.name),
+        serde_json::json!({ "org": org.id, "endpoint": e.id }),
+    );
+    Ok(e)
+}
+
+fn may_call(s: &Store, org: &Org, a: &Actor, e: &Endpoint, perm: &str) -> Result<()> {
+    if matches!(a, Actor::Guest) && e.anyone && (org.visibility == Visibility::Public || org.access == Access::Open) {
+        return Ok(());
+    }
+    require(s, org, a, &e.perm)?;
+    if perm != e.perm { require(s, org, a, perm) } else { Ok(()) }
+}
+
+/// Call an endpoint. Records endpoints take `{"op": "query", "where": [...], "text", "sort",
+/// "limit", "offset"}`, `{"op": "get", "id"}`, `{"op": "create", "values": {...}}`,
+/// `{"op": "update", "id", "values"}` or `{"op": "delete", "id"}`; rule endpoints run the
+/// rule's then-actions on an `org.call` action carrying the input; code endpoints run the
+/// (approved) code space.
+pub fn call(s: &Store, origin: &str, a: &Actor, org: &Org, endpoint: &str, input: &serde_json::Value) -> Result<serde_json::Value> {
+    let e = s.find_endpoint(&org.id, endpoint)?;
+    let op = input.get("op").and_then(|v| v.as_str()).unwrap_or("query").to_ascii_lowercase();
+    let out = match e.kind {
+        EndpointKind::Records => {
+            let m = s.model(&e.ref_id)?.ok_or_else(|| Error::invalid("endpoint", "its model is gone"))?;
+            let values = || -> Result<serde_json::Map<String, serde_json::Value>> {
+                input.get("values").and_then(|v| v.as_object()).cloned().ok_or_else(|| Error::invalid("input", "give `values` as an object"))
+            };
+            let id = || input.get("id").and_then(|v| v.as_str()).map(str::to_string).ok_or_else(|| Error::invalid("input", "give the record `id`"));
+            match op.as_str() {
+                "query" | "list" => {
+                    may_call(s, org, a, &e, "records.read")?;
+                    let mut q: crate::store::RecordQuery =
+                        serde_json::from_value(input.clone()).map_err(|x| Error::invalid("query", x.to_string()))?;
+                    q.limit = Some(q.limit.unwrap_or(500).min(5000));
+                    serde_json::json!({ "records": s.records(&m, &q)? })
+                }
+                "get" => {
+                    may_call(s, org, a, &e, "records.read")?;
+                    serde_json::json!({ "record": s.find_record(&m, &id()?)? })
+                }
+                "create" => {
+                    may_call(s, org, a, &e, "records.write")?;
+                    let r = s.create_record(&m, &values()?)?;
+                    record(
+                        s,
+                        origin,
+                        "record.create",
+                        format!("record {} created in {} through {} by {}", r.short_id(), m.name, org.name, a.who()),
+                        serde_json::json!({ "model": m.id, "record": r.id, "org": org.id, "endpoint": e.id, "by": a.who() }),
+                    );
+                    serde_json::json!({ "record": r })
+                }
+                "update" => {
+                    may_call(s, org, a, &e, "records.write")?;
+                    let r = s.find_record(&m, &id()?)?;
+                    let r = s.update_record(&m, &r.id, &values()?)?;
+                    record(
+                        s,
+                        origin,
+                        "record.update",
+                        format!("record {} changed in {} through {} by {}", r.short_id(), m.name, org.name, a.who()),
+                        serde_json::json!({ "model": m.id, "record": r.id, "org": org.id, "endpoint": e.id, "by": a.who() }),
+                    );
+                    serde_json::json!({ "record": r })
+                }
+                "delete" => {
+                    may_call(s, org, a, &e, "records.write")?;
+                    let r = s.find_record(&m, &id()?)?;
+                    let r = s.delete_record(&m, &r.id)?;
+                    record(
+                        s,
+                        origin,
+                        "record.delete",
+                        format!("record {} deleted from {} through {} by {}", r.short_id(), m.name, org.name, a.who()),
+                        serde_json::json!({ "model": m.id, "record": r.id, "org": org.id, "endpoint": e.id, "by": a.who() }),
+                    );
+                    serde_json::json!({ "deleted": r.id })
+                }
+                o => return Err(Error::invalid("input", format!("op `{o}`: query, get, create, update or delete"))),
+            }
+        }
+        EndpointKind::Rule => {
+            may_call(s, org, a, &e, "call")?;
+            let rule = s.rule(&e.ref_id)?.ok_or_else(|| Error::invalid("endpoint", "its rule is gone"))?;
+            let id = s.record_action(
+                &NewAction::new("org.call", origin, format!("{} called {} in {}", a.who(), e.name, org.name))
+                    .params(serde_json::json!({ "org": org.id, "endpoint": e.id, "name": e.name, "by": a.who(), "input": input })),
+            )?;
+            let act = s.action(id)?.ok_or_else(|| Error::Other("the call's action vanished".into()))?;
+            let r = crate::rules::run(s, &rule, &act);
+            serde_json::json!({ "status": r.status, "messages": r.messages, "action": r.action })
+        }
+        EndpointKind::Code => {
+            may_call(s, org, a, &e, "call")?;
+            let space = s.code_space(&e.ref_id)?.ok_or_else(|| Error::invalid("endpoint", "its code space is gone"))?;
+            if !crate::code::approved(&space) {
+                return Err(Error::invalid(
+                    "endpoint",
+                    format!("code space {} changed since it was approved; approve it on this node first", space.name),
+                ));
+            }
+            let env = crate::code::CodeEnv::for_store(s)?;
+            let info = crate::code::run(s, &env, origin, &space, &mut |_| {})?;
+            record(
+                s,
+                origin,
+                "org.call",
+                format!("{} ran {} in {}", a.who(), e.name, org.name),
+                serde_json::json!({ "org": org.id, "endpoint": e.id, "by": a.who() }),
+            );
+            crate::code::run_json(&info)
+        }
+    };
+    Ok(out)
+}
+
+// ---------- templates ----------
+
+/// Add or replace a template (the look of the org's site).
+pub fn save_template(s: &Store, origin: &str, a: &Actor, org: &Org, name: &str, html: &str, css: &str) -> Result<Template> {
+    require(s, org, a, "publish")?;
+    let (t, new) = s.save_template(&org.id, name, html, css)?;
+    record(
+        s,
+        origin,
+        "org.template.save",
+        format!("template {} {} in {}", t.name, if new { "added" } else { "changed" }, org.name),
+        serde_json::json!({ "org": org.id, "template": t.id }),
+    );
+    Ok(t)
+}
+
+/// Store a file with a template (served at `/o/{slug}/assets/{template}/{name}`).
+pub fn put_asset(s: &Store, origin: &str, a: &Actor, org: &Org, t: &Template, name: &str, data: &[u8]) -> Result<String> {
+    require(s, org, a, "publish")?;
+    let name = name.trim().trim_start_matches('/');
+    if name.is_empty() || name.contains("..") || name.contains('\\') {
+        return Err(Error::invalid("asset", "a plain file name (folders with /, no ..)"));
+    }
+    let mime = mime_of(name).to_string();
+    s.put_template_asset(&t.id, name, &mime, data)?;
+    record(
+        s,
+        origin,
+        "org.template.asset",
+        format!("asset {name} stored with template {} of {}", t.name, org.name),
+        serde_json::json!({ "org": org.id, "template": t.id, "asset": name, "bytes": data.len() }),
+    );
+    Ok(mime)
+}
+
+pub fn mime_of(name: &str) -> &'static str {
+    match name.rsplit('.').next().unwrap_or("").to_ascii_lowercase().as_str() {
+        "css" => "text/css; charset=utf-8",
+        "js" | "mjs" => "text/javascript; charset=utf-8",
+        "html" | "htm" => "text/html; charset=utf-8",
+        "json" => "application/json",
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "ico" => "image/x-icon",
+        "woff" => "font/woff",
+        "woff2" => "font/woff2",
+        "ttf" => "font/ttf",
+        "txt" | "md" => "text/plain; charset=utf-8",
+        "pdf" => "application/pdf",
+        _ => "application/octet-stream",
+    }
 }
 
 // ---------- summaries ----------

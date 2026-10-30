@@ -871,6 +871,36 @@ impl Store {
         self.member(id)?.ok_or_else(|| Error::Other("member vanished".into()))
     }
 
+    /// An invitation answered: the member's real node. A node that was a member before
+    /// keeps its old membership row (the invitation's row goes).
+    pub fn set_member_peer(&self, id: &str, peer: &str, label: &str) -> Result<Member> {
+        let m = self.member(id)?.ok_or_else(|| Error::invalid("member", format!("`{id}` not found")))?;
+        if let Some(old) = self.member_by_peer(&m.org_id, peer)?
+            && old.id != m.id
+        {
+            self.conn.execute("DELETE FROM org_members WHERE id = ?1", [&m.id])?;
+            return self.upsert_member(
+                &m.org_id,
+                peer,
+                label,
+                m.role_id.as_deref(),
+                m.status,
+                m.exchange_id.as_deref(),
+                &m.note,
+                m.decided_by.as_deref(),
+            );
+        }
+        self.conn.execute(
+            "UPDATE org_members SET peer_id = ?2, label = CASE WHEN ?3 = '' THEN label ELSE ?3 END, updated_at = ?4 WHERE id = ?1",
+            params![id, peer, label, now_ms()],
+        )?;
+        self.member(id)?.ok_or_else(|| Error::Other("member vanished".into()))
+    }
+
+    pub fn delete_member(&self, id: &str) -> Result<bool> {
+        Ok(self.conn.execute("DELETE FROM org_members WHERE id = ?1", [id])? > 0)
+    }
+
     pub fn set_member_exchange(&self, id: &str, exchange: Option<&str>) -> Result<()> {
         self.conn.execute("UPDATE org_members SET exchange_id = ?2, updated_at = ?3 WHERE id = ?1", params![id, exchange, now_ms()])?;
         Ok(())

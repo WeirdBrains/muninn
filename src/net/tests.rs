@@ -318,3 +318,129 @@ fn identity_and_exchanges_survive_a_restart() {
     let items = client::remote_list(&a.store, a.node(), &x, &[]).unwrap();
     assert_eq!(items.len(), 1);
 }
+
+// ---------- organizations (2.7) ----------
+
+#[test]
+fn nodes_apply_get_approved_invited_and_kicked_from_an_org() {
+    use crate::org::{self, Actor, Leftovers, net as onet};
+    use crate::store::{MemberStatus, OrgChange, Visibility};
+    let a = Peer::new("anna");
+    let b = Peer::new("ben");
+    let c = Peer::new("cleo");
+    let d = Peer::new("dora");
+    let o = org::create(&a.store, "cli", "Research Lab", None, "we look up").unwrap();
+    // a private org is not listed, but its slug finds it
+    assert!(onet::browse(&b.store, b.node(), &a.addr(), None, &[]).unwrap().is_empty());
+    assert_eq!(onet::browse(&b.store, b.node(), &a.addr(), Some("research-lab"), &[]).unwrap()[0].id, o.id);
+    let o = org::edit(&a.store, "cli", &Actor::Owner, &o, &OrgChange { visibility: Some(Visibility::Public), ..Default::default() }).unwrap();
+    assert_eq!(onet::browse(&b.store, b.node(), &a.addr(), None, &[]).unwrap().len(), 1);
+
+    // ben applies; anna sees the application with its note
+    let j = onet::apply(&b.store, b.node(), &b.kp, &a.addr(), "research-lab", "I study comets", "ben", &[], "cli").unwrap();
+    assert_eq!(j.status, MemberStatus::Applied);
+    let ben = wait(|| a.store.member_by_peer(&o.id, &b.peer_id()).unwrap());
+    assert_eq!((ben.status, ben.note.as_str()), (MemberStatus::Applied, "I study comets"));
+    assert!(onet::apply(&b.store, b.node(), &b.kp, &a.addr(), "research-lab", "", "ben", &[], "cli").is_err(), "one application at a time");
+    assert_eq!(onet::sync(&b.store, b.node(), &j, &[], "cli").unwrap().status, MemberStatus::Applied);
+    // anna approves; the answer reaches ben's node, which joins
+    let (ben, delivered) = onet::approve(&a.store, Some(a.node()), &a.kp, &Actor::Owner, &o, &ben, None, "cli").unwrap();
+    assert!(matches!(delivered, Some(Ok(_))), "{delivered:?}");
+    assert_eq!((ben.status, org::role_name(&a.store, &ben).as_str()), (MemberStatus::Member, "user"));
+    wait(|| b.store.joined_org(&o.id).unwrap().filter(|j| j.status == MemberStatus::Member));
+    let j = onet::sync(&b.store, b.node(), &b.store.joined_org(&o.id).unwrap().unwrap(), &[], "cli").unwrap();
+    assert_eq!((j.role.as_str(), j.perms.contains(&"call".to_string())), ("user", true));
+
+    // resources: ben sees anna's, gives one of his own, cannot manage
+    let notes = a.store.create_journal("lab notes", None, EntryFormat::Markdown).unwrap();
+    a.store.add_entry(&notes.id, "Comet", "a bright comet", None).unwrap();
+    org::transfer(&a.store, "cli", &Actor::Owner, &o, ShareKind::Journal, "lab notes", None).unwrap();
+    let v = onet::request(&b.store, b.node(), &j, onet::OrgReq::Resources, &[]).unwrap();
+    assert_eq!(v["resources"].as_array().unwrap().len(), 1);
+    let it = onet::fetch(&b.store, b.node(), &j, "lab notes", Some("html"), &[]).unwrap();
+    assert!(String::from_utf8_lossy(&it.data).contains("bright comet"));
+    let mine = b.store.create_journal("ben's comets", None, EntryFormat::Markdown).unwrap();
+    b.store.add_entry(&mine.id, "Tail", "a long tail", None).unwrap();
+    onet::transfer(&b.store, b.node(), &j, ShareKind::Journal, "ben's comets", &[], "cli").unwrap();
+    let given = a.store.resources(&o.id).unwrap().into_iter().find(|r| r.transferred_by.as_deref() == Some(ben.id.as_str())).expect("transferred");
+    assert!(a.store.find_journal(&given.ref_id).is_ok(), "the org's node holds a copy");
+    let no = onet::request(
+        &b.store,
+        b.node(),
+        &j,
+        onet::OrgReq::Manage { op: onet::ManageOp::Publish { resource: given.id.clone(), to: crate::store::Published::Public } },
+        &[],
+    );
+    assert!(no.unwrap_err().to_string().contains("may not"));
+    let members = onet::request(&b.store, b.node(), &j, onet::OrgReq::Members, &[]).unwrap();
+    assert_eq!(members["members"].as_array().unwrap().len(), 2);
+
+    // cleo is invited as a viewer and takes the invitation
+    let viewer = a.store.find_role(&o.id, "viewer").unwrap();
+    let (inv, made) = onet::invite(&a.store, Some(a.node()), &a.kp, &Actor::Owner, &o, Some(&viewer), Some(&c.addr()), "cleo", &[], "cli").unwrap();
+    assert!(matches!(made.delivered, Some(Ok(_))), "{:?}", made.delivered);
+    assert_eq!(inv.status, MemberStatus::Invited);
+    let acc =
+        client::accept(&c.store, Some(c.node()), &c.kp, &made.exchange.id, "", "cleo", client::my_addrs(&c.store, Some(c.node())), "cli").unwrap();
+    assert!(matches!(acc.delivered, Some(Ok(_))), "{:?}", acc.delivered);
+    let cleo = wait(|| a.store.member_by_peer(&o.id, &c.peer_id()).unwrap().filter(|m| m.status == MemberStatus::Member));
+    assert_eq!(org::role_name(&a.store, &cleo), "viewer");
+    let jc = onet::sync(&c.store, c.node(), &c.store.joined_org(&o.id).unwrap().expect("cleo joined"), &[], "cli").unwrap();
+    assert_eq!(jc.role, "viewer");
+    assert!(onet::request(&c.store, c.node(), &jc, onet::OrgReq::Call { endpoint: "x".into(), input: serde_json::json!({}) }, &[]).is_err());
+
+    // dora applies and is turned down
+    let jd = onet::apply(&d.store, d.node(), &d.kp, &a.addr(), &o.id, "", "dora", &[], "cli").unwrap();
+    let dora = wait(|| a.store.member_by_peer(&o.id, &d.peer_id()).unwrap());
+    onet::reject(&a.store, "cli", &Actor::Owner, &o, &dora).unwrap();
+    assert_eq!(onet::sync(&d.store, d.node(), &jd, &[], "cli").unwrap().status, MemberStatus::Rejected);
+
+    // ben is kicked; what he gave stays with the org, archived, and his node is told
+    onet::kick(&a.store, Some(a.node()), &Actor::Owner, &o, &ben, Leftovers::Archive, &[], "cli").unwrap();
+    wait(|| b.store.joined_org(&o.id).unwrap().filter(|j| j.status == MemberStatus::Kicked));
+    let given = a.store.resource(&given.id).unwrap().unwrap();
+    assert_eq!(given.state, crate::store::ResourceState::Archived);
+    assert!(onet::request(&b.store, b.node(), &j, onet::OrgReq::Status, &[]).is_err());
+    // cleo leaves
+    onet::leave(&c.store, Some(c.node()), &jc, &[], "cli").unwrap();
+    assert_eq!(a.store.member(&cleo.id).unwrap().unwrap().status, MemberStatus::Left);
+    assert!(a.store.actions().unwrap().iter().any(|x| x.kind == "org.member.kick"));
+}
+
+#[test]
+fn an_admin_on_another_node_manages_members_remotely() {
+    use crate::org::{self, Actor, net as onet};
+    use crate::store::MemberStatus;
+    let a = Peer::new("anna");
+    let b = Peer::new("ben");
+    let c = Peer::new("cleo");
+    let o = org::create(&a.store, "cli", "Lab", None, "").unwrap();
+    let admin = a.store.find_role(&o.id, "admin").unwrap();
+    let (_, made) = onet::invite(&a.store, Some(a.node()), &a.kp, &Actor::Owner, &o, Some(&admin), Some(&b.addr()), "ben", &[], "cli").unwrap();
+    client::accept(&b.store, Some(b.node()), &b.kp, &made.exchange.id, "", "ben", client::my_addrs(&b.store, Some(b.node())), "cli").unwrap();
+    wait(|| a.store.member_by_peer(&o.id, &b.peer_id()).unwrap().filter(|m| m.status == MemberStatus::Member));
+    let jb = onet::sync(&b.store, b.node(), &b.store.joined_org(&o.id).unwrap().unwrap(), &[], "cli").unwrap();
+    assert_eq!(jb.role, "admin");
+    // cleo applies; ben (admin, on his own node) approves; cleo picks the answer up by polling
+    let jc = onet::apply(&c.store, c.node(), &c.kp, &a.addr(), "lab", "", "cleo", &[], "cli").unwrap();
+    let cleo = wait(|| a.store.member_by_peer(&o.id, &c.peer_id()).unwrap());
+    let v = onet::request(
+        &b.store,
+        b.node(),
+        &jb,
+        onet::OrgReq::Manage { op: onet::ManageOp::Approve { member: cleo.id.clone(), role: Some("viewer".into()) } },
+        &[],
+    )
+    .unwrap();
+    assert_eq!(v["status"], "member");
+    let jc = onet::sync(&c.store, c.node(), &jc, &[], "cli").unwrap();
+    assert_eq!((jc.status, jc.role.as_str()), (MemberStatus::Member, "viewer"));
+    // an admin cannot make someone admin, nor touch the owner
+    let up = onet::ManageOp::Role { member: cleo.id.clone(), role: "admin".into() };
+    assert!(onet::request(&b.store, b.node(), &jb, onet::OrgReq::Manage { op: up }, &[]).is_err());
+    let owner = a.store.member_by_peer(&o.id, &a.peer_id()).unwrap().unwrap();
+    let kick = onet::ManageOp::Kick { member: owner.id, resources: Default::default() };
+    assert!(onet::request(&b.store, b.node(), &jb, onet::OrgReq::Manage { op: kick }, &[]).is_err());
+    let snap = onet::request(&b.store, b.node(), &jb, onet::OrgReq::Snapshot, &[]).unwrap();
+    assert_eq!(snap["org"]["slug"], "lab");
+}

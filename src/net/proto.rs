@@ -30,6 +30,16 @@ pub enum Wire {
         exchange: String,
         sealed: Sealed,
     },
+    /// The public organizations this node keeps (2.7).
+    Orgs,
+    /// One organization by id or slug (private ones too: knowing the slug is enough to apply).
+    OrgInfo {
+        org: String,
+    },
+    /// Has my application (an offer to an org) been decided? Only its offerer may ask.
+    Poll {
+        exchange: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +58,14 @@ pub enum WireResp {
     },
     Error {
         msg: String,
+    },
+    Orgs {
+        orgs: Vec<crate::org::OrgCard>,
+    },
+    /// `applied`, `member` (with the answer token), `rejected` or `kicked`.
+    Poll {
+        status: String,
+        answer: Option<String>,
     },
 }
 
@@ -116,18 +134,41 @@ pub enum Req {
     },
     /// The other side ended the exchange.
     Revoke,
+    /// A request to an organization this exchange is a membership of (2.7).
+    Org {
+        org: String,
+        req: crate::org::net::OrgReq,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Resp {
-    Pong { label: String, shared: usize },
-    Shared { items: Vec<SharedItem> },
-    Item { item: Item },
-    Found { results: Vec<Found>, truncated: bool },
+    Pong {
+        label: String,
+        shared: usize,
+    },
+    Shared {
+        items: Vec<SharedItem>,
+    },
+    Item {
+        item: Item,
+    },
+    Found {
+        results: Vec<Found>,
+        truncated: bool,
+    },
     Stored,
-    Shards { shards: Vec<ShardBlob> },
+    Shards {
+        shards: Vec<ShardBlob>,
+    },
     Ok,
-    Error { msg: String },
+    Error {
+        msg: String,
+    },
+    /// An organization's answer.
+    Org {
+        body: serde_json::Value,
+    },
 }
 
 /// Bytes as base64 in JSON (sealed payloads are JSON).

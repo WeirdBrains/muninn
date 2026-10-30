@@ -131,3 +131,82 @@ fn project_members_act_under_project_roles_capped_by_their_org_role() {
     remove(&s, "cli", &Actor::Owner, &o).unwrap();
     assert!(s.find_project("Halving").is_ok(), "deleting an org keeps its projects");
 }
+
+#[test]
+fn the_site_serves_what_is_published_through_the_template() {
+    use super::serve::route;
+    use crate::store::{Design, FieldOp, Mirror};
+    let s = Store::open_in_memory().unwrap();
+    let o = create(&s, "cli", "Lab", None, "we <look>").unwrap();
+    let j = s.create_journal("notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    s.add_entry(&j.id, "Comet", "a bright comet", None).unwrap();
+    let (r, _) = transfer(&s, "cli", &Actor::Owner, &o, ShareKind::Journal, "notes", None).unwrap();
+    let get = |p: &str| route(&s, "GET", p, b"", None);
+    // nothing until hosted, public and published
+    assert_eq!(get("/o/lab/").status, 404);
+    let o = edit(&s, "cli", &Actor::Owner, &o, &OrgChange { hosted: Some(true), ..Default::default() }).unwrap();
+    assert_eq!(get("/o/lab/").status, 404, "private orgs are invisible to guests");
+    let o = edit(&s, "cli", &Actor::Owner, &o, &OrgChange { visibility: Some(Visibility::Public), ..Default::default() }).unwrap();
+    let page = get("/o/lab/");
+    assert_eq!(page.status, 200);
+    let html = String::from_utf8(page.body).unwrap();
+    assert!(html.contains("we &lt;look&gt;") && html.contains("Nothing is published"));
+    assert_eq!(get(&format!("/o/lab/a/{}.html", r.id)).status, 404);
+    let r = set_published(&s, "cli", &Actor::Owner, &o, &r, Published::Public).unwrap();
+    assert!(String::from_utf8(get("/").body).unwrap().contains("/o/lab/"));
+    assert!(String::from_utf8(get("/o/lab/").body).unwrap().contains(&format!("/o/lab/a/{}.json", r.id)));
+    let doc = get(&format!("/o/lab/a/{}.html", r.id));
+    assert!(doc.mime.starts_with("text/html") && String::from_utf8_lossy(&doc.body).contains("bright comet"));
+    assert_eq!(get(&format!("/o/lab/a/{}.json", r.id)).mime, "application/json");
+    assert_eq!(get(&format!("/o/lab/a/{}.mnnp", r.id)).status, 404);
+    let api: serde_json::Value = serde_json::from_slice(&get("/o/lab/api/artifacts").body).unwrap();
+    assert_eq!(api["artifacts"][0]["name"], "notes");
+    // a template with an asset
+    let t = save_template(
+        &s,
+        "cli",
+        &Actor::Owner,
+        &o,
+        "plain",
+        "<html><body><h1>{{org.name}}!</h1>{{content}}<img src=\"{{assets}}logo.svg\"></body></html>",
+        "",
+    )
+    .unwrap();
+    put_asset(&s, "cli", &Actor::Owner, &o, &t, "logo.svg", b"<svg/>").unwrap();
+    assert!(put_asset(&s, "cli", &Actor::Owner, &o, &t, "../x", b"").is_err());
+    let o = edit(&s, "cli", &Actor::Owner, &o, &OrgChange { template_id: Some(Some(t.id.clone())), ..Default::default() }).unwrap();
+    let wrapped = String::from_utf8(get(&format!("/o/lab/a/{}", r.id)).body).unwrap();
+    assert!(wrapped.contains("<h1>Lab!</h1>") && wrapped.contains("bright comet") && wrapped.contains("/o/lab/assets/logo.svg"));
+    let logo = get("/o/lab/assets/logo.svg");
+    assert_eq!((logo.status, logo.mime.as_str(), logo.body.as_slice()), (200, "image/svg+xml", b"<svg/>".as_slice()));
+    // a records endpoint: members only unless open to anyone
+    let (m, _) = s.create_model("signals", "", Design::default(), false).unwrap();
+    s.edit_model(&m.id, &[FieldOp::Add { spec: "symbol:text".into() }]).unwrap();
+    s.apply_model(&m.id, &Default::default()).unwrap();
+    add_endpoint(&s, "cli", &Actor::Owner, &o, "signals", EndpointKind::Records, "signals", None, false).unwrap();
+    let call = |b: &str| route(&s, "POST", "/o/lab/api/call/signals", b.as_bytes(), None);
+    assert_eq!(call(r#"{"op":"query"}"#).status, 403);
+    add_endpoint(&s, "cli", &Actor::Owner, &o, "signals", EndpointKind::Records, "signals", Some("records.write"), true).unwrap();
+    assert_eq!(call(r#"{"op":"create","values":{"symbol":"BTC"}}"#).status, 200, "the owner opened it to anyone");
+    let q: serde_json::Value = serde_json::from_slice(&call(r#"{"op":"query"}"#).body).unwrap();
+    assert!(q["records"].as_array().unwrap().len() == 1 && q.to_string().contains("BTC"), "{q}");
+    // a signed member sees members-only artifacts
+    let (_, ben) = {
+        let r = s.find_role(&o.id, "viewer").unwrap();
+        let m = s.upsert_member(&o.id, "12D3KooWbenben", "ben", Some(&r.id), MemberStatus::Member, Some("x-ben"), "", None).unwrap();
+        ((), m)
+    };
+    let r = set_published(&s, "cli", &Actor::Owner, &o, &r, Published::Members).unwrap();
+    assert_eq!(get(&format!("/o/lab/a/{}.json", r.id)).status, 404);
+    assert_eq!(route(&s, "GET", &format!("/o/lab/a/{}.json", r.id), b"", ben.exchange_id.as_deref()).status, 200);
+    // a mirror serves a snapshot (public artifacts only)
+    let r = set_published(&s, "cli", &Actor::Owner, &o, &r, Published::Public).unwrap();
+    let snap = serde_json::to_vec(&super::serve::snapshot(&s, &o).unwrap()).unwrap();
+    let m2 = Store::open_in_memory().unwrap();
+    m2.save_mirror(&Mirror { org_id: o.id.clone(), slug: "lab".into(), node_peer: o.owner_peer.clone(), snapshot: snap, fetched_at: 1 }).unwrap();
+    let mget = |p: &str| route(&m2, "GET", p, b"", None);
+    assert!(String::from_utf8_lossy(&mget(&format!("/o/lab/a/{}", r.id)).body).contains("bright comet"));
+    assert_eq!(mget("/o/lab/assets/logo.svg").body, b"<svg/>");
+    assert_eq!(route(&m2, "POST", "/o/lab/api/call/signals", b"{}", None).status, 405);
+    assert!(String::from_utf8(mget("/").body).unwrap().contains("(mirror)"));
+}

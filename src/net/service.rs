@@ -33,9 +33,9 @@ impl Service {
         Service { store: Mutex::new(store), local, label: label.to_string() }
     }
 
-    fn with<T>(&self, f: impl FnOnce(&Store) -> Result<T>) -> Result<T> {
-        let s = self.store.lock().map_err(|_| Error::Other("store lock poisoned".into()))?;
-        f(&s)
+    fn with<T>(&self, f: impl FnOnce(&mut Store) -> Result<T>) -> Result<T> {
+        let mut s = self.store.lock().map_err(|_| Error::Other("store lock poisoned".into()))?;
+        f(&mut s)
     }
 
     fn wire(&self, from: &PeerId, req: Wire) -> Result<WireResp> {
@@ -45,6 +45,11 @@ impl Service {
             }
             Wire::Offer { token } => self.with(|s| incoming_offer(s, from, &token)).map(|msg| WireResp::Ok { msg }),
             Wire::Answer { token } => self.with(|s| incoming_answer(s, from, &token)).map(|msg| WireResp::Ok { msg }),
+            Wire::Orgs => self.with(|s| crate::org::net::listed(s)).map(|orgs| WireResp::Orgs { orgs }),
+            Wire::OrgInfo { org } => self.with(|s| crate::org::net::info(s, &org)).map(|o| WireResp::Orgs { orgs: vec![o] }),
+            Wire::Poll { exchange } => {
+                self.with(|s| crate::org::net::poll(s, from, &exchange)).map(|(status, answer)| WireResp::Poll { status, answer })
+            }
             Wire::Sealed { exchange, sealed } => self.with(|s| {
                 let x = s.exchange(&exchange)?.ok_or_else(|| Error::invalid("exchange", "unknown exchange"))?;
                 if !x.status.active() {
@@ -56,7 +61,11 @@ impl Service {
                 let key = s.exchange_key(&x.id)?.ok_or_else(|| Error::invalid("exchange", "no key"))?;
                 let plain = exchange::open_msg(&key, &x.id, from, &self.local, &sealed)?;
                 let req: Req = serde_json::from_slice(&plain).map_err(|e| Error::invalid("request", e.to_string()))?;
-                let resp = match answer(s, &x, from, req, &self.label) {
+                let done = match req {
+                    Req::Org { org, req } => crate::org::net::serve(s, &x, from, &org, req),
+                    req => answer(s, &x, from, req, &self.label),
+                };
+                let resp = match done {
                     Ok(r) => r,
                     Err(e) => Resp::Error { msg: e.to_string() },
                 };
@@ -100,6 +109,7 @@ pub fn incoming_offer(s: &Store, from: &PeerId, token: &str) -> Result<String> {
     if let Some(x) = s.exchange(&o.id)? {
         return Ok(format!("already known ({})", x.status.as_str()));
     }
+    crate::org::net::check_application(s, &o)?;
     let incoming = s.exchanges()?.into_iter().filter(|x| x.status == ExchangeStatus::Incoming).count();
     if incoming >= MAX_INCOMING {
         return Err(Error::invalid("exchange", "too many pending offers on this node"));
@@ -119,6 +129,9 @@ pub fn incoming_offer(s: &Store, from: &PeerId, token: &str) -> Result<String> {
         None,
     )?;
     s.upsert_net_peer(&o.peer, Some(&o.label), &o.addrs, None, None, "exchange")?;
+    if let Some(msg) = crate::org::net::applied(s, &o, &x)? {
+        return Ok(msg);
+    }
     record(
         s,
         "net.exchange.incoming",
@@ -162,6 +175,7 @@ pub fn complete_offer(s: &Store, a: &exchange::Answer, token: &str) -> Result<Ex
     let d = a.complete(&o, &secret)?;
     let x = s.complete_exchange(&x.id, &a.peer, &a.label, &token.split_whitespace().collect::<String>(), &d.key, &d.short_code, &d.fingerprint)?;
     s.upsert_net_peer(&a.peer, Some(&a.label), &a.addrs, None, None, "exchange")?;
+    crate::org::net::answered(s, &x)?;
     Ok(x)
 }
 
@@ -253,6 +267,13 @@ fn doc_format(f: &str) -> Option<crate::render::DocFormat> {
 
 /// A shared item's content.
 pub fn item(s: &Store, sh: &Share, format: Option<&str>) -> Result<Item> {
+    item_of(s, sh.kind, &sh.ref_id, &sh.name, format)
+}
+
+/// The content of one of this node's things (`json`, a document format, or `mnnp`).
+pub fn item_of(s: &Store, kind: ShareKind, ref_id: &str, name: &str, format: Option<&str>) -> Result<Item> {
+    let sh = Share { id: String::new(), kind, ref_id: ref_id.to_string(), name: name.to_string(), exchange_id: None, author_id: None, created_at: 0 };
+    let sh = &sh;
     let fmt = format.map(|f| f.trim().to_ascii_lowercase()).filter(|f| !f.is_empty());
     let json = |v: &serde_json::Value| -> Result<Item> {
         Ok(Item { kind: sh.kind, name: sh.name.clone(), format: "json".into(), data: serde_json::to_vec_pretty(v)? })
@@ -427,8 +448,10 @@ pub fn answer(s: &Store, x: &Exchange, from: &PeerId, req: Req, label: &str) -> 
             }
             Resp::Shards { shards }
         }
+        Req::Org { .. } => return Err(Error::Other("organization requests are answered by the org's node".into())),
         Req::Revoke => {
             let x = s.set_exchange_status(&x.id, ExchangeStatus::Revoked, Some("peer"))?;
+            crate::org::net::ended(s, &x)?;
             record(s, "net.exchange.revoke", format!("{} ended the key exchange", x.title()), serde_json::json!({ "exchange": x.id, "by": "peer" }));
             Resp::Ok
         }
