@@ -19,9 +19,10 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 9 | [Reviews](#reviews) | v2.8.0 | ✅ Released |
 | 10 | [Automatic Key Exchanges](#automatic-key-exchanges): network on by default, hosting autostart, invite links, TUI dark shards | v2.9.0 | ✅ Released |
 | 11 | [Users and Connections](#users-and-connections): user identities, linked nodes, user-owned orgs, connections with trust, unified invites | v2.10.0 | ✅ Released |
-| 12 | [Linked-Node Sync](#linked-node-sync): all of a user's data on all of their nodes | v2.11.0 | 📋 Planned |
-| 13 | [Private Sites and Code Access](#private-sites-and-code-access): gated sites for private orgs, code-space role permissions | v2.12.0 | 📋 Planned |
-| 14 | [Review Copies](#review-copies): what is reviewed lives on the reviewer's node in review mode | v2.13.0 | 📋 Planned |
+| 12 | [Linked-Node Sync](#linked-node-sync): all of a user's data on all of their nodes | v2.11.0 | ✅ Released |
+| 13 | [Python in Rust](#python-in-rust): Python code spaces parsed and translated in pure Rust, no external `rythonc`, no libpython | v2.12.0 | 📋 Planned |
+| 14 | [Private Sites and Code Access](#private-sites-and-code-access): gated sites for private orgs, code-space role permissions | v2.13.0 | 📋 Planned |
+| 15 | [Review Copies](#review-copies): what is reviewed lives on the reviewer's node in review mode | v2.14.0 | 📋 Planned |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
 
 **2.0 launch wrap-up:** snapshot to `docs/historical/2.0` with this plan, the announcement, and the full changelog; then clear `PLAN.md`.
@@ -30,7 +31,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 
 - **Document generation is internal, LaTeX first.** Exports are generated as LaTeX, and PDF and Docx are rendered from it inside the app, with no system tools required.
 - **Code Spaces languages:** mathematical algorithms, Polars, Rust, and Python.
-  - Python goes through Rython, which compiles Python to Rust and can run Python in Rust.
+  - Python is translated to Rust inside Muninn, in pure Rust (see [Python in Rust](#python-in-rust)).
   - Every language ends up as a compiled binary, loaded through a Rust FFI plugin approach.
 - **Key exchanges are a black box.** Nodes exchange keys by themselves when the user acts (connect, apply, invite, review, share); the user sees the action and its status (pending, connecting, connected, declined, failed). The cryptography is unchanged (Ed25519, X25519 + HKDF, XChaCha20-Poly1305, scoped exchanges, revocation).
 - **Identity is trust on first use, not compared codes.** Peer ids are hashes of node keys and every connection is authenticated by them; the first exchange pins a key to a name, and a different key under a known name is a warning. Invite links are signed by the inviter and single use. Short codes stay available as an advanced check (`mnnn net exchange`, hidden).
@@ -39,7 +40,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 - **Users own things, nodes carry them.** A user identity (its own signing key) certifies the nodes it links; orgs, memberships, reviews and connections belong to users, so any linked node can act with the user's role. Revoking a node ends its access.
 - **All of a user's data is on all of their nodes.** Linked nodes sync everything end to end encrypted with keys only the user's nodes hold. Conflicts never lose data: every record keeps its versions in history, the newest wins and conflicts are shown for the user to settle. Bars sync lazily.
 - **Connections replace friends.** A connection is mutual user-to-user trust made through an invite; each is trusted or untrusted (default untrusted). Shares and reviews may use any connection; dark shards go only to trusted ones.
-- **Python stays on the external `rythonc`.** Python code spaces are translated by the Rython compiler run as a separate program (`MUNINN_RYTHONC`, else `rythonc` on `PATH`); Muninn does not embed a Python parser or link libpython. Packages do not bundle `rythonc`; the install docs say how to get a Rython release or `cargo install rythonc`.
+- **Python is parsed and translated in pure Rust.** (Changed after 2.9.2, which used the external `rythonc`.) Python code spaces are parsed with `ruff_python_parser` (pinned to an exact version: its API is unstable), converted into `python-ast`'s public AST types and turned into Rust with `python-ast`'s code generation, all inside Muninn. No external `rythonc`, no bundled or linked libpython, no pyo3 in the normal build. CPython may only be used in a test or dev comparison, never at runtime or in a release.
 
 ---
 
@@ -164,7 +165,7 @@ The model designer allows you to create new shapes and forms for your data to be
 
 > **Phase 6 · v2.5.0 · 📋 Planned**
 
-Code spaces allow us to create algorithms that work with the data we ingest. Supported languages: mathematical algorithms, Polars, Rust, and Python (via Rython), all compiled to binaries loaded through a Rust FFI plugin approach. There should be:
+Code spaces allow us to create algorithms that work with the data we ingest. Supported languages: mathematical algorithms, Polars, Rust, and Python (translated to Rust in pure Rust), all compiled to binaries loaded through a Rust FFI plugin approach. There should be:
 
 1. Variables for all features (or attributes) in a model (or row) for current model types (or tables)
 2. Functions to:
@@ -276,7 +277,7 @@ A linked node acts with its user's org role when it serves or is served by an or
 
 ## Linked-Node Sync
 
-> **Phase 12 · v2.11.0 · 📋 Planned**
+> **Phase 12 · v2.11.0 · ✅ Released**
 
 Every linked node has everything on all of the user's nodes.
 
@@ -286,9 +287,24 @@ Every linked node has everything on all of the user's nodes.
 4. Large data (bars) syncs lazily
 5. Revoking a node stops sync to it
 
-## Private Sites and Code Access
+Preferences (`preferences.toml`) are not synced yet; each node keeps its own. Other nodes' history is added to each node's history under local ids. Bars come with `mnnn sync bars`.
+
+## Python in Rust
 
 > **Phase 13 · v2.12.0 · 📋 Planned**
+
+Python code spaces need nothing but Muninn.
+
+1. Python source is parsed in pure Rust with `ruff_python_parser` (MIT, 3.12+ syntax), pinned to an exact version (or `rustpython-ruff_python_parser` 0.16.10 if that proves steadier)
+2. Ruff's AST is converted into `python-ast` 1.1.0's public types (29 expression and 19 statement kinds among 63 types), covering the mismatches: no single `Constant` node, implicit string concatenation and f-string parts, the parameter and defaults layout, byte offsets to line and column
+3. `python-ast`'s Rust code generation turns that into the Rust a code space builds, as Python code spaces do today
+4. No pyo3 or libpython in Muninn's normal build or releases; if `python-ast` pulls pyo3 in at link time, it is kept out with feature flags or by vendoring only the code generation (with its license notice)
+5. Checked against Rython's test suite by comparing the output with the CPython path, in tests or dev only
+6. The external `rythonc` (`MUNINN_RYTHONC`) goes away; docs, help and install notes say Python needs nothing extra
+
+## Private Sites and Code Access
+
+> **Phase 14 · v2.13.0 · 📋 Planned**
 
 Private organizations can still have a front door.
 
@@ -303,7 +319,7 @@ Private organizations can still have a front door.
 
 ## Review Copies
 
-> **Phase 14 · v2.13.0 · 📋 Planned**
+> **Phase 15 · v2.14.0 · 📋 Planned**
 
 Reviewers work on their own node, even offline.
 
