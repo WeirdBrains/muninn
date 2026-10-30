@@ -6,6 +6,18 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-10-30
+
+### Added
+- `mnnn review`: request, invite, join, view, comment, suggest, highlight, vote, withdraw, accept, reject, merge, close, reopen, drop, leave, remove and revisions
+- Review links: single-use key exchanges scoped to one review, with per-review permissions
+- Merges make numbered revisions (`mnnn review revisions`); conflicts are reported unless `--force`
+- TUI: the Reviews window (`V`, Projects ▸ Reviews)
+- Rules can react to `review.*` actions
+
+### Fixed
+- Rules can react to organization actions (`org.*`)
+
 ## [2.7.0] - 2026-10-30
 
 ### Added
@@ -297,7 +309,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.7.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/kommandosaldat/muninn/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/kommandosaldat/muninn/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/kommandosaldat/muninn/compare/v2.5.1...v2.6.0
 [2.5.1]: https://github.com/kommandosaldat/muninn/compare/v2.5.0...v2.5.1
