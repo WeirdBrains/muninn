@@ -89,17 +89,29 @@ pub fn reachable(s: &Status) -> Vec<String> {
 }
 
 /// Our addresses for offers: the running node's (this or another process), else the saved ones.
+/// IPv6 link-local addresses are left out: they need an interface to dial and only make
+/// invite links longer.
 pub fn offer_addrs(home: &Path, store: &Store, node: Option<&Node>) -> Vec<String> {
-    if let Some(n) = node {
-        let v = n.reachable_addrs();
-        if !v.is_empty() {
-            return v;
-        }
-    }
-    match running(home) {
-        Some(f) => reachable(&f.status),
-        None => super::client::my_addrs(store, None),
-    }
+    let all = match node.map(|n| n.reachable_addrs()).filter(|v| !v.is_empty()) {
+        Some(v) => v,
+        None => match running(home) {
+            Some(f) => reachable(&f.status),
+            None => super::client::my_addrs(store, None),
+        },
+    };
+    all.into_iter().filter(|a| !link_local(a)).collect()
+}
+
+fn link_local(a: &str) -> bool {
+    a.strip_prefix("/ip6/").is_some_and(|r| r.get(..4).is_some_and(|p| p.eq_ignore_ascii_case("fe80")))
+}
+
+#[cfg(test)]
+#[test]
+fn link_local_addresses_are_not_offered() {
+    assert!(link_local("/ip6/fe80::1/udp/4741/quic-v1"));
+    assert!(!link_local("/ip6/fd7a:115c::1/udp/4741/quic-v1"));
+    assert!(!link_local("/ip4/100.75.141.6/tcp/4741"));
 }
 
 /// The node this process runs for the user (`mnnn net start` or the TUI): it keeps

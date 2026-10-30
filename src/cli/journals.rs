@@ -2,7 +2,7 @@
 use super::searches::record;
 use super::{Ctx, JournalCommand, SelectArgs, TextArgs};
 use crate::export::files::Target;
-use crate::ingest::time::fmt_ts;
+use crate::ingest::time::fmt_local;
 use crate::store::journals::{AnnotationDoc, select};
 use crate::store::{Annotation, AnnotationKind, Entry, Journal, Span};
 use anyhow::{Context, anyhow};
@@ -85,7 +85,7 @@ fn summary(a: &Annotation) -> String {
 
 fn print_entry(d: &crate::store::journals::EntryDoc) {
     let e = &d.entry;
-    println!("── {} · {} · {} · {} · {}", e.heading(), e.short_id(), d.author.as_deref().unwrap_or("-"), fmt_ts(e.created_at), e.format.as_str());
+    println!("── {} · {} · {} · {} · {}", e.heading(), e.short_id(), d.author.as_deref().unwrap_or("-"), fmt_local(e.created_at), e.format.as_str());
     if let Some(f) = &e.forked_from {
         println!("   (copied from entry {})", crate::store::projects::short_of(f));
     }

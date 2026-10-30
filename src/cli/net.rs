@@ -162,10 +162,12 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
             } else {
                 for p in &ps {
                     let st = auto::node_link(&n.store, &p.peer_id)?.map(|x| auto::status_of(&x).as_str()).unwrap_or("-");
+                    let user = crate::net::user::user_of_peer(&n.store, &p.peer_id)?.map(|u| u.label).filter(|l| !l.is_empty());
                     println!(
-                        "{}\t{}\t{}\t{}\t{}\tseen {}",
+                        "{}\t{}\t{}\t{}\t{}\t{}\tseen {}",
                         p.short_id(),
                         if p.label.is_empty() { "-" } else { &p.label },
+                        user.as_deref().unwrap_or("-"),
                         client::caps_text(&p.caps),
                         st,
                         p.source,
@@ -859,10 +861,13 @@ fn shard(ctx: &Ctx, cmd: NetShardCommand) -> anyhow::Result<()> {
         NetShardCommand::Entrust { to, threshold, master } => {
             let mut n = Net::open(ctx)?;
             let relays = n.relays();
+            // trusting the connection is the human decision now; an unverified short code
+            // only matters for a node that is not a trusted connection
             let unverified: Vec<String> = to
                 .iter()
                 .filter_map(|k| client::exchange_for(&n.store, k).ok())
                 .filter(|x| x.status != ExchangeStatus::Verified)
+                .filter(|x| !x.peer_id.as_deref().is_some_and(|p| crate::net::user::trusted_peer(&n.store, p).unwrap_or(false)))
                 .map(|x| x.title())
                 .collect();
             if !unverified.is_empty()

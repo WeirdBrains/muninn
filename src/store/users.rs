@@ -371,4 +371,28 @@ mod tests {
         assert!(s.connection("cc33").unwrap().unwrap().trusted);
         assert!(s.remove_connection("cc33").unwrap());
     }
+
+    #[test]
+    fn a_connection_name_finds_its_node_when_every_node_is_called_muninn() {
+        let s = Store::open_in_memory().unwrap();
+        s.init_self_user("aa11", "me", b"pk", b"kp", None).unwrap();
+        for (u, name, peer) in [("cc33", "Starbase Sam", "PEERSAM"), ("dd44", "Starbase Two", "PEERTWO")] {
+            s.upsert_user(u, name, b"pk").unwrap();
+            s.upsert_net_peer(peer, Some("muninn"), &[], None, None, "test").unwrap();
+            let n = UserNode {
+                user_id: u.into(),
+                peer_id: peer.into(),
+                label: String::new(),
+                cert: vec![1],
+                issued_at: 1,
+                revoked_at: None,
+                revocation: None,
+            };
+            s.put_user_node(&n).unwrap();
+        }
+        assert_eq!(s.find_net_peer("Starbase Two").unwrap().peer_id, "PEERTWO");
+        assert_eq!(s.find_net_peer("Starbase Sam").unwrap().peer_id, "PEERSAM");
+        assert!(s.find_net_peer("muninn").is_err());
+        assert!(s.find_net_peer("nobody").is_err());
+    }
 }

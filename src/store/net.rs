@@ -336,6 +336,14 @@ pub struct NewExchange {
 const EX_COLS: &str = "id, label, role, status, peer_id, peer_label, scope, offer, answer, short_code, fingerprint, expires_at, \
                        revoked_by, author_id, created_at, updated_at, verified_at, revoked_at";
 
+/// EX_COLS for reading: the peer is named after its user (when it is someone else's node), so
+/// two nodes that both call themselves `muninn` read as the people they belong to.
+const EX_SEL: &str = "id, label, role, status, peer_id, \
+    COALESCE((SELECT u.label FROM user_nodes n JOIN users u ON u.id = n.user_id \
+              WHERE n.peer_id = net_exchanges.peer_id AND n.revoked_at IS NULL AND u.keypair IS NULL AND u.label <> '' \
+              ORDER BY n.issued_at DESC LIMIT 1), peer_label), \
+    scope, offer, answer, short_code, fingerprint, expires_at, revoked_by, author_id, created_at, updated_at, verified_at, revoked_at";
+
 fn json_list(s: String) -> Vec<String> {
     serde_json::from_str(&s).unwrap_or_default()
 }
@@ -414,7 +422,20 @@ impl Store {
         let m: Vec<&NetPeer> = all.iter().filter(|p| !k.is_empty() && (p.label.eq_ignore_ascii_case(k) || p.peer_id.ends_with(k))).collect();
         match m.len() {
             1 => Ok(m[0].clone()),
-            0 => Err(Error::invalid("peer", format!("`{k}` not found (see `mnnn net peers`)"))),
+            0 => {
+                // a connection's name stands for its node(s) we know
+                let by_user: Vec<&NetPeer> = match self.find_user(k) {
+                    Ok(u) => {
+                        let nodes = self.user_nodes(&u.id)?;
+                        all.iter().filter(|p| nodes.iter().any(|n| n.peer_id == p.peer_id && n.revoked_at.is_none())).collect()
+                    }
+                    Err(_) => vec![],
+                };
+                match by_user.first() {
+                    Some(p) => Ok((*p).clone()),
+                    None => Err(Error::invalid("peer", format!("`{k}` not found (see `mnnn net peers` or `mnnn connection list`)"))),
+                }
+            }
             _ => Err(Error::invalid("peer", format!("`{k}` matches more than one; use the full peer id"))),
         }
     }
@@ -492,13 +513,13 @@ impl Store {
     }
 
     pub fn exchanges(&self) -> Result<Vec<Exchange>> {
-        let mut st = self.conn.prepare(&format!("SELECT {EX_COLS} FROM net_exchanges ORDER BY created_at DESC, id"))?;
+        let mut st = self.conn.prepare(&format!("SELECT {EX_SEL} FROM net_exchanges ORDER BY created_at DESC, id"))?;
         let v = st.query_map([], Self::row_exchange)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(v)
     }
 
     pub fn exchange(&self, id: &str) -> Result<Option<Exchange>> {
-        Ok(self.conn.query_row(&format!("SELECT {EX_COLS} FROM net_exchanges WHERE id = ?1"), [id], Self::row_exchange).optional()?)
+        Ok(self.conn.query_row(&format!("SELECT {EX_SEL} FROM net_exchanges WHERE id = ?1"), [id], Self::row_exchange).optional()?)
     }
 
     /// By id, unique id prefix, label or peer label.
@@ -562,7 +583,7 @@ impl Store {
     /// Active exchanges we answered whose answer has not reached the offerer yet.
     pub fn undelivered_answers(&self) -> Result<Vec<Exchange>> {
         let mut st = self.conn.prepare(&format!(
-            "SELECT {EX_COLS} FROM net_exchanges WHERE role = 'answerer' AND status IN ('complete', 'verified') AND answer IS NOT NULL
+            "SELECT {EX_SEL} FROM net_exchanges WHERE role = 'answerer' AND status IN ('complete', 'verified') AND answer IS NOT NULL
              AND delivered_at IS NULL ORDER BY created_at DESC, id"
         ))?;
         let v = st.query_map([], Self::row_exchange)?.collect::<rusqlite::Result<Vec<_>>>()?;
