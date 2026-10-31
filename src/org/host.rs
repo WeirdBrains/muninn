@@ -900,11 +900,72 @@ fn page_response(p: Page, hsts: bool) -> Response<Body> {
     b.body(Full::new(Bytes::from(p.body)).boxed()).unwrap_or_else(|_| Response::new(Full::new(Bytes::new()).boxed()))
 }
 
+/// Server reflection is a stream: each request is answered as it arrives. It answers as a
+/// guest, so no request signature is needed.
+fn reflection_stream(state: Arc<State>, mut body: Incoming) -> Response<Body> {
+    let (tx, rx) = futures::channel::mpsc::unbounded::<std::result::Result<Frame<Bytes>, Infallible>>();
+    tokio::spawn(async move {
+        let mut buf: Vec<u8> = vec![];
+        let mut status: (u32, String) = (0, String::new());
+        'read: while let Some(f) = body.frame().await {
+            let Ok(f) = f else { break };
+            let Ok(d) = f.into_data() else { continue };
+            buf.extend_from_slice(&d);
+            if buf.len() > MAX_BODY {
+                status = (8, "request too large".into());
+                break;
+            }
+            while buf.len() >= 5 {
+                if buf[0] != 0 {
+                    status = (12, "compressed messages are not supported".into());
+                    break 'read;
+                }
+                let n = u32::from_be_bytes([buf[1], buf[2], buf[3], buf[4]]) as usize;
+                if buf.len() < 5 + n {
+                    break;
+                }
+                let msg: Vec<u8> = buf.drain(..5 + n).skip(5).collect();
+                let st = state.clone();
+                let out = tokio::task::spawn_blocking(move || st.store.lock().ok().map(|s| super::reflect::answer(&s, &msg))).await.ok().flatten();
+                match out {
+                    Some(Ok(m)) => {
+                        let _ = tx.unbounded_send(Ok(Frame::data(Bytes::from(grpc_frame(&m)))));
+                    }
+                    Some(Err(e)) => {
+                        status = e;
+                        break 'read;
+                    }
+                    None => {
+                        status = (13, "internal error".into());
+                        break 'read;
+                    }
+                }
+            }
+        }
+        let mut t = HeaderMap::new();
+        t.insert("grpc-status", HeaderValue::from(status.0));
+        if status.0 != 0
+            && let Ok(v) = HeaderValue::from_str(&percent(&status.1))
+        {
+            t.insert("grpc-message", v);
+        }
+        let _ = tx.unbounded_send(Ok(Frame::trailers(t)));
+    });
+    Response::builder()
+        .status(200)
+        .header(header::CONTENT_TYPE, "application/grpc+proto")
+        .body(StreamBody::new(rx).boxed())
+        .unwrap_or_else(|_| Response::new(Full::new(Bytes::new()).boxed()))
+}
+
 async fn handle(state: Arc<State>, req: Request<Incoming>) -> std::result::Result<Response<Body>, Infallible> {
     let method = req.method().as_str().to_string();
     let path = req.uri().path_and_query().map(|p| p.as_str().to_string()).unwrap_or_else(|| "/".into());
     let grpc = req.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).is_some_and(|c| c.starts_with("application/grpc"));
     let auth = req.headers().get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).map(str::to_string);
+    if grpc && super::reflect::is_reflection(&path) {
+        return Ok(reflection_stream(state, req.into_body()));
+    }
     let body = match Limited::new(req.into_body(), MAX_BODY).collect().await {
         Ok(b) => b.to_bytes(),
         Err(_) if grpc => return Ok(grpc_response(Err((8, "request too large".into())))),

@@ -319,3 +319,12 @@ otherwise:
 
 Opening a code space item in a project opens its editor. Runs happen in the foreground
 (the plugin works on the open database); builds happen in the background.
+
+## Served as executables
+
+An org node can serve code spaces as protobuf *executables* (`mnnn org code serve`):
+listed by `muninn.code.v1.Executables/List`, run by `<package>.<Service>/Run` or
+`POST /o/ORG/api/run/NAME`, with `.proto` files at `/o/ORG/proto/`. Declare the view a
+caller gets with an `@view table|chart|text` comment. The host also answers gRPC server
+reflection (`grpc.reflection.v1`, as a guest), so `grpcurl HOST list` works; see
+[org-hosting](org-hosting.md#executables-213).

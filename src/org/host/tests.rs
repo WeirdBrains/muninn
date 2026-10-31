@@ -480,3 +480,33 @@ fn acme_needs_a_domain_and_an_email() {
     let h = crate::prefs::HostingPrefs::default();
     assert_eq!((h.bind.as_str(), h.port, h.acme.enabled), ("127.0.0.1", 8443, false));
 }
+
+#[test]
+fn the_host_streams_reflection_and_lists_executables() {
+    use crate::org::reflect::{FileDescriptorProto, ReflectionRequest, ReflectionResponse};
+    let s = Store::open_in_memory().unwrap();
+    hosted_lab(&s);
+    let host = Host::start(s, opts()).unwrap();
+    let hs = vec![("content-type", "application/grpc".to_string()), ("te", "trailers".to_string())];
+    let mut body = grpc_frame(&ReflectionRequest { list_services: Some(String::new()), ..Default::default() }.encode_to_vec());
+    body.extend(grpc_frame(
+        &ReflectionRequest { file_by_filename: Some(crate::org::exec::COMMON_PROTO.into()), ..Default::default() }.encode_to_vec(),
+    ));
+    let r = send(host.addr, true, "POST", "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo", &hs, body);
+    assert_eq!(grpc_status(&r), "0");
+    let n = u32::from_be_bytes([r.body[1], r.body[2], r.body[3], r.body[4]]) as usize;
+    let first = ReflectionResponse::decode(&r.body[5..5 + n]).unwrap();
+    assert!(first.list_services_response.unwrap().service.iter().any(|s| s.name == crate::org::exec::LIST_SERVICE));
+    let second = ReflectionResponse::decode(grpc_unframe(&r.body[5 + n..]).unwrap()).unwrap();
+    let f = FileDescriptorProto::decode(second.file_descriptor_response.unwrap().file_descriptor_proto[0].as_slice()).unwrap();
+    assert_eq!(f.package.as_deref(), Some("muninn.code.v1"));
+    // guests run nothing
+    let msg = crate::org::exec::pb::ListRequest { org: "lab".into() }.encode_to_vec();
+    let r = send(host.addr, true, "POST", "/muninn.code.v1.Executables/List", &hs, grpc_frame(&msg));
+    assert_eq!(grpc_status(&r), "0");
+    assert!(crate::org::exec::pb::ExecutableList::decode(grpc_unframe(&r.body).unwrap()).unwrap().executables.is_empty());
+    // a public org, so the package resolves; a guest lacks code.run
+    let r = send(host.addr, true, "POST", "/muninn.code.v1.o.lab.Sma/Run", &hs, grpc_frame(&[]));
+    assert_eq!(grpc_status(&r), "7");
+    host.stop();
+}

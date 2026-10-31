@@ -12,6 +12,7 @@
 pub mod exec;
 pub mod host;
 pub mod net;
+pub mod reflect;
 pub mod serve;
 
 use crate::error::{Error, Result};
