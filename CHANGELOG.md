@@ -6,6 +6,14 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-10-30
+
+### Added
+- Review copies: joining copies what is reviewed to your node; `mnnn review view|show` refresh it when the author's node answers and show the copy otherwise (TUI Reviews, Joined tab: Enter)
+- Offline review work: comments, suggestions, highlights and votes made while the author's node is unreachable are kept and sent on `mnnn review sync` (or s in the TUI), and by a running node every few minutes
+- Record reviews make their model on the reviewer's node or add the missing fields, additively; recorded in history as `review.model`
+- Closed, dropped or left reviews keep their copy archived and read-only; `mnnn review remove` forgets it
+
 ## [2.13.0] - 2026-10-30
 
 ### Added
@@ -403,7 +411,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.13.0...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.14.0...HEAD
+[2.14.0]: https://github.com/kommandosaldat/muninn/compare/v2.13.0...v2.14.0
 [2.13.0]: https://github.com/kommandosaldat/muninn/compare/v2.12.1...v2.13.0
 [2.12.1]: https://github.com/kommandosaldat/muninn/compare/v2.12.0...v2.12.1
 [2.12.0]: https://github.com/kommandosaldat/muninn/compare/v2.11.2...v2.12.0
