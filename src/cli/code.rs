@@ -381,10 +381,45 @@ pub(crate) fn run_pipe(
 /// `mnnn pipe`.
 pub fn pipe(ctx: &Ctx, a: super::args::PipeArgs) -> anyhow::Result<()> {
     let store = ctx.open_store()?;
-    let src = code::pipe::Source::parse(&a.source)?;
+    use code::pipe::{Source, read_data};
+    let src = Source::parse(&a.source)?;
     let steps = a.steps.iter().map(|s| code::pipe::Step::parse(s)).collect::<crate::Result<Vec<_>>>()?;
     let to = a.to.iter().map(|s| code::pipe::Sink::parse(s)).collect::<crate::Result<Vec<_>>>()?;
-    run_pipe(ctx, &store, &src, &steps, &to, a.json, a.rows)
+    if src != Source::Stdin {
+        return run_pipe(ctx, &store, &src, &steps, &to, a.json, a.rows);
+    }
+    if a.chunk == 0 {
+        let mut text = String::new();
+        std::io::stdin().read_to_string(&mut text)?;
+        return run_pipe(ctx, &store, &Source::Frame(read_data(&text, "stdin")?), &steps, &to, a.json, a.rows);
+    }
+    // streaming: CSV keeps its header for every chunk; NDJSON is a line a row
+    let mut head: Option<String> = None;
+    let mut buf: Vec<String> = vec![];
+    let mut n = 0;
+    let mut flush = |buf: &mut Vec<String>, head: &Option<String>| -> anyhow::Result<()> {
+        if buf.is_empty() {
+            return Ok(());
+        }
+        let text = head.iter().cloned().chain(buf.drain(..)).collect::<Vec<_>>().join("\n");
+        n += 1;
+        run_pipe(ctx, &store, &Source::Frame(read_data(&text, &format!("stdin#{n}"))?), &steps, &to, a.json, a.rows)
+    };
+    for line in std::io::stdin().lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        if head.is_none() && buf.is_empty() && !line.trim_start().starts_with('{') {
+            head = Some(line);
+            continue;
+        }
+        buf.push(line);
+        if buf.len() >= a.chunk {
+            flush(&mut buf, &head)?;
+        }
+    }
+    flush(&mut buf, &head)
 }
 
 /// A `--scope` filter.

@@ -9,6 +9,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ### Added
 - Model design templates: export a model's design to a file and import it (plan first, rename or merge on clashes); built-in bars template; models from peers arrive as drafts to approve
 - Code space input picker (i or [Input]): pick a source, or a model then its where, matching, group, sort and limit with the line previewed
+- Pipes from standard input (CSV, JSON, NDJSON; --chunk streams) and a live Pipes window in the TUI that follows pipes run anywhere on the same home
 - Pipes: code spaces work on data piped in and keep none of it. Any live search (records, series, journals), journal, model query or code space output is a source; steps are code spaces and search filters; saves to journals and models branch off at any step while the data flows on (mnnn pipe, share to a code space, TUI >)
 
 ### Changed

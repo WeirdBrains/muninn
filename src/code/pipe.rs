@@ -28,6 +28,9 @@ pub enum Source {
     Code(String),
     /// Data given as is: a frame (`{model, fields, ids, columns, groups}`).
     Frame(Value),
+    /// Standard input (`-`): CSV, a JSON array of objects, NDJSON or a frame; the CLI
+    /// reads it ([`read_data`]) and pipes it in as a frame.
+    Stdin,
 }
 
 impl Source {
@@ -39,6 +42,9 @@ impl Source {
         let need = |what: &str| -> Result<String> {
             if rest.is_empty() { Err(Error::invalid("input", format!("`{what}:` needs a name"))) } else { Ok(rest.to_string()) }
         };
+        if s == "-" {
+            return Ok(Source::Stdin);
+        }
         Ok(match k.as_str() {
             "search" => Source::Search(need("search")?),
             "journal" => Source::Journal(need("journal")?),
@@ -60,7 +66,7 @@ impl Source {
     pub fn input(&self) -> CodeInput {
         match self {
             Source::Model(i) => i.clone(),
-            Source::None | Source::Frame(_) => CodeInput::default(),
+            Source::None | Source::Frame(_) | Source::Stdin => CodeInput::default(),
             o => CodeInput { from: o.text(), ..Default::default() },
         }
     }
@@ -73,6 +79,7 @@ impl Source {
             Source::Journal(n) => format!("journal:{n}"),
             Source::Code(n) => format!("code:{n}"),
             Source::Frame(f) => format!("data:{}", f.get("model").and_then(Value::as_str).unwrap_or("shared")),
+            Source::Stdin => "-".into(),
         }
     }
 }
@@ -87,6 +94,7 @@ pub fn frame(store: &Store, env: &CodeEnv, origin: &str, src: &Source, log: &mut
     Ok(Some(match src {
         Source::None => return Ok(None),
         Source::Frame(f) => f.clone(),
+        Source::Stdin => return Err(Error::invalid("pipe", "standard input is read by `mnnn pipe -`")),
         Source::Model(i) => host::load(store, &serde_json::to_value(i)?)?,
         Source::Search(n) => {
             let ls = store.find_live_search(n)?;
@@ -356,15 +364,58 @@ pub struct Piped {
 /// Run `src | steps… > sink`. Each code run is recorded (`code.run`, with its input named),
 /// and the pipe as a whole (`pipe.run`, with every hop). Code steps must be approved.
 pub fn run(store: &Store, env: &CodeEnv, origin: &str, src: &Source, steps: &[Step], to: &[Sink], log: &mut dyn FnMut(&str)) -> Result<Piped> {
+    let mut out = Piped { hops: vec![src.text()], ..Default::default() };
+    let token = crate::store::new_id();
+    let plan: Vec<String> = std::iter::once(src.text()).chain(steps.iter().map(Step::text)).chain(to.iter().map(Sink::text)).collect();
+    store.note_action(&NewAction::new("pipe.start", origin, format!("pipe {}", plan.join(" | "))).params(json!({ "token": token, "plan": plan })));
+    let t0 = std::time::Instant::now();
+    let hop = |i: usize, name: &str, f: &Option<Value>, err: Option<&str>, t: std::time::Instant| {
+        let rows = f.as_ref().and_then(|f| f.get("ids")).and_then(Value::as_array).map(Vec::len).unwrap_or(0);
+        let cols: Vec<String> =
+            f.as_ref().and_then(|f| f.get("columns")).and_then(Value::as_object).map(|c| c.keys().cloned().collect()).unwrap_or_default();
+        let status = if err.is_some() { "error" } else { "ok" };
+        store.note_action(
+            &NewAction::new("pipe.hop", origin, format!("pipe hop {name}: {}", err.map(str::to_string).unwrap_or_else(|| format!("{rows} rows"))))
+                .params(json!({ "token": token, "i": i, "hop": name, "rows": rows, "columns": cols, "ms": t.elapsed().as_millis() as u64, "status": status, "error": err })),
+        );
+    };
+    let res = run_hops(store, env, origin, src, steps, to, log, &mut out, &|i, n, f, e, t| hop(i, n, f, e, t));
+    if let Err(e) = &res {
+        hop(out.hops.len().saturating_sub(1), out.hops.last().map(String::as_str).unwrap_or("?"), &None, Some(&e.to_string()), t0);
+    }
+    res?;
+    store.note_action(
+        &NewAction::new("pipe.run", origin, format!("pipe {}", out.hops.join(" | ")))
+            .params(json!({ "token": token, "hops": out.hops, "saved": out.saved, "ms": t0.elapsed().as_millis() as u64 })),
+    );
+    Ok(out)
+}
+
+type HopFn<'a> = dyn Fn(usize, &str, &Option<Value>, Option<&str>, std::time::Instant) + 'a;
+
+#[allow(clippy::too_many_arguments)]
+fn run_hops(
+    store: &Store,
+    env: &CodeEnv,
+    origin: &str,
+    src: &Source,
+    steps: &[Step],
+    to: &[Sink],
+    log: &mut dyn FnMut(&str),
+    out: &mut Piped,
+    hop: &HopFn,
+) -> Result<()> {
     let mut seen: Vec<String> = vec![];
     if let Source::Code(n) = src {
         seen.push(store.find_code_space(n)?.id);
     }
-    let mut out = Piped { hops: vec![src.text()], ..Default::default() };
+    let t = std::time::Instant::now();
     let mut cur = frame(store, env, origin, src, log)?;
+    hop(0, &src.text(), &cur, None, t);
     let mut last: Option<(CodeSpace, RunInfo)> = None;
     for st in steps {
         out.hops.push(st.text());
+        let t = std::time::Instant::now();
         match st {
             Step::Search(n) => {
                 let ls = store.find_live_search(n)?;
@@ -390,6 +441,7 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, src: &Source, steps: &[St
                 last = Some((c, info));
             }
         }
+        hop(out.hops.len() - 1, &st.text(), &cur, None, t);
     }
     for k in to {
         out.hops.push(k.text());
@@ -398,10 +450,87 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, src: &Source, steps: &[St
         out.saved.push(format!("{} → {made}", k.text()));
     }
     out.frame = cur;
-    store.note_action(
-        &NewAction::new("pipe.run", origin, format!("pipe {}", out.hops.join(" | "))).params(json!({ "hops": out.hops, "saved": out.saved })),
-    );
-    Ok(out)
+    Ok(())
+}
+
+/// Data from outside (standard input) as a frame: a frame as is, a JSON array of objects,
+/// NDJSON (one object a line) or CSV with a header row. Numbers read as numbers.
+pub fn read_data(text: &str, name: &str) -> Result<Value> {
+    let t = text.trim_start();
+    let rows: Vec<Map<String, Value>> = if t.starts_with('[') {
+        let v: Vec<Value> = serde_json::from_str(t).map_err(|e| Error::invalid("input", format!("JSON: {e}")))?;
+        v.into_iter().map(obj).collect::<Result<_>>()?
+    } else if t.starts_with('{') {
+        if let Ok(v) = serde_json::from_str::<Value>(t)
+            && v.get("columns").is_some()
+        {
+            return Ok(v);
+        }
+        t.lines()
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| serde_json::from_str(l).map_err(|e| Error::invalid("input", format!("NDJSON: {e}"))).and_then(obj))
+            .collect::<Result<_>>()?
+    } else {
+        let mut lines = t.lines().filter(|l| !l.trim().is_empty());
+        let head = csv_line(lines.next().unwrap_or_default());
+        lines.map(|l| head.iter().cloned().zip(csv_line(l).into_iter().map(|c| cell(&c))).collect()).collect()
+    };
+    Ok(rows_frame(name, &rows))
+}
+
+fn obj(v: Value) -> Result<Map<String, Value>> {
+    match v {
+        Value::Object(m) => Ok(m),
+        o => Err(Error::invalid("input", format!("expected objects, got {o}"))),
+    }
+}
+
+fn cell(s: &str) -> Value {
+    match s.trim().parse::<f64>() {
+        Ok(n) if n.is_finite() => json!(n),
+        _ if s.is_empty() => Value::Null,
+        _ => json!(s),
+    }
+}
+
+/// One CSV line (quotes, `""` inside quotes).
+pub fn csv_line(l: &str) -> Vec<String> {
+    let (mut out, mut cur, mut q) = (vec![], String::new(), false);
+    let mut it = l.trim_end_matches('\r').chars().peekable();
+    while let Some(c) = it.next() {
+        match c {
+            '"' if q && it.peek() == Some(&'"') => {
+                cur.push('"');
+                it.next();
+            }
+            '"' => q = !q,
+            ',' if !q => out.push(std::mem::take(&mut cur)),
+            c => cur.push(c),
+        }
+    }
+    out.push(cur);
+    out
+}
+
+/// Rows of objects as a frame (columns in first-seen order).
+pub fn rows_frame(name: &str, rows: &[Map<String, Value>]) -> Value {
+    let mut names: Vec<String> = vec![];
+    for r in rows {
+        for k in r.keys() {
+            if !names.contains(k) {
+                names.push(k.clone());
+            }
+        }
+    }
+    let cols = names
+        .iter()
+        .map(|n| {
+            let v: Vec<Value> = rows.iter().map(|r| r.get(n).cloned().unwrap_or(Value::Null)).collect();
+            let t = if v.iter().all(|x| x.is_number() || x.is_null()) { "real" } else { "text" };
+            (n.as_str(), t, v)
+        })
+        .collect();
+    col_frame(name, cols, (0..rows.len()).map(|i| i.to_string()).collect(), vec![])
 }
 
 /// The frame as a Markdown table (at most `max` rows).

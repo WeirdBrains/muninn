@@ -22,6 +22,7 @@ mnnn pipe journal:Notes search:alphas --to model:picks
 | `search:NAME`, any live search, run when the pipe runs | records: the model's fields (several models: a `model` column and every field); series: their bars (`source symbol base quote period timestamp open high low close volume flags`, one group per series, in the search's time range); journal entries: `journal title body words _created_at _updated_at` |
 | `journal:NAME` | that journal's entries, as above |
 | `code:SPACE` | that space's output, run on its own default input |
+| `-` (CLI) | standard input: CSV with a header row (quotes as usual), a JSON array of objects, NDJSON, or a frame; numbers read as numbers |
 
 ## Steps
 
@@ -38,6 +39,21 @@ mnnn pipe journal:Notes search:alphas --to model:picks
 
 A code space may appear once per pipe, and a default input that leads back to itself is
 refused (a cycle). Every pipe is recorded as `pipe.run` with its hops and saves.
+
+## Standard input and live runs
+
+```
+cat trades.csv | mnnn pipe - code:fast --to model:trades
+tail -f feed.ndjson | mnnn pipe - code:fast --chunk 100 --to journal:Feed
+```
+
+`--chunk N` runs the pipe on every N rows as they arrive (CSV keeps its header for each
+chunk), so long or endless input flows through. Every pipe records `pipe.start`, a
+`pipe.hop` per node (rows, columns, ms, status, error) and `pipe.run`, as it goes. A TUI
+open on the same home shows them live in **Projects ▸ Pipes (live)…**: each pipe with
+its status and origin, and the selected one's nodes with rows, time and errors; the
+status line says when one finishes or fails. Nothing to install and no daemon: the TUI
+reads the history on every tick.
 
 ## Share and the TUI
 

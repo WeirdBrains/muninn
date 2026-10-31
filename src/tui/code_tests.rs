@@ -319,3 +319,38 @@ fn a_search_pipes_through_two_code_spaces_into_journals() {
     let kinds: Vec<String> = a.store.actions().unwrap().into_iter().map(|r| r.kind).collect();
     assert!(kinds.iter().filter(|k| *k == "pipe.run").count() >= 2 && kinds.iter().filter(|k| *k == "code.run").count() >= 2, "{kinds:?}");
 }
+
+/// A pipe run elsewhere (the CLI, on the same database) shows up live in Pipes….
+#[test]
+fn the_pipes_window_follows_pipes_run_elsewhere() {
+    let (_t, mut a) = app();
+    a.store.create_journal("Feed", None, crate::store::EntryFormat::Markdown).unwrap();
+    a.dispatch(Action::Pipes);
+    assert!(matches!(a.modal, Some(Modal::Pipes)));
+    assert!(screen_text(&mut a).contains("no pipes yet"));
+    // as `cat x.csv | mnnn pipe - --to journal:Feed` would
+    let env = crate::code::CodeEnv::for_store(&a.store).unwrap();
+    let f = crate::code::pipe::read_data("a,b\n1,2\n3,4\n", "stdin").unwrap();
+    crate::code::pipe::run(
+        &a.store,
+        &env,
+        "cli",
+        &crate::code::pipe::Source::Frame(f),
+        &[],
+        &[crate::code::pipe::Sink::Journal("Feed".into())],
+        &mut |_| {},
+    )
+    .unwrap();
+    a.tick();
+    let p = a.pipes.list.first().cloned().expect("seen");
+    assert_eq!((p.status.as_str(), p.origin.as_str()), ("done", "cli"));
+    assert_eq!(p.hops.len(), 2);
+    assert_eq!((p.hops[0].rows, p.hops[0].columns.clone()), (2, vec!["a".to_string(), "b".to_string()]));
+    let s = render(&mut a, 140, 40);
+    assert!(s.contains("data:stdin → journal:Feed") && s.contains("done"), "{s}");
+    // a failing one shows its error
+    crate::code::pipe::run(&a.store, &env, "cli", &crate::code::pipe::Source::Search("nope".into()), &[], &[], &mut |_| {}).unwrap_err();
+    a.tick();
+    assert_eq!(a.pipes.list[0].status, "error");
+    assert!(render(&mut a, 140, 40).contains("error"));
+}

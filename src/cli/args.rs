@@ -3303,10 +3303,12 @@ pub enum ReviewCommand {
 #[command(after_help = "Examples:
   mnnn pipe search:usdt code:fast journal:Raw code:smooth --to journal:Notes
   mnnn pipe \"bars where symbol = BTC/USDT limit 500\" fast
-  mnnn pipe journal:Notes code:wordcount --json")]
+  mnnn pipe journal:Notes code:wordcount --json
+  cat trades.csv | mnnn pipe - code:fast --to model:trades
+  tail -f feed.ndjson | mnnn pipe - code:fast --chunk 100 --to journal:Feed")]
 pub struct PipeArgs {
     /// Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a
-    /// bare model query).
+    /// bare model query), or `-` for standard input (CSV, JSON, NDJSON).
     pub source: String,
     /// Steps in order: code:SPACE (or a space name), search:NAME (keeps the rows it
     /// matches), or a save that passes the data on unchanged, like `tee`: journal:NAME (a
@@ -3321,6 +3323,10 @@ pub struct PipeArgs {
     /// Table rows to print (0: all).
     #[arg(long, default_value_t = 30)]
     pub rows: usize,
+    /// With `-` (standard input) as the source: run the pipe on every N rows as they
+    /// arrive (CSV or NDJSON), so an open TUI sees it progress. 0: all at once.
+    #[arg(long, default_value_t = 0)]
+    pub chunk: usize,
 }
 
 #[derive(Debug, Args)]

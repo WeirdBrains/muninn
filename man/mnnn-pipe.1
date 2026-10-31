@@ -8,7 +8,7 @@ mnnn\-pipe \- Pipe data through code spaces: a source (a live search of any kind
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn pipe\fR [\fB\-\-home\fR] [\fB\-\-to\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rows\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISOURCE\fR> [\fISTEPS\fR] 
+\fBmnnn pipe\fR [\fB\-\-home\fR] [\fB\-\-to\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rows\fR] [\fB\-\-chunk\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISOURCE\fR> [\fISTEPS\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -43,6 +43,9 @@ May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable
 .TP
 \fB\-\-rows\fR \fI<ROWS>\fR [default: 30]
 Table rows to print (0: all)
+.TP
+\fB\-\-chunk\fR \fI<CHUNK>\fR [default: 0]
+With `\-` (standard input) as the source: run the pipe on every N rows as they arrive (CSV or NDJSON), so an open TUI sees it progress. 0: all at once
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
@@ -81,7 +84,7 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 Print help
 .TP
 <\fISOURCE\fR>
-Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a bare model query)
+Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a bare model query), or `\-` for standard input (CSV, JSON, NDJSON)
 .TP
 [\fISTEPS\fR]
 Steps in order: code:SPACE (or a space name), search:NAME (keeps the rows it matches), or a save that passes the data on unchanged, like `tee`: journal:NAME (a new entry with the data) or model:NAME (new records). Save at any step, many times

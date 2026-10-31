@@ -55,3 +55,42 @@ fn code_spaces_take_any_data_piped_in_and_keep_none_of_it() {
     let o = e.run(&["-y", "pipe", "code:a"]);
     assert!(!o.status.success() && err(&o).contains("cycle"), "{}", err(&o));
 }
+
+#[test]
+fn standard_input_is_a_pipe_source_in_one_go_or_in_chunks() {
+    use std::io::Write;
+    let e = Env::new();
+    e.ok(&["journal", "new", "Feed"]);
+    e.ok(&["model", "create", "Ticks", "--fields", "sym:text; px:real"]);
+    let feed = |args: &[&str], input: &str| {
+        let mut c = e
+            .cmd()
+            .args(args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        c.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+        c.wait_with_output().unwrap()
+    };
+    // CSV, all at once: saved to a journal on the way, then into a model
+    let o = feed(&["pipe", "-", "journal:Feed", "--to", "model:Ticks", "--json"], "sym,px\n\"BTC, spot\",42000.5\nETH,3000\n");
+    assert!(o.status.success(), "{}", err(&o));
+    let j: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+    assert_eq!(j["output"]["columns"]["px"], serde_json::json!([42000.5, 3000.0]), "{j}");
+    assert_eq!(j["output"]["columns"]["sym"][0], "BTC, spot", "{j}");
+    let recs: serde_json::Value = serde_json::from_str(&e.ok(&["model", "record", "list", "Ticks", "--json"])).unwrap();
+    assert_eq!(recs.as_array().unwrap().len(), 2, "{recs}");
+    // NDJSON in chunks of 2: three pipe runs, each recorded with its hops
+    let o = feed(&["pipe", "-", "--to", "journal:Feed", "--chunk", "2"], "{\"a\":1}\n{\"a\":2}\n{\"a\":3}\n{\"a\":4}\n{\"a\":5}\n");
+    assert!(o.status.success(), "{}", err(&o));
+    let h = e.ok(&["history", "list", "--json"]);
+    let hist: serde_json::Value = serde_json::from_str(&h).unwrap();
+    let kinds: Vec<&str> = hist.as_array().unwrap().iter().filter_map(|a| a["kind"].as_str()).collect();
+    assert_eq!(kinds.iter().filter(|k| **k == "pipe.run").count(), 4, "{kinds:?}");
+    assert!(kinds.contains(&"pipe.hop") && kinds.contains(&"pipe.start"));
+    // JSON array too; bad input is refused
+    assert!(feed(&["pipe", "-", "--json"], "[{\"x\":1},{\"x\":2}]").status.success());
+    assert!(!feed(&["pipe", "-"], "[1,2]").status.success());
+}

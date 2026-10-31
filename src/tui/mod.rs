@@ -21,6 +21,7 @@ pub mod models;
 pub mod network;
 pub mod orgs;
 pub mod picker;
+pub mod pipes;
 pub mod projects;
 pub mod reports;
 pub mod reviews;
@@ -156,6 +157,7 @@ pub struct App {
     pub orgs: orgs::OrgsState,
     pub reviews: reviews::ReviewsState,
     pub code: code::CodeState,
+    pub pipes: pipes::PipesState,
     pub models: models::ModelsState,
     pub projects: projects::ProjectsState,
     pub journals: journals::JournalsState,
@@ -205,6 +207,7 @@ impl App {
             orgs: Default::default(),
             reviews: Default::default(),
             code: Default::default(),
+            pipes: Default::default(),
             models: Default::default(),
             projects: Default::default(),
             journals: Default::default(),
@@ -433,6 +436,7 @@ impl App {
                 orgs::open(self, orgs::Tab::Site);
             }
             Code => code::open(self),
+            Pipes => pipes::open(self),
             Models => models::open(self),
             AddToProject => match projects::selected_series(self) {
                 Some(r) => {
@@ -1282,6 +1286,7 @@ impl App {
     pub fn tick(&mut self) {
         rules::poll(self);
         code::poll(self);
+        pipes::poll(self);
         network::poll(self);
         orgs::poll(self);
         reviews::poll(self);

@@ -47,6 +47,8 @@ pub enum Modal {
     Rules,
     /// Projects ▸ Code spaces…
     Code,
+    /// Projects ▸ Pipes (live)…
+    Pipes,
     /// Net ▸ …
     Network,
     /// Orgs ▸ …
@@ -121,6 +123,7 @@ impl Modal {
             Modal::Orgs => "organizations",
             Modal::Reviews => "reviews",
             Modal::Code => "code-spaces",
+            Modal::Pipes => "pipes",
             Modal::Models => "models",
             Modal::DocExport => "export-formats",
             Modal::Prefs { .. } => "preferences",
@@ -356,6 +359,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Orgs => super::orgs::on_key(app, k),
         Modal::Reviews => super::reviews::on_key(app, k),
         Modal::Code => super::code::on_key(app, k),
+        Modal::Pipes => super::pipes::on_key(app, k),
         Modal::Models => super::models::on_key(app, k),
         Modal::DocExport => super::docexport::on_key(app, k),
         Modal::PickProject => super::workspace::on_key(app, k),
@@ -682,6 +686,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Orgs => super::orgs::draw(app, f, r, &mut extra),
         Modal::Reviews => super::reviews::draw(app, f, r, &mut extra),
         Modal::Code => super::code::draw(app, f, r, &mut extra),
+        Modal::Pipes => super::pipes::draw(app, f, r, &mut extra),
         Modal::Models => super::models::draw(app, f, r, &mut extra),
         Modal::DocExport => super::docexport::draw(app, f, r, &mut extra),
         Modal::PickProject => super::workspace::draw(app, f, r, &mut extra),
