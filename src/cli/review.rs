@@ -63,12 +63,53 @@ fn add(ctx: &Ctx, key: &str, ask: Ask) -> anyhow::Result<()> {
         Target::Mine(r) => review::add(&n.store, ORIGIN, &r, &Who::Author, &ask)?,
         Target::Joined(g) => {
             let relays = n.relays();
-            n.node()?;
-            rnet::add(&n.store, n.node.as_ref().expect("node"), &g, &ask, &relays, ORIGIN)?
+            if g.status == crate::store::ReviewingStatus::Joined {
+                n.node()?;
+            }
+            match rnet::send_or_queue(&n.store, n.node.as_ref(), &g, &ask, &relays, ORIGIN)? {
+                rnet::Sent::Item(it) => *it,
+                rnet::Sent::Queued(_) => {
+                    ctx.io.info(format!("{} kept here; it is sent when the node of {} is reachable", ask.kind.as_str(), g.title()));
+                    return Ok(());
+                }
+            }
         }
     };
     ctx.io.info(review::line(&it));
     Ok(())
+}
+
+/// A joined review, refreshed from the author's node when it answers, else this node's copy.
+fn refreshed(ctx: &Ctx, n: &mut Net, g: Reviewing) -> anyhow::Result<Reviewing> {
+    if g.status != crate::store::ReviewingStatus::Joined {
+        ctx.io.note(format!("{} is {}: this is the archived, read-only copy", g.title(), g.status.as_str()));
+        return Ok(g);
+    }
+    let relays = n.relays();
+    n.node()?;
+    match rnet::refresh(&n.store, n.node.as_ref().expect("node"), &g, &relays, ORIGIN) {
+        Ok((g, r)) => {
+            report(ctx, &g, &r);
+            Ok(g)
+        }
+        Err(e) if !g.copy.is_null() => {
+            ctx.io.note(format!("{e}; showing the copy from {}", fmt_ts(g.copied_at)));
+            Ok(g)
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+fn report(ctx: &Ctx, g: &Reviewing, r: &rnet::Refreshed) {
+    if r.sent > 0 {
+        ctx.io.info(format!("sent {} kept item(s) to {}", r.sent, g.title()));
+    }
+    for e in &r.refused {
+        ctx.io.warn(format!("dropped kept work the author's node refused: {e}"));
+    }
+    if let Some(m) = &r.model {
+        ctx.io.info(format!("{m} (for this review)"));
+    }
 }
 
 /// Print a link for a reviewer (or that it was sent).
@@ -202,11 +243,8 @@ pub fn run(ctx: &Ctx, cmd: ReviewCommand) -> anyhow::Result<()> {
                     print_thread(&items);
                 }
                 Target::Joined(g) => {
-                    let relays = n.relays();
-                    n.node()?;
-                    let node = n.node.as_ref().expect("node");
-                    let g = rnet::sync(&n.store, node, &g, &relays)?;
-                    let items = rnet::thread(&n.store, node, &g, &relays)?;
+                    let g = refreshed(ctx, &mut n, g)?;
+                    let items: Vec<ReviewItem> = serde_json::from_value(g.thread.clone()).unwrap_or_default();
                     if json {
                         return pretty(&json!({ "reviewing": g, "items": items }));
                     }
@@ -221,11 +259,7 @@ pub fn run(ctx: &Ctx, cmd: ReviewCommand) -> anyhow::Result<()> {
             let mut n = Net::open(ctx)?;
             let v = match target(&n.store, &key)? {
                 Target::Mine(r) => review::view(&n.store, &r)?,
-                Target::Joined(g) => {
-                    let relays = n.relays();
-                    n.node()?;
-                    rnet::view(&n.store, n.node.as_ref().expect("node"), &g, &relays)?
-                }
+                Target::Joined(g) => refreshed(ctx, &mut n, g)?.copy,
             };
             if json {
                 return pretty(&v);
@@ -260,6 +294,17 @@ pub fn run(ctx: &Ctx, cmd: ReviewCommand) -> anyhow::Result<()> {
             n.node()?;
             let (g, a) = rnet::join(&n.store, n.node.as_ref(), &n.kp, &token, &label, ORIGIN)?;
             ctx.io.info(format!("reviewing {} ({} {}); you may {}", g.title(), g.kind, g.name, g.allow.join(", ")));
+            // the copy to work on, even offline
+            if matches!(a.delivered, Some(Ok(_))) {
+                let relays = n.relays();
+                match rnet::refresh(&n.store, n.node.as_ref().expect("node"), &g, &relays, ORIGIN) {
+                    Ok((g, r)) => {
+                        report(ctx, &g, &r);
+                        ctx.io.info("copied here; comments, suggestions, highlights and votes work offline too");
+                    }
+                    Err(e) => ctx.io.note(format!("no copy yet ({e}); `mnnn review sync` makes one")),
+                }
+            }
             if let Some(ans) = &a.answer
                 && !matches!(a.delivered, Some(Ok(_)))
             {
@@ -273,7 +318,8 @@ pub fn run(ctx: &Ctx, cmd: ReviewCommand) -> anyhow::Result<()> {
             let g = n.store.find_reviewing(&key)?;
             let relays = n.relays();
             n.node()?;
-            let g = rnet::sync(&n.store, n.node.as_ref().expect("node"), &g, &relays)?;
+            let (g, r) = rnet::refresh(&n.store, n.node.as_ref().expect("node"), &g, &relays, ORIGIN)?;
+            report(ctx, &g, &r);
             let items = g.info["items"].as_u64().unwrap_or(0);
             ctx.io.info(format!("{}: {}, {items} items; you may {}", g.title(), g.status.as_str(), g.allow.join(", ")));
             Ok(())

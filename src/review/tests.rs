@@ -192,3 +192,71 @@ fn reviewers_withdraw_only_their_own_and_left_reviewers_are_refused() {
     remove(&s, "cli", &r).unwrap();
     assert!(s.reviews().unwrap().is_empty());
 }
+
+fn joined(review: &str, allow: &[&str]) -> crate::store::Reviewing {
+    crate::store::Reviewing {
+        review_id: review.into(),
+        title: "Their signals".into(),
+        kind: "record".into(),
+        name: "signals".into(),
+        node_peer: "12D3author".into(),
+        exchange_id: None,
+        status: crate::store::ReviewingStatus::Joined,
+        allow: allow.iter().map(|a| a.to_string()).collect(),
+        info: Value::Null,
+        created_at: 1,
+        updated_at: 1,
+        copy: Value::Null,
+        thread: json!([]),
+        copied_at: 0,
+    }
+}
+
+#[test]
+fn a_review_copy_makes_and_extends_the_model_and_offline_work_is_kept() {
+    // the author's node
+    let a = store();
+    let (m, _) = a
+        .create_model(
+            "Signals",
+            "",
+            Design { fields: vec![Field::new("price", FieldType::Real), Field::new("note", FieldType::Text)], ..Default::default() },
+            true,
+        )
+        .unwrap();
+    let rec = a.create_record(&a.find_model(&m.id).unwrap(), &serde_json::from_value(json!({ "price": 1.5, "note": "buy" })).unwrap()).unwrap();
+    let r = request(&a, "cli", ReviewKind::Record, &format!("signals/{}", &rec.id[..8]), "", "", &[]).unwrap();
+    let v = view(&a, &r).unwrap();
+    assert_eq!(v["model"]["name"], "signals");
+
+    // the reviewer's node: the model is made, and only extended later
+    let b = store();
+    let mut g = joined(&r.id, &["view", "comment"]);
+    b.save_reviewing(&g).unwrap();
+    let out = net::keep_copy(&b, &mut g, v.clone(), json!([])).unwrap();
+    assert!(out.changed && out.model.is_some());
+    let bm = b.find_model("signals").unwrap();
+    assert_eq!(bm.design.stored().map(|f| f.name.as_str()).collect::<Vec<_>>(), ["price", "note"]);
+    assert_eq!(b.find_reviewing(&r.id).unwrap().copy["content"]["note"], "buy");
+    let mut v2 = v.clone();
+    v2["model"]["fields"].as_array_mut().unwrap().push(serde_json::to_value(Field::new("score", FieldType::Integer)).unwrap());
+    let out = net::keep_copy(&b, &mut g, v2, json!([])).unwrap();
+    assert!(!out.changed && out.model.unwrap().contains("score"));
+    assert!(b.find_model("signals").unwrap().design.field("score").is_some());
+    assert!(net::keep_copy(&b, &mut g, v, json!([])).unwrap().model.is_none(), "nothing removed or re-added");
+    assert!(kinds(&b).iter().filter(|k| *k == "review.model").count() == 2);
+
+    // no node: comments wait; what is not allowed is refused here
+    let c = Ask { body: "why 1.5?".into(), ..ask(ReviewItemKind::Comment) };
+    assert!(matches!(net::send_or_queue(&b, None, &g, &c, &[], "cli").unwrap(), net::Sent::Queued(_)));
+    assert_eq!(b.review_work(&r.id).unwrap().len(), 1);
+    assert!(net::send_or_queue(&b, None, &g, &ask(ReviewItemKind::Vote), &[], "cli").is_err(), "vote not allowed");
+
+    // closed: the copy stays, read-only
+    g.status = crate::store::ReviewingStatus::Closed;
+    b.save_reviewing(&g).unwrap();
+    assert!(net::send_or_queue(&b, None, &g, &c, &[], "cli").unwrap_err().to_string().contains("read-only"));
+    assert_eq!(b.find_reviewing(&r.id).unwrap().copy["content"]["price"], 1.5);
+    assert!(b.forget_reviewing(&r.id).unwrap());
+    assert!(b.review_work(&r.id).unwrap().is_empty());
+}

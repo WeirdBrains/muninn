@@ -169,6 +169,12 @@ pub fn view(s: &Store, r: &Review) -> Result<Value> {
         let es: Vec<Value> = s.entries(&r.ref_id)?.iter().map(|e| json!({ "id": e.id, "title": e.title, "body": e.body })).collect();
         v["entries"] = json!(es);
     }
+    // a record review: the model it needs, so the reviewer's node can make or extend it
+    if r.kind == ReviewKind::Record {
+        let m = model_of(s, r)?;
+        v["model"] = json!({ "name": m.name, "description": m.description, "fields": m.design.stored().collect::<Vec<_>>() });
+    }
+    v["revisions"] = json!(revisions(s, r.kind, &r.ref_id).map(|v| v.len()).unwrap_or(0));
     Ok(v)
 }
 
@@ -215,7 +221,7 @@ pub struct Ask {
     pub reply_to: Option<String>,
 }
 
-fn perm_of(k: ReviewItemKind) -> &'static str {
+pub(crate) fn perm_of(k: ReviewItemKind) -> &'static str {
     match k {
         ReviewItemKind::Comment => "comment",
         ReviewItemKind::Suggestion => "suggest",

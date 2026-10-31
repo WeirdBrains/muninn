@@ -85,6 +85,20 @@ CREATE TABLE reviewing (
 );
 "#;
 
+/// 2.14: review copies on a reviewer's node, and work waiting for the author's node.
+pub const MIGRATION_2_14: &str = r#"
+ALTER TABLE reviewing ADD COLUMN copy TEXT NOT NULL DEFAULT 'null';
+ALTER TABLE reviewing ADD COLUMN thread TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE reviewing ADD COLUMN copied_at INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE review_outbox (
+    id TEXT PRIMARY KEY,
+    review_id TEXT NOT NULL,
+    ask TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX review_outbox_review ON review_outbox(review_id, created_at);
+"#;
+
 macro_rules! words {
     ($(#[$m:meta])* $name:ident { $($v:ident = $s:literal),+ $(,)? } default $d:ident) => {
         $(#[$m])*
@@ -304,6 +318,15 @@ pub struct Reviewing {
     pub info: Value,
     pub created_at: i64,
     pub updated_at: i64,
+    /// The copy of what is reviewed (2.14), as the author's node last sent it.
+    #[serde(default)]
+    pub copy: Value,
+    /// The thread as last seen.
+    #[serde(default)]
+    pub thread: Value,
+    /// When the copy was last refreshed (0: never).
+    #[serde(default)]
+    pub copied_at: i64,
 }
 
 impl Reviewing {
@@ -320,7 +343,8 @@ const REVIEWER_COLS: &str = "id, review_id, peer_id, label, exchange_id, status,
 const ITEM_COLS: &str = "id, review_id, reviewer_id, who, kind, target, field, span_start, span_end, quote, body, value, before, reply_to, state, \
                          decided_by, revision, created_at, updated_at";
 const REVISION_COLS: &str = "id, kind, ref_id, rev, review_id, before, after, items, author_id, created_at";
-const REVIEWING_COLS: &str = "review_id, title, kind, name, node_peer, exchange_id, status, allow, info, created_at, updated_at";
+const REVIEWING_COLS: &str =
+    "review_id, title, kind, name, node_peer, exchange_id, status, allow, info, created_at, updated_at, copy, thread, copied_at";
 
 fn json_opt(s: Option<String>) -> Option<Value> {
     s.and_then(|s| serde_json::from_str(&s).ok())
@@ -421,6 +445,9 @@ fn row_reviewing(r: &rusqlite::Row) -> rusqlite::Result<Reviewing> {
         info: serde_json::from_str(&i).unwrap_or_default(),
         created_at: r.get(9)?,
         updated_at: r.get(10)?,
+        copy: serde_json::from_str(&r.get::<_, String>(11)?).unwrap_or_default(),
+        thread: serde_json::from_str(&r.get::<_, String>(12)?).unwrap_or_default(),
+        copied_at: r.get(13)?,
     })
 }
 
@@ -663,9 +690,9 @@ impl Store {
     pub fn save_reviewing(&self, r: &Reviewing) -> Result<()> {
         self.conn.execute(
             &format!(
-                "INSERT INTO reviewing({REVIEWING_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                "INSERT INTO reviewing({REVIEWING_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
                  ON CONFLICT(review_id) DO UPDATE SET title = ?2, kind = ?3, name = ?4, node_peer = ?5, exchange_id = ?6, status = ?7,
-                 allow = ?8, info = ?9, updated_at = ?11"
+                 allow = ?8, info = ?9, updated_at = ?11, copy = ?12, thread = ?13, copied_at = ?14"
             ),
             params![
                 r.review_id,
@@ -678,7 +705,10 @@ impl Store {
                 serde_json::to_string(&r.allow)?,
                 r.info.to_string(),
                 r.created_at,
-                r.updated_at
+                r.updated_at,
+                r.copy.to_string(),
+                r.thread.to_string(),
+                r.copied_at
             ],
         )?;
         Ok(())
@@ -705,7 +735,30 @@ impl Store {
     }
 
     pub fn forget_reviewing(&self, review: &str) -> Result<bool> {
+        self.conn.execute("DELETE FROM review_outbox WHERE review_id = ?1", [review])?;
         Ok(self.conn.execute("DELETE FROM reviewing WHERE review_id = ?1", [review])? == 1)
+    }
+
+    /// Keep review work for the author's node until it can be reached. Returns its id.
+    pub fn queue_review_work(&self, review: &str, ask: &Value) -> Result<String> {
+        let id = new_id();
+        self.conn.execute(
+            "INSERT INTO review_outbox(id, review_id, ask, created_at) VALUES (?1, ?2, ?3, ?4)",
+            params![id, review, ask.to_string(), now_ms()],
+        )?;
+        Ok(id)
+    }
+
+    /// Work waiting for the author's node, oldest first.
+    pub fn review_work(&self, review: &str) -> Result<Vec<(String, Value)>> {
+        let mut st = self.conn.prepare("SELECT id, ask FROM review_outbox WHERE review_id = ?1 ORDER BY created_at, id")?;
+        let rows = st.query_map([review], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?.into_iter().map(|(i, a)| (i, serde_json::from_str(&a).unwrap_or_default())).collect())
+    }
+
+    pub fn unqueue_review_work(&self, id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM review_outbox WHERE id = ?1", [id])?;
+        Ok(())
     }
 }
 
@@ -793,8 +846,14 @@ mod tests {
             info: Value::Null,
             created_at: now,
             updated_at: now,
+            copy: json!({ "content": { "title": "x" } }),
+            thread: json!([]),
+            copied_at: now,
         };
         s.save_reviewing(&g).unwrap();
+        assert_eq!(s.find_reviewing("abc123").unwrap().copy["content"]["title"], "x");
+        let q = s.queue_review_work("abc123", &json!({ "kind": "comment" })).unwrap();
+        assert_eq!(s.review_work("abc123").unwrap()[0].0, q);
         assert_eq!(s.find_reviewing("their notes").unwrap().review_id, "abc123");
         assert_eq!(s.reviewing_by_exchange("x9").unwrap().unwrap().allow, vec!["view".to_string()]);
         assert!(s.forget_reviewing("abc123").unwrap());

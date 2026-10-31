@@ -53,6 +53,20 @@ journal review. A suggestion replaces the `--at` text, or the whole field, with 
 (`--json` for a record's typed value). Replies use `comment --reply ITEM`.
 Each person has one vote on the review and one on each item; voting again changes it.
 
+### Your copy, offline
+
+Joining copies what is reviewed to your node. `view` and `show` refresh the copy when the
+author's node answers and show the copy otherwise. Comments, suggestions, highlights and
+votes made while it is offline are kept and sent on the next `mnnn review sync` (a
+running node also does this every few minutes). Kept work the author's node refuses is
+dropped, with a warning. A record review also creates its model on your node, or adds
+the fields yours is missing. Fields are only ever added, never changed or removed, and
+each change is recorded in history as `review.model`. The copy itself can't be edited.
+New revisions refresh it.
+
+When the review is closed, you are dropped or you leave, the copy stays, archived and
+read-only. `mnnn review remove` forgets it, together with any work still waiting.
+
 ## Accepting and merging
 
 ```

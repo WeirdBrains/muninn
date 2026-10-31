@@ -332,8 +332,10 @@ fn add(app: &mut App, a: review::Ask) {
         let Some(g) = app.reviews.joined.get(app.reviews.sel).cloned() else { return };
         let relays = app.prefs.net.relays.clone();
         return spawn(app, a.kind.as_str(), move |s, n, _| {
-            let it = rnet::add(s, n, &g, &a, &relays, ORIGIN)?;
-            Ok(vec![format!("sent to {}: {}", g.title(), review::line(&it))])
+            Ok(vec![match rnet::send_or_queue(s, Some(n), &g, &a, &relays, ORIGIN)? {
+                rnet::Sent::Item(it) => format!("sent to {}: {}", g.title(), review::line(&it)),
+                rnet::Sent::Queued(_) => format!("kept here; sent when the node of {} is reachable", g.title()),
+            }])
         });
     }
     let Some(r) = app.reviews.current().cloned() else { return };
@@ -555,25 +557,30 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             let Some(g) = app.reviews.joined.get(app.reviews.sel).cloned() else { return };
             let relays = app.prefs.net.relays.clone();
             spawn(app, "sync", move |s, n, _| {
-                let g = rnet::sync(s, n, &g, &relays)?;
-                Ok(vec![format!("{}: {}; you may {}", g.title(), g.status.as_str(), g.allow.join(", "))])
+                let (g, r) = rnet::refresh(s, n, &g, &relays, ORIGIN)?;
+                let mut l = vec![format!("{}: {}; you may {}; {} kept item(s) sent", g.title(), g.status.as_str(), g.allow.join(", "), r.sent)];
+                l.extend(r.refused.iter().map(|e| format!("dropped (refused): {e}")));
+                l.extend(r.model);
+                Ok(l)
             });
         }
         (Tab::Joined, KeyCode::Enter) => {
             let Some(g) = app.reviews.joined.get(app.reviews.sel).cloned() else { return };
             if g.status != ReviewingStatus::Joined {
-                return ok(app, format!("{} is {}", g.title(), g.status.as_str()));
+                app.reviews.detail = copy_lines(&g);
+                return ok(app, format!("{} is {}: archived, read-only copy", g.title(), g.status.as_str()));
             }
             let relays = app.prefs.net.relays.clone();
             spawn(app, "view", move |s, n, _| {
-                let v = rnet::view(s, n, &g, &relays)?;
-                let items = rnet::thread(s, n, &g, &relays)?;
-                let (a, c, r) = review::tally(&items);
-                let mut l = vec![format!("{}: {} items, votes {a} approve · {c} changes · {r} reject", g.title(), items.len())];
-                l.extend(content_lines(&v));
-                l.push(String::new());
-                l.extend(items.iter().map(review::line));
-                Ok(l)
+                Ok(match rnet::refresh(s, n, &g, &relays, ORIGIN) {
+                    Ok((g, _)) => copy_lines(&g),
+                    Err(e) if !g.copy.is_null() => {
+                        let mut l = vec![format!("{e}; the copy kept here:")];
+                        l.extend(copy_lines(&g));
+                        l
+                    }
+                    Err(e) => return Err(e),
+                })
             });
         }
         (Tab::Joined, KeyCode::Char('l')) => {
@@ -585,6 +592,17 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         }
         _ => {}
     }
+}
+
+/// A joined review's copy and thread, as lines.
+fn copy_lines(g: &crate::store::Reviewing) -> Vec<String> {
+    let items: Vec<crate::store::ReviewItem> = serde_json::from_value(g.thread.clone()).unwrap_or_default();
+    let (a, c, r) = review::tally(&items);
+    let mut l = vec![format!("{}: {} items, votes {a} approve · {c} changes · {r} reject", g.title(), items.len())];
+    l.extend(content_lines(&g.copy));
+    l.push(String::new());
+    l.extend(items.iter().map(review::line));
+    l
 }
 
 fn switch(app: &mut App, i: usize) {

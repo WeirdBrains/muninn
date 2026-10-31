@@ -148,6 +148,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     sync::MIGRATION,
     // 2.13: per-node served code
     orgs::MIGRATION_2_13,
+    // 2.14: review copies
+    reviews::MIGRATION_2_14,
 ];
 
 /// A new random id (32 hex characters).
@@ -1006,7 +1008,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
             old_org(&s, "o-lab");
             let c = s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
             s.save_endpoint("o-lab", "calc", EndpointKind::Code, &c.id, "call", false).unwrap();
@@ -1015,5 +1017,29 @@ mod tests {
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
         assert_eq!(s.served_code(&org).unwrap(), vec![code]);
+    }
+
+    #[test]
+    fn a_2_13_database_keeps_its_joined_reviews_without_a_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v213.database");
+        let key = [7u8; 32];
+        {
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store::wrap(conn);
+            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.conn
+                .execute(
+                    "INSERT INTO reviewing(review_id, title, node_peer, status, created_at, updated_at) VALUES ('r1', 'Notes', '12D3', 'joined', 1, 1)",
+                    [],
+                )
+                .unwrap();
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        let g = s.find_reviewing("r1").unwrap();
+        assert!(g.copy.is_null() && g.copied_at == 0 && g.title == "Notes");
+        assert!(s.review_work("r1").unwrap().is_empty());
     }
 }

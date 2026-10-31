@@ -217,6 +217,8 @@ impl Hosted {
                 let _ = super::auto::settle(&s, &node, &relays, "network");
                 // linked nodes: pull what changed (each about once a minute)
                 let _ = super::sync::tick(&s, &node, &relays, "network");
+                // review copies: send waiting work, refresh the copies
+                let _ = crate::review::net::tick(&s, &node, &relays, "network");
                 s
             }));
         }

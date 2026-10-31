@@ -139,6 +139,9 @@ pub fn answered(s: &Store, x: &Exchange) -> Result<()> {
         info: Value::Null,
         created_at: now,
         updated_at: now,
+        copy: Value::Null,
+        thread: json!([]),
+        copied_at: 0,
     };
     s.save_reviewing(&g)?;
     super::record(s, "network", "review.joined", format!("joined the review of {}", g.title()), json!({ "review": g.review_id, "exchange": x.id }));
@@ -351,4 +354,181 @@ pub fn leave(s: &Store, node: Option<&Node>, g: &Reviewing, relays: &[String], o
     s.save_reviewing(&g)?;
     super::record(s, origin, "review.leave", format!("left the review of {}", g.title()), json!({ "review": g.review_id, "told": told.is_ok() }));
     Ok(g)
+}
+
+// ---------- review copies (2.14) ----------
+
+/// What became of a piece of review work.
+#[derive(Debug)]
+pub enum Sent {
+    /// The author's node took it.
+    Item(Box<ReviewItem>),
+    /// Kept here until the author's node can be reached (the id of the queued work).
+    Queued(String),
+}
+
+/// How often a running node refreshes the copies of reviews it takes part in.
+pub const REFRESH_EVERY_MS: i64 = 5 * 60 * 1000;
+
+/// A copy is read-only once the review is closed, dropped or left.
+fn check_open(g: &Reviewing) -> Result<()> {
+    if g.status != ReviewingStatus::Joined {
+        return Err(Error::invalid("review", format!("{} is {}; its copy here is archived and read-only", g.title(), g.status.as_str())));
+    }
+    Ok(())
+}
+
+/// The author's node could not be reached (as opposed to it answering no).
+fn unreachable(e: &Error) -> bool {
+    e.to_string().starts_with("network: ")
+}
+
+/// Comment, suggest, highlight or vote: sent when the author's node answers, kept here otherwise.
+pub fn send_or_queue(s: &Store, node: Option<&Node>, g: &Reviewing, ask: &Ask, relays: &[String], origin: &str) -> Result<Sent> {
+    check_open(g)?;
+    let perm = super::perm_of(ask.kind);
+    if !g.allow.iter().any(|a| a == perm) {
+        return Err(Error::invalid("review", format!("reviewers may not {perm} in {}", g.title())));
+    }
+    // the author's node decides when it answers (its refusals are final); unreachable, it waits here
+    if let Some(n) = node {
+        match add(s, n, g, ask, relays, origin) {
+            Ok(it) => return Ok(Sent::Item(Box::new(it))),
+            Err(e) if !unreachable(&e) => return Err(e),
+            Err(_) => {}
+        }
+    }
+    let id = s.queue_review_work(&g.review_id, &serde_json::to_value(ask)?)?;
+    super::record(
+        s,
+        origin,
+        "review.queue",
+        format!("{} kept for the review of {} until its node is reachable", ask.kind.as_str(), g.title()),
+        json!({ "review": g.review_id, "work": id, "kind": ask.kind }),
+    );
+    Ok(Sent::Queued(id))
+}
+
+/// Make or extend the model a record review needs, additively (new fields only).
+pub fn ensure_model(s: &Store, g: &Reviewing, model: &Value) -> Result<Option<String>> {
+    let name = sv(model, "name");
+    if name.is_empty() {
+        return Ok(None);
+    }
+    let fields: Vec<crate::store::Field> = serde_json::from_value(model.get("fields").cloned().unwrap_or_default()).unwrap_or_default();
+    let known: Vec<String> = s.models()?.into_iter().map(|m| m.id).collect();
+    // fresh ids, no constraints the copied values could break; refs to the author's other models become text
+    let fresh = |f: &crate::store::Field| {
+        let ty = match &f.ty {
+            crate::store::FieldType::Ref(m) if m != "bars" && !known.contains(m) => crate::store::FieldType::Text,
+            t => t.clone(),
+        };
+        crate::store::Field { id: crate::store::models::new_field_id(), ty, required: false, unique: false, ..f.clone() }
+    };
+    let params = |added: &[String]| json!({ "review": g.review_id, "model": name, "fields": added });
+    match s.models()?.into_iter().find(|m| m.name == name) {
+        None => {
+            let d = crate::store::Design { fields: fields.iter().map(fresh).collect(), ..Default::default() };
+            s.create_model(&name, &sv(model, "description"), d, true)?;
+            let added: Vec<String> = fields.iter().map(|f| f.name.clone()).collect();
+            super::record(s, "review", "review.model", format!("model {name} made for the review of {}", g.title()), params(&added));
+            Ok(Some(format!("made model {name}")))
+        }
+        Some(m) => {
+            let missing: Vec<_> = fields.iter().filter(|f| m.design.field(&f.name).is_none()).collect();
+            if missing.is_empty() {
+                return Ok(None);
+            }
+            let mut d = m.design.clone();
+            d.fields.extend(missing.iter().map(|f| fresh(f)));
+            s.set_model_draft(&m.id, Some(d))?;
+            s.apply_model(&m.id, &crate::store::ApplyOpts { destructive: false, note: format!("fields for the review of {}", g.title()) })?;
+            let added: Vec<String> = missing.iter().map(|f| f.name.clone()).collect();
+            super::record(
+                s,
+                "review",
+                "review.model",
+                format!("model {name} gained {} for the review of {}", added.join(", "), g.title()),
+                params(&added),
+            );
+            Ok(Some(format!("added {} to model {name}", added.join(", "))))
+        }
+    }
+}
+
+/// What a refresh did.
+#[derive(Debug, Default)]
+pub struct Refreshed {
+    pub sent: usize,
+    /// Work the author's node turned down (dropped here), with why.
+    pub refused: Vec<String>,
+    /// The copy changed (a new revision, or the first copy).
+    pub changed: bool,
+    pub model: Option<String>,
+}
+
+/// Store what the author's node sent as this node's copy.
+pub fn keep_copy(s: &Store, g: &mut Reviewing, view: Value, thread: Value) -> Result<Refreshed> {
+    let mut out =
+        Refreshed { changed: g.copy.get("content") != view.get("content") || g.copy.get("entries") != view.get("entries"), ..Default::default() };
+    if let Some(m) = view.get("model") {
+        out.model = ensure_model(s, g, m)?;
+    }
+    if out.changed && !g.copy.is_null() {
+        super::record(s, "review", "review.refresh", format!("the copy of {} has a new revision", g.title()), json!({ "review": g.review_id }));
+    }
+    g.copy = view;
+    g.thread = thread;
+    g.copied_at = now_ms();
+    g.updated_at = g.copied_at;
+    s.save_reviewing(g)?;
+    Ok(out)
+}
+
+/// Send waiting work, then bring the review and its copy up to date.
+pub fn refresh(s: &Store, node: &Node, g: &Reviewing, relays: &[String], origin: &str) -> Result<(Reviewing, Refreshed)> {
+    let mut g = sync(s, node, g, relays)?;
+    let mut sent = 0;
+    let mut refused = vec![];
+    if g.status == ReviewingStatus::Joined {
+        for (id, ask) in s.review_work(&g.review_id)? {
+            let ask: Ask = match serde_json::from_value(ask) {
+                Ok(a) => a,
+                Err(_) => {
+                    s.unqueue_review_work(&id)?;
+                    continue;
+                }
+            };
+            match add(s, node, &g, &ask, relays, origin) {
+                Ok(_) => sent += 1,
+                Err(e) if unreachable(&e) => return Err(e),
+                Err(e) => refused.push(e.to_string()),
+            }
+            s.unqueue_review_work(&id)?;
+        }
+    }
+    let view = self::view(s, node, &g, relays)?;
+    let th = request(s, node, &g, ReviewReq::Thread, relays)?.get("items").cloned().unwrap_or(json!([]));
+    let mut r = keep_copy(s, &mut g, view, th)?;
+    r.sent = sent;
+    r.refused = refused;
+    Ok((g, r))
+}
+
+/// For a running node: refresh joined reviews whose turn it is, or that have work waiting.
+pub fn tick(s: &Store, node: &Node, relays: &[String], origin: &str) -> Vec<String> {
+    let now = now_ms();
+    let mut out = vec![];
+    for g in s.reviewing().unwrap_or_default().into_iter().filter(|g| g.status == ReviewingStatus::Joined) {
+        let waiting = s.review_work(&g.review_id).map(|w| w.len()).unwrap_or(0);
+        if waiting == 0 && now - g.copied_at < REFRESH_EVERY_MS {
+            continue;
+        }
+        if let Ok((g, r)) = refresh(s, node, &g, relays, origin)
+            && (r.sent > 0 || r.changed)
+        {
+            out.push(format!("review {}: {} sent, copy {}", g.title(), r.sent, if r.changed { "refreshed" } else { "current" }));
+        }
+    }
+    out
 }
