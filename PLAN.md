@@ -378,6 +378,12 @@ Before the launch: the website, screenshots and announcement come after this.
 
 ## Announcement
 
+Launch step before the post goes out: a public relay node.
+
+- Deploy a public Muninn relay on a DigitalOcean droplet under Michael's domain: a systemd unit running relay-server mode (`mnnn net relay serve on`), external address set to the domain, firewall open only for the node and relay ports, an ACME certificate for the domain
+- Write `docs/deploy-relay.md`: droplet setup, DNS, systemd unit, firewall, ACME, upgrades and logs
+- Plan only for now
+
 > **Phase 19 · with the 2.0 wrap-up**
 
 1. An announcement of Muninn 2.0 (to confirm with Michael: "v1.0" or 2.0): what it is, the headline features, screenshots, install
