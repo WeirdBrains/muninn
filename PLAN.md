@@ -23,14 +23,15 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 13 | [Python in Rust](#python-in-rust): Python code spaces parsed and translated in pure Rust, no external `rythonc`, no libpython | v2.12.0 | ✅ Released |
 | 14 | [Private Sites and Code Access](#private-sites-and-code-access): gated sites for private orgs, code-space role permissions | v2.13.0 | ✅ Released |
 | 15 | [Review Copies](#review-copies): what is reviewed lives on the reviewer's node in review mode | v2.14.0 | ✅ Released |
-| 16 | [Share and Clickable Hints](#share-and-clickable-hints): one Share action for everything; every hint is a button | v2.15.0 | 🚧 In progress |
-| 17 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | 📋 Planned |
-| 18 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | 📋 Planned |
-| 19 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
-| 20 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | 📋 Planned |
-| 21 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 📋 Planned |
-| 22 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | post-2.0 | 📋 Planned |
-| 23 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | v2.19.0 | 📋 Planned |
+| 16 | [Share and Clickable Hints](#share-and-clickable-hints): one Share action for everything; every hint is a button | v2.15.0 | ✅ Released |
+| 17 | [Model Design Templates](#model-design-templates): export, import and share model designs; bars become a built-in template | v2.16.0 | 📋 Planned |
+| 18 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | 📋 Planned |
+| 19 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | 📋 Planned |
+| 20 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
+| 21 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | 📋 Planned |
+| 22 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 📋 Planned |
+| 23 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | post-2.0 | 📋 Planned |
+| 24 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | v2.19.0 | 📋 Planned |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
 
 **2.0 launch wrap-up:** snapshot to `docs/historical/2.0` with this plan, the announcement, and the full changelog; then clear `PLAN.md`.
@@ -348,6 +349,17 @@ One Share action for everything, and every hint is a button.
 4. Every hotkey hint drawn in the TUI (key bars, status bar, view heads, popup titles, prompts such as `y confirms`, `(Ctrl-T switches)`) is clickable: a click presses the key named there, at a lower priority than existing buttons
 5. Tests cover the share model, CLI, TUI picker, hint parsing and clicks
 6. URLs drawn in the TUI are links: OSC 8 hyperlinks where the terminal supports them, and a mouse click opens the URL (e.g. a node's website); may ship as a patch
+
+## Model Design Templates
+
+Before the launch: the website, screenshots and announcement come after this.
+
+1. `mnnn model export MODEL --out FILE` writes any model design (types, fields, relations, rules living in it, optional sample records) as a versioned template file
+2. `mnnn model import FILE` adds the template's model next to existing designs and runs the migration plan (shown first, like `model plan`/`apply`); name clashes ask to rename or merge
+3. Templates are shareable: the Share action and `net share`/`net fetch` carry them between nodes; imported templates from peers need approval like code
+4. The hard-coded bars feature is removed from the app and ships as a built-in model design template; bars views, ingest and charts work through the model
+5. Existing bars data migrates losslessly into the imported bars model on upgrade (counts, values, timestamps, sources, symbols, history links); tested by upgrading a 2.14 database and comparing every row
+6. Docs, help, man pages and the TUI Models window cover export, import and the built-in templates
 
 ## Website
 
