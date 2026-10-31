@@ -243,6 +243,12 @@ pub fn actor(s: &Store, org: &Org, exchange: Option<&str>) -> Actor {
 }
 
 /// May this actor see the org at all? (Private orgs are invisible to guests.)
+/// The org a gRPC executable call is for and who is calling, gated like the site.
+pub fn exec_caller(s: &Store, org: &Org, exchange: Option<&str>) -> Option<Actor> {
+    let a = actor(s, org, exchange);
+    (org.hosted && shown(org, &a)).then_some(a)
+}
+
 fn shown(org: &Org, a: &Actor) -> bool {
     a.is_member() || org.visibility == Visibility::Public || org.access == Access::Open
 }
@@ -418,6 +424,38 @@ fn live(s: &Store, org: &Org, method: &str, rest: &[&str], body: &[u8], exchange
                 Ok(v) => Ok(Page::json(&v)),
                 Err(e) if e.to_string().contains("may not") => Ok(Page::error(403, &e.to_string())),
                 Err(e) => Ok(Page::error(400, &e.to_string())),
+            }
+        }
+        ("GET", ["api", "executables"]) => {
+            let v: Vec<Value> = super::exec::executables(s, org, &a)?.iter().map(|e| json!(e)).collect();
+            Ok(Page::json(&json!({ "executables": v })))
+        }
+        ("POST", ["api", "run", name]) => {
+            let input: Value =
+                if body.is_empty() { json!({}) } else { serde_json::from_slice(body).map_err(|e| Error::invalid("input", e.to_string()))? };
+            let input = match super::exec::Input::from_json(&input) {
+                Ok(i) => i,
+                Err(e) => return Ok(Page::error(400, &e.to_string())),
+            };
+            match super::exec::run(s, "web", &a, org, name, &input) {
+                Ok(v) => Ok(Page::json(&v)),
+                Err(e) if e.to_string().contains("may not") => Ok(Page::error(403, &e.to_string())),
+                Err(e) if e.to_string().contains("is not served") => Ok(Page::not_found()),
+                Err(e) => Ok(Page::error(400, &e.to_string())),
+            }
+        }
+        ("GET", ["proto", rest @ ..]) => {
+            let path = rest.join("/");
+            if !super::can(s, org, &a, "code.run") {
+                return Ok(Page::not_found());
+            }
+            if path == super::exec::COMMON_PROTO {
+                return Ok(Page::new(200, "text/plain; charset=utf-8", super::exec::common_proto().into_bytes()));
+            }
+            let Some(svc) = path.strip_suffix(".proto") else { return Ok(Page::not_found()) };
+            match super::exec::executables(s, org, &a)?.into_iter().find(|e| e.service.rsplit('.').next() == Some(svc)) {
+                Some(e) => Ok(Page::new(200, "text/plain; charset=utf-8", super::exec::space_proto(org, &e).into_bytes())),
+                None => Ok(Page::not_found()),
             }
         }
         _ => Ok(Page::not_found()),

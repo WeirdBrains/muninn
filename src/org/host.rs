@@ -499,6 +499,9 @@ fn page_error(p: &Page) -> (u32, String) {
 }
 
 fn grpc_dispatch(s: &Store, path: &str, body: &[u8], who: Option<&str>) -> std::result::Result<Vec<u8>, (u32, String)> {
+    if path.starts_with(&format!("/{}.", super::exec::PACKAGE)) {
+        return grpc_exec(s, path, body, who);
+    }
     let Some(method) = path.strip_prefix(&format!("/{GRPC_SERVICE}/")) else { return Err((12, format!("unknown service {path}"))) };
     let msg = grpc_unframe(body)?;
     let bad = |e: prost::DecodeError| (3, format!("bad message: {e}"));
@@ -535,6 +538,47 @@ fn grpc_dispatch(s: &Store, path: &str, body: &[u8], who: Option<&str>) -> std::
         }
         m => Err((12, format!("unknown method {m}"))),
     }
+}
+
+/// `muninn.code.v1.Executables/List` and each served space's `Run`.
+fn grpc_exec(s: &Store, path: &str, body: &[u8], who: Option<&str>) -> std::result::Result<Vec<u8>, (u32, String)> {
+    use super::exec::{self, pb};
+    let msg = grpc_unframe(body)?;
+    let bad = |e: prost::DecodeError| (3, format!("bad message: {e}"));
+    let fail = |e: Error| {
+        let m = e.to_string();
+        (
+            if m.contains("may not") {
+                7
+            } else if m.contains("is not served") {
+                5
+            } else {
+                3
+            },
+            m,
+        )
+    };
+    let (svc, method) = path.trim_start_matches('/').split_once('/').ok_or((12, format!("unknown method {path}")))?;
+    let hidden = || (5, "no such org".to_string());
+    if svc == exec::LIST_SERVICE {
+        if method != "List" {
+            return Err((12, format!("unknown method {method}")));
+        }
+        let q = pb::ListRequest::decode(msg).map_err(bad)?;
+        let org = s.find_org(&q.org).map_err(|_| hidden())?;
+        let a = serve::exec_caller(s, &org, who).ok_or_else(hidden)?;
+        let list = exec::executables(s, &org, &a).map_err(fail)?;
+        return Ok(pb::ExecutableList { executables: list.iter().map(|e| e.to_pb()).collect() }.encode_to_vec());
+    }
+    if method != "Run" {
+        return Err((12, format!("unknown method {method}")));
+    }
+    let (pkg, short) = svc.rsplit_once('.').ok_or((12, format!("unknown service {svc}")))?;
+    let org = s.orgs().map_err(fail)?.into_iter().find(|o| exec::package(o) == pkg).ok_or((12, format!("unknown service {svc}")))?;
+    let a = serve::exec_caller(s, &org, who).ok_or_else(hidden)?;
+    let input = exec::Input::decode(msg).map_err(bad)?;
+    let v = exec::run(s, "grpc", &a, &org, short, &input).map_err(fail)?;
+    Ok(exec::result_pb(&v).encode_to_vec())
 }
 
 fn percent(msg: &str) -> String {

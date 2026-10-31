@@ -88,3 +88,20 @@ message ArtifactReply { string mime = 1; bytes data = 2; }
 
 Errors use the usual gRPC status codes (`UNAUTHENTICATED`, `PERMISSION_DENIED`,
 `NOT_FOUND`, `INVALID_ARGUMENT`).
+
+## Executables (2.13)
+
+Every code space a node serves (`mnnn org code serve ORG SPACE`) is an *executable*,
+described in protobuf and callable by anyone holding `code.run` in the org:
+
+| What | Web | gRPC |
+|------|-----|------|
+| list | `GET /o/ORG/api/executables` | `muninn.code.v1.Executables/List` (`ListRequest{org}`) |
+| run  | `POST /o/ORG/api/run/NAME` (JSON) | `muninn.code.v1.o.ORG.Name/Run` |
+| protos | `GET /o/ORG/proto/muninn/code/v1/executable.proto`, `GET /o/ORG/proto/Name.proto` | |
+
+The input is the space's own record query, narrowed: `where` adds conditions to the
+space's, `text`, `sort` and `group` replace them, and `limit` can never raise the space's.
+A run returns a `RunResult` (status, error, the `@view` the source declares, logs, writes,
+ms, and the full JSON). The node runs only the source it has approved; an edited space must
+be approved again before it runs. Every run is recorded as an `org.run` action.

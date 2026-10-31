@@ -190,6 +190,14 @@ fn the_site_serves_what_is_published_through_the_template() {
     assert_eq!(call(r#"{"op":"create","values":{"symbol":"BTC"}}"#).status, 200, "the owner opened it to anyone");
     let q: serde_json::Value = serde_json::from_slice(&call(r#"{"op":"query"}"#).body).unwrap();
     assert!(q["records"].as_array().unwrap().len() == 1 && q.to_string().contains("BTC"), "{q}");
+    // served code is for callers with code.run only
+    let c = s.create_code_space("sma", "", crate::store::Lang::Math, "x = close", crate::store::CodeInput::default()).unwrap();
+    s.serve_code(&o.id, &c.id).unwrap();
+    let ex: serde_json::Value = serde_json::from_slice(&get("/o/lab/api/executables").body).unwrap();
+    assert_eq!(ex["executables"].as_array().unwrap().len(), 0, "{ex}");
+    assert_eq!(get("/o/lab/proto/Sma.proto").status, 404);
+    assert_eq!(get("/o/lab/proto/muninn/code/v1/executable.proto").status, 404);
+    assert_eq!(route(&s, "POST", "/o/lab/api/run/sma", b"{}", None).status, 403);
     // a signed member sees members-only artifacts
     let (_, ben) = {
         let r = s.find_role(&o.id, "viewer").unwrap();
