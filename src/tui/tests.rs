@@ -1977,3 +1977,33 @@ fn s_shares_the_selected_item_to_a_picked_target() {
     a.on_key(key(KeyCode::Esc));
     assert!(matches!(a.modal, Some(Modal::Journals)));
 }
+
+#[test]
+fn share_is_in_the_key_bar_and_the_main_view_shares_as_a_live_search() {
+    let (_t, mut a) = app();
+    a.store.create_project("Alpha", "").unwrap();
+    a.store.create_journal("Notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    a.dispatch(Action::Journals);
+    let s = render(&mut a, 140, 45);
+    assert!(s.contains("[S share]") && s.contains("⇪ S Share"), "key bar and border button\n{s}");
+    a.modal = None;
+    let s = render(&mut a, 140, 45);
+    let (x, y) = find_on(&s, "⇪ Share view").unwrap();
+    a.on_mouse(click(x + 2, y));
+    a.searches.ask.as_mut().expect("name the view").value = "tape".into();
+    a.on_key(key(KeyCode::Enter));
+    let Some(Modal::Pick { items, .. }) = &a.modal else { panic!("share picker after saving") };
+    assert!(items.contains(&"project · Alpha".to_string()), "{items:?}");
+    let s = render(&mut a, 140, 45);
+    assert!(s.contains("Live searches") || s.contains("tape"), "the picker sits on the window it came from\n{s}");
+}
+
+#[test]
+fn collapsed_history_has_a_clickable_handle() {
+    let (_t, mut a) = app();
+    a.prefs.tui.history_open = false;
+    let s = render(&mut a, 140, 45);
+    let (x, y) = find_on(&s, "» History").unwrap();
+    a.on_mouse(click(x, y));
+    assert!(a.prefs.tui.history_open);
+}

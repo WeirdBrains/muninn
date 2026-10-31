@@ -798,6 +798,7 @@ fn draw_list(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
         ("f scope", KeyCode::Char('f')),
         ("Esc", KeyCode::Esc),
     ];
+    super::share::add_key(app, &mut v.keys);
     draw_view(f, r, v, &t, hits);
 }
 

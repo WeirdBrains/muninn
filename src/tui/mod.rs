@@ -82,6 +82,8 @@ pub enum Hit {
     HelpLink(usize),
     /// The n-th URL drawn this frame (index into `App::urls`).
     Url(usize),
+    /// Share the main view.
+    ShareView,
     /// A row of a popup list (Preferences, Layers, Pick, Filter, Themes, Help topics).
     Row(usize),
     /// A field or action button of a form (Export, Keys): index as in `Form::sel`.
@@ -905,6 +907,7 @@ impl App {
                 self.layout_changed();
             }
             Some(Hit::Url(i)) => self.open_url(i),
+            Some(Hit::ShareView) => searches::open_save_then_share(self),
             Some(Hit::Press(code)) => self.on_key(ratatui::crossterm::event::KeyEvent::from(code)),
             Some(Hit::Chord(code, m)) => self.on_key(ratatui::crossterm::event::KeyEvent::new(code, m)),
             Some(
@@ -1015,17 +1018,30 @@ impl App {
             Span::styled(format!(" {} ", self.variant.name()), Style::new().fg(t.bg).bg(t.info)),
             Span::styled(format!(" {}", self.status), Style::new().fg(t.muted)),
         ]));
-        f.render_widget(status, bottom);
+        // the history bar's toggle, on the left of the status line
+        let hl = if self.prefs.tui.history_open { " « History " } else { " » History " };
+        let hb = Rect { width: (hl.chars().count() as u16).min(bottom.width), ..bottom };
+        f.render_widget(Paragraph::new(Line::styled(hl, Style::new().fg(t.bg).bg(t.muted))), hb);
+        hits.push((hb, Hit::HistoryCollapse));
+        f.render_widget(status, Rect { x: bottom.x + hb.width, width: bottom.width - hb.width, ..bottom });
         let en = |a| self.enabled(a);
         menu::draw_dropdowns(&self.menu, f, area, bar, &xs, &t, &en, &mut hits);
         // every key named in hint text is a button too (below the drawn controls)
         let colours = [t.muted, t.header, t.warning];
-        if self.modal.is_some() && share::item(self).is_some() && self.modal_area.width > 12 {
-            // the window's share button, on its top border
+        if self.modal.is_some() && share::item(self).is_some() && self.modal_area.width > 16 {
+            // the window's share button, on its top border, next to the [X]
             let r = self.modal_area;
-            let b = Rect { x: r.right().saturating_sub(12), y: r.y, width: 9, height: 1 };
-            f.render_widget(Paragraph::new(Line::styled("[S share]", Style::new().fg(t.accent))), b);
+            let b = Rect { x: r.right().saturating_sub(18), y: r.y, width: 11, height: 1 };
+            let st = Style::new().fg(t.bg).bg(t.accent).add_modifier(Modifier::BOLD);
+            f.render_widget(Paragraph::new(Line::styled(" ⇪ S Share ", st)), b);
             self.modal_hits.push((b, Hit::Chord(KeyCode::Char('S'), KeyModifiers::NONE)));
+        }
+        if self.modal.is_none() && !self.menu.is_open() && content.width > 30 {
+            // the main view: share it from the status line (saved as a live search, then the share picker)
+            let b = Rect { x: bottom.right().saturating_sub(16), y: bottom.y, width: 14, height: 1 };
+            let st = Style::new().fg(t.bg).bg(t.accent).add_modifier(Modifier::BOLD);
+            f.render_widget(Paragraph::new(Line::styled(" ⇪ Share view ", st)), b);
+            hits.push((b, Hit::ShareView));
         }
         if self.modal.is_some() {
             let found = widgets::scan_hints(f.buffer_mut(), self.modal_area, &colours);

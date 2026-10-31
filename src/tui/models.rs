@@ -1190,7 +1190,7 @@ fn draw_list(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
         v.head.push(Line::raw(""));
     }
     v.sel = (!st.list.is_empty()).then_some(st.sel);
-    let v = finish(
+    let mut v = finish(
         app,
         v,
         vec![
@@ -1204,6 +1204,7 @@ fn draw_list(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
             ("Esc", KeyCode::Esc),
         ],
     );
+    super::share::add_key(app, &mut v.keys);
     draw_view(f, r, v, &t, hits);
 }
 

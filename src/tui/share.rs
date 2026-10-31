@@ -4,6 +4,7 @@ use super::App;
 use super::modal::{Modal, PickKind};
 use crate::share::{TargetKind, share, targets_for};
 use crate::store::ShareKind;
+use ratatui::crossterm::event::KeyCode;
 
 /// The item the open window has selected: kind, id, name.
 pub fn item(app: &App) -> Option<(ShareKind, String, String)> {
@@ -19,6 +20,13 @@ pub fn item(app: &App) -> Option<(ShareKind, String, String)> {
         Modal::Reports => get(app.reports.list.get(app.reports.sel).map(|r| (r.id.as_str(), r.name.as_str())), ShareKind::Report),
         Modal::Projects => get(app.projects.list.get(app.projects.sel).map(|p| (p.id.as_str(), p.name.as_str())), ShareKind::Project),
         _ => None,
+    }
+}
+
+/// Put `S share` first in a window's key bar when its selected item can be shared.
+pub fn add_key(app: &App, keys: &mut Vec<(&'static str, KeyCode)>) {
+    if item(app).is_some() && !keys.iter().any(|(_, k)| *k == KeyCode::Char('S')) {
+        keys.insert(0, ("S share", KeyCode::Char('S')));
     }
 }
 

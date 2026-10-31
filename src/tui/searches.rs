@@ -26,6 +26,8 @@ pub struct SearchesState {
     pub msg: Option<(String, bool)>,
     /// Save into this project too (Projects ▸ project ▸ s).
     pub into_project: Option<String>,
+    /// Open the share picker on the search once it is saved (the main view's Share button).
+    pub then_share: bool,
 }
 
 impl SearchesState {
@@ -59,6 +61,7 @@ pub fn open(app: &mut App) {
     app.searches.confirm_delete = false;
     app.searches.msg = None;
     app.searches.into_project = None;
+    app.searches.then_share = false;
     reopen(app);
 }
 
@@ -74,6 +77,15 @@ pub fn open_save(app: &mut App, project: Option<String>) {
     app.searches.into_project = project;
     let q = app.sidebar.query.trim().to_string();
     app.searches.ask = Some(Ask::new(SAsk::Save, "Save current search as", q));
+}
+
+/// The main view's Share button: name the view (saved as a live search), then pick where it goes.
+pub fn open_save_then_share(app: &mut App) {
+    open_save(app, None);
+    app.searches.then_share = true;
+    if let Some(a) = app.searches.ask.as_mut() {
+        a.title = "Share this view: save it as".into();
+    }
 }
 
 fn reload(app: &mut App) {
@@ -133,6 +145,9 @@ fn save(app: &mut App, name: &str) {
             select_id(app, &s.id);
             app.set_status(m.clone());
             app.searches.msg = Some((m, false));
+            if std::mem::take(&mut app.searches.then_share) {
+                super::share::open(app);
+            }
         }
         Err(e) => app.searches.msg = Some((e.to_string(), true)),
     }
@@ -304,5 +319,6 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         ("p project", KeyCode::Char('p')),
         ("Esc", KeyCode::Esc),
     ];
+    super::share::add_key(app, &mut v.keys);
     draw_view(f, r, v, &t, hits);
 }

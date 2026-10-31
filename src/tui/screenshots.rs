@@ -98,7 +98,20 @@ fn seed(a: &mut App) {
 fn feature_screenshots() {
     let (_t, mut a) = app();
     seed(&mut a);
-    shot(&mut a, "01-home", "Home: charts of the ingested bars");
+    shot(&mut a, "01-home", "Home: the main view, its Share view button and the collapsed history handle");
+    // the history bar on the left, opened
+    a.dispatch(Action::ToggleHistory);
+    shot(&mut a, "01b-history", "Action history bar on the left (Y or click » to toggle)");
+    a.dispatch(Action::ToggleHistory);
+    a.history.focused = false;
+    // share the main view: name it, then pick where it goes
+    searches::open_save_then_share(&mut a);
+    a.searches.ask.as_mut().unwrap().value = "BTC 5m tape".into();
+    shot(&mut a, "01c-share-view-name", "Share view: saving the view as a live search");
+    a.on_key(key(KeyCode::Enter));
+    shot(&mut a, "01d-share-view-picker", "Share view: where it can go");
+    a.on_key(key(KeyCode::Esc));
+    a.modal = None;
 
     // journals, then the share picker open on an entry
     a.dispatch(Action::Journals);
@@ -107,7 +120,7 @@ fn feature_screenshots() {
     shot(&mut a, "03-journal-entries", "A journal's entries");
     a.on_key(key(KeyCode::Char('S')));
     shot(&mut a, "04-share-picker", "Share: pick where the item goes");
-    a.close_modal();
+    a.on_key(key(KeyCode::Esc));
     a.modal = None;
 
     // model designer: a new model, its migration plan, then records

@@ -8,7 +8,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Clear, Paragraph, Wrap};
+use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptKind {
@@ -246,6 +246,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
         }
         Hit::Picker(p) => super::picker::on_click(app, p),
         Hit::Url(i) => app.open_url(i),
+        Hit::ShareView => {}
         Hit::HelpLink(n) => {
             if let Some(Modal::Help(h)) = app.modal.as_mut() {
                 h.click_link(n);
@@ -624,6 +625,14 @@ pub fn filter_items(app: &App, kind: super::action::FilterKind) -> Vec<(String, 
 
 pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     let t = app.theme.clone();
+    // the share picker sits on the window it was opened from
+    if matches!(app.modal, Some(Modal::Pick { kind: PickKind::Share, .. })) && app.share_back.is_some() {
+        let pick = app.modal.take();
+        app.modal = app.share_back.take().map(|b| *b);
+        draw(app, f, area);
+        app.share_back = app.modal.take().map(Box::new);
+        app.modal = pick;
+    }
     let Some(m) = app.modal.as_ref() else { return };
     let (w, h) = match m {
         Modal::Prompt(_) => (70, 6),
@@ -635,7 +644,12 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Pick { items, .. } => (50, items.len() as u16 + 4),
         Modal::Layers { .. } => (44, super::chart::LAYERS.len() as u16 + 4),
         Modal::Filter { kind, .. } => (46, (filter_items(app, *kind).len() as u16 + 5).min(area.height)),
-        _ => (area.width.saturating_sub(4), area.height.saturating_sub(2)),
+        _ => {
+            // a full window: cover what is behind it, so nothing shows at its edges
+            f.render_widget(Clear, area);
+            f.render_widget(Block::new().style(Style::new().bg(t.bg).fg(t.fg)), area);
+            (area.width.saturating_sub(4), area.height.saturating_sub(2))
+        }
     };
     let r = centered(area, w, h);
     f.render_widget(Clear, r);

@@ -742,5 +742,6 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
     };
     v.ask = st.ask.as_ref().map(|a| (a.title.clone(), a.value.clone()));
     v.msg = st.msg.clone();
+    super::share::add_key(app, &mut v.keys);
     draw_view(f, r, v, &t, hits);
 }
