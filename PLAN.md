@@ -319,7 +319,7 @@ Private organizations can still have a front door.
 
 ## Review Copies
 
-> **Phase 15 · v2.14.0 · 📋 Planned**
+> **Phase 15 · v2.14.0 · ✅ Released**
 
 Reviewers work on their own node, even offline.
 
