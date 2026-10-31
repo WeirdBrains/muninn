@@ -304,7 +304,7 @@ Python code spaces need nothing but Muninn.
 
 ## Private Sites and Code Access
 
-> **Phase 14 · v2.13.0 · 📋 Planned**
+> **Phase 14 · v2.13.0 · ✅ Released**
 
 Private organizations can still have a front door.
 
