@@ -114,3 +114,11 @@ Every step is in the [history](history.md) under the current author: `review.req
 `review.leave`, `review.remove` and `review.serve`. A merge also records the edit itself
 (`entry.edit`, `journal.edit`, `project.edit`, `search.edit` or `record.update`) with the
 review's id. [Rules](rules.md) can react to all of them (`mnnn rule events`).
+
+## More commands
+
+```
+mnnn review list [--json]        # your reviews and the ones you joined
+mnnn review close REVIEW         # close it; reviewers' links and exchanges end, their copies stay read-only
+mnnn review reopen REVIEW        # open a closed review again; reviewers need new links
+```

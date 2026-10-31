@@ -26,7 +26,7 @@ mnnn ingest service http --url URL [-X METHOD] [--body STRING|@FILE] [--param K=
 Default headers, always sent unless you override them:
 
 ```
-User-Agent: muninn/<version> (+https://github.com/kommandosaldat/muninn)
+User-Agent: muninn/<version> (+https://github.com/WeirdBrains/muninn)
 Accept: application/json, text/csv;q=0.9
 ```
 

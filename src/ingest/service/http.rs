@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::time::Duration as StdDuration;
 
 pub fn user_agent() -> String {
-    format!("muninn/{} (+https://github.com/kommandosaldat/muninn)", env!("CARGO_PKG_VERSION"))
+    format!("muninn/{} (+https://github.com/WeirdBrains/muninn)", env!("CARGO_PKG_VERSION"))
 }
 
 pub const ACCEPT: &str = "application/json, text/csv;q=0.9";

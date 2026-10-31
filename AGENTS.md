@@ -2,7 +2,7 @@
 
 ## Where to work
 - Always work directly on the owner's machine (alien-blue), in
-  `~/Projects/kommandosaldat/code/muninn`. No cloud agents, no clones elsewhere.
+  `~/Projects/WeirdBrains/muninn`. No cloud agents, no clones elsewhere.
 - Toolchain: Rust >= 1.99 (edition 2024), cargo on this machine. Prefer bundled/vendored
   crate features over installing system packages; ask before installing anything.
 

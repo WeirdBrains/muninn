@@ -154,3 +154,9 @@ The version and the `do` tags leave room for new triggers and then-actions (for 
 scheduled or data-driven events) without changing existing rules.
 
 See also: [action history](history.md), [projects](projects.md).
+
+## More commands
+
+```
+mnnn rule disable RULE           # switch a rule off (enable turns it back on)
+```

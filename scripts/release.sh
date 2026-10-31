@@ -28,9 +28,9 @@ entry = f"## [{ver}] - {datetime.date.today()}\n\n" + "\n".join(
     f"### {k}\n" + "".join(f"- {b}\n" for b in v) for k, v in secs.items() if v) + "\n"
 s = s.replace("## [Unreleased]\n\n", "## [Unreleased]\n\n" + entry, 1)
 prev = re.search(r"compare/v([0-9.]+)\.\.\.HEAD", s).group(1)
-s = s.replace(f"[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v{prev}...HEAD",
-              f"[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v{ver}...HEAD\n"
-              f"[{ver}]: https://github.com/kommandosaldat/muninn/compare/v{prev}...v{ver}")
+s = s.replace(f"[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v{prev}...HEAD",
+              f"[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v{ver}...HEAD\n"
+              f"[{ver}]: https://github.com/WeirdBrains/muninn/compare/v{prev}...v{ver}")
 open(p, "w").write(s)
 PY
 cargo test -q --lib man >/dev/null 2>&1 || true

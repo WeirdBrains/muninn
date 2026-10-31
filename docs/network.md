@@ -132,3 +132,11 @@ window stays usable. `g` refreshes. See [keybindings](keybindings.md).
   author, and [rules](rules.md) can react to them.
 - Scopes are carried in every exchange: `{"kind":"node"}`, an organization's, or
   `{"kind":"resource","as":"review"}` for a [review](reviews.md) link.
+
+## More commands
+
+```
+mnnn net forget PEER             # forget a known peer; exchanges with it are kept
+mnnn net relay remove RELAY      # stop using a relay
+mnnn net relay serve on|off      # be a relay for others
+```

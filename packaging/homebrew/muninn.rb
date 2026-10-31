@@ -3,11 +3,11 @@
 # (the release workflow prints a filled-in formula).
 class Muninn < Formula
   desc "Local, encrypted store for OHLCV market bars"
-  homepage "https://github.com/kommandosaldat/muninn"
+  homepage "https://github.com/WeirdBrains/muninn"
   version "2.14.0"
   license "MIT"
 
-  base = "https://github.com/kommandosaldat/muninn/releases/download/v#{version}"
+  base = "https://github.com/WeirdBrains/muninn/releases/download/v#{version}"
   on_macos do
     on_arm do
       url "#{base}/muninn-#{version}-aarch64-apple-darwin.tar.gz"

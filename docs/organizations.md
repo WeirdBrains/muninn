@@ -146,3 +146,14 @@ A template fills `{{title}}`, `{{org.name}}`, `{{org.description}}`, `{{org.slug
 Roles, ranks, published states and the history of who did what are the pieces
 [reviews](reviews.md) build on: a review link is its own key exchange scoped to the one
 thing under review, so a reviewer gets no other access to your node or orgs.
+
+## More commands
+
+```
+mnnn org endpoint list ORG [--json]     # the org's endpoints
+mnnn org endpoint remove ORG NAME       # remove an endpoint
+mnnn org member list ORG [--json]       # the org's members and roles
+mnnn org resource restore ORG RESOURCE  # bring back a removed resource
+mnnn org sync-code ORG [--json]         # copy a joined org's code spaces here to run them (needs host and code.view); changed ones need approval again
+mnnn org sign-in ORG --site URL         # one-time browser sign-in link to a joined org's private site (five minutes, single use)
+```

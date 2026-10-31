@@ -193,3 +193,9 @@ mnnn rule create Grow --on record.create --if "name = notes" \
   - fields added to bars arrive as optional fields on the local bars model, with their
     values on the archive's bars (the local names of the fields from imports stay).
 - **Backups** contain everything.
+
+## More commands
+
+```
+mnnn model remove MODEL          # removes the model and its records; rules in it become standalone and off
+```

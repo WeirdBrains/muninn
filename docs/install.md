@@ -33,7 +33,7 @@ Uninstall: remove `~/.local/bin/mnnn` and `~/.local/share/man/man1/mnnn*.1`.
 **From a checkout (works today, needs Rust):**
 
 ```sh
-git clone git@github.com:kommandosaldat/muninn.git && cd muninn/packaging/arch
+git clone git@github.com:WeirdBrains/muninn.git && cd muninn/packaging/arch
 makepkg -si            # builds the committed checkout, installs package "muninn"
 ```
 
