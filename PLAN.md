@@ -20,9 +20,17 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 10 | [Automatic Key Exchanges](#automatic-key-exchanges): network on by default, hosting autostart, invite links, TUI dark shards | v2.9.0 | ✅ Released |
 | 11 | [Users and Connections](#users-and-connections): user identities, linked nodes, user-owned orgs, connections with trust, unified invites | v2.10.0 | ✅ Released |
 | 12 | [Linked-Node Sync](#linked-node-sync): all of a user's data on all of their nodes | v2.11.0 | ✅ Released |
-| 13 | [Python in Rust](#python-in-rust): Python code spaces parsed and translated in pure Rust, no external `rythonc`, no libpython | v2.12.0 | 📋 Planned |
-| 14 | [Private Sites and Code Access](#private-sites-and-code-access): gated sites for private orgs, code-space role permissions | v2.13.0 | 📋 Planned |
-| 15 | [Review Copies](#review-copies): what is reviewed lives on the reviewer's node in review mode | v2.14.0 | 📋 Planned |
+| 13 | [Python in Rust](#python-in-rust): Python code spaces parsed and translated in pure Rust, no external `rythonc`, no libpython | v2.12.0 | ✅ Released |
+| 14 | [Private Sites and Code Access](#private-sites-and-code-access): gated sites for private orgs, code-space role permissions | v2.13.0 | ✅ Released |
+| 15 | [Review Copies](#review-copies): what is reviewed lives on the reviewer's node in review mode | v2.14.0 | ✅ Released |
+| 16 | [Share and Clickable Hints](#share-and-clickable-hints): one Share action for everything; every hint is a button | v2.15.0 | 🚧 In progress |
+| 17 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | 📋 Planned |
+| 18 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | 📋 Planned |
+| 19 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
+| 20 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | 📋 Planned |
+| 21 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 📋 Planned |
+| 22 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | post-2.0 | 📋 Planned |
+| 23 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | v2.19.0 | 📋 Planned |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
 
 **2.0 launch wrap-up:** snapshot to `docs/historical/2.0` with this plan, the announcement, and the full changelog; then clear `PLAN.md`.
@@ -327,3 +335,76 @@ Reviewers work on their own node, even offline.
 2. Models and fields the records need are created or extended on the reviewer's node, additively and recorded in history as from the review
 3. Review work syncs back to the author when their node is reachable; new revisions refresh the copy
 4. Closing, dropping or leaving a review keeps the copy read-only and archived (removed only when asked)
+
+## Share and Clickable Hints
+
+> **Phase 16 · v2.15.0**
+
+One Share action for everything, and every hint is a button.
+
+1. Anything shareable (model, live search, journal, project, report, code space) can be shared to anything that accepts shares: a project (added as an item), a journal (a new entry about it, with an optional note), a code space (a model becomes its input) or the network (exchange shares, as `mnnn net share`)
+2. One generic model (`share::TargetKind::accepts`, `targets_for`) decides what goes where; refusals name the targets that would work; every share is recorded in history
+3. CLI `mnnn share KIND ITEM TARGET [TO…] [--note]` and `mnnn share KIND --targets`; in the TUI, `S` (and a `[S share]` button) on every view opens a share picker of the valid targets
+4. Every hotkey hint drawn in the TUI (key bars, status bar, view heads, popup titles, prompts such as `y confirms`, `(Ctrl-T switches)`) is clickable: a click presses the key named there, at a lower priority than existing buttons
+5. Tests cover the share model, CLI, TUI picker, hint parsing and clicks
+6. URLs drawn in the TUI are links: OSC 8 hyperlinks where the terminal supports them, and a mouse click opens the URL (e.g. a node's website); may ship as a patch
+
+## Website
+
+> **Phase 17 · v2.16.0**
+
+1. A single-page Muninn website built with Jaspr in `site/`, styled with the Muninn theme (its colours and the header art), linking releases, docs and install steps
+2. Built and checked in CI; no build step added to the Rust release
+
+## Screenshots
+
+> **Phase 18 · v2.16.0**
+
+1. Screenshots of every feature, made from a scratch `MUNINN_HOME` with real-looking sample data (never `~/.muninn`), scripted so they can be redone each release
+2. Each feature shows its key actions, a few of them mid-action (a prompt open, a picker, a run in progress)
+3. Used by the website, the README and the announcement
+
+## Announcement
+
+> **Phase 19 · with the 2.0 wrap-up**
+
+1. An announcement of Muninn 2.0 (to confirm with Michael: "v1.0" or 2.0): what it is, the headline features, screenshots, install
+
+## Org Site Templates in the App
+
+> **Phase 20 · v2.17.0**
+
+Today templates are saved from files with the CLI only (`mnnn org template save/asset/list`, `org edit --template`); there is no in-app editing.
+
+1. Edit a template's HTML and CSS, and its assets, in the TUI (and `mnnn org template edit`, opening `$EDITOR`), with a live preview through the local host
+2. An optional build step for compiled templates (React, Jaspr, …): a per-template shell command run in a scratch dir, asking before the first and each changed command, its output becoming the template's files; never run on other nodes without their own consent
+3. When an org's site is open, announce it to the org's nodes and connections (its address and what it serves), and show announced sites in the TUI and `mnnn org sites`
+
+## Notifications
+
+> **Phase 21 · v2.18.0**
+
+1. Every notification is a rule set trigger: built-in events (review comments, invites, sync conflicts, shares to you, code waiting for approval, …) are triggers rule sets can match
+2. Any rule set can emit a notification as an action (title, body, link)
+3. A notification links to its context (the entry, review, project, record, org …) and opens it
+4. A bell in the TUI header with the unread count; clicking it (or its key) opens the notifications page; mark one or all read; `mnnn notify list/read`
+5. Stored additively; synced to the user's linked nodes
+6. Node broadcasts: a rule set can use a broadcast from another node as a trigger, and can emit a node broadcast as an action (to the user's nodes, an org's nodes or connections, with the same consent and trust checks as other network traffic)
+
+## MCP
+
+> **Phase 23 · v2.19.0**
+
+1. Muninn publishes an MCP server: `mnnn mcp serve` over stdio and HTTP (off until started), exposing journals, entries, projects, models and records, reports, live searches, org resources, views and executables as MCP resources and tools
+2. Every MCP call is checked like any other access: the caller is a named, revocable MCP client with a role (read only by default); writes and runs need permissions and are recorded in history
+3. Users add external MCP servers in the app (`mnnn mcp add/list/remove`, a TUI page), with their credentials kept in the encrypted store and never logged
+4. Rule sets can call an external server's tools as actions (`mcp SERVER TOOL args…`) and use them as data sources in conditions, asking before the first call of each tool
+
+
+> **Phase 22 · after the 2.0 launch**
+
+1. Real-time collaboration between key-exchanged connections over a gRPC bidirectional stream with protobuf messages (`muninn.live.v1`), end-to-end encrypted with the exchange keys
+2. Real-time collaborative editing of entries, journals, code and records (operations merged without loss; presence and cursors)
+3. Messaging between nodes (direct and per item), kept in history and notifications
+4. Execution between nodes: run a peer's served executables, with their role and consent checks, streaming results
+5. A peers view: your peers and what each has available to share with you (websites, resources, executables, rule sets, …), with actions to open, join, run or request

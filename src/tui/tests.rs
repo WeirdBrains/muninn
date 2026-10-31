@@ -1949,3 +1949,31 @@ fn clicking_a_key_named_in_hint_text_presses_it() {
     render(&mut a, 140, 45);
     assert!(a.code.ask.is_none(), "Esc in the hint cancelled the prompt");
 }
+
+#[test]
+fn s_shares_the_selected_item_to_a_picked_target() {
+    let (_t, mut a) = app();
+    a.store.create_project("Alpha", "").unwrap();
+    a.store.create_journal("Notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    a.dispatch(Action::Journals);
+    let s = render(&mut a, 140, 45);
+    assert!(s.contains("[S share]"), "a share button on the window\n{s}");
+    // the button is a click on S
+    let (x, y) = find_on(&s, "[S share]").unwrap();
+    a.on_mouse(click(x + 1, y));
+    let Some(Modal::Pick { items, .. }) = &a.modal else { panic!("share picker: {:?}", a.modal.is_some()) };
+    assert!(items.contains(&"project · Alpha".to_string()) && items.contains(&"net · all exchanges".to_string()), "{items:?}");
+    assert!(!items.iter().any(|i| i == "journal · Notes"), "not into itself");
+    let i = items.iter().position(|i| i == "project · Alpha").unwrap();
+    for _ in 0..i {
+        a.on_key(key(KeyCode::Down));
+    }
+    a.on_key(key(KeyCode::Enter));
+    assert!(matches!(a.modal, Some(Modal::Journals)), "back on the window");
+    let p = a.store.find_project("Alpha").unwrap();
+    assert_eq!(a.store.project_items(&p.id).unwrap().len(), 1);
+    // Esc on the picker goes back too
+    a.on_key(key(KeyCode::Char('S')));
+    a.on_key(key(KeyCode::Esc));
+    assert!(matches!(a.modal, Some(Modal::Journals)));
+}

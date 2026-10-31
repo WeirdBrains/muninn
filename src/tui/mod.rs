@@ -26,6 +26,7 @@ pub mod reports;
 pub mod reviews;
 pub mod rules;
 pub mod searches;
+mod share;
 pub mod sidebar;
 pub mod themes;
 pub mod tiles;
@@ -121,6 +122,9 @@ pub struct App {
     pub data: data::DataCache,
     /// Click targets inside the open popup (checked before anything else).
     pub modal_hits: Vec<(Rect, Hit)>,
+    /// The item being shared and the window to go back to.
+    pub share_item: Option<(crate::store::ShareKind, String)>,
+    pub share_back: Option<Box<modal::Modal>>,
     /// Where the open popup is drawn (its hint text is clickable).
     pub modal_area: Rect,
     /// `Ctrl-w` was pressed; the next key is a window command.
@@ -169,6 +173,8 @@ impl App {
             import: Default::default(),
             data: data::DataCache::new(paths.db.clone(), dek.0),
             modal_hits: vec![],
+            share_item: None,
+            share_back: None,
             modal_area: Rect::default(),
             content: Rect::new(0, 0, 120, 30),
             export: forms::ExportForm::default(),
@@ -1002,6 +1008,13 @@ impl App {
         menu::draw_dropdowns(&self.menu, f, area, bar, &xs, &t, &en, &mut hits);
         // every key named in hint text is a button too (below the drawn controls)
         let colours = [t.muted, t.header, t.warning];
+        if self.modal.is_some() && share::item(self).is_some() && self.modal_area.width > 12 {
+            // the window's share button, on its top border
+            let r = self.modal_area;
+            let b = Rect { x: r.right().saturating_sub(12), y: r.y, width: 9, height: 1 };
+            f.render_widget(Paragraph::new(Line::styled("[S share]", Style::new().fg(t.accent))), b);
+            self.modal_hits.push((b, Hit::Chord(KeyCode::Char('S'), KeyModifiers::NONE)));
+        }
         if self.modal.is_some() {
             let found = widgets::scan_hints(f.buffer_mut(), self.modal_area, &colours);
             self.modal_hits.splice(0..0, found);

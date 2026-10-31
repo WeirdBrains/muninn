@@ -1,18 +1,18 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH mnnn-net-exchange-restore 1  "mnnn-net-exchange-restore 2.8.0" 
+.TH mnnn-share 1  "mnnn-share 2.14.0" 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-net\-exchange\-restore \- Restore exchanges (and the node identity) from a backup
+mnnn\-share \- Share anything shareable to anything that takes shares: a project, a journal (a new entry about it), a code space (a model as its input) or your exchanges (`net`)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn net exchange restore\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIFILE\fR> 
+\fBmnnn share\fR [\fB\-\-home\fR] [\fB\-\-note\fR] [\fB\-\-db\fR] [\fB\-\-targets\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> [\fIITEM\fR] [\fITARGET\fR] [\fITO\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-Restore exchanges (and the node identity) from a backup
+Share anything shareable to anything that takes shares: a project, a journal (a new entry about it), a code space (a model as its input) or your exchanges (`net`)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -23,11 +23,20 @@ Muninn home directory (default ~/.muninn)
 May also be specified with the \fBMUNINN_HOME\fR environment variable. 
 .RE
 .TP
+\fB\-\-note\fR \fI<NOTE>\fR [default: ]
+A note for a journal entry
+.TP
 \fB\-\-db\fR \fI<PATH>\fR
 Database file (default <home>/storage/muninn.database)
 .RS
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
+.TP
+\fB\-\-targets\fR
+List where this kind of item can be shared
+.TP
+\fB\-\-json\fR
+
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
@@ -71,11 +80,20 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 \fB\-h\fR, \fB\-\-help\fR
 Print help
 .TP
-<\fIFILE\fR>
-
+<\fIKIND\fR>
+What to share: model, search, journal, project, report or code
+.TP
+[\fIITEM\fR]
+The item (id or name)
+.TP
+[\fITARGET\fR]
+Where: project, journal, code or net
+.TP
+[\fITO\fR]
+The project, journal or code space (id or name); for net, exchanges (none: all)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION
-v2.8.0
+v2.14.0
 .SH SEE ALSO
 \fBmnnn\fR(1)

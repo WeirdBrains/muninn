@@ -171,6 +171,7 @@ mod tests {
             "cli",
             "organizations",
             "reviews",
+            "share",
             "org-hosting",
             "ingest-csv",
             "ingest-json",

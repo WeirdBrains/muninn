@@ -15,6 +15,8 @@ Every key runs the same named action as its [menu](menus.md) item.
 | q | quit (when no dialog is open and you are not typing) |
 | Ctrl-C | quit |
 | Esc | close the open menu or dialog |
+| S | share the selected item of a window ([share](share.md)) |
+| click a key in a hint | the same as pressing it (`[x label]` buttons, `q quit`, `y confirms`, `(Ctrl-T switches)`) |
 
 ## Dialogs
 

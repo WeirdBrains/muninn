@@ -109,6 +109,9 @@ pub enum Command {
     /// entry, journal, project, live search or record; accept, reject and merge what they say.
     #[command(subcommand, alias = "reviews", after_long_help = REVIEW_NOTES)]
     Review(ReviewCommand),
+    /// Share anything shareable to anything that takes shares: a project, a journal (a new
+    /// entry about it), a code space (a model as its input) or your exchanges (`net`).
+    Share(ShareArgs),
     /// You as a user: your identity across your nodes, linking another node to it and
     /// revoking one.
     #[command(subcommand, alias = "users", after_long_help = USER_NOTES)]
@@ -3250,4 +3253,26 @@ pub enum ReviewCommand {
         #[arg(long)]
         json: bool,
     },
+}
+
+#[derive(Debug, Args)]
+pub struct ShareArgs {
+    /// What to share: model, search, journal, project, report or code.
+    pub kind: String,
+    /// The item (id or name).
+    #[arg(required_unless_present = "targets")]
+    pub item: Option<String>,
+    /// Where: project, journal, code or net.
+    #[arg(required_unless_present = "targets")]
+    pub target: Option<String>,
+    /// The project, journal or code space (id or name); for net, exchanges (none: all).
+    pub to: Vec<String>,
+    /// A note for a journal entry.
+    #[arg(long, default_value = "")]
+    pub note: String,
+    /// List where this kind of item can be shared.
+    #[arg(long)]
+    pub targets: bool,
+    #[arg(long)]
+    pub json: bool,
 }

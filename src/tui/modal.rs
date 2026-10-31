@@ -91,6 +91,8 @@ pub enum Modal {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PickKind {
     SavedLayout,
+    /// A share target (`super::share`).
+    Share,
 }
 
 impl Modal {
@@ -308,6 +310,13 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
     if matches!(app.modal, Some(Modal::DateTime(_))) {
         return super::picker::on_key(app, k);
     }
+    if k.code == KeyCode::Char('S')
+        && !k.modifiers.intersects(ratatui::crossterm::event::KeyModifiers::CONTROL | ratatui::crossterm::event::KeyModifiers::ALT)
+        && !app.modal.as_ref().is_some_and(|m| m.typing(app))
+        && super::share::open(app)
+    {
+        return;
+    }
     let Some(m) = app.modal.as_mut() else { return };
     match m {
         Modal::DateTime(_) => {}
@@ -401,7 +410,11 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Pick { items, sel, kind, .. } => match k.code {
             KeyCode::Down | KeyCode::Char('j') => *sel = (*sel + 1).min(items.len().saturating_sub(1)),
             KeyCode::Up | KeyCode::Char('k') => *sel = sel.saturating_sub(1),
-            KeyCode::Esc => app.modal = None,
+            KeyCode::Esc => {
+                let share = *kind == PickKind::Share;
+                app.modal = if share { app.share_back.take().map(|b| *b) } else { None };
+                app.share_item = None;
+            }
             KeyCode::Enter => {
                 let (item, kind) = (items.get(*sel).cloned(), *kind);
                 app.modal = None;
@@ -471,6 +484,7 @@ impl App {
 
     pub fn on_pick(&mut self, kind: PickKind, item: &str) {
         match kind {
+            PickKind::Share => super::share::picked(self, item),
             PickKind::SavedLayout => {
                 if let Some(l) = self.prefs.tui.layouts.get(item).cloned() {
                     self.layout = l;

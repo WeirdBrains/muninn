@@ -118,3 +118,32 @@ pub fn man(out: &Path) -> anyhow::Result<()> {
     println!("wrote {n} man pages to {}", out.display());
     Ok(())
 }
+
+/// `mnnn share`.
+pub fn share(ctx: &Ctx, a: super::args::ShareArgs) -> anyhow::Result<()> {
+    use crate::share::{TargetKind, share, targets_for};
+    use crate::store::ShareKind;
+    let kind =
+        ShareKind::parse(&a.kind).ok_or_else(|| anyhow::anyhow!("unknown kind {:?} (model, search, journal, project, report, code)", a.kind))?;
+    if a.targets {
+        let ts = targets_for(kind);
+        if a.json {
+            println!("{}", serde_json::to_string_pretty(&ts)?);
+        } else {
+            for t in ts {
+                println!("{:<8} {}", t.as_str(), t.verb());
+            }
+        }
+        return Ok(());
+    }
+    let (item, target) = (a.item.unwrap_or_default(), a.target.unwrap_or_default());
+    let t = TargetKind::parse(&target).ok_or_else(|| anyhow::anyhow!("unknown target {target:?} (project, journal, code, net)"))?;
+    let store = ctx.open_store()?;
+    let out = share(&store, kind, &item, t, &a.to, &a.note, "cli")?;
+    if a.json {
+        println!("{}", serde_json::to_string_pretty(&out)?);
+    } else {
+        ctx.io.info(out.summary());
+    }
+    Ok(())
+}
