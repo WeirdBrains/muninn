@@ -8,7 +8,7 @@ mnnn\-org\-edit \- Change an organization
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-slug\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-visibility\fR] [\fB\-\-access\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-hosted\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-member\-auth\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-template\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> 
+\fBmnnn org edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-slug\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-visibility\fR] [\fB\-\-access\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-hosted\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-member\-auth\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-gated\fR] [\fB\-\-template\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -107,6 +107,19 @@ system
 .RE
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-gated\fR \fI<on|off>\fR
+A private org\*(Aqs site shows guests a landing, sign\-in and join page
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+on
+.IP \(bu 2
+off
 .RE
 .TP
 \fB\-\-template\fR \fI<TEMPLATE>\fR

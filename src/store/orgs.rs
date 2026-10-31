@@ -23,6 +23,7 @@ CREATE TABLE org_code_copies (
     synced_at INTEGER NOT NULL,
     PRIMARY KEY (org_id, resource_id)
 );
+ALTER TABLE orgs ADD COLUMN gated INTEGER NOT NULL DEFAULT 0;
 "#;
 
 pub const MIGRATION: &str = r#"
@@ -229,6 +230,8 @@ pub struct Org {
     pub hosted: bool,
     /// Members may sign web requests with their exchange key.
     pub member_auth: bool,
+    /// A private org's site shows guests a landing, sign-in and join page (2.13).
+    pub gated: bool,
     pub template_id: Option<String>,
     pub author_id: Option<String>,
     pub created_at: i64,
@@ -253,6 +256,7 @@ pub struct OrgChange {
     pub invite_role: Option<String>,
     pub hosted: Option<bool>,
     pub member_auth: Option<bool>,
+    pub gated: Option<bool>,
     /// `Some(None)` goes back to the built-in template.
     pub template_id: Option<Option<String>>,
 }
@@ -544,7 +548,7 @@ fn check_slug(s: &str) -> Result<String> {
     Ok(v)
 }
 
-const ORG_COLS: &str = "id, name, slug, description, visibility, access, owner_peer, apply_role, invite_role, hosted, member_auth, template_id, author_id, created_at, updated_at";
+const ORG_COLS: &str = "id, name, slug, description, visibility, access, owner_peer, apply_role, invite_role, hosted, member_auth, template_id, author_id, created_at, updated_at, gated";
 const MEMBER_COLS: &str = "id, org_id, peer_id, label, role_id, status, exchange_id, note, decided_by, created_at, updated_at";
 const RES_COLS: &str = "id, org_id, kind, ref_id, name, transferred_by, state, published, created_at, updated_at";
 const JOINED_COLS: &str = "org_id, name, slug, node_peer, exchange_id, status, role, perms, info, created_at, updated_at";
@@ -564,6 +568,7 @@ fn row_org(r: &rusqlite::Row) -> rusqlite::Result<Org> {
         invite_role: r.get(8)?,
         hosted: r.get::<_, i64>(9)? != 0,
         member_auth: r.get::<_, i64>(10)? != 0,
+        gated: r.get::<_, i64>(15)? != 0,
         template_id: r.get(11)?,
         author_id: r.get(12)?,
         created_at: r.get(13)?,
@@ -725,13 +730,16 @@ impl Store {
         if let Some(m) = c.member_auth {
             o.member_auth = m;
         }
+        if let Some(g) = c.gated {
+            o.gated = g;
+        }
         if let Some(t) = &c.template_id {
             o.template_id = t.clone();
         }
         o.updated_at = now_ms();
         self.conn.execute(
             "UPDATE orgs SET name = ?2, slug = ?3, description = ?4, visibility = ?5, access = ?6, apply_role = ?7, invite_role = ?8,
-             hosted = ?9, member_auth = ?10, template_id = ?11, updated_at = ?12 WHERE id = ?1",
+             hosted = ?9, member_auth = ?10, template_id = ?11, updated_at = ?12, gated = ?13 WHERE id = ?1",
             params![
                 o.id,
                 o.name,
@@ -744,7 +752,8 @@ impl Store {
                 o.hosted as i64,
                 o.member_auth as i64,
                 o.template_id,
-                o.updated_at
+                o.updated_at,
+                o.gated as i64
             ],
         )?;
         Ok(o)

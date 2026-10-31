@@ -510,3 +510,44 @@ fn the_host_streams_reflection_and_lists_executables() {
     assert_eq!(grpc_status(&r), "7");
     host.stop();
 }
+
+#[test]
+fn a_gated_private_site_lets_members_sign_in_a_browser() {
+    let s = Store::open_in_memory().unwrap();
+    let (_, members) = hosted_lab(&s);
+    let o = s.find_org("lab").unwrap();
+    edit(&s, "cli", &Actor::Owner, &o, &OrgChange { visibility: Some(Visibility::Private), gated: Some(true), ..Default::default() }).unwrap();
+    let host = Host::start(s, opts()).unwrap();
+    let get = |p: &str, hs: &[(&str, String)]| send(host.addr, true, "GET", p, hs, vec![]);
+    // guests: the landing, sign-in and join pages only
+    let land = get("/o/lab/", &[]);
+    assert!(land.status == 200 && String::from_utf8_lossy(&land.body).contains("private"));
+    assert_eq!(get("/o/lab/sign-in", &[]).status, 200);
+    assert_eq!(get("/o/lab/join", &[]).status, 200);
+    let p = format!("/o/lab/a/{members}.json");
+    assert_eq!(get(&p, &[]).status, 404);
+    assert_eq!(get("/o/lab/api/artifacts", &[]).status, 404);
+    // a one-time signed sign-in link opens a session cookie for this org's pages
+    let auth = sign_with(&Key32(KEY), "x-ben", "GET", "/o/lab/sign-in", b"", now_ms());
+    let link = format!("/o/lab/sign-in?auth={}", query_escape(&auth));
+    let r = get(&link, &[]);
+    assert_eq!((r.status, r.headers[header::LOCATION].to_str().unwrap()), (303, "/o/lab/"));
+    let set = r.headers[header::SET_COOKIE].to_str().unwrap().to_string();
+    assert!(set.contains("HttpOnly") && set.contains("Secure") && set.contains("SameSite=Strict") && set.contains("Path=/o/lab/"), "{set}");
+    let cookie = set.split(';').next().unwrap().to_string();
+    assert_eq!(get(&link, &[]).status, 401, "the link works once");
+    let ok = get(&p, &[("cookie", cookie.clone())]);
+    assert!(ok.status == 200 && String::from_utf8_lossy(&ok.body).contains("members only"));
+    assert_eq!(get(&p, &[("cookie", "muninn_session=00".into())]).status, 404);
+    assert_eq!(get("/o/lab/sign-out", &[("cookie", cookie.clone())]).status, 303);
+    assert_eq!(get(&p, &[("cookie", cookie)]).status, 404, "signed out");
+    host.stop();
+}
+
+#[test]
+fn queries_and_join_links_round_trip() {
+    let v = "Muninn exchange=x-ben, ts=1, sig=ab+/=";
+    assert_eq!(query_value(&format!("a=1&auth={}", query_escape(v)), "auth").as_deref(), Some(v));
+    assert_eq!(join_url("https://h:1/", "lab", "muninn://join/AB"), "https://h:1/o/lab/join#muninn%3A%2F%2Fjoin%2FAB");
+    assert_eq!(session_cookie(Some("a=b; muninn_session=cafe")), Some("cafe"));
+}

@@ -1,5 +1,5 @@
 //! `mnnn code`: code spaces (compiled plugins over your data). Thin over [`crate::code`].
-use super::{CodeCommand, CodeInputArgs, CodeSourceArgs, Ctx};
+use super::{CodeBuiltinCommand, CodeCommand, CodeInputArgs, CodeSourceArgs, Ctx};
 use crate::code::{self, CodeEnv};
 use crate::ingest::time::fmt_ts;
 use crate::store::{CodeChange, CodeInput, CodeSpace, ItemKind, Lang, Store};
@@ -238,6 +238,7 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
                 println!("\n{}", c.source.trim_end());
             }
         }
+        CodeCommand::Builtin(b) => builtin(ctx, &store, b)?,
         CodeCommand::Remove { space } => {
             let c = store.find_code_space(&space)?;
             if !ctx.io.confirm(&format!("remove code space `{}`? (its source is kept in the history)", c.name))? {
@@ -326,4 +327,45 @@ fn scope_filter(store: &Store, f: &str) -> crate::error::Result<ScopeFilter> {
             _ => return Err(crate::error::Error::invalid("scope", format!("{f}: use user, org, org:NAME or global"))),
         },
     })
+}
+
+fn builtin(ctx: &Ctx, store: &Store, cmd: CodeBuiltinCommand) -> anyhow::Result<()> {
+    use crate::org::builtin::{self, BUILTINS};
+    let named = |n: &str| builtin::find(n).ok_or_else(|| anyhow!("no built-in `{n}` (see `mnnn code builtin list`)"));
+    match cmd {
+        CodeBuiltinCommand::List { json } => {
+            if json {
+                let v: Vec<_> = BUILTINS
+                    .iter()
+                    .map(|b| json!({ "name": b.name, "summary": b.summary, "scope": "global", "version": env!("CARGO_PKG_VERSION"), "version_hash": builtin::version_hash(b) }))
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&v)?);
+                return Ok(());
+            }
+            for b in BUILTINS {
+                println!("{:<18} global  {}  {}", b.name, &builtin::version_hash(b)[..12], b.summary);
+            }
+            ctx.io.info(format!("{} built-ins (Muninn {}); `mnnn code builtin show NAME` for a contract", BUILTINS.len(), env!("CARGO_PKG_VERSION")));
+        }
+        CodeBuiltinCommand::Show { name } => print!("{}", named(&name)?.contract),
+        CodeBuiltinCommand::Override { name, org } => {
+            let b = named(&name)?;
+            let o = store.find_org(&org)?;
+            if !ctx.io.confirm(&format!(
+                "override built-in `{}` for {}? Your code space then answers in its place, for callers with code.run only.",
+                b.name, o.name
+            ))? {
+                return Err(crate::Error::Aborted.into());
+            }
+            let contract: String = b.contract.lines().map(|l| format!("// {l}\n")).collect();
+            let src = format!("{contract}// @view table\n{}", code::template(Lang::Rust));
+            let c = match store.find_code_space(b.name) {
+                Ok(c) => c,
+                Err(_) => code::create(store, "cli", b.name, b.summary, Lang::Rust, &src, CodeInput::default())?,
+            };
+            crate::org::serve_code(store, "cli", &crate::org::Actor::Owner, &o, &c.id)?;
+            ctx.io.info(format!("{} now serves code space {} in place of the built-in; edit it with `mnnn code edit {}`", o.name, c.name, c.name));
+        }
+    }
+    Ok(())
 }

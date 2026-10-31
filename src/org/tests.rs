@@ -194,7 +194,7 @@ fn the_site_serves_what_is_published_through_the_template() {
     let c = s.create_code_space("sma", "", crate::store::Lang::Math, "x = close", crate::store::CodeInput::default()).unwrap();
     s.serve_code(&o.id, &c.id).unwrap();
     let ex: serde_json::Value = serde_json::from_slice(&get("/o/lab/api/executables").body).unwrap();
-    assert_eq!(ex["executables"].as_array().unwrap().len(), 0, "{ex}");
+    assert!(ex["executables"].as_array().unwrap().iter().all(|e| e["language"] == "builtin"), "only built-ins for guests: {ex}");
     assert_eq!(get("/o/lab/proto/Sma.proto").status, 404);
     assert_eq!(get("/o/lab/proto/muninn/code/v1/executable.proto").status, 404);
     assert_eq!(route(&s, "POST", "/o/lab/api/run/sma", b"{}", None).status, 403);
@@ -253,4 +253,26 @@ fn each_node_chooses_the_code_it_serves() {
     assert!(unserve_code(&s, "cli", &Actor::Owner, &o, "calc").is_err());
     serve_code(&s, "cli", &Actor::Owner, &o, &c.id).unwrap();
     assert_eq!(s.served_code(&o.id).unwrap(), vec![c.id]);
+}
+
+#[test]
+fn a_gated_private_org_shows_guests_its_door_only() {
+    let s = Store::open_in_memory().unwrap();
+    let o = create(&s, "cli", "Lab", None, "we look").unwrap();
+    let o = edit(&s, "cli", &Actor::Owner, &o, &OrgChange { hosted: Some(true), ..Default::default() }).unwrap();
+    let get = |p: &str| serve::route(&s, "GET", p, b"", None);
+    assert_eq!(get("/o/lab/").status, 404, "private and not gated: nothing");
+    let o = edit(&s, "cli", &Actor::Owner, &o, &OrgChange { gated: Some(true), ..Default::default() }).unwrap();
+    assert!(o.gated && s.org(&o.id).unwrap().unwrap().gated, "kept");
+    let land = String::from_utf8(get("/o/lab/").body).unwrap();
+    assert!(land.contains("we look") && land.contains("/o/lab/sign-in") && land.contains("/o/lab/join"), "{land}");
+    assert!(String::from_utf8(get("/o/lab/join").body).unwrap().contains("join.js"));
+    assert!(String::from_utf8(get("/o/x/assets-builtin/join.js").body).unwrap().contains("location.hash"));
+    let ex: serde_json::Value = serde_json::from_slice(&get("/o/lab/api/executables").body).unwrap();
+    assert_eq!(ex["executables"].as_array().unwrap().len(), builtin::BUILTINS.len(), "{ex}");
+    let r = serve::route(&s, "POST", "/o/lab/api/run/membership-apply", b"{}", None);
+    assert_eq!(r.status, 200);
+    assert!(String::from_utf8_lossy(&r.body).contains("mnnn org apply"));
+    assert_eq!(serve::route(&s, "POST", "/o/lab/api/run/other", b"{}", None).status, 404);
+    assert_eq!(get("/o/lab/api/org").status, 404);
 }

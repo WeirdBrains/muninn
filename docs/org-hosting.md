@@ -105,3 +105,37 @@ space's, `text`, `sort` and `group` replace them, and `limit` can never raise th
 A run returns a `RunResult` (status, error, the `@view` the source declares, logs, writes,
 ms, and the full JSON). The node runs only the source it has approved; an edited space must
 be approved again before it runs. Every run is recorded as an `org.run` action.
+
+## Gated private sites (2.13)
+
+A private org's site shows guests nothing. Turn on its door with
+`mnnn org edit ORG --gated on`: guests then see a landing page (name and description),
+`/o/ORG/sign-in` and `/o/ORG/join`; everything else stays for members.
+
+**Browser sign-in.** A member runs `mnnn org sign-in ORG --site https://HOST:PORT` on
+their own node. It prints a link signed with their exchange key, good once and for five
+minutes. Opening it sets an `HttpOnly; Secure; SameSite=Strict` cookie for that org's
+pages for 12 hours. The node keeps only a hash of the session, in memory, so restarting the
+host signs everyone out. `/o/ORG/sign-out` ends a session early. Sessions cover GET pages;
+API calls stay signed requests.
+
+**Invite links.** When the site is being served, `mnnn org member invite` also prints a web
+link, `https://HOST/o/ORG/join#muninn://join/…`. The invite stays in the `#fragment`,
+which browsers never send, so it never reaches the host or its logs. The join page reads
+it in the browser and offers to open it in Muninn, or shows the `mnnn org join` command.
+Accepting the invite starts the key exchange from the invitee's node.
+
+## Built-in executables (2.13)
+
+Muninn ships global executables, versioned with it, that every hosted org serves to
+anyone, including guests at a gated door:
+
+| name | what |
+|------|------|
+| `invite-redeem` | `{ "link": … }` → is this invite for this org, still open, and which role |
+| `membership-apply` | how to apply: the org node's peer id, addresses, and the `mnnn org apply` command |
+
+Use `mnnn code builtin list` to see them and `mnnn code builtin show NAME` for a contract.
+`mnnn code builtin override NAME ORG` asks first, then creates an editable code space of
+the same name and serves it in place of the built-in. An override runs as ordinary code,
+so callers need `code.run` and the source must be approved.

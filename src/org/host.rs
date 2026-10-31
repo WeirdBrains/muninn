@@ -131,6 +131,86 @@ impl Replay {
     }
 }
 
+/// Browser sessions (2.13): a member opens a one-time signed sign-in link and gets a
+/// cookie for that org's pages. Only the SHA-256 of a session id is kept, in memory.
+#[derive(Default)]
+pub struct Sessions {
+    live: HashMap<[u8; 32], Session>,
+}
+
+struct Session {
+    exchange: String,
+    slug: String,
+    until: i64,
+}
+
+pub const SESSION_COOKIE: &str = "muninn_session";
+pub const SESSION_MS: i64 = 12 * 60 * 60 * 1000;
+
+impl Sessions {
+    /// A new session id (64 hex characters) for a member of the org at `slug`.
+    pub fn open(&mut self, exchange: &str, slug: &str, now: i64) -> Zeroizing<String> {
+        self.live.retain(|_, x| x.until > now);
+        let mut raw = Zeroizing::new([0u8; 32]);
+        getrandom::getrandom(raw.as_mut()).expect("system randomness");
+        let id = Zeroizing::new(hex::encode(raw.as_ref()));
+        self.live.insert(Sha256::digest(id.as_bytes()).into(), Session { exchange: exchange.into(), slug: slug.into(), until: now + SESSION_MS });
+        id
+    }
+
+    /// The exchange a session cookie stands for, on its own org's pages only.
+    pub fn who(&self, id: &str, path: &str, now: i64) -> Option<String> {
+        let x = self.live.get(&<[u8; 32]>::from(Sha256::digest(id.as_bytes())))?;
+        (x.until > now && path.starts_with(&format!("/o/{}/", x.slug))).then(|| x.exchange.clone())
+    }
+
+    pub fn close(&mut self, id: &str) {
+        self.live.remove(&<[u8; 32]>::from(Sha256::digest(id.as_bytes())));
+    }
+}
+
+/// A session cookie's value from a `Cookie` header.
+pub fn session_cookie(h: Option<&str>) -> Option<&str> {
+    h?.split(';').filter_map(|p| p.trim().split_once('=')).find(|(k, _)| *k == SESSION_COOKIE).map(|(_, v)| v.trim())
+}
+
+/// A web invite link: the site's join page with the invite in the fragment.
+pub fn join_url(site: &str, slug: &str, link: &str) -> String {
+    format!("{}/o/{slug}/join#{}", site.trim_end_matches('/'), query_escape(link))
+}
+
+/// Percent-encoding for a query value.
+pub fn query_escape(v: &str) -> String {
+    v.bytes()
+        .map(|b| if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') { (b as char).to_string() } else { format!("%{b:02X}") })
+        .collect()
+}
+
+/// The decoded value of `key` in a query string.
+pub fn query_value(query: &str, key: &str) -> Option<String> {
+    let raw = query.split('&').filter_map(|p| p.split_once('=')).find(|(k, _)| *k == key)?.1;
+    let b = raw.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'%' if i + 2 < b.len() => {
+                out.push(u8::from_str_radix(std::str::from_utf8(&b[i + 1..i + 3]).ok()?, 16).ok()?);
+                i += 3;
+            }
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            c => {
+                out.push(c);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
 /// Who signed a request: `Ok(None)` when it is not signed the Muninn way, the exchange id
 /// when the signature is good, and why not otherwise.
 pub fn verify(
@@ -656,6 +736,7 @@ impl HostOptions {
 struct State {
     store: Mutex<Store>,
     replay: Mutex<Replay>,
+    sessions: Mutex<Sessions>,
     challenges: Challenges,
     resolver: Arc<Resolver>,
     cert: RwLock<CertInfo>,
@@ -740,6 +821,7 @@ impl Host {
         let state = Arc::new(State {
             store: Mutex::new(store),
             replay: Mutex::new(Replay::default()),
+            sessions: Mutex::new(Sessions::default()),
             challenges: Arc::new(RwLock::new(HashMap::new())),
             resolver,
             cert: RwLock::new(info),
@@ -963,6 +1045,7 @@ async fn handle(state: Arc<State>, req: Request<Incoming>) -> std::result::Resul
     let path = req.uri().path_and_query().map(|p| p.as_str().to_string()).unwrap_or_else(|| "/".into());
     let grpc = req.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).is_some_and(|c| c.starts_with("application/grpc"));
     let auth = req.headers().get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).map(str::to_string);
+    let cookie = req.headers().get(header::COOKIE).and_then(|v| v.to_str().ok()).and_then(|c| session_cookie(Some(c))).map(str::to_string);
     if grpc && super::reflect::is_reflection(&path) {
         return Ok(reflection_stream(state, req.into_body()));
     }
@@ -972,18 +1055,26 @@ async fn handle(state: Arc<State>, req: Request<Incoming>) -> std::result::Resul
         Err(_) => return Ok(page_response(Page::error(413, "request body too large"), false)),
     };
     let st = state.clone();
-    let out = tokio::task::spawn_blocking(move || answer(&st, &method, &path, &body, auth.as_deref(), grpc)).await;
+    let out = tokio::task::spawn_blocking(move || answer(&st, &method, &path, &body, auth.as_deref(), cookie.as_deref(), grpc)).await;
     Ok(out.unwrap_or_else(|_| page_response(Page::error(500, "internal error"), false)))
 }
 
-fn answer(st: &State, method: &str, path: &str, body: &[u8], auth: Option<&str>, grpc: bool) -> Response<Body> {
+fn answer(st: &State, method: &str, path: &str, body: &[u8], auth: Option<&str>, cookie: Option<&str>, grpc: bool) -> Response<Body> {
     let hsts = st.cert().source == "acme";
     let Ok(s) = st.store.lock() else { return page_response(Page::error(500, "store lock poisoned"), hsts) };
+    if !grpc && method == "GET" {
+        let (bare, query) = path.split_once('?').unwrap_or((path, ""));
+        let parts: Vec<&str> = bare.trim_start_matches('/').split('/').collect();
+        if let ["o", slug, page @ ("sign-in" | "sign-out")] = parts.as_slice() {
+            return session_page(st, &s, slug, page, bare, query, cookie, hsts);
+        }
+    }
     let who = match st.replay.lock() {
         Ok(mut r) => verify(&s, auth, method, path, body, now_ms(), &mut r),
         Err(_) => Err("replay lock poisoned"),
     };
     let who = match who {
+        Ok(None) if !grpc && method == "GET" => cookie.and_then(|c| st.sessions.lock().ok().and_then(|x| x.who(c, path, now_ms()))),
         Ok(w) => w,
         Err(e) if grpc => return grpc_response(Err((16, e.to_string()))),
         Err(e) => return page_response(Page::error(401, e), hsts),
@@ -992,6 +1083,49 @@ fn answer(st: &State, method: &str, path: &str, body: &[u8], auth: Option<&str>,
         return grpc_response(grpc_dispatch(&s, path, body, who.as_deref()));
     }
     page_response(serve::route(&s, method, path, body, who.as_deref()), hsts)
+}
+
+/// `/o/ORG/sign-in?auth=…` (a one-time signed link from `mnnn org sign-in`) opens a
+/// session; `/o/ORG/sign-out` ends it. Without `auth`, sign-in is the site's own page.
+#[allow(clippy::too_many_arguments)]
+fn session_page(st: &State, s: &Store, slug: &str, page: &str, bare: &str, query: &str, cookie: Option<&str>, hsts: bool) -> Response<Body> {
+    let home = format!("/o/{slug}/");
+    let go = |set: String| {
+        let mut b = Response::builder()
+            .status(303)
+            .header(header::LOCATION, home.as_str())
+            .header(header::SET_COOKIE, set)
+            .header(header::CACHE_CONTROL, "no-store")
+            .header("referrer-policy", "no-referrer");
+        if hsts {
+            b = b.header("strict-transport-security", "max-age=86400");
+        }
+        b.body(Full::new(Bytes::new()).boxed()).unwrap_or_else(|_| Response::new(Full::new(Bytes::new()).boxed()))
+    };
+    if page == "sign-out" {
+        if let (Some(c), Ok(mut x)) = (cookie, st.sessions.lock()) {
+            x.close(c);
+        }
+        return go(format!("{SESSION_COOKIE}=; Path={home}; Max-Age=0; HttpOnly; Secure; SameSite=Strict"));
+    }
+    let Some(auth) = query_value(query, "auth") else { return page_response(serve::route(s, "GET", bare, b"", None), hsts) };
+    let now = now_ms();
+    let who = match st.replay.lock() {
+        Ok(mut r) => verify(s, Some(&auth), "GET", bare, b"", now, &mut r),
+        Err(_) => Err("replay lock poisoned"),
+    };
+    let x = match who {
+        Ok(Some(x)) => x,
+        Ok(None) => return page_response(Page::error(401, "not a Muninn sign-in link"), hsts),
+        Err(e) => return page_response(Page::error(401, e), hsts),
+    };
+    let member = s.orgs().ok().and_then(|os| os.into_iter().find(|o| o.slug == slug)).is_some_and(|o| serve::actor(s, &o, Some(&x)).is_member());
+    if !member {
+        return page_response(Page::error(403, "that key exchange is not a member of this org (or member sign-in is off)"), hsts);
+    }
+    let Ok(mut sessions) = st.sessions.lock() else { return page_response(Page::error(500, "session lock poisoned"), hsts) };
+    let id = sessions.open(&x, slug, now);
+    go(format!("{SESSION_COOKIE}={}; Path={home}; Max-Age={}; HttpOnly; Secure; SameSite=Strict", id.as_str(), SESSION_MS / 1000))
 }
 
 // ---------------------------------------------------------------------------------------

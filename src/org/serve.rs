@@ -249,6 +249,75 @@ pub fn exec_caller(s: &Store, org: &Org, exchange: Option<&str>) -> Option<Actor
     (org.hosted && shown(org, &a)).then_some(a)
 }
 
+/// What a guest sees of a gated private org: a landing page, how members sign in, and the
+/// page an invite link opens. The invite itself rides in the link's `#fragment`, which
+/// browsers never send, so it never reaches this node's logs.
+fn gate(s: &Store, org: &Org, page: &str) -> Result<Page> {
+    let card = super::card(s, org);
+    let name = escape(&org.name);
+    let slug = escape(&org.slug);
+    let (title, content) = match page {
+        "sign-in" => (
+            format!("Sign in to {}", org.name),
+            format!(
+                "<h1>Sign in to {name}</h1><p>Members sign in from their own Muninn node: run</p>\
+                 <pre>mnnn org sign-in {slug} --site https://THIS-ADDRESS</pre>\
+                 <p>and open the link it prints here within five minutes. It works once and keeps this browser signed in for 12 hours \
+                 (<a href=\"/o/{slug}/sign-out\">sign out</a>).</p>"
+            ),
+        ),
+        "join" => (
+            format!("Join {}", org.name),
+            format!(
+                "<h1>Join {name}</h1><p id=\"how\">Open this page from the invite link you were given.</p>\
+                 <p><a id=\"open\" hidden>Open in Muninn</a></p><pre id=\"cmd\" hidden></pre>\
+                 <script src=\"/o/{slug}/assets-builtin/join.js\"></script>\
+                 <noscript><p>Copy the part of the link after <code>#</code> and run <code>mnnn org join</code> with it.</p></noscript>"
+            ),
+        ),
+        _ => (
+            org.name.clone(),
+            format!(
+                "<h1>{name}</h1><p>{}</p><p>This organization is private.</p>\
+                 <ul><li><a href=\"/o/{slug}/sign-in\">Members: sign in</a></li><li><a href=\"/o/{slug}/join\">Have an invite? Join</a></li></ul>",
+                escape(&org.description)
+            ),
+        ),
+    };
+    Ok(Page::new(200, "text/html; charset=utf-8", fill(&look(s, org)?, &card, &title, &content)))
+}
+
+/// The join page's script: it reads the invite from the fragment, in the browser.
+pub const JOIN_JS: &str = r#"(function () {
+  var t = decodeURIComponent((location.hash || "").slice(1));
+  if (!t) return;
+  history.replaceState(null, "", location.pathname);
+  var how = document.getElementById("how"), open = document.getElementById("open"), cmd = document.getElementById("cmd");
+  how.textContent = "Accept it from your Muninn node (this starts the key exchange with the organization):";
+  if (t.indexOf("muninn://") === 0) { open.href = t; open.hidden = false; }
+  cmd.textContent = "mnnn org join '" + t.replace(/'/g, "") + "'";
+  cmd.hidden = false;
+})();
+"#;
+
+fn gate_asset(s: &Store, org: &Org, rest: &[&str]) -> Result<Page> {
+    let name = rest[1..].join("/");
+    let Some(t) = org.template_id.as_deref() else { return Ok(Page::not_found()) };
+    match s.template_asset(t, &name)? {
+        Some((mime, data)) => Ok(Page::new(200, &mime, data)),
+        None => Ok(Page::not_found()),
+    }
+}
+
+fn builtin_run(s: &Store, org: &Org, a: &Actor, name: &str, body: &[u8]) -> Result<Page> {
+    let input: Value = if body.is_empty() { json!({}) } else { serde_json::from_slice(body).map_err(|e| Error::invalid("input", e.to_string()))? };
+    match super::builtin::run(s, "web", a, org, name, &input) {
+        Ok(v) => Ok(Page::json(&v)),
+        Err(e) if e.to_string().contains("may not") => Ok(Page::error(403, &e.to_string())),
+        Err(e) => Ok(Page::error(400, &e.to_string())),
+    }
+}
+
 fn shown(org: &Org, a: &Actor) -> bool {
     a.is_member() || org.visibility == Visibility::Public || org.access == Access::Open
 }
@@ -271,6 +340,7 @@ fn route_inner(s: &Store, method: &str, path: &str, body: &[u8], exchange: Optio
             let Some(site) = site(s, slug)? else { return Ok(Page::not_found()) };
             org_page(s, &site, exchange)
         }
+        ["o", _, "assets-builtin", "join.js"] => Ok(Page::new(200, "text/javascript; charset=utf-8", JOIN_JS.as_bytes().to_vec())),
         ["o", slug, rest @ ..] => {
             let Some(site) = site(s, slug)? else { return Ok(Page::not_found()) };
             match site {
@@ -341,6 +411,9 @@ fn org_page(s: &Store, site: &Site, exchange: Option<&str>) -> Result<Page> {
     match site {
         Site::Live(org) => {
             let a = actor(s, org, exchange);
+            if org.hosted && org.gated && !shown(org, &a) {
+                return gate(s, org, "");
+            }
             if !org.hosted || !shown(org, &a) {
                 return Ok(Page::not_found());
             }
@@ -364,6 +437,18 @@ fn split_ext(name: &str) -> (&str, Option<&str>) {
 
 fn live(s: &Store, org: &Org, method: &str, rest: &[&str], body: &[u8], exchange: Option<&str>) -> Result<Page> {
     let a = actor(s, org, exchange);
+    if org.hosted && org.gated && !shown(org, &a) {
+        return match (method, rest) {
+            ("GET", [page @ ("sign-in" | "join")]) => gate(s, org, page),
+            ("GET", ["assets", ..]) if org.template_id.is_some() => gate_asset(s, org, rest),
+            ("POST", ["api", "run", name]) if super::builtin::find(name).is_some() => builtin_run(s, org, &a, name, body),
+            ("GET", ["api", "executables"]) => {
+                let v: Vec<Value> = super::builtin::executables(org).iter().map(|e| json!(e)).collect();
+                Ok(Page::json(&json!({ "executables": v })))
+            }
+            _ => Ok(Page::not_found()),
+        };
+    }
     if !org.hosted || !shown(org, &a) {
         return Ok(Page::not_found());
     }
@@ -427,9 +512,13 @@ fn live(s: &Store, org: &Org, method: &str, rest: &[&str], body: &[u8], exchange
             }
         }
         ("GET", ["api", "executables"]) => {
-            let v: Vec<Value> = super::exec::executables(s, org, &a)?.iter().map(|e| json!(e)).collect();
+            let mut v: Vec<Value> = super::exec::executables(s, org, &a)?.iter().map(|e| json!(e)).collect();
+            v.extend(
+                super::builtin::BUILTINS.iter().filter(|b| !super::builtin::overridden(s, org, b)).map(|b| json!(super::builtin::describe(org, b))),
+            );
             Ok(Page::json(&json!({ "executables": v })))
         }
+        ("POST", ["api", "run", name]) if super::builtin::find(name).is_some() => builtin_run(s, org, &a, name, body),
         ("POST", ["api", "run", name]) => {
             let input: Value =
                 if body.is_empty() { json!({}) } else { serde_json::from_slice(body).map_err(|e| Error::invalid("input", e.to_string()))? };

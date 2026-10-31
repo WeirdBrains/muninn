@@ -89,7 +89,7 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
             ctx.io.note("Invite with `mnnn org member invite`; members reach it while `mnnn net start` runs.");
             Ok(())
         }
-        OrgCommand::Edit { org: key, name, slug, description, visibility, access, hosted, member_auth, template } => {
+        OrgCommand::Edit { org: key, name, slug, description, visibility, access, hosted, member_auth, gated, template } => {
             let n = Net::open(ctx)?;
             let s = &n.store;
             let o = mine(s, &key)?;
@@ -106,6 +106,7 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
                 access: access.as_deref().map(Access::parse).transpose()?,
                 hosted: hosted.map(|h| h.on()),
                 member_auth: member_auth.map(|h| h.on()),
+                gated: gated.map(|h| h.on()),
                 template_id,
                 ..Default::default()
             };
@@ -357,6 +358,15 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
             ctx.io.note("Valid for five minutes, once, for exactly this method, path and body.");
             Ok(())
         }
+        OrgCommand::SignIn { org: key, site } => {
+            let n = Net::open(ctx)?;
+            let j = n.store.find_joined(&key)?;
+            let path = format!("/o/{}/sign-in", j.slug);
+            let h = host::authorization(&n.store, &key, "GET", &path, b"")?;
+            println!("{}{path}?auth={}", site.trim_end_matches('/'), host::query_escape(&h));
+            ctx.io.note("Open it in a browser within five minutes; it works once and signs that browser in for 12 hours.");
+            Ok(())
+        }
         OrgCommand::Host(c) => host_cmd(ctx, c),
         OrgCommand::Cert(c) => cert(ctx, c),
     }
@@ -387,8 +397,9 @@ fn show(s: &Store, o: &Org, json: bool) -> anyhow::Result<()> {
     println!("  {}, {}; new members: {} (apply) / {} (invite)", o.visibility.as_str(), o.access.as_str(), role(&o.apply_role), role(&o.invite_role));
     let tpl = o.template_id.as_deref().and_then(|t| templates.iter().find(|x| x.id == t)).map(|t| t.name.as_str()).unwrap_or("default");
     println!(
-        "  site: {}; member sign-in {}; template {tpl}",
+        "  site: {}{}; member sign-in {}; template {tpl}",
         if o.hosted { "hosted" } else { "not hosted" },
+        if o.gated { " (gated)" } else { "" },
         if o.member_auth { "on" } else { "off" }
     );
     println!("roles:");
@@ -542,7 +553,14 @@ fn member(ctx: &Ctx, cmd: OrgMemberCommand) -> anyhow::Result<()> {
                         ctx.io.warn(format!("could not reach them ({e})"));
                     }
                     ctx.io.note("Send them this invite link (single use, expires in 7 days; they run `mnnn org join LINK`):");
-                    println!("{}", crate::net::exchange::link(&c.token));
+                    let link = crate::net::exchange::link(&c.token);
+                    println!("{link}");
+                    if o.hosted
+                        && let Some(f) = host::running(&ctx.paths.home)
+                    {
+                        ctx.io.note("Or this web link to the site's join page (the invite stays in the part after #, which browsers never send):");
+                        println!("{}", host::join_url(&f.url, &o.slug, &link));
+                    }
                 }
             }
             Ok(())

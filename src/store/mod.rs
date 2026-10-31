@@ -950,6 +950,13 @@ mod tests {
         assert_eq!(s.org_projects(&o.id).unwrap().len(), 1);
     }
 
+    /// An org row as an older schema has it (before later columns).
+    fn old_org(s: &Store, id: &str) {
+        s.conn
+            .execute("INSERT INTO orgs(id, name, slug, owner_peer, created_at, updated_at) VALUES (?1, 'Lab', 'lab', '12D3KooWx', 1, 1)", [id])
+            .unwrap();
+    }
+
     #[test]
     fn a_2_7_database_migrates_and_gains_reviews() {
         let dir = tempfile::tempdir().unwrap();
@@ -961,7 +968,7 @@ mod tests {
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
             s.migrate_to(MIGRATIONS.len() - 2).unwrap();
-            s.insert_org("Lab", None, "", "12D3KooWx").unwrap();
+            old_org(&s, "o-lab");
             let j = s.create_journal("Lab book", None, EntryFormat::Markdown).unwrap();
             s.add_entry(&j.id, "Day 1", "teh result", None).unwrap();
         }
@@ -1000,10 +1007,10 @@ mod tests {
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
             s.migrate_to(MIGRATIONS.len() - 1).unwrap();
-            let o = s.insert_org("Lab", None, "", "12D3KooWx").unwrap();
+            old_org(&s, "o-lab");
             let c = s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
-            s.save_endpoint(&o.id, "calc", EndpointKind::Code, &c.id, "call", false).unwrap();
-            (o.id, c.id)
+            s.save_endpoint("o-lab", "calc", EndpointKind::Code, &c.id, "call", false).unwrap();
+            ("o-lab".to_string(), c.id)
         };
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);

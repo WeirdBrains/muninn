@@ -2395,6 +2395,23 @@ pub enum CodeCommand {
         #[arg(long, default_value = "muninn-plugin")]
         out: PathBuf,
     },
+    /// The built-in global executables shipped with Muninn (served by every hosted org).
+    #[command(subcommand)]
+    Builtin(CodeBuiltinCommand),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CodeBuiltinCommand {
+    /// The built-ins and their versions.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// A built-in's contract.
+    Show { name: String },
+    /// Override a built-in for one of your orgs: an editable code space of the same name,
+    /// served in its place (asks first; it then runs as ordinary code, needing code.run).
+    Override { name: String, org: String },
 }
 
 pub const MODEL_NOTES: &str = "\
@@ -2649,6 +2666,9 @@ pub enum OrgCommand {
         /// Members may sign web requests with their exchange key.
         #[arg(long, value_name = "on|off")]
         member_auth: Option<OnOff>,
+        /// A private org's site shows guests a landing, sign-in and join page.
+        #[arg(long, value_name = "on|off")]
+        gated: Option<OnOff>,
         /// The site template (a template name, or `default`).
         #[arg(long)]
         template: Option<String>,
@@ -2763,6 +2783,13 @@ pub enum OrgCommand {
         /// The request body (a file, `-` for stdin).
         #[arg(long)]
         body: Option<String>,
+    },
+    /// A one-time browser sign-in link to a joined org's site (valid five minutes, once).
+    SignIn {
+        org: String,
+        /// The site's address, e.g. https://lab.example.org:4743.
+        #[arg(long)]
+        site: String,
     },
     /// Serve hosted orgs over HTTPS.
     #[command(subcommand)]
