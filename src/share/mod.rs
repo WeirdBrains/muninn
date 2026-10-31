@@ -1,6 +1,6 @@
 //! The universal Share action: anything shareable (a [`ShareKind`] item) goes to anything
 //! that accepts shares (a [`Target`]): a project, a journal (as a new entry about it), a code
-//! space (a model becomes its input) or the network (an exchange share, `mnnn net share`).
+//! space (a model or a records live search becomes its input) or the network (an exchange share, `mnnn net share`).
 use crate::error::{Error, Result};
 use crate::store::{CodeChange, CodeInput, ItemKind, NewAction, SearchTarget, ShareKind, Store};
 use serde::Serialize;

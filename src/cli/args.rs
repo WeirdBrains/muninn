@@ -110,7 +110,8 @@ pub enum Command {
     #[command(subcommand, alias = "reviews", after_long_help = REVIEW_NOTES)]
     Review(ReviewCommand),
     /// Share anything shareable to anything that takes shares: a project, a journal (a new
-    /// entry about it), a code space (a model as its input) or your exchanges (`net`).
+    /// entry about it), a code space (a model or records search as its input; --run runs
+    /// it) or your exchanges (`net`).
     Share(ShareArgs),
     /// You as a user: your identity across your nodes, linking another node to it and
     /// revoking one.

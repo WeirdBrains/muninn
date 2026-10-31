@@ -99,8 +99,13 @@ and refs are TEXT; integers, bools and timestamps (epoch ms) are INTEGER; reals 
 Required fields are `NOT NULL`, and unique and indexed fields get their own indexes.
 These tables are created and rebuilt only by migrations.
 
-The built-in `bars` model reads the `bars` table. Fields added to it live in `mx_bars`,
-keyed by the bar id; removing a bar removes those values too.
+The bars are the records of the built-in `bars` model and live in its table, `m_bars`,
+like any model's: the bars' own columns (`_base`, `_quote`, `_timestamp`, `_open` …
+`_volume`, `_source_id`, `_duration_s`, `_flags`) next to a column per field added to
+it, so removing a bar removes its values too. A bar's id is the BLAKE3 hash of its
+timestamp, source, symbol and period. Reads go through the `bar_rows` view (the bars'
+columns under their plain names). Upgrading to 2.16 moves the old `bars` and `mx_bars`
+tables into `m_bars` in one transaction, keeping every id, value, stamp and version.
 
 ## Decisions
 

@@ -85,7 +85,7 @@ Records have an `id` and the hidden fields `_version`, `_created_at`, `_updated_
 take the same form as rule conditions: `FIELD OP VALUE` with `= != ~ !~ > >= < <=`, or
 `FIELD ?` (present) and `FIELD !?` (missing). `=` takes `*` wildcards, and text comparisons ignore
 case. On bars, comparisons on `timestamp`, `open` … `volume`, and `=` on `period`, `source`,
-`base` and `quote`, go straight to the bar tables, so they stay fast on millions of bars.
+`base` and `quote`, go straight to the bars' own indexed columns, so they stay fast on millions of bars.
 
 Grouping counts the records per value of one or more fields, and can add `sum:F`,
 `avg:F`, `min:F` or `max:F` for each group.

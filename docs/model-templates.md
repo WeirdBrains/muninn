@@ -49,8 +49,9 @@ mnnn model import builtin:bars --name candles
 
 `builtin:bars` is the design of the built-in bars model (source, symbol, base, quote,
 period, timestamp, open, high, low, close, volume, flags), for record tables shaped like
-price bars. The bars model itself stays built in for now: ingest, charts and code spaces
-read the bars table.
+price bars. The bars model itself is built from it: its records are the bars, kept in its
+table `m_bars`, which ingest, charts, code spaces, sync, archives and backups read and
+write ([data model](data-model.md)).
 
 ## Sharing
 

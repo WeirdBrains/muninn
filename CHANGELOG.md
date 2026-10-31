@@ -10,6 +10,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Model design templates: export a model's design to a file and import it (plan first, rename or merge on clashes); built-in bars template; models from peers arrive as drafts to approve
 - Code space input picker (i or [Input]): pick a model, then its where, matching, group, sort and limit with the line previewed; sharing a model or a records live search into a code space sets its input and runs it (CLI: mnnn share … code SPACE --run)
 
+### Changed
+- Bars are the records of the built-in bars model, kept in its own table; upgrading moves every bar and every value stored on bars losslessly (same ids)
+
 ## [2.15.0] - 2026-10-31
 
 ### Added

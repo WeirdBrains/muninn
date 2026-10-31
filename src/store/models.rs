@@ -8,11 +8,12 @@
 //! `model_versions`, so any version can be looked at again or rolled back to.
 //!
 //! Tables: model `name` keeps its records in `m_<name>` (`id`, `_version`, `_created_at`,
-//! `_updated_at`, `_author`, then one column per field). The built-in `bars` model is the
-//! bars table itself. Its built-in fields (ids `bar.KEY`) read the bars table's columns and
-//! can be renamed, moved, constrained, retyped and dropped like any field: a retyped one
-//! is stored in the bars table under its name (converted), a dropped one leaves the model while the bars keep
-//! their imported values. Fields added to it are columns of the same table (`m_bars`).
+//! `_updated_at`, `_author`, then one column per field). The built-in `bars` model keeps
+//! the bars in its own table too (`m_bars`), next to the bars' own columns (`_base` …
+//! `_flags`). Its built-in fields (ids `bar.KEY`) read those columns and can be renamed,
+//! moved, constrained, retyped and dropped like any field: a retyped one is stored under
+//! its name (converted), a dropped one leaves the model while the bars keep their
+//! imported values. Fields added to it are columns of the same table.
 //!
 //! Field ids stay the same across versions, so a renamed field keeps its values.
 use super::{Store, new_id, now_ms};
