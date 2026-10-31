@@ -23,8 +23,9 @@
   Cut small fixtures into `tests/fixtures/`; full-file tests are `#[ignore]` and read
   `MUNINN_RAW_DATA`.
 - Never edit files outside this project folder (cargo caches excepted).
-- Git: commit locally in logical steps. Do **not** push commits or tags, change remotes,
-  force-push, rewrite published history, or skip hooks.
+- Git: always go in this order: test, commit, tag, push. Commit in logical steps once the
+  quality bar passes, tag releases, then push (`git push origin main --follow-tags`).
+  Do **not** change remotes, force-push, rewrite published history, or skip hooks.
 - Secrets (keys, words, shards, passwords) are never logged, printed in `-v` output, or
   committed.
 
@@ -32,7 +33,7 @@
 - Semantic versioning. Pre-1.0: MINOR bump per new feature, PATCH for fixes/docs-only.
 - Each release: bump `Cargo.toml` (+ `Cargo.lock`), regenerate man pages, update the
   version shown in the TUI header, add a `CHANGELOG.md` entry, commit as
-  `release: vX.Y.Z`, and create an annotated tag `vX.Y.Z` (local only).
+  `release: vX.Y.Z`, and create an annotated tag `vX.Y.Z`, then push main with the tag.
 - `CHANGELOG.md` (Keep a Changelog format) stays **summary level**: a few short one-line
   bullets per release naming the feature. No implementation details, file lists or
   sub-bullets. Tag messages are one short line.
@@ -67,7 +68,8 @@
   chart layers, import as a popup with a folder browser.
 
 ## Releases
-- Cut releases locally with `scripts/release.sh` (commit + annotated tag); never push.
+- Cut releases locally with `scripts/release.sh` (commit + annotated tag), then push with
+  `git push origin main --follow-tags`.
   Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds all platform
   binaries and packages and publishes the GitHub Release. See `docs/release.md`.
 - Packages always ship prebuilt binaries; installing must never need Rust.
