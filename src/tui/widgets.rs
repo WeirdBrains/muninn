@@ -365,3 +365,142 @@ pub fn scan_hints(buf: &ratatui::buffer::Buffer, area: Rect, colours: &[ratatui:
     }
     out
 }
+
+/// Where URLs (http, https, muninn) are drawn in `area`, one line at a time.
+pub fn scan_urls(buf: &ratatui::buffer::Buffer, area: Rect) -> Vec<(Rect, String)> {
+    let mut out = vec![];
+    let area = area.intersection(buf.area);
+    for y in area.top()..area.bottom() {
+        // the row's text, with each char's x
+        let mut text = String::new();
+        let mut xs = vec![];
+        for x in area.left()..area.right() {
+            let sym = buf[(x, y)].symbol();
+            for ch in sym.chars() {
+                text.push(ch);
+                xs.push(x);
+            }
+        }
+        out.extend(find_urls(&text).into_iter().filter_map(|(a, n)| {
+            let chars: Vec<char> = text.chars().collect();
+            let url: String = chars[a..a + n].iter().collect();
+            let (x0, x1) = (*xs.get(a)?, *xs.get(a + n - 1)?);
+            Some((Rect { x: x0, y, width: x1 - x0 + 1, height: 1 }, url))
+        }));
+    }
+    out
+}
+
+/// (char start, char length) of every URL in `text`; trailing punctuation is left out.
+pub fn find_urls(text: &str) -> Vec<(usize, usize)> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = vec![];
+    let mut i = 0;
+    while i < chars.len() {
+        let rest: String = chars[i..chars.len().min(i + 10)].iter().collect();
+        let scheme = ["https://", "http://", "muninn://"].iter().find(|s| rest.starts_with(**s));
+        let boundary = i == 0 || !chars[i - 1].is_alphanumeric();
+        if let (Some(sc), true) = (scheme, boundary) {
+            let mut j = i + sc.len();
+            while j < chars.len() && !chars[j].is_whitespace() && !matches!(chars[j], '"' | '<' | '>' | '`' | '│' | '┃' | '║') {
+                j += 1;
+            }
+            while j > i + sc.len() && matches!(chars[j - 1], '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '\'' | '…') {
+                // keep a closing bracket that has its opening one inside the URL
+                let c = chars[j - 1];
+                let open = match c {
+                    ')' => Some('('),
+                    ']' => Some('['),
+                    _ => None,
+                };
+                if let Some(o) = open
+                    && chars[i..j - 1].contains(&o)
+                {
+                    break;
+                }
+                j -= 1;
+            }
+            if j > i + sc.len() {
+                out.push((i, j - i));
+            }
+            i = j.max(i + 1);
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Write each URL again as an OSC 8 hyperlink, in the colours already on screen, so
+/// terminals that support it make it a real link. The buffer is left as drawn.
+pub fn paint_links(buf: &ratatui::buffer::Buffer, urls: &[(Rect, String)]) -> std::io::Result<()> {
+    use ratatui::crossterm::{cursor, queue, style};
+    use std::io::Write;
+    if urls.is_empty() {
+        return Ok(());
+    }
+    let mut out = std::io::stdout().lock();
+    queue!(out, cursor::SavePosition)?;
+    for (r, url) in urls {
+        let safe: String = url.chars().filter(|c| !c.is_control()).collect();
+        queue!(out, cursor::MoveTo(r.x, r.y))?;
+        write!(out, "\x1b]8;;{safe}\x1b\\")?;
+        for x in r.left()..r.right() {
+            if !buf.area.contains((x, r.y).into()) {
+                break;
+            }
+            let c = &buf[(x, r.y)];
+            queue!(out, style::SetForegroundColor(ct(c.fg)), style::SetBackgroundColor(ct(c.bg)))?;
+            write!(out, "{}", c.symbol())?;
+        }
+        write!(out, "\x1b]8;;\x1b\\")?;
+    }
+    queue!(out, style::ResetColor, cursor::RestorePosition)?;
+    out.flush()
+}
+
+/// ratatui's colour as crossterm's.
+fn ct(c: ratatui::style::Color) -> ratatui::crossterm::style::Color {
+    use ratatui::crossterm::style::Color as X;
+    use ratatui::style::Color as C;
+    match c {
+        C::Reset => X::Reset,
+        C::Rgb(r, g, b) => X::Rgb { r, g, b },
+        C::Indexed(i) => X::AnsiValue(i),
+        C::Black => X::Black,
+        C::Red => X::DarkRed,
+        C::Green => X::DarkGreen,
+        C::Yellow => X::DarkYellow,
+        C::Blue => X::DarkBlue,
+        C::Magenta => X::DarkMagenta,
+        C::Cyan => X::DarkCyan,
+        C::Gray => X::Grey,
+        C::DarkGray => X::DarkGrey,
+        C::LightRed => X::Red,
+        C::LightGreen => X::Green,
+        C::LightYellow => X::Yellow,
+        C::LightBlue => X::Blue,
+        C::LightMagenta => X::Magenta,
+        C::LightCyan => X::Cyan,
+        C::White => X::White,
+    }
+}
+
+#[cfg(test)]
+mod url_tests {
+    use super::find_urls;
+
+    fn urls(t: &str) -> Vec<String> {
+        let c: Vec<char> = t.chars().collect();
+        find_urls(t).into_iter().map(|(a, n)| c[a..a + n].iter().collect()).collect()
+    }
+
+    #[test]
+    fn finds_urls_and_drops_trailing_punctuation() {
+        assert_eq!(urls("site: https://lab.example.org:4743/x, ok"), vec!["https://lab.example.org:4743/x"]);
+        assert_eq!(urls("(see http://a.b/c)."), vec!["http://a.b/c"]);
+        assert_eq!(urls("https://en.wikipedia.org/wiki/A_(b)"), vec!["https://en.wikipedia.org/wiki/A_(b)"]);
+        assert_eq!(urls("join muninn://join/abc│"), vec!["muninn://join/abc"]);
+        assert!(urls("nohttps://x https:// plain").is_empty());
+    }
+}

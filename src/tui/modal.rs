@@ -245,6 +245,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             on_key(app, enter);
         }
         Hit::Picker(p) => super::picker::on_click(app, p),
+        Hit::Url(i) => app.open_url(i),
         Hit::HelpLink(n) => {
             if let Some(Modal::Help(h)) = app.modal.as_mut() {
                 h.click_link(n);

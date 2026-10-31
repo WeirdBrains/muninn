@@ -80,6 +80,8 @@ pub enum Hit {
     ImportInput(u8),
     /// The n-th internal link of the open help topic.
     HelpLink(usize),
+    /// The n-th URL drawn this frame (index into `App::urls`).
+    Url(usize),
     /// A row of a popup list (Preferences, Layers, Pick, Filter, Themes, Help topics).
     Row(usize),
     /// A field or action button of a form (Export, Keys): index as in `Form::sel`.
@@ -136,6 +138,12 @@ pub struct App {
     pub themes: themes::ThemeState,
     /// Regions from the last draw, for mouse hit-testing.
     pub hits: Vec<(Rect, Hit)>,
+    /// URLs drawn this frame, with where they are (for clicks and OSC 8 links).
+    pub urls: Vec<(Rect, String)>,
+    /// The URL sets already written as OSC 8 links (repainted when they change).
+    pub painted_urls: Vec<(Rect, String)>,
+    /// The last URL a click opened.
+    pub opened: Option<String>,
     /// Last dispatched action (tests and the status line).
     pub last_action: Option<Action>,
     pub authors: authors::AuthorsState,
@@ -183,6 +191,9 @@ impl App {
             menu: menu::MenuState::default(),
             modal: None,
             hits: vec![],
+            urls: vec![],
+            painted_urls: vec![],
+            opened: None,
             last_action: None,
             authors: Default::default(),
             history: Default::default(),
@@ -893,6 +904,7 @@ impl App {
                 self.propagate_from_list(id);
                 self.layout_changed();
             }
+            Some(Hit::Url(i)) => self.open_url(i),
             Some(Hit::Press(code)) => self.on_key(ratatui::crossterm::event::KeyEvent::from(code)),
             Some(Hit::Chord(code, m)) => self.on_key(ratatui::crossterm::event::KeyEvent::new(code, m)),
             Some(
@@ -1020,6 +1032,16 @@ impl App {
             self.modal_hits.splice(0..0, found);
         } else if !self.menu.is_open() {
             hits.splice(0..0, widgets::scan_hints(f.buffer_mut(), area, &colours));
+        }
+        // every URL on screen is clickable (on top of anything else)
+        self.urls =
+            if self.menu.is_open() { vec![] } else { widgets::scan_urls(f.buffer_mut(), if self.modal.is_some() { self.modal_area } else { area }) };
+        for (i, (r, _)) in self.urls.iter().enumerate() {
+            if self.modal.is_some() {
+                self.modal_hits.push((*r, Hit::Url(i)));
+            } else {
+                hits.push((*r, Hit::Url(i)));
+            }
         }
         self.hits = hits;
     }
@@ -1181,6 +1203,10 @@ pub fn run(mut app: App) -> crate::Result<()> {
         while !app.quit {
             app.tick();
             terminal.draw(|f| app.draw(f))?;
+            if app.urls != app.painted_urls {
+                let _ = widgets::paint_links(terminal.current_buffer_mut(), &app.urls);
+                app.painted_urls = app.urls.clone();
+            }
             if event::poll(std::time::Duration::from_millis(100))? {
                 match event::read()? {
                     Event::Key(k) => app.on_key(k),
@@ -1204,6 +1230,37 @@ pub fn run(mut app: App) -> crate::Result<()> {
 }
 
 impl App {
+    /// Open the n-th URL on screen in the system's browser (muninn:// links are shown, not opened).
+    pub fn open_url(&mut self, i: usize) {
+        let Some((_, url)) = self.urls.get(i).cloned() else { return };
+        self.opened = Some(url.clone());
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            self.status = format!("link: {url}");
+            return;
+        }
+        if cfg!(test) {
+            return;
+        }
+        let (cmd, args): (&str, Vec<&str>) = if cfg!(target_os = "macos") {
+            ("open", vec![])
+        } else if cfg!(windows) {
+            ("cmd", vec!["/C", "start", ""])
+        } else {
+            ("xdg-open", vec![])
+        };
+        let r = std::process::Command::new(cmd)
+            .args(args)
+            .arg(&url)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+        self.status = match r {
+            Ok(_) => format!("opened {url}"),
+            Err(e) => format!("could not open {url}: {e}"),
+        };
+    }
+
     /// Periodic work between frames (background tasks).
     /// Every loop turn (about 10 a second): show what rules did.
     pub fn tick(&mut self) {
@@ -1229,6 +1286,8 @@ mod reports_tests;
 mod reviews_tests;
 #[cfg(test)]
 mod rules_tests;
+#[cfg(test)]
+mod screenshots;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

@@ -25,13 +25,14 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 15 | [Review Copies](#review-copies): what is reviewed lives on the reviewer's node in review mode | v2.14.0 | ✅ Released |
 | 16 | [Share and Clickable Hints](#share-and-clickable-hints): one Share action for everything; every hint is a button | v2.15.0 | ✅ Released |
 | 17 | [Model Design Templates](#model-design-templates): export, import and share model designs; bars become a built-in template | v2.16.0 | 📋 Planned |
-| 18 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | 📋 Planned |
-| 19 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | 📋 Planned |
-| 20 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
-| 21 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | 📋 Planned |
-| 22 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 📋 Planned |
-| 23 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | post-2.0 | 📋 Planned |
-| 24 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | v2.19.0 | 📋 Planned |
+| 18 | [Org TLS](#org-tls): org domains; your own cert, else Let's Encrypt, else self-signed; auto-renew | v2.16.0 | 📋 Planned |
+| 19 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | 📋 Planned |
+| 20 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | 📋 Planned |
+| 21 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
+| 22 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | 📋 Planned |
+| 23 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 📋 Planned |
+| 24 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | post-2.0 | 📋 Planned |
+| 25 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | v2.19.0 | 📋 Planned |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
 
 **2.0 launch wrap-up:** snapshot to `docs/historical/2.0` with this plan, the announcement, and the full changelog; then clear `PLAN.md`.
@@ -360,6 +361,17 @@ Before the launch: the website, screenshots and announcement come after this.
 4. The hard-coded bars feature is removed from the app and ships as a built-in model design template; bars views, ingest and charts work through the model
 5. Existing bars data migrates losslessly into the imported bars model on upgrade (counts, values, timestamps, sources, symbols, history links); tested by upgrading a 2.14 database and comparing every row
 6. Docs, help, man pages and the TUI Models window cover export, import and the built-in templates
+
+## Org TLS
+
+Before the launch, next to model design templates. Builds on the `org host cert status|acme|renew` commands that exist today.
+
+1. Orgs get optional domains and cert settings (`mnnn org domain add|list|remove ORG DOMAIN`)
+2. Cert priority: a user-supplied cert and key (`mnnn org cert set ORG --cert FILE --key FILE`; the key is kept in the encrypted store and never logged) > Let's Encrypt over ACME for the configured domains (HTTP-01 or TLS-ALPN-01 when the port is reachable; DNS-01 noted as an option for hosts behind NAT) > a self-signed fallback
+3. Org status shows where the cert came from and when it expires; certs renew automatically before expiry
+4. The TUI org settings let you add domains and set or replace the cert
+5. Scheduled rule sets (pre-launch): a cron-style or interval trigger (`--every 6h`, `--cron "0 3 * * *"`) that runs the rule set on the node, shown, edited and dry-run like any other rule
+6. A cert expiry watcher, shipped as a built-in scheduled rule set (viewable, editable and copyable, not hard-coded); its actions renew an ACME cert or emit a notification for user-supplied certs: Let's Encrypt certs renew about 30 days before expiry, retrying with backoff and notifying on failure; user-supplied certs notify at 30, 14 and 3 days and on expiry, telling you to renew with your provider. Expiry events are notifications, so they are rule-set triggers too
 
 ## Website
 

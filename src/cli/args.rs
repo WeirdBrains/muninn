@@ -2841,11 +2841,13 @@ pub enum OrgRoleCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum OrgMemberCommand {
+    /// The org's members, their roles and when they joined.
     List {
         org: String,
         #[arg(long)]
         json: bool,
     },
+    /// Let an applicant in.
     Approve {
         org: String,
         member: String,
@@ -2853,10 +2855,8 @@ pub enum OrgMemberCommand {
         #[arg(long)]
         role: Option<String>,
     },
-    Reject {
-        org: String,
-        member: String,
-    },
+    /// Turn an applicant away.
+    Reject { org: String, member: String },
     /// Invite a node: prints the token to give them (or sends it with --peer).
     Invite {
         org: String,
@@ -2877,11 +2877,7 @@ pub enum OrgMemberCommand {
         resources: String,
     },
     /// Change a member's role.
-    Role {
-        org: String,
-        member: String,
-        role: String,
-    },
+    Role { org: String, member: String, role: String },
     /// The roles new members get.
     Defaults {
         org: String,
@@ -2895,6 +2891,7 @@ pub enum OrgMemberCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum OrgResourceCommand {
+    /// What the org holds, and who gave it.
     List {
         org: String,
         #[arg(long)]
@@ -2907,19 +2904,12 @@ pub enum OrgResourceCommand {
         kind: String,
         name: String,
     },
-    Archive {
-        org: String,
-        resource: String,
-    },
-    Restore {
-        org: String,
-        resource: String,
-    },
+    /// Hide a resource from members (it is kept; restore brings it back).
+    Archive { org: String, resource: String },
+    /// Bring an archived resource back for members.
+    Restore { org: String, resource: String },
     /// No longer the org's (the thing itself stays here).
-    Release {
-        org: String,
-        resource: String,
-    },
+    Release { org: String, resource: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -2947,11 +2937,13 @@ pub enum OrgProjectCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum OrgEndpointCommand {
+    /// The org's callable endpoints, their targets and permissions.
     List {
         org: String,
         #[arg(long)]
         json: bool,
     },
+    /// Expose a model's records, a rule or a code space as a callable endpoint.
     Add {
         org: String,
         name: String,
@@ -2968,10 +2960,8 @@ pub enum OrgEndpointCommand {
         #[arg(long)]
         anyone: bool,
     },
-    Remove {
-        org: String,
-        name: String,
-    },
+    /// Remove an endpoint (callers are then refused).
+    Remove { org: String, name: String },
 }
 
 #[derive(Debug, Subcommand)]
