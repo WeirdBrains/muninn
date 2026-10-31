@@ -37,12 +37,16 @@ fn anything_shares_to_projects_journals_and_code_spaces() {
     assert_eq!(es[0].id, e.made);
     assert!(es[0].title.contains("calc") && es[0].body.contains("worth a look") && es[0].body.contains(&c.id));
 
-    share(&s, ShareKind::Model, "signals", TargetKind::Code, &v("calc"), "", "cli").unwrap();
-    assert_eq!(s.find_code_space("calc").unwrap().input.model, m.name);
+    // a code space takes data to run over; it keeps none of it
+    let out = share(&s, ShareKind::Model, "signals", TargetKind::Code, &v("calc"), "", "cli").unwrap();
+    assert_eq!(out.made, c.id);
+    assert!(s.find_code_space("calc").unwrap().input.is_empty());
+    let _ = &m;
 
     // refusals
     share(&s, ShareKind::Project, "alpha", TargetKind::Project, &v("alpha"), "", "cli").unwrap_err();
-    share(&s, ShareKind::Journal, "notes", TargetKind::Code, &v("calc"), "", "cli").unwrap_err();
+    share(&s, ShareKind::Report, "notes", TargetKind::Code, &v("calc"), "", "cli").unwrap_err();
+    share(&s, ShareKind::Code, "calc", TargetKind::Code, &v("calc"), "", "cli").unwrap_err();
     share(&s, ShareKind::Journal, "notes", TargetKind::Journal, &v("notes"), "", "cli").unwrap_err();
     share(&s, ShareKind::Model, "signals", TargetKind::Project, &[], "", "cli").unwrap_err();
     share(&s, ShareKind::Model, "nope", TargetKind::Project, &v("alpha"), "", "cli").unwrap_err();
@@ -50,29 +54,14 @@ fn anything_shares_to_projects_journals_and_code_spaces() {
 }
 
 #[test]
-fn data_shared_to_a_code_space_becomes_its_input() {
-    let s = Store::open_in_memory().unwrap();
-    let (m, _) = s.create_model("Signals", "", Design::default(), true).unwrap();
-    s.create_code_space("calc", "", Lang::Math, "1+1", CodeInput { model: "bars".into(), limit: Some(5), ..Default::default() }).unwrap();
-    assert!(TargetKind::Code.accepts(ShareKind::LiveSearch) && !TargetKind::Code.accepts(ShareKind::Report));
-    // a model replaces the whole input
-    share(&s, ShareKind::Model, "signals", TargetKind::Code, &v("calc"), "", "cli").unwrap();
-    assert_eq!(s.find_code_space("calc").unwrap().input, CodeInput { model: m.name.clone(), ..Default::default() });
-    // a live search over records: its model, conditions and text
-    let spec = crate::store::SearchSpec {
-        target: crate::store::SearchTarget::Records,
-        model: Some(m.id.clone()),
-        conditions: vec![crate::rules::parse_condition("price > 3").unwrap()],
-        query: "btc".into(),
-        ..Default::default()
-    };
-    s.save_live_search("big", &spec, None).unwrap();
-    let out = share(&s, ShareKind::LiveSearch, "big", TargetKind::Code, &v("calc"), "", "cli").unwrap();
-    assert!(out.new);
-    let i = s.find_code_space("calc").unwrap().input;
-    assert_eq!((i.model.as_str(), i.filter.clone(), i.text.as_str()), ("signals", vec!["price > 3".to_string()], "btc"));
-    // a journal search is not data for code
-    let js = crate::store::SearchSpec { target: crate::store::SearchTarget::Journals, ..Default::default() };
-    s.save_live_search("notes", &js, None).unwrap();
-    assert!(share(&s, ShareKind::LiveSearch, "notes", TargetKind::Code, &v("calc"), "", "cli").is_err());
+fn any_data_is_a_pipe_source_for_a_code_space() {
+    use crate::code::pipe::Source;
+    for k in [ShareKind::Model, ShareKind::LiveSearch, ShareKind::Journal, ShareKind::Code] {
+        assert!(TargetKind::Code.accepts(k), "{k:?}");
+    }
+    assert!(!TargetKind::Code.accepts(ShareKind::Report) && !TargetKind::Code.accepts(ShareKind::Project));
+    assert_eq!(source_for(ShareKind::LiveSearch, "id1", "big").unwrap(), Source::Search("id1".into()));
+    assert_eq!(source_for(ShareKind::Journal, "j", "Notes").unwrap(), Source::Journal("j".into()));
+    assert_eq!(source_for(ShareKind::Code, "c", "calc").unwrap(), Source::Code("c".into()));
+    assert!(matches!(source_for(ShareKind::Model, "m", "signals").unwrap(), Source::Model(i) if i.model == "signals"));
 }

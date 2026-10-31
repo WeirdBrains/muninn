@@ -41,7 +41,11 @@ pub fn choices(app: &App, kind: ShareKind, id: &str) -> Vec<String> {
                 .journals()
                 .map(|l| l.into_iter().filter(|j| !(kind == ShareKind::Journal && j.id == id)).map(|j| j.name).collect())
                 .unwrap_or_default(),
-            TargetKind::Code => app.store.code_spaces().map(|l| l.into_iter().map(|c| c.name).collect()).unwrap_or_default(),
+            TargetKind::Code => app
+                .store
+                .code_spaces()
+                .map(|l| l.into_iter().filter(|c| !(kind == ShareKind::Code && c.id == id)).map(|c| c.name).collect())
+                .unwrap_or_default(),
             TargetKind::Net => vec!["all exchanges".into()],
         };
         v.extend(names.into_iter().map(|n| format!("{} · {n}", t.as_str())));
@@ -68,12 +72,16 @@ pub fn picked(app: &mut App, row: &str) {
     let Some(t) = TargetKind::parse(t) else { return };
     let to: Vec<String> = if t == TargetKind::Net { vec![] } else { vec![to.to_string()] };
     match share(&app.store, kind, &id, t, &to, "", "tui") {
-        // data into a code space: open it and run it (a new or changed source asks first)
-        Ok(s) if t == TargetKind::Code => {
-            app.set_status(s.summary());
-            super::code::open_space(app, &s.made);
-            super::code::run_shared(app, &s.summary());
-        }
+        // data into a code space: open it and run it over the data (the space is not
+        // changed; a new or changed source asks to be approved first)
+        Ok(s) if t == TargetKind::Code => match crate::share::source_for(kind, &s.item, &s.name) {
+            Ok(src) => {
+                app.set_status(s.summary());
+                super::code::open_space(app, &s.made);
+                super::code::run_piped(app, src, &s.summary());
+            }
+            Err(e) => app.set_status(format!("share: {e}")),
+        },
         Ok(s) => app.set_status(s.summary()),
         Err(e) => app.set_status(format!("share: {e}")),
     }

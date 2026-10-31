@@ -49,11 +49,13 @@ pub struct Run<'a> {
     pub notes: Vec<String>,
     pub error: Option<String>,
     pub writes: usize,
+    /// The frame piped in (else the space's default model query).
+    pub input: Option<Value>,
 }
 
 impl<'a> Run<'a> {
     pub fn new(store: &'a Store, space: &'a CodeSpace) -> Self {
-        Run { store, space, logs: vec![], result: None, notes: vec![], error: None, writes: 0 }
+        Run { store, space, logs: vec![], result: None, notes: vec![], error: None, writes: 0, input: None }
     }
 
     /// The table to hand to `muninn_plugin_run` (valid while `self` is).
@@ -83,11 +85,17 @@ impl<'a> Run<'a> {
             "methods" => Ok(json!(METHODS)),
             "input_request" => Ok(serde_json::to_value(&self.space.input)?),
             "input" => {
+                if let Some(f) = &self.input {
+                    return Ok(f.clone());
+                }
                 let i = &self.space.input;
                 if i.is_empty() {
                     return Err(Error::invalid(
                         "input",
-                        format!("code space {} has no input; set one with `mnnn code edit {} --model MODEL`", self.space.name, self.space.name),
+                        format!(
+                            "code space {} has no input; pipe data in (`mnnn pipe SOURCE {}`) or give it a default with `mnnn code edit {} --input SOURCE`",
+                            self.space.name, self.space.name, self.space.name
+                        ),
                     ));
                 }
                 load(s, &serde_json::to_value(i)?)

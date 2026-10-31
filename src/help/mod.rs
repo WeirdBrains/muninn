@@ -199,6 +199,8 @@ mod tests {
             "models",
             "model-templates",
             "code-spaces",
+            "pipes",
+            "pipelines",
             "network",
             "key-exchanges",
             "dark-shards",

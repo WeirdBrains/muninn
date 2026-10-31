@@ -252,26 +252,70 @@ fn the_input_picker_builds_the_line_from_a_model_and_its_parts() {
 }
 
 #[test]
-fn sharing_data_to_a_code_space_sets_its_input_and_runs_it() {
+fn sharing_data_to_a_code_space_runs_it_over_the_data_without_rebinding_it() {
     let (_t, mut a) = app();
-    let c = a.store.create_code_space("calc", "", crate::store::Lang::Math, "C = close * 2", Default::default()).unwrap();
-    // first time: it asks to approve the source, then runs
+    a.store.create_code_space("calc", "", crate::store::Lang::Math, "C = close * 2", Default::default()).unwrap();
     a.share_item = Some((crate::store::ShareKind::Model, "bars".into()));
     super::share::picked(&mut a, "code · calc");
-    assert_eq!(a.store.find_code_space("calc").unwrap().input.model, "bars");
     assert!(matches!(a.modal, Some(Modal::Code)) && a.code.screen == Screen::Edit);
+    // the data is piped in; the space keeps none of it
+    assert!(a.store.find_code_space("calc").unwrap().input.is_empty());
+    assert!(a.code.piped.as_ref().is_some_and(|p| p.text() == "bars"), "{:?}", a.code.piped);
+    assert!(screen_text(&mut a).contains("piped in: bars"));
+    // a new source asks first
     assert_eq!(a.code.confirm, Some(Confirm::ApproveRun));
     assert!(a.code.msg.as_ref().unwrap().0.contains("native code"));
-    a.on_key(key(KeyCode::Char('y')));
-    // approved: it runs (a compiled space builds on its thread first, then runs)
-    assert!(crate::code::approved(&a.store.find_code_space("calc").unwrap()));
-    assert!(a.code.building.is_some() || a.code.result.is_some(), "{:?}", a.code.msg);
-    // approved now: sharing again goes straight to the run
-    a.code.building = None;
-    a.modal = None;
-    a.share_item = Some((crate::store::ShareKind::Model, "bars".into()));
-    super::share::picked(&mut a, "code · calc");
-    assert_eq!(a.code.confirm, None);
-    assert!(a.code.building.is_some() || a.code.result.is_some(), "{:?}", a.code.msg);
-    let _ = c;
+    // a code space is not offered to itself
+    assert!(!super::share::choices(&a, crate::store::ShareKind::Code, &a.code.space.as_ref().unwrap().id).contains(&"code · calc".to_string()));
+}
+
+/// search | code | code, saving on the way (tee) and at the end.
+#[test]
+fn a_search_pipes_through_two_code_spaces_into_journals() {
+    if crate::code::cargo().is_err() {
+        eprintln!("skipped: no cargo");
+        return;
+    }
+    let (_t, mut a) = app();
+    let j = a.store.create_journal("Notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    for (t, b) in [("one", "alpha beta"), ("two", "alpha beta gamma delta")] {
+        a.store.add_entry(&j.id, t, b, None).unwrap();
+    }
+    let out = a.store.create_journal("Out", None, crate::store::EntryFormat::Markdown).unwrap();
+    let spec = crate::store::SearchSpec { target: crate::store::SearchTarget::Journals, query: "alpha".into(), ..Default::default() };
+    a.store.save_live_search("alphas", &spec, None).unwrap();
+    for (n, src) in [("double", "@view table\nw2 = words * 2"), ("plus", "@view table\nw3 = w2 + 1")] {
+        let c = a.store.create_code_space(n, "", crate::store::Lang::Math, src, Default::default()).unwrap();
+        crate::code::approve(&a.store, "test", &c).unwrap();
+    }
+    // a journal search into the first space
+    a.share_item = Some((crate::store::ShareKind::LiveSearch, "alphas".into()));
+    super::share::picked(&mut a, "code · double");
+    let r = a.code.result.clone().unwrap_or_else(|| panic!("{:?} {:?}", a.code.msg, a.code.log));
+    assert_eq!(r.status, "ok", "{r:?} {:?}", a.code.log);
+    // > : save it to Out (a tee) and keep going
+    a.on_key(key(KeyCode::Char('>')));
+    let Some(Modal::Pick { items, .. }) = &a.modal else { panic!("the pipe picker") };
+    assert!(items.contains(&"code · plus".to_string()) && !items.contains(&"code · double".to_string()), "{items:?}");
+    a.on_pick(super::modal::PickKind::Pipe, "save to journal · Out");
+    assert_eq!(a.store.entries(&out.id).unwrap().len(), 1, "{:?}", a.code.msg);
+    assert_eq!(a.code.space.as_ref().unwrap().name, "double", "a save does not end the pipe");
+    // > : on into the second space, then save its result
+    a.on_key(key(KeyCode::Char('>')));
+    a.on_pick(super::modal::PickKind::Pipe, "code · plus");
+    assert_eq!(a.code.space.as_ref().unwrap().name, "plus");
+    let r = a.code.result.clone().expect("plus ran");
+    assert_eq!(r.status, "ok", "{r:?} {:?}", a.code.log);
+    a.on_key(key(KeyCode::Char('>')));
+    a.on_pick(super::modal::PickKind::Pipe, "save to journal · Out");
+    let es = a.store.entries(&out.id).unwrap();
+    assert_eq!(es.len(), 2);
+    let last = es.iter().find(|e| e.title.contains("plus")).unwrap_or_else(|| panic!("{es:?}"));
+    // words 2 and 4 → w2 4 and 8 → w3 5 and 9
+    assert!(last.body.contains("w3") && last.body.contains('5') && last.body.contains('9'), "{}", last.body);
+    for c in ["double", "plus"] {
+        assert!(a.store.find_code_space(c).unwrap().input.is_empty(), "{c} keeps no input");
+    }
+    let kinds: Vec<String> = a.store.actions().unwrap().into_iter().map(|r| r.kind).collect();
+    assert!(kinds.iter().filter(|k| *k == "pipe.run").count() >= 2 && kinds.iter().filter(|k| *k == "code.run").count() >= 2, "{kinds:?}");
 }

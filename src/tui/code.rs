@@ -3,6 +3,7 @@
 //! need no database); runs happen on the UI thread (plugins use the store).
 use super::workspace::{Ask, Back, Purpose, Typed, View, ask_key, draw_view, muted, pick_project, row_style};
 use super::{App, Hit, block};
+use crate::code::pipe::{Sink, Source, Step};
 use crate::code::{self, CodeEnv};
 use crate::ingest::time::fmt_ts;
 use crate::store::{CodeChange, CodeInput, CodeScope, CodeSpace, ItemKind, Lang, RunInfo};
@@ -225,6 +226,9 @@ pub struct CodeState {
     /// Which scopes the list shows (`f` cycles).
     pub filter: ScopeView,
     pub picker: Option<InputPicker>,
+    /// Data piped into the open space (a share or the step before): runs work on it, the
+    /// space keeps none of it. Cleared when the space closes.
+    pub piped: Option<Source>,
 }
 
 /// The input picker (`i` or [Input]): pick a model (or none), then its parts.
@@ -344,6 +348,7 @@ pub fn open_space(app: &mut App, id: &str) {
 fn edit_selected(app: &mut App) {
     let Some(c) = app.code.selected().cloned() else { return };
     let st = &mut app.code;
+    st.piped = None;
     st.editor = Editor::new(&c.source);
     st.result = c.last_run.clone();
     st.log = c.last_run.as_ref().map(|r| r.logs.clone()).unwrap_or_default();
@@ -454,7 +459,9 @@ pub fn poll(app: &mut App) {
 }
 
 /// After data was shared into the open space: run it and show the output.
-pub fn run_shared(app: &mut App, what: &str) {
+/// Run the open space over piped data (after a share, or as the next step of a pipe).
+pub fn run_piped(app: &mut App, src: Source, what: &str) {
+    app.code.piped = Some(src);
     run(app);
     if app.code.confirm == Some(Confirm::ApproveRun) {
         let m = app.code.msg.take().map(|m| m.0).unwrap_or_default();
@@ -480,6 +487,20 @@ fn run(app: &mut App) {
         Ok(e) => e,
         Err(e) => return err(app, e),
     };
+    if let Some(src) = app.code.piped.clone() {
+        // piped data: one step of a pipe, built (if needed) and run here
+        let mut logs = vec![];
+        let res = code::pipe::run(&app.store, &env, "tui", &src, &[Step::Code(c.id.clone())], &[], &mut |l| logs.push(l.to_string()));
+        app.code.log = logs;
+        return match res {
+            Ok(p) => {
+                if let Some((_, info)) = p.runs.into_iter().next_back() {
+                    finished(app, &c, info);
+                }
+            }
+            Err(e) => err(app, e),
+        };
+    }
     // compiled and not cached yet: build on the thread first
     if c.lang != Lang::Plugin && !env.plugin_path(&code::build_key(c.lang, &c.source)).exists() {
         return start_build(app, true);
@@ -497,7 +518,14 @@ fn run_now(app: &mut App) {
     let res = code::run(&app.store, &env, "tui", &c, &mut |l| logs.push(l.to_string()));
     app.code.log.extend(logs);
     match res {
-        Ok(info) => {
+        Ok(info) => finished(app, &c, info),
+        Err(e) => err(app, e),
+    }
+}
+
+fn finished(app: &mut App, c: &CodeSpace, info: RunInfo) {
+    {
+        {
             app.code.log.extend(info.logs.iter().cloned());
             match &info.error {
                 Some(e) => err(app, format!("the run failed: {e}")),
@@ -514,6 +542,48 @@ fn run_now(app: &mut App) {
             app.refresh_history(true);
             app.refresh_rows();
         }
+    }
+}
+
+/// `>`: pipe the last result on: into another code space (which runs over it), or save
+/// it to a journal or a model and keep going (a save is a side branch).
+fn pipe_on(app: &mut App) {
+    let Some(c) = app.code.space.clone() else { return };
+    let Some(info) = app.code.result.clone() else { return err(app, "run it first: r") };
+    if let Err(e) = code::pipe::output(&c, &info) {
+        return err(app, e);
+    }
+    let mut items: Vec<String> =
+        app.store.code_spaces().unwrap_or_default().into_iter().filter(|x| x.id != c.id).map(|x| format!("code · {}", x.name)).collect();
+    items.extend(app.store.journals().unwrap_or_default().into_iter().map(|j| format!("save to journal · {}", j.name)));
+    items.extend(
+        app.store.models().unwrap_or_default().into_iter().filter(|m| !m.is_bars() && m.version > 0).map(|m| format!("save to model · {}", m.name)),
+    );
+    app.share_back = app.modal.take().map(Box::new);
+    app.modal =
+        Some(super::modal::Modal::Pick { title: format!("Pipe the result of {} to", c.name), items, sel: 0, kind: super::modal::PickKind::Pipe });
+}
+
+/// A row of the `>` picker was chosen.
+pub fn pipe_picked(app: &mut App, row: &str) {
+    app.modal = app.share_back.take().map(|b| *b);
+    let (Some(c), Some(info)) = (app.code.space.clone(), app.code.result.clone()) else { return };
+    let frame = match code::pipe::output(&c, &info) {
+        Ok(f) => f,
+        Err(e) => return err(app, e),
+    };
+    let Some((k, name)) = row.split_once(" · ") else { return };
+    if k == "code" {
+        let Ok(next) = app.store.find_code_space(name) else { return err(app, format!("no code space {name}")) };
+        open_space(app, &next.id);
+        return run_piped(app, Source::Frame(frame), &format!("piped {} into {}", c.name, next.name));
+    }
+    let sink = if k.ends_with("journal") { Sink::Journal(name.into()) } else { Sink::Model(name.into()) };
+    match code::pipe::save(&app.store, "tui", &sink, &frame, Some((&c, &info)), &format!("code:{} | tee {}", c.name, sink.text())) {
+        Ok(made) => {
+            app.refresh_history(true);
+            ok(app, format!("saved the result of {} to {} ({made}) · > pipes it on", c.name, sink.text()));
+        }
         Err(e) => err(app, e),
     }
 }
@@ -523,7 +593,17 @@ fn open_picker(app: &mut App) {
     let Some(c) = app.code.space.clone().or_else(|| app.code.selected().cloned()) else { return };
     let mut models = vec!["none".to_string()];
     models.extend(app.store.models().unwrap_or_default().into_iter().map(|m| m.name));
-    let sel = if c.input.model.is_empty() { 0 } else { models.iter().position(|m| m.eq_ignore_ascii_case(&c.input.model)).unwrap_or(0) };
+    // other sources: any live search, a journal, another space's output
+    models.extend(app.store.live_searches().unwrap_or_default().into_iter().map(|l| format!("search:{}", l.name)));
+    models.extend(app.store.journals().unwrap_or_default().into_iter().map(|j| format!("journal:{}", j.name)));
+    models.extend(app.store.code_spaces().unwrap_or_default().into_iter().filter(|x| x.id != c.id).map(|x| format!("code:{}", x.name)));
+    let sel = if !c.input.from.is_empty() {
+        models.iter().position(|m| m.eq_ignore_ascii_case(&c.input.from)).unwrap_or(0)
+    } else if c.input.model.is_empty() {
+        0
+    } else {
+        models.iter().position(|m| m.eq_ignore_ascii_case(&c.input.model)).unwrap_or(0)
+    };
     app.code.picker = Some(InputPicker { space: c.id.clone(), models_stage: true, models, sel, input: c.input.clone() });
     app.code.msg = None;
 }
@@ -582,6 +662,11 @@ fn picker_pick(app: &mut App) {
         let m = p.models.get(p.sel).cloned().unwrap_or_default();
         if p.sel == 0 {
             p.input = CodeInput::default();
+            return use_input(app);
+        }
+        if m.contains(':') {
+            // a whole source: no parts to edit
+            p.input = CodeInput { from: m, ..Default::default() };
             return use_input(app);
         }
         if !m.eq_ignore_ascii_case(&p.input.model) {
@@ -823,6 +908,11 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 KeyCode::Char('b') => start_build(app, false),
                 KeyCode::Char('r') => run(app),
                 KeyCode::Char('t') => app.code.wide = !app.code.wide,
+                KeyCode::Char('>') => pipe_on(app),
+                KeyCode::Char('x') if app.code.piped.is_some() => {
+                    app.code.piped = None;
+                    ok(app, "runs use its default input again");
+                }
                 KeyCode::Char('i') => open_picker(app),
                 KeyCode::Char('c') => {
                     let lines: Vec<String> = match (app.code.space.as_ref(), env(app)) {
@@ -953,12 +1043,13 @@ fn draw_picker(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)
     ]));
     if p.models_stage {
         for (i, m) in p.models.iter().enumerate() {
-            let what = if i == 0 {
-                "no input records"
-            } else if m == "bars" {
-                "the bars (OHLCV)"
-            } else {
-                "a designed model"
+            let what = match m.split_once(':').map(|x| x.0) {
+                _ if i == 0 => "no default input (pipe data in)",
+                Some("search") => "a live search's matches, when it runs",
+                Some("journal") => "a journal's entries",
+                Some("code") => "another code space's output",
+                _ if m == "bars" => "the bars (OHLCV)",
+                _ => "a designed model",
             };
             v.rows.push(Line::from(vec![
                 Span::styled(format!(" {m:<24}"), row_style(&t, i == p.sel)),
@@ -1070,8 +1161,12 @@ fn draw_edit(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
     if inner.height < 6 || inner.width < 20 {
         return;
     }
+    let input = match &app.code.piped {
+        Some(p) => format!(" piped in: {} (x: default {})", p.text(), c.input.text()),
+        None => format!(" default input: {}", c.input.text()),
+    };
     let head = Line::from(vec![
-        Span::styled(format!(" input: {}", c.input.text()), Style::new().fg(t.fg)),
+        Span::styled(input, Style::new().fg(t.fg)),
         Span::styled(format!(" · {}", status_of(&c)), Style::new().fg(if code::approved(&c) { t.accent } else { t.warning })),
         Span::styled(
             if app.code.building.is_some() { format!(" · {} building", super::widgets::spinner_frame()) } else { String::new() },
@@ -1178,6 +1273,7 @@ fn draw_edit(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
             ("r run", KeyCode::Char('r')),
             ("c check", KeyCode::Char('c')),
             ("i input", KeyCode::Char('i')),
+            ("> pipe on", KeyCode::Char('>')),
             ("t result", KeyCode::Char('t')),
             ("p project", KeyCode::Char('p')),
             ("Esc back", KeyCode::Esc),

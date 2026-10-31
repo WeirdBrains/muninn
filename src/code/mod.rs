@@ -25,6 +25,7 @@ pub mod abi;
 pub mod bars;
 pub mod host;
 pub mod math;
+pub mod pipe;
 pub mod png;
 pub mod polars;
 pub mod pyconv;
@@ -487,6 +488,30 @@ pub fn note_build(store: &Store, origin: &str, space: &CodeSpace, b: &Built, sec
 /// Run a code space: approval check, build if needed, load, run, record. A plugin's own
 /// error is a run with status `error` (returned, not raised).
 pub fn run(store: &Store, env: &CodeEnv, origin: &str, space: &CodeSpace, log: &mut dyn FnMut(&str)) -> Result<RunInfo> {
+    // the default input (a convenience: a code space works on whatever is piped in)
+    if !approved(space) {
+        return Err(need_approval(space));
+    }
+    let src = pipe::Source::of(space.input.clone());
+    let input = match &src {
+        // a model query loads lazily, when the plugin asks
+        pipe::Source::Model(_) | pipe::Source::None => None,
+        s => pipe::frame(store, env, origin, s, log)?,
+    };
+    run_on(store, env, origin, space, input, &src.text(), log)
+}
+
+/// Run a code space over `input` (a frame; `None`: its default model query, if any).
+/// `from` names where the input came from, for the history.
+pub fn run_on(
+    store: &Store,
+    env: &CodeEnv,
+    origin: &str,
+    space: &CodeSpace,
+    input: Option<serde_json::Value>,
+    from: &str,
+    log: &mut dyn FnMut(&str),
+) -> Result<RunInfo> {
     if !approved(space) {
         return Err(need_approval(space));
     }
@@ -504,12 +529,13 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, space: &CodeSpace, log: &
     let quiet = store.rules_rt.off.replace(true);
     let action = store.record_action(
         &NewAction::new("code.run", origin, format!("run code space {}", space.name))
-            .params(json!({ "id": space.id, "name": space.name, "lang": space.lang.as_str(), "input": space.input.text() })),
+            .params(json!({ "id": space.id, "name": space.name, "lang": space.lang.as_str(), "input": from })),
     );
     store.rules_rt.off.set(quiet);
     let action = action?;
     let t = std::time::Instant::now();
     let mut r = host::Run::new(store, space);
+    r.input = input;
     let table = r.table();
     // SAFETY: an approved plugin with a checked ABI; `table` and `r` outlive the call.
     let code = unsafe { (plugin.run)(&table) };
@@ -531,7 +557,7 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, space: &CodeSpace, log: &
         }
         (e, _) => format!("run code space {}: error: {}", space.name, e.as_deref().unwrap_or("").lines().next().unwrap_or("")),
     };
-    let params = json!({ "id": space.id, "name": space.name, "lang": space.lang.as_str(), "input": space.input.text(), "status": status, "writes": writes, "ms": ms, "error": error });
+    let params = json!({ "id": space.id, "name": space.name, "lang": space.lang.as_str(), "input": from, "status": status, "writes": writes, "ms": ms, "error": error });
     store.update_action(action, &summary, &params)?;
     let info = RunInfo { at: now_ms(), status: status.into(), view, error, logs, writes, ms, action: Some(action) };
     store.set_code_run(&space.id, &info)?;
@@ -546,6 +572,19 @@ pub fn parse_input(s: &str) -> Result<CodeInput> {
     let s = s.trim();
     if s.is_empty() || s.eq_ignore_ascii_case("none") {
         return Ok(CodeInput::default());
+    }
+    // another source: a live search, a journal, a code space's output
+    if let Some((k, n)) = s.split_once(':') {
+        let k = k.trim().to_ascii_lowercase();
+        if ["search", "journal", "code"].contains(&k.as_str()) {
+            if n.trim().is_empty() {
+                return Err(Error::invalid("input", format!("`{k}:` needs a name")));
+            }
+            return Ok(CodeInput { from: format!("{k}:{}", n.trim()), ..Default::default() });
+        }
+        if k == "model" {
+            return parse_input(n);
+        }
     }
     const KEYS: [&str; 5] = ["where", "matching", "group", "sort", "limit"];
     // split at the keywords (outside quotes)

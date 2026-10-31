@@ -23,24 +23,35 @@ fn share_goes_to_projects_journals_and_code_spaces() {
 }
 
 #[test]
-fn data_shared_to_a_code_space_becomes_its_input_and_can_run() {
+fn code_spaces_take_any_data_piped_in_and_keep_none_of_it() {
     let e = Env::new();
-    e.ok(&["model", "create", "Trades", "--fields", "price:real; side:text"]);
-    e.ok(&["code", "create", "calc", "--lang", "math", "--model", "bars", "--limit", "9", "--source", "x = price * 2\n"]);
-    e.ok(&["search", "save", "big", "--model", "Trades", "--where", "price > 3", "--query", "buy"]);
-    e.ok(&["share", "search", "big", "code", "calc"]);
-    let j: serde_json::Value = serde_json::from_str(&e.ok(&["code", "show", "calc", "--json"])).unwrap();
-    assert_eq!(j["input"]["model"], "trades", "{j}");
-    assert_eq!(j["input"]["where"][0], "price > 3", "{j}");
-    assert_eq!(j["input"]["text"], "buy", "{j}");
-    assert!(j["input"]["limit"].is_null(), "the search replaces the whole input: {j}");
-    // a series search is not one model's records
-    e.ok(&["search", "save", "usdt", "--query", "usdt"]);
-    assert!(!e.run(&["share", "search", "usdt", "code", "calc"]).status.success());
-    // --run runs it after; unapproved code doesn't run without a yes
-    let o = e.run(&["share", "model", "Trades", "code", "calc", "--run"]);
-    assert!(!o.status.success() && err(&o).contains("not approved"), "{}", err(&o));
-    // --run is only for code spaces
     e.ok(&["journal", "new", "Notes"]);
-    assert!(!e.run(&["share", "model", "Trades", "journal", "Notes", "--run"]).status.success());
+    e.ok(&["journal", "new", "Out"]);
+    e.ok(&["code", "create", "calc", "--lang", "math", "--source", "@view table\nw2 = words * 2\n"]);
+    // a journal search is data like any other; sharing runs over it and asks to approve first
+    e.ok(&["search", "save", "notes", "--journals", "--query", "x"]);
+    let o = e.run(&["share", "search", "notes", "code", "calc"]);
+    assert!(!o.status.success() && err(&o).contains("not approved"), "{}", err(&o));
+    let j: serde_json::Value = serde_json::from_str(&e.ok(&["code", "show", "calc", "--json"])).unwrap();
+    assert!(j["input"].as_object().is_none_or(|o| o.is_empty()), "the space keeps no input: {j}");
+    // a default input can name any source (a convenience)
+    e.ok(&["code", "edit", "calc", "--input", "search:notes"]);
+    let j: serde_json::Value = serde_json::from_str(&e.ok(&["code", "show", "calc", "--json"])).unwrap();
+    assert_eq!(j["input"]["from"], "search:notes", "{j}");
+    e.ok(&["code", "edit", "calc", "--no-input"]);
+    // a pipe without code: a search, saved (tee) to a journal, then filtered and saved again
+    e.ok(&["journal", "write", "Notes", "--title", "alpha", "--text", "alpha beta"]);
+    e.ok(&["journal", "write", "Notes", "--title", "zed", "--text", "zed"]);
+    e.ok(&["search", "save", "all", "--journals"]);
+    e.ok(&["search", "save", "alphas", "--journals", "--query", "alpha"]);
+    let j: serde_json::Value =
+        serde_json::from_str(&e.ok(&["pipe", "search:all", "journal:Out", "search:alphas", "--to", "journal:Out", "--json"])).unwrap();
+    assert_eq!(j["saved"].as_array().unwrap().len(), 2, "{j}");
+    assert!(j["output"]["columns"]["title"].as_array().unwrap().iter().all(|t| t.as_str().unwrap().contains("alpha")), "{j}");
+    // refusals: an unknown step, a cycle of default inputs
+    assert!(!e.run(&["pipe", "search:all", "nope:x"]).status.success());
+    e.ok(&["code", "create", "a", "--lang", "math", "--input", "code:b", "--source", "x = 1"]);
+    e.ok(&["code", "create", "b", "--lang", "math", "--input", "code:a", "--source", "x = 1"]);
+    let o = e.run(&["-y", "pipe", "code:a"]);
+    assert!(!o.status.success() && err(&o).contains("cycle"), "{}", err(&o));
 }

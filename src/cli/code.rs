@@ -10,6 +10,7 @@ use std::io::Read;
 impl CodeInputArgs {
     fn given(&self) -> bool {
         self.model.is_some()
+            || self.input.is_some()
             || !self.filter.is_empty()
             || self.matching.is_some()
             || !self.group.is_empty()
@@ -17,6 +18,18 @@ impl CodeInputArgs {
             || self.limit.is_some()
     }
     fn input(&self) -> anyhow::Result<CodeInput> {
+        if let Some(i) = &self.input {
+            if self.model.is_some()
+                || !self.filter.is_empty()
+                || self.matching.is_some()
+                || !self.group.is_empty()
+                || !self.sort.is_empty()
+                || self.limit.is_some()
+            {
+                return Err(anyhow!("--input takes the whole input (`bars where … limit N`); leave out --model and friends"));
+            }
+            return Ok(code::parse_input(i)?);
+        }
         let Some(model) = &self.model else {
             if self.given() {
                 return Err(anyhow!("--where, --matching, --group, --sort and --limit go with --model"));
@@ -32,6 +45,7 @@ impl CodeInputArgs {
             group: split(&self.group, ','),
             text: self.matching.clone().unwrap_or_default(),
             limit: self.limit,
+            ..Default::default()
         };
         // the same checks as the TUI's one-line input
         code::parse_input(&i.text())?;
@@ -262,7 +276,10 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
             let b = code::build_space(&store, &env, "cli", &c, &mut |l| eprintln!("{l}"))?;
             ctx.io.info(format!("{} code space {} ({})", if b.cached { "already built:" } else { "built" }, c.name, b.path.display()));
         }
-        CodeCommand::Run { space, json, rows } => run_space(ctx, &store, &space, json, rows)?,
+        CodeCommand::Run { space, input: Some(src), json, rows } => {
+            run_pipe(ctx, &store, &code::pipe::Source::parse(&src)?, &[code::pipe::Step::Code(space)], &[], json, rows)?
+        }
+        CodeCommand::Run { space, input: None, json, rows } => run_space(ctx, &store, &space, json, rows)?,
         CodeCommand::Check { space: Some(space) } => {
             let c = store.find_code_space(&space)?;
             let env = CodeEnv::for_store(&store)?;
@@ -303,6 +320,71 @@ pub(crate) fn run_space(ctx: &Ctx, store: &Store, space: &str, json: bool, rows:
         if info.writes > 0 { format!(", {} writes", info.writes) } else { String::new() }
     ));
     Ok(())
+}
+
+/// Run a pipe: approve its code spaces first (asking, as `code run` does), then print each
+/// run's result (or, with `json`, the output frame) and what the saves made.
+pub(crate) fn run_pipe(
+    ctx: &Ctx,
+    store: &Store,
+    src: &code::pipe::Source,
+    steps: &[code::pipe::Step],
+    to: &[code::pipe::Sink],
+    json: bool,
+    rows: usize,
+) -> anyhow::Result<()> {
+    use code::pipe::{Source, Step};
+    let mut names: Vec<String> = steps.iter().filter_map(|s| if let Step::Code(n) = s { Some(n.clone()) } else { None }).collect();
+    // a code source runs too, and so does whatever it reads by default
+    let mut from = if let Source::Code(n) = src { Some(n.clone()) } else { None };
+    while let Some(n) = from.take() {
+        let c = store.find_code_space(&n)?;
+        if names.contains(&c.name) || names.contains(&c.id) {
+            break;
+        }
+        names.push(c.name.clone());
+        from = Source::of(c.input.clone()).text().strip_prefix("code:").map(str::to_string);
+    }
+    for n in &names {
+        let c = store.find_code_space(n)?;
+        ensure_approved(ctx, store, &c)?;
+    }
+    let env = CodeEnv::for_store(store)?;
+    let quiet = ctx.global.quiet;
+    let p = code::pipe::run(store, &env, "cli", src, steps, to, &mut |l| {
+        if !quiet {
+            eprintln!("{l}")
+        }
+    })?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&json!({ "hops": p.hops, "saved": p.saved, "output": p.frame }))?);
+    } else {
+        for (c, info) in &p.runs {
+            if p.runs.len() > 1 {
+                println!("-- {} --", c.name);
+            }
+            print_run(info, rows);
+        }
+        if p.runs.is_empty()
+            && let Some(f) = &p.frame
+        {
+            print!("{}", code::pipe::markdown(f, if rows == 0 { usize::MAX } else { rows }));
+        }
+    }
+    for s in &p.saved {
+        ctx.io.note(format!("saved {s}"));
+    }
+    ctx.io.note(format!("pipe {}", p.hops.join(" | ")));
+    Ok(())
+}
+
+/// `mnnn pipe`.
+pub fn pipe(ctx: &Ctx, a: super::args::PipeArgs) -> anyhow::Result<()> {
+    let store = ctx.open_store()?;
+    let src = code::pipe::Source::parse(&a.source)?;
+    let steps = a.steps.iter().map(|s| code::pipe::Step::parse(s)).collect::<crate::Result<Vec<_>>>()?;
+    let to = a.to.iter().map(|s| code::pipe::Sink::parse(s)).collect::<crate::Result<Vec<_>>>()?;
+    run_pipe(ctx, &store, &src, &steps, &to, a.json, a.rows)
 }
 
 /// A `--scope` filter.

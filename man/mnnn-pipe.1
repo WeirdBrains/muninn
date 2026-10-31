@@ -1,0 +1,93 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-pipe 1  "mnnn-pipe 2.15.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-pipe \- Pipe data through code spaces: a source (a live search of any kind, a journal, a model query or a code space\*(Aqs output), then steps (code spaces, or live searches that filter), then optionally a target that keeps the result (a journal or a model)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn pipe\fR [\fB\-\-home\fR] [\fB\-\-to\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rows\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISOURCE\fR> [\fISTEPS\fR] 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Pipe data through code spaces: a source (a live search of any kind, a journal, a model query or a code space\*(Aqs output), then steps (code spaces, or live searches that filter), then optionally a target that keeps the result (a journal or a model)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-to\fR \fI<TO>\fR
+Save the final output too (journal:NAME or model:NAME; repeatable)
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-json\fR
+Print the output frame as JSON
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-rows\fR \fI<ROWS>\fR [default: 30]
+Table rows to print (0: all)
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fISOURCE\fR>
+Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a bare model query)
+.TP
+[\fISTEPS\fR]
+Steps in order: code:SPACE (or a space name), search:NAME (keeps the rows it matches), or a save that passes the data on unchanged, like `tee`: journal:NAME (a new entry with the data) or model:NAME (new records). Save at any step, many times
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.15.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

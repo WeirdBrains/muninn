@@ -59,8 +59,15 @@ symbol), so a moving average never runs across two symbols.
 In the TUI, `i` or the **[Input]** button (in the list's key bar and on the editor's input
 line) opens the input picker: pick a model (or `none`), then edit its where, matching,
 group, sort and limit parts while the resulting line is shown above them; "use this
-input" (or `u`) saves it, "type the whole line…" edits it as text. Sharing a model or a
-records live search into a code space ([share](share.md)) sets its input and runs it.
+input" (or `u`) saves it, "type the whole line…" edits it as text. The picker also lists
+whole sources: any live search, a journal, another code space's output.
+
+The input is a **default**, a convenience: a code space works on whatever is piped into
+it and keeps none of it. `mnnn code run SPACE --input SOURCE` runs it over other data
+without changing it; `mnnn code edit SPACE --input search:NAME` (or `journal:NAME`,
+`code:SPACE`) sets a default from another source. Sharing data into a code space
+([share](share.md)) runs it over that data, and [pipes](pipes.md) chain sources, code
+spaces, filters and saves.
 
 ## Math
 
@@ -321,7 +328,9 @@ otherwise:
 | `b` | build (in the background; the window stays usable) |
 | `r` (Ctrl+R while editing) | save, build if needed, and run; a new or changed source asks `y`/`n` first |
 | `c` | check the source without running it |
-| `i` / [Input] | the input picker (model, then where/matching/group/sort/limit) |
+| `i` / [Input] | the default input picker (a source, or a model then where/matching/group/sort/limit) |
+| `>` | pipe the result on: into another code space, or save it to a journal or model (and keep going) |
+| `x` | drop piped-in data (runs use the default input again) |
 | `t` | widen the result tile / back |
 | `p` | add to a project |
 | Esc | back to the list (asks when there are unsaved changes: `y` discards, `s` saves) |

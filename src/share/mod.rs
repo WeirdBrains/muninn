@@ -1,8 +1,9 @@
 //! The universal Share action: anything shareable (a [`ShareKind`] item) goes to anything
 //! that accepts shares (a [`Target`]): a project, a journal (as a new entry about it), a code
-//! space (a model or a records live search becomes its input) or the network (an exchange share, `mnnn net share`).
+//! space (data is piped into it and it runs) or the network (an exchange share, `mnnn net share`).
+use crate::code::pipe::Source;
 use crate::error::{Error, Result};
-use crate::store::{CodeChange, CodeInput, ItemKind, NewAction, SearchTarget, ShareKind, Store};
+use crate::store::{CodeInput, ItemKind, NewAction, ShareKind, Store};
 use serde::Serialize;
 
 /// The kinds of place a share can go.
@@ -30,7 +31,7 @@ impl TargetKind {
         match self {
             TargetKind::Project => "add it to a project",
             TargetKind::Journal => "write a new journal entry about it",
-            TargetKind::Code => "make it a code space's input (and run it)",
+            TargetKind::Code => "run a code space over it (the space keeps no data)",
             TargetKind::Net => "share it with your exchanges",
         }
     }
@@ -48,8 +49,8 @@ impl TargetKind {
         match self {
             TargetKind::Project => kind != ShareKind::Project,
             TargetKind::Journal | TargetKind::Net => true,
-            // data: a model, or a live search (its model and conditions)
-            TargetKind::Code => matches!(kind, ShareKind::Model | ShareKind::LiveSearch),
+            // data: a model, any live search, a journal's entries, a code space's output
+            TargetKind::Code => matches!(kind, ShareKind::Model | ShareKind::LiveSearch | ShareKind::Journal | ShareKind::Code),
         }
     }
     /// Whether a target of this kind is named (`net` takes exchanges, or none for all).
@@ -85,7 +86,7 @@ impl Shared {
             TargetKind::Project if !self.new => format!("{what} is already in project {}", self.to),
             TargetKind::Project => format!("added {what} to project {}", self.to),
             TargetKind::Journal => format!("wrote an entry about {what} in journal {}", self.to),
-            TargetKind::Code => format!("code space {} now reads {what}", self.to),
+            TargetKind::Code => format!("piped {what} into code space {}", self.to),
             TargetKind::Net => format!("shared {what} with {}", self.to),
         }
     }
@@ -113,35 +114,33 @@ pub fn entry_body(kind: ShareKind, id: &str, name: &str, note: &str) -> String {
     b
 }
 
-/// The code space input a shared item stands for: a model as a whole, or a live search's
-/// records (its model, conditions and text).
-pub fn input_for(s: &Store, kind: ShareKind, id: &str, name: &str) -> Result<CodeInput> {
-    match kind {
-        ShareKind::Model => Ok(CodeInput { model: name.to_string(), ..Default::default() }),
-        ShareKind::LiveSearch => {
-            let ls = s.find_live_search(id)?;
-            let sp = &ls.spec;
-            let model = match (sp.target, &sp.model) {
-                (SearchTarget::Records, Some(m)) => s.model(m)?.map(|m| m.name).unwrap_or_else(|| m.clone()),
-                _ => {
-                    return Err(Error::invalid(
-                        "share",
-                        format!(
-                            "live search {} is not over one model's records (save it with --model), so it can't be a code space's input",
-                            ls.name
-                        ),
-                    ));
-                }
-            };
-            Ok(CodeInput {
-                model,
-                filter: sp.conditions.iter().map(crate::rules::condition_text).collect(),
-                text: sp.query.trim().to_string(),
-                ..Default::default()
-            })
-        }
-        _ => Err(Error::invalid("share", format!("a {} is not data for a code space", kind.label()))),
-    }
+/// The data a shared item stands for, as a pipe source: a model as a whole, a live search
+/// (of any kind, evaluated when it runs), a journal's entries or a code space's output.
+pub fn source_for(kind: ShareKind, id: &str, name: &str) -> Result<Source> {
+    Ok(match kind {
+        ShareKind::Model => Source::Model(CodeInput { model: name.to_string(), ..Default::default() }),
+        ShareKind::LiveSearch => Source::Search(id.to_string()),
+        ShareKind::Journal => Source::Journal(id.to_string()),
+        ShareKind::Code => Source::Code(id.to_string()),
+        _ => return Err(Error::invalid("share", format!("a {} is not data for a code space", kind.label()))),
+    })
+}
+
+/// Share data into a code space: run the space over it (the space is not changed; the
+/// result is the pipe's output, kept only where it is piped on).
+pub fn to_code(
+    s: &Store,
+    env: &crate::code::CodeEnv,
+    kind: ShareKind,
+    key: &str,
+    space: &str,
+    origin: &str,
+    log: &mut dyn FnMut(&str),
+) -> Result<(Shared, crate::code::pipe::Piped)> {
+    let out = share(s, kind, key, TargetKind::Code, &[space.to_string()], "", origin)?;
+    let src = source_for(kind, &out.item, &out.name)?;
+    let p = crate::code::pipe::run(s, env, origin, &src, &[crate::code::pipe::Step::Code(out.made.clone())], &[], log)?;
+    Ok((out, p))
 }
 
 /// Share item `key` of `kind` to `target` (`to`: its id or name; for `net`, exchange
@@ -183,11 +182,13 @@ pub fn share(s: &Store, kind: ShareKind, key: &str, target: TargetKind, to: &[St
             (out.to, out.made) = (j.name, e.id);
         }
         TargetKind::Code => {
+            // checked here; the run is `to_code` (it needs the code environment)
             let c = s.find_code_space(one()?)?;
-            let input = input_for(s, kind, &id, &name)?;
-            out.new = input != c.input;
-            let c = s.update_code_space(&c.id, &CodeChange { input: Some(input), ..Default::default() })?;
-            (out.to, out.made) = (c.name, c.id);
+            if kind == ShareKind::Code && c.id == id {
+                return Err(Error::invalid("share", "a code space can't be piped into itself"));
+            }
+            source_for(kind, &id, &name)?;
+            (out.to, out.made, out.new) = (c.name, c.id, false);
         }
         TargetKind::Net => {
             let made = crate::net::client::share(s, kind, &id, to, origin)?;

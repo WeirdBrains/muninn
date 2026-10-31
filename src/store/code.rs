@@ -122,14 +122,20 @@ pub struct CodeInput {
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<usize>,
+    /// Another source instead of a model query: `search:NAME`, `journal:NAME`, `code:SPACE`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub from: String,
 }
 
 impl CodeInput {
     pub fn is_empty(&self) -> bool {
-        self.model.is_empty()
+        self.model.is_empty() && self.from.is_empty()
     }
     /// `bars where symbol = BTC/USDT sort timestamp group symbol limit 500`.
     pub fn text(&self) -> String {
+        if !self.from.is_empty() {
+            return self.from.clone();
+        }
         if self.model.is_empty() {
             return "none".into();
         }

@@ -1,5 +1,7 @@
 # Live searches
 
+Any live search (records, series or journal entries) is also a [pipe](pipes.md) source: `mnnn pipe search:NAME code:SPACE`, or share it to a code space.
+
 A live search is a saved search. Muninn stores **what you searched for**, not what it
 found, so a live search always runs on the current data: import more bars or a new
 series and the live search shows them the next time you open it.

@@ -93,6 +93,8 @@ pub enum PickKind {
     SavedLayout,
     /// A share target (`super::share`).
     Share,
+    /// Where a code run's output goes next (`super::code`): a code space, or a save.
+    Pipe,
 }
 
 impl Modal {
@@ -413,7 +415,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             KeyCode::Down | KeyCode::Char('j') => *sel = (*sel + 1).min(items.len().saturating_sub(1)),
             KeyCode::Up | KeyCode::Char('k') => *sel = sel.saturating_sub(1),
             KeyCode::Esc => {
-                let share = *kind == PickKind::Share;
+                let share = matches!(*kind, PickKind::Share | PickKind::Pipe);
                 app.modal = if share { app.share_back.take().map(|b| *b) } else { None };
                 app.share_item = None;
             }
@@ -487,6 +489,7 @@ impl App {
     pub fn on_pick(&mut self, kind: PickKind, item: &str) {
         match kind {
             PickKind::Share => super::share::picked(self, item),
+            PickKind::Pipe => super::code::pipe_picked(self, item),
             PickKind::SavedLayout => {
                 if let Some(l) = self.prefs.tui.layouts.get(item).cloned() {
                     self.layout = l;
@@ -626,7 +629,7 @@ pub fn filter_items(app: &App, kind: super::action::FilterKind) -> Vec<(String, 
 pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     let t = app.theme.clone();
     // the share picker sits on the window it was opened from
-    if matches!(app.modal, Some(Modal::Pick { kind: PickKind::Share, .. })) && app.share_back.is_some() {
+    if matches!(app.modal, Some(Modal::Pick { kind: PickKind::Share | PickKind::Pipe, .. })) && app.share_back.is_some() {
         let pick = app.modal.take();
         app.modal = app.share_back.take().map(|b| *b);
         draw(app, f, area);

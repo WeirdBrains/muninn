@@ -113,6 +113,10 @@ pub enum Command {
     /// entry about it), a code space (a model or records search as its input; --run runs
     /// it) or your exchanges (`net`).
     Share(ShareArgs),
+    /// Pipe data through code spaces: a source (a live search of any kind, a journal, a
+    /// model query or a code space's output), then steps (code spaces, or live searches
+    /// that filter), then optionally a target that keeps the result (a journal or a model).
+    Pipe(PipeArgs),
     /// You as a user: your identity across your nodes, linking another node to it and
     /// revoking one.
     #[command(subcommand, alias = "users", after_long_help = USER_NOTES)]
@@ -2300,6 +2304,11 @@ pub struct CodeSourceArgs {
 /// The records a code space gets as input.
 #[derive(Debug, Clone, Default, Args)]
 pub struct CodeInputArgs {
+    /// Default input from another source: `search:NAME` (any live search), `journal:NAME`,
+    /// `code:SPACE` (its output) or a model query (`bars where … limit N`). A convenience:
+    /// whatever is piped in (`mnnn pipe`, share) is what a run works on.
+    #[arg(long, conflicts_with = "model")]
+    pub input: Option<String>,
     /// Model to read (`bars` or a designed model).
     #[arg(long)]
     pub model: Option<String>,
@@ -2384,6 +2393,10 @@ pub enum CodeCommand {
     /// Run a code space: build if needed, then run it and show its result.
     Run {
         space: String,
+        /// Run it over this data instead of its default input (search:NAME, journal:NAME,
+        /// code:SPACE or a model query); the space is not changed.
+        #[arg(long)]
+        input: Option<String>,
         /// Print the run (status, view, logs) as JSON.
         #[arg(long)]
         json: bool,
@@ -3285,6 +3298,31 @@ pub enum ReviewCommand {
     },
 }
 
+/// `mnnn pipe SOURCE STEP… [--to TARGET]`.
+#[derive(Debug, Clone, Args)]
+#[command(after_help = "Examples:
+  mnnn pipe search:usdt code:fast journal:Raw code:smooth --to journal:Notes
+  mnnn pipe \"bars where symbol = BTC/USDT limit 500\" fast
+  mnnn pipe journal:Notes code:wordcount --json")]
+pub struct PipeArgs {
+    /// Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a
+    /// bare model query).
+    pub source: String,
+    /// Steps in order: code:SPACE (or a space name), search:NAME (keeps the rows it
+    /// matches), or a save that passes the data on unchanged, like `tee`: journal:NAME (a
+    /// new entry with the data) or model:NAME (new records). Save at any step, many times.
+    pub steps: Vec<String>,
+    /// Save the final output too (journal:NAME or model:NAME; repeatable).
+    #[arg(long)]
+    pub to: Vec<String>,
+    /// Print the output frame as JSON.
+    #[arg(long)]
+    pub json: bool,
+    /// Table rows to print (0: all).
+    #[arg(long, default_value_t = 30)]
+    pub rows: usize,
+}
+
 #[derive(Debug, Args)]
 pub struct ShareArgs {
     /// What to share: model, search, journal, project, report or code.
@@ -3303,10 +3341,6 @@ pub struct ShareArgs {
     /// List where this kind of item can be shared.
     #[arg(long)]
     pub targets: bool,
-    /// With a code space target: run it once its input is set (a new or changed source
-    /// asks to be approved first, as `mnnn code run` does).
-    #[arg(long)]
-    pub run: bool,
     #[arg(long)]
     pub json: bool,
 }

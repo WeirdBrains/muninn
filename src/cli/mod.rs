@@ -136,6 +136,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Org(c) => org::run(&ctx, c),
         Command::Review(c) => review::run(&ctx, c),
         Command::Share(a) => misc::share(&ctx, a),
+        Command::Pipe(a) => code::pipe(&ctx, a),
         Command::User(c) => users::user(&ctx, c),
         Command::Connection(c) => users::connection(&ctx, c),
         Command::Invite(c) => users::invite(&ctx, c),

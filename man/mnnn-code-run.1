@@ -8,7 +8,7 @@ mnnn\-code\-run \- Run a code space: build if needed, then run it and show its r
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn code run\fR [\fB\-\-home\fR] [\fB\-\-json\fR] [\fB\-\-db\fR] [\fB\-\-rows\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISPACE\fR> 
+\fBmnnn code run\fR [\fB\-\-home\fR] [\fB\-\-input\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rows\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISPACE\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -23,8 +23,8 @@ Muninn home directory (default ~/.muninn)
 May also be specified with the \fBMUNINN_HOME\fR environment variable. 
 .RE
 .TP
-\fB\-\-json\fR
-Print the run (status, view, logs) as JSON
+\fB\-\-input\fR \fI<INPUT>\fR
+Run it over this data instead of its default input (search:NAME, journal:NAME, code:SPACE or a model query); the space is not changed
 .TP
 \fB\-\-db\fR \fI<PATH>\fR
 Database file (default <home>/storage/muninn.database)
@@ -32,14 +32,17 @@ Database file (default <home>/storage/muninn.database)
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
 .TP
-\fB\-\-rows\fR \fI<ROWS>\fR [default: 30]
-Table rows to print (0: all)
+\fB\-\-json\fR
+Print the run (status, view, logs) as JSON
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
 .RS
 May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
 .RE
+.TP
+\fB\-\-rows\fR \fI<ROWS>\fR [default: 30]
+Table rows to print (0: all)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)

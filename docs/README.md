@@ -39,6 +39,8 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Key exchanges](key-exchanges.md): offers, answers, short codes, verifying, revoking, backups
 - [Dark shards](dark-shards.md): the master key split among peers, sealed so they cannot read it
 - [Organizations](organizations.md): roles, members, resources, endpoints and templates; the Orgs menu
+- [Pipes](pipes.md): pipe any data through code spaces, filter it, save it on the way
+- [Pipelines](pipelines.md): design note for saved pipelines that end in a model table
 - [Share](share.md): share anything to a project, a journal, a code space or your exchanges
 - [Reviews](reviews.md): review links, comments, suggestions, highlights, votes, merges and revisions
 - [Org hosting](org-hosting.md): HTTPS sites with HTML, JSON and gRPC, signed member requests, Let's Encrypt

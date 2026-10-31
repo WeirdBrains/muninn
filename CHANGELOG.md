@@ -8,7 +8,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Added
 - Model design templates: export a model's design to a file and import it (plan first, rename or merge on clashes); built-in bars template; models from peers arrive as drafts to approve
-- Code space input picker (i or [Input]): pick a model, then its where, matching, group, sort and limit with the line previewed; sharing a model or a records live search into a code space sets its input and runs it (CLI: mnnn share … code SPACE --run)
+- Code space input picker (i or [Input]): pick a source, or a model then its where, matching, group, sort and limit with the line previewed
+- Pipes: code spaces work on data piped in and keep none of it. Any live search (records, series, journals), journal, model query or code space output is a source; steps are code spaces and search filters; saves to journals and models branch off at any step while the data flows on (mnnn pipe, share to a code space, TUI >)
 
 ### Changed
 - Bars are the records of the built-in bars model, kept in its own table; upgrading moves every bar and every value stored on bars losslessly (same ids)
