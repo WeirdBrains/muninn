@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-10-31
+
+### Added
+- Share: send any view's item to anything that takes shares (projects, a new journal entry, code space inputs, connections). Press S or click the share button, or run mnnn share
+- Clickable hints: every key shown in a hint is also a button you can click
+
+### Changed
+- Docs cover every subcommand; the old net exchange man pages are gone; the repository is now WeirdBrains/muninn
+
 ## [2.14.0] - 2026-10-30
 
 ### Added
@@ -411,7 +420,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.14.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.15.0...HEAD
+[2.15.0]: https://github.com/WeirdBrains/muninn/compare/v2.14.0...v2.15.0
 [2.14.0]: https://github.com/WeirdBrains/muninn/compare/v2.13.0...v2.14.0
 [2.13.0]: https://github.com/WeirdBrains/muninn/compare/v2.12.1...v2.13.0
 [2.12.1]: https://github.com/WeirdBrains/muninn/compare/v2.12.0...v2.12.1
