@@ -1,0 +1,273 @@
+[
+  {
+    "model_id": "bars",
+    "version": 1,
+    "design": {
+      "fields": [
+        {
+          "id": "bar.source",
+          "name": "source",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.symbol",
+          "name": "symbol",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.base",
+          "name": "base",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.quote",
+          "name": "quote",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.period",
+          "name": "period",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.timestamp",
+          "name": "timestamp",
+          "type": "timestamp",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.open",
+          "name": "open",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.high",
+          "name": "high",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.low",
+          "name": "low",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.close",
+          "name": "close",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.volume",
+          "name": "volume",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.flags",
+          "name": "flags",
+          "type": "integer",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "05aac5ab0c2d",
+          "name": "note",
+          "type": "text"
+        },
+        {
+          "id": "950a84692335",
+          "name": "score",
+          "type": "real",
+          "default": 0.0
+        },
+        {
+          "id": "8571c2ce5e57",
+          "name": "tag",
+          "type": "text",
+          "index": true,
+          "choices": [
+            "a",
+            "b"
+          ]
+        }
+      ],
+      "builtins": true
+    },
+    "steps": [
+      {
+        "step": "create_table",
+        "table": "mx_bars"
+      },
+      {
+        "step": "add_field",
+        "field": "note",
+        "ty": "text",
+        "filled": 0,
+        "with": null
+      },
+      {
+        "step": "add_field",
+        "field": "score",
+        "ty": "real",
+        "filled": 763,
+        "with": 0.0
+      },
+      {
+        "step": "add_field",
+        "field": "tag",
+        "ty": "text",
+        "filled": 0,
+        "with": null
+      }
+    ],
+    "note": "",
+    "rule_id": null,
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088265
+  },
+  {
+    "model_id": "bars",
+    "version": 2,
+    "design": {
+      "fields": [
+        {
+          "id": "bar.source",
+          "name": "source",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.symbol",
+          "name": "symbol",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.base",
+          "name": "base",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.quote",
+          "name": "quote",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.period",
+          "name": "period",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.timestamp",
+          "name": "timestamp",
+          "type": "timestamp",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.open",
+          "name": "open",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.high",
+          "name": "high",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.low",
+          "name": "low",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.close",
+          "name": "close",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.volume",
+          "name": "volume",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.flags",
+          "name": "flags",
+          "type": "text",
+          "about": "from imports"
+        },
+        {
+          "id": "05aac5ab0c2d",
+          "name": "note",
+          "type": "text"
+        },
+        {
+          "id": "950a84692335",
+          "name": "score",
+          "type": "real",
+          "default": 0.0
+        },
+        {
+          "id": "8571c2ce5e57",
+          "name": "tag",
+          "type": "text",
+          "index": true,
+          "choices": [
+            "a",
+            "b"
+          ]
+        }
+      ],
+      "builtins": true
+    },
+    "steps": [
+      {
+        "step": "change_type",
+        "field": "flags",
+        "from": "integer",
+        "to": "text",
+        "lost": 0
+      }
+    ],
+    "note": "",
+    "rule_id": null,
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088332
+  }
+]

@@ -1,0 +1,49 @@
+version = 2
+
+[theme]
+name = "tokyo-night"
+mode = "system"
+
+[ingest]
+drop_zero_volume = false
+
+[tui]
+header = "auto"
+sidebar_collapsed = false
+history_open = false
+import_bookmarks = []
+import_recent = []
+
+[tui.sidebar]
+sort = "year"
+desc = false
+
+[tui.sidebar.filters.price]
+metric = "close"
+
+[net]
+label = ""
+port = 4741
+listen = []
+mdns = true
+relay_server = false
+relays = []
+bootstrap = []
+autostart = true
+accept = "known"
+external_addresses = []
+
+[hosting]
+bind = "127.0.0.1"
+port = 8443
+names = []
+cert_days = 7
+autostart = false
+
+[hosting.acme]
+enabled = false
+domain = ""
+email = ""
+directory = "letsencrypt"
+profile = "shortlived"
+http_port = 80

@@ -1,0 +1,426 @@
+[
+  {
+    "id": 20,
+    "parent": 19,
+    "kind": "export",
+    "summary": "export 823 bars to /home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/bars-2.14/bars.csv (csv)",
+    "params": {
+      "out": "/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/bars-2.14/bars.csv",
+      "format": "csv",
+      "bars": 823,
+      "scope": [],
+      "from": null,
+      "to": null
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485089229,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 19,
+    "parent": 18,
+    "kind": "project.add",
+    "summary": "add model bars to project Alpha",
+    "params": {
+      "project": "2b16b273f5df4327949be8194933d947",
+      "item": 2,
+      "kind": "model",
+      "ref": "bars"
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485089183,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 18,
+    "parent": 17,
+    "kind": "project.add",
+    "summary": "add result BTC/USDT binance 5m to project Alpha",
+    "params": {
+      "project": "2b16b273f5df4327949be8194933d947",
+      "item": 1,
+      "kind": "result",
+      "ref": "binance:BTC/USDT:5m"
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485089119,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 17,
+    "parent": 16,
+    "kind": "project.create",
+    "summary": "create project Alpha",
+    "params": {
+      "project": "2b16b273f5df4327949be8194933d947",
+      "name": "Alpha"
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485089064,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 16,
+    "parent": 15,
+    "kind": "record.create",
+    "summary": "create picks record 3a9a6cb0",
+    "params": {
+      "model": "e5b1c43d2dce4a4a834e1241a057903e",
+      "name": "picks",
+      "record": "3a9a6cb015fc481abd89f81b9238c0fc",
+      "values": {
+        "bar": "cc2b7b436ead734ddd32bf545d5a433df4ae72651a241f2af38d8153f98b8ad6",
+        "why": "breakout"
+      }
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485089019,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 15,
+    "parent": 14,
+    "kind": "model.apply",
+    "summary": "apply model picks v0 → v1 (3 steps)",
+    "params": {
+      "model": "e5b1c43d2dce4a4a834e1241a057903e",
+      "name": "picks",
+      "version": 1,
+      "from": 0,
+      "to": 1,
+      "steps": [
+        "create table m_picks",
+        "add bar (ref:bars)",
+        "add why (text)"
+      ],
+      "lost": 0,
+      "records": 0
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088927,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 14,
+    "parent": 13,
+    "kind": "model.create",
+    "summary": "create model picks",
+    "params": {
+      "model": "e5b1c43d2dce4a4a834e1241a057903e",
+      "name": "picks",
+      "version": 0
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088920,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 13,
+    "parent": 12,
+    "kind": "import",
+    "summary": "import unnamed.csv · 60 bars · completed · run #4",
+    "params": {
+      "run": 4,
+      "status": "completed",
+      "files_done": 1,
+      "files_total": 1,
+      "files": [
+        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/unnamed.csv"
+      ],
+      "inserted": 60
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088854,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 12,
+    "parent": 11,
+    "kind": "record.update",
+    "summary": "update 2 bars records",
+    "params": {
+      "model": "bars",
+      "name": "bars",
+      "record": null,
+      "count": 2,
+      "where": "source = manual",
+      "values": {
+        "note": "hand",
+        "tag": "b"
+      }
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088510,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 11,
+    "parent": 10,
+    "kind": "record.update",
+    "summary": "update 285 bars records",
+    "params": {
+      "model": "bars",
+      "name": "bars",
+      "record": null,
+      "count": 285,
+      "where": "symbol = ETH/USDT; close > 300",
+      "values": {
+        "note": "eth-high",
+        "score": "2.5",
+        "tag": "a"
+      }
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088456,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 10,
+    "parent": 9,
+    "kind": "model.apply",
+    "summary": "apply model bars v1 → v2 (1 step)",
+    "params": {
+      "model": "bars",
+      "name": "bars",
+      "version": 2,
+      "from": 1,
+      "to": 2,
+      "steps": [
+        "change flags integer → text"
+      ],
+      "lost": 0,
+      "records": 763
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088335,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 9,
+    "parent": 8,
+    "kind": "model.edit",
+    "summary": "edit model bars: change flags:text optional",
+    "params": {
+      "model": "bars",
+      "name": "bars",
+      "version": 1,
+      "ops": [
+        "change flags:text optional"
+      ],
+      "draft": true
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088324,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 8,
+    "parent": 7,
+    "kind": "model.apply",
+    "summary": "apply model bars v0 → v1 (4 steps)",
+    "params": {
+      "model": "bars",
+      "name": "bars",
+      "version": 1,
+      "from": 0,
+      "to": 1,
+      "steps": [
+        "create table mx_bars",
+        "add note (text)",
+        "add score (real), filling 763 records with 0.0",
+        "add tag (text)"
+      ],
+      "lost": 0,
+      "records": 763
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088267,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 7,
+    "parent": 6,
+    "kind": "model.edit",
+    "summary": "edit model bars: add note:text, add score:real default=0, add tag:text choices=a|b index",
+    "params": {
+      "model": "bars",
+      "name": "bars",
+      "version": 0,
+      "ops": [
+        "add note:text",
+        "add score:real default=0",
+        "add tag:text choices=a|b index"
+      ],
+      "draft": true
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088260,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 6,
+    "parent": 5,
+    "kind": "record.create",
+    "summary": "create bars record fa31ff00",
+    "params": {
+      "model": "bars",
+      "name": "bars",
+      "record": "fa31ff004d901dcc3fe576f44632d3da9e18f22e935609430303968eb15b237b",
+      "values": {
+        "source": "manual",
+        "symbol": "SOL/USDT",
+        "base": "SOL",
+        "quote": "USDT",
+        "period": "1d",
+        "timestamp": 1704153600000,
+        "open": 105.0,
+        "high": 120.0,
+        "low": 100.0,
+        "close": 118.0,
+        "volume": 5000.0,
+        "flags": 0
+      }
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088202,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 5,
+    "parent": 4,
+    "kind": "record.create",
+    "summary": "create bars record cc2b7b43",
+    "params": {
+      "model": "bars",
+      "name": "bars",
+      "record": "cc2b7b436ead734ddd32bf545d5a433df4ae72651a241f2af38d8153f98b8ad6",
+      "values": {
+        "source": "manual",
+        "symbol": "SOL/USDT",
+        "base": "SOL",
+        "quote": "USDT",
+        "period": "1h",
+        "timestamp": 1704067200000,
+        "open": 100.0,
+        "high": 110.0,
+        "low": 95.0,
+        "close": 105.0,
+        "volume": 0.0,
+        "flags": 1
+      }
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088126,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 4,
+    "parent": 3,
+    "kind": "import",
+    "summary": "import unnamed.csv · 60 bars · completed · run #3",
+    "params": {
+      "run": 3,
+      "status": "completed",
+      "files_done": 1,
+      "files_total": 1,
+      "files": [
+        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/unnamed.csv"
+      ],
+      "inserted": 60
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485088027,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 3,
+    "parent": 2,
+    "kind": "import",
+    "summary": "import ETHUSDT_5m.csv · 300 bars · completed · run #2",
+    "params": {
+      "run": 2,
+      "status": "completed",
+      "files_done": 1,
+      "files_total": 1,
+      "files": [
+        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/ETHUSDT_5m.csv"
+      ],
+      "inserted": 300
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485087948,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 2,
+    "parent": 1,
+    "kind": "import",
+    "summary": "import BTCUSDT_5m.csv · 401 bars · completed · run #1",
+    "params": {
+      "run": 1,
+      "status": "completed",
+      "files_done": 1,
+      "files_total": 1,
+      "files": [
+        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/BTCUSDT_5m.csv"
+      ],
+      "inserted": 401
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485087879,
+    "before": null,
+    "after": null
+  },
+  {
+    "id": 1,
+    "parent": null,
+    "kind": "author.add",
+    "summary": "add author Ada",
+    "params": {
+      "author": "c6d28549c85f47f99ab64a1ce201b9c4",
+      "name": "Ada"
+    },
+    "origin": "cli",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485087822,
+    "before": null,
+    "after": null
+  }
+]

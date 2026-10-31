@@ -1,0 +1,124 @@
+{
+  "model": {
+    "id": "bars",
+    "name": "bars",
+    "description": "imported price bars (built in)",
+    "builtin": true,
+    "version": 2,
+    "design": {
+      "fields": [
+        {
+          "id": "bar.source",
+          "name": "source",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.symbol",
+          "name": "symbol",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.base",
+          "name": "base",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.quote",
+          "name": "quote",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.period",
+          "name": "period",
+          "type": "text",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.timestamp",
+          "name": "timestamp",
+          "type": "timestamp",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.open",
+          "name": "open",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.high",
+          "name": "high",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.low",
+          "name": "low",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.close",
+          "name": "close",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.volume",
+          "name": "volume",
+          "type": "real",
+          "required": true,
+          "about": "from imports"
+        },
+        {
+          "id": "bar.flags",
+          "name": "flags",
+          "type": "text",
+          "about": "from imports"
+        },
+        {
+          "id": "05aac5ab0c2d",
+          "name": "note",
+          "type": "text"
+        },
+        {
+          "id": "950a84692335",
+          "name": "score",
+          "type": "real",
+          "default": 0.0
+        },
+        {
+          "id": "8571c2ce5e57",
+          "name": "tag",
+          "type": "text",
+          "index": true,
+          "choices": [
+            "a",
+            "b"
+          ]
+        }
+      ],
+      "builtins": true
+    },
+    "draft": null,
+    "author_id": null,
+    "created_at": 0,
+    "updated_at": 1793485088332
+  },
+  "records": 823,
+  "rules": []
+}

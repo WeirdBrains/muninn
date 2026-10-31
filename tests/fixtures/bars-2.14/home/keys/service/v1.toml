@@ -1,0 +1,12 @@
+version = 1
+created_at = 1793485087764
+retired = false
+
+[wrapped]
+kdf = "argon2id"
+salt = "5ccce220c52652986b91fc696dffa681"
+m_cost = 19456
+t_cost = 2
+p_cost = 1
+nonce = "e2ee48e1bc9a07ebf3cb657c2757519cf3c521264cde0d73"
+ct = "ebb987e164b819d888d5fd1a36db0a8a0da1cd240723dac2a89767a8267fac69ff5ddce4ee56b8df87450b47c20a8002"

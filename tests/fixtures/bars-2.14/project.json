@@ -1,0 +1,45 @@
+{
+  "project": {
+    "id": "2b16b273f5df4327949be8194933d947",
+    "name": "Alpha",
+    "description": "",
+    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+    "created_at": 1793485089060,
+    "updated_at": 1793485089060
+  },
+  "items": [
+    {
+      "item": {
+        "id": 1,
+        "project_id": "2b16b273f5df4327949be8194933d947",
+        "kind": "result",
+        "ref_id": "binance:BTC/USDT:5m",
+        "payload": {
+          "source": "binance",
+          "symbol": {
+            "base": "BTC",
+            "quote": "USDT"
+          },
+          "duration": 300
+        },
+        "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+        "added_at": 1793485089110
+      },
+      "name": "BTC/USDT binance 5m",
+      "now": "401 bars now"
+    },
+    {
+      "item": {
+        "id": 2,
+        "project_id": "2b16b273f5df4327949be8194933d947",
+        "kind": "model",
+        "ref_id": "bars",
+        "payload": {},
+        "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
+        "added_at": 1793485089174
+      },
+      "name": "bars",
+      "now": "v2 · 15 fields · 823 records"
+    }
+  ]
+}
