@@ -288,7 +288,7 @@ reads standard input; `--editor` opens `$VISUAL` or `$EDITOR`.
 ## Terminal UI
 
 `C` or **Projects ▸ Code spaces…** opens the list: each space with `●` approved / `○`
-not, its language, input and last run.
+not, its language, its scope (`user`, `global` or `org:NAME`), input and last run.
 
 | key | list |
 |-----|------|
@@ -298,6 +298,8 @@ not, its language, input and last run.
 | `r` | run |
 | `m` | rename |
 | `p` | add to a project |
+| `g` | give it to one of your organizations (members get it with `mnnn org sync-code`) |
+| `f` | cycle the scope filter: all, user, organization |
 | `d` | delete (`y` confirms) |
 | Esc | close |
 

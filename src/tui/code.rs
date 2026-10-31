@@ -5,7 +5,7 @@ use super::workspace::{Ask, Back, Purpose, Typed, View, ask_key, draw_view, mute
 use super::{App, Hit, block};
 use crate::code::{self, CodeEnv};
 use crate::ingest::time::fmt_ts;
-use crate::store::{CodeChange, CodeInput, CodeSpace, ItemKind, Lang, RunInfo};
+use crate::store::{CodeChange, CodeInput, CodeScope, CodeSpace, ItemKind, Lang, RunInfo};
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
@@ -23,6 +23,8 @@ pub enum CAsk {
     /// The input of the open space (`MODEL where … sort … limit N`).
     Input,
     Rename,
+    /// Give the selected space to one of your orgs.
+    Give,
 }
 
 impl CAsk {
@@ -32,6 +34,7 @@ impl CAsk {
             CAsk::Lang => "Language (math, polars, rust, python, plugin)",
             CAsk::Input => "Input (MODEL [where C; C] [matching \"T\"] [group F] [sort -F] [limit N], or none)",
             CAsk::Rename => "New name",
+            CAsk::Give => "Give it to which of your organizations",
         }
     }
 }
@@ -205,6 +208,44 @@ pub struct CodeState {
     pub confirm: Option<Confirm>,
     pub msg: Option<(String, bool)>,
     pub building: Option<Building>,
+    /// Each space's scope (by id) and the org names they point at.
+    pub scopes: std::collections::HashMap<String, CodeScope>,
+    pub org_names: std::collections::HashMap<String, String>,
+    /// Which scopes the list shows (`f` cycles).
+    pub filter: ScopeView,
+}
+
+/// The list's scope filter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScopeView {
+    #[default]
+    All,
+    User,
+    Org,
+}
+
+impl ScopeView {
+    pub fn next(self) -> Self {
+        match self {
+            ScopeView::All => ScopeView::User,
+            ScopeView::User => ScopeView::Org,
+            ScopeView::Org => ScopeView::All,
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            ScopeView::All => "all",
+            ScopeView::User => "user",
+            ScopeView::Org => "organization",
+        }
+    }
+    fn shows(self, sc: &CodeScope) -> bool {
+        match self {
+            ScopeView::All => true,
+            ScopeView::User => sc.kind() == "user",
+            ScopeView::Org => sc.kind() == "organization",
+        }
+    }
 }
 
 impl CodeState {
@@ -242,8 +283,21 @@ pub fn reopen(app: &mut App) {
     app.modal = Some(super::modal::Modal::Code);
 }
 
+/// The scope column's text: `user`, `global` or `org:NAME`.
+pub fn scope_label(st: &CodeState, c: &CodeSpace) -> String {
+    match st.scopes.get(&c.id) {
+        Some(CodeScope::Organization { org_id }) => format!("org:{}", st.org_names.get(org_id).map(String::as_str).unwrap_or("?")),
+        Some(other) => other.kind().to_string(),
+        None => "user".into(),
+    }
+}
+
 fn reload(app: &mut App) {
-    app.code.list = app.store.code_spaces().unwrap_or_default();
+    app.code.scopes = app.store.code_scopes().unwrap_or_default();
+    app.code.org_names = app.store.orgs().unwrap_or_default().into_iter().map(|o| (o.id, o.name)).collect();
+    let (scopes, filter) = (&app.code.scopes, app.code.filter);
+    app.code.list =
+        app.store.code_spaces().unwrap_or_default().into_iter().filter(|c| filter.shows(scopes.get(&c.id).unwrap_or(&CodeScope::User))).collect();
     app.code.sel = app.code.sel.min(app.code.list.len().saturating_sub(1));
 }
 
@@ -458,6 +512,24 @@ fn answer(app: &mut App, kind: CAsk, v: String) {
                 Err(e) => err(app, e),
             }
         }
+        CAsk::Give => {
+            let Some(c) = app.code.selected().cloned() else { return };
+            let org = match app.store.find_org(&v) {
+                Ok(o) => o,
+                Err(e) => {
+                    err(app, e);
+                    return ask(app, kind, v);
+                }
+            };
+            match crate::org::transfer(&app.store, "tui", &crate::org::Actor::Owner, &org, crate::store::ShareKind::Code, &c.id, None) {
+                Ok(_) => {
+                    app.refresh_history(true);
+                    reload(app);
+                    ok(app, format!("gave {} to {} · members sync it with `mnnn org sync-code`", c.name, org.name));
+                }
+                Err(e) => err(app, e),
+            }
+        }
         CAsk::Input | CAsk::Rename => {
             let Some(c) = app.code.space.clone().or_else(|| app.code.selected().cloned()) else { return };
             let ch = if kind == CAsk::Input {
@@ -639,6 +711,18 @@ fn list_key(app: &mut App, k: KeyEvent) {
                 st.confirm = Some(Confirm::Delete);
             }
         }
+        KeyCode::Char('f') => {
+            st.filter = st.filter.next();
+            st.sel = 0;
+            let l = st.filter.label();
+            reload(app);
+            ok(app, format!("showing {l} code spaces"));
+        }
+        KeyCode::Char('g') => {
+            if st.selected().is_some() {
+                ask(app, CAsk::Give, "");
+            }
+        }
         KeyCode::Char('p') => {
             if let Some(c) = st.selected().cloned() {
                 pick_project(app, Purpose::Add(ItemKind::Code, c.id.clone(), serde_json::json!({}), c.name.clone()), Back::Code);
@@ -677,14 +761,22 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
 fn draw_list(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) {
     let t = app.theme.clone();
     let st = &app.code;
-    let mut v = View::new("Code spaces · math, Polars, Rust, Python → native plugins");
+    let title = if st.filter == ScopeView::All {
+        "Code spaces · math, Polars, Rust, Python → native plugins".to_string()
+    } else {
+        format!("Code spaces · {} only (f: all)", st.filter.label())
+    };
+    let mut v = View::new(title);
     let w = st.list.iter().map(|x| x.name.chars().count()).max().unwrap_or(4).min(28);
+    let sw = st.list.iter().map(|x| scope_label(st, x).chars().count()).max().unwrap_or(4).min(20);
     for (i, c) in st.list.iter().enumerate() {
         let ok = code::approved(c);
+        let scope = scope_label(st, c);
         v.rows.push(Line::from(vec![
             Span::styled(format!(" {} ", if ok { "●" } else { "○" }), Style::new().fg(if ok { t.accent } else { t.muted })),
             Span::styled(format!("{:<w$} ", c.name), row_style(&t, i == st.sel)),
             Span::styled(format!(" {:<7}", c.lang.as_str()), Style::new().fg(t.accent)),
+            Span::styled(format!(" {:<sw$}", scope), Style::new().fg(t.muted)),
             Span::styled(format!(" {} · {} · {}", c.input.text(), status_of(c), last_run(c)), Style::new().fg(t.muted)),
         ]));
     }
@@ -702,6 +794,8 @@ fn draw_list(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
         ("m rename", KeyCode::Char('m')),
         ("d delete", KeyCode::Char('d')),
         ("p project", KeyCode::Char('p')),
+        ("g give", KeyCode::Char('g')),
+        ("f scope", KeyCode::Char('f')),
         ("Esc", KeyCode::Esc),
     ];
     draw_view(f, r, v, &t, hits);

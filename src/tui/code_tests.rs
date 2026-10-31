@@ -168,3 +168,33 @@ fn code_window_builds_on_a_thread_and_shows_the_result() {
     a.on_key(key(KeyCode::Char('t')));
     assert!(a.code.wide);
 }
+
+#[test]
+fn code_list_shows_scope_filters_it_and_gives_code_to_an_org() {
+    let (_t, mut a) = app();
+    crate::org::create(&a.store, "cli", "Lab", None, "").unwrap();
+    for n in ["mine", "shared"] {
+        crate::code::create(&a.store, "cli", n, "", crate::store::Lang::Math, "x = close", Default::default()).unwrap();
+    }
+    a.on_key(key(KeyCode::Char('C')));
+    let txt = screen_text(&mut a);
+    assert!(txt.contains("user") && txt.contains("g give") && txt.contains("f scope"), "{txt}");
+    // give the selected one (mine sorts first or second: pick shared by name)
+    a.code.sel = a.code.list.iter().position(|c| c.name == "shared").unwrap();
+    a.on_key(key(KeyCode::Char('g')));
+    assert_eq!(a.code.ask.as_ref().unwrap().kind, CAsk::Give);
+    typ(&mut a, "nope\n");
+    assert!(a.code.msg.as_ref().unwrap().1, "an unknown org is an error");
+    a.code.ask.as_mut().unwrap().value.clear();
+    typ(&mut a, "Lab\n");
+    assert!(!a.code.msg.as_ref().unwrap().1, "{:?}", a.code.msg);
+    assert!(screen_text(&mut a).contains("org:Lab"));
+    // f cycles all → user → organization → all
+    a.on_key(key(KeyCode::Char('f')));
+    assert_eq!(a.code.list.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), vec!["mine"]);
+    a.on_key(key(KeyCode::Char('f')));
+    assert_eq!(a.code.list.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), vec!["shared"]);
+    assert!(screen_text(&mut a).contains("organization only"));
+    a.on_key(key(KeyCode::Char('f')));
+    assert_eq!(a.code.list.len(), 2);
+}
