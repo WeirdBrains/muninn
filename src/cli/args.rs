@@ -3302,6 +3302,10 @@ pub struct ShareArgs {
     /// List where this kind of item can be shared.
     #[arg(long)]
     pub targets: bool,
+    /// With a code space target: run it once its input is set (a new or changed source
+    /// asks to be approved first, as `mnnn code run` does).
+    #[arg(long)]
+    pub run: bool,
     #[arg(long)]
     pub json: bool,
 }

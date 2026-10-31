@@ -68,6 +68,12 @@ pub fn picked(app: &mut App, row: &str) {
     let Some(t) = TargetKind::parse(t) else { return };
     let to: Vec<String> = if t == TargetKind::Net { vec![] } else { vec![to.to_string()] };
     match share(&app.store, kind, &id, t, &to, "", "tui") {
+        // data into a code space: open it and run it (a new or changed source asks first)
+        Ok(s) if t == TargetKind::Code => {
+            app.set_status(s.summary());
+            super::code::open_space(app, &s.made);
+            super::code::run_shared(app, &s.summary());
+        }
         Ok(s) => app.set_status(s.summary()),
         Err(e) => app.set_status(format!("share: {e}")),
     }

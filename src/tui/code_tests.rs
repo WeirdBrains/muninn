@@ -2,7 +2,7 @@
 use super::action::Action;
 use super::code::{CAsk, Confirm, Editor, Screen};
 use super::modal::Modal;
-use super::tests::{app, key, screen_text};
+use super::tests::{app, click, find_on, key, render, screen_text};
 use super::*;
 use crate::store::ItemKind;
 
@@ -76,8 +76,15 @@ fn code_window_creates_edits_and_approves_before_running() {
     let text = screen_text(&mut a);
     assert!(text.contains("Code space fast") && text.contains("C = close * 2") && text.contains("not approved"), "{text}");
 
-    // i sets the input (checked)
+    // i opens the input picker; "type the whole line" sets it as text (checked)
     a.on_key(key(KeyCode::Char('i')));
+    let bars = a.code.picker.as_ref().unwrap().models.iter().position(|m| m == "bars").unwrap();
+    a.code.picker.as_mut().unwrap().sel = bars;
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Up));
+    a.on_key(key(KeyCode::Enter));
+    assert_eq!(a.code.ask.as_ref().unwrap().kind, CAsk::Input);
+    a.code.ask.as_mut().unwrap().value.clear();
     typ(&mut a, "bars wher x\n");
     assert!(a.code.ask.is_some(), "a bad input stays open");
     a.code.ask.as_mut().unwrap().value = "bars where symbol = BTC/USDT; sort timestamp; limit 5".into();
@@ -197,4 +204,74 @@ fn code_list_shows_scope_filters_it_and_gives_code_to_an_org() {
     assert!(screen_text(&mut a).contains("organization only"));
     a.on_key(key(KeyCode::Char('f')));
     assert_eq!(a.code.list.len(), 2);
+}
+
+#[test]
+fn the_input_picker_builds_the_line_from_a_model_and_its_parts() {
+    let (_t, mut a) = app();
+    let c = a.store.create_code_space("calc", "", crate::store::Lang::Math, "C = close * 2", Default::default()).unwrap();
+    a.on_key(key(KeyCode::Char('C')));
+    // the list's key bar has it
+    assert!(render(&mut a, 140, 40).contains("[i input]"));
+    super::code::open_space(&mut a, &c.id);
+    // the [Input] button in the editor's head is the same as i
+    let s = render(&mut a, 140, 40);
+    let (x, y) = find_on(&s, "[Input]").unwrap_or_else(|| panic!("{s}"));
+    a.on_mouse(click(x + 1, y));
+    let p = a.code.picker.clone().expect("the picker opens");
+    assert!(p.models_stage && p.models[0] == "none" && p.models.contains(&"bars".to_string()), "{p:?}");
+    assert!(render(&mut a, 140, 40).contains("pick a model"));
+    a.code.picker.as_mut().unwrap().sel = p.models.iter().position(|m| m == "bars").unwrap();
+    a.on_key(key(KeyCode::Enter));
+    // the parts: where, matching, group, sort, limit
+    for (row, v) in [(1, "symbol = BTC/USDT"), (3, "symbol"), (4, "-timestamp"), (5, "50")] {
+        a.code.picker.as_mut().unwrap().sel = row;
+        a.on_key(key(KeyCode::Enter));
+        a.code.ask.as_mut().unwrap().value = v.into();
+        a.on_key(key(KeyCode::Enter));
+    }
+    let line = "bars where symbol = BTC/USDT group symbol sort -timestamp limit 50";
+    let s = render(&mut a, 140, 40);
+    assert!(s.contains(line), "the line is previewed\n{s}");
+    // a bad limit stays open
+    a.code.picker.as_mut().unwrap().sel = 5;
+    a.on_key(key(KeyCode::Enter));
+    a.code.ask.as_mut().unwrap().value = "lots".into();
+    a.on_key(key(KeyCode::Enter));
+    assert!(a.code.ask.is_some() && a.code.msg.as_ref().unwrap().1);
+    a.on_key(key(KeyCode::Esc));
+    assert!(a.code.picker.is_some(), "Esc on a part goes back to the picker");
+    a.on_key(key(KeyCode::Char('u')));
+    assert!(a.code.picker.is_none());
+    assert_eq!(a.store.find_code_space("calc").unwrap().input.text(), line);
+    // none clears it
+    a.on_key(key(KeyCode::Char('i')));
+    a.code.picker.as_mut().unwrap().sel = 0;
+    a.on_key(key(KeyCode::Enter));
+    assert!(a.store.find_code_space("calc").unwrap().input.is_empty());
+}
+
+#[test]
+fn sharing_data_to_a_code_space_sets_its_input_and_runs_it() {
+    let (_t, mut a) = app();
+    let c = a.store.create_code_space("calc", "", crate::store::Lang::Math, "C = close * 2", Default::default()).unwrap();
+    // first time: it asks to approve the source, then runs
+    a.share_item = Some((crate::store::ShareKind::Model, "bars".into()));
+    super::share::picked(&mut a, "code · calc");
+    assert_eq!(a.store.find_code_space("calc").unwrap().input.model, "bars");
+    assert!(matches!(a.modal, Some(Modal::Code)) && a.code.screen == Screen::Edit);
+    assert_eq!(a.code.confirm, Some(Confirm::ApproveRun));
+    assert!(a.code.msg.as_ref().unwrap().0.contains("native code"));
+    a.on_key(key(KeyCode::Char('y')));
+    // approved: it runs (a compiled space builds on its thread first, then runs)
+    assert!(crate::code::approved(&a.store.find_code_space("calc").unwrap()));
+    assert!(a.code.building.is_some() || a.code.result.is_some(), "{:?}", a.code.msg);
+    // approved now: sharing again goes straight to the run
+    a.code.building = None;
+    a.modal = None;
+    a.share_item = Some((crate::store::ShareKind::Model, "bars".into()));
+    super::share::picked(&mut a, "code · calc");
+    assert_eq!(a.code.confirm, None);
+    assert!(a.code.building.is_some() || a.code.result.is_some(), "{:?}", a.code.msg);
+    let _ = c;
 }

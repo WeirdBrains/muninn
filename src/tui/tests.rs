@@ -1904,7 +1904,7 @@ fn menus_have_authors_and_history() {
 }
 
 /// Where `needle` is drawn (column of its first character, row).
-fn find_on(s: &str, needle: &str) -> Option<(u16, u16)> {
+pub fn find_on(s: &str, needle: &str) -> Option<(u16, u16)> {
     s.lines().enumerate().find_map(|(y, l)| l.find(needle).map(|b| (l[..b].chars().count() as u16, y as u16)))
 }
 

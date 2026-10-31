@@ -56,6 +56,12 @@ In the TUI (and in `mnnn code show`) the input is one line:
 descending. With `--group`, math, Polars and Python compute per group (for example per
 symbol), so a moving average never runs across two symbols.
 
+In the TUI, `i` or the **[Input]** button (in the list's key bar and on the editor's input
+line) opens the input picker: pick a model (or `none`), then edit its where, matching,
+group, sort and limit parts while the resulting line is shown above them; "use this
+input" (or `u`) saves it, "type the whole line…" edits it as text. Sharing a model or a
+records live search into a code space ([share](share.md)) sets its input and runs it.
+
 ## Math
 
 One line per formula, `NAME = EXPRESSION`. A name is an input field (`close`, `volume`,
@@ -300,6 +306,7 @@ not, its language, its scope (`user`, `global` or `org:NAME`), input and last ru
 | `p` | add to a project |
 | `g` | give it to one of your organizations (members get it with `mnnn org sync-code`) |
 | `f` | cycle the scope filter: all, user, organization |
+| `i` | the input picker for the selected space |
 | `d` | delete (`y` confirms) |
 | Esc | close |
 
@@ -314,7 +321,7 @@ otherwise:
 | `b` | build (in the background; the window stays usable) |
 | `r` (Ctrl+R while editing) | save, build if needed, and run; a new or changed source asks `y`/`n` first |
 | `c` | check the source without running it |
-| `i` | edit the input line |
+| `i` / [Input] | the input picker (model, then where/matching/group/sort/limit) |
 | `t` | widen the result tile / back |
 | `p` | add to a project |
 | Esc | back to the list (asks when there are unsaved changes: `y` discards, `s` saves) |

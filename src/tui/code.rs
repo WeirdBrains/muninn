@@ -25,6 +25,12 @@ pub enum CAsk {
     Rename,
     /// Give the selected space to one of your orgs.
     Give,
+    /// One part of the input in the input picker.
+    Where,
+    Matching,
+    Group,
+    Sort,
+    Limit,
 }
 
 impl CAsk {
@@ -35,6 +41,11 @@ impl CAsk {
             CAsk::Input => "Input (MODEL [where C; C] [matching \"T\"] [group F] [sort -F] [limit N], or none)",
             CAsk::Rename => "New name",
             CAsk::Give => "Give it to which of your organizations",
+            CAsk::Where => "where (conditions, `;` between: close > 3; symbol = BTC/USDT)",
+            CAsk::Matching => "matching (text to search for)",
+            CAsk::Group => "group (fields, `,` between)",
+            CAsk::Sort => "sort (fields, `,` between; -f descending)",
+            CAsk::Limit => "limit (a number, empty for none)",
         }
     }
 }
@@ -213,7 +224,24 @@ pub struct CodeState {
     pub org_names: std::collections::HashMap<String, String>,
     /// Which scopes the list shows (`f` cycles).
     pub filter: ScopeView,
+    pub picker: Option<InputPicker>,
 }
+
+/// The input picker (`i` or [Input]): pick a model (or none), then its parts.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct InputPicker {
+    /// The space whose input this is.
+    pub space: String,
+    /// Picking the model (`false`: the parts).
+    pub models_stage: bool,
+    /// `none` first, then every model.
+    pub models: Vec<String>,
+    pub sel: usize,
+    pub input: CodeInput,
+}
+
+/// The parts stage's rows.
+pub const PICK_ROWS: [&str; 8] = ["model", "where", "matching", "group", "sort", "limit", "type the whole line…", "use this input"];
 
 /// The list's scope filter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -425,6 +453,15 @@ pub fn poll(app: &mut App) {
     }
 }
 
+/// After data was shared into the open space: run it and show the output.
+pub fn run_shared(app: &mut App, what: &str) {
+    run(app);
+    if app.code.confirm == Some(Confirm::ApproveRun) {
+        let m = app.code.msg.take().map(|m| m.0).unwrap_or_default();
+        ok(app, format!("{what} · {m}"));
+    }
+}
+
 /// r: run (asks to approve a new or changed source first).
 fn run(app: &mut App) {
     if !save(app) {
@@ -481,6 +518,127 @@ fn run_now(app: &mut App) {
     }
 }
 
+/// i / [Input]: open the input picker on the open (or selected) space.
+fn open_picker(app: &mut App) {
+    let Some(c) = app.code.space.clone().or_else(|| app.code.selected().cloned()) else { return };
+    let mut models = vec!["none".to_string()];
+    models.extend(app.store.models().unwrap_or_default().into_iter().map(|m| m.name));
+    let sel = if c.input.model.is_empty() { 0 } else { models.iter().position(|m| m.eq_ignore_ascii_case(&c.input.model)).unwrap_or(0) };
+    app.code.picker = Some(InputPicker { space: c.id.clone(), models_stage: true, models, sel, input: c.input.clone() });
+    app.code.msg = None;
+}
+
+fn split(v: &str, sep: char) -> Vec<String> {
+    v.split(sep).map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()
+}
+
+/// Save the picked input on its space.
+fn use_input(app: &mut App) {
+    let Some(p) = app.code.picker.clone() else { return };
+    // the line it shows must read back the same
+    let input = match code::parse_input(&p.input.text()) {
+        Ok(i) => i,
+        Err(e) => return err(app, e),
+    };
+    match code::edit(&app.store, "tui", &p.space, &CodeChange { input: Some(input), ..Default::default() }) {
+        Ok(n) => {
+            app.code.picker = None;
+            if app.code.space.as_ref().is_some_and(|s| s.id == n.id) {
+                app.code.space = Some(n.clone());
+            }
+            app.refresh_history(true);
+            reload(app);
+            ok(app, format!("input: {}", n.input.text()));
+        }
+        Err(e) => err(app, e),
+    }
+}
+
+fn picker_key(app: &mut App, k: KeyEvent) {
+    let Some(p) = app.code.picker.as_mut() else { return };
+    let n = if p.models_stage { p.models.len() } else { PICK_ROWS.len() };
+    app.code.msg = None;
+    match k.code {
+        KeyCode::Down | KeyCode::Char('j') => p.sel = (p.sel + 1).min(n.saturating_sub(1)),
+        KeyCode::Up | KeyCode::Char('k') => p.sel = p.sel.saturating_sub(1),
+        KeyCode::Enter => picker_pick(app),
+        KeyCode::Char('u') if !p.models_stage => use_input(app),
+        KeyCode::Esc | KeyCode::Char('q') => {
+            if p.models_stage {
+                app.code.picker = None;
+                ok(app, "input unchanged");
+            } else {
+                p.models_stage = true;
+                p.sel = p.models.iter().position(|m| m.eq_ignore_ascii_case(&p.input.model)).unwrap_or(0);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn picker_pick(app: &mut App) {
+    let Some(p) = app.code.picker.as_mut() else { return };
+    if p.models_stage {
+        let m = p.models.get(p.sel).cloned().unwrap_or_default();
+        if p.sel == 0 {
+            p.input = CodeInput::default();
+            return use_input(app);
+        }
+        if !m.eq_ignore_ascii_case(&p.input.model) {
+            // another model's fields: start its parts afresh
+            p.input = CodeInput { model: m, ..Default::default() };
+        }
+        p.models_stage = false;
+        p.sel = PICK_ROWS.len() - 1;
+        return;
+    }
+    let i = p.input.clone();
+    match p.sel {
+        0 => {
+            p.models_stage = true;
+            p.sel = p.models.iter().position(|m| m.eq_ignore_ascii_case(&i.model)).unwrap_or(0);
+        }
+        1 => ask(app, CAsk::Where, i.filter.join("; ")),
+        2 => ask(app, CAsk::Matching, i.text),
+        3 => ask(app, CAsk::Group, i.group.join(",")),
+        4 => ask(app, CAsk::Sort, i.sort.join(",")),
+        5 => ask(app, CAsk::Limit, i.limit.map(|n| n.to_string()).unwrap_or_default()),
+        6 => {
+            let v = i.text();
+            app.code.picker = None;
+            ask(app, CAsk::Input, if v == "none" { String::new() } else { v });
+        }
+        _ => use_input(app),
+    }
+}
+
+/// An answer to one part of the picker's input.
+fn picker_answer(app: &mut App, kind: CAsk, v: String) {
+    let Some(p) = app.code.picker.as_mut() else { return };
+    let i = &mut p.input;
+    match kind {
+        CAsk::Where => i.filter = split(&v, ';'),
+        CAsk::Matching => i.text = v.trim().trim_matches('"').to_string(),
+        CAsk::Group => i.group = split(&v, ','),
+        CAsk::Sort => i.sort = split(&v, ','),
+        CAsk::Limit => match v.trim() {
+            "" => i.limit = None,
+            n => match n.parse() {
+                Ok(n) => i.limit = Some(n),
+                Err(_) => {
+                    err(app, format!("`{n}` is not a number"));
+                    return ask(app, kind, v);
+                }
+            },
+        },
+        _ => {}
+    }
+    // check the line it makes as soon as it's typed
+    if let Err(e) = code::parse_input(&i.text()) {
+        err(app, e);
+    }
+}
+
 fn ask(app: &mut App, kind: CAsk, value: impl Into<String>) {
     app.code.ask = Some(Ask::new(kind, kind.title(), value));
 }
@@ -530,6 +688,7 @@ fn answer(app: &mut App, kind: CAsk, v: String) {
                 Err(e) => err(app, e),
             }
         }
+        CAsk::Where | CAsk::Matching | CAsk::Group | CAsk::Sort | CAsk::Limit => picker_answer(app, kind, v),
         CAsk::Input | CAsk::Rename => {
             let Some(c) = app.code.space.clone().or_else(|| app.code.selected().cloned()) else { return };
             let ch = if kind == CAsk::Input {
@@ -608,6 +767,9 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         match ask_key(a, k) {
             Typed::Cancel => {
                 app.code.ask = None;
+                if app.code.picker.is_some() {
+                    return;
+                }
                 ok(app, "cancelled");
             }
             Typed::Done(v) => {
@@ -631,6 +793,9 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             _ => ok(app, "cancelled"),
         }
         return;
+    }
+    if app.code.picker.is_some() {
+        return picker_key(app, k);
     }
     let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
     match app.code.screen {
@@ -658,10 +823,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 KeyCode::Char('b') => start_build(app, false),
                 KeyCode::Char('r') => run(app),
                 KeyCode::Char('t') => app.code.wide = !app.code.wide,
-                KeyCode::Char('i') => {
-                    let v = app.code.space.as_ref().map(|c| c.input.text()).unwrap_or_default();
-                    ask(app, CAsk::Input, if v == "none" { String::new() } else { v });
-                }
+                KeyCode::Char('i') => open_picker(app),
                 KeyCode::Char('c') => {
                     let lines: Vec<String> = match (app.code.space.as_ref(), env(app)) {
                         (Some(c), Ok(e)) => code::check(&e, c.lang, &app.code.editor.text()).unwrap_or_else(|e| vec![format!("error: {e}")]),
@@ -695,6 +857,7 @@ fn list_key(app: &mut App, k: KeyEvent) {
         KeyCode::Up | KeyCode::Char('k') => st.sel = st.sel.saturating_sub(1),
         KeyCode::Enter | KeyCode::Char('e') => edit_selected(app),
         KeyCode::Char('n') | KeyCode::Char('a') => ask(app, CAsk::Name, ""),
+        KeyCode::Char('i') => open_picker(app),
         KeyCode::Char('m') => {
             if let Some(c) = st.selected().cloned() {
                 app.code.space = None;
@@ -734,6 +897,14 @@ fn list_key(app: &mut App, k: KeyEvent) {
 }
 
 pub fn on_click(app: &mut App, i: usize) {
+    if let (Some(p), None) = (app.code.picker.as_mut(), app.code.ask.as_ref()) {
+        if p.sel == i {
+            picker_pick(app);
+        } else {
+            p.sel = i;
+        }
+        return;
+    }
     if app.code.ask.is_some() || app.code.screen != Screen::List {
         return;
     }
@@ -752,10 +923,73 @@ fn last_run(c: &CodeSpace) -> String {
 }
 
 pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) {
+    if app.code.picker.is_some() {
+        return draw_picker(app, f, r, hits);
+    }
     match app.code.screen {
         Screen::List => draw_list(app, f, r, hits),
         Screen::Edit => draw_edit(app, f, r, hits),
     }
+}
+
+fn draw_picker(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) {
+    let t = app.theme.clone();
+    let st = &app.code;
+    let Some(p) = &st.picker else { return };
+    let name = st.list.iter().chain(st.space.iter()).find(|c| c.id == p.space).map(|c| c.name.clone()).unwrap_or_default();
+    let mut v = View::new(format!("Input of {name} · {}", if p.models_stage { "pick a model" } else { "its parts" }));
+    v.head.push(Line::from(vec![
+        Span::styled(" input: ", Style::new().fg(t.muted)),
+        Span::styled(
+            if p.models_stage && p.sel > 0 && !p.models[p.sel].eq_ignore_ascii_case(&p.input.model) {
+                p.models[p.sel].clone()
+            } else if p.models_stage && p.sel == 0 {
+                "none".into()
+            } else {
+                p.input.text()
+            },
+            Style::new().fg(t.accent).add_modifier(Modifier::BOLD),
+        ),
+    ]));
+    if p.models_stage {
+        for (i, m) in p.models.iter().enumerate() {
+            let what = if i == 0 {
+                "no input records"
+            } else if m == "bars" {
+                "the bars (OHLCV)"
+            } else {
+                "a designed model"
+            };
+            v.rows.push(Line::from(vec![
+                Span::styled(format!(" {m:<24}"), row_style(&t, i == p.sel)),
+                Span::styled(format!(" {what}"), Style::new().fg(t.muted)),
+            ]));
+        }
+        v.keys = vec![("Enter pick", KeyCode::Enter), ("Esc cancel", KeyCode::Esc)];
+    } else {
+        let i = &p.input;
+        let vals = [
+            i.model.clone(),
+            i.filter.join("; "),
+            i.text.clone(),
+            i.group.join(","),
+            i.sort.join(","),
+            i.limit.map(|n| n.to_string()).unwrap_or_default(),
+            String::new(),
+            String::new(),
+        ];
+        for (n, (label, val)) in PICK_ROWS.iter().zip(vals).enumerate() {
+            v.rows.push(Line::from(vec![
+                Span::styled(format!(" {label:<22}"), row_style(&t, n == p.sel)),
+                Span::styled(format!(" {}", if val.is_empty() && n < 6 { "—".into() } else { val }), Style::new().fg(t.fg)),
+            ]));
+        }
+        v.keys = vec![("Enter edit", KeyCode::Enter), ("u use", KeyCode::Char('u')), ("Esc models", KeyCode::Esc)];
+    }
+    v.sel = Some(p.sel);
+    v.ask = st.ask.as_ref().map(|a| (a.title.clone(), a.value.clone()));
+    v.msg = st.msg.clone();
+    draw_view(f, r, v, &t, hits);
 }
 
 fn draw_list(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) {
@@ -791,6 +1025,7 @@ fn draw_list(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
         ("Enter edit", KeyCode::Enter),
         ("n new", KeyCode::Char('n')),
         ("r run", KeyCode::Char('r')),
+        ("i input", KeyCode::Char('i')),
         ("m rename", KeyCode::Char('m')),
         ("d delete", KeyCode::Char('d')),
         ("p project", KeyCode::Char('p')),
@@ -843,7 +1078,14 @@ fn draw_edit(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
             Style::new().fg(t.accent),
         ),
     ]);
+    let hw = head.width() as u16;
     f.render_widget(Paragraph::new(head), Rect { height: 1, ..inner });
+    // [Input]: the same as i
+    let b = Rect { x: inner.x + hw + 1, y: inner.y, width: 7, height: 1 };
+    if b.right() <= inner.right() {
+        f.render_widget(Paragraph::new(Line::styled("[Input]", Style::new().fg(t.accent).add_modifier(Modifier::BOLD))), b);
+        hits.push((b, Hit::Press(KeyCode::Char('i'))));
+    }
     let body = Rect { y: inner.y + 1, height: inner.height.saturating_sub(3), ..inner };
     let (ed, side) = if app.code.wide {
         (Rect { width: 0, ..body }, body)

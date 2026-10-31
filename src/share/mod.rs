@@ -2,7 +2,7 @@
 //! that accepts shares (a [`Target`]): a project, a journal (as a new entry about it), a code
 //! space (a model becomes its input) or the network (an exchange share, `mnnn net share`).
 use crate::error::{Error, Result};
-use crate::store::{CodeChange, ItemKind, NewAction, ShareKind, Store};
+use crate::store::{CodeChange, CodeInput, ItemKind, NewAction, SearchTarget, ShareKind, Store};
 use serde::Serialize;
 
 /// The kinds of place a share can go.
@@ -30,7 +30,7 @@ impl TargetKind {
         match self {
             TargetKind::Project => "add it to a project",
             TargetKind::Journal => "write a new journal entry about it",
-            TargetKind::Code => "use it as a code space's input",
+            TargetKind::Code => "make it a code space's input (and run it)",
             TargetKind::Net => "share it with your exchanges",
         }
     }
@@ -48,7 +48,8 @@ impl TargetKind {
         match self {
             TargetKind::Project => kind != ShareKind::Project,
             TargetKind::Journal | TargetKind::Net => true,
-            TargetKind::Code => kind == ShareKind::Model,
+            // data: a model, or a live search (its model and conditions)
+            TargetKind::Code => matches!(kind, ShareKind::Model | ShareKind::LiveSearch),
         }
     }
     /// Whether a target of this kind is named (`net` takes exchanges, or none for all).
@@ -112,6 +113,37 @@ pub fn entry_body(kind: ShareKind, id: &str, name: &str, note: &str) -> String {
     b
 }
 
+/// The code space input a shared item stands for: a model as a whole, or a live search's
+/// records (its model, conditions and text).
+pub fn input_for(s: &Store, kind: ShareKind, id: &str, name: &str) -> Result<CodeInput> {
+    match kind {
+        ShareKind::Model => Ok(CodeInput { model: name.to_string(), ..Default::default() }),
+        ShareKind::LiveSearch => {
+            let ls = s.find_live_search(id)?;
+            let sp = &ls.spec;
+            let model = match (sp.target, &sp.model) {
+                (SearchTarget::Records, Some(m)) => s.model(m)?.map(|m| m.name).unwrap_or_else(|| m.clone()),
+                _ => {
+                    return Err(Error::invalid(
+                        "share",
+                        format!(
+                            "live search {} is not over one model's records (save it with --model), so it can't be a code space's input",
+                            ls.name
+                        ),
+                    ));
+                }
+            };
+            Ok(CodeInput {
+                model,
+                filter: sp.conditions.iter().map(crate::rules::condition_text).collect(),
+                text: sp.query.trim().to_string(),
+                ..Default::default()
+            })
+        }
+        _ => Err(Error::invalid("share", format!("a {} is not data for a code space", kind.label()))),
+    }
+}
+
 /// Share item `key` of `kind` to `target` (`to`: its id or name; for `net`, exchange
 /// labels/ids, empty for every exchange). `note` goes into journal entries.
 pub fn share(s: &Store, kind: ShareKind, key: &str, target: TargetKind, to: &[String], note: &str, origin: &str) -> Result<Shared> {
@@ -152,9 +184,8 @@ pub fn share(s: &Store, kind: ShareKind, key: &str, target: TargetKind, to: &[St
         }
         TargetKind::Code => {
             let c = s.find_code_space(one()?)?;
-            let mut input = c.input.clone();
-            out.new = input.model != name;
-            input.model = name.clone();
+            let input = input_for(s, kind, &id, &name)?;
+            out.new = input != c.input;
             let c = s.update_code_space(&c.id, &CodeChange { input: Some(input), ..Default::default() })?;
             (out.to, out.made) = (c.name, c.id);
         }

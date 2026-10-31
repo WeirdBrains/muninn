@@ -262,32 +262,7 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
             let b = code::build_space(&store, &env, "cli", &c, &mut |l| eprintln!("{l}"))?;
             ctx.io.info(format!("{} code space {} ({})", if b.cached { "already built:" } else { "built" }, c.name, b.path.display()));
         }
-        CodeCommand::Run { space, json, rows } => {
-            let c = store.find_code_space(&space)?;
-            ensure_approved(ctx, &store, &c)?;
-            let c = store.code_space(&c.id)?.ok_or_else(|| anyhow!("code space {} vanished", c.name))?;
-            let env = CodeEnv::for_store(&store)?;
-            let quiet = ctx.global.quiet;
-            let info = code::run(&store, &env, "cli", &c, &mut |l| {
-                if !quiet {
-                    eprintln!("{l}")
-                }
-            })?;
-            if json {
-                println!("{}", serde_json::to_string_pretty(&code::run_json(&info))?);
-            } else {
-                print_run(&info, rows);
-            }
-            if let Some(e) = &info.error {
-                return Err(anyhow!("code space {} failed: {e}", c.name));
-            }
-            ctx.io.note(format!(
-                "ran code space {} in {} ms{}",
-                c.name,
-                info.ms,
-                if info.writes > 0 { format!(", {} writes", info.writes) } else { String::new() }
-            ));
-        }
+        CodeCommand::Run { space, json, rows } => run_space(ctx, &store, &space, json, rows)?,
         CodeCommand::Check { space: Some(space) } => {
             let c = store.find_code_space(&space)?;
             let env = CodeEnv::for_store(&store)?;
@@ -298,6 +273,35 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
         }
         CodeCommand::Check { space: None } | CodeCommand::Sdk { .. } => {}
     }
+    Ok(())
+}
+
+/// Run a code space (asking to approve a new or changed source) and print its result.
+pub(crate) fn run_space(ctx: &Ctx, store: &Store, space: &str, json: bool, rows: usize) -> anyhow::Result<()> {
+    let c = store.find_code_space(space)?;
+    ensure_approved(ctx, store, &c)?;
+    let c = store.code_space(&c.id)?.ok_or_else(|| anyhow!("code space {} vanished", c.name))?;
+    let env = CodeEnv::for_store(store)?;
+    let quiet = ctx.global.quiet;
+    let info = code::run(store, &env, "cli", &c, &mut |l| {
+        if !quiet {
+            eprintln!("{l}")
+        }
+    })?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&code::run_json(&info))?);
+    } else {
+        print_run(&info, rows);
+    }
+    if let Some(e) = &info.error {
+        return Err(anyhow!("code space {} failed: {e}", c.name));
+    }
+    ctx.io.note(format!(
+        "ran code space {} in {} ms{}",
+        c.name,
+        info.ms,
+        if info.writes > 0 { format!(", {} writes", info.writes) } else { String::new() }
+    ));
     Ok(())
 }
 

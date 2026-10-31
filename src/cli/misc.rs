@@ -139,11 +139,17 @@ pub fn share(ctx: &Ctx, a: super::args::ShareArgs) -> anyhow::Result<()> {
     let (item, target) = (a.item.unwrap_or_default(), a.target.unwrap_or_default());
     let t = TargetKind::parse(&target).ok_or_else(|| anyhow::anyhow!("unknown target {target:?} (project, journal, code, net)"))?;
     let store = ctx.open_store()?;
+    if a.run && t != TargetKind::Code {
+        return Err(anyhow::anyhow!("--run is for sharing to a code space"));
+    }
     let out = share(&store, kind, &item, t, &a.to, &a.note, "cli")?;
-    if a.json {
+    if a.json && !a.run {
         println!("{}", serde_json::to_string_pretty(&out)?);
     } else {
-        ctx.io.info(out.summary());
+        ctx.io.note(out.summary());
+    }
+    if a.run {
+        super::code::run_space(ctx, &store, &out.made, a.json, 20)?;
     }
     Ok(())
 }
