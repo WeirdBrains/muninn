@@ -91,6 +91,8 @@ pub enum Hit {
     ChartDate(u32, u8),
     /// A clickable key hint: acts as if that key was pressed.
     Press(ratatui::crossterm::event::KeyCode),
+    /// A key named in hint text (with Ctrl or Alt): acts as if it was pressed.
+    Chord(ratatui::crossterm::event::KeyCode, ratatui::crossterm::event::KeyModifiers),
     /// A bar row of a list tile (absolute row index).
     ListRow(u32, i64),
     /// The history bar (focus), its `«` collapse button, and a row (0: the start).
@@ -119,6 +121,8 @@ pub struct App {
     pub data: data::DataCache,
     /// Click targets inside the open popup (checked before anything else).
     pub modal_hits: Vec<(Rect, Hit)>,
+    /// Where the open popup is drawn (its hint text is clickable).
+    pub modal_area: Rect,
     /// `Ctrl-w` was pressed; the next key is a window command.
     pub pending_w: bool,
     /// Content area from the last draw (split geometry, min sizes).
@@ -165,6 +169,7 @@ impl App {
             import: Default::default(),
             data: data::DataCache::new(paths.db.clone(), dek.0),
             modal_hits: vec![],
+            modal_area: Rect::default(),
             content: Rect::new(0, 0, 120, 30),
             export: forms::ExportForm::default(),
             keys: forms::KeysForm::default(),
@@ -883,6 +888,7 @@ impl App {
                 self.layout_changed();
             }
             Some(Hit::Press(code)) => self.on_key(ratatui::crossterm::event::KeyEvent::from(code)),
+            Some(Hit::Chord(code, m)) => self.on_key(ratatui::crossterm::event::KeyEvent::new(code, m)),
             Some(
                 Hit::CloseModal
                 | Hit::ImportCancel
@@ -994,6 +1000,14 @@ impl App {
         f.render_widget(status, bottom);
         let en = |a| self.enabled(a);
         menu::draw_dropdowns(&self.menu, f, area, bar, &xs, &t, &en, &mut hits);
+        // every key named in hint text is a button too (below the drawn controls)
+        let colours = [t.muted, t.header, t.warning];
+        if self.modal.is_some() {
+            let found = widgets::scan_hints(f.buffer_mut(), self.modal_area, &colours);
+            self.modal_hits.splice(0..0, found);
+        } else if !self.menu.is_open() {
+            hits.splice(0..0, widgets::scan_hints(f.buffer_mut(), area, &colours));
+        }
         self.hits = hits;
     }
 

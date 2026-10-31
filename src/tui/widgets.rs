@@ -194,3 +194,174 @@ pub fn loading(f: &mut ratatui::Frame, area: Rect, p: &super::data::Pending, t: 
     let y = area.y + area.height.saturating_sub(h) / 2;
     f.render_widget(ratatui::widgets::Paragraph::new(lines).style(st), Rect { y, height: h, ..area });
 }
+
+// ---------- clickable key hints (2.15) ----------
+
+use ratatui::crossterm::event::{KeyCode as KC, KeyModifiers as KM};
+
+/// A key named in a hint: `Enter`, `Esc`, `Tab`, `S-Tab`, `Space`, `F1`, `Ctrl-S`,
+/// `Ctrl+R`, `Alt-x`, `j/k` (the first), `↑↓`, `1-9`, or one character.
+pub fn parse_key(tok: &str) -> Option<(KC, KM)> {
+    let tok = tok.trim().trim_end_matches([':', ',', ';', ')']).trim_start_matches('(');
+    let first = tok.split('/').next().unwrap_or(tok);
+    let first = if first.chars().count() > 1 && first.contains(['-', '–']) && first.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        &first[..1]
+    } else {
+        first
+    };
+    let named = |n: &str| -> Option<KC> {
+        Some(match n.to_ascii_lowercase().as_str() {
+            "enter" | "return" => KC::Enter,
+            "esc" | "escape" => KC::Esc,
+            "tab" => KC::Tab,
+            "s-tab" | "shift-tab" | "backtab" => KC::BackTab,
+            "space" => KC::Char(' '),
+            "del" | "delete" => KC::Delete,
+            "backspace" => KC::Backspace,
+            "pgup" => KC::PageUp,
+            "pgdn" => KC::PageDown,
+            "home" => KC::Home,
+            "end" => KC::End,
+            f if f.len() >= 2 && f.starts_with('f') && f[1..].parse::<u8>().is_ok_and(|n| (1..=12).contains(&n)) => KC::F(f[1..].parse().ok()?),
+            _ => return None,
+        })
+    };
+    if let Some(k) = named(first) {
+        return Some((k, KM::NONE));
+    }
+    for (pre, m) in [("ctrl-", KM::CONTROL), ("ctrl+", KM::CONTROL), ("^", KM::CONTROL), ("alt-", KM::ALT), ("alt+", KM::ALT)] {
+        if first.len() > pre.len() && first.to_ascii_lowercase().starts_with(pre) {
+            let rest = &first[pre.len()..];
+            if let Some(k) = named(rest) {
+                return Some((k, m));
+            }
+            let mut cs = rest.chars();
+            let (Some(c), None) = (cs.next(), cs.next()) else { return None };
+            return Some((KC::Char(if m == KM::CONTROL { c.to_ascii_lowercase() } else { c }), m));
+        }
+    }
+    let mut cs = first.chars();
+    match (cs.next(), cs.next()) {
+        (Some('↑'), _) => Some((KC::Up, KM::NONE)),
+        (Some('↓'), _) => Some((KC::Down, KM::NONE)),
+        (Some('←'), _) => Some((KC::Left, KM::NONE)),
+        (Some('→'), _) => Some((KC::Right, KM::NONE)),
+        (Some(c), None) if c.is_ascii_graphic() => Some((KC::Char(c), KM::NONE)),
+        _ => None,
+    }
+}
+
+/// The keys a hint text names, with the character span (start, len) of each key's
+/// part of the text. A hint is a `·`-separated list (`Enter ok · Esc cancel`), a
+/// confirmation (`y confirms`, `y/n`) or a parenthesis (`(Ctrl-T switches)`, `(f: all)`).
+pub fn hint_keys(text: &str) -> Vec<(usize, usize, KC, KM)> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = vec![];
+    let listy = text.contains('·');
+    // segments between `·`
+    let mut start = 0;
+    let mut segs = vec![];
+    for (i, c) in chars.iter().enumerate() {
+        if *c == '·' {
+            segs.push((start, i));
+            start = i + 1;
+        }
+    }
+    segs.push((start, chars.len()));
+    let word_at = |from: usize, to: usize| -> Option<(usize, usize)> {
+        let mut a = from;
+        while a < to && chars[a] == ' ' {
+            a += 1;
+        }
+        let mut b = a;
+        while b < to && chars[b] != ' ' {
+            b += 1;
+        }
+        (b > a).then_some((a, b))
+    };
+    for (i, &(a, b)) in segs.iter().enumerate() {
+        let seg: String = chars[a..b].iter().collect();
+        if listy {
+            // the key comes first in a segment; in the first one it may follow a title (`Prefs · Esc`)
+            if let Some((wa, wb)) = word_at(a, b) {
+                let w: String = chars[wa..wb].iter().collect();
+                let rest_ok = i > 0 || segs.len() == 1 || chars[wb..b].iter().collect::<String>().trim().len() < 40;
+                if let Some((k, m)) = parse_key(&w).filter(|_| rest_ok) {
+                    // a lone letter must be followed by a word (`n new`), not stand in prose
+                    let lone = w.chars().count() == 1 && w.chars().all(|c| c.is_ascii_alphabetic());
+                    if !lone || wb < b {
+                        out.push((wa, wb - wa, k, m));
+                        continue;
+                    }
+                }
+            }
+        }
+        for pat in ["y confirms", "y/n"] {
+            if let Some(p) = seg.find(pat) {
+                let at = a + seg[..p].chars().count();
+                out.push((at, 1, KC::Char('y'), KM::NONE));
+            }
+        }
+        // `(Ctrl-T switches)`, `(f: all)`, `(Esc: keys)`
+        let mut j = a;
+        while j < b {
+            if chars[j] == '('
+                && let Some((wa, wb)) = word_at(j + 1, b)
+            {
+                let w: String = chars[wa..wb].iter().collect();
+                let wt = w.trim_end_matches([':', ')']);
+                let keyish = wt.chars().count() == 1 || parse_key(wt).is_some_and(|(k, m)| m != KM::NONE || !matches!(k, KC::Char(_)));
+                if keyish
+                    && (w.ends_with(':') || wb < b && chars[wb] == ' ')
+                    && let Some((k, m)) = parse_key(wt)
+                {
+                    out.push((wa, wt.chars().count(), k, m));
+                }
+            }
+            j += 1;
+        }
+    }
+    out
+}
+
+/// Clickable regions for every key hint drawn in `area` of the buffer, in the given
+/// colours (hints are muted, titles and warnings; content text is left alone).
+pub fn scan_hints(buf: &ratatui::buffer::Buffer, area: Rect, colours: &[ratatui::style::Color]) -> Vec<(Rect, super::Hit)> {
+    let mut out = vec![];
+    let area = area.intersection(buf.area);
+    for y in area.top()..area.bottom() {
+        // runs of cells in a hint colour
+        let mut run: Vec<(u16, String)> = vec![];
+        let flush = |run: &mut Vec<(u16, String)>, out: &mut Vec<(Rect, super::Hit)>| {
+            if run.is_empty() {
+                return;
+            }
+            let text: String = run.iter().map(|(_, s)| s.as_str()).collect();
+            // char index → x
+            let mut xs = vec![];
+            for (x, s) in run.iter() {
+                for _ in s.chars() {
+                    xs.push(*x);
+                }
+            }
+            for (a, n, k, m) in hint_keys(&text) {
+                let (Some(&x0), Some(&x1)) = (xs.get(a), xs.get(a + n - 1)) else { continue };
+                out.push((Rect { x: x0, y, width: x1 - x0 + 1, height: 1 }, super::Hit::Chord(k, m)));
+            }
+            run.clear();
+        };
+        for x in area.left()..area.right() {
+            let c = &buf[(x, y)];
+            if c.symbol().is_empty() {
+                continue; // the second half of a wide character
+            }
+            if colours.contains(&c.fg) {
+                run.push((x, c.symbol().to_string()));
+            } else {
+                flush(&mut run, &mut out);
+            }
+        }
+        flush(&mut run, &mut out);
+    }
+    out
+}

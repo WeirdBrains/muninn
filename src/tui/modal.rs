@@ -231,6 +231,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             }
             on_key(app, KeyEvent::from(code))
         }
+        Hit::Chord(code, m) => on_key(app, KeyEvent::new(code, m)),
         Hit::FormRow(i) => {
             let fm = match app.modal {
                 Some(Modal::Export) => &mut app.export.form,
@@ -624,6 +625,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
     let r = centered(area, w, h);
     f.render_widget(Clear, r);
     app.modal_hits.clear();
+    app.modal_area = r;
     let mut extra: Vec<(Rect, super::Hit)> = vec![];
     match app.modal.as_mut().unwrap() {
         Modal::Help(hv) => hv.draw(f, r, &t, &mut extra),

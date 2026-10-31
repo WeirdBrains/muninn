@@ -1902,3 +1902,50 @@ fn menus_have_authors_and_history() {
     let s = screen_text(&mut a);
     assert!(s.contains("History"), "{s}");
 }
+
+/// Where `needle` is drawn (column of its first character, row).
+fn find_on(s: &str, needle: &str) -> Option<(u16, u16)> {
+    s.lines().enumerate().find_map(|(y, l)| l.find(needle).map(|b| (l[..b].chars().count() as u16, y as u16)))
+}
+
+#[test]
+fn hint_text_names_clickable_keys() {
+    use super::widgets::{hint_keys, parse_key};
+    use KeyModifiers as M;
+    assert_eq!(parse_key("Ctrl+S"), Some((KeyCode::Char('s'), M::CONTROL)));
+    assert_eq!(parse_key("Ctrl-T"), Some((KeyCode::Char('t'), M::CONTROL)));
+    assert_eq!(parse_key("S-Tab"), Some((KeyCode::BackTab, M::NONE)));
+    assert_eq!(parse_key("F10"), Some((KeyCode::F(10), M::NONE)));
+    assert_eq!(parse_key("j/k"), Some((KeyCode::Char('j'), M::NONE)));
+    assert_eq!(parse_key("1-9"), Some((KeyCode::Char('1'), M::NONE)));
+    assert_eq!(parse_key("Esc/p"), Some((KeyCode::Esc, M::NONE)));
+    assert_eq!(parse_key("word"), None);
+    let ks = |t: &str| hint_keys(t).into_iter().map(|(_, _, k, m)| (k, m)).collect::<Vec<_>>();
+    assert_eq!(ks(" Enter ok · Esc cancel"), [(KeyCode::Enter, M::NONE), (KeyCode::Esc, M::NONE)]);
+    assert_eq!(ks(" Ctrl+S save · Ctrl+R run · Esc for the window's keys")[1], (KeyCode::Char('r'), M::CONTROL));
+    assert_eq!(ks("delete it? y confirms, any other key cancels"), [(KeyCode::Char('y'), M::NONE)]);
+    assert_eq!(ks(" Format markdown (Ctrl-T switches)"), [(KeyCode::Char('t'), M::CONTROL)]);
+    assert_eq!(ks("Code spaces · rust only (f: all)"), [(KeyCode::Char('f'), M::NONE)]);
+    assert!(ks("a fine start, nothing to press here").is_empty(), "prose is not a hint");
+    let (a, n, ..) = hint_keys("Prefs · Esc closes")[0];
+    assert_eq!((a, n), (8, 3));
+}
+
+#[test]
+fn clicking_a_key_named_in_hint_text_presses_it() {
+    let (_t, mut a) = app();
+    // the status bar: `? help`
+    let s = render(&mut a, 140, 45);
+    let (x, y) = find_on(&s, "? help").expect("status hint");
+    a.on_mouse(click(x, y));
+    assert!(matches!(a.modal, Some(Modal::Help(_))), "? opened help");
+    // inside a popup: a title hint closes it
+    a.modal = None;
+    a.dispatch(Action::Code);
+    a.on_key(key(KeyCode::Char('n')));
+    let s = render(&mut a, 140, 45);
+    let (x, y) = find_on(&s, "Esc cancel").or_else(|| find_on(&s, "Esc")).expect("an Esc hint");
+    a.on_mouse(click(x, y));
+    render(&mut a, 140, 45);
+    assert!(a.code.ask.is_none(), "Esc in the hint cancelled the prompt");
+}
