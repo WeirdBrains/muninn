@@ -47,7 +47,9 @@ fn check_unique(s: &Store, m: &Model, core: &Map<String, Value>) -> Result<()> {
         let Some(f) = m.design.bar_field(key).filter(|f| f.unique) else { continue };
         let e = crate::store::models::bar_sql(key);
         let dups: i64 =
-            s.conn.query_row(&format!("SELECT COUNT(*) - COUNT(DISTINCT {e}) FROM bars b JOIN sources s ON s.id = b.source_id"), [], |r| r.get(0))?;
+            s.conn.query_row(&format!("SELECT COUNT(*) - COUNT(DISTINCT {e}) FROM bar_rows b JOIN sources s ON s.id = b.source_id"), [], |r| {
+                r.get(0)
+            })?;
         if dups > 0 {
             return Err(Error::invalid("value", format!("{}: another bar already has this value (it is unique)", f.name)));
         }
@@ -84,7 +86,7 @@ fn read(s: &Store, id: &str) -> Result<Row> {
     s.conn
         .query_row(
             "SELECT b.source_id, s.name, b.base, b.quote, b.duration_s, b.timestamp, b.open, b.high, b.low, b.close, b.volume, b.flags
-             FROM bars b JOIN sources s ON s.id = b.source_id WHERE b.id = ?1",
+             FROM bar_rows b JOIN sources s ON s.id = b.source_id WHERE b.id = ?1",
             [key],
             |r| {
                 Ok(Row {
@@ -176,7 +178,7 @@ fn restat(s: &Store, source_id: &str, sym: &Symbol, dur: Duration) -> Result<()>
         params![source_id, sym.base, sym.quote, dur.0],
     )?;
     s.conn.execute(
-        "INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MIN(timestamp), MAX(timestamp) FROM bars
+        "INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MIN(timestamp), MAX(timestamp) FROM bar_rows
          WHERE source_id = ?1 AND base = ?2 AND quote = ?3 AND duration_s = ?4 GROUP BY source_id, base, quote, duration_s",
         params![source_id, sym.base, sym.quote, dur.0],
     )?;
@@ -184,7 +186,7 @@ fn restat(s: &Store, source_id: &str, sym: &Symbol, dur: Duration) -> Result<()>
 }
 
 fn exists(s: &Store, id: &str) -> Result<bool> {
-    Ok(s.conn.query_row("SELECT COUNT(*) FROM bars WHERE id = ?1", [hex::decode(id).unwrap_or_default()], |r| r.get::<_, i64>(0))? > 0)
+    Ok(s.conn.query_row("SELECT COUNT(*) FROM m_bars WHERE id = ?1", [hex::decode(id).unwrap_or_default()], |r| r.get::<_, i64>(0))? > 0)
 }
 
 fn known_symbol(s: &Store, sym: &Symbol) -> Result<()> {
@@ -211,8 +213,8 @@ pub fn update(s: &Store, id: &str, core: &Map<String, Value>) -> Result<(String,
     }
     let o = row.ohlcv;
     s.conn.execute(
-        "UPDATE bars SET id = ?1, base = ?2, quote = ?3, timestamp = ?4, open = ?5, high = ?6, low = ?7, close = ?8, volume = ?9,
-         source_id = ?10, duration_s = ?11, flags = ?12 WHERE id = ?13",
+        "UPDATE m_bars SET id = ?1, _base = ?2, _quote = ?3, _timestamp = ?4, _open = ?5, _high = ?6, _low = ?7, _close = ?8, _volume = ?9,
+         _source_id = ?10, _duration_s = ?11, _flags = ?12 WHERE id = ?13",
         params![
             hex::decode(&new_id).unwrap_or_default(),
             row.sym.base,
@@ -285,7 +287,7 @@ pub fn create(s: &Store, m: &Model, core: &Map<String, Value>) -> Result<String>
     known_symbol(s, &row.sym)?;
     let o = row.ohlcv;
     s.conn.execute(
-        "INSERT INTO bars(id, base, quote, timestamp, open, high, low, close, volume, source_id, duration_s, flags) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT INTO m_bars(id, _base, _quote, _timestamp, _open, _high, _low, _close, _volume, _source_id, _duration_s, _flags) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![hex::decode(&id).unwrap_or_default(), row.sym.base, row.sym.quote, row.ts, o[0], o[1], o[2], o[3], o[4], row.source_id, row.dur.0, row.flags],
     )?;
     restat(s, &row.source_id, &row.sym, row.dur)?;
@@ -350,7 +352,7 @@ pub fn delete(s: &Store, ids: &[String]) -> Result<usize> {
     let mut n = 0;
     for id in ids {
         let Ok(row) = read(s, id) else { continue };
-        n += s.conn.execute("DELETE FROM bars WHERE id = ?1", [hex::decode(id).unwrap_or_default()])?;
+        n += s.conn.execute("DELETE FROM m_bars WHERE id = ?1", [hex::decode(id).unwrap_or_default()])?;
         series.insert((row.source_id, row.sym.base, row.sym.quote, row.dur.0));
     }
     for (src, base, quote, d) in series {

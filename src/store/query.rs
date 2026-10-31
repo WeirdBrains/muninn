@@ -163,7 +163,7 @@ impl Store {
     /// Number of bars matching a filter.
     pub fn count_filtered(&self, f: &BarFilter) -> Result<i64> {
         let (w, p) = where_clause(f);
-        Ok(self.conn.query_row(&format!("SELECT COUNT(*) FROM bars b{w}"), rusqlite::params_from_iter(p), |r| r.get(0))?)
+        Ok(self.conn.query_row(&format!("SELECT COUNT(*) FROM bar_rows b{w}"), rusqlite::params_from_iter(p), |r| r.get(0))?)
     }
 
     /// One page of bars sorted by `sort` (ties broken by time).
@@ -171,7 +171,7 @@ impl Store {
         let (w, p) = where_clause(f);
         let dir = if desc { "DESC" } else { "ASC" };
         let sql = format!(
-            "SELECT b.timestamp, b.open, b.high, b.low, b.close, b.volume, b.flags FROM bars b{w}
+            "SELECT b.timestamp, b.open, b.high, b.low, b.close, b.volume, b.flags FROM bar_rows b{w}
              ORDER BY {} {dir}, b.timestamp {dir} LIMIT {limit} OFFSET {offset}",
             sort.sql()
         );
@@ -185,7 +185,7 @@ impl Store {
         let (w, mut p) = where_clause(f);
         p.push(ts.into());
         let op = if desc { ">" } else { "<" };
-        Ok(self.conn.query_row(&format!("SELECT COUNT(*) FROM bars b{w} AND b.timestamp {op} ?"), rusqlite::params_from_iter(p), |r| r.get(0))?)
+        Ok(self.conn.query_row(&format!("SELECT COUNT(*) FROM bar_rows b{w} AND b.timestamp {op} ?"), rusqlite::params_from_iter(p), |r| r.get(0))?)
     }
 
     /// Bars aggregated into buckets of `bucket_ms` (open = first, close = last, high/low = extremes,
@@ -194,17 +194,17 @@ impl Store {
         let (w, p) = where_clause(f);
         let raw = f.duration.map(|d| bucket_ms <= d.millis()).unwrap_or(bucket_ms <= 1);
         if raw {
-            let sql = format!("SELECT b.timestamp, b.open, b.high, b.low, b.close, b.volume, b.flags FROM bars b{w} ORDER BY b.timestamp");
+            let sql = format!("SELECT b.timestamp, b.open, b.high, b.low, b.close, b.volume, b.flags FROM bar_rows b{w} ORDER BY b.timestamp");
             let mut st = self.conn.prepare(&sql)?;
             return Ok(st.query_map(rusqlite::params_from_iter(p), row_bar)?.collect::<rusqlite::Result<Vec<_>>>()?);
         }
         let bk = format!("(b.timestamp / {bucket_ms})");
         let sql = format!(
             "WITH g AS (SELECT {bk} AS k, MIN(b.timestamp) AS t0, MAX(b.timestamp) AS t1, MAX(b.high) AS h, MIN(b.low) AS l,
-                               SUM(b.volume) AS v, MAX(b.flags) AS fl FROM bars b{w} GROUP BY k)
+                               SUM(b.volume) AS v, MAX(b.flags) AS fl FROM bar_rows b{w} GROUP BY k)
              SELECT g.k * {bucket_ms},
-                    (SELECT b.open FROM bars b{w} AND b.timestamp = g.t0 LIMIT 1), g.h, g.l,
-                    (SELECT b.close FROM bars b{w} AND b.timestamp = g.t1 LIMIT 1), g.v, g.fl
+                    (SELECT b.open FROM bar_rows b{w} AND b.timestamp = g.t0 LIMIT 1), g.h, g.l,
+                    (SELECT b.close FROM bar_rows b{w} AND b.timestamp = g.t1 LIMIT 1), g.v, g.fl
              FROM g ORDER BY g.k"
         );
         let mut all = p.clone();
@@ -243,7 +243,7 @@ impl Store {
         let (w, p) = where_clause(f);
         type Row = (i64, Option<i64>, Option<i64>, Option<f64>, Option<f64>, Option<f64>);
         let row: Row = self.conn.query_row(
-            &format!("SELECT COUNT(*), MIN(b.timestamp), MAX(b.timestamp), MAX(b.high), MIN(b.low), SUM(b.volume) FROM bars b{w}"),
+            &format!("SELECT COUNT(*), MIN(b.timestamp), MAX(b.timestamp), MAX(b.high), MIN(b.low), SUM(b.volume) FROM bar_rows b{w}"),
             rusqlite::params_from_iter(p.clone()),
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
         )?;
@@ -254,9 +254,11 @@ impl Store {
         let px = |ts: i64, col: &str| -> Result<f64> {
             let mut q = p.clone();
             q.push(ts.into());
-            Ok(self
-                .conn
-                .query_row(&format!("SELECT b.{col} FROM bars b{w} AND b.timestamp = ? LIMIT 1"), rusqlite::params_from_iter(q), |r| r.get(0))?)
+            Ok(self.conn.query_row(
+                &format!("SELECT b.{col} FROM bar_rows b{w} AND b.timestamp = ? LIMIT 1"),
+                rusqlite::params_from_iter(q),
+                |r| r.get(0),
+            )?)
         };
         Ok(Some(BarSummary { count, first, last, open: px(first, "open")?, close: px(last, "close")?, high, low, volume: volume.unwrap_or(0.0) }))
     }
@@ -266,11 +268,11 @@ impl Store {
         let (w, p) = where_clause(f);
         let sql = if m == crate::model::PriceMetric::Vwap {
             format!(
-                "SELECT SUM({e} * b.volume) / NULLIF(SUM(b.volume), 0), SUM({e} * b.volume) / NULLIF(SUM(b.volume), 0) FROM bars b{w}",
+                "SELECT SUM({e} * b.volume) / NULLIF(SUM(b.volume), 0), SUM({e} * b.volume) / NULLIF(SUM(b.volume), 0) FROM bar_rows b{w}",
                 e = m.sql()
             )
         } else {
-            format!("SELECT MIN({e}), MAX({e}) FROM bars b{w}", e = m.sql())
+            format!("SELECT MIN({e}), MAX({e}) FROM bar_rows b{w}", e = m.sql())
         };
         let r: (Option<f64>, Option<f64>) = self.conn.query_row(&sql, rusqlite::params_from_iter(p), |r| Ok((r.get(0)?, r.get(1)?)))?;
         Ok(match r {

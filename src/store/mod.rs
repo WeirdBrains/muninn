@@ -151,6 +151,7 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     orgs::MIGRATION_2_13,
     // 2.14: review copies
     reviews::MIGRATION_2_14,
+    models::MIGRATION_2_16,
 ];
 
 /// A new random id (32 hex characters).
@@ -248,6 +249,7 @@ impl Store {
         }
         let mut s = Self::wrap(conn);
         s.migrate()?;
+        s.finish_bars_upgrade()?;
         s.sync_ensure()?;
         Ok(s)
     }
@@ -264,6 +266,7 @@ impl Store {
     pub fn open_in_memory() -> Result<Self> {
         let mut s = Self::wrap(Connection::open_in_memory()?);
         s.migrate()?;
+        s.finish_bars_upgrade()?;
         s.sync_ensure()?;
         Ok(s)
     }
@@ -312,6 +315,9 @@ impl Store {
             let target = i as i64 + 1;
             if v < target {
                 tx.execute_batch(m)?;
+                if std::ptr::eq(*m, models::MIGRATION_2_16) {
+                    models::upgrade_bars_2_16(&tx)?;
+                }
                 tx.execute("INSERT INTO schema_version(version) VALUES (?1)", [target])?;
                 if target == 1 {
                     for b in KNOWN_BASES {
@@ -402,12 +408,12 @@ impl Store {
         let tx = self.conn.transaction()?;
         tx.execute("UPDATE sources SET name = ?1 WHERE id = ?2", params![to, src.id])?;
         let rows: Vec<(Vec<u8>, String, String, i64, i64)> = {
-            let mut st = tx.prepare("SELECT id, base, quote, timestamp, duration_s FROM bars WHERE source_id = ?1")?;
+            let mut st = tx.prepare("SELECT id, _base, _quote, _timestamp, _duration_s FROM m_bars WHERE _source_id = ?1")?;
             st.query_map([&src.id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))?.collect::<rusqlite::Result<Vec<_>>>()?
         };
         let mut n = 0;
         {
-            let mut up = tx.prepare("UPDATE bars SET id = ?1 WHERE id = ?2")?;
+            let mut up = tx.prepare("UPDATE m_bars SET id = ?1 WHERE id = ?2")?;
             for (old, base, quote, ts, d) in rows {
                 let id = BarId::compute(ts, to, &Symbol { base, quote }, Duration(d));
                 up.execute(params![&id.0[..], old])?;
@@ -420,7 +426,7 @@ impl Store {
 
     pub fn remove_source(&self, name: &str) -> Result<u64> {
         let src = self.source_by_name(name)?.ok_or_else(|| Error::invalid("source", format!("`{name}` not found")))?;
-        let n = self.conn.execute("DELETE FROM bars WHERE source_id = ?1", [&src.id])?;
+        let n = self.conn.execute("DELETE FROM m_bars WHERE _source_id = ?1", [&src.id])?;
         self.conn.execute("DELETE FROM ingest_runs WHERE source_id = ?1", [&src.id])?;
         self.conn.execute("DELETE FROM series_stats WHERE source_id = ?1", [&src.id])?;
         self.conn.execute("DELETE FROM sources WHERE id = ?1", [&src.id])?;
@@ -460,7 +466,7 @@ impl Store {
 
     /// Known symbols: explicit ones plus every stored series.
     pub fn symbols(&self) -> Result<Vec<Symbol>> {
-        let mut st = self.conn.prepare("SELECT base, quote FROM symbols UNION SELECT DISTINCT base, quote FROM bars ORDER BY 1, 2")?;
+        let mut st = self.conn.prepare("SELECT base, quote FROM symbols UNION SELECT DISTINCT base, quote FROM bar_rows ORDER BY 1, 2")?;
         let v = st.query_map([], |r| Ok(Symbol { base: r.get(0)?, quote: r.get(1)? }))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(v)
     }
@@ -505,7 +511,7 @@ impl Store {
         let mut c = UpsertCounts::default();
         {
             let mut st = tx.prepare_cached(
-                "INSERT INTO bars(id, base, quote, timestamp, open, high, low, close, volume, source_id, duration_s, flags)
+                "INSERT INTO m_bars(id, _base, _quote, _timestamp, _open, _high, _low, _close, _volume, _source_id, _duration_s, _flags)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) ON CONFLICT(id) DO NOTHING",
             )?;
             for (i, b) in bars.iter().enumerate() {
@@ -569,13 +575,13 @@ impl Store {
     }
 
     pub fn count_bars(&self) -> Result<i64> {
-        Ok(self.conn.query_row("SELECT COUNT(*) FROM bars", [], |r| r.get(0))?)
+        Ok(self.conn.query_row("SELECT COUNT(*) FROM m_bars", [], |r| r.get(0))?)
     }
 
     pub fn query_bars(&self, f: &BarFilter) -> Result<Vec<StoredBar>> {
         let mut sql = String::from(
             "SELECT s.name, b.base, b.quote, b.duration_s, b.timestamp, b.open, b.high, b.low, b.close, b.volume, b.flags
-             FROM bars b JOIN sources s ON s.id = b.source_id WHERE 1=1",
+             FROM bar_rows b JOIN sources s ON s.id = b.source_id WHERE 1=1",
         );
         let mut p: Vec<rusqlite::types::Value> = Vec::new();
         if let Some(s) = &f.source {
@@ -726,7 +732,7 @@ mod tests {
         s.upsert_bars(&src, &sym, Duration(300), &bars).unwrap();
         s.upsert_bars(&src, &sym, Duration(300), &bars[..2]).unwrap();
         let group: (i64, i64, i64) =
-            s.conn.query_row("SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM bars", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
+            s.conn.query_row("SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM bar_rows", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
         let v = s.series().unwrap();
         assert_eq!((v[0].count, v[0].first, v[0].last), group);
         s.remove_source("binance").unwrap();
@@ -740,7 +746,7 @@ mod tests {
         let sym = Symbol::new("ETH", "USD");
         s.upsert_bars(&src, &sym, Duration(60), &[bar(0)]).unwrap();
         assert_eq!(s.rename_source("a", "b").unwrap(), 1);
-        let id: Vec<u8> = s.conn.query_row("SELECT id FROM bars", [], |r| r.get(0)).unwrap();
+        let id: Vec<u8> = s.conn.query_row("SELECT id FROM m_bars", [], |r| r.get(0)).unwrap();
         assert_eq!(id, BarId::compute(0, "b", &sym, Duration(60)).0.to_vec());
         assert!(s.source_by_name("a").unwrap().is_none());
     }
@@ -768,7 +774,7 @@ mod tests {
             s.migrate_to(3).unwrap();
             assert_eq!(s.schema_version().unwrap(), 3);
             let src = s.add_source("binance", "file", None).unwrap();
-            s.upsert_bars(&src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0), bar(300_000)]).unwrap();
+            old_bars(&s, &src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0), bar(300_000)]);
             let run = s.begin_import_run("cli", 1).unwrap();
             s.conn.execute("UPDATE import_runs SET status = 'completed' WHERE id = ?1", [run]).unwrap();
         }
@@ -822,7 +828,7 @@ mod tests {
 
     #[test]
     fn a_2_2_database_migrates_and_gains_rules() {
-        let upto = MIGRATIONS.len() - 5;
+        let upto = MIGRATIONS.len() - 6;
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join("v22.database");
         let key = [3u8; 32];
@@ -859,9 +865,9 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 5).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 6).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
-            s.upsert_bars(&src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0)]).unwrap();
+            old_bars(&s, &src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0)]);
             let spec = RuleSpec { on: vec!["*".into()], then: vec![Then::Status { text: "x".into() }], ..Default::default() };
             rule = s.create_rule(&NewRule { name: "r".into(), spec, enabled: true, ..Default::default() }).unwrap().id;
         }
@@ -888,7 +894,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 4).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 5).unwrap();
             s.create_model("trades", "", Design { fields: vec![Field::new("note", FieldType::Text)], ..Default::default() }, true).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -911,7 +917,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 3).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 4).unwrap();
             s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -937,7 +943,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 3).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 4).unwrap();
             s.set_node_identity(b"kp", "12D3KooWx").unwrap();
             s.create_project("p", "").unwrap();
         }
@@ -970,7 +976,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 3).unwrap();
             old_org(&s, "o-lab");
             let j = s.create_journal("Lab book", None, EntryFormat::Markdown).unwrap();
             s.add_entry(&j.id, "Day 1", "teh result", None).unwrap();
@@ -987,6 +993,69 @@ mod tests {
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.find_review(&r.id).unwrap().name, "Day 1");
         assert_eq!(s.revisions(ReviewKind::Entry, &e.id).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_2_15_database_moves_its_bars_into_the_model_table() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v215.database");
+        let key = [8u8; 32];
+        let (ids, note_id) = {
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store::wrap(conn);
+            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            let src = s.add_source("binance", "file", None).unwrap();
+            let sym = Symbol::new("BTC", "USDT");
+            old_bars(&s, &src, &sym, Duration(300), &[bar(0), bar(300_000), bar(600_000)]);
+            let mut f = crate::store::Field::new("note", crate::store::FieldType::Text);
+            f.id = "n1".into();
+            let d = crate::store::Design { fields: vec![f], ..Default::default() }.with_builtins();
+            s.conn.execute("UPDATE models SET version = 1, design = ?1 WHERE id = 'bars'", [serde_json::to_string(&d).unwrap()]).unwrap();
+            s.conn
+                .execute_batch(
+                    "CREATE TABLE mx_bars (id BLOB PRIMARY KEY REFERENCES bars(id) ON DELETE CASCADE ON UPDATE CASCADE, _version INTEGER NOT NULL,
+                     _created_at INTEGER NOT NULL, _updated_at INTEGER NOT NULL, _author TEXT, note TEXT)",
+                )
+                .unwrap();
+            let id = BarId::compute(300_000, "binance", &sym, Duration(300));
+            s.conn.execute("INSERT INTO mx_bars VALUES (?1, 1, 11, 22, 'ada', 'hi')", [&id.0[..]]).unwrap();
+            let ids: Vec<String> = [0, 300_000, 600_000].iter().map(|t| BarId::compute(*t, "binance", &sym, Duration(300)).hex()).collect();
+            (ids, id.hex())
+        };
+        let s = Store::open(&db, Some(&key)).unwrap();
+        for t in ["bars", "mx_bars", "_mx_bars_upgrade"] {
+            assert!(!s.table_exists(t).unwrap(), "{t} is gone");
+        }
+        let m = s.find_model("bars").unwrap();
+        let rs = s.records(&m, &crate::store::RecordQuery::default()).unwrap();
+        let got: Vec<String> = rs.iter().map(|r| r.id.clone()).collect();
+        assert_eq!(got, ids, "the same BLAKE3 ids");
+        let r = rs.iter().find(|r| r.id == note_id).unwrap();
+        assert_eq!((r.values["note"].clone(), r.created_at, r.updated_at, r.author_id.as_deref()), (serde_json::json!("hi"), 11, 22, Some("ada")));
+        assert!(rs.iter().filter(|r| r.id != note_id).all(|r| r.values["note"].is_null() && r.created_at == 0));
+        assert_eq!(s.count_bars().unwrap(), 3);
+        assert_eq!(s.query_bars(&BarFilter::default()).unwrap()[1].bar, bar(300_000));
+    }
+
+    /// Bars as databases before 2.16 kept them (the `bars` table).
+    fn old_bars(s: &Store, src: &Source, sym: &Symbol, d: Duration, bars: &[Bar]) {
+        for b in bars {
+            let id = BarId::compute(b.ts, &src.name, sym, d);
+            s.conn
+                .execute(
+                    "INSERT INTO bars(id, base, quote, timestamp, open, high, low, close, volume, source_id, duration_s, flags) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                    params![&id.0[..], sym.base, sym.quote, b.ts, b.open, b.high, b.low, b.close, b.volume, src.id, d.0, b.flags],
+                )
+                .unwrap();
+            s.conn
+                .execute(
+                    "INSERT INTO series_stats(source_id, base, quote, duration_s, count, first, last) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?5)
+                     ON CONFLICT DO UPDATE SET count = count + 1, first = min(first, excluded.first), last = max(last, excluded.last)",
+                    params![src.id, sym.base, sym.quote, d.0, b.ts],
+                )
+                .unwrap();
+        }
     }
 
     #[test]
@@ -1009,7 +1078,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 3).unwrap();
             old_org(&s, "o-lab");
             let c = s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
             s.save_endpoint("o-lab", "calc", EndpointKind::Code, &c.id, "call", false).unwrap();
@@ -1029,7 +1098,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 2).unwrap();
             s.conn
                 .execute(
                     "INSERT INTO reviewing(review_id, title, node_peer, status, created_at, updated_at) VALUES ('r1', 'Notes', '12D3', 'joined', 1, 1)",

@@ -231,7 +231,7 @@ impl Store {
         let join = if ext { format!(" LEFT JOIN {} x ON x.id = b.id", q(&m.table())) } else { String::new() };
         let cols = if ext { format!(", {}", Self::ext_cols(m, "x")) } else { String::new() };
         let mut sql = format!(
-            "SELECT b.id, s.name, b.base, b.quote, b.duration_s, b.timestamp, b.open, b.high, b.low, b.close, b.volume, b.flags{cols} FROM bars b JOIN sources s ON s.id = b.source_id{join}"
+            "SELECT b.id, s.name, b.base, b.quote, b.duration_s, b.timestamp, b.open, b.high, b.low, b.close, b.volume, b.flags{cols} FROM bar_rows b JOIN sources s ON s.id = b.source_id{join}"
         );
         if !wh.is_empty() {
             sql.push_str(&format!(" WHERE {}", wh.join(" AND ")));
@@ -266,7 +266,7 @@ impl Store {
                     (version, created_at, updated_at, author_id) = (v, c, u, a);
                     more = stored;
                 }
-                // in the design's order and names: built-in fields read the bars, the rest mx_bars
+                // in the design's order and names: built-in fields read the bars, the rest stored columns
                 let mut values = Map::new();
                 for f in &m.design.fields {
                     let v = match bar_key(f) {
@@ -437,7 +437,7 @@ impl Store {
     pub fn record_exists(&self, model_id: &str, id: &str) -> Result<bool> {
         if model_id == super::models::BARS {
             let Ok(b) = hex::decode(id) else { return Ok(false) };
-            return Ok(self.conn.query_row("SELECT COUNT(*) FROM bars WHERE id = ?1", [b], |r| r.get::<_, i64>(0))? > 0);
+            return Ok(self.conn.query_row("SELECT COUNT(*) FROM m_bars WHERE id = ?1", [b], |r| r.get::<_, i64>(0))? > 0);
         }
         let Some(m) = self.model(model_id)? else { return Ok(false) };
         if m.version == 0 || !self.table_exists(&m.table())? {
@@ -530,7 +530,7 @@ impl Store {
     }
 
     /// Change fields of records known to exist (full ids). On bars, built-in fields change
-    /// the bars (a key field re-keys the bar) and the rest go to `mx_bars`.
+    /// the bars (a key field re-keys the bar) and the rest go to stored columns.
     pub(crate) fn update_ids(&self, m: &Model, ids: &[String], values: &Map<String, Value>) -> Result<usize> {
         if m.is_bars() {
             let (core, _) = crate::code::bars::split(m, values)?;
@@ -552,7 +552,7 @@ impl Store {
 
     /// Change stored fields (not the bars' own columns) of records known to exist.
     pub(crate) fn update_stored(&self, m: &Model, ids: &[String], values: &Map<String, Value>) -> Result<usize> {
-        if m.is_bars() && !self.table_exists(&m.table())? {
+        if m.is_bars() && m.design.stored().next().is_none() {
             return Err(Error::invalid(
                 "model",
                 format!("no fields have been added to {} yet (`mnnn model edit {} --add NAME:TYPE --apply`)", m.name, m.name),
@@ -566,13 +566,9 @@ impl Store {
         let author: Sql = self.current_author_id()?.map(Sql::from).unwrap_or(Sql::Null);
         let t = q(&m.table());
         let sql = if m.is_bars() {
-            let cols: Vec<String> = given.iter().map(|(f, _)| q(&f.name)).collect();
-            let marks: Vec<String> = (0..given.len()).map(|i| format!("?{}", i + 5)).collect();
-            let set: Vec<String> = cols.iter().map(|c| format!("{c} = excluded.{c}")).collect();
+            let set: Vec<String> = given.iter().enumerate().map(|(i, (f, _))| format!("{} = ?{}", q(&f.name), i + 5)).collect();
             format!(
-                "INSERT INTO {t}(id, _version, _created_at, _updated_at, _author, {}) VALUES (?1, ?2, ?3, ?3, ?4, {}) ON CONFLICT(id) DO UPDATE SET _version = excluded._version, _updated_at = excluded._updated_at, _author = excluded._author, {}",
-                cols.join(", "),
-                marks.join(", "),
+                "UPDATE {t} SET _version = ?2, _created_at = COALESCE(_created_at, ?3), _updated_at = ?3, _author = ?4, {} WHERE id = ?1",
                 set.join(", ")
             )
         } else {
@@ -665,9 +661,14 @@ impl Store {
         let names: Vec<String> = m.design.stored().map(|f| q(&f.name)).collect();
         let marks: Vec<String> = (1..=5 + names.len()).map(|i| format!("?{i}")).collect();
         let extra = if names.is_empty() { String::new() } else { format!(", {}", names.join(", ")) };
-        let mut st = self
-            .conn
-            .prepare(&format!("INSERT OR REPLACE INTO {t}(id, _version, _created_at, _updated_at, _author{extra}) VALUES ({})", marks.join(", ")))?;
+        let sql = if m.is_bars() {
+            // the bar is there already: only its stored values and stamps are written
+            let set: Vec<String> = m.design.stored().enumerate().map(|(i, f)| format!(", {} = ?{}", q(&f.name), i + 6)).collect();
+            format!("UPDATE {t} SET _version = ?2, _created_at = ?3, _updated_at = ?4, _author = ?5{} WHERE id = ?1", set.join(""))
+        } else {
+            format!("INSERT OR REPLACE INTO {t}(id, _version, _created_at, _updated_at, _author{extra}) VALUES ({})", marks.join(", "))
+        };
+        let mut st = self.conn.prepare(&sql)?;
         let mut n = 0;
         for r in rows {
             if m.is_bars() && !self.record_exists(super::models::BARS, &r.id)? {
@@ -840,6 +841,6 @@ mod tests {
         let limited = s.records(&m, &RecordQuery { limit: Some(1), sort: vec![("open".into(), true)], ..Default::default() }).unwrap();
         assert_eq!(limited[0].values["open"], json!(4.0));
         s.remove_source("binance").unwrap();
-        assert_eq!(s.conn.query_row("SELECT COUNT(*) FROM mx_bars", [], |r| r.get::<_, i64>(0)).unwrap(), 0);
+        assert_eq!(s.conn.query_row("SELECT COUNT(*) FROM m_bars", [], |r| r.get::<_, i64>(0)).unwrap(), 0);
     }
 }

@@ -175,7 +175,7 @@ impl Store {
         };
         for (id, file) in created {
             let used: i64 = self.conn.query_row(
-                "SELECT (SELECT COUNT(*) FROM series_stats WHERE source_id = ?1) + EXISTS(SELECT 1 FROM bars WHERE source_id = ?1)",
+                "SELECT (SELECT COUNT(*) FROM series_stats WHERE source_id = ?1) + EXISTS(SELECT 1 FROM m_bars WHERE _source_id = ?1)",
                 [&id],
                 |r| r.get(0),
             )?;

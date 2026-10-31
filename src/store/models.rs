@@ -11,9 +11,8 @@
 //! `_updated_at`, `_author`, then one column per field). The built-in `bars` model is the
 //! bars table itself. Its built-in fields (ids `bar.KEY`) read the bars table's columns and
 //! can be renamed, moved, constrained, retyped and dropped like any field: a retyped one
-//! moves into `mx_bars` (converted), a dropped one leaves the model while the bars keep
-//! their imported values. Fields added to it live in `mx_bars`, one row per bar keyed by
-//! the bar id (following source renames and removals).
+//! is stored in the bars table under its name (converted), a dropped one leaves the model while the bars keep
+//! their imported values. Fields added to it are columns of the same table (`m_bars`).
 //!
 //! Field ids stay the same across versions, so a renamed field keeps its values.
 use super::{Store, new_id, now_ms};
@@ -49,6 +48,42 @@ CREATE TABLE model_versions (
 INSERT INTO models(id, name, description, builtin, version, design, created_at, updated_at)
     VALUES ('bars', 'bars', 'imported price bars (built in)', 1, 0, '{"fields":[]}', 0, 0);
 "#;
+
+/// 2.16: the bars live in the bars model's own table (`m_bars`), see [`upgrade_bars_2_16`].
+pub const MIGRATION_2_16: &str = "-- 2.16: bars move into the bars model table (done in Rust)";
+
+/// The bars model's table: every bar, its own columns (`_base` … `_flags`, named with a
+/// leading `_` so they never meet a field's column) and the columns of the fields stored
+/// in the model.
+pub const BARS_TABLE: &str = "m_bars";
+
+/// The bars' own columns in [`BARS_TABLE`], with their SQL types.
+const BAR_CORE: &str = "_base TEXT NOT NULL, _quote TEXT NOT NULL, _timestamp INTEGER NOT NULL, _open REAL NOT NULL, _high REAL NOT NULL,
+    _low REAL NOT NULL, _close REAL NOT NULL, _volume REAL NOT NULL, _source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+    _duration_s INTEGER NOT NULL, _flags INTEGER NOT NULL DEFAULT 0";
+const BAR_CORE_COLS: &str = "_base, _quote, _timestamp, _open, _high, _low, _close, _volume, _source_id, _duration_s, _flags";
+
+/// `bar_rows`: the bars' own columns under their plain names, for queries.
+const BAR_VIEW: &str = "DROP VIEW IF EXISTS bar_rows; CREATE VIEW bar_rows AS SELECT id, _base AS base, _quote AS quote, _timestamp AS timestamp,
+    _open AS open, _high AS high, _low AS low, _close AS close, _volume AS volume, _source_id AS source_id, _duration_s AS duration_s,
+    _flags AS flags FROM m_bars;";
+
+/// The 2.16 upgrade, inside the migration transaction: the bars move into `m_bars` (ids,
+/// values, sources, periods, timestamps and flags as they are); the values of fields added
+/// to bars (the old `mx_bars`) wait in `_mx_bars_upgrade` for [`Store::finish_bars_upgrade`],
+/// which knows the design.
+pub(crate) fn upgrade_bars_2_16(c: &rusqlite::Connection) -> Result<()> {
+    c.execute_batch(&format!(
+        "CREATE TABLE m_bars (id BLOB PRIMARY KEY, _version INTEGER, _created_at INTEGER, _updated_at INTEGER, _author TEXT, {BAR_CORE}) WITHOUT ROWID;
+         INSERT INTO m_bars(id, {BAR_CORE_COLS}) SELECT id, base, quote, timestamp, open, high, low, close, volume, source_id, duration_s, flags FROM bars;"
+    ))?;
+    let mx: i64 = c.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'mx_bars'", [], |r| r.get(0))?;
+    if mx > 0 {
+        c.execute_batch("CREATE TABLE _mx_bars_upgrade AS SELECT * FROM mx_bars; DROP TABLE mx_bars;")?;
+    }
+    c.execute_batch(&format!("DROP TABLE bars; CREATE INDEX bars_series ON m_bars(_base, _quote, _source_id, _duration_s, _timestamp); {BAR_VIEW}"))?;
+    Ok(())
+}
 
 /// Id and name of the built-in bars model.
 pub const BARS: &str = "bars";
@@ -86,7 +121,7 @@ pub fn bar_builtins() -> Vec<Field> {
 }
 
 /// The bars column a field reads: a built-in bars field with its shipped type. A built-in
-/// field given another type is stored in `mx_bars` like an added field.
+/// field given another type is stored in `m_bars` like an added field.
 pub fn bar_key(f: &Field) -> Option<&'static str> {
     let k = f.id.strip_prefix(BAR_ID_PREFIX)?;
     BAR_FIELDS.iter().find(|(n, t)| *n == k && FieldType::basic(t).as_ref() == Some(&f.ty)).map(|(n, _)| *n)
@@ -343,7 +378,7 @@ impl Model {
     }
     /// The SQL table the records are in.
     pub fn table(&self) -> String {
-        if self.builtin { format!("mx_{}", self.name) } else { format!("m_{}", self.name) }
+        if self.is_bars() { BARS_TABLE.to_string() } else { format!("m_{}", self.name) }
     }
     /// The draft if there is one, else the applied design.
     pub fn pending(&self) -> &Design {
@@ -753,7 +788,7 @@ impl Store {
                 }
                 let old = m.table();
                 m.name = n;
-                if self.table_exists(&old)? {
+                if old != m.table() && self.table_exists(&old)? {
                     self.conn.execute_batch(&format!("ALTER TABLE {} RENAME TO {}", q(&old), q(&m.table())))?;
                 }
             }
@@ -840,26 +875,34 @@ impl Store {
     /// Stored rows: (id, meta, values by field id) — what migrations work on.
     pub(crate) fn raw_rows(&self, m: &Model) -> Result<Vec<RawRow>> {
         let t = m.table();
+        if m.is_bars() {
+            // bars that have had stored values written (the rest read the defaults)
+            return self.raw_rows_from(&t, &m.design, " WHERE _version IS NOT NULL");
+        }
         if m.version == 0 || !self.table_exists(&t)? {
             return Ok(vec![]);
         }
-        let stored: Vec<&Field> = m.design.stored().collect();
+        self.raw_rows_from(&t, &m.design, "")
+    }
+
+    fn raw_rows_from(&self, t: &str, design: &Design, wh: &str) -> Result<Vec<RawRow>> {
+        let stored: Vec<&Field> = design.stored().collect();
         let cols: Vec<String> = stored.iter().map(|f| q(&f.name)).collect();
         let sel = if cols.is_empty() { String::new() } else { format!(", {}", cols.join(", ")) };
-        let mut st = self.conn.prepare(&format!("SELECT id, _created_at, _updated_at, _author{sel} FROM {}", q(&t)))?;
+        let mut st = self.conn.prepare(&format!("SELECT id, _created_at, _updated_at, _author, _version{sel} FROM {}{wh}", q(t)))?;
         let n = stored.len();
         let rows = st
             .query_map([], |r| {
                 let mut values = Vec::with_capacity(n);
                 for (i, f) in stored.iter().enumerate() {
-                    values.push((f.id.clone(), from_sql(r.get(4 + i)?, &f.ty)));
+                    values.push((f.id.clone(), from_sql(r.get(5 + i)?, &f.ty)));
                 }
                 let id = match r.get::<_, rusqlite::types::Value>(0)? {
                     rusqlite::types::Value::Blob(b) => hex::encode(b),
                     rusqlite::types::Value::Text(t) => t,
                     o => format!("{o:?}"),
                 };
-                Ok(RawRow { id, created_at: r.get(1)?, updated_at: r.get(2)?, author: r.get(3)?, values })
+                Ok(RawRow { id, created_at: r.get(1)?, updated_at: r.get(2)?, author: r.get(3)?, version: r.get(4)?, values })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
@@ -877,23 +920,22 @@ impl Store {
     /// Distinct values of a bars column with how many bars hold each.
     fn bar_column_values(&self, key: &str) -> Result<Vec<(Value, usize)>> {
         let e = bar_sql(key);
-        let mut st = self.conn.prepare(&format!("SELECT {e}, COUNT(*) FROM bars b JOIN sources s ON s.id = b.source_id GROUP BY {e}"))?;
+        let mut st = self.conn.prepare(&format!("SELECT {e}, COUNT(*) FROM bar_rows b JOIN sources s ON s.id = b.source_id GROUP BY {e}"))?;
         let v = st.query_map([], |r| Ok((bar_value(key, r.get(0)?), r.get::<_, i64>(1)? as usize)))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(v)
     }
 
     /// The plan for the bars model. Built-in fields that read the bars table cost nothing
     /// to rename, move, describe or drop (the bars keep their imported values); retyping one
-    /// moves its converted values into `mx_bars`, and its type back shows the bars' values again.
+    /// moves its converted values into a stored column, and its type back shows the bars' values again.
     fn plan_bars(&self, m: &Model, to: &Design, rows: &[RawRow]) -> Result<Plan> {
         let bars = self.count_records(m)?;
         let only_stored = |d: &Design| Design { fields: d.stored().cloned().collect(), builtins: d.builtins };
         let inner = Model { design: only_stored(&m.design), ..m.clone() };
         let mut plan = plan_rows(&inner, &only_stored(to), rows);
         plan.rows = bars;
-        if to.stored().next().is_none() {
-            plan.steps.retain(|s| !matches!(s, Step::CreateTable { .. }));
-        }
+        // the bars table is always there
+        plan.steps.retain(|s| !matches!(s, Step::CreateTable { .. }));
         plan.steps.retain(|s| !matches!(s, Step::Order { .. }));
         for step in plan.steps.iter_mut() {
             // a stored field added with a default fills every bar (they read it), not only those with a row
@@ -947,7 +989,7 @@ impl Store {
                     debug_assert!(!k.is_empty());
                 }
                 (Some(o), None) if bar_key(o).is_some() => {
-                    // a built-in field retyped: its values are converted into mx_bars
+                    // a built-in field retyped: its values are converted into a stored column
                     let key = bar_key(o).unwrap_or_default();
                     plan.steps.retain(|s| !matches!(s, Step::AddField { field, .. } if *field == f.name));
                     if o.name != f.name {
@@ -1093,6 +1135,10 @@ impl Store {
 
     /// Build the table for `to` and copy the rows over (converted, filled, stamped).
     pub(crate) fn rebuild(&self, m: &Model, to: &Design, version: i64, rows: &[RawRow]) -> Result<()> {
+        if m.is_bars() {
+            self.rebuild_bars_table(m, to, Some(version), rows)?;
+            return self.rebuild_bars(m, to, version);
+        }
         let t = m.table();
         let new = format!("{t}__new");
         let id_col = if m.is_bars() { "id BLOB PRIMARY KEY REFERENCES bars(id) ON DELETE CASCADE ON UPDATE CASCADE" } else { "id TEXT PRIMARY KEY" };
@@ -1152,49 +1198,142 @@ impl Store {
                 self.conn.execute_batch(&format!("CREATE INDEX {} ON {}({})", q(&format!("ix_{t}_{}", f.id)), q(&t), q(&f.name)))?;
             }
         }
-        if m.is_bars() {
-            self.rebuild_bars(m, to, version)?;
+        Ok(())
+    }
+
+    /// Build `m_bars` for design `to`: every bar's own columns as they are, and the stored
+    /// fields' values of `rows` (converted; stamped `version`, or each row's own when None).
+    pub(crate) fn rebuild_bars_table(&self, m: &Model, to: &Design, version: Option<i64>, rows: &[RawRow]) -> Result<()> {
+        let stored: Vec<Field> = to.stored().cloned().collect();
+        let mut cols = vec![
+            "id BLOB PRIMARY KEY".to_string(),
+            "_version INTEGER".into(),
+            "_created_at INTEGER".into(),
+            "_updated_at INTEGER".into(),
+            "_author TEXT".into(),
+            BAR_CORE.into(),
+        ];
+        for f in &stored {
+            // no NOT NULL: bars without values read the field's default
+            cols.push(format!("{} {}{}", q(&f.name), f.ty.sql(), if f.unique { " UNIQUE" } else { "" }));
+        }
+        self.conn.execute_batch(&format!(
+            "DROP VIEW IF EXISTS bar_rows; DROP TABLE IF EXISTS m_bars__new; CREATE TABLE m_bars__new ({}) WITHOUT ROWID;
+             INSERT INTO m_bars__new(id, {BAR_CORE_COLS}) SELECT id, {BAR_CORE_COLS} FROM m_bars;",
+            cols.join(", ")
+        ))?;
+        {
+            let set: Vec<String> = stored.iter().enumerate().map(|(i, f)| format!(", {} = ?{}", q(&f.name), i + 6)).collect();
+            let mut up = self.conn.prepare(&format!(
+                "UPDATE m_bars__new SET _version = ?2, _created_at = ?3, _updated_at = ?4, _author = ?5{} WHERE id = ?1",
+                set.join("")
+            ))?;
+            for r in rows {
+                let mut vals: Vec<rusqlite::types::Value> = vec![
+                    rusqlite::types::Value::Blob(hex::decode(&r.id).unwrap_or_default()),
+                    version.or(r.version).unwrap_or(m.version).into(),
+                    r.created_at.into(),
+                    r.updated_at.into(),
+                    r.author.clone().map(Into::into).unwrap_or(rusqlite::types::Value::Null),
+                ];
+                for f in &stored {
+                    let old = r.values.iter().find(|(id, _)| *id == f.id).map(|(_, v)| v.clone()).unwrap_or(Value::Null);
+                    let mut v = convert(&old, &f.ty).unwrap_or(Value::Null);
+                    if v.is_null()
+                        && let Some(d) = &f.default
+                        && (f.required || m.design.by_id(&f.id).is_none())
+                    {
+                        v = coerce(f, d.clone())?;
+                    }
+                    vals.push(to_sql(&v, &f.ty));
+                }
+                up.execute(rusqlite::params_from_iter(vals))?;
+            }
+        }
+        self.conn.execute_batch(&format!(
+            "DROP TABLE m_bars; ALTER TABLE m_bars__new RENAME TO m_bars;
+             CREATE INDEX bars_series ON m_bars(_base, _quote, _source_id, _duration_s, _timestamp); {BAR_VIEW}"
+        ))?;
+        for f in &stored {
+            if f.index || matches!(f.ty, FieldType::Ref(_)) {
+                self.conn.execute_batch(&format!("CREATE INDEX {} ON m_bars({})", q(&format!("ix_m_bars_{}", f.id)), q(&f.name)))?;
+            }
+        }
+        self.bar_indexes(to)
+    }
+
+    /// Index the bars' own columns of indexed built-in fields.
+    fn bar_indexes(&self, to: &Design) -> Result<()> {
+        for (k, _) in BAR_FIELDS {
+            let col = match *k {
+                "source" => "_source_id",
+                "symbol" => "_base, _quote",
+                "period" => "_duration_s",
+                "base" => "_base",
+                "quote" => "_quote",
+                "timestamp" => "_timestamp",
+                "open" => "_open",
+                "high" => "_high",
+                "low" => "_low",
+                "close" => "_close",
+                "volume" => "_volume",
+                _ => "_flags",
+            };
+            let ix = q(&format!("ix_bars_{k}"));
+            if to.bar_field(k).is_some_and(|f| f.index) {
+                self.conn.execute_batch(&format!("CREATE INDEX IF NOT EXISTS {ix} ON m_bars({col})"))?;
+            } else {
+                self.conn.execute_batch(&format!("DROP INDEX IF EXISTS {ix}"))?;
+            }
         }
         Ok(())
     }
 
-    /// bars: copy the values of built-in fields given another type into `mx_bars`
+    /// The second half of the 2.16 upgrade: the values of the fields added to bars (kept in
+    /// `_mx_bars_upgrade`) go into `m_bars` with their stamps, and the indexes are made.
+    pub(crate) fn finish_bars_upgrade(&self) -> Result<()> {
+        if !self.table_exists("_mx_bars_upgrade")? {
+            return Ok(());
+        }
+        let m = self.model_or_err(BARS)?;
+        let design = m.design.clone().with_builtins();
+        self.conn.execute_batch("SAVEPOINT bars_upgrade")?;
+        let r = (|| -> Result<()> {
+            let rows = self.raw_rows_from("_mx_bars_upgrade", &design, "")?;
+            self.rebuild_bars_table(&Model { design: design.clone(), ..m.clone() }, &design, None, &rows)?;
+            self.conn.execute_batch("DROP TABLE _mx_bars_upgrade")?;
+            Ok(())
+        })();
+        match r {
+            Ok(()) => Ok(self.conn.execute_batch("RELEASE bars_upgrade")?),
+            Err(e) => {
+                let _ = self.conn.execute_batch("ROLLBACK TO bars_upgrade; RELEASE bars_upgrade");
+                Err(e)
+            }
+        }
+    }
+
+    /// bars: copy the values of built-in fields given another type into a stored column
     /// (converted), and index the bars columns of indexed built-in fields.
     fn rebuild_bars(&self, m: &Model, to: &Design, version: i64) -> Result<()> {
-        let t = q(&m.table());
         let now = now_ms();
         for f in to.stored() {
             let Some(old) = m.design.by_id(&f.id) else { continue };
             let Some(key) = bar_key(old) else { continue };
-            let mut read = self.conn.prepare(&format!("SELECT b.id, {} FROM bars b JOIN sources s ON s.id = b.source_id", bar_sql(key)))?;
+            let mut read = self.conn.prepare(&format!("SELECT b.id, {} FROM bar_rows b JOIN sources s ON s.id = b.source_id", bar_sql(key)))?;
             let mut write = self.conn.prepare(&format!(
-                "INSERT INTO {t}(id, _version, _created_at, _updated_at, _author, {c}) VALUES (?1, ?2, ?3, ?3, NULL, ?4)
-                 ON CONFLICT(id) DO UPDATE SET {c} = excluded.{c}",
+                "UPDATE m_bars SET {c} = ?4, _version = COALESCE(_version, ?2), _created_at = COALESCE(_created_at, ?3),
+                 _updated_at = COALESCE(_updated_at, ?3) WHERE id = ?1",
                 c = q(&f.name)
             ))?;
-            let rows = read.query_map([], |r| Ok((r.get::<_, Vec<u8>>(0)?, bar_value(key, r.get(1)?))))?;
-            for row in rows {
-                let (id, v) = row?;
+            let rows = read.query_map([], |r| Ok((r.get::<_, Vec<u8>>(0)?, bar_value(key, r.get(1)?))))?.collect::<rusqlite::Result<Vec<_>>>()?;
+            for (id, v) in rows {
                 let v = convert(&v, &f.ty).unwrap_or(Value::Null);
                 let v = match (&v, &f.default) {
                     (Value::Null, Some(d)) if f.required => coerce(f, d.clone())?,
                     _ => v,
                 };
                 write.execute(params![id, version, now, to_sql(&v, &f.ty)])?;
-            }
-        }
-        for (k, _) in BAR_FIELDS {
-            let col = match *k {
-                "source" => "source_id",
-                "symbol" => "base, quote",
-                "period" => "duration_s",
-                o => o,
-            };
-            let ix = q(&format!("ix_bars_{k}"));
-            if to.bar_field(k).is_some_and(|f| f.index) {
-                self.conn.execute_batch(&format!("CREATE INDEX IF NOT EXISTS {ix} ON bars({col})"))?;
-            } else {
-                self.conn.execute_batch(&format!("DROP INDEX IF EXISTS {ix}"))?;
             }
         }
         Ok(())
@@ -1257,15 +1396,16 @@ impl Store {
         }
         self.conn.execute_batch("SAVEPOINT model_remove")?;
         let r = (|| -> Result<()> {
-            self.conn.execute_batch(&format!("DROP TABLE IF EXISTS {}", q(&m.table())))?;
+            if !m.is_bars() {
+                self.conn.execute_batch(&format!("DROP TABLE IF EXISTS {}", q(&m.table())))?;
+            }
             self.conn.execute("DELETE FROM project_items WHERE kind = 'model' AND ref_id = ?1", [&m.id])?;
             self.orphan_rules(super::OwnerKind::Model, &m.id)?;
             if m.is_bars() {
                 // the bars go with their model; imports start it again as shipped
-                self.conn.execute_batch("DELETE FROM bars; DELETE FROM series_stats; DELETE FROM model_versions WHERE model_id = 'bars'")?;
-                for (k, _) in BAR_FIELDS {
-                    self.conn.execute_batch(&format!("DROP INDEX IF EXISTS {}", q(&format!("ix_bars_{k}"))))?;
-                }
+                self.conn.execute_batch("DELETE FROM m_bars; DELETE FROM series_stats; DELETE FROM model_versions WHERE model_id = 'bars'")?;
+                let shipped = Design::default().with_builtins();
+                self.rebuild_bars_table(&m, &shipped, Some(0), &[])?;
                 self.conn.execute(
                     "UPDATE models SET name = ?1, description = ?2, version = 0, design = ?3, draft = NULL, updated_at = ?4 WHERE id = ?1",
                     params![BARS, "imported price bars (built in)", serde_json::to_string(&Design::default().with_builtins())?, now_ms()],
@@ -1293,6 +1433,8 @@ pub(crate) struct RawRow {
     pub created_at: i64,
     pub updated_at: i64,
     pub author: Option<String>,
+    /// The version the row was written under.
+    pub version: Option<i64>,
     /// (field id, value)
     pub values: Vec<(String, Value)>,
 }
@@ -1493,7 +1635,7 @@ mod tests {
         s.set_model_draft("bars", Some(Design { fields: vec![req], ..Default::default() })).unwrap();
         let (b, _) = s.apply_model("bars", &ApplyOpts::default()).unwrap();
         assert_eq!(b.version, 1);
-        assert!(s.table_exists("mx_bars").unwrap());
+        assert!(s.table_exists("m_bars").unwrap());
 
         assert!(s.create_model("x", "", Design { fields: vec![f("id", FieldType::Text)], ..Default::default() }, false).is_err(), "reserved");
         assert!(s.create_model("x", "", Design { fields: vec![f("a", FieldType::Ref("nope".into()))], ..Default::default() }, false).is_err());
@@ -1559,7 +1701,7 @@ mod tests {
         assert!(e.contains("was dropped"), "{e}");
         assert_eq!(s.query_bars(&BarFilter::default()).unwrap()[0].bar.volume, 10.0);
 
-        // retype open to text: values move into mx_bars, converted
+        // retype open to text: values move into a stored column, converted
         // (required with a default, or not required: new bars from imports have no text open)
         let p = edit_bars(&s, |d| {
             let o = d.fields.iter_mut().find(|f| f.name == "open").unwrap();
