@@ -6,6 +6,18 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-30
+
+### Added
+- Code scopes: every code space is global, user or organization, shown and filtered with `mnnn code list --scope user|org|org:NAME|global` and in the TUI (C, f cycles)
+- Code permissions: roles grant code.view, code.run, code.edit and code.manage (nested); older roles carry over (resources.manage, call, read)
+- Per-node served code: `mnnn org code list|serve|stop ORG [SPACE]` picks which of an org's spaces this node runs, also for joined orgs
+- Give code to an org with `mnnn org give ORG code SPACE` or g in the TUI; members pull it with `mnnn org sync-code ORG` (new, changed or same; approval asked before running)
+- Executables in protobuf: `GET /o/ORG/api/executables`, `POST /o/ORG/api/run/NAME`, gRPC `muninn.code.v1.Executables/List` and `<pkg>.<Service>/Run`, `.proto` files under `/o/ORG/proto/`, and gRPC server reflection
+- Gated private sites: `mnnn org edit ORG --gated on` shows guests a landing, sign-in and join page only; members sign a browser in with `mnnn org sign-in ORG --site URL` (one-time link, 12-hour cookie)
+- Web invite links: `mnnn org member invite` prints `https://HOST/o/ORG/join#…` while the site is served; the invite stays in the fragment and the join page starts the key exchange
+- Built-in executables shipped with Muninn (invite-redeem, membership-apply): `mnnn code builtin list|show|override`
+
 ## [2.12.1] - 2026-10-30
 
 ### Added
@@ -391,7 +403,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.12.1...HEAD
+[Unreleased]: https://github.com/kommandosaldat/muninn/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/kommandosaldat/muninn/compare/v2.12.1...v2.13.0
 [2.12.1]: https://github.com/kommandosaldat/muninn/compare/v2.12.0...v2.12.1
 [2.12.0]: https://github.com/kommandosaldat/muninn/compare/v2.11.2...v2.12.0
 [2.11.2]: https://github.com/kommandosaldat/muninn/compare/v2.11.1...v2.11.2
