@@ -26,6 +26,7 @@ pub mod bars;
 pub mod host;
 pub mod math;
 pub mod pipe;
+pub mod pipeline;
 pub mod png;
 pub mod polars;
 pub mod pyconv;
@@ -501,6 +502,29 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, space: &CodeSpace, log: &
     run_on(store, env, origin, space, input, &src.text(), log)
 }
 
+/// Run a code space over named inputs (fan-in): `host.input()` is the first,
+/// `host.input_named(NAME)` any of them, `host.inputs()` their names.
+pub fn run_named(
+    store: &Store,
+    env: &CodeEnv,
+    origin: &str,
+    space: &CodeSpace,
+    inputs: Vec<(String, serde_json::Value)>,
+    from: &str,
+    log: &mut dyn FnMut(&str),
+) -> Result<RunInfo> {
+    NAMED.with(|n| *n.borrow_mut() = inputs.clone());
+    let first = inputs.into_iter().next().map(|x| x.1);
+    let r = run_on(store, env, origin, space, first, from, log);
+    NAMED.with(|n| n.borrow_mut().clear());
+    r
+}
+
+thread_local! {
+    /// The named inputs of the run starting now (see [`run_named`]).
+    static NAMED: std::cell::RefCell<Vec<(String, serde_json::Value)>> = const { std::cell::RefCell::new(vec![]) };
+}
+
 /// Run a code space over `input` (a frame; `None`: its default model query, if any).
 /// `from` names where the input came from, for the history.
 pub fn run_on(
@@ -536,6 +560,7 @@ pub fn run_on(
     let t = std::time::Instant::now();
     let mut r = host::Run::new(store, space);
     r.input = input;
+    r.named = NAMED.with(|n| std::mem::take(&mut *n.borrow_mut()));
     let table = r.table();
     // SAFETY: an approved plugin with a checked ABI; `table` and `r` outlive the call.
     let code = unsafe { (plugin.run)(&table) };

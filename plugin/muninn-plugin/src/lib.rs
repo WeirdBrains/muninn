@@ -115,6 +115,16 @@ impl Host {
         Frame::from_json(&self.call("input", &Json::Null)?)
     }
 
+    /// The names of the inputs, when several feed this run (a pipeline's fan-in).
+    pub fn inputs(&self) -> Result<Vec<String>> {
+        Ok(self.call("inputs", &Json::Null)?.as_array().unwrap_or(&[]).iter().filter_map(|m| m.as_str().map(str::to_string)).collect())
+    }
+
+    /// One input by name (a pipeline's fan-in: the upstream node's id, or the edge's name).
+    pub fn input_named(&self, name: &str) -> Result<Frame> {
+        Frame::from_json(&self.call("input_named", &Json::obj().with("name", name))?)
+    }
+
     /// The code space's input request itself (what [`Host::input`] loads).
     pub fn input_request(&self) -> Result<Json> {
         self.call("input_request", &Json::Null)

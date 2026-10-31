@@ -235,6 +235,8 @@ Through the SDK's `Host` (and in ABI terms, a method name and a JSON request):
 | method | SDK | does |
 |--------|-----|------|
 | `input` | `host.input()` | the code space's input as a `Frame` |
+| `inputs` | `host.inputs()` | the names of its inputs (several in a pipeline fan-in) |
+| `input_named` | `host.input_named("NAME")` | one named input as a `Frame` |
 | `input_request` | `host.input_request()` | the input's definition |
 | `models` | `host.models()` | the models and their fields |
 | `load` | `host.load(&Load::model("bars").filter("close > 3").sort("-timestamp").group("symbol").limit(100))` | any records, filtered, grouped and sorted |
@@ -346,3 +348,9 @@ listed by `muninn.code.v1.Executables/List`, run by `<package>.<Service>/Run` or
 caller gets with an `@view table|chart|text` comment. The host also answers gRPC server
 reflection (`grpc.reflection.v1`, as a guest), so `grpcurl HOST list` works; see
 [org-hosting](org-hosting.md#executables-213).
+
+## Several inputs
+
+In a [pipeline](pipelines.md) a code space can have several upstream nodes (fan-in). It
+runs once they have all finished: `input()` is the first, `input_named("NAME")` any of
+them by its edge name (default: the upstream node's id), and `inputs()` lists the names.

@@ -1,8 +1,37 @@
-# Pipelines (design note)
+# Pipelines
 
-Status: **design**. What ships today is the pipe layer underneath it ([pipes](pipes.md)):
-`mnnn pipe SOURCE STEP… [--to TARGET]` (stdin included), share-to-code, the TUI `>`
-action and the live Pipes window. This note fixes the shape of the first-class Pipeline.
+Status: the pipe layer ([pipes](pipes.md)) and the Pipeline object ship: storage with
+versions, the DAG run (fan-out, fan-in with named inputs, every leaf a model table),
+validation, `mnnn pipeline create|edit|show|list|run|remove|export|import` and history
+records. Still design: the Designer window, the Monitor tile, views as tiles, and
+pipelines over Share and `net` (see *Order of work*).
+
+```sh
+mnnn pipeline create flow --node src=search:usdt --node a=code:fast --node b=code:slow \
+  --node fa=model:Fast --node sb=model:Slow --edge 'src>a>fa' --edge 'src>b>sb'
+mnnn pipeline show flow        # in order, with anything wrong marked !
+mnnn pipeline run flow         # asks to approve new code first
+cat trades.csv | mnnn pipeline run feed - --chunk 500
+mnnn pipeline export flow --out flow.json
+mnnn pipeline import flow.json --dry-run      # the plan; then without --dry-run
+```
+
+Nodes are `ID=KIND`: `search:NAME`, `journal:NAME`, `source:QUERY` or `-` (stdin) as
+sources; `code:SPACE`; `view:table|chart[:col,col]`; `filter:SEARCH`; `model:NAME`.
+Saves along the way: `raw=code:fast+journal:Raw`. Edges are `FROM>TO[:NAME]` and chain
+(`a>b>c`); a code space with several inputs reads `host.input()` (the first) or
+`host.input_named("NAME")` and `host.inputs()` (the names). A node that fails marks
+those downstream `skipped`; an unapproved space is `waiting approval`; the rest still run.
+`pipeline edit` adds or replaces nodes and edges (`--remove-node`, `--remove-edge`); a
+changed graph is a new version.
+
+The file (`format: muninn-pipeline`, `version: 1`) holds the graph, each code space's
+lang, source and trust hash (a source that does not match its hash is refused), and the
+sink models by name with their templates (`--no-templates` leaves them out). Import plans
+first: a code space already here with the same hash is used as is, different code of the
+same name lands as `NAME (imported)`, new code is created unapproved; missing models are
+created from their templates; a pipeline name clash is refused unless `--name OTHER` or
+`--merge` (a new version); missing sources are listed as problems.
 
 ## Principles
 
@@ -87,5 +116,6 @@ drafts to approve, as models do.
 
 1. Pipe layer: sources of every kind, code steps, filters, tees, cycles, history (done).
 2. Stdin source (CSV/JSON/NDJSON, chunked) and live hop records with the Pipes window (done).
-3. Pipeline object: storage, DAG run with fan-out/fan-in, validation, CLI, export/import.
+3. Pipeline object: storage, DAG run with fan-out/fan-in, validation, CLI, export/import (done).
 4. Designer window, monitor tile, code space tile with a result chart, views as tiles.
+5. Pipelines over Share and `net share`/`net fetch` (peer pipelines as drafts); project, org and net sinks.

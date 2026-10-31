@@ -117,6 +117,10 @@ pub enum Command {
     /// model query or a code space's output), then steps (code spaces, or live searches
     /// that filter), then optionally a target that keeps the result (a journal or a model).
     Pipe(PipeArgs),
+    /// Pipelines: saved, named graphs (DAGs) of sources, code spaces, views and filters that
+    /// end in model tables. Create, edit, show, run, export and import them.
+    #[command(subcommand, alias = "pipelines")]
+    Pipeline(PipelineCommand),
     /// You as a user: your identity across your nodes, linking another node to it and
     /// revoking one.
     #[command(subcommand, alias = "users", after_long_help = USER_NOTES)]
@@ -3295,6 +3299,98 @@ pub enum ReviewCommand {
         target: String,
         #[arg(long)]
         json: bool,
+    },
+}
+
+/// Pipeline commands.
+#[derive(Debug, Subcommand)]
+#[command(after_help = "Nodes are ID=KIND: search:NAME, journal:NAME, source:QUERY or - (stdin) as
+sources; code:SPACE; view:table|chart[:col,col]; filter:SEARCH; model:NAME (a table every
+leaf must be). Add saves along the way with +: raw=code:fast+journal:Raw. Edges are
+FROM>TO[:NAME] (A>B>C chains); NAME is what a code space gets it as (host.input_named).
+
+Examples:
+  mnnn pipeline create flow --node src=search:usdt --node a=code:fast --node b=code:slow \\
+    --node fa=model:Fast --node sb=model:Slow --edge 'src>a>fa' --edge 'src>b>sb'
+  mnnn pipeline run flow
+  cat trades.csv | mnnn pipeline run feed - --chunk 500
+  mnnn pipeline export flow --out flow.json && mnnn pipeline import flow.json --name flow2")]
+pub enum PipelineCommand {
+    /// A new pipeline.
+    Create {
+        name: String,
+        #[arg(long, default_value = "")]
+        description: String,
+        /// A node: ID=KIND[+SAVE…] (repeatable).
+        #[arg(long = "node")]
+        nodes: Vec<String>,
+        /// Edges: FROM>TO[:NAME], or A>B>C (repeatable).
+        #[arg(long = "edge")]
+        edges: Vec<String>,
+    },
+    /// Change a pipeline (a new version): add or replace nodes and edges, remove nodes.
+    Edit {
+        pipeline: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long = "node")]
+        nodes: Vec<String>,
+        #[arg(long = "edge")]
+        edges: Vec<String>,
+        /// Remove a node (and its edges).
+        #[arg(long = "remove-node")]
+        remove: Vec<String>,
+        /// Remove an edge FROM>TO.
+        #[arg(long = "remove-edge")]
+        remove_edges: Vec<String>,
+    },
+    /// The graph, in order, with what is wrong with it.
+    Show {
+        pipeline: String,
+        #[arg(long)]
+        json: bool,
+    },
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Run it: code spaces are approved first; `-` feeds standard input to `-` sources.
+    Run {
+        pipeline: String,
+        /// `-`: read standard input (CSV, JSON, NDJSON).
+        stdin: Option<String>,
+        /// With `-`: run on every N rows as they arrive.
+        #[arg(long, default_value_t = 0)]
+        chunk: usize,
+        #[arg(long)]
+        json: bool,
+    },
+    Remove {
+        pipeline: String,
+    },
+    /// Write a pipeline file: nodes, edges, code (by trust hash), sink models by name.
+    Export {
+        pipeline: String,
+        #[arg(long)]
+        out: std::path::PathBuf,
+        /// Leave the sink models' templates out (they must exist where it is imported).
+        #[arg(long)]
+        no_templates: bool,
+    },
+    /// Import a pipeline file: shows the plan, then asks.
+    Import {
+        file: std::path::PathBuf,
+        /// Import under this name.
+        #[arg(long)]
+        name: Option<String>,
+        /// Make it a new version of the pipeline of the same name.
+        #[arg(long)]
+        merge: bool,
+        /// Only show the plan.
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 

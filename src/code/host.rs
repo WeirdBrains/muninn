@@ -27,6 +27,8 @@ pub const METHODS: &[&str] = &[
     "methods",
     "input",
     "input_request",
+    "inputs",
+    "input_named",
     "models",
     "load",
     "update",
@@ -51,11 +53,13 @@ pub struct Run<'a> {
     pub writes: usize,
     /// The frame piped in (else the space's default model query).
     pub input: Option<Value>,
+    /// Every input by name, when several upstreams feed it (a pipeline's fan-in).
+    pub named: Vec<(String, Value)>,
 }
 
 impl<'a> Run<'a> {
     pub fn new(store: &'a Store, space: &'a CodeSpace) -> Self {
-        Run { store, space, logs: vec![], result: None, notes: vec![], error: None, writes: 0, input: None }
+        Run { store, space, logs: vec![], result: None, notes: vec![], error: None, writes: 0, input: None, named: vec![] }
     }
 
     /// The table to hand to `muninn_plugin_run` (valid while `self` is).
@@ -84,6 +88,16 @@ impl<'a> Run<'a> {
         match method {
             "methods" => Ok(json!(METHODS)),
             "input_request" => Ok(serde_json::to_value(&self.space.input)?),
+            "inputs" => Ok(json!(self.named.iter().map(|(n, _)| n).collect::<Vec<_>>())),
+            "input_named" => {
+                let n = str_of(&req, "name")?;
+                self.named.iter().find(|(k, _)| *k == n).map(|(_, f)| f.clone()).ok_or_else(|| {
+                    Error::invalid(
+                        "input",
+                        format!("no input `{n}` (inputs: {})", self.named.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>().join(", ")),
+                    )
+                })
+            }
             "input" => {
                 if let Some(f) = &self.input {
                     return Ok(f.clone());

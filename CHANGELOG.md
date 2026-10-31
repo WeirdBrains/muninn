@@ -7,6 +7,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ## [Unreleased]
 
 ### Added
+- Pipelines: saved, versioned DAGs of sources, code spaces, views and filters that end in model tables; fan-out computed once, fan-in with named inputs (host.input_named); validated (acyclic, every leaf a model); mnnn pipeline create|edit|show|list|run|remove, export/import with code by trust hash and embedded model templates (plan first, rename or merge, imported code unapproved)
 - Model design templates: export a model's design to a file and import it (plan first, rename or merge on clashes); built-in bars template; models from peers arrive as drafts to approve
 - Code space input picker (i or [Input]): pick a source, or a model then its where, matching, group, sort and limit with the line previewed
 - Pipes from standard input (CSV, JSON, NDJSON; --chunk streams) and a live Pipes window in the TUI that follows pipes run anywhere on the same home

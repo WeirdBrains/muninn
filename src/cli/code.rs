@@ -106,7 +106,7 @@ fn last_run(c: &CodeSpace) -> String {
 }
 
 /// Approve (after asking) when the source is new or changed.
-fn ensure_approved(ctx: &Ctx, store: &Store, c: &CodeSpace) -> anyhow::Result<()> {
+pub(crate) fn ensure_approved(ctx: &Ctx, store: &Store, c: &CodeSpace) -> anyhow::Result<()> {
     if code::approved(c) {
         return Ok(());
     }
