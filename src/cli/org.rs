@@ -326,6 +326,21 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
             ctx.io.info(format!("mirrored {} ({} bytes); `mnnn org host start` serves it at /o/{}/", j.name, m.snapshot.len(), m.slug));
             Ok(())
         }
+        OrgCommand::SyncCode { org: key, json } => {
+            let mut n = Net::open(ctx)?;
+            let relays = n.relays();
+            let j = n.store.find_joined(&key)?;
+            n.node()?;
+            let out = onet::sync_code(&n.store, n.node.as_ref().expect("node"), &j, &relays, ORIGIN)?;
+            if json {
+                return pretty(&out);
+            }
+            for x in &out {
+                println!("{}\t{}", x.state, x.name);
+            }
+            ctx.io.info(format!("{} code spaces of {} here; approve before running, and `mnnn org code serve` to serve one", out.len(), j.name));
+            Ok(())
+        }
         OrgCommand::Sign { org: key, method, path, body } => {
             let body = match body.as_deref() {
                 None => vec![],
@@ -752,13 +767,16 @@ fn served(ctx: &Ctx, cmd: OrgCodeCommand) -> anyhow::Result<()> {
     let s = &n.store;
     match cmd {
         OrgCodeCommand::List { org: key, json } => {
-            let o = mine(s, &key)?;
-            let cs = org::served_code(s, &o)?;
+            let (id, name) = match target(s, &key)? {
+                Target::Mine(o) => (o.id, o.name),
+                Target::Joined(j) => (j.org_id, j.name),
+            };
+            let cs: Vec<_> = s.served_code(&id)?.into_iter().filter_map(|c| s.code_space(&c).ok().flatten()).collect();
             if json {
                 return pretty(&cs.iter().map(|c| serde_json::json!({ "id": c.id, "name": c.name, "lang": c.lang })).collect::<Vec<_>>());
             }
             if cs.is_empty() {
-                ctx.io.info(format!("this node serves no code for {}", o.name));
+                ctx.io.info(format!("this node serves no code for {name}"));
             }
             for c in &cs {
                 println!("{}\t{}\t{}", c.short_id(), c.name, c.lang.as_str());
@@ -766,15 +784,19 @@ fn served(ctx: &Ctx, cmd: OrgCodeCommand) -> anyhow::Result<()> {
             Ok(())
         }
         OrgCodeCommand::Serve { org: key, space } => {
-            let o = mine(s, &key)?;
-            let c = org::serve_code(s, ORIGIN, &OWNER, &o, &space)?;
-            ctx.io.info(format!("this node serves {} for {}", c.name, o.name));
+            let (c, name) = match target(s, &key)? {
+                Target::Mine(o) => (org::serve_code(s, ORIGIN, &OWNER, &o, &space)?, o.name),
+                Target::Joined(j) => (org::serve_joined_code(s, ORIGIN, &j, &space, true)?, j.name),
+            };
+            ctx.io.info(format!("this node serves {} for {name}", c.name));
             Ok(())
         }
         OrgCodeCommand::Stop { org: key, space } => {
-            let o = mine(s, &key)?;
-            let c = org::unserve_code(s, ORIGIN, &OWNER, &o, &space)?;
-            ctx.io.info(format!("this node no longer serves {} for {}", c.name, o.name));
+            let (c, name) = match target(s, &key)? {
+                Target::Mine(o) => (org::unserve_code(s, ORIGIN, &OWNER, &o, &space)?, o.name),
+                Target::Joined(j) => (org::serve_joined_code(s, ORIGIN, &j, &space, false)?, j.name),
+            };
+            ctx.io.info(format!("this node no longer serves {} for {name}", c.name));
             Ok(())
         }
     }

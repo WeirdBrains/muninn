@@ -195,6 +195,23 @@ fn members_apply_join_by_invitation_give_fetch_and_get_kicked() {
     assert!(b.ok(&["org", "member", "list", "comet-lab"]).contains("cleo"));
     assert!(!c.run(&["org", "member", "kick", "comet-lab", "ben"]).status.success(), "a user cannot kick an admin");
 
+    // ben gives a code space; as an admin (host + code.view) his node syncs the org's copy,
+    // a changed source comes back changed (to approve again), and he serves it there
+    b.ok(&["code", "create", "calc", "--lang", "math", "--source", "x = close"]);
+    b.ok(&["org", "give", "comet-lab", "code", "calc"]);
+    let synced = json(&b.ok(&["org", "sync-code", "comet-lab", "--json"]));
+    assert_eq!(synced[0]["state"], "new", "{synced}");
+    let copy = synced[0]["name"].as_str().unwrap().to_string();
+    assert_eq!(json(&b.ok(&["org", "sync-code", "comet-lab", "--json"]))[0]["state"], "same");
+    let rs = json(&a.ok(&["org", "resource", "list", "comet-lab", "--json"]));
+    let code_res = rs.as_array().unwrap().iter().find(|r| r["kind"] == "code").expect("the code resource");
+    a.ok(&["code", "edit", code_res["name"].as_str().unwrap(), "--source", "x = close * 3"]);
+    assert_eq!(json(&b.ok(&["org", "sync-code", "comet-lab", "--json"]))[0]["state"], "changed");
+    assert_eq!(b.ok(&["code", "show", &copy, "--source"]).trim(), "x = close * 3");
+    b.ok(&["org", "code", "serve", "comet-lab", &copy]);
+    assert!(b.ok(&["org", "code", "list", "comet-lab"]).contains(&copy));
+    assert!(!c.run(&["org", "sync-code", "comet-lab"]).status.success(), "users do not host");
+
     // a member's signed web request header
     let h = b.ok(&["org", "sign", "comet-lab", "GET", "/o/comet-lab/api/artifacts"]);
     assert!(h.starts_with("Authorization: Muninn exchange="), "{h}");

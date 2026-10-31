@@ -126,6 +126,11 @@ Requests to an org run rules or code, gated by roles:
   `mnnn org code serve ORG SPACE` and `mnnn org code stop ORG SPACE` (need `code.manage`).
   Adding a code endpoint serves its space on that node; a code endpoint whose space the node
   does not serve refuses calls there. Code endpoints from before 2.13 stay served.
+- Members give code spaces with `mnnn org give ORG code SPACE`. A member node that hosts
+  (`host` and `code.view`) copies the org's code spaces with `mnnn org sync-code ORG`: new
+  ones are added, changed sources replace the copy's (so it asks for approval before the
+  next run), and each node builds its own (cached). `mnnn org code serve ORG SPACE` on that
+  node then serves its copy (needs `code.manage` in its role there).
 
 ## Templates and the site
 

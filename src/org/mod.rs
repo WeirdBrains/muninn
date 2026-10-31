@@ -750,6 +750,33 @@ pub fn served_code(s: &Store, org: &Org) -> Result<Vec<crate::store::CodeSpace>>
     Ok(s.served_code(&org.id)?.into_iter().filter_map(|id| s.code_space(&id).ok().flatten()).collect())
 }
 
+/// May this node, a member of a joined org, do something there (by the role it was given)?
+pub fn joined_can(j: &crate::store::Joined, perm: &str) -> bool {
+    j.status == MemberStatus::Member && j.perms.iter().any(|p| p == "*" || p == perm || IMPLIES.iter().any(|(k, v)| k == p && v.contains(&perm)))
+}
+
+/// Serve (or stop serving) a code space for a joined org on this node (needs `code.manage`
+/// in the role this node holds there).
+pub fn serve_joined_code(s: &Store, origin: &str, j: &crate::store::Joined, code: &str, on: bool) -> Result<crate::store::CodeSpace> {
+    if !joined_can(j, "code.manage") {
+        return Err(Error::invalid("permission", format!("your role in {} may not code.manage", j.name)));
+    }
+    let c = s.find_code_space(code)?;
+    let changed = if on { s.serve_code(&j.org_id, &c.id)? } else { s.unserve_code(&j.org_id, &c.id)? };
+    if !on && !changed {
+        return Err(Error::invalid("code", format!("{} is not served for {}", c.name, j.name)));
+    }
+    let verb = if on { "serves" } else { "stopped serving" };
+    record(
+        s,
+        origin,
+        if on { "org.code.serve" } else { "org.code.unserve" },
+        format!("this node {verb} code space {} for {}", c.name, j.name),
+        serde_json::json!({ "org": j.org_id, "code": c.id }),
+    );
+    Ok(c)
+}
+
 /// Run a code space for an org on this node (needs `code.manage`).
 pub fn serve_code(s: &Store, origin: &str, a: &Actor, org: &Org, code: &str) -> Result<crate::store::CodeSpace> {
     require(s, org, a, "code.manage")?;
@@ -781,6 +808,75 @@ pub fn unserve_code(s: &Store, origin: &str, a: &Actor, org: &Org, code: &str) -
         serde_json::json!({ "org": org.id, "code": c.id }),
     );
     Ok(c)
+}
+
+// ---------- syncing code to org nodes ----------
+
+/// One of an org's code spaces, as sent to its nodes (approval and runs stripped).
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct OrgCode {
+    pub resource: String,
+    pub space: crate::store::CodeSpace,
+}
+
+/// What syncing did with one code space.
+#[derive(Debug, Clone, Serialize)]
+pub struct Synced {
+    pub name: String,
+    pub code_id: String,
+    /// new, changed or same.
+    pub state: &'static str,
+}
+
+/// The org's active code resources.
+pub fn code_of(s: &Store, org: &Org) -> Result<Vec<OrgCode>> {
+    let mut v = vec![];
+    for r in s.resources(&org.id)?.into_iter().filter(|r| r.kind == ShareKind::Code && r.state == ResourceState::Active) {
+        if let Some(mut c) = s.code_space(&r.ref_id)? {
+            c.approved_hash = None;
+            c.last_run = None;
+            v.push(OrgCode { resource: r.id, space: c });
+        }
+    }
+    Ok(v)
+}
+
+/// Apply an org's code list to this node's copies.
+pub fn apply_code(s: &Store, org_id: &str, org_name: &str, list: &[OrgCode]) -> Result<Vec<Synced>> {
+    let mut out = vec![];
+    for oc in list {
+        let c = &oc.space;
+        let existing = s.code_copy(org_id, &oc.resource)?.and_then(|id| s.code_space(&id).ok().flatten());
+        let (space, state) = match existing {
+            Some(mine) if mine.source == c.source && mine.lang == c.lang && mine.input == c.input => (mine, "same"),
+            Some(mine) => {
+                let ch = crate::store::CodeChange {
+                    lang: Some(c.lang),
+                    source: Some(c.source.clone()),
+                    input: Some(c.input.clone()),
+                    description: Some(c.description.clone()),
+                    ..Default::default()
+                };
+                (s.update_code_space(&mine.id, &ch)?, "changed")
+            }
+            None => {
+                let taken: Vec<String> = s.code_spaces()?.into_iter().map(|x| x.name.to_lowercase()).collect();
+                let mut name = c.name.clone();
+                if taken.contains(&name.to_lowercase()) {
+                    name = format!("{} ({org_name})", c.name);
+                }
+                let mut n = 2;
+                while taken.contains(&name.to_lowercase()) {
+                    name = format!("{} ({org_name} {n})", c.name);
+                    n += 1;
+                }
+                (s.create_code_space(&name, &c.description, c.lang, &c.source, c.input.clone())?, "new")
+            }
+        };
+        s.save_code_copy(org_id, &oc.resource, &space.id)?;
+        out.push(Synced { name: space.name, code_id: space.id, state });
+    }
+    Ok(out)
 }
 
 // ---------- templates ----------

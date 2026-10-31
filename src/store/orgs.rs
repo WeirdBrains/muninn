@@ -16,6 +16,13 @@ CREATE TABLE org_served_code (
 );
 INSERT OR IGNORE INTO org_served_code(org_id, code_id, added_at)
     SELECT org_id, ref_id, created_at FROM org_endpoints WHERE kind = 'code';
+CREATE TABLE org_code_copies (
+    org_id TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    code_id TEXT NOT NULL,
+    synced_at INTEGER NOT NULL,
+    PRIMARY KEY (org_id, resource_id)
+);
 "#;
 
 pub const MIGRATION: &str = r#"
@@ -1267,6 +1274,23 @@ impl Store {
 
     pub fn unserve_code(&self, org: &str, code: &str) -> Result<bool> {
         Ok(self.conn.execute("DELETE FROM org_served_code WHERE org_id = ?1 AND code_id = ?2", [org, code])? == 1)
+    }
+
+    /// The local copy of an org's code resource (on a node that syncs it).
+    pub fn code_copy(&self, org: &str, resource: &str) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .query_row("SELECT code_id FROM org_code_copies WHERE org_id = ?1 AND resource_id = ?2", [org, resource], |r| r.get(0))
+            .optional()?)
+    }
+
+    pub fn save_code_copy(&self, org: &str, resource: &str, code: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO org_code_copies(org_id, resource_id, code_id, synced_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(org_id, resource_id) DO UPDATE SET code_id = ?3, synced_at = ?4",
+            params![org, resource, code, now_ms()],
+        )?;
+        Ok(())
     }
 
     // ---------- joined (orgs on other nodes) ----------

@@ -2746,6 +2746,13 @@ pub enum OrgCommand {
     },
     /// Copy a joined org's public site here to serve it (needs the host permission).
     Mirror { org: String },
+    /// Copy a joined org's code spaces here to run them (needs host and code.view); changed
+    /// ones ask for approval again.
+    SyncCode {
+        org: String,
+        #[arg(long)]
+        json: bool,
+    },
     /// The `Authorization` header for a signed web request to a joined org's site.
     Sign {
         org: String,
