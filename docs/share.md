@@ -14,6 +14,8 @@ One action shares anything shareable to anything that takes shares.
 - **code**: a code space reads the model (its input `model`).
 - **net**: the same as `mnnn net share` (with exchanges named, or all of them).
 
+A model fetched from a peer arrives as a draft to approve ([model templates](model-templates.md)).
+
 Every share is recorded in [history](history.md).
 
 ## CLI

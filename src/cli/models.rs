@@ -4,6 +4,7 @@ use super::searches::record;
 use super::{Ctx, ModelCommand, RecordCommand};
 use crate::designer::{self as d, Act};
 use crate::ingest::time::fmt_ts;
+use crate::store::templates::{self as tpl, ImportOpts, Template};
 use crate::store::{ApplyOpts, FieldOp, FieldType, ItemKind, Model, OwnerKind, Plan, Record, RecordQuery, Store};
 use anyhow::anyhow;
 use serde_json::{Value, json};
@@ -335,6 +336,37 @@ pub fn run(ctx: &Ctx, cmd: ModelCommand) -> anyhow::Result<()> {
             note(&store, d::act_model_remove(&m, n));
             ctx.io.info(format!("removed model {} ({n} record(s))", m.name));
         }
+        ModelCommand::Export { model, out, records } => {
+            let t = store.export_template(&model, records)?;
+            std::fs::write(&out, t.to_json()?)?;
+            record(
+                &store,
+                "model.export",
+                format!("export model {} as a template", t.name),
+                json!({ "model": t.name, "out": out.display().to_string(), "records": t.records.len() }),
+            );
+            ctx.io.info(format!(
+                "wrote template {} ({} field(s), {} rule(s), {} sample record(s)) to {}",
+                t.name,
+                t.design.fields.len(),
+                t.rules.len(),
+                t.records.len(),
+                out.display()
+            ));
+        }
+        ModelCommand::Import { file, name, merge, draft, no_records, dry_run } => {
+            import_template(ctx, &store, &file, name, merge, draft, no_records, dry_run)?
+        }
+        ModelCommand::Templates { json: as_json } => {
+            let all = tpl::builtin_templates();
+            if as_json {
+                println!("{}", serde_json::to_string_pretty(&all)?);
+                return Ok(());
+            }
+            let rows: Vec<Vec<String>> =
+                all.iter().map(|t| vec![format!("builtin:{}", t.name), t.design.fields.len().to_string(), t.description.clone()]).collect();
+            table(&["template", "fields", "description"].map(String::from), &rows);
+        }
         ModelCommand::Record(c) => records(ctx, &store, c)?,
     }
     Ok(())
@@ -481,5 +513,81 @@ fn records(ctx: &Ctx, store: &Store, cmd: RecordCommand) -> anyhow::Result<()> {
             }
         }
     }
+    Ok(())
+}
+
+/// A template from a file or `builtin:NAME`.
+fn read_template(file: &str) -> anyhow::Result<Template> {
+    if let Some(n) = file.strip_prefix("builtin:") {
+        return tpl::builtin_template(n).ok_or_else(|| anyhow!("no built-in template `{n}` (see `mnnn model templates`)"));
+    }
+    let bytes = std::fs::read(file).map_err(|e| anyhow!("{file}: {e}"))?;
+    Ok(Template::parse(&bytes)?)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn import_template(
+    ctx: &Ctx,
+    store: &Store,
+    file: &str,
+    name: Option<String>,
+    merge: bool,
+    draft: bool,
+    no_records: bool,
+    dry_run: bool,
+) -> anyhow::Result<()> {
+    let t = read_template(file)?;
+    let mut opts = ImportOpts { name, merge, draft, no_records };
+    if let Some(m) = store.template_clash(&t, &opts)?
+        && !opts.merge
+    {
+        // a name clash: ask to rename or merge
+        let free = tpl::free_model_name(store, &m.name)?;
+        let a = ctx.io.prompt(
+            "name",
+            &format!("model {} already exists: a new name, or `merge` to add the template's fields to it", m.name),
+            Some(&free),
+            "--name NEW or --merge",
+        )?;
+        if a.trim().eq_ignore_ascii_case("merge") {
+            opts.merge = true;
+            opts.draft = false;
+        } else {
+            opts.name = Some(a);
+        }
+    }
+    let p = store.plan_template(&t, &opts)?;
+    println!(
+        "{} template {} {} model {} (v{} → v{}):",
+        if dry_run { "importing" } else { "import" },
+        t.name,
+        if p.merge { "into" } else { "as" },
+        p.model,
+        p.plan.from,
+        p.plan.to
+    );
+    print_plan(store, &p.plan);
+    if !p.kept.is_empty() {
+        println!("  kept as they are (another type here): {}", p.kept.join(", "));
+    }
+    println!("  {} sample record(s), {} rule(s) (switched off)", p.records, p.rules);
+    if !p.plan.blocked.is_empty() {
+        return Err(anyhow!("{} cannot be migrated as it is:\n  {}", p.model, p.plan.blocked.join("\n  ")));
+    }
+    if dry_run {
+        return Ok(());
+    }
+    let lost = p.plan.lost();
+    if lost > 0 && !ctx.io.confirm(&format!("this throws away {lost} value(s) of {}; go ahead?", p.model))? {
+        return Err(anyhow!("nothing changed"));
+    }
+    let done = store.import_template(&t, &opts, lost > 0)?;
+    record(
+        store,
+        "model.import",
+        format!("import template {}: {}", t.name, done.summary()),
+        json!({ "template": t.name, "model": done.model.id, "merged": done.merged, "records": done.records, "rules": done.rules }),
+    );
+    ctx.io.info(done.summary());
     Ok(())
 }

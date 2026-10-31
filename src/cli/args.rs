@@ -2437,7 +2437,10 @@ Examples:
   mnnn model record create signals symbol=BTC/USDT price=42000 side=buy
   mnnn model record list signals --where \"price > 40000\" --sort -price
   mnnn model record list signals --group side --agg avg:price
-  mnnn model record update signals --where \"side = buy\" note=checked";
+  mnnn model record update signals --where \"side = buy\" note=checked
+  mnnn model export signals --out signals.json --records
+  mnnn model import signals.json --name signals2
+  mnnn model import builtin:bars --name candles";
 
 #[derive(Debug, Subcommand)]
 pub enum ModelCommand {
@@ -2530,6 +2533,42 @@ pub enum ModelCommand {
         version: String,
         #[arg(long)]
         dry_run: bool,
+    },
+    /// Write a model's design as a template file (types, fields, refs, rules; --records
+    /// adds its records as samples).
+    Export {
+        model: String,
+        #[arg(long, short = 'o', value_name = "FILE")]
+        out: std::path::PathBuf,
+        /// Include the records as sample records.
+        #[arg(long)]
+        records: bool,
+    },
+    /// Import a template file (or a built-in one, e.g. `builtin:bars`) as a new model, or
+    /// merge it into the model of that name. Shows the migration plan first.
+    Import {
+        /// A template file, or `builtin:NAME`.
+        file: String,
+        /// The new model's name (default: the template's).
+        #[arg(long)]
+        name: Option<String>,
+        /// Add the template's missing fields to the existing model of that name.
+        #[arg(long, conflicts_with = "draft")]
+        merge: bool,
+        /// Leave it as a draft (`mnnn model apply` applies it).
+        #[arg(long)]
+        draft: bool,
+        /// Skip the template's sample records.
+        #[arg(long)]
+        no_records: bool,
+        /// Only show the plan.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// List the built-in model design templates.
+    Templates {
+        #[arg(long)]
+        json: bool,
     },
     /// Remove a model and its records (rules living in it become standalone, off).
     #[command(alias = "rm")]

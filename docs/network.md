@@ -88,7 +88,8 @@ Kinds: `model`, `search` (live search), `journal`, `project`, `report`, `code`. 
 a project shares its journals and models for searches too. Sharing the `bars` model
 lets peers search your imported series. Fetched items come as JSON (or a project
 archive, or a document format with `--format`); `--import` adds journals, projects,
-code spaces and live searches to your database, under a free name, recorded in the
+code spaces, live searches and models (as drafts to approve, see
+[model templates](model-templates.md)) to your database, under a free name, recorded in the
 [history](history.md) as `net.import`.
 
 `--with NAME` connects to that node first if needed. In the TUI: Shared page `a` shares

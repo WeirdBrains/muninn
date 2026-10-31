@@ -111,6 +111,9 @@ mnnn model discard signals
 mnnn model history signals [--json]
 mnnn model rollback signals 2 [--dry-run]
 mnnn -y model remove signals
+mnnn model export signals --out signals.json [--records]   # a template file
+mnnn model import signals.json [--name N | --merge] [--draft] [--dry-run]
+mnnn model templates                                       # built-in templates (builtin:bars)
 
 mnnn model record create signals symbol=BTC/USDT price=42000 side=buy
 mnnn model record update signals --id 3f2a note=checked
@@ -136,7 +139,7 @@ timestamp gives the bar a new id) and delete them. `model record list` on bars s
 
 | Screen | Keys |
 |--------|------|
-| Models | **Enter** design · **n** new (name, then fields) · **r** records · **h** history · **f** rules · **p** add to a project · **d** remove |
+| Models | **Enter** design · **n** new (name, then fields) · **r** records · **h** history · **f** rules · **p** add to a project · **x** export a template · **i** import one · **d** remove |
 | Design | **a** add a field · **e**/**Enter** edit it (the whole spec; the field keeps its id, so a rename keeps values) · **x** drop · **u** undo the draft's change to the field · **K**/**J** move up/down · **A** apply (asks when values are lost) · **z** discard the draft · **N** rename the model · **i** description · **d** remove |
 | History | **Enter** show a version (fields, steps, what rolling back to it would do) · **b**/**R** roll back to it (asks) |
 | Records | **Enter** show · **n** new · **e** edit · **d** delete · **w** where · **/** text · **s** sort (`price`, `-price`) · **g** group (`side, sum:price`) · **U** update all matching · **D** delete all matching · **c** clear · **PgUp**/**PgDn** |
@@ -193,6 +196,8 @@ mnnn rule create Grow --on record.create --if "name = notes" \
   - fields added to bars arrive as optional fields on the local bars model, with their
     values on the archive's bars (the local names of the fields from imports stay).
 - **Backups** contain everything.
+
+See [Model design templates](model-templates.md) for exporting, importing and sharing designs.
 
 ## More commands
 

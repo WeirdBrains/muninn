@@ -92,6 +92,9 @@ Examples:
   mnnn model record list signals \-\-where "price > 40000" \-\-sort \-price
   mnnn model record list signals \-\-group side \-\-agg avg:price
   mnnn model record update signals \-\-where "side = buy" note=checked
+  mnnn model export signals \-\-out signals.json \-\-records
+  mnnn model import signals.json \-\-name signals2
+  mnnn model import builtin:bars \-\-name candles
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SUBCOMMANDS
@@ -125,6 +128,15 @@ List the applied versions
 .TP
 mnnn\-model\-rollback(1)
 Apply the design of an earlier version as the next version
+.TP
+mnnn\-model\-export(1)
+Write a model\*(Aqs design as a template file (types, fields, refs, rules; \-\-records adds its records as samples)
+.TP
+mnnn\-model\-import(1)
+Import a template file (or a built\-in one, e.g. `builtin:bars`) as a new model, or merge it into the model of that name. Shows the migration plan first
+.TP
+mnnn\-model\-templates(1)
+List the built\-in model design templates
 .TP
 mnnn\-model\-remove(1)
 Remove a model and its records (rules living in it become standalone, off)

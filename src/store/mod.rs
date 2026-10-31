@@ -21,6 +21,7 @@ pub mod rules;
 pub mod runs;
 pub mod searches;
 pub mod sync;
+pub mod templates;
 pub mod users;
 pub use authors::{Author, AuthorChange};
 pub use code::{CodeChange, CodeInput, CodeScope, CodeSpace, Lang, RunInfo};

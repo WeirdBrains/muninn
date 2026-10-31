@@ -204,3 +204,38 @@ fn bars_fields_can_be_renamed_and_dropped() {
     a.on_key(key(KeyCode::Char('n')));
     assert_eq!(a.store.count_records(&a.store.find_model("bars").unwrap()).unwrap(), n, "any other key cancels");
 }
+
+#[test]
+fn templates_export_and_import_from_the_models_window() {
+    let (t, mut a) = app();
+    a.on_key(key(KeyCode::Char('D')));
+    let text = screen_text(&mut a);
+    assert!(text.contains("x export") && text.contains("i import"), "{text}");
+    // import the built-in bars template: the name is taken, so it asks for another
+    a.on_key(key(KeyCode::Char('i')));
+    fill(&mut a, "builtin:bars");
+    assert_eq!(a.models.ask.as_ref().map(|x| x.kind.clone()), Some(models::MAsk::ImportName));
+    fill(&mut a, "candles");
+    let text = screen_text(&mut a);
+    assert!(text.contains("template bars as model candles") && text.contains("y confirms"), "{text}");
+    a.on_key(key(KeyCode::Char('y')));
+    let m = a.store.find_model("candles").unwrap();
+    assert_eq!((m.version, m.design.fields.len()), (1, 12));
+    assert!(kinds(&a).contains(&"model.import".to_string()));
+    // export it, then import the file again, cancelling the first time
+    let file = t.path().join("candles.json");
+    a.models.sel = a.models.list.iter().position(|x| x.name == "candles").unwrap();
+    a.on_key(key(KeyCode::Char('x')));
+    fill(&mut a, file.to_str().unwrap());
+    assert!(file.exists());
+    a.on_key(key(KeyCode::Char('i')));
+    fill(&mut a, file.to_str().unwrap());
+    fill(&mut a, "candles_2");
+    a.on_key(key(KeyCode::Char('n')));
+    assert!(a.store.find_model("candles_2").is_err(), "cancelled");
+    a.on_key(key(KeyCode::Char('i')));
+    fill(&mut a, file.to_str().unwrap());
+    fill(&mut a, "candles_2");
+    a.on_key(key(KeyCode::Char('y')));
+    assert!(a.store.find_model("candles_2").is_ok());
+}

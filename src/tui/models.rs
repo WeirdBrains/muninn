@@ -5,6 +5,7 @@ use super::workspace::{Ask, Back, Purpose, Typed, View, ask_key, draw_view, mute
 use super::{App, Hit, block};
 use crate::designer::{self as dz, Act};
 use crate::rules;
+use crate::store::templates::{self as tpl, ImportOpts, Template};
 use crate::store::{
     ApplyOpts, Design, Field, Group, ItemKind, LiveSearch, Model, ModelVersion, NewRule, OwnerKind, Plan, Record, RecordQuery, Rule, RuleSpec,
 };
@@ -48,6 +49,10 @@ pub enum MAsk {
     RuleOn,
     RuleIf,
     RuleThen,
+    ExportPath,
+    ImportPath,
+    /// The imported template's model name is taken: a new name, or `merge`.
+    ImportName,
 }
 
 impl MAsk {
@@ -70,6 +75,9 @@ impl MAsk {
             MAsk::RuleOn => "On (action kinds: import, journal.*, record.create, *)",
             MAsk::RuleIf => "If (FIELD OP VALUE; …, empty: always)",
             MAsk::RuleThen => "Then (record-create f={field} …; record-update where=… f=v; status …)",
+            MAsk::ExportPath => "Export the design as a template file (with its rules; records are not included)",
+            MAsk::ImportPath => "Import a template: a file, or builtin:bars",
+            MAsk::ImportName => "That model exists: a new name, or merge to add the template's fields to it",
         }
     }
 }
@@ -85,6 +93,8 @@ pub enum Confirm {
     UpdateMany(Map<String, Value>),
     DeleteMany,
     DeleteRule(String),
+    /// Import the template waiting in `ModelsState::import`.
+    Import,
 }
 
 #[derive(Debug, Default)]
@@ -120,6 +130,8 @@ pub struct ModelsState {
     /// Lines shown above a list: a record, a version, a dry run.
     pub detail: Vec<String>,
     pub from_search: Option<String>,
+    /// A template being imported, with how.
+    pub import: Option<(Template, ImportOpts)>,
 }
 
 impl ModelsState {
@@ -336,6 +348,26 @@ fn save_draft(app: &mut App, d: Design) {
     }
 }
 
+/// Show what importing a template does and ask before doing it.
+fn plan_import(app: &mut App, t: Template, opts: ImportOpts) -> crate::Result<()> {
+    let p = app.store.plan_template(&t, &opts)?;
+    let mut lines =
+        vec![format!("template {} {} model {} (v{} → v{}):", t.name, if p.merge { "into" } else { "as" }, p.model, p.plan.from, p.plan.to)];
+    lines.extend(dz::plan_lines(&app.store, &p.plan).into_iter().map(|l| format!("  {l}")));
+    if !p.kept.is_empty() {
+        lines.push(format!("  kept as they are (another type here): {}", p.kept.join(", ")));
+    }
+    lines.push(format!("  {} sample records, {} rules (switched off)", p.records, p.rules));
+    if !p.plan.blocked.is_empty() {
+        return Err(crate::Error::invalid("template", p.plan.blocked.join("; ")));
+    }
+    app.models.detail = lines;
+    app.models.import = Some((t, opts));
+    app.models.confirm = Some(Confirm::Import);
+    ok(app, format!("import into {} as shown? y confirms, any other key cancels", p.model));
+    Ok(())
+}
+
 fn ask(app: &mut App, k: MAsk, v: impl Into<String>) {
     let title = k.title();
     app.models.ask = Some(Ask::new(k, title, v));
@@ -362,6 +394,42 @@ fn answer_step(app: &mut App, k: MAsk, v: String) -> crate::Result<()> {
     let m = app.models.model.clone();
     {
         match &k {
+            MAsk::ExportPath => {
+                let Some(m) = app.models.model.clone().or_else(|| app.models.list.get(app.models.sel).cloned()) else { return Ok(()) };
+                let t = app.store.export_template(&m.id, false)?;
+                std::fs::write(v.trim(), t.to_json()?)?;
+                record(
+                    app,
+                    "model.export",
+                    format!("export model {} as a template", t.name),
+                    serde_json::json!({ "model": t.name, "out": v.trim() }),
+                );
+                ok(app, format!("wrote template {} ({} fields, {} rules) to {}", t.name, t.design.fields.len(), t.rules.len(), v.trim()));
+            }
+            MAsk::ImportPath => {
+                let f = v.trim();
+                let t = match f.strip_prefix("builtin:") {
+                    Some(n) => tpl::builtin_template(n).ok_or_else(|| crate::Error::invalid("template", format!("no built-in template `{n}`")))?,
+                    None => Template::parse(&std::fs::read(f).map_err(|e| crate::Error::invalid("template", format!("{f}: {e}")))?)?,
+                };
+                let opts = ImportOpts::default();
+                if let Some(m) = app.store.template_clash(&t, &opts)? {
+                    let free = tpl::free_model_name(&app.store, &m.name)?;
+                    app.models.import = Some((t, opts));
+                    ask(app, MAsk::ImportName, free);
+                } else {
+                    plan_import(app, t, opts)?;
+                }
+            }
+            MAsk::ImportName => {
+                let Some((t, mut opts)) = app.models.import.take() else { return Ok(()) };
+                if v.trim().eq_ignore_ascii_case("merge") {
+                    opts.merge = true;
+                } else {
+                    opts.name = Some(v.trim().to_string());
+                }
+                plan_import(app, t, opts)?;
+            }
             MAsk::NewModel => {
                 if v.trim().is_empty() {
                     return Err(crate::Error::invalid("model name", "must not be empty"));
@@ -728,11 +796,33 @@ fn try_rule(app: &mut App, dry: bool) {
 
 fn confirm(app: &mut App, c: Confirm, yes: bool) {
     if !yes {
+        if c == Confirm::Import {
+            app.models.import = None;
+            app.models.detail.clear();
+        }
         return ok(app, "cancelled");
     }
     let s = &app.store;
     let Some(m) = app.models.model.clone().or_else(|| app.models.list.get(app.models.sel).cloned()) else { return };
     match c {
+        Confirm::Import => {
+            let Some((t, opts)) = app.models.import.take() else { return };
+            app.models.detail.clear();
+            match s.import_template(&t, &opts, true) {
+                Ok(done) => {
+                    record(
+                        app,
+                        "model.import",
+                        format!("import template {}: {}", t.name, done.summary()),
+                        serde_json::json!({ "template": t.name, "model": done.model.id }),
+                    );
+                    reload(app);
+                    app.models.sel = app.models.list.iter().position(|x| x.id == done.model.id).unwrap_or(app.models.sel);
+                    ok(app, done.summary());
+                }
+                Err(e) => err(app, e),
+            }
+        }
         Confirm::Apply => apply(app, true),
         Confirm::Rollback(v) => rollback(app, v, true),
         Confirm::RemoveModel => match s.remove_model(&m.id, true) {
@@ -874,6 +964,12 @@ fn list_key(app: &mut App, k: KeyEvent) {
         KeyCode::Up | KeyCode::Char('k') => st.sel = st.sel.saturating_sub(1),
         KeyCode::Enter => enter(app, Screen::Design),
         KeyCode::Char('n') | KeyCode::Char('a') => ask(app, MAsk::NewModel, ""),
+        KeyCode::Char('x') => {
+            let Some(m) = st.list.get(st.sel).cloned() else { return };
+            let dir = std::env::current_dir().unwrap_or_default();
+            ask(app, MAsk::ExportPath, dir.join(format!("{}.template.json", m.name)).display().to_string());
+        }
+        KeyCode::Char('i') => ask(app, MAsk::ImportPath, ""),
         KeyCode::Char('d') | KeyCode::Delete => {
             let Some(m) = st.list.get(st.sel).cloned() else { return };
             let c = st.counts.get(st.sel).copied().unwrap_or(0);
@@ -1200,6 +1296,8 @@ fn draw_list(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
             ("h history", KeyCode::Char('h')),
             ("f rules", KeyCode::Char('f')),
             ("p project", KeyCode::Char('p')),
+            ("x export", KeyCode::Char('x')),
+            ("i import", KeyCode::Char('i')),
             ("d remove", KeyCode::Char('d')),
             ("Esc", KeyCode::Esc),
         ],

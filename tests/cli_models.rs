@@ -184,3 +184,38 @@ fn live_searches_and_reports_show_records() {
     let p = e.ok(&["report", "preview", "Book"]);
     assert!(p.contains("ETH/USDT") && !p.contains("BTC/USDT"), "{p}");
 }
+
+#[test]
+fn templates_export_import_and_merge() {
+    let e = Env::new();
+    e.ok(&["model", "create", "Signals", "--fields", "symbol:text!; price:real!; side:text choices=buy|sell"]);
+    e.ok(&["model", "record", "create", "signals", "symbol=BTC/USDT", "price=42000", "side=buy"]);
+    let file = e.home().join("signals.json");
+    let f = file.to_str().unwrap();
+    let out = e.ok(&["model", "export", "signals", "--out", f, "--records"]);
+    assert!(out.contains("1 sample record"), "{out}");
+    let t: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(t["format"], "muninn.model-template");
+    // a clash is refused without a choice
+    let o = e.run(&["model", "import", f]);
+    assert!(!o.status.success() && err(&o).contains("--merge"), "{}", err(&o));
+    let plan = e.ok(&["model", "import", f, "--name", "signals2", "--dry-run"]);
+    assert!(plan.contains("signals2") && plan.contains("price"), "{plan}");
+    assert!(!e.ok(&["model", "list"]).contains("signals2"), "a dry run changes nothing");
+    let out = e.ok(&["model", "import", f, "--name", "signals2"]);
+    assert!(out.contains("imported as model signals2") && out.contains("1 sample record"), "{out}");
+    let m = json(&e, &["model", "show", "signals2", "--json"]);
+    assert_eq!((m["model"]["version"].as_i64(), m["records"].as_i64()), (Some(1), Some(1)));
+    // built-in templates
+    assert!(e.ok(&["model", "templates"]).contains("builtin:bars"));
+    e.ok(&["model", "import", "builtin:bars", "--name", "candles"]);
+    let m = json(&e, &["model", "show", "candles", "--json"]);
+    assert_eq!(m["model"]["design"]["fields"].as_array().unwrap().len(), 12);
+    // merging adds the missing fields
+    e.ok(&["-y", "model", "edit", "signals2", "--drop", "side", "--apply"]);
+    let out = e.ok(&["model", "import", f, "--name", "signals2", "--merge"]);
+    assert!(out.contains("merged into model signals2"), "{out}");
+    let m = json(&e, &["model", "show", "signals2", "--json"]);
+    assert_eq!(m["model"]["version"], 3);
+    assert!(m["model"]["design"]["fields"].as_array().unwrap().iter().any(|x| x["name"] == "side"));
+}

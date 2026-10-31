@@ -851,7 +851,8 @@ fn free_name(taken: impl Fn(&str) -> bool, name: &str, from: &str) -> String {
 }
 
 /// Add a fetched item to this database: projects (archive or JSON), journals (JSON), live
-/// searches and code spaces (which must be approved before they run). Names that are
+/// searches, models (as drafts to approve with `model apply`) and code spaces (which must
+/// be approved before they run). Names that are
 /// taken get " (from PEER)". Returns what was made, in words.
 pub fn import_item(s: &mut Store, it: &Item, from: &str, origin: &str) -> Result<String> {
     Ok(import_item_as(s, it, from, origin)?.2)
@@ -896,10 +897,30 @@ pub fn import_item_as(s: &mut Store, it: &Item, from: &str, origin: &str) -> Res
             made_id = (made.id.clone(), made.name.clone());
             format!("code space {} (review and approve it before it runs)", made.name)
         }
+        (ShareKind::Model, "json") => {
+            let t = match crate::store::templates::Template::parse(&it.data) {
+                Ok(t) => t,
+                Err(_) => {
+                    let p: crate::store::archive::ModelPack =
+                        serde_json::from_slice(&it.data).map_err(|e| Error::invalid("model", format!("damaged ({e})")))?;
+                    crate::store::templates::from_pack(&p)?
+                }
+            };
+            let name = crate::store::templates::free_model_name(s, &t.name)?;
+            let done = s.import_template(&t, &crate::store::templates::ImportOpts { name: Some(name), draft: true, ..Default::default() }, false)?;
+            made_id = (done.model.id.clone(), done.model.name.clone());
+            format!(
+                "model {} as a draft (review it with `mnnn model plan {}` and approve it with `mnnn model apply {}`)",
+                done.model.name, done.model.name, done.model.name
+            )
+        }
         (k, f) => {
             return Err(Error::invalid(
                 "import",
-                format!("a {} as {f} cannot be imported (projects, journals, live searches and code spaces can); save it with --out", k.label()),
+                format!(
+                    "a {} as {f} cannot be imported (projects, journals, live searches, models and code spaces can); save it with --out",
+                    k.label()
+                ),
             ));
         }
     };

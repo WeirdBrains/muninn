@@ -826,3 +826,26 @@ fn linked_nodes_sync_everything_keep_conflicts_fetch_bars_and_stop_when_revoked(
     user::revoke_node(&a.store, &c.peer_id(), "cli").unwrap();
     assert!(sync::pull(&c.store, c.node(), &x, &[], "cli").is_err());
 }
+
+#[test]
+fn shared_models_arrive_as_drafts_to_approve() {
+    let a = Store::open_in_memory().unwrap();
+    let (m, _) = a.create_model("signals", "", Default::default(), false).unwrap();
+    let d = crate::store::Design { fields: crate::designer::parse_fields(&a, &m, "price:real!; note:text").unwrap(), ..Default::default() };
+    a.set_model_draft(&m.id, Some(d)).unwrap();
+    a.apply_model(&m.id, &Default::default()).unwrap();
+    let it = super::service::item_of(&a, ShareKind::Model, &m.id, "signals", None).unwrap();
+    let mut b = Store::open_in_memory().unwrap();
+    b.create_model("signals", "", Default::default(), true).unwrap();
+    let (id, name, made) = client::import_item_as(&mut b, &it, "ada", "test").unwrap();
+    assert_eq!(name, "signals_2");
+    assert!(made.contains("mnnn model apply signals_2"), "{made}");
+    let got = b.model(&id).unwrap().unwrap();
+    assert_eq!(got.version, 0, "nothing applied until it is approved");
+    assert_eq!(got.pending().fields.len(), 2);
+    // a template file shared as JSON imports the same way
+    let t = a.export_template("signals", false).unwrap();
+    let it = super::proto::Item { kind: ShareKind::Model, name: "signals".into(), format: "json".into(), data: t.to_json().unwrap().into_bytes() };
+    let (_, name, _) = client::import_item_as(&mut b, &it, "ada", "test").unwrap();
+    assert_eq!(name, "signals_3");
+}

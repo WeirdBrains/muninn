@@ -197,6 +197,7 @@ mod tests {
             "import",
             "rules",
             "models",
+            "model-templates",
             "code-spaces",
             "network",
             "key-exchanges",
