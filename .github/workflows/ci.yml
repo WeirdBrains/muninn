@@ -24,3 +24,26 @@ jobs:
       - run: cargo test --locked
       - name: Arch build-local.sh installs with or without namcap (stubbed)
         run: packaging/arch/test-build-local.sh
+
+  # The website (site/, Jaspr). Separate from the Rust build and the release: Dart is
+  # installed here, in the runner, only.
+  site:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - run: dart pub get
+      - run: dart pub global activate jaspr_cli 0.23.5
+      - run: dart format --output=none --set-exit-if-changed lib
+      - run: jaspr build
+      - run: dart analyze --fatal-infos
+      - run: tool/check.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site/build/jaspr

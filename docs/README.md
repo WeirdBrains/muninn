@@ -8,6 +8,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 
 - [Install](install.md): packages per platform, building from source, uninstalling
 - [Releasing](release.md): release script and the GitHub Actions release workflow
+- [Website](website.md): the single-page Jaspr site in `site/`, how it is built and checked
 - [Command line](cli.md): global flags, environment, exit codes, man pages
 - [Terminal UI](tui.md): header, menus, content area
 - [Menus](menus.md) and [keybindings](keybindings.md)

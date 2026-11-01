@@ -7,6 +7,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ## [Unreleased]
 
 ### Added
+- Website: a single-page Jaspr site in site/ in the Muninn theme (header art, Tokyo Night colours) linking releases, docs and install steps; built and checked in CI, not part of the Rust release (docs/website.md)
 - Org TLS: orgs get their own domains (mnnn org domain add|list|remove), served by name from the one site port; each org's certificate is yours (org cert set|clear, key kept in the encrypted store), else Let's Encrypt for its domains (org cert acme --org, HTTP-01 or TLS-ALPN-01), else self-signed; org cert status shows source and expiry; ACME certificates renew by themselves with backoff; TUI Organizations page w / c / L, listed on the Site page
 - Scheduled rule sets: --every 6h or --cron "0 3 * * *", shown, edited (TUI "on" field too), tested and dry-run like any rule; run by the TUI, a running org host or mnnn rule tick
 - Built-in cert-expiry-watch rule set (editable, removable): renews Let's Encrypt certificates about 30 days before expiry and notifies for your own at 30, 14 and 3 days and on expiry; notifications are notify actions and rule triggers

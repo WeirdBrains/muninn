@@ -1,0 +1,81 @@
+/* The Muninn theme (Tokyo Night, the app's default; assets/themes/tokyo-night.toml).
+   Roles as in the TUI: header = blue, accent = magenta, muted = comment. A cargo test
+   checks these colours against the theme file. */
+:root {
+  --bg: #1a1b26;
+  --bg-dark: #16161e;
+  --bg-highlight: #292e42;
+  --fg: #c0caf5;
+  --muted: #565f89;
+  --border: #3b4261;
+  --header: #7aa2f7;
+  --accent: #bb9af7;
+  --info: #7dcfff;
+  --success: #9ece6a;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #e1e2e7;
+    --bg-dark: #d0d5e3;
+    --bg-highlight: #c4c8da;
+    --fg: #3760bf;
+    --muted: #848cb5;
+    --border: #a8aecb;
+    --header: #2e7de9;
+    --accent: #9854f1;
+    --info: #007197;
+    --success: #587539;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+a { color: var(--info); }
+code, pre { font-family: "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", Menlo, monospace; }
+.page { max-width: 64rem; margin: 0 auto; padding: 3rem 1.5rem; }
+.hero { text-align: center; }
+.banner {
+  color: var(--header);
+  font-weight: bold;
+  line-height: 1.05;
+  font-size: clamp(0.45rem, 1.6vw, 1rem);
+  overflow-x: auto;
+  margin: 0 auto 1.5rem;
+}
+.tagline { font-size: 1.2rem; max-width: 40rem; margin: 0 auto 1.5rem; }
+.links { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+.button {
+  padding: 0.55rem 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  color: var(--fg);
+  text-decoration: none;
+  background: var(--bg-highlight);
+}
+.button:hover { border-color: var(--header); }
+.button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: bold; }
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem;
+  margin: 3rem 0;
+}
+.card { border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem 1.2rem; background: var(--bg-dark); }
+.card h3 { color: var(--accent); margin: 0 0 0.4rem; font-size: 1.05rem; }
+.card p { margin: 0; }
+h2 { color: var(--header); border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+h4 { margin: 1rem 0 0.3rem; color: var(--success); }
+pre:not(.banner) {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  padding: 0.7rem 1rem;
+  overflow-x: auto;
+}
+.muted { color: var(--muted); }
+.docs ul { columns: 2; padding-left: 1.2rem; }
+footer { margin-top: 3rem; color: var(--muted); text-align: center; border-top: 1px solid var(--border); padding-top: 1rem; }
