@@ -26,7 +26,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 16 | [Share and Clickable Hints](#share-and-clickable-hints): one Share action for everything; every hint is a button | v2.15.0 | ✅ Released |
 | 17 | [Model Design Templates](#model-design-templates): export, import and share model designs; bars become a built-in template | v2.16.0 | ✅ Done |
 | 18 | [Org TLS](#org-tls): org domains; your own cert, else Let's Encrypt, else self-signed; auto-renew | v2.16.0 | ✅ Done |
-| 19 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | 📋 Planned |
+| 19 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | ✅ Done |
 | 20 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | 📋 Planned |
 | 21 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
 | 22 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | 📋 Planned |

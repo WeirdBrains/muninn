@@ -14,7 +14,7 @@ the MUNINN header art, and links the releases, the docs and the install steps.
 
 ## Building
 
-It needs the Dart SDK (3.8 or later) and the Jaspr CLI; neither is needed for Muninn
+It needs the Dart SDK (3.8 or later; Flutter's bundled `dart` works) and the Jaspr CLI; `site/pubspec.lock` pins the packages; neither is needed for Muninn
 itself, and the Rust build and the release workflow never run them.
 
 ```sh
