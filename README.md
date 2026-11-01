@@ -6,6 +6,152 @@ Redis, SQLite and Postgres; export to CSV, Parquet or JSON; browse it in a TUI.
 Data lives in `~/.muninn` (override with `MUNINN_HOME` or `--home`), in a
 SQLCipher database protected by an envelope key scheme (see `docs/encryption.md`).
 
+## Screenshots
+
+<!-- screenshots: written by scripts/screenshots.sh -->
+![cat ticks.csv | mnnn pipeline run feed -: three views as three live columns](site/web/screenshots/pipeline-live.png)
+
+<details><summary>Every feature (pipeline-live above; 34 screens)</summary>
+
+**Home: every series in a list, the header with the node's status**
+
+![Home: every series in a list, the header with the node's status](site/web/screenshots/home.png)
+
+**A chart tile beside the list: ETH/USDT 5m candles in the Muninn theme**
+
+![A chart tile beside the list: ETH/USDT 5m candles in the Muninn theme](site/web/screenshots/home-chart.png)
+
+**The action history bar: every step, forks kept, step back and on**
+
+![The action history bar: every step, forks kept, step back and on](site/web/screenshots/history.png)
+
+**Live searches: saved questions that rerun on new data**
+
+![Live searches: saved questions that rerun on new data](site/web/screenshots/live-searches.png)
+
+**Share view, mid-action: saving the view as a live search**
+
+![Share view, mid-action: saving the view as a live search](site/web/screenshots/share-view-name.png)
+
+**Share: pick where it goes (a project, an org, a connection)**
+
+![Share: pick where it goes (a project, an org, a connection)](site/web/screenshots/share-view-picker.png)
+
+**Journals with their entries**
+
+![Journals with their entries](site/web/screenshots/journals.png)
+
+**A journal's entries in Markdown**
+
+![A journal's entries in Markdown](site/web/screenshots/journal-entries.png)
+
+**Sharing a journal entry: the picker open**
+
+![Sharing a journal entry: the picker open](site/web/screenshots/share-picker.png)
+
+**Reports: sections of text, series and journals, exported to PDF, Docx or HTML**
+
+![Reports: sections of text, series and journals, exported to PDF, Docx or HTML](site/web/screenshots/reports.png)
+
+**A report's sections**
+
+![A report's sections](site/web/screenshots/report-sections.png)
+
+**Rule sets: on actions or on a schedule (every 1h, cron), with the built-in cert watcher**
+
+![Rule sets: on actions or on a schedule (every 1h, cron), with the built-in cert watcher](site/web/screenshots/rules.png)
+
+**A scheduled rule: its schedule, next run and then-actions**
+
+![A scheduled rule: its schedule, next run and then-actions](site/web/screenshots/rule-scheduled.png)
+
+**New rule, mid-action: "on" takes action kinds or a schedule**
+
+![New rule, mid-action: "on" takes action kinds or a schedule](site/web/screenshots/rule-new.png)
+
+**Model designer: models, the built-in bars model among them**
+
+![Model designer: models, the built-in bars model among them](site/web/screenshots/models.png)
+
+**Designing a model: the migration plan before apply**
+
+![Designing a model: the migration plan before apply](site/web/screenshots/model-plan.png)
+
+**Records of the new model**
+
+![Records of the new model](site/web/screenshots/model-records.png)
+
+**Model templates, mid-action: importing a design (planned first, rename or merge)**
+
+![Model templates, mid-action: importing a design (planned first, rename or merge)](site/web/screenshots/model-template-import.png)
+
+**New code space, mid-action: choosing a language (math, Polars, Rust, Python)**
+
+![New code space, mid-action: choosing a language (math, Polars, Rust, Python)](site/web/screenshots/code-new.png)
+
+**Editing a code space**
+
+![Editing a code space](site/web/screenshots/code-editor.png)
+
+**Code spaces and their scope**
+
+![Code spaces and their scope](site/web/screenshots/code-list.png)
+
+**A code space's result as a live chart tile beside the series**
+
+![A code space's result as a live chart tile beside the series](site/web/screenshots/code-chart.png)
+
+**cat ticks.csv | mnnn pipeline run feed -: three views as three live columns**
+
+![cat ticks.csv | mnnn pipeline run feed -: three views as three live columns](site/web/screenshots/pipeline-live.png)
+
+**The pipeline monitor: each node's status, rows, rate and what landed**
+
+![The pipeline monitor: each node's status, rows, rate and what landed](site/web/screenshots/pipeline-monitor.png)
+
+**Pipes: data from stdin or any search through code spaces, followed live**
+
+![Pipes: data from stdin or any search through code spaces, followed live](site/web/screenshots/pipes.png)
+
+**The pipeline designer: a graph of sources, code, views and model tables**
+
+![The pipeline designer: a graph of sources, code, views and model tables](site/web/screenshots/pipeline-designer.png)
+
+**Pipeline designer, mid-action: adding a code node**
+
+![Pipeline designer, mid-action: adding a code node](site/web/screenshots/pipeline-designer-add.png)
+
+**Organizations: visibility, access, hosting, domains (w), certificate (c), ACME (L)**
+
+![Organizations: visibility, access, hosting, domains (w), certificate (c), ACME (L)](site/web/screenshots/orgs.png)
+
+**Org TLS, mid-action: adding a domain**
+
+![Org TLS, mid-action: adding a domain](site/web/screenshots/org-domain.png)
+
+**The org site: each org's domains and certificate (yours, Let's Encrypt or self-signed)**
+
+![The org site: each org's domains and certificate (yours, Let's Encrypt or self-signed)](site/web/screenshots/org-site.png)
+
+**Reviews: comments, suggestions, highlights and votes on shared work**
+
+![Reviews: comments, suggestions, highlights and votes on shared work](site/web/screenshots/reviews.png)
+
+**The network: this node, relays, connections and shares, end to end encrypted**
+
+![The network: this node, relays, connections and shares, end to end encrypted](site/web/screenshots/network.png)
+
+**Peers: nodes seen nearby and through relays**
+
+![Peers: nodes seen nearby and through relays](site/web/screenshots/peers.png)
+
+**Connections: people you trust, made through invites**
+
+![Connections: people you trust, made through invites](site/web/screenshots/connections.png)
+
+</details>
+<!-- /screenshots -->
+
 ## Install
 
 Packages for Arch, Debian/Ubuntu, Fedora, Homebrew and winget, plus uninstall steps:

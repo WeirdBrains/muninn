@@ -50,3 +50,70 @@ fn the_site_links_releases_docs_and_install_steps() {
         }
     }
 }
+
+/// Every `screenshots/NAME.png` mentioned in `text`.
+fn shot_refs(text: &str) -> Vec<String> {
+    text.match_indices("screenshots/")
+        .filter_map(|(i, _)| {
+            let rest = &text[i..];
+            rest.find(".png").map(|end| rest[..end + 4].to_string())
+        })
+        .filter(|s| !s.contains(char::is_whitespace) && !s.contains('\''))
+        .collect()
+}
+
+#[test]
+fn the_site_shows_a_hero_and_a_screenshot_per_feature() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let app = read("site/lib/app.dart");
+    for want in [
+        "import 'shots.dart'",
+        "'hero-shot'",
+        "heroShot.$1",
+        "id: 'screenshots'",
+        "href: '#screenshots'",
+        "Component.text('Screenshots')",
+        "MediaLoading.lazy",
+        "alt: caption",
+        "figcaption",
+    ] {
+        assert!(app.contains(want), "site/lib/app.dart lacks {want}");
+    }
+    let shots = read("site/lib/shots.dart");
+    let hero = shots.split("heroShot").nth(1).and_then(|h| shot_refs(h).into_iter().next()).expect("shots.dart has no heroShot");
+    let all = shot_refs(&shots);
+    assert!(all.len() >= 20, "only {} screenshots", all.len());
+    for f in all.iter().chain([&hero]) {
+        assert!(root.join("site/web").join(f).exists(), "site shows {f}, which is missing");
+    }
+    for feature in [
+        "home",
+        "live-searches",
+        "journals",
+        "reports",
+        "rule-scheduled",
+        "model-template-import",
+        "code-chart",
+        "pipeline-designer",
+        "pipeline-live",
+        "pipes",
+        "org-domain",
+        "reviews",
+        "peers",
+        "share-picker",
+    ] {
+        assert!(all.iter().any(|f| f == &format!("screenshots/{feature}.png")), "no {feature} screenshot");
+    }
+}
+
+#[test]
+fn the_readme_shows_existing_screenshots() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let readme = read("README.md");
+    let refs: Vec<_> =
+        readme.match_indices("site/web/").map(|(i, _)| &readme[i..]).filter_map(|r| r.find(".png").map(|e| r[..e + 4].to_string())).collect();
+    assert!(!refs.is_empty(), "README shows no screenshots");
+    for f in refs {
+        assert!(root.join(&f).exists(), "README shows {f}, which is missing");
+    }
+}

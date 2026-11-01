@@ -2,10 +2,13 @@ import 'package:jaspr/jaspr.dart';
 import 'package:jaspr/dom.dart';
 
 import 'banner.dart';
+import 'shots.dart';
 
 const repo = 'https://github.com/WeirdBrains/muninn';
 const releases = '$repo/releases';
 const docs = '$repo/tree/main/docs';
+const shotWidth = 1464;
+const shotHeight = 890;
 const installDoc = '$repo/blob/main/docs/install.md';
 
 /// The whole site: one page, no client-side code.
@@ -21,6 +24,15 @@ class App extends StatelessComponent {
           attributes: {'aria-label': 'Muninn'},
           [Component.text(banner.join('\n'))],
         ),
+        figure(classes: 'hero-shot', [
+          img(
+            src: heroShot.$1,
+            alt: heroShot.$2,
+            width: shotWidth,
+            height: shotHeight,
+          ),
+          figcaption([Component.text(heroShot.$2)]),
+        ]),
         p(classes: 'tagline', [
           Component.text(
             'A local, encrypted workbench for market data: ingest, search, journal, model and share, in a terminal UI and a CLI.',
@@ -31,6 +43,9 @@ class App extends StatelessComponent {
             Component.text('Releases'),
           ]),
           a(href: '#install', classes: 'button', [Component.text('Install')]),
+          a(href: '#screenshots', classes: 'button', [
+            Component.text('Screenshots'),
+          ]),
           a(href: docs, classes: 'button', [Component.text('Docs')]),
           a(href: repo, classes: 'button', [Component.text('Source')]),
         ]),
@@ -41,6 +56,29 @@ class App extends StatelessComponent {
             h3([Component.text(title)]),
             p([Component.text(body)]),
           ]),
+      ]),
+      section(id: 'screenshots', classes: 'screenshots', [
+        h2([Component.text('Screenshots')]),
+        p(classes: 'muted', [
+          Component.text(
+            'Every view in the TUI, rendered from the app itself by scripts/screenshots.sh.',
+          ),
+        ]),
+        div(classes: 'shots', [
+          for (final (file, caption) in shots)
+            figure([
+              a(href: file, [
+                img(
+                  src: file,
+                  alt: caption,
+                  width: shotWidth,
+                  height: shotHeight,
+                  loading: MediaLoading.lazy,
+                ),
+              ]),
+              figcaption([Component.text(caption)]),
+            ]),
+        ]),
       ]),
       section(id: 'install', classes: 'install', [
         h2([Component.text('Install')]),
