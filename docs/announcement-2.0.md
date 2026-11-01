@@ -6,7 +6,8 @@ Muninn (`mnnn`) is a local, encrypted workbench for market data. It ingests bars
 records from files and services, keeps them in a SQLCipher database on your machine, and
 gives you a terminal UI and a CLI to search, journal, model and share them. Muninn 2.0
 is the result of twenty phases of work, released as v2.0.0 through v2.16.0. Here is
-what it brings.
+what it brings. The core from 1.x (ingest, encryption, backups, export, charts, tiling and
+themes) is in the [Muninn 1.0 announcement](https://github.com/WeirdBrains/muninn/blob/main/docs/historical/1.0/ANNOUNCEMENT.md).
 
 ## Research, kept together
 
@@ -33,11 +34,13 @@ what it brings.
 - **Users, connections and linked-node sync**: one identity across your nodes, all your data on all of them, end to end encrypted.
 - **Dark shards**: your master key split among trusted peers, sealed so they cannot read it.
 - **Share and reviews**: send any item to a project, journal, code space or connection; review it with comments, suggestions, highlights and votes, on the reviewer's own node.
-- **Organizations**: roles, members and hosted HTTPS sites (HTML, JSON and gRPC), with your own domains and Let's Encrypt certificates that renew themselves.
+- **Organizations**: roles, members and hosted HTTPS sites (HTML, JSON and gRPC), with your own domains and Let's Encrypt certificates that renew themselves. Private orgs can gate their site: guests see only a landing, sign-in and join page.
 
 ![Peers: nodes seen nearby and through relays](../site/web/screenshots/peers.png)
 
 ![Reviews: comments, suggestions, highlights and votes](../site/web/screenshots/reviews.png)
+
+- **Clickable hints**: every key shown in a hint is also a button you can click.
 
 ## Install
 
