@@ -24,10 +24,10 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 14 | [Private Sites and Code Access](#private-sites-and-code-access): gated sites for private orgs, code-space role permissions | v2.13.0 | ✅ Released |
 | 15 | [Review Copies](#review-copies): what is reviewed lives on the reviewer's node in review mode | v2.14.0 | ✅ Released |
 | 16 | [Share and Clickable Hints](#share-and-clickable-hints): one Share action for everything; every hint is a button | v2.15.0 | ✅ Released |
-| 17 | [Model Design Templates](#model-design-templates): export, import and share model designs; bars become a built-in template | v2.16.0 | ✅ Done |
-| 18 | [Org TLS](#org-tls): org domains; your own cert, else Let's Encrypt, else self-signed; auto-renew | v2.16.0 | ✅ Done |
-| 19 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | ✅ Done |
-| 20 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | ✅ Done |
+| 17 | [Model Design Templates](#model-design-templates): export, import and share model designs; bars become a built-in template | v2.16.0 | ✅ Released |
+| 18 | [Org TLS](#org-tls): org domains; your own cert, else Let's Encrypt, else self-signed; auto-renew | v2.16.0 | ✅ Released |
+| 19 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | ✅ Released |
+| 20 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | ✅ Released |
 | 21 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
 | 22 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | 📋 Planned |
 | 23 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 📋 Planned |
