@@ -111,6 +111,8 @@ pub enum Hit {
 
 pub struct App {
     pub paths: Paths,
+    /// Shown in the header instead of the home path (screenshots use `~/.muninn`; display only).
+    pub home_shown: Option<String>,
     pub store: Store,
     pub dek: Key32,
     pub prefs: Preferences,
@@ -223,6 +225,7 @@ impl App {
             pick_project: Default::default(),
             view_base: crate::history::ViewState::capture(&prefs),
             paths,
+            home_shown: None,
             store,
             dek,
             prefs,
@@ -985,7 +988,10 @@ impl App {
     }
 
     pub fn status_items(&self) -> Vec<String> {
-        let mut v = vec![format!("● unlocked · {} ({})", self.prefs.theme.mode, self.variant.name()), self.paths.home.display().to_string()];
+        let mut v = vec![
+            format!("● unlocked · {} ({})", self.prefs.theme.mode, self.variant.name()),
+            self.home_shown.clone().unwrap_or_else(|| self.paths.home.display().to_string()),
+        ];
         if let Ok(Some(a)) = self.store.current_author() {
             v.push(format!("author: {}", a.name));
         }

@@ -196,3 +196,23 @@ fn two_windows_review_through_a_link() {
     }
     a.dispatch(Action::NetStop);
 }
+
+#[test]
+fn an_untitled_reviews_thread_names_its_subject_once() {
+    let (_t, mut a) = app();
+    a.store.create_journal("Field Notes", None, crate::store::EntryFormat::default()).unwrap();
+    a.on_key(key(KeyCode::Char('V')));
+    a.on_key(key(KeyCode::Char('n')));
+    typ(&mut a, "Field Notes\n");
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Char('c')));
+    typ(&mut a, "add the funding chart\n");
+    let r = a.store.find_review("Field Notes").unwrap();
+    let items = a.store.review_items(&r.id).unwrap();
+    assert_eq!(items.len(), 1, "the comment is stored once: {items:?}");
+    let s = screen_text(&mut a);
+    assert_eq!(s.matches("journal Field Notes").count(), 1, "subject repeated: {s}");
+    let body = s.lines().filter(|l| !l.contains("» History")).collect::<Vec<_>>().join("\n");
+    assert_eq!(body.matches("add the funding chart").count(), 1, "comment repeated in the window: {s}");
+    assert!(s.contains(&format!("added comment {}", items[0].short_id())), "{s}");
+}

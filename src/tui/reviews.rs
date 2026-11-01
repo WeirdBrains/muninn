@@ -340,7 +340,8 @@ fn add(app: &mut App, a: review::Ask) {
     }
     let Some(r) = app.reviews.current().cloned() else { return };
     let res = review::add(&app.store, ORIGIN, &r, &Who::Author, &a);
-    done(app, res, review::line);
+    // The thread shows the new item; the message only confirms it (not the same line twice).
+    done(app, res, |it| format!("added {} {}", it.kind.as_str(), it.short_id()));
     if app.reviews.tab == Tab::Thread {
         app.reviews.sel = app.reviews.items.len().saturating_sub(1);
     }
@@ -651,7 +652,9 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         Tab::Thread => match st.current() {
             Some(r) => {
                 let (a, c, j) = review::tally(&st.items);
-                v.head.push(Line::styled(format!(" {} ({} {}) · {}", r.title(), r.kind.label(), r.name, r.status.as_str()), fg));
+                // An untitled review's title is already "kind name": don't say it twice.
+                let what = if r.title.is_empty() { r.title() } else { format!("{} ({} {})", r.title, r.kind.label(), r.name) };
+                v.head.push(Line::styled(format!(" {what} · {}", r.status.as_str()), fg));
                 let who: Vec<String> = st.reviewers.iter().map(|v| format!("{} ({})", v.title(), v.status.as_str())).collect();
                 v.head.push(muted(&t, format!(" reviewers: {}", if who.is_empty() { "none yet (i makes a link)".into() } else { who.join(", ") })));
                 v.head.push(muted(&t, format!(" votes: {a} approve · {c} changes · {j} reject")));

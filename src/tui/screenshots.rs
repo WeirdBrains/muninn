@@ -126,6 +126,8 @@ fn feature_screenshots() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/screenshots");
     let _ = std::fs::remove_dir_all(&dir);
     let (_t, mut a) = app();
+    // display only: the home stays the scratch one
+    a.home_shown = Some("~/.muninn".into());
     seed(&mut a);
     use crate::store::{Design, EntryFormat, Field, FieldType, NewRule, NewSection, RuleSpec, Schedule, SearchSpec, SectionKind};
 
@@ -349,7 +351,53 @@ fn feature_screenshots() {
     shot(&mut a, "reviews", "Reviews: comments, suggestions, highlights and votes on shared work");
     close(&mut a);
 
-    // network
+    // network: this node and two sample nodes on localhost, connected
+    let local = |x: &mut App, label: &str, user: &str| {
+        let (me, _) = crate::net::user::load_or_create(&x.store).unwrap();
+        x.store.label_user(&me.id, user).unwrap();
+        x.prefs.net.listen = vec!["/ip4/127.0.0.1/tcp/0".into()];
+        x.prefs.net.mdns = false;
+        x.prefs.net.label = label.into();
+        x.dispatch(Action::NetStart);
+        assert!(x.network.node_running(), "{:?}", x.network.msg);
+    };
+    let settle = |x: &mut App| {
+        let t = std::time::Instant::now();
+        while x.network.job.is_some() {
+            assert!(t.elapsed() < std::time::Duration::from_secs(30), "network task did not finish");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            x.tick();
+        }
+    };
+    let (_tb, mut b) = app();
+    let (_tc, mut c) = app();
+    local(&mut a, "comet-lab", "Ada");
+    local(&mut b, "ben-laptop", "Ben");
+    local(&mut c, "cleo-desk", "Cleo");
+    for x in [&mut b, &mut c] {
+        let h = x.network.hosted.as_ref().expect("node running");
+        let to = format!("{}/p2p/{}", h.node.status().listening[0], h.node.peer_id());
+        a.dispatch(Action::NetExchanges);
+        a.on_key(key(KeyCode::Char('c')));
+        typ(&mut a, &format!("{to}\n"));
+        settle(&mut a);
+        close(&mut a);
+        x.dispatch(Action::NetExchanges);
+        x.on_key(key(KeyCode::Char('a')));
+        settle(x);
+    }
+    let t = std::time::Instant::now();
+    while a.store.connections().unwrap().len() < 2 || a.store.exchanges().unwrap().iter().filter(|x| x.status.active()).count() < 2 {
+        assert!(t.elapsed() < std::time::Duration::from_secs(30), "sample nodes did not connect");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        a.tick();
+        b.tick();
+        c.tick();
+    }
+    for _ in 0..5 {
+        a.tick();
+    }
+    a.set_status("connected: ben-laptop, cleo-desk");
     a.dispatch(Action::NetStatus);
     shot(&mut a, "network", "The network: this node, relays, connections and shares, end to end encrypted");
     close(&mut a);
@@ -359,5 +407,8 @@ fn feature_screenshots() {
     a.dispatch(Action::NetConnections);
     shot(&mut a, "connections", "Connections: people you trust, made through invites");
     close(&mut a);
+    for x in [&mut a, &mut b, &mut c] {
+        x.dispatch(Action::NetStop);
+    }
     let _ = EntryFormat::Markdown;
 }
