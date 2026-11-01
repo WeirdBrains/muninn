@@ -6,30 +6,24 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
-### Added
-- Screenshots of every feature, mid-action on sample data, on the website (hero under the header, a Screenshots section linked from the header) and in the README; scripts/screenshots.sh redoes them
-- Website: a single-page Jaspr site in site/ in the Muninn theme (header art, Tokyo Night colours) linking releases, docs and install steps; built and checked in CI, not part of the Rust release (docs/website.md)
-- Org TLS: orgs get their own domains (mnnn org domain add|list|remove), served by name from the one site port; each org's certificate is yours (org cert set|clear, key kept in the encrypted store), else Let's Encrypt for its domains (org cert acme --org, HTTP-01 or TLS-ALPN-01), else self-signed; org cert status shows source and expiry; ACME certificates renew by themselves with backoff; TUI Organizations page w / c / L, listed on the Site page
-- Scheduled rule sets: --every 6h or --cron "0 3 * * *", shown, edited (TUI "on" field too), tested and dry-run like any rule; run by the TUI, a running org host or mnnn rule tick
-- Built-in cert-expiry-watch rule set (editable, removable): renews Let's Encrypt certificates about 30 days before expiry and notifies for your own at 30, 14 and 3 days and on expiry; notifications are notify actions and rule triggers
-- Parser code spaces: sources pass data through raw (standard input as one `text` column) and code shapes it; built-in parse-csv, parse-json, parse-ndjson and to-bars ship as templates (mnnn code parsers [--install|--show], code create --from); mnnn pipe - --format csv|json|ndjson puts the parser in as a visible first step; --keep-header for chunked CSV
-- Pipe saves to projects, organizations and the network (project:NAME[/J], org:ORG[/J], net[:EXCHANGE|all][/J]), also from the TUI > picker
-- Pipelines over Share (projects, journals) and the network: net share/fetch carry the pipeline file; a peer's pipeline and the models it brings arrive as drafts (mnnn pipeline approve, A in the Designer), its code unapproved
-- Pipeline Designer (E, Projects ▸ Pipelines…): make and edit pipelines node by node, validated as you go; M ends a branch in a model table (made when new, fields from what passed there); run off the UI thread, open the monitor, export and import (plan first, rename or merge)
-- Data tiles: a code space's result as a chart (time x, numeric series) or table (t), with columns or series picked (c), updating on every run and on runs anywhere on the same home; running a pipeline opens its view nodes as tiles side by side (three views: three live columns); a pipeline monitor tile with each node's status, rows in/out, rate, last update, errors and rows landed
-- Piped code runs and pipeline runs in the TUI build and run on a worker thread: the UI stays live
-- Pipelines: saved, versioned DAGs of sources, code spaces, views and filters that end in model tables; fan-out computed once, fan-in with named inputs (host.input_named); validated (acyclic, every leaf a model); mnnn pipeline create|edit|show|list|run|remove, export/import with code by trust hash and embedded model templates (plan first, rename or merge, imported code unapproved)
-- Model design templates: export a model's design to a file and import it (plan first, rename or merge on clashes); built-in bars template; models from peers arrive as drafts to approve
-- Code space input picker (i or [Input]): pick a source, or a model then its where, matching, group, sort and limit with the line previewed
-- Pipes from standard input (CSV, JSON, NDJSON; --chunk streams) and a live Pipes window in the TUI that follows pipes run anywhere on the same home
-- Pipes: code spaces work on data piped in and keep none of it. Any live search (records, series, journals), journal, model query or code space output is a source; steps are code spaces and search filters; saves to journals and models branch off at any step while the data flows on (mnnn pipe, share to a code space, TUI >)
+## [2.16.0] - 2026-11-01
 
-- Math code spaces read named inputs in a pipeline's fan-in: `INPUT.field` (`spread = fast.close - slow.close`)
+### Added
+- Pipes: run data from any live search, journal, model query, code space or standard input through code spaces and filters, saving to journals, models, projects, orgs or the network on the way: `mnnn pipe`, or `>` in the TUI
+- Pipelines: saved, versioned graphs of sources, code, views and filters ending in model tables, with export and import: `mnnn pipeline create|run|export|import`
+- Pipeline Designer and live tiles: build pipelines node by node and watch each view as a live chart or table beside a monitor: `E` in the TUI (Projects ▸ Pipelines…)
+- Parser code spaces: built-in CSV, JSON and NDJSON parsers and to-bars: `mnnn code parsers`, `mnnn pipe - --format csv`
+- Model design templates: export, import and share model designs; bars are a built-in template: `mnnn model export|import`, `mnnn model templates`
+- Org TLS: org domains with your own certificate, else Let's Encrypt (auto-renewed), else self-signed: `mnnn org domain add`, `mnnn org cert status`
+- Scheduled rule sets and a built-in certificate expiry watch: `mnnn rule create … --every 6h` or `--cron "0 3 * * *"`
+- Website and screenshots: a single-page site in the Muninn theme with a screenshot of every feature (site/, docs/website.md)
 
 ### Changed
-- Standard input to a pipe or pipeline is no longer parsed by Muninn: add a parser step (or --format)
-- Series sources give their stored rows as generic structured data through the general record load, with no bar shaping or per-series grouping (a code space such as to-bars makes bars)
-- Bars are the records of the built-in bars model, kept in its own table; upgrading moves every bar and every value stored on bars losslessly (same ids)
+- Standard input is no longer parsed by Muninn: add a parser step or `--format`
+- Bars are records of the built-in bars model; upgrading moves them losslessly
+
+### Fixed
+- Reviews: an untitled review's thread no longer names its subject twice, and a new comment is not repeated below the thread
 
 ## [2.15.0] - 2026-10-31
 
@@ -445,7 +439,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.15.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.16.0...HEAD
+[2.16.0]: https://github.com/WeirdBrains/muninn/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/WeirdBrains/muninn/compare/v2.14.0...v2.15.0
 [2.14.0]: https://github.com/WeirdBrains/muninn/compare/v2.13.0...v2.14.0
 [2.13.0]: https://github.com/WeirdBrains/muninn/compare/v2.12.1...v2.13.0
