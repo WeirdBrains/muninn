@@ -11,7 +11,7 @@
 use super::view::ResultView;
 use super::{CodeEnv, host};
 use crate::error::{Error, Result};
-use crate::store::{BarFilter, CodeInput, CodeSpace, NewAction, RunInfo, SearchSpec, SearchTarget, Store};
+use crate::store::{CodeInput, CodeSpace, NewAction, RunInfo, SearchSpec, SearchTarget, Store};
 use serde_json::{Map, Value, json};
 
 /// Where a pipe's data comes from.
@@ -149,8 +149,8 @@ fn entries_frame(name: &str, es: Vec<(String, crate::store::Entry)>) -> Value {
 }
 
 /// A live search's matches as a frame: records as their model's fields (several models:
-/// a `model` column and every field), series as their bars (one group per series, in the
-/// time range the search scopes), journal entries as journal, title, body, words and times.
+/// a `model` column and every field), series as the rows stored for them (their model's
+/// fields, loaded like any records, in the time range the search scopes), journal entries as journal, title, body, words and times.
 pub fn search_frame(store: &Store, spec: &SearchSpec, name: &str) -> Result<Value> {
     match spec.target {
         SearchTarget::Records => {
@@ -180,46 +180,41 @@ pub fn search_frame(store: &Store, spec: &SearchSpec, name: &str) -> Result<Valu
         }
         SearchTarget::Journals => Ok(entries_frame(name, crate::live::entry_matches(store, spec)?.into_iter().map(|(j, e)| (j.name, e)).collect())),
         SearchTarget::Series => {
+            // the matching series' rows, loaded like any records (the general load path):
+            // whatever fields their model has, in one frame, nothing shaped or grouped
             let scope = spec.filters.scope();
-            let mut bars = vec![];
-            let mut groups = vec![];
+            let mut out: Option<Value> = None;
             for s in crate::live::series_matches(store, spec)? {
-                let f = BarFilter {
-                    source: Some(s.source.clone()),
-                    symbol: Some(s.symbol.clone()),
-                    duration: Some(s.duration),
-                    from: scope.map(|x| x.0),
-                    to: scope.map(|x| x.1),
-                    ..Default::default()
-                };
-                let got = store.query_bars(&f)?;
-                if got.is_empty() {
-                    continue;
+                let mut w = vec![format!("source = {}", s.source), format!("symbol = {}", s.symbol.display()), format!("period = {}", s.duration)];
+                if let Some((from, to)) = scope {
+                    w.push(format!("timestamp >= {from}"));
+                    w.push(format!("timestamp <= {to}"));
                 }
-                groups.push(json!({ "key": [s.source, s.symbol.display(), s.duration.to_string()], "start": bars.len(), "len": got.len() }));
-                bars.extend(got);
+                let f = host::load(store, &json!({ "model": "bars", "where": w, "sort": ["timestamp"], "limit": u32::MAX }))?;
+                out = Some(match out {
+                    None => f,
+                    Some(mut acc) => {
+                        if let (Some(ids), Some(more)) = (acc["ids"].as_array_mut(), f["ids"].as_array()) {
+                            ids.extend(more.iter().cloned());
+                        }
+                        if let Some(cols) = f["columns"].as_object() {
+                            for (k, v) in cols {
+                                if let (Some(dst), Some(src)) = (acc["columns"][k].as_array_mut(), v.as_array()) {
+                                    dst.extend(src.iter().cloned());
+                                }
+                            }
+                        }
+                        acc
+                    }
+                });
             }
-            let c = |f: &dyn Fn(&crate::model::StoredBar) -> Value| bars.iter().map(f).collect::<Vec<_>>();
-            let ids = bars.iter().map(|b| crate::model::BarId::compute(b.bar.ts, &b.source, &b.symbol, b.duration).hex()).collect();
-            Ok(col_frame(
-                name,
-                vec![
-                    ("source", "text", c(&|b| json!(b.source))),
-                    ("symbol", "text", c(&|b| json!(b.symbol.display()))),
-                    ("base", "text", c(&|b| json!(b.symbol.base))),
-                    ("quote", "text", c(&|b| json!(b.symbol.quote))),
-                    ("period", "text", c(&|b| json!(b.duration.to_string()))),
-                    ("timestamp", "timestamp", c(&|b| json!(b.bar.ts))),
-                    ("open", "real", c(&|b| json!(b.bar.open))),
-                    ("high", "real", c(&|b| json!(b.bar.high))),
-                    ("low", "real", c(&|b| json!(b.bar.low))),
-                    ("close", "real", c(&|b| json!(b.bar.close))),
-                    ("volume", "real", c(&|b| json!(b.bar.volume))),
-                    ("flags", "integer", c(&|b| json!(b.bar.flags))),
-                ],
-                ids,
-                groups,
-            ))
+            let mut f = match out {
+                Some(f) => f,
+                None => host::load(store, &json!({ "model": "bars", "limit": 0 }))?,
+            };
+            f["groups"] = json!([]);
+            f["source"] = json!(name);
+            Ok(f)
         }
     }
 }
@@ -748,7 +743,7 @@ mod tests {
     use crate::model::{Bar, Duration, Symbol};
 
     #[test]
-    fn series_searches_pipe_their_bars_and_views_become_frames() {
+    fn series_searches_pipe_their_rows_and_views_become_frames() {
         let mut s = Store::open_in_memory().unwrap();
         let src = s.add_source("binance", "file", None).unwrap();
         let bars: Vec<Bar> =
@@ -757,7 +752,7 @@ mod tests {
         s.upsert_bars(&src, &Symbol::new("ETH", "USDT"), Duration(300), &bars[..2]).unwrap();
         let f = search_frame(&s, &SearchSpec::default(), "search:all").unwrap();
         assert_eq!(f["ids"].as_array().unwrap().len(), 6);
-        assert_eq!(f["groups"].as_array().unwrap().len(), 2, "one group per series");
+        assert!(f["groups"].as_array().unwrap().is_empty(), "no grouping imposed");
         assert_eq!(f["columns"]["close"][3], json!(3.0));
         assert!(f["fields"].as_array().unwrap().iter().any(|x| x["name"] == "timestamp" && x["type"] == "timestamp"));
         let btc = search_frame(&s, &SearchSpec { query: "btc".into(), ..Default::default() }, "b").unwrap();

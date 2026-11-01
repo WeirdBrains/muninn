@@ -21,7 +21,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Changed
 - Standard input to a pipe or pipeline is no longer parsed by Muninn: add a parser step (or --format)
-- Series sources give their rows as the bars model stores them, not a separate bar shape
+- Series sources give their stored rows as generic structured data through the general record load, with no bar shaping or per-series grouping (a code space such as to-bars makes bars)
 - Bars are the records of the built-in bars model, kept in its own table; upgrading moves every bar and every value stored on bars losslessly (same ids)
 
 ## [2.15.0] - 2026-10-31

@@ -19,7 +19,7 @@ mnnn pipe journal:Notes search:alphas --to model:picks
 |---|---|
 | `none` | no data |
 | a model query (`bars where … group … sort … limit N`, or `model:…`) | the model's fields, as `mnnn code edit --model` |
-| `search:NAME`, any live search, run when the pipe runs | records: the model's fields (several models: a `model` column and every field); series: their rows as the bars model stores them (its own fields, one group per series, in the search's time range); journal entries: `journal title body words _created_at _updated_at` |
+| `search:NAME`, any live search, run when the pipe runs | records: the model's fields (several models: a `model` column and every field); series: the rows stored for each matching series as structured data, whatever fields their model has, loaded like any records (in the search's time range, no grouping imposed; shape them into bars with a code space such as `to-bars` if you want bars); journal entries: `journal title body words _created_at _updated_at` |
 | `journal:NAME` | that journal's entries, as above |
 | `code:SPACE` | that space's output, run on its own default input |
 | `-` (CLI) | standard input, **raw**: one `text` column holding the bytes as text, nothing parsed (see [Parsers](#parsers)) |
