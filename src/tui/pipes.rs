@@ -22,6 +22,10 @@ pub struct Hop {
     pub ms: u64,
     pub columns: Vec<String>,
     pub error: Option<String>,
+    /// A pipeline node's state: ok, error, skipped or waiting approval.
+    pub state: String,
+    pub rows_in: u64,
+    pub updated: i64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -33,6 +37,8 @@ pub struct LivePipe {
     pub status: String,
     pub saved: Vec<String>,
     pub updated: i64,
+    /// The pipeline it runs (none: a one-off pipe).
+    pub pipeline: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -75,6 +81,7 @@ pub fn poll(app: &mut App) {
             |k: &str| a.params[k].as_array().map(|v| v.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>()).unwrap_or_default();
         match a.kind.as_str() {
             "pipe.start" => {
+                p.pipeline = a.params["pipeline"].as_str().map(str::to_string);
                 p.hops = strs("plan").into_iter().map(|n| Hop { name: n, status: "waiting".into(), ..Default::default() }).collect();
             }
             "pipe.hop" => {
@@ -91,13 +98,18 @@ pub fn poll(app: &mut App) {
                 h.ms = a.params["ms"].as_u64().unwrap_or(0);
                 h.columns = strs("columns");
                 h.error = a.params["error"].as_str().map(str::to_string);
+                h.state = a.params["state"].as_str().unwrap_or_default().to_string();
+                h.rows_in = a.params["rows_in"].as_u64().unwrap_or(0);
+                h.updated = a.created_at;
                 if h.status == "error" {
                     p.status = "error".into();
                     done.push(format!("pipe failed at {}: {}", h.name, h.error.clone().unwrap_or_default()));
                 }
             }
             _ => {
-                p.status = "done".into();
+                if p.status != "error" {
+                    p.status = "done".into();
+                }
                 p.saved = strs("saved");
                 for h in p.hops.iter_mut().filter(|h| h.status == "waiting") {
                     h.status = "ok".into();

@@ -120,11 +120,14 @@ pub struct Tile {
     pub list: ListOpts,
     #[serde(default)]
     pub chart: super::chart::ChartOpts,
+    /// A data tile (a code result, a pipeline view or monitor) instead of a series.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame: Option<Box<super::frametile::FrameTile>>,
 }
 
 impl Tile {
     pub fn new(id: u32, view: View, series: Option<SeriesKey>) -> Self {
-        Tile { id, view, series, link: None, list: ListOpts::default(), chart: Default::default() }
+        Tile { id, view, series, link: None, list: ListOpts::default(), chart: Default::default(), frame: None }
     }
 }
 
@@ -418,7 +421,7 @@ impl TileLayout {
         let node = self.root.at_mut(&path);
         let old = std::mem::replace(node, Node::Tile(Tile::new(0, View::List, None)));
         let mut new = match &old {
-            Node::Tile(t) => Tile { id, link: None, ..t.clone() },
+            Node::Tile(t) => Tile { id, link: None, frame: None, ..t.clone() },
             _ => unreachable!(),
         };
         if let Some(v) = view {

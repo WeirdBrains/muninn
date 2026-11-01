@@ -393,6 +393,39 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, src: &Source, steps: &[St
 
 type HopFn<'a> = dyn Fn(usize, &str, &Option<Value>, Option<&str>, std::time::Instant) + 'a;
 
+/// Rows a `pipe.frame` record keeps (the last ones): enough for a live tile.
+pub const FRAME_ROWS: usize = 500;
+
+/// The last rows of a frame (and its groups dropped): what a tile shows live.
+pub fn tail(f: &Value, keep: usize) -> Value {
+    let n = f.get("ids").and_then(Value::as_array).map(Vec::len).unwrap_or_else(|| {
+        f.get("columns").and_then(Value::as_object).and_then(|c| c.values().next()).and_then(Value::as_array).map(Vec::len).unwrap_or(0)
+    });
+    if n <= keep {
+        return f.clone();
+    }
+    let from = n - keep;
+    let mut out = f.clone();
+    if let Some(ids) = f.get("ids").and_then(Value::as_array) {
+        out["ids"] = Value::Array(ids[from..].to_vec());
+    }
+    if let Some(cols) = f.get("columns").and_then(Value::as_object) {
+        out["columns"] = Value::Object(
+            cols.iter().map(|(k, v)| (k.clone(), Value::Array(v.as_array().map(|a| a[from.min(a.len())..].to_vec()).unwrap_or_default()))).collect(),
+        );
+    }
+    out["groups"] = json!([]);
+    out
+}
+
+/// Record a step's output (`pipe.frame`, the last [`FRAME_ROWS`] rows) so tiles showing
+/// it (`code:NAME`, `view:PIPELINE/NODE`) update in any TUI on the same home.
+pub fn note_frame(store: &Store, origin: &str, key: &str, f: &Value) {
+    store.note_action(
+        &crate::store::NewAction::new("pipe.frame", origin, format!("{key} output")).params(json!({ "key": key, "frame": tail(f, FRAME_ROWS) })),
+    );
+}
+
 #[allow(clippy::too_many_arguments)]
 fn run_hops(
     store: &Store,
@@ -437,6 +470,9 @@ fn run_hops(
                 let from = out.hops[out.hops.len() - 2].clone();
                 let info = super::run_on(store, env, origin, &c, cur.take(), &from, log)?;
                 cur = Some(output(&c, &info)?);
+                if let Some(f) = &cur {
+                    note_frame(store, origin, &format!("code:{}", c.name), f);
+                }
                 out.runs.push((c.clone(), info.clone()));
                 last = Some((c, info));
             }

@@ -269,6 +269,18 @@ fn sharing_data_to_a_code_space_runs_it_over_the_data_without_rebinding_it() {
     assert!(!super::share::choices(&a, crate::store::ShareKind::Code, &a.code.space.as_ref().unwrap().id).contains(&"code · calc".to_string()));
 }
 
+/// Let a build on the thread finish (piped runs build there, then run).
+fn wait_build(a: &mut App) {
+    for _ in 0..1200 {
+        a.tick();
+        if a.code.building.is_none() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    panic!("the build did not finish");
+}
+
 /// search | code | code, saving on the way (tee) and at the end.
 #[test]
 fn a_search_pipes_through_two_code_spaces_into_journals() {
@@ -291,6 +303,7 @@ fn a_search_pipes_through_two_code_spaces_into_journals() {
     // a journal search into the first space
     a.share_item = Some((crate::store::ShareKind::LiveSearch, "alphas".into()));
     super::share::picked(&mut a, "code · double");
+    wait_build(&mut a);
     let r = a.code.result.clone().unwrap_or_else(|| panic!("{:?} {:?}", a.code.msg, a.code.log));
     assert_eq!(r.status, "ok", "{r:?} {:?}", a.code.log);
     // > : save it to Out (a tee) and keep going
@@ -303,6 +316,7 @@ fn a_search_pipes_through_two_code_spaces_into_journals() {
     // > : on into the second space, then save its result
     a.on_key(key(KeyCode::Char('>')));
     a.on_pick(super::modal::PickKind::Pipe, "code · plus");
+    wait_build(&mut a);
     assert_eq!(a.code.space.as_ref().unwrap().name, "plus");
     let r = a.code.result.clone().expect("plus ran");
     assert_eq!(r.status, "ok", "{r:?} {:?}", a.code.log);

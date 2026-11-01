@@ -53,6 +53,18 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | Home / End, `0` | first bars / latest (live) |
 | `,` / `.` | previous / next series |
 
+| key (data tile: a code result or pipeline view) | action |
+|-----|--------|
+| `t` | chart ↔ table |
+| `c` | columns (table) or series (chart) to show, comma separated |
+| ↑ ↓ j k | scroll the table |
+
+| key (pipeline monitor tile) | action |
+|-----|--------|
+| ↑ ↓ j k | select a node |
+| Enter | open the node: a view or code space as its tile, else its details |
+| `r` | run the pipeline (on a thread) |
+
 ## Sidebar
 
 | key | action |

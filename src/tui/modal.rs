@@ -19,6 +19,8 @@ pub enum PromptKind {
     ChartStart,
     ChartEnd,
     Mas,
+    /// A data tile's columns or series.
+    FrameColumns,
 }
 
 pub struct Prompt {
@@ -477,6 +479,9 @@ impl App {
 
     /// Prompts handled by later features (layouts, charts).
     pub fn on_prompt_ext(&mut self, kind: PromptKind, input: &str) {
+        if kind == PromptKind::FrameColumns {
+            return super::frametile::set_columns(self, input);
+        }
         if kind != PromptKind::LayoutSave {
             return self.chart_prompt(kind, input);
         }

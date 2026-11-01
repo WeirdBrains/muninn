@@ -353,7 +353,7 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, p: &Pipeline, stdin: Opti
     let token = crate::store::new_id();
     let plan: Vec<String> = order.iter().map(|id| format!("{id} ({})", g.node(id).map(|n| n.kind.text()).unwrap_or_default())).collect();
     store.note_action(
-        &NewAction::new("pipe.start", origin, format!("pipeline {}", p.name)).params(json!({ "token": token, "plan": plan, "pipeline": p.name })),
+        &NewAction::new("pipe.start", origin, format!("pipeline {}", p.name)).params(json!({ "token": token, "plan": plan, "pipeline": p.name, "views": g.nodes.iter().filter(|n| matches!(n.kind, NodeKind::View { .. })).map(|n| format!("view:{}/{}", p.name, n.id)).collect::<Vec<_>>() })),
     );
     let mut out = PipelineRun { pipeline: p.name.clone(), ..Default::default() };
     for (i, id) in order.iter().enumerate() {
@@ -382,6 +382,11 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, p: &Pipeline, stdin: Opti
                     }
                     if let NodeKind::Sink { model } = &n.kind {
                         out.landed.push((model.clone(), nr.rows_out));
+                    }
+                    match &n.kind {
+                        NodeKind::Code { space } => pipe::note_frame(store, origin, &format!("code:{space}"), &f),
+                        NodeKind::View { .. } => pipe::note_frame(store, origin, &format!("view:{}/{id}", p.name), &f),
+                        _ => {}
                     }
                     if nr.status == "ok" {
                         out.frames.insert(id.clone(), f);

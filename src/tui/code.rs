@@ -487,21 +487,7 @@ fn run(app: &mut App) {
         Ok(e) => e,
         Err(e) => return err(app, e),
     };
-    if let Some(src) = app.code.piped.clone() {
-        // piped data: one step of a pipe, built (if needed) and run here
-        let mut logs = vec![];
-        let res = code::pipe::run(&app.store, &env, "tui", &src, &[Step::Code(c.id.clone())], &[], &mut |l| logs.push(l.to_string()));
-        app.code.log = logs;
-        return match res {
-            Ok(p) => {
-                if let Some((_, info)) = p.runs.into_iter().next_back() {
-                    finished(app, &c, info);
-                }
-            }
-            Err(e) => err(app, e),
-        };
-    }
-    // compiled and not cached yet: build on the thread first
+    // compiled and not cached yet: build on the thread first (piped runs too)
     if c.lang != Lang::Plugin && !env.plugin_path(&code::build_key(c.lang, &c.source)).exists() {
         return start_build(app, true);
     }
@@ -514,6 +500,20 @@ fn run_now(app: &mut App) {
         Ok(e) => e,
         Err(e) => return err(app, e),
     };
+    if let Some(src) = app.code.piped.clone() {
+        // piped data: one step of a pipe, run here (built already)
+        let mut logs = vec![];
+        let res = code::pipe::run(&app.store, &env, "tui", &src, &[Step::Code(c.id.clone())], &[], &mut |l| logs.push(l.to_string()));
+        app.code.log = logs;
+        return match res {
+            Ok(p) => {
+                if let Some((_, info)) = p.runs.into_iter().next_back() {
+                    finished(app, &c, info);
+                }
+            }
+            Err(e) => err(app, e),
+        };
+    }
     let mut logs = vec![];
     let res = code::run(&app.store, &env, "tui", &c, &mut |l| logs.push(l.to_string()));
     app.code.log.extend(logs);
@@ -533,6 +533,9 @@ fn finished(app: &mut App, c: &CodeSpace, info: RunInfo) {
                     app,
                     format!("ran {} in {} ms{}", c.name, info.ms, if info.writes > 0 { format!(", {} writes", info.writes) } else { String::new() }),
                 ),
+            }
+            if let Ok(fr) = code::pipe::output(c, &info) {
+                app.frames.data.insert(format!("code:{}", c.name), fr);
             }
             app.code.result = Some(info);
             if let Ok(Some(n)) = app.store.code_space(&c.id) {
@@ -909,6 +912,15 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                 KeyCode::Char('r') => run(app),
                 KeyCode::Char('t') => app.code.wide = !app.code.wide,
                 KeyCode::Char('>') => pipe_on(app),
+                KeyCode::Char('T') => {
+                    if let Some(c) = app.code.space.clone() {
+                        let ft = super::frametile::FrameTile::new(format!("code:{}", c.name));
+                        if super::frametile::open(app, ft).is_some() {
+                            app.modal = None;
+                            app.set_status(format!("{}: its result in a tile (t table/chart, c columns); it updates on every run", c.name));
+                        }
+                    }
+                }
                 KeyCode::Char('x') if app.code.piped.is_some() => {
                     app.code.piped = None;
                     ok(app, "runs use its default input again");
@@ -1274,6 +1286,7 @@ fn draw_edit(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>)
             ("c check", KeyCode::Char('c')),
             ("i input", KeyCode::Char('i')),
             ("> pipe on", KeyCode::Char('>')),
+            ("T tile", KeyCode::Char('T')),
             ("t result", KeyCode::Char('t')),
             ("p project", KeyCode::Char('p')),
             ("Esc back", KeyCode::Esc),

@@ -93,6 +93,27 @@ Narrow tiles show the columns that fit, from the left.
 Candles with volume, period selectors, zoom/pan and toggleable layers: see
 [charts](charts.md).
 
+## Data tiles
+
+A tile can show data instead of a series:
+
+- **A code space's result** (`T` in the Code window): a chart of its numeric columns
+  over the time column (`timestamp`, `ts`, `time`, `date` or `_created_at`; else the row
+  number), `t` for the table, `c` to pick the columns or series. It updates on every run
+  here and on runs anywhere on the same home (`mnnn pipe …`, pipelines, stdin feeds).
+- **A pipeline view** (`view:PIPELINE/NODE`): opened when the pipeline runs, here or
+  from the command line (`cat ticks.csv | mnnn pipeline run feed -`). Views open side by
+  side and are equalized, so three views make three columns; the next run or chunk
+  updates them in place. A view node's `view:chart:px,vol` sets its mode and series.
+- **A pipeline monitor** (`monitor:PIPELINE`, from the Pipelines window): each node in
+  order with its status (idle, running, ok, error, skipped, waiting approval), rows in and
+  out, rows a second, last update and error, and the rows landed per model table. Enter
+  opens a node; `r` runs the pipeline on a worker thread.
+
+Runs record each code step's and view's output (`pipe.frame` in the history, the last
+500 rows) so other TUIs follow them without a daemon. Data tiles are saved with the
+layout; their data comes back with the next run.
+
 ## Linked tiles
 
 **View ▸ Link tile** (`Ctrl-w y`) links the focused tile to the next tile; press again

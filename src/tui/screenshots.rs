@@ -157,4 +157,44 @@ fn feature_screenshots() {
     a.on_key(key(KeyCode::Esc));
     a.code.screen = code::Screen::List;
     shot(&mut a, "10-code-list", "Code spaces list with scope");
+    a.modal = None;
+
+    // a pipeline fed from standard input, its three views as three live columns
+    use crate::store::{Design, Field, FieldType};
+    for m in ["Prices", "Volumes", "Ticks"] {
+        a.store
+            .create_model(
+                m,
+                "",
+                Design { fields: vec![Field::new("px", FieldType::Real), Field::new("vol", FieldType::Real)], ..Default::default() },
+                true,
+            )
+            .unwrap();
+    }
+    let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+    let g = crate::code::pipeline::Graph::parse(
+        &s(&["in=-", "price=view:chart:px", "volume=view:chart:vol", "tape=view:table", "p=model:Prices", "v=model:Volumes", "t=model:Ticks"]),
+        &s(&["in>price>p", "in>volume>v", "in>tape>t"]),
+    )
+    .unwrap();
+    let p = a.store.create_pipeline("feed", "", &g).unwrap();
+    a.layout = super::layout::TileLayout::single(None);
+    a.tick();
+    let mut csv = String::from("timestamp,px,vol\n");
+    for i in 0..120i64 {
+        let x = i as f64;
+        csv.push_str(&format!(
+            "{},{:.2},{:.1}\n",
+            1_704_067_200_000 + i * 300_000,
+            42_000.0 + 300.0 * (x / 9.0).sin() + 4.0 * x,
+            20.0 + 15.0 * (x / 5.0).cos().abs()
+        ));
+    }
+    let env = crate::code::CodeEnv::new(&a.paths.home);
+    crate::code::pipeline::run(&a.store, &env, "cli", &p, Some(crate::code::pipe::read_data(&csv, "stdin").unwrap()), &mut |_| {}).unwrap();
+    a.tick();
+    shot(&mut a, "11-pipeline-views", "cat ticks.csv | mnnn pipeline run feed -: its three views as live columns");
+    super::frametile::open(&mut a, super::frametile::FrameTile::new("monitor:feed"));
+    a.tick();
+    shot(&mut a, "12-pipeline-monitor", "The pipeline monitor: each node's status, rows, rate and what landed");
 }

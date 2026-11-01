@@ -8,8 +8,10 @@ pub mod chart;
 mod charting;
 mod code;
 pub mod data;
+pub mod designer;
 pub mod docexport;
 pub mod forms;
+pub mod frametile;
 pub mod header;
 pub mod history;
 pub mod import;
@@ -158,6 +160,8 @@ pub struct App {
     pub reviews: reviews::ReviewsState,
     pub code: code::CodeState,
     pub pipes: pipes::PipesState,
+    pub frames: frametile::FramesState,
+    pub designer: designer::DesignerState,
     pub models: models::ModelsState,
     pub projects: projects::ProjectsState,
     pub journals: journals::JournalsState,
@@ -208,6 +212,8 @@ impl App {
             reviews: Default::default(),
             code: Default::default(),
             pipes: Default::default(),
+            frames: Default::default(),
+            designer: Default::default(),
             models: Default::default(),
             projects: Default::default(),
             journals: Default::default(),
@@ -693,6 +699,9 @@ impl App {
         if self.sidebar.focused && sidebar_key(self, k) {
             return;
         }
+        if frametile::on_key(self, k) || self.layout.focused().frame.is_some() {
+            return;
+        }
         tiles::on_key(self, k);
     }
 
@@ -1074,6 +1083,10 @@ impl App {
             match p {
                 layout::Placed::Tile(id, r) => {
                     let Some(tile) = self.layout.tile(id).cloned() else { continue };
+                    if let Some(ft) = &tile.frame {
+                        frametile::draw(self, f, r, &tile, ft, id == self.layout.focus, &t, hits);
+                        continue;
+                    }
                     let bounds = self.bounds(tile.series.as_ref());
                     let d = tile.series.as_ref().and_then(|k| self.data.get(k, &self.store));
                     let pending = tile.series.as_ref().and_then(|k| self.data.pending(k));
@@ -1287,6 +1300,8 @@ impl App {
         rules::poll(self);
         code::poll(self);
         pipes::poll(self);
+        frametile::poll(self);
+        designer::poll(self);
         network::poll(self);
         orgs::poll(self);
         reviews::poll(self);
@@ -1295,6 +1310,8 @@ impl App {
 
 #[cfg(test)]
 mod code_tests;
+#[cfg(test)]
+mod frames_tests;
 #[cfg(test)]
 mod models_tests;
 #[cfg(test)]
