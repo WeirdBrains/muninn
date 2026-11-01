@@ -32,7 +32,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 22 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | 📋 Planned |
 | 23 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 📋 Planned |
 | 24 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | post-2.0 | 📋 Planned |
-| 25 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | v2.19.0 | 📋 Planned |
+| 25 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | post-2.0 | 📋 Planned |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
 
 **2.0 launch wrap-up:** snapshot to `docs/historical/2.0` with this plan, the announcement, and the full changelog; then clear `PLAN.md`.
@@ -423,7 +423,7 @@ Today templates are saved from files with the CLI only (`mnnn org template save/
 
 ## MCP
 
-> **Phase 23 · v2.19.0**
+> **Phase 25 · after the 2.0 launch**
 
 1. Muninn publishes an MCP server: `mnnn mcp serve` over stdio and HTTP (off until started), exposing journals, entries, projects, models and records, reports, live searches, org resources, views and executables as MCP resources and tools
 2. Every MCP call is checked like any other access: the caller is a named, revocable MCP client with a role (read only by default); writes and runs need permissions and are recorded in history
