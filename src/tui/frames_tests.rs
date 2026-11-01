@@ -193,3 +193,87 @@ fn the_pipeline_monitor_follows_runs_and_opens_nodes() {
     a.on_key(key(KeyCode::Char('r')));
     assert!(a.status.contains("approve code space raw"), "{}", a.status);
 }
+
+/// The Pipeline Designer: build a graph key by key, end it in a model it makes, run it off
+/// the UI thread (its view opens as a tile), then export, remove and import it.
+#[test]
+fn the_designer_builds_runs_exports_and_imports_pipelines() {
+    let (t, mut a) = app();
+    a.layout = TileLayout::single(None);
+    let j = a.store.create_journal("Notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    for (n, b) in [("one", "alpha beta"), ("two", "alpha beta gamma")] {
+        a.store.add_entry(&j.id, n, b, None).unwrap();
+    }
+    a.tick();
+    a.on_key(key(KeyCode::Char('E')));
+    assert!(matches!(a.modal, Some(super::modal::Modal::Pipelines)));
+    assert!(screen_text(&mut a).contains("no pipelines yet"));
+    a.on_key(key(KeyCode::Char('n')));
+    typ(&mut a, "words\n");
+    assert_eq!(a.designer.screen, super::designer::Screen::Edit);
+    for n in ["in=journal:Notes", "v=view:table"] {
+        a.on_key(key(KeyCode::Char('a')));
+        typ(&mut a, &format!("{n}\n"));
+    }
+    a.on_key(key(KeyCode::Char('e')));
+    assert_eq!(a.designer.ask.as_ref().unwrap().value, "in>", "starts from the selected node");
+    typ(&mut a, "v\n");
+    let s = screen_text(&mut a);
+    assert!(s.contains("every leaf is a model table"), "{s}");
+    // what passed through the view last (as after a preview run) gives the new model its fields
+    a.frames.data.insert("view:words/v".into(), read_data("title,words\none,2\n", "x").unwrap());
+    a.on_key(key(KeyCode::Char('j')));
+    a.on_key(key(KeyCode::Char('M')));
+    a.designer.ask.as_mut().unwrap().value = "WordRows".into();
+    a.on_key(key(KeyCode::Enter));
+    let m = a.store.find_model("WordRows").unwrap();
+    assert_eq!(m.design.fields.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(), vec!["title", "words"]);
+    assert!(screen_text(&mut a).contains("valid: every leaf ends in a model table"));
+    // a tee on the view
+    a.store.create_journal("Raw", None, crate::store::EntryFormat::Markdown).unwrap();
+    a.on_key(key(KeyCode::Char('t')));
+    typ(&mut a, "Raw\n");
+    assert!(a.store.find_pipeline("words").unwrap().graph.node("v").unwrap().tees == vec!["journal:Raw".to_string()]);
+    // run: on a thread; the view opens as a tile
+    a.on_key(key(KeyCode::Char('r')));
+    assert!(a.designer.job.is_some());
+    for _ in 0..200 {
+        a.tick();
+        if a.designer.job.is_none() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    a.tick();
+    assert!(a.status.contains("pipeline words ran"), "{}", a.status);
+    assert_eq!(a.store.count_records(&m).unwrap(), 2);
+    assert!(a.layout.tiles().iter().any(|t| t.frame.as_ref().is_some_and(|f| f.key == "view:words/v" && f.table)));
+    // export, remove, import
+    let file = t.path().join("words.json");
+    a.dispatch(super::action::Action::Pipelines);
+    a.on_key(key(KeyCode::Char('x')));
+    a.designer.ask.as_mut().unwrap().value = file.display().to_string();
+    a.on_key(key(KeyCode::Enter));
+    assert!(file.exists(), "{:?}", a.designer.msg);
+    a.on_key(key(KeyCode::Char('d')));
+    a.on_key(key(KeyCode::Char('y')));
+    assert!(a.store.pipelines().unwrap().is_empty());
+    a.on_key(key(KeyCode::Char('i')));
+    typ(&mut a, &format!("{}\n", file.display()));
+    let s = screen_text(&mut a);
+    assert!(s.contains("pipeline words: new") && s.contains("model WordRows: exists"), "{s}");
+    a.on_key(key(KeyCode::Char('y')));
+    assert_eq!(a.store.find_pipeline("words").unwrap().graph.nodes.len(), 3);
+    // again: the clash is named, and `as NAME` renames
+    a.on_key(key(KeyCode::Char('i')));
+    typ(&mut a, &format!("{}\n", file.display()));
+    assert!(a.designer.msg.as_ref().unwrap().0.contains("exists already"));
+    a.on_key(key(KeyCode::Char('i')));
+    typ(&mut a, &format!("{} as words2\n", file.display()));
+    a.on_key(key(KeyCode::Char('y')));
+    assert!(a.store.find_pipeline("words2").is_ok());
+    let kinds: Vec<String> = a.store.actions().unwrap().into_iter().map(|r| r.kind).collect();
+    for k in ["pipeline.create", "pipeline.edit", "pipeline.export", "pipeline.remove", "pipeline.import"] {
+        assert!(kinds.iter().any(|x| x == k), "{k}: {kinds:?}");
+    }
+}

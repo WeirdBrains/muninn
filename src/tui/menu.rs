@@ -164,6 +164,7 @@ pub fn menus() -> Vec<Menu> {
                 a("Rules…", 'u', "R", Rules),
                 a("Code spaces…", 'c', "C", Code),
                 a("Pipes (live)…", 'e', "", Pipes),
+                a("Pipelines…", 'i', "E", Pipelines),
                 sep(),
                 a("Add selected series to project…", 'a', "a", AddToProject),
             ],

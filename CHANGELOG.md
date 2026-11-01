@@ -7,6 +7,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ## [Unreleased]
 
 ### Added
+- Pipeline Designer (E, Projects ▸ Pipelines…): make and edit pipelines node by node, validated as you go; M ends a branch in a model table (made when new, fields from what passed there); run off the UI thread, open the monitor, export and import (plan first, rename or merge)
 - Data tiles: a code space's result as a chart (time x, numeric series) or table (t), with columns or series picked (c), updating on every run and on runs anywhere on the same home; running a pipeline opens its view nodes as tiles side by side (three views: three live columns); a pipeline monitor tile with each node's status, rows in/out, rate, last update, errors and rows landed
 - Piped code runs and pipeline runs in the TUI build and run on a worker thread: the UI stays live
 - Pipelines: saved, versioned DAGs of sources, code spaces, views and filters that end in model tables; fan-out computed once, fan-in with named inputs (host.input_named); validated (acyclic, every leaf a model); mnnn pipeline create|edit|show|list|run|remove, export/import with code by trust hash and embedded model templates (plan first, rename or merge, imported code unapproved)

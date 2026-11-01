@@ -320,6 +320,7 @@ impl App {
             KeyCode::Char('V') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reviews),
             KeyCode::Char('C') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Code),
             KeyCode::Char('D') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Models),
+            KeyCode::Char('E') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Pipelines),
             KeyCode::Char('Y') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::ToggleHistory),
             KeyCode::Char('u') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryBack),
             KeyCode::Char('U') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::HistoryForward),
@@ -443,6 +444,7 @@ impl App {
             }
             Code => code::open(self),
             Pipes => pipes::open(self),
+            Pipelines => designer::open(self),
             Models => models::open(self),
             AddToProject => match projects::selected_series(self) {
                 Some(r) => {

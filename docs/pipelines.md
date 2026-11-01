@@ -3,7 +3,7 @@
 Status: the pipe layer ([pipes](pipes.md)) and the Pipeline object ship: storage with
 versions, the DAG run (fan-out, fan-in with named inputs, every leaf a model table),
 validation, `mnnn pipeline create|edit|show|list|run|remove|export|import` and history
-records. Still design: the Designer window, the Monitor tile, views as tiles, and
+records, the Designer window, the Monitor tile and views as tiles. Still design:
 pipelines over Share and `net` (see *Order of work*).
 
 ```sh
@@ -103,19 +103,25 @@ drafts to approve, as models do.
 - **CLI** (thin): `mnnn pipeline create|edit|show|list|run|remove|export|import`; the
   graph is edited by node and edge (`--node ID=KIND:CONFIG`, `--edge A>B[:as]`).
   `mnnn pipe …` stays the one-off chain form.
-- **Designer** (TUI window, like the Model Designer): add, connect, reorder and remove
-  nodes; validate; preview the frame at any node; pick or create sink models; x/i export
-  and import.
+- **Designer** (`E`, Projects ▸ Pipelines…): the list (n new, Enter edit, r run,
+  m monitor, x export, i import, d remove) and a pipeline's nodes in run order with what
+  each feeds and what is still wrong. `a` adds a node (`ID=KIND`), `e` connects the
+  selected node (`A>B[:NAME]`), `t` adds a save there, `M` ends its branch in a model
+  table (a new model takes its fields from the columns last seen at that node), `D`
+  removes it, Enter opens its view or code result as a tile. Import shows the plan and
+  asks; type `PATH as NAME` to rename or `PATH merge` for a new version. Runs go to a
+  worker thread.
 - **Monitor** (TUI tile): the graph while it runs, each node with status, rows in/out,
-  throughput, last update and errors, and rows landed per sink; Enter jumps to a node's
-  view or shows its latest frame.
-- **Views**: running a pipeline opens its view nodes as tiles (three views: a 3-column
-  layout). "Pipe to…" on a view edits the pipeline behind it.
+  throughput, last update and errors, and rows landed per sink; Enter opens a node's
+  view or code tile; `r` runs. See [tiling](tiling.md#data-tiles).
+- **Views**: running a pipeline, here or on the command line with a TUI open, opens its
+  view nodes as tiles side by side (three views: three columns), updated in place by the
+  next run or chunk.
 
 ## Order of work
 
 1. Pipe layer: sources of every kind, code steps, filters, tees, cycles, history (done).
 2. Stdin source (CSV/JSON/NDJSON, chunked) and live hop records with the Pipes window (done).
 3. Pipeline object: storage, DAG run with fan-out/fan-in, validation, CLI, export/import (done).
-4. Designer window, monitor tile, code space tile with a result chart, views as tiles.
+4. Designer window, monitor tile, code space tile with a result chart, views as tiles (done).
 5. Pipelines over Share and `net share`/`net fetch` (peer pipelines as drafts); project, org and net sinks.

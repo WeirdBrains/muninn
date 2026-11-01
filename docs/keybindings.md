@@ -92,6 +92,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `P` | the [projects](projects.md) page |
 | `F` | the [live searches](live-searches.md) list |
 | `B` | save the sidebar's search as a live search |
+| `E` | the Pipeline Designer ([pipelines](pipelines.md)) |
 | `J` | the [journals](journals.md) list |
 | `O` | the [reports](reports.md) list |
 | `R` | the [rules](rules.md) window (`n` new, `e` edit, Space on/off, `t` test, `x` dry run) |

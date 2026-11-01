@@ -62,6 +62,7 @@ pub enum Action {
     Rules,
     Code,
     Pipes,
+    Pipelines,
     Models,
     AddToProject,
     // Network
@@ -178,6 +179,7 @@ impl Action {
             Rules => "rules".into(),
             Code => "code".into(),
             Pipes => "pipes".into(),
+            Pipelines => "pipelines".into(),
             Models => "models".into(),
             AddToProject => "project.add-series".into(),
             NetStatus => "net.status".into(),

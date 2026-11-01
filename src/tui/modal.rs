@@ -51,6 +51,8 @@ pub enum Modal {
     Code,
     /// Projects ▸ Pipes (live)…
     Pipes,
+    /// Projects ▸ Pipelines… (the Pipeline Designer)
+    Pipelines,
     /// Net ▸ …
     Network,
     /// Orgs ▸ …
@@ -126,6 +128,7 @@ impl Modal {
             Modal::Reviews => "reviews",
             Modal::Code => "code-spaces",
             Modal::Pipes => "pipes",
+            Modal::Pipelines => "pipelines",
             Modal::Models => "models",
             Modal::DocExport => "export-formats",
             Modal::Prefs { .. } => "preferences",
@@ -161,6 +164,7 @@ impl Modal {
             Modal::Orgs => app.orgs.typing(),
             Modal::Reviews => app.reviews.typing(),
             Modal::Code => app.code.typing(),
+            Modal::Pipelines => app.designer.ask.is_some(),
             Modal::Models => app.models.typing(),
             Modal::DocExport => app.doc_export.typing(),
             Modal::PickProject => app.pick_project.typing(),
@@ -362,6 +366,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Reviews => super::reviews::on_key(app, k),
         Modal::Code => super::code::on_key(app, k),
         Modal::Pipes => super::pipes::on_key(app, k),
+        Modal::Pipelines => super::designer::on_key(app, k),
         Modal::Models => super::models::on_key(app, k),
         Modal::DocExport => super::docexport::on_key(app, k),
         Modal::PickProject => super::workspace::on_key(app, k),
@@ -692,6 +697,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Reviews => super::reviews::draw(app, f, r, &mut extra),
         Modal::Code => super::code::draw(app, f, r, &mut extra),
         Modal::Pipes => super::pipes::draw(app, f, r, &mut extra),
+        Modal::Pipelines => super::designer::draw(app, f, r, &mut extra),
         Modal::Models => super::models::draw(app, f, r, &mut extra),
         Modal::DocExport => super::docexport::draw(app, f, r, &mut extra),
         Modal::PickProject => super::workspace::draw(app, f, r, &mut extra),
