@@ -215,3 +215,23 @@ fn saves_go_to_projects_orgs_and_the_network() {
     assert_eq!(s.resources(&org.id).unwrap().len(), 1);
     assert_eq!(s.shares().unwrap().len(), 1);
 }
+
+/// A math space reads a named input by `INPUT.field`, row by row beside the first.
+#[test]
+fn math_reads_named_inputs() {
+    if crate::code::cargo().is_err() {
+        eprintln!("skipped: no cargo");
+        return;
+    }
+    let (s, dir) = (store(), tempfile::tempdir().unwrap());
+    fixture(&s);
+    let c = s.create_code_space("plus", "", Lang::Math, "@view table\nw2 = words + more.words", Default::default()).unwrap();
+    crate::code::approve(&s, "test", &c).unwrap();
+    let x = g(&["n=journal:Notes", "m=journal:More", "p=code:plus", "out=model:Doubled"], &["n>p:notes", "m>p:more", "p>out"]).unwrap();
+    let p = s.create_pipeline("sum", "", &x).unwrap();
+    let r = run(&s, &CodeEnv::new(dir.path()), "test", &p, None, &mut |_| {}).unwrap();
+    assert!(r.ok(), "{:?}", r.nodes);
+    // notes have 2 and 4 words, more has one entry of 3 (newest first or not, 3 is added to the first row)
+    let got = col(&s, "Doubled", "w2");
+    assert!(got == vec![5.0] || got == vec![7.0], "{got:?}");
+}

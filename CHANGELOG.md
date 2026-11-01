@@ -19,6 +19,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Pipes from standard input (CSV, JSON, NDJSON; --chunk streams) and a live Pipes window in the TUI that follows pipes run anywhere on the same home
 - Pipes: code spaces work on data piped in and keep none of it. Any live search (records, series, journals), journal, model query or code space output is a source; steps are code spaces and search filters; saves to journals and models branch off at any step while the data flows on (mnnn pipe, share to a code space, TUI >)
 
+- Math code spaces read named inputs in a pipeline's fan-in: `INPUT.field` (`spread = fast.close - slow.close`)
+
 ### Changed
 - Standard input to a pipe or pipeline is no longer parsed by Muninn: add a parser step (or --format)
 - Series sources give their stored rows as generic structured data through the general record load, with no bar shaping or per-series grouping (a code space such as to-bars makes bars)

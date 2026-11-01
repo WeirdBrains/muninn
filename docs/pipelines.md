@@ -21,7 +21,8 @@ text: follow it with a parser node such as `code:parse-csv`, see [pipes](pipes.m
 sources; `code:SPACE`; `view:table|chart[:col,col]`; `filter:SEARCH`; `model:NAME`.
 Saves along the way: `raw=code:fast+journal:Raw`. Edges are `FROM>TO[:NAME]` and chain
 (`a>b>c`); a code space with several inputs reads `host.input()` (the first) or
-`host.input_named("NAME")` and `host.inputs()` (the names). A node that fails marks
+`host.input_named("NAME")` and `host.inputs()` (the names); a math space writes
+`NAME.field`. A node that fails marks
 those downstream `skipped`; an unapproved space is `waiting approval`; the rest still run.
 `pipeline edit` adds or replaces nodes and edges (`--remove-node`, `--remove-edge`); a
 changed graph is a new version.

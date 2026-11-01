@@ -74,6 +74,9 @@ spaces, filters and saves.
 One line per formula, `NAME = EXPRESSION`. A name is an input field (`close`, `volume`,
 a designed field) or an earlier line. Every value is a column: one number per record,
 missing values are `NaN`. Operators: `+ - * / %`, comparisons, `and`, `or`, `not`.
+In a pipeline with several inputs (fan-in), plain names are fields of the first input and
+`INPUT.field` reads a named one (`spread = fast.close - slow.close`), row by row beside the
+first input's rows (`NaN` past its end).
 
 | functions | |
 |-----------|-|

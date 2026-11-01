@@ -119,8 +119,14 @@ fn lex(s: &str) -> std::result::Result<Vec<Tok>, String> {
             out.push(Tok::Num(v));
         } else if c.is_ascii_alphabetic() || c == '_' {
             let st = i;
+            let mut dotted = false;
             while i < cs.len() && (cs[i].is_ascii_alphanumeric() || cs[i] == '_') {
                 i += 1;
+                // `INPUT.field`: a field of a named input (a pipeline's fan-in)
+                if !dotted && i + 1 < cs.len() && cs[i] == '.' && (cs[i + 1].is_ascii_alphabetic() || cs[i + 1] == '_') {
+                    dotted = true;
+                    i += 1;
+                }
             }
             out.push(match cs[st..i].iter().collect::<String>().as_str() {
                 "and" => Tok::Op("&&"),
@@ -416,7 +422,7 @@ fn rs(e: &Expr, defined: &BTreeSet<String>) -> String {
     match e {
         Expr::Num(n) => format!("s::k({n:?}, n)"),
         Expr::Name(x) if defined.contains(x) => format!("v_{x}.clone()"),
-        Expr::Name(x) => format!("f_{x}.clone()"),
+        Expr::Name(x) => format!("f_{}.clone()", var(x)),
         Expr::Neg(a) => format!("s::map({}, |x| -x)", r(a)),
         Expr::Not(a) => format!("s::map({}, |x| s::flag(!s::truthy(x)))", r(a)),
         Expr::Bin(op, a, b) => {
@@ -440,13 +446,29 @@ fn rs(e: &Expr, defined: &BTreeSet<String>) -> String {
     }
 }
 
+/// A name as a Rust identifier (`slow.close` → `slow__close`).
+fn var(x: &str) -> String {
+    x.replace('.', "__")
+}
+
 /// The Rust `user.rs` for a math source.
 pub fn generate(src: &str) -> Result<String> {
     let p = parse(src)?;
     let mut defined = BTreeSet::new();
     let mut body = String::new();
+    let mut named = String::new();
     for f in p.fields() {
-        body += &format!("        let f_{f} = g.f64({f:?})?;\n");
+        match f.split_once('.') {
+            // a named input's column, row by row beside the first input's rows (NaN past its end)
+            Some((input, field)) => {
+                let v = var(&f);
+                named += &format!("    let n_{v} = host.input_named({input:?})?.f64({field:?})?;\n");
+                body += &format!(
+                    "        let f_{v}: Vec<f64> = (grp.start..grp.start + n).map(|i| n_{v}.get(i).copied().unwrap_or(f64::NAN)).collect();\n"
+                );
+            }
+            None => body += &format!("        let f_{f} = g.f64({f:?})?;\n"),
+        }
     }
     for (i, (n, e)) in p.lines.iter().enumerate() {
         body += &format!("        let v_{n}: Vec<f64> = {};\n", rs(e, &defined));
@@ -464,7 +486,7 @@ const NAMES: &[&str] = &[{names}];
 
 pub fn run(host: &Host) -> Result<View> {{
     let frame = host.input()?;
-    let mut cols: Vec<(String, Vec<f64>)> = NAMES.iter().map(|n| (n.to_string(), Vec::with_capacity(frame.len()))).collect();
+{named}    let mut cols: Vec<(String, Vec<f64>)> = NAMES.iter().map(|n| (n.to_string(), Vec::with_capacity(frame.len()))).collect();
     for grp in frame.groups() {{
         let g = frame.slice(grp.start, grp.len);
         let n = g.len();
@@ -473,6 +495,7 @@ pub fn run(host: &Host) -> Result<View> {{
 }}
 "#,
         names = names.join(", "),
+        named = named,
         out = p.dirs.output_rs()
     ))
 }
@@ -512,5 +535,14 @@ mod tests {
         assert!(bad("@update a = b\nx = 1").contains("not one of the formulas"));
         assert!(bad("@view pie\nx = 1").contains("@view"));
         assert!(bad("# nothing").contains("no formulas"));
+    }
+
+    #[test]
+    fn named_inputs_are_read_by_dotted_names() {
+        let rs = generate("spread = fast.close - slow.close\nboth = spread + close").unwrap();
+        assert!(rs.contains("let n_fast__close = host.input_named(\"fast\")?.f64(\"close\")?;"), "{rs}");
+        assert!(rs.contains("let f_slow__close: Vec<f64>") && rs.contains("let f_close = g.f64(\"close\")?;"), "{rs}");
+        assert!(rs.contains("s::zip(&f_fast__close.clone(), &f_slow__close.clone()"), "{rs}");
+        assert!(parse_expr("a.b.c").is_err() && parse_expr("a.").is_err());
     }
 }
