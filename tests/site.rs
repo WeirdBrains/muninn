@@ -117,3 +117,14 @@ fn the_readme_shows_existing_screenshots() {
         assert!(root.join(&f).exists(), "README shows {f}, which is missing");
     }
 }
+
+#[test]
+fn the_announcement_shows_existing_screenshots() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let post = read("docs/announcement-2.0.md");
+    let refs: Vec<_> = post.match_indices("](../").map(|(i, _)| &post[i + 2..]).filter_map(|r| r.find(')').map(|e| r[..e].to_string())).collect();
+    assert!(refs.iter().any(|r| r.ends_with("pipeline-live.png")), "the hero is missing");
+    for r in refs {
+        assert!(root.join("docs").join(&r).exists(), "the announcement shows {r}, which is missing");
+    }
+}

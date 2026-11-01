@@ -47,6 +47,11 @@ pub fn resolve_href(from: &str, href: &str) -> Option<String> {
     if path.is_empty() {
         return Some(from.to_string());
     }
+    // Files other than docs (images such as ../site/web/screenshots/x.png) are not topics.
+    let file = path.rsplit('/').next().unwrap_or("");
+    if file.rsplit_once('.').is_some_and(|(_, ext)| ext != "md") {
+        return None;
+    }
     let path = path.trim_end_matches(".md");
     let mut parts: Vec<&str> = from.split('/').collect();
     parts.pop(); // directory of `from`
@@ -147,6 +152,13 @@ fn subsequence(q: &str, s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn image_links_are_not_topics() {
+        assert_eq!(resolve_href("announcement-2.0", "../site/web/screenshots/home.png"), None);
+        assert_eq!(resolve_href("announcement-2.0", "install.md#debian"), Some("install".into()));
+        assert_eq!(resolve_href("announcement-2.0", "network"), Some("network".into()));
+    }
 
     #[test]
     fn every_internal_link_resolves() {

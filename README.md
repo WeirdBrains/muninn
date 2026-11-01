@@ -6,6 +6,8 @@ Redis, SQLite and Postgres; export to CSV, Parquet or JSON; browse it in a TUI.
 Data lives in `~/.muninn` (override with `MUNINN_HOME` or `--home`), in a
 SQLCipher database protected by an envelope key scheme (see `docs/encryption.md`).
 
+New here? Read the [Muninn 2.0 announcement](docs/announcement-2.0.md).
+
 ## Screenshots
 
 <!-- screenshots: written by scripts/screenshots.sh -->
