@@ -7,6 +7,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 ## Using Muninn
 
 - [Install](install.md): packages per platform, building from source, uninstalling
+- [Muninn 2.0](announcement-2.0.md): the launch post: what Muninn is, the headline features, install
 - [Releasing](release.md): release script and the GitHub Actions release workflow
 - [Website](website.md): the single-page Jaspr site in `site/`, how it is built and checked
 - [Command line](cli.md): global flags, environment, exit codes, man pages
@@ -44,6 +45,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Pipelines](pipelines.md): design note for saved pipelines that end in a model table
 - [Share](share.md): share anything to a project, a journal, a code space or your exchanges
 - [Reviews](reviews.md): review links, comments, suggestions, highlights, votes, merges and revisions
+- [Deploying a relay](deploy-relay.md): a public relay node on a droplet: DNS, systemd, firewall, ACME
 - [Org hosting](org-hosting.md): HTTPS sites with HTML, JSON and gRPC, signed member requests, Let's Encrypt
 
 ## Getting data in and out
