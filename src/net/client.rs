@@ -577,6 +577,10 @@ pub fn find_item(s: &Store, kind: ShareKind, key: &str) -> Result<(String, Strin
             let c = s.find_code_space(key)?;
             (c.id, c.name)
         }
+        ShareKind::Pipeline => {
+            let p = s.find_pipeline(key)?;
+            (p.id, p.name)
+        }
     })
 }
 
@@ -897,6 +901,19 @@ pub fn import_item_as(s: &mut Store, it: &Item, from: &str, origin: &str) -> Res
             made_id = (made.id.clone(), made.name.clone());
             format!("code space {} (review and approve it before it runs)", made.name)
         }
+        (ShareKind::Pipeline, "json") => {
+            let e = crate::code::pipeline::Export::parse(&it.data)?;
+            let names: Vec<String> = s.pipelines()?.into_iter().map(|p| p.name.to_lowercase()).collect();
+            let name = free_name(|n| names.contains(&n.to_lowercase()), &e.name, from);
+            let mut plan = crate::code::pipeline::plan_import(s, &e, Some(&name), false)?;
+            plan.draft = true;
+            let p = crate::code::pipeline::import(s, &e, &plan)?;
+            made_id = (p.id.clone(), p.name.clone());
+            format!(
+                "pipeline {} as a draft (review it with `mnnn pipeline show {}`, approve it with `mnnn pipeline approve {}`; its code needs approval too)",
+                p.name, p.name, p.name
+            )
+        }
         (ShareKind::Model, "json") => {
             let t = match crate::store::templates::Template::parse(&it.data) {
                 Ok(t) => t,
@@ -918,7 +935,7 @@ pub fn import_item_as(s: &mut Store, it: &Item, from: &str, origin: &str) -> Res
             return Err(Error::invalid(
                 "import",
                 format!(
-                    "a {} as {f} cannot be imported (projects, journals, live searches, models and code spaces can); save it with --out",
+                    "a {} as {f} cannot be imported (projects, journals, live searches, models, code spaces and pipelines can); save it with --out",
                     k.label()
                 ),
             ));

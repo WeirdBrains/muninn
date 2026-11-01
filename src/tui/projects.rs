@@ -162,6 +162,7 @@ fn open_item(app: &mut App) {
         ItemKind::RuleSet => super::rules::open_rule(app, &it.ref_id),
         ItemKind::Model => super::models::open_model(app, &it.ref_id),
         ItemKind::Code => super::code::open_space(app, &it.ref_id),
+        ItemKind::Pipeline => super::designer::open_pipeline(app, &it.ref_id),
     }
 }
 
@@ -424,6 +425,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                     ItemKind::Report => "▦",
                     ItemKind::Model => "◇",
                     ItemKind::Code => "λ",
+                    ItemKind::Pipeline => "⇉",
                 };
                 v.rows.push(Line::from(vec![
                     Span::styled(format!(" {icon} {name} "), row_style(&t, i == st.isel)),

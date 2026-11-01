@@ -872,6 +872,19 @@ pub fn project(store: &Store, id: &str, rows: usize) -> Result<Doc> {
                     blocks.extend(b.code_blocks(&c)?);
                 }
             }
+            ItemKind::Pipeline => {
+                if let Some(p) = store.pipeline(&it.ref_id)? {
+                    blocks.push(Block::Heading(1, vec![t(format!("Pipeline: {}", p.name))]));
+                    let order = p.graph.order().unwrap_or_else(|_| p.graph.nodes.iter().map(|n| n.id.clone()).collect());
+                    for id in order {
+                        if let Some(n) = p.graph.node(&id) {
+                            let to: Vec<String> = p.graph.downs(&id).iter().map(|e| e.to.clone()).collect();
+                            let to = if to.is_empty() { String::new() } else { format!(" → {}", to.join(", ")) };
+                            blocks.push(Block::Para(vec![t(format!("{id} = {}{to}", n.kind.text()))]));
+                        }
+                    }
+                }
+            }
             ItemKind::RuleSet => {
                 if let Some(r) = store.rule(&it.ref_id)? {
                     blocks.push(Block::Heading(1, vec![t(format!("Rule: {}", r.name))]));

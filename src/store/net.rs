@@ -228,11 +228,13 @@ pub enum ShareKind {
     Report,
     /// A code space's source.
     Code,
+    /// A pipeline: its graph, code and sink model templates (peers get a draft).
+    Pipeline,
 }
 
 impl ShareKind {
-    pub const ALL: [ShareKind; 6] =
-        [ShareKind::Model, ShareKind::LiveSearch, ShareKind::Journal, ShareKind::Project, ShareKind::Report, ShareKind::Code];
+    pub const ALL: [ShareKind; 7] =
+        [ShareKind::Model, ShareKind::LiveSearch, ShareKind::Journal, ShareKind::Project, ShareKind::Report, ShareKind::Code, ShareKind::Pipeline];
     pub fn as_str(self) -> &'static str {
         match self {
             ShareKind::Model => "model",
@@ -241,6 +243,7 @@ impl ShareKind {
             ShareKind::Project => "project",
             ShareKind::Report => "report",
             ShareKind::Code => "code",
+            ShareKind::Pipeline => "pipeline",
         }
     }
     pub fn parse(s: &str) -> Option<Self> {
@@ -251,6 +254,7 @@ impl ShareKind {
             "project" | "projects" => ShareKind::Project,
             "report" | "reports" => ShareKind::Report,
             "code" | "code_space" | "code_spaces" => ShareKind::Code,
+            "pipeline" | "pipelines" => ShareKind::Pipeline,
             _ => return None,
         })
     }
@@ -262,6 +266,7 @@ impl ShareKind {
             ShareKind::Project => "project",
             ShareKind::Report => "report",
             ShareKind::Code => "code space",
+            ShareKind::Pipeline => "pipeline",
         }
     }
 }

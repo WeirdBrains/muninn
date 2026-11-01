@@ -99,6 +99,7 @@ fn item_kind(k: ShareKind) -> Option<ItemKind> {
         ShareKind::Journal => ItemKind::Journal,
         ShareKind::Report => ItemKind::Report,
         ShareKind::Code => ItemKind::Code,
+        ShareKind::Pipeline => ItemKind::Pipeline,
         ShareKind::Project => return None,
     })
 }

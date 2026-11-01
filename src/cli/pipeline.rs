@@ -81,6 +81,9 @@ pub fn run(ctx: &Ctx, c: PipelineCommand) -> anyhow::Result<()> {
                     p.version,
                     if p.description.is_empty() { String::new() } else { format!(": {}", p.description) }
                 );
+                if p.draft {
+                    println!("  a draft from a peer: `mnnn pipeline approve {}` lets it run", p.name);
+                }
                 for l in graph_lines(&store, &p.graph) {
                     println!("{l}");
                 }
@@ -94,7 +97,13 @@ pub fn run(ctx: &Ctx, c: PipelineCommand) -> anyhow::Result<()> {
                 ctx.io.note("no pipelines (`mnnn pipeline create NAME --node … --edge …`)");
             } else {
                 for p in ps {
-                    let ok = if p.graph.problems(Some(&store)).is_empty() { "" } else { " (not valid)" };
+                    let ok = if p.draft {
+                        " (draft)"
+                    } else if p.graph.problems(Some(&store)).is_empty() {
+                        ""
+                    } else {
+                        " (not valid)"
+                    };
                     println!("{}  v{}  {} nodes → {}{ok}", p.name, p.version, p.graph.nodes.len(), p.graph.sinks().join(", "));
                 }
             }
@@ -165,6 +174,20 @@ pub fn run(ctx: &Ctx, c: PipelineCommand) -> anyhow::Result<()> {
                 }
                 Some(x) => anyhow::bail!("`{x}`: only `-` (standard input) goes after the pipeline"),
             }
+        }
+        PipelineCommand::Approve { pipeline } => {
+            let p = store.find_pipeline(&pipeline)?;
+            if !p.draft {
+                ctx.io.note(format!("{} is not a draft", p.name));
+                return Ok(());
+            }
+            for l in graph_lines(&store, &p.graph) {
+                println!("{l}");
+            }
+            if !ctx.io.confirm(&format!("approve pipeline `{}`?", p.name))? {
+                return Err(crate::Error::Aborted.into());
+            }
+            ctx.io.note(crate::tui::designer::approve(&store, "cli", &p)?);
         }
         PipelineCommand::Remove { pipeline } => {
             let p = store.find_pipeline(&pipeline)?;

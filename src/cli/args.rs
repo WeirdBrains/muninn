@@ -2060,9 +2060,9 @@ pub enum NetCommand {
     /// Advanced: key exchanges by hand (tokens, short codes). `connect` does this for you.
     #[command(subcommand, alias = "x", hide = true)]
     Exchange(NetExchangeCommand),
-    /// Share an item: model, search, journal, project, report or code.
+    /// Share an item: model, search, journal, project, report, code or pipeline.
     Share {
-        /// model, search, journal, project, report or code.
+        /// model, search, journal, project, report, code or pipeline.
         kind: String,
         /// Id, id prefix or name.
         item: String,
@@ -3370,6 +3370,10 @@ pub enum PipelineCommand {
     Remove {
         pipeline: String,
     },
+    /// Approve a draft (a pipeline from a peer) so it can run; its code is approved on run.
+    Approve {
+        pipeline: String,
+    },
     /// Write a pipeline file: nodes, edges, code (by trust hash), sink models by name.
     Export {
         pipeline: String,
@@ -3427,7 +3431,7 @@ pub struct PipeArgs {
 
 #[derive(Debug, Args)]
 pub struct ShareArgs {
-    /// What to share: model, search, journal, project, report or code.
+    /// What to share: model, search, journal, project, report, code or pipeline.
     pub kind: String,
     /// The item (id or name).
     #[arg(required_unless_present = "targets")]

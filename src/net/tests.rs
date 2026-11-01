@@ -849,3 +849,42 @@ fn shared_models_arrive_as_drafts_to_approve() {
     let (_, name, _) = client::import_item_as(&mut b, &it, "ada", "test").unwrap();
     assert_eq!(name, "signals_3");
 }
+
+#[test]
+fn shared_pipelines_arrive_as_drafts_with_their_code_and_models() {
+    use crate::code::pipeline::Graph;
+    let a = Store::open_in_memory().unwrap();
+    a.create_journal("Notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    let c = a.create_code_space("double", "", crate::store::Lang::Math, "w2 = words * 2", Default::default()).unwrap();
+    crate::code::approve(&a, "test", &c).unwrap();
+    let f = vec![crate::store::Field::new("w2", crate::store::FieldType::Real)];
+    a.create_model("Doubled", "", crate::store::Design { fields: f, ..Default::default() }, true).unwrap();
+    let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+    let g = Graph::parse(&s(&["src=journal:Notes", "d=code:double", "out=model:Doubled"]), &s(&["src>d>out"])).unwrap();
+    let p = a.create_pipeline("flow", "", &g).unwrap();
+    // offered over the network like anything else
+    let (sh, _) = client::share(&a, ShareKind::Pipeline, "flow", &[], "test").unwrap().remove(0);
+    assert_eq!(sh.kind, ShareKind::Pipeline);
+    let it = super::service::item_of(&a, ShareKind::Pipeline, &p.id, "flow", None).unwrap();
+    assert_eq!(it.format, "json");
+    let mut b = Store::open_in_memory().unwrap();
+    b.create_journal("Notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    let (id, name, made) = client::import_item_as(&mut b, &it, "ada", "test").unwrap();
+    assert!(made.contains("as a draft") && made.contains("mnnn pipeline approve"), "{made}");
+    let got = b.pipeline(&id).unwrap().unwrap();
+    assert!(got.draft && got.name == name);
+    let code = b.find_code_space("double").unwrap();
+    assert!(!crate::code::approved(&code), "the peer's code waits for approval");
+    let m = b.find_model("Doubled").unwrap();
+    assert_eq!(m.version, 0, "the model is a draft too");
+    // a draft does not run
+    let env = crate::code::CodeEnv::new(std::env::temp_dir().as_path());
+    let e = crate::code::pipeline::run(&b, &env, "test", &got, None, &mut |_| {}).unwrap_err();
+    assert!(e.to_string().contains("draft"), "{e}");
+    let msg = crate::tui::designer::approve(&b, "test", &got).unwrap();
+    assert!(msg.contains("still needs approval: double"), "{msg}");
+    assert!(!b.pipeline(&id).unwrap().unwrap().draft);
+    // a second copy gets a free name
+    let (_, name2, _) = client::import_item_as(&mut b, &it, "ada", "test").unwrap();
+    assert_ne!(name2, name);
+}

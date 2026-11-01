@@ -3,8 +3,8 @@
 Status: the pipe layer ([pipes](pipes.md)) and the Pipeline object ship: storage with
 versions, the DAG run (fan-out, fan-in with named inputs, every leaf a model table),
 validation, `mnnn pipeline create|edit|show|list|run|remove|export|import` and history
-records, the Designer window, the Monitor tile and views as tiles. Still design:
-pipelines over Share and `net` (see *Order of work*).
+records, the Designer window, the Monitor tile, views as tiles, and pipelines over
+Share and `net` (peer pipelines arrive as drafts).
 
 ```sh
 mnnn pipeline create flow --node src=search:usdt --node a=code:fast --node b=code:slow \
@@ -32,6 +32,12 @@ first: a code space already here with the same hash is used as is, different cod
 same name lands as `NAME (imported)`, new code is created unapproved; missing models are
 created from their templates; a pipeline name clash is refused unless `--name OTHER` or
 `--merge` (a new version); missing sources are listed as problems.
+
+Share a pipeline (`mnnn share pipeline NAME project|journal|net …`, or `S` in the
+Designer) like anything else. A peer fetching it with `mnnn net fetch … --import` gets the
+same file and the same plan, but as a **draft**: it does not run, and the models it makes
+are drafts too, until `mnnn pipeline approve NAME` (or `A` in the Designer); its code
+spaces still need their own approval when it first runs.
 
 ## Principles
 
@@ -124,4 +130,5 @@ drafts to approve, as models do.
 2. Stdin source (CSV/JSON/NDJSON, chunked) and live hop records with the Pipes window (done).
 3. Pipeline object: storage, DAG run with fan-out/fan-in, validation, CLI, export/import (done).
 4. Designer window, monitor tile, code space tile with a result chart, views as tiles (done).
-5. Pipelines over Share and `net share`/`net fetch` (peer pipelines as drafts); project, org and net sinks.
+5. Pipelines over Share and `net share`/`net fetch` (peer pipelines as drafts) (done).
+6. Saves to projects, orgs and the network.

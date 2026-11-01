@@ -344,6 +344,12 @@ pub fn union(name: &str, frames: &[&Value]) -> Value {
 /// Run a pipeline: nodes in order, each once; `stdin` is the frame for `-` sources. A node
 /// that fails stops the nodes downstream of it (`skipped`); the others still run.
 pub fn run(store: &Store, env: &CodeEnv, origin: &str, p: &Pipeline, stdin: Option<Value>, log: &mut dyn FnMut(&str)) -> Result<PipelineRun> {
+    if p.draft {
+        return Err(Error::invalid(
+            "pipeline",
+            format!("{} is a draft from a peer: review it, then approve it (`mnnn pipeline approve {}`)", p.name, p.name),
+        ));
+    }
     let g = &p.graph;
     let problems = g.problems(Some(store));
     if !problems.is_empty() {

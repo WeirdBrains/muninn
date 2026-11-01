@@ -48,6 +48,8 @@ pub enum ItemKind {
     Model,
     /// A code space (`mnnn code`): its source and last result.
     Code,
+    /// A pipeline (`mnnn pipeline`).
+    Pipeline,
 }
 
 impl ItemKind {
@@ -60,6 +62,7 @@ impl ItemKind {
             ItemKind::Report => "report",
             ItemKind::Model => "model",
             ItemKind::Code => "code",
+            ItemKind::Pipeline => "pipeline",
         }
     }
     pub fn parse(s: &str) -> Option<Self> {
@@ -71,6 +74,7 @@ impl ItemKind {
             "report" => ItemKind::Report,
             "model" => ItemKind::Model,
             "code" => ItemKind::Code,
+            "pipeline" => ItemKind::Pipeline,
             _ => return None,
         })
     }
@@ -83,6 +87,7 @@ impl ItemKind {
             ItemKind::Report => "report",
             ItemKind::Model => "model",
             ItemKind::Code => "code space",
+            ItemKind::Pipeline => "pipeline",
         }
     }
     pub fn plural(self) -> &'static str {
@@ -94,6 +99,7 @@ impl ItemKind {
             ItemKind::Report => "reports",
             ItemKind::Model => "models",
             ItemKind::Code => "code spaces",
+            ItemKind::Pipeline => "pipelines",
         }
     }
 }
@@ -297,6 +303,7 @@ impl Store {
             ItemKind::RuleSet => self.rule(ref_id)?.is_some(),
             ItemKind::Model => self.model(ref_id)?.is_some(),
             ItemKind::Code => self.code_space(ref_id)?.is_some(),
+            ItemKind::Pipeline => self.pipeline(ref_id)?.is_some(),
         };
         if !exists {
             return Err(Error::invalid(kind.label(), format!("`{ref_id}` not found")));

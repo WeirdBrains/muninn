@@ -59,7 +59,7 @@ pub fn formats(kind: ShareKind) -> &'static [&'static str] {
     match kind {
         ShareKind::Journal | ShareKind::Report => &["html", "json", "pdf", "docx", "latex", "text"],
         ShareKind::Project => &["html", "json", "pdf", "docx", "latex", "text", "mnnp"],
-        ShareKind::Model | ShareKind::LiveSearch | ShareKind::Code => &["json"],
+        ShareKind::Model | ShareKind::LiveSearch | ShareKind::Code | ShareKind::Pipeline => &["json"],
     }
 }
 

@@ -84,12 +84,15 @@ mnnn net list ben                                # what ben shares with you
 mnnn net fetch ben "field notes" --import        # copy it into your database
 ```
 
-Kinds: `model`, `search` (live search), `journal`, `project`, `report`, `code`. Sharing
+Kinds: `model`, `search` (live search), `journal`, `project`, `report`, `code`,
+`pipeline`. Sharing
 a project shares its journals and models for searches too. Sharing the `bars` model
 lets peers search your imported series. Fetched items come as JSON (or a project
 archive, or a document format with `--format`); `--import` adds journals, projects,
-code spaces, live searches and models (as drafts to approve, see
-[model templates](model-templates.md)) to your database, under a free name, recorded in the
+code spaces, live searches, models (as drafts to approve, see
+[model templates](model-templates.md)) and pipelines (the [pipeline file](pipelines.md):
+the pipeline and any models it brings arrive as drafts, its code unapproved;
+`mnnn pipeline approve NAME` or `A` in the Designer lets it run) to your database, under a free name, recorded in the
 [history](history.md) as `net.import`.
 
 `--with NAME` connects to that node first if needed. In the TUI: Shared page `a` shares

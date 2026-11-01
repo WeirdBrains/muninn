@@ -230,6 +230,13 @@ pub fn describe_item(store: &Store, it: &crate::store::ProjectItem) -> (String, 
             }
             None => ("(removed code space)".into(), String::new()),
         },
+        crate::store::ItemKind::Pipeline => match store.pipeline(&it.ref_id).ok().flatten() {
+            Some(p) => (
+                p.name.clone(),
+                format!("v{} · {} nodes → {}{}", p.version, p.graph.nodes.len(), p.graph.sinks().join(", "), if p.draft { " · draft" } else { "" }),
+            ),
+            None => ("(removed pipeline)".into(), String::new()),
+        },
     }
 }
 

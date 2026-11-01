@@ -73,6 +73,14 @@ pub fn open(app: &mut App) {
     app.modal = Some(super::modal::Modal::Pipelines);
 }
 
+/// Open the Designer on one pipeline.
+pub fn open_pipeline(app: &mut App, id: &str) {
+    open(app);
+    app.designer.open = Some(id.to_string());
+    app.designer.screen = Screen::Edit;
+    app.designer.node = 0;
+}
+
 fn current(app: &App) -> Option<crate::store::pipelines::Pipeline> {
     app.designer.open.as_ref().and_then(|id| app.store.pipeline(id).ok().flatten())
 }
@@ -245,6 +253,21 @@ fn answer(app: &mut App, kind: DAsk, v: String) {
     }
 }
 
+/// Approve a draft pipeline (from a peer): it can run once its code is approved too.
+pub fn approve(s: &Store, origin: &str, p: &crate::store::pipelines::Pipeline) -> crate::Result<String> {
+    s.set_pipeline_draft(&p.id, false)?;
+    s.note_action(
+        &crate::store::NewAction::new("pipeline.approve", origin, format!("pipeline {} approved", p.name))
+            .params(serde_json::json!({ "pipeline": p.id })),
+    );
+    let waiting: Vec<String> = p.graph.code_spaces().into_iter().filter(|c| s.find_code_space(c).is_ok_and(|c| !code::approved(&c))).collect();
+    Ok(if waiting.is_empty() {
+        format!("approved {}", p.name)
+    } else {
+        format!("approved {}; its code still needs approval: {}", p.name, waiting.join(", "))
+    })
+}
+
 fn ask(app: &mut App, kind: DAsk, title: &str, value: &str) {
     app.designer.ask = Some(Ask::new(kind, title, value));
 }
@@ -314,6 +337,21 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         (_, KeyCode::Char('x')) => {
             if let Some(n) = name {
                 ask(app, DAsk::Export, "Export to file", &format!("{n}.pipeline.json"));
+            }
+        }
+        (_, KeyCode::Char('A')) => {
+            let p = match app.designer.screen {
+                Screen::Edit => current(app),
+                Screen::List => app.designer.list.get(app.designer.sel).cloned(),
+            };
+            if let Some(p) = p.filter(|p| p.draft) {
+                match approve(&app.store, "tui", &p) {
+                    Ok(m) => ok(app, m),
+                    Err(e) => err(app, e),
+                }
+                reload(app);
+            } else {
+                ok(app, "not a draft");
             }
         }
         (_, KeyCode::Char('i')) => ask(app, DAsk::Import, "Import file (PATH, PATH as NAME, PATH merge)", ""),
@@ -402,14 +440,20 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
             }
             for (i, p) in st.list.iter().enumerate() {
                 let bad = p.graph.problems(Some(&app.store)).len();
-                let state = if bad == 0 { "valid".to_string() } else { format!("{bad} to fix") };
+                let state = if p.draft {
+                    "draft from a peer: A approves".to_string()
+                } else if bad == 0 {
+                    "valid".to_string()
+                } else {
+                    format!("{bad} to fix")
+                };
                 v.rows.push(Line::from(vec![
                     Span::styled(format!(" {:<24}", p.name), row_style(&t, i == st.sel)),
                     Span::styled(
                         format!(" v{:<3} {:>2} nodes → {}  ", p.version, p.graph.nodes.len(), p.graph.sinks().join(", ")),
                         Style::new().fg(t.fg),
                     ),
-                    Span::styled(state, Style::new().fg(if bad == 0 { t.success } else { t.warning })),
+                    Span::styled(state, Style::new().fg(if bad == 0 && !p.draft { t.success } else { t.warning })),
                 ]));
             }
             v.sel = (!st.list.is_empty()).then_some(st.sel);
@@ -450,6 +494,12 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ]));
             }
             let probs = p.graph.problems(Some(&app.store));
+            if p.draft {
+                v.head.push(Line::styled(
+                    " a draft from a peer: review it, then A approves it (its code needs approval too)",
+                    Style::new().fg(t.warning),
+                ));
+            }
             if probs.is_empty() {
                 v.head.push(Line::styled(" valid: every leaf ends in a model table", Style::new().fg(t.success)));
             }
@@ -479,6 +529,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
     }
     v.ask = st.ask.as_ref().map(|a| (a.title.clone(), a.value.clone()));
     v.msg = st.msg.clone();
+    super::share::add_key(app, &mut v.keys);
     draw_view(f, r, v, &t, hits);
 }
 
@@ -491,6 +542,9 @@ pub fn run(app: &mut App, name: &str) {
         Ok(p) => p,
         Err(e) => return app.set_status(e.to_string()),
     };
+    if p.draft {
+        return app.set_status(format!("{} is a draft from a peer: review it, then approve it (A in the Pipelines window)", p.name));
+    }
     let problems = p.graph.problems(Some(&app.store));
     if !problems.is_empty() {
         return app.set_status(format!("{} is not valid: {}", p.name, problems.join("; ")));

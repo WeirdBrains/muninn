@@ -26,6 +26,9 @@ CREATE TABLE pipeline_versions (
 );
 "#;
 
+/// Pipelines from peers arrive as drafts: they run once approved.
+pub const MIGRATION_DRAFT: &str = "ALTER TABLE pipelines ADD COLUMN draft INTEGER NOT NULL DEFAULT 0;";
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Pipeline {
     pub id: String,
@@ -36,9 +39,12 @@ pub struct Pipeline {
     pub author_id: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    /// From a peer (`net fetch`) and not approved yet: it does not run.
+    #[serde(default)]
+    pub draft: bool,
 }
 
-const COLS: &str = "id, name, description, version, graph, author_id, created_at, updated_at";
+const COLS: &str = "id, name, description, version, graph, author_id, created_at, updated_at, draft";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Pipeline> {
     let g: String = r.get(4)?;
@@ -51,6 +57,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Pipeline> {
         author_id: r.get(5)?,
         created_at: r.get(6)?,
         updated_at: r.get(7)?,
+        draft: r.get::<_, i64>(8)? != 0,
     })
 }
 
@@ -95,10 +102,11 @@ impl Store {
             author_id: self.current_author_id()?,
             created_at: now,
             updated_at: now,
+            draft: false,
         };
         let g = serde_json::to_string(&p.graph)?;
         self.conn.execute(
-            &format!("INSERT INTO pipelines ({COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"),
+            &format!("INSERT INTO pipelines ({COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0)"),
             params![p.id, p.name, p.description, p.version, g, p.author_id, p.created_at, p.updated_at],
         )?;
         self.conn.execute("INSERT INTO pipeline_versions VALUES (?1, 1, ?2, ?3)", params![p.id, g, now])?;
@@ -138,6 +146,12 @@ impl Store {
 
     pub fn remove_pipeline(&self, id: &str) -> Result<()> {
         self.conn.execute("DELETE FROM pipelines WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    /// Mark a pipeline a draft (from a peer) or approve it (`draft` false).
+    pub fn set_pipeline_draft(&self, id: &str, draft: bool) -> Result<()> {
+        self.conn.execute("UPDATE pipelines SET draft = ?2, updated_at = ?3 WHERE id = ?1", params![id, draft as i64, now_ms()])?;
         Ok(())
     }
 

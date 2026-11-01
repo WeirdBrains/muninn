@@ -65,3 +65,21 @@ fn any_data_is_a_pipe_source_for_a_code_space() {
     assert_eq!(source_for(ShareKind::Code, "c", "calc").unwrap(), Source::Code("c".into()));
     assert!(matches!(source_for(ShareKind::Model, "m", "signals").unwrap(), Source::Model(i) if i.model == "signals"));
 }
+
+#[test]
+fn pipelines_share_to_projects_journals_and_net_but_not_code() {
+    let s = Store::open_in_memory().unwrap();
+    s.add_author("Ada", None, &[]).unwrap();
+    s.create_project("Alpha", "").unwrap();
+    s.create_journal("Notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    let st = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+    let g = crate::code::pipeline::Graph::parse(&st(&["src=journal:Notes", "v=view:table"]), &st(&["src>v"])).unwrap();
+    s.create_pipeline("flow", "", &g).unwrap();
+    assert_eq!(targets_for(ShareKind::Pipeline), vec![TargetKind::Project, TargetKind::Journal, TargetKind::Net]);
+    let r = share(&s, ShareKind::Pipeline, "flow", TargetKind::Project, &["Alpha".into()], "", "test").unwrap();
+    assert!(r.summary().contains("added pipeline flow to project Alpha"), "{}", r.summary());
+    let p = s.find_project("Alpha").unwrap();
+    assert!(s.project_items(&p.id).unwrap().iter().any(|i| i.kind == crate::store::ItemKind::Pipeline));
+    share(&s, ShareKind::Pipeline, "flow", TargetKind::Journal, &["Notes".into()], "see", "test").unwrap();
+    assert!(share(&s, ShareKind::Pipeline, "flow", TargetKind::Code, &["x".into()], "", "test").is_err());
+}

@@ -18,6 +18,14 @@ pub fn item(app: &App) -> Option<(ShareKind, String, String)> {
         Modal::Journals => get(app.journals.list.get(app.journals.sel).map(|j| (j.id.as_str(), j.name.as_str())), ShareKind::Journal),
         Modal::Searches => get(app.searches.list.get(app.searches.sel).map(|(s, _)| (s.id.as_str(), s.name.as_str())), ShareKind::LiveSearch),
         Modal::Reports => get(app.reports.list.get(app.reports.sel).map(|r| (r.id.as_str(), r.name.as_str())), ShareKind::Report),
+        Modal::Pipelines => {
+            let d = &app.designer;
+            let p = match d.screen {
+                super::designer::Screen::Edit => d.open.as_ref().and_then(|id| d.list.iter().find(|p| &p.id == id)),
+                super::designer::Screen::List => d.list.get(d.sel),
+            };
+            get(p.map(|p| (p.id.as_str(), p.name.as_str())), ShareKind::Pipeline)
+        }
         Modal::Projects => get(app.projects.list.get(app.projects.sel).map(|p| (p.id.as_str(), p.name.as_str())), ShareKind::Project),
         _ => None,
     }

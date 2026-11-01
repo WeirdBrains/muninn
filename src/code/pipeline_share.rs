@@ -89,6 +89,8 @@ pub struct ImportPlan {
     pub models: Vec<(String, String)>,
     /// What will still be wrong (missing searches, models without templates…).
     pub problems: Vec<String>,
+    /// Land as a draft (from a peer): the pipeline and the models it makes wait for approval.
+    pub draft: bool,
 }
 
 impl ImportPlan {
@@ -179,11 +181,16 @@ pub fn import(store: &Store, e: &Export, plan: &ImportPlan) -> Result<Pipeline> 
         if store.find_model(&m.name).is_err()
             && let Some(t) = &m.template
         {
-            store.import_template(t, &ImportOpts { name: Some(m.name.clone()), ..Default::default() }, false)?;
+            store.import_template(t, &ImportOpts { name: Some(m.name.clone()), draft: plan.draft, ..Default::default() }, false)?;
         }
     }
-    match store.find_pipeline(&plan.name) {
-        Ok(p) => store.update_pipeline(&p.id, None, Some(&e.description), Some(&g)),
-        Err(_) => store.create_pipeline(&plan.name, &e.description, &g),
+    let mut p = match store.find_pipeline(&plan.name) {
+        Ok(p) => store.update_pipeline(&p.id, None, Some(&e.description), Some(&g))?,
+        Err(_) => store.create_pipeline(&plan.name, &e.description, &g)?,
+    };
+    if plan.draft {
+        store.set_pipeline_draft(&p.id, true)?;
+        p.draft = true;
     }
+    Ok(p)
 }

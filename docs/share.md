@@ -10,6 +10,7 @@ One action shares anything shareable to anything that takes shares.
 | journal | added as an item | a new entry (not into itself) | runs over its entries | exchange share |
 | report | added as an item | a new entry about it | – | exchange share |
 | project | – | a new entry about it | – | exchange share |
+| pipeline | added as an item | a new entry about it | – | exchange share (peers get a draft) |
 
 - **project**: the item is added to the project (once; sharing again changes nothing).
 - **journal**: a new Markdown entry "Shared: NAME" naming the item, with your note.
