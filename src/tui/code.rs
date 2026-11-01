@@ -562,6 +562,9 @@ fn pipe_on(app: &mut App) {
     items.extend(
         app.store.models().unwrap_or_default().into_iter().filter(|m| !m.is_bars() && m.version > 0).map(|m| format!("save to model · {}", m.name)),
     );
+    items.extend(app.store.projects().unwrap_or_default().into_iter().map(|p| format!("save to project · {}", p.name)));
+    items.extend(app.store.orgs().unwrap_or_default().into_iter().map(|o| format!("save to org · {}", o.slug)));
+    items.push("save to net · all exchanges".into());
     app.share_back = app.modal.take().map(Box::new);
     app.modal =
         Some(super::modal::Modal::Pick { title: format!("Pipe the result of {} to", c.name), items, sel: 0, kind: super::modal::PickKind::Pipe });
@@ -581,7 +584,13 @@ pub fn pipe_picked(app: &mut App, row: &str) {
         open_space(app, &next.id);
         return run_piped(app, Source::Frame(frame), &format!("piped {} into {}", c.name, next.name));
     }
-    let sink = if k.ends_with("journal") { Sink::Journal(name.into()) } else { Sink::Model(name.into()) };
+    let sink = match k {
+        "save to journal" => Sink::Journal(name.into()),
+        "save to project" => Sink::Project(name.into(), None),
+        "save to org" => Sink::Org(name.into(), None),
+        "save to net" => Sink::Net(None, None),
+        _ => Sink::Model(name.into()),
+    };
     match code::pipe::save(&app.store, "tui", &sink, &frame, Some((&c, &info)), &format!("code:{} | tee {}", c.name, sink.text())) {
         Ok(made) => {
             app.refresh_history(true);

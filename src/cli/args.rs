@@ -1611,7 +1611,7 @@ mod tests {
         .command
         {
             Command::Code(CodeCommand::Create { name, lang, input, source, .. }) => {
-                assert_eq!((name.as_str(), lang), ("f", CodeLang::Python));
+                assert_eq!((name.as_str(), lang), ("f", Some(CodeLang::Python)));
                 assert_eq!(input.filter, vec!["a = 1", "b > 2"]);
                 assert_eq!(input.sort, vec!["-timestamp"]);
                 assert_eq!(input.limit, Some(3));
@@ -2339,8 +2339,11 @@ pub enum CodeCommand {
     #[command(alias = "new")]
     Create {
         name: String,
-        #[arg(long, value_enum)]
-        lang: CodeLang,
+        #[arg(long, value_enum, required_unless_present = "from")]
+        lang: Option<CodeLang>,
+        /// Start from a copy of a code space or a built-in parser (`mnnn code parsers`).
+        #[arg(long)]
+        from: Option<String>,
         #[command(flatten)]
         source: CodeSourceArgs,
         #[command(flatten)]
@@ -2350,6 +2353,15 @@ pub enum CodeCommand {
         /// Add it to a project.
         #[arg(long)]
         project: Option<String>,
+    },
+    /// The built-in parser code spaces (parse-csv, parse-json, parse-ndjson, to-bars):
+    /// templates that shape raw data. --install makes them code spaces to view and edit.
+    Parsers {
+        #[arg(long)]
+        install: bool,
+        /// Print one built-in's source.
+        #[arg(long)]
+        show: Option<String>,
     },
     /// Change a code space; a new source needs approving again.
     Edit {
@@ -3313,7 +3325,7 @@ Examples:
   mnnn pipeline create flow --node src=search:usdt --node a=code:fast --node b=code:slow \\
     --node fa=model:Fast --node sb=model:Slow --edge 'src>a>fa' --edge 'src>b>sb'
   mnnn pipeline run flow
-  cat trades.csv | mnnn pipeline run feed - --chunk 500
+  cat trades.csv | mnnn pipeline run feed - --chunk 500 --keep-header
   mnnn pipeline export flow --out flow.json && mnnn pipeline import flow.json --name flow2")]
 pub enum PipelineCommand {
     /// A new pipeline.
@@ -3359,11 +3371,14 @@ pub enum PipelineCommand {
     /// Run it: code spaces are approved first; `-` feeds standard input to `-` sources.
     Run {
         pipeline: String,
-        /// `-`: read standard input (CSV, JSON, NDJSON).
+        /// `-`: read standard input raw, for a parser node such as code:parse-csv.
         stdin: Option<String>,
         /// With `-`: run on every N rows as they arrive.
         #[arg(long, default_value_t = 0)]
         chunk: usize,
+        /// With --chunk: repeat the first line (a header) at the top of every chunk.
+        #[arg(long)]
+        keep_header: bool,
         #[arg(long)]
         json: bool,
     },
@@ -3404,17 +3419,18 @@ pub enum PipelineCommand {
   mnnn pipe search:usdt code:fast journal:Raw code:smooth --to journal:Notes
   mnnn pipe \"bars where symbol = BTC/USDT limit 500\" fast
   mnnn pipe journal:Notes code:wordcount --json
-  cat trades.csv | mnnn pipe - code:fast --to model:trades
-  tail -f feed.ndjson | mnnn pipe - code:fast --chunk 100 --to journal:Feed")]
+  cat trades.csv | mnnn pipe - --format csv code:fast --to model:trades
+  tail -f feed.ndjson | mnnn pipe - --format ndjson code:fast --chunk 100 --to journal:Feed")]
 pub struct PipeArgs {
     /// Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a
-    /// bare model query), or `-` for standard input (CSV, JSON, NDJSON).
+    /// bare model query), or `-` for standard input (raw text: add a parser step, or --format).
     pub source: String,
     /// Steps in order: code:SPACE (or a space name), search:NAME (keeps the rows it
     /// matches), or a save that passes the data on unchanged, like `tee`: journal:NAME (a
-    /// new entry with the data) or model:NAME (new records). Save at any step, many times.
+    /// new entry with the data), model:NAME (new records), project:NAME[/J], org:ORG[/J] or net[:EXCHANGE|all][/J] (a journal
+    /// entry kept in the project, given to the org, shared on the network). Save at any step.
     pub steps: Vec<String>,
-    /// Save the final output too (journal:NAME or model:NAME; repeatable).
+    /// Save the final output too (any save above; repeatable).
     #[arg(long)]
     pub to: Vec<String>,
     /// Print the output frame as JSON.
@@ -3423,10 +3439,19 @@ pub struct PipeArgs {
     /// Table rows to print (0: all).
     #[arg(long, default_value_t = 30)]
     pub rows: usize,
-    /// With `-` (standard input) as the source: run the pipe on every N rows as they
-    /// arrive (CSV or NDJSON), so an open TUI sees it progress. 0: all at once.
+    /// With `-` (standard input) as the source: run the pipe on every N lines as they
+    /// arrive, so an open TUI sees it progress. 0: all at once.
     #[arg(long, default_value_t = 0)]
     pub chunk: usize,
+    /// With `-`: parse standard input with a built-in parser code space first (csv, json,
+    /// ndjson), shown as the pipe's first step. Without it the data arrives raw (a `text`
+    /// column) for your own parser step.
+    #[arg(long)]
+    pub format: Option<String>,
+    /// With --chunk: repeat the first line (a header) at the top of every chunk (implied
+    /// by --format csv).
+    #[arg(long)]
+    pub keep_header: bool,
 }
 
 #[derive(Debug, Args)]

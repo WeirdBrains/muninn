@@ -6,10 +6,16 @@ fn err(o: &std::process::Output) -> String {
     String::from_utf8_lossy(&o.stderr).to_string()
 }
 
+fn has_cargo() -> bool {
+    std::process::Command::new("cargo").arg("--version").output().map(|o| o.status.success()).unwrap_or(false)
+}
+
 fn feed(e: &Env, args: &[&str], input: &str) -> std::process::Output {
     use std::io::Write;
     let mut c = e
         .cmd()
+        .env("HOME", std::env::var("HOME").unwrap_or_default())
+        .env("MUNINN_CODE_TARGET", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("code-target"))
         .args(args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -22,19 +28,36 @@ fn feed(e: &Env, args: &[&str], input: &str) -> std::process::Output {
 
 #[test]
 fn pipelines_are_validated_stored_run_and_removed() {
+    if !has_cargo() {
+        eprintln!("skipped: no cargo (the CSV parser is a Rust code space)");
+        return;
+    }
     let e = Env::new();
+    e.ok(&["code", "parsers", "--install"]);
     e.ok(&["model", "create", "Ticks", "--fields", "sym:text; px:real"]);
     e.ok(&["model", "create", "Prices", "--fields", "px:real"]);
     e.ok(&["journal", "new", "Raw"]);
     // a leaf that is not a model table is refused at run time and shown
-    e.ok(&["pipeline", "create", "feed", "--node", "in=-+journal:Raw", "--node", "v=view:table:px", "--edge", "in>v"]);
+    e.ok(&[
+        "pipeline",
+        "create",
+        "feed",
+        "--node",
+        "in=-+journal:Raw",
+        "--node",
+        "c=code:parse-csv",
+        "--node",
+        "v=view:table:px",
+        "--edge",
+        "in>c>v",
+    ]);
     assert!(e.ok(&["pipeline", "show", "feed"]).contains("every leaf is a model table"));
-    let o = feed(&e, &["pipeline", "run", "feed", "-"], "sym,px\nBTC,1\n");
+    let o = feed(&e, &["-y", "pipeline", "run", "feed", "-"], "sym,px\nBTC,1\n");
     assert!(!o.status.success() && err(&o).contains("not valid"), "{}", err(&o));
     // fan-out: one input, computed once, into two tables
-    e.ok(&["pipeline", "edit", "feed", "--node", "t=model:Ticks", "--node", "p=model:Prices", "--edge", "in>t", "--edge", "v>p"]);
+    e.ok(&["pipeline", "edit", "feed", "--node", "t=model:Ticks", "--node", "p=model:Prices", "--edge", "c>t", "--edge", "v>p"]);
     assert!(!e.ok(&["pipeline", "show", "feed"]).contains('!'));
-    let o = feed(&e, &["pipeline", "run", "feed", "-", "--chunk", "2", "--json"], "sym,px\nBTC,1\nETH,2\nSOL,3\n");
+    let o = feed(&e, &["-y", "pipeline", "run", "feed", "-", "--chunk", "2", "--keep-header", "--json"], "sym,px\nBTC,1\nETH,2\nSOL,3\n");
     assert!(o.status.success(), "{}", err(&o));
     let n = |m: &str| serde_json::from_str::<serde_json::Value>(&e.ok(&["model", "record", "list", m, "--json"])).unwrap().as_array().unwrap().len();
     assert_eq!((n("Ticks"), n("Prices")), (3, 3));

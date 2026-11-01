@@ -8,7 +8,7 @@ mnnn\-pipeline\-run \- Run it: code spaces are approved first; `\-` feeds standa
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn pipeline run\fR [\fB\-\-chunk\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPIPELINE\fR> [\fISTDIN\fR] 
+\fBmnnn pipeline run\fR [\fB\-\-chunk\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-keep\-header\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPIPELINE\fR> [\fISTDIN\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -31,6 +31,9 @@ Database file (default <home>/storage/muninn.database)
 .RS
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
+.TP
+\fB\-\-keep\-header\fR
+With \-\-chunk: repeat the first line (a header) at the top of every chunk
 .TP
 \fB\-\-json\fR
 
@@ -81,7 +84,7 @@ Print help
 
 .TP
 [\fISTDIN\fR]
-`\-`: read standard input (CSV, JSON, NDJSON)
+`\-`: read standard input raw, for a parser node such as code:parse\-csv
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION

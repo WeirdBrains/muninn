@@ -108,7 +108,7 @@ pub fn run(ctx: &Ctx, c: PipelineCommand) -> anyhow::Result<()> {
                 }
             }
         }
-        PipelineCommand::Run { pipeline, stdin, chunk, json } => {
+        PipelineCommand::Run { pipeline, stdin, chunk, keep_header, json } => {
             let p = store.find_pipeline(&pipeline)?;
             for n in p.graph.code_spaces() {
                 super::code::ensure_approved(ctx, &store, &store.find_code_space(&n)?)?;
@@ -145,7 +145,7 @@ pub fn run(ctx: &Ctx, c: PipelineCommand) -> anyhow::Result<()> {
                 Some("-") if chunk == 0 => {
                     let mut text = String::new();
                     std::io::stdin().read_to_string(&mut text)?;
-                    go(Some(code::pipe::read_data(&text, "stdin")?))?
+                    go(Some(code::parsers::raw_frame(&text, "stdin")))?
                 }
                 Some("-") => {
                     let (mut head, mut buf): (Option<String>, Vec<String>) = (None, vec![]);
@@ -154,14 +154,14 @@ pub fn run(ctx: &Ctx, c: PipelineCommand) -> anyhow::Result<()> {
                             return Ok(());
                         }
                         let text = head.iter().cloned().chain(buf.drain(..)).collect::<Vec<_>>().join("\n");
-                        go(Some(code::pipe::read_data(&text, "stdin")?))
+                        go(Some(code::parsers::raw_frame(&text, "stdin")))
                     };
                     for line in std::io::stdin().lines() {
                         let line = line?;
                         if line.trim().is_empty() {
                             continue;
                         }
-                        if head.is_none() && buf.is_empty() && !line.trim_start().starts_with('{') {
+                        if keep_header && head.is_none() && buf.is_empty() {
                             head = Some(line);
                             continue;
                         }

@@ -28,8 +28,8 @@ pub enum Source {
     Code(String),
     /// Data given as is: a frame (`{model, fields, ids, columns, groups}`).
     Frame(Value),
-    /// Standard input (`-`): CSV, a JSON array of objects, NDJSON or a frame; the CLI
-    /// reads it ([`read_data`]) and pipes it in as a frame.
+    /// Standard input (`-`): passed on raw, as text in one `text` column; a parser code
+    /// space step (`parse-csv`, `parse-json`, `parse-ndjson`, or your own) shapes it.
     Stdin,
 }
 
@@ -307,12 +307,20 @@ pub enum Step {
 
 impl Step {
     pub fn parse(s: &str) -> Result<Step> {
+        if s.trim().eq_ignore_ascii_case("net") {
+            return Ok(Step::Save(Sink::Net(None, None)));
+        }
         match s.trim().split_once(':') {
             Some((k, n)) if k.eq_ignore_ascii_case("search") && !n.trim().is_empty() => Ok(Step::Search(n.trim().into())),
             Some((k, n)) if k.eq_ignore_ascii_case("code") && !n.trim().is_empty() => Ok(Step::Code(n.trim().into())),
-            Some((k, _)) if ["journal", "model"].contains(&k.trim().to_ascii_lowercase().as_str()) => Ok(Step::Save(Sink::parse(s)?)),
+            Some((k, _)) if ["journal", "model", "project", "org", "net"].contains(&k.trim().to_ascii_lowercase().as_str()) => {
+                Ok(Step::Save(Sink::parse(s)?))
+            }
             None if !s.trim().is_empty() => Ok(Step::Code(s.trim().into())),
-            _ => Err(Error::invalid("pipe", format!("`{s}`: a step is code:SPACE (or a space name), search:NAME, journal:NAME or model:NAME"))),
+            _ => Err(Error::invalid(
+                "pipe",
+                format!("`{s}`: a step is code:SPACE (or a space name), search:NAME, or a save: journal:, model:, project:, org: or net"),
+            )),
         }
     }
     pub fn text(&self) -> String {
@@ -331,20 +339,60 @@ pub enum Sink {
     Journal(String),
     /// New records of a model (columns named like its fields).
     Model(String),
+    /// An entry in a journal of a project (`project:NAME[/JOURNAL]`; made in it if new).
+    Project(String, Option<String>),
+    /// An entry in a journal given to an org (`org:ORG[/JOURNAL]`; made and given if new).
+    Org(String, Option<String>),
+    /// An entry in a journal shared with exchanges (`net`, `net:EXCHANGE[/JOURNAL]`).
+    Net(Option<String>, Option<String>),
+}
+
+/// The journal a project, org or net save writes into when none is named.
+pub const OUTPUT_JOURNAL: &str = "Pipe output";
+
+fn split_journal(n: &str) -> (String, Option<String>) {
+    match n.split_once('/') {
+        Some((a, j)) if !j.trim().is_empty() => (a.trim().to_string(), Some(j.trim().to_string())),
+        _ => (n.trim().trim_end_matches('/').to_string(), None),
+    }
 }
 
 impl Sink {
     pub fn parse(s: &str) -> Result<Sink> {
-        match s.trim().split_once(':') {
+        let t = s.trim();
+        if t.eq_ignore_ascii_case("net") || t.eq_ignore_ascii_case("net:") {
+            return Ok(Sink::Net(None, None));
+        }
+        match t.split_once(':') {
             Some((k, n)) if k.eq_ignore_ascii_case("journal") && !n.trim().is_empty() => Ok(Sink::Journal(n.trim().into())),
             Some((k, n)) if k.eq_ignore_ascii_case("model") && !n.trim().is_empty() => Ok(Sink::Model(n.trim().into())),
-            _ => Err(Error::invalid("pipe", format!("`{s}`: a target is journal:NAME or model:NAME"))),
+            Some((k, n)) if k.eq_ignore_ascii_case("project") && !n.trim().is_empty() => {
+                let (a, j) = split_journal(n);
+                Ok(Sink::Project(a, j))
+            }
+            Some((k, n)) if k.eq_ignore_ascii_case("org") && !n.trim().is_empty() => {
+                let (a, j) = split_journal(n);
+                Ok(Sink::Org(a, j))
+            }
+            Some((k, n)) if k.eq_ignore_ascii_case("net") => {
+                let (a, j) = split_journal(n);
+                Ok(Sink::Net((!a.is_empty() && !a.eq_ignore_ascii_case("all")).then_some(a), j))
+            }
+            _ => Err(Error::invalid(
+                "pipe",
+                format!("`{s}`: a target is journal:NAME, model:NAME, project:NAME[/JOURNAL], org:ORG[/JOURNAL] or net[:EXCHANGE][/JOURNAL]"),
+            )),
         }
     }
     pub fn text(&self) -> String {
+        let j = |j: &Option<String>| j.as_ref().map(|j| format!("/{j}")).unwrap_or_default();
         match self {
             Sink::Journal(n) => format!("journal:{n}"),
             Sink::Model(n) => format!("model:{n}"),
+            Sink::Project(p, x) => format!("project:{p}{}", j(x)),
+            Sink::Org(o, x) => format!("org:{o}{}", j(x)),
+            Sink::Net(None, None) => "net".into(),
+            Sink::Net(e, x) => format!("net:{}{}", e.clone().unwrap_or_else(|| "all".into()), j(x)),
         }
     }
 }
@@ -491,6 +539,7 @@ fn run_hops(
 
 /// Data from outside (standard input) as a frame: a frame as is, a JSON array of objects,
 /// NDJSON (one object a line) or CSV with a header row. Numbers read as numbers.
+#[cfg(test)]
 pub fn read_data(text: &str, name: &str) -> Result<Value> {
     let t = text.trim_start();
     let rows: Vec<Map<String, Value>> = if t.starts_with('[') {
@@ -514,6 +563,7 @@ pub fn read_data(text: &str, name: &str) -> Result<Value> {
     Ok(rows_frame(name, &rows))
 }
 
+#[cfg(test)]
 fn obj(v: Value) -> Result<Map<String, Value>> {
     match v {
         Value::Object(m) => Ok(m),
@@ -521,6 +571,7 @@ fn obj(v: Value) -> Result<Map<String, Value>> {
     }
 }
 
+#[cfg(test)]
 fn cell(s: &str) -> Value {
     match s.trim().parse::<f64>() {
         Ok(n) if n.is_finite() => json!(n),
@@ -594,6 +645,26 @@ pub fn save(store: &Store, origin: &str, sink: &Sink, f: &Value, last: Option<(&
     deliver(store, origin, sink, f, last.as_ref(), hops)
 }
 
+/// A journal by name, made when there is none.
+fn output_journal(store: &Store, name: &str) -> Result<crate::store::Journal> {
+    match store.find_journal(name) {
+        Ok(j) => Ok(j),
+        Err(_) => store.create_journal(name, None, crate::store::EntryFormat::Markdown),
+    }
+}
+
+/// `name`, or `name 2`, `name 3`… when a journal has it already (journal names are unique).
+fn unique_journal(store: &Store, name: &str) -> Result<String> {
+    let names: Vec<String> = store.journals()?.into_iter().map(|j| j.name.to_lowercase()).collect();
+    let mut n = name.to_string();
+    let mut i = 2;
+    while names.contains(&n.to_lowercase()) {
+        n = format!("{name} {i}");
+        i += 1;
+    }
+    Ok(n)
+}
+
 fn deliver(store: &Store, origin: &str, sink: &Sink, f: &Value, last: Option<&(CodeSpace, RunInfo)>, hops: &str) -> Result<String> {
     match sink {
         Sink::Journal(n) => {
@@ -615,6 +686,37 @@ fn deliver(store: &Store, origin: &str, sink: &Sink, f: &Value, last: Option<&(C
                     .params(json!({ "journal": j.id, "entry": e.id, "pipe": hops })),
             );
             Ok(e.id)
+        }
+        Sink::Project(p, j) => {
+            let p = store.find_project(p)?;
+            let name = j.clone().unwrap_or_else(|| OUTPUT_JOURNAL.to_string());
+            let jr =
+                match store.journals()?.into_iter().find(|x| x.name.eq_ignore_ascii_case(&name) && x.project_id.as_deref() == Some(p.id.as_str())) {
+                    Some(x) => x,
+                    None => {
+                        let x = store.create_journal(&unique_journal(store, &name)?, Some(&p.id), crate::store::EntryFormat::Markdown)?;
+                        let _ = store.add_project_item(&p.id, crate::store::ItemKind::Journal, &x.id, json!({}));
+                        x
+                    }
+                };
+            let e = deliver(store, origin, &Sink::Journal(jr.id.clone()), f, last, hops)?;
+            Ok(format!("project {} · journal {} · entry {e}", p.name, jr.name))
+        }
+        Sink::Org(o, j) => {
+            let org = store.find_org(o)?;
+            let jr = output_journal(store, j.as_deref().unwrap_or(&format!("{} {}", org.name, OUTPUT_JOURNAL.to_lowercase())))?;
+            let e = deliver(store, origin, &Sink::Journal(jr.id.clone()), f, last, hops)?;
+            crate::org::transfer(store, origin, &crate::org::Actor::Owner, &org, crate::store::ShareKind::Journal, &jr.id, None)?;
+            Ok(format!("org {} · journal {} · entry {e}", org.name, jr.name))
+        }
+        Sink::Net(x, j) => {
+            let jr = output_journal(store, j.as_deref().unwrap_or("Shared pipe output"))?;
+            let e = deliver(store, origin, &Sink::Journal(jr.id.clone()), f, last, hops)?;
+            let with: Vec<String> = x.iter().cloned().collect();
+            let made = crate::net::client::share(store, crate::store::ShareKind::Journal, &jr.id, &with, origin)?;
+            let fresh = made.iter().any(|(_, n)| *n);
+            let to = x.clone().unwrap_or_else(|| "every exchange".into());
+            Ok(format!("journal {} shared with {to}{} · entry {e}", jr.name, if fresh { "" } else { " (already)" }))
         }
         Sink::Model(n) => {
             let m = store.find_model(n)?;
@@ -673,7 +775,7 @@ mod tests {
             assert_eq!(Source::parse(t).unwrap().text(), t);
         }
         assert_eq!(Source::of(Source::parse("code:x").unwrap().input()), Source::Code("x".into()));
-        assert!(Step::parse("tee:x").is_err() && Sink::parse("org:x").is_err());
+        assert!(Step::parse("tee:x").is_err() && Sink::parse("bogus:x").is_err());
         assert_eq!(Step::parse("journal:Out").unwrap(), Step::Save(Sink::Journal("Out".into())));
     }
 }

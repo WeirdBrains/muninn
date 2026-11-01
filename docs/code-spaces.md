@@ -298,7 +298,10 @@ mnnn code sdk [--out DIR]                      # the plugin SDK
 ```
 
 `SPACE` is an id, a unique id prefix or a name; `mnnn codes` is an alias. `--file -`
-reads standard input; `--editor` opens `$VISUAL` or `$EDITOR`.
+reads standard input; `--editor` opens `$VISUAL` or `$EDITOR`. `--from SPACE` starts from a
+copy of another code space or a built-in parser (`parse-csv`, `parse-json`, `parse-ndjson`,
+`to-bars`; `mnnn code parsers`). Parsers are code spaces: Muninn passes raw data through
+and code shapes it ([pipes](pipes.md#parsers)).
 
 ## Terminal UI
 

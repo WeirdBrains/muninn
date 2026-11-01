@@ -7,6 +7,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ## [Unreleased]
 
 ### Added
+- Parser code spaces: sources pass data through raw (standard input as one `text` column) and code shapes it; built-in parse-csv, parse-json, parse-ndjson and to-bars ship as templates (mnnn code parsers [--install|--show], code create --from); mnnn pipe - --format csv|json|ndjson puts the parser in as a visible first step; --keep-header for chunked CSV
+- Pipe saves to projects, organizations and the network (project:NAME[/J], org:ORG[/J], net[:EXCHANGE|all][/J]), also from the TUI > picker
 - Pipelines over Share (projects, journals) and the network: net share/fetch carry the pipeline file; a peer's pipeline and the models it brings arrive as drafts (mnnn pipeline approve, A in the Designer), its code unapproved
 - Pipeline Designer (E, Projects ▸ Pipelines…): make and edit pipelines node by node, validated as you go; M ends a branch in a model table (made when new, fields from what passed there); run off the UI thread, open the monitor, export and import (plan first, rename or merge)
 - Data tiles: a code space's result as a chart (time x, numeric series) or table (t), with columns or series picked (c), updating on every run and on runs anywhere on the same home; running a pipeline opens its view nodes as tiles side by side (three views: three live columns); a pipeline monitor tile with each node's status, rows in/out, rate, last update, errors and rows landed
@@ -18,6 +20,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Pipes: code spaces work on data piped in and keep none of it. Any live search (records, series, journals), journal, model query or code space output is a source; steps are code spaces and search filters; saves to journals and models branch off at any step while the data flows on (mnnn pipe, share to a code space, TUI >)
 
 ### Changed
+- Standard input to a pipe or pipeline is no longer parsed by Muninn: add a parser step (or --format)
+- Series sources give their rows as the bars model stores them, not a separate bar shape
 - Bars are the records of the built-in bars model, kept in its own table; upgrading moves every bar and every value stored on bars losslessly (same ids)
 
 ## [2.15.0] - 2026-10-31

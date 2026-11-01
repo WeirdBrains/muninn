@@ -25,6 +25,7 @@ pub mod abi;
 pub mod bars;
 pub mod host;
 pub mod math;
+pub mod parsers;
 pub mod pipe;
 pub mod pipeline;
 pub mod png;

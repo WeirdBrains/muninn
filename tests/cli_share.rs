@@ -2,6 +2,14 @@
 mod common;
 use common::*;
 
+fn has_cargo() -> bool {
+    std::process::Command::new("cargo").arg("--version").output().map(|o| o.status.success()).unwrap_or(false)
+}
+
+fn nums(v: &serde_json::Value) -> Vec<f64> {
+    v.as_array().map(|a| a.iter().filter_map(|x| x.as_f64()).collect()).unwrap_or_default()
+}
+
 fn err(o: &std::process::Output) -> String {
     String::from_utf8_lossy(&o.stderr).to_string()
 }
@@ -65,6 +73,8 @@ fn standard_input_is_a_pipe_source_in_one_go_or_in_chunks() {
     let feed = |args: &[&str], input: &str| {
         let mut c = e
             .cmd()
+            .env("HOME", std::env::var("HOME").unwrap_or_default())
+            .env("MUNINN_CODE_TARGET", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("code-target"))
             .args(args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
@@ -74,23 +84,51 @@ fn standard_input_is_a_pipe_source_in_one_go_or_in_chunks() {
         c.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
         c.wait_with_output().unwrap()
     };
-    // CSV, all at once: saved to a journal on the way, then into a model
-    let o = feed(&["pipe", "-", "journal:Feed", "--to", "model:Ticks", "--json"], "sym,px\n\"BTC, spot\",42000.5\nETH,3000\n");
+    // raw: no parser, the text arrives as it is, one `text` column
+    let o = feed(&["pipe", "-", "--json"], "sym,px\nBTC,1\n");
     assert!(o.status.success(), "{}", err(&o));
     let j: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
-    assert_eq!(j["output"]["columns"]["px"], serde_json::json!([42000.5, 3000.0]), "{j}");
-    assert_eq!(j["output"]["columns"]["sym"][0], "BTC, spot", "{j}");
-    let recs: serde_json::Value = serde_json::from_str(&e.ok(&["model", "record", "list", "Ticks", "--json"])).unwrap();
-    assert_eq!(recs.as_array().unwrap().len(), 2, "{recs}");
-    // NDJSON in chunks of 2: three pipe runs, each recorded with its hops
-    let o = feed(&["pipe", "-", "--to", "journal:Feed", "--chunk", "2"], "{\"a\":1}\n{\"a\":2}\n{\"a\":3}\n{\"a\":4}\n{\"a\":5}\n");
+    assert_eq!(j["output"]["columns"]["text"], serde_json::json!(["sym,px\nBTC,1\n"]), "{j}");
+    // raw lines in chunks of 2: three pipe runs, each recorded with its hops
+    let o = feed(&["pipe", "-", "--to", "journal:Feed", "--chunk", "2"], "a\nb\nc\nd\ne\n");
     assert!(o.status.success(), "{}", err(&o));
     let h = e.ok(&["history", "list", "--json"]);
     let hist: serde_json::Value = serde_json::from_str(&h).unwrap();
     let kinds: Vec<&str> = hist.as_array().unwrap().iter().filter_map(|a| a["kind"].as_str()).collect();
     assert_eq!(kinds.iter().filter(|k| **k == "pipe.run").count(), 4, "{kinds:?}");
     assert!(kinds.contains(&"pipe.hop") && kinds.contains(&"pipe.start"));
-    // JSON array too; bad input is refused
-    assert!(feed(&["pipe", "-", "--json"], "[{\"x\":1},{\"x\":2}]").status.success());
-    assert!(!feed(&["pipe", "-"], "[1,2]").status.success());
+    assert!(!feed(&["pipe", "journal:Feed", "--format", "csv"], "").status.success(), "--format is for stdin");
+    assert!(!feed(&["pipe", "-", "--format", "xml"], "").status.success());
+    if !has_cargo() {
+        eprintln!("skipped the parser half: no cargo");
+        return;
+    }
+    // --format csv: the built-in parser installed and shown as the first step
+    let o =
+        feed(&["-y", "pipe", "-", "journal:Feed", "--to", "model:Ticks", "--json", "--format", "csv"], "sym,px\n\"BTC, spot\",42000.5\nETH,3000\n");
+    assert!(o.status.success(), "{}", err(&o));
+    assert!(err(&o).contains("code:parse-csv"), "{}", err(&o));
+    let j: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+    assert_eq!(nums(&j["output"]["columns"]["px"]), vec![42000.5, 3000.0], "{j}");
+    assert_eq!(j["output"]["columns"]["sym"][0], "BTC, spot", "{j}");
+    let recs: serde_json::Value = serde_json::from_str(&e.ok(&["model", "record", "list", "Ticks", "--json"])).unwrap();
+    assert_eq!(recs.as_array().unwrap().len(), 2, "{recs}");
+    // the other built-ins, and to-bars after a parser
+    for (fmt, input) in [("ndjson", "{\"x\":1}\n{\"x\":2}\n"), ("json", "[{\"x\":1},{\"x\":2}]")] {
+        let o = feed(&["-y", "pipe", "-", "--json", "--format", fmt], input);
+        assert!(o.status.success(), "{fmt}: {}", err(&o));
+        let j: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+        assert_eq!(nums(&j["output"]["columns"]["x"]), vec![1.0, 2.0], "{fmt}: {j}");
+    }
+    assert!(e.ok(&["code", "parsers"]).contains("not installed (--install)"));
+    e.ok(&["code", "parsers", "--install"]);
+    let o = feed(&["-y", "pipe", "-", "code:to-bars", "--json", "--format", "csv"], "time,open,high,low,close,vol\n1700000000000,1,2,0.5,1.5,10\n");
+    assert!(o.status.success(), "{}", err(&o));
+    let j: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+    assert_eq!(nums(&j["output"]["columns"]["close"]), vec![1.5], "{j}");
+    // the templates are ordinary code spaces: shown, copied
+    assert!(e.ok(&["code", "parsers"]).contains("installed"));
+    assert!(e.ok(&["code", "parsers", "--show", "to-bars"]).contains("pub fn run"));
+    e.ok(&["code", "create", "my-csv", "--from", "parse-csv"]);
+    assert!(e.ok(&["code", "show", "my-csv"]).contains("pub fn run"));
 }

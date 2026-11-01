@@ -11,12 +11,13 @@ mnnn pipeline create flow --node src=search:usdt --node a=code:fast --node b=cod
   --node fa=model:Fast --node sb=model:Slow --edge 'src>a>fa' --edge 'src>b>sb'
 mnnn pipeline show flow        # in order, with anything wrong marked !
 mnnn pipeline run flow         # asks to approve new code first
-cat trades.csv | mnnn pipeline run feed - --chunk 500
+cat trades.csv | mnnn pipeline run feed - --chunk 500 --keep-header   # feed: in=- > c=code:parse-csv > …
 mnnn pipeline export flow --out flow.json
 mnnn pipeline import flow.json --dry-run      # the plan; then without --dry-run
 ```
 
-Nodes are `ID=KIND`: `search:NAME`, `journal:NAME`, `source:QUERY` or `-` (stdin) as
+Nodes are `ID=KIND`: `search:NAME`, `journal:NAME`, `source:QUERY` or `-` (stdin, raw
+text: follow it with a parser node such as `code:parse-csv`, see [pipes](pipes.md#parsers)) as
 sources; `code:SPACE`; `view:table|chart[:col,col]`; `filter:SEARCH`; `model:NAME`.
 Saves along the way: `raw=code:fast+journal:Raw`. Edges are `FROM>TO[:NAME]` and chain
 (`a>b>c`); a code space with several inputs reads `host.input()` (the first) or
@@ -127,7 +128,7 @@ drafts to approve, as models do.
 ## Order of work
 
 1. Pipe layer: sources of every kind, code steps, filters, tees, cycles, history (done).
-2. Stdin source (CSV/JSON/NDJSON, chunked) and live hop records with the Pipes window (done).
+2. Stdin source (raw, parsed by parser code spaces; chunked) and live hop records with the Pipes window (done).
 3. Pipeline object: storage, DAG run with fan-out/fan-in, validation, CLI, export/import (done).
 4. Designer window, monitor tile, code space tile with a result chart, views as tiles (done).
 5. Pipelines over Share and `net share`/`net fetch` (peer pipelines as drafts) (done).

@@ -8,7 +8,7 @@ mnnn\-pipe \- Pipe data through code spaces: a source (a live search of any kind
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn pipe\fR [\fB\-\-home\fR] [\fB\-\-to\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rows\fR] [\fB\-\-chunk\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISOURCE\fR> [\fISTEPS\fR] 
+\fBmnnn pipe\fR [\fB\-\-home\fR] [\fB\-\-to\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rows\fR] [\fB\-\-chunk\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-format\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-keep\-header\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISOURCE\fR> [\fISTEPS\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -24,7 +24,7 @@ May also be specified with the \fBMUNINN_HOME\fR environment variable.
 .RE
 .TP
 \fB\-\-to\fR \fI<TO>\fR
-Save the final output too (journal:NAME or model:NAME; repeatable)
+Save the final output too (any save above; repeatable)
 .TP
 \fB\-\-db\fR \fI<PATH>\fR
 Database file (default <home>/storage/muninn.database)
@@ -45,16 +45,22 @@ May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable
 Table rows to print (0: all)
 .TP
 \fB\-\-chunk\fR \fI<CHUNK>\fR [default: 0]
-With `\-` (standard input) as the source: run the pipe on every N rows as they arrive (CSV or NDJSON), so an open TUI sees it progress. 0: all at once
+With `\-` (standard input) as the source: run the pipe on every N lines as they arrive, so an open TUI sees it progress. 0: all at once
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
+.TP
+\fB\-\-format\fR \fI<FORMAT>\fR
+With `\-`: parse standard input with a built\-in parser code space first (csv, json, ndjson), shown as the pipe\*(Aqs first step. Without it the data arrives raw (a `text` column) for your own parser step
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
+.TP
+\fB\-\-keep\-header\fR
+With \-\-chunk: repeat the first line (a header) at the top of every chunk (implied by \-\-format csv)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -84,10 +90,10 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 Print help
 .TP
 <\fISOURCE\fR>
-Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a bare model query), or `\-` for standard input (CSV, JSON, NDJSON)
+Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a bare model query), or `\-` for standard input (raw text: add a parser step, or \-\-format)
 .TP
 [\fISTEPS\fR]
-Steps in order: code:SPACE (or a space name), search:NAME (keeps the rows it matches), or a save that passes the data on unchanged, like `tee`: journal:NAME (a new entry with the data) or model:NAME (new records). Save at any step, many times
+Steps in order: code:SPACE (or a space name), search:NAME (keeps the rows it matches), or a save that passes the data on unchanged, like `tee`: journal:NAME (a new entry with the data), model:NAME (new records), project:NAME[/J], org:ORG[/J] or net[:EXCHANGE|all][/J] (a journal entry kept in the project, given to the org, shared on the network). Save at any step
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION

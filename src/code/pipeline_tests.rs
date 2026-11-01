@@ -177,3 +177,41 @@ fn pipelines_export_and_import() {
     assert!(again.merge);
     assert_eq!(import(&b, &back, &again).unwrap().version, 2);
 }
+
+/// Saves (tees) to a project, an org and the network: each lands as a journal entry in a
+/// journal that belongs there, made the first time; the data flows on.
+#[test]
+fn saves_go_to_projects_orgs_and_the_network() {
+    use crate::code::pipe::{self, Sink, Source, Step};
+    let s = store();
+    fixture(&s);
+    let pr = s.create_project("Alpha", "").unwrap();
+    let org = crate::org::create(&s, "test", "Lab", None, "").unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    for t in ["project:Alpha", "org:lab/Lab notes", "net", "net:all/Shared out"] {
+        let k = Sink::parse(t).unwrap();
+        assert_eq!(Sink::parse(&k.text()).unwrap(), k, "{t}");
+    }
+    assert!(Sink::parse("project:").is_err());
+    let steps: Vec<Step> = ["project:Alpha", "org:lab/Lab notes", "net"].iter().map(|x| Step::parse(x).unwrap()).collect();
+    let r = pipe::run(&s, &CodeEnv::new(dir.path()), "test", &Source::Journal("Notes".into()), &steps, &[Sink::Model("All".into())], &mut |_| {})
+        .unwrap();
+    assert_eq!(r.saved.len(), 4, "{:?}", r.saved);
+    // the project's own output journal, an item of the project
+    let pj = s.journals().unwrap().into_iter().find(|j| j.project_id.as_deref() == Some(pr.id.as_str())).expect("a project journal");
+    assert_eq!(pj.name, pipe::OUTPUT_JOURNAL);
+    assert!(s.project_items(&pr.id).unwrap().iter().any(|i| i.ref_id == pj.id));
+    assert_eq!(s.entries(&pj.id).unwrap().len(), 1);
+    // the org holds its journal
+    let lj = s.find_journal("Lab notes").unwrap();
+    assert!(s.resources(&org.id).unwrap().iter().any(|x| x.ref_id == lj.id));
+    // shared with every exchange
+    assert!(s.shares().unwrap().iter().any(|x| x.kind == crate::store::ShareKind::Journal && x.exchange_id.is_none()));
+    // and the rows still reached the end
+    assert_eq!(col(&s, "All", "words"), vec![2.0, 4.0]);
+    // again: the same journals, one more entry each, no second share
+    pipe::run(&s, &CodeEnv::new(dir.path()), "test", &Source::Journal("Notes".into()), &steps, &[], &mut |_| {}).unwrap();
+    assert_eq!(s.entries(&pj.id).unwrap().len(), 2);
+    assert_eq!(s.resources(&org.id).unwrap().len(), 1);
+    assert_eq!(s.shares().unwrap().len(), 1);
+}

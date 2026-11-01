@@ -156,9 +156,38 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
     }
     let store = ctx.open_store()?;
     match cmd {
-        CodeCommand::Create { name, lang, source, input, description, project } => {
-            let lang = lang.lang();
-            let src = source_of(&source, lang, None)?.unwrap_or_else(|| code::template(lang).to_string());
+        CodeCommand::Parsers { install, show } => {
+            if let Some(n) = show {
+                let b = code::parsers::builtin(&n).ok_or_else(|| anyhow::anyhow!("no built-in `{n}` (see `mnnn code parsers`)"))?;
+                print!("{}", b.source);
+                return Ok(());
+            }
+            for b in code::parsers::BUILTINS {
+                let have = store.find_code_space(b.name).ok();
+                let state = match (&have, install) {
+                    (Some(_), _) => "installed".to_string(),
+                    (None, true) => {
+                        code::parsers::install(&store, "cli", b)?;
+                        "installed now (approve it on first run)".to_string()
+                    }
+                    (None, false) => "not installed (--install)".to_string(),
+                };
+                println!("{:<14} {:<60} {state}", b.name, b.about);
+            }
+        }
+        CodeCommand::Create { name, lang, from, source, input, description, project } => {
+            let base = match &from {
+                Some(f) => Some(match store.find_code_space(f) {
+                    Ok(c) => (c.lang, c.source),
+                    Err(_) => {
+                        let b = code::parsers::builtin(f).ok_or_else(|| anyhow::anyhow!("no code space or built-in `{f}`"))?;
+                        (crate::store::Lang::Rust, b.source.to_string())
+                    }
+                }),
+                None => None,
+            };
+            let lang = lang.map(|l| l.lang()).or(base.as_ref().map(|b| b.0)).expect("clap requires --lang or --from");
+            let src = source_of(&source, lang, None)?.or(base.map(|b| b.1)).unwrap_or_else(|| code::template(lang).to_string());
             let p = project.map(|p| store.find_project(&p)).transpose()?;
             let c = code::create(&store, "cli", &name, &description, lang, &src, input.input()?)?;
             ctx.io.info(format!("created code space {} ({}); review and run it with `mnnn code run {} -y`", c.name, lang.as_str(), c.name));
@@ -381,17 +410,31 @@ pub(crate) fn run_pipe(
 /// `mnnn pipe`.
 pub fn pipe(ctx: &Ctx, a: super::args::PipeArgs) -> anyhow::Result<()> {
     let store = ctx.open_store()?;
-    use code::pipe::{Source, read_data};
+    use code::parsers::raw_frame;
+    use code::pipe::Source;
     let src = Source::parse(&a.source)?;
-    let steps = a.steps.iter().map(|s| code::pipe::Step::parse(s)).collect::<crate::Result<Vec<_>>>()?;
+    let mut steps = a.steps.iter().map(|s| code::pipe::Step::parse(s)).collect::<crate::Result<Vec<_>>>()?;
+    if let Some(f) = &a.format {
+        if src != Source::Stdin {
+            anyhow::bail!("--format parses standard input: use it with `-`");
+        }
+        let b =
+            code::parsers::for_format(f).ok_or_else(|| anyhow::anyhow!("--format {f}: csv, json or ndjson (or put your own parser step first)"))?;
+        let (c, new) = code::parsers::install(&store, "cli", b)?;
+        if new {
+            ctx.io.note(format!("installed the built-in parser {} (`mnnn code show {}`)", c.name, c.name));
+        }
+        steps.insert(0, code::pipe::Step::Code(c.name));
+    }
     let to = a.to.iter().map(|s| code::pipe::Sink::parse(s)).collect::<crate::Result<Vec<_>>>()?;
+    let keep_header = a.keep_header || a.format.as_deref().is_some_and(|f| f.eq_ignore_ascii_case("csv"));
     if src != Source::Stdin {
         return run_pipe(ctx, &store, &src, &steps, &to, a.json, a.rows);
     }
     if a.chunk == 0 {
         let mut text = String::new();
         std::io::stdin().read_to_string(&mut text)?;
-        return run_pipe(ctx, &store, &Source::Frame(read_data(&text, "stdin")?), &steps, &to, a.json, a.rows);
+        return run_pipe(ctx, &store, &Source::Frame(raw_frame(&text, "stdin")), &steps, &to, a.json, a.rows);
     }
     // streaming: CSV keeps its header for every chunk; NDJSON is a line a row
     let mut head: Option<String> = None;
@@ -403,14 +446,14 @@ pub fn pipe(ctx: &Ctx, a: super::args::PipeArgs) -> anyhow::Result<()> {
         }
         let text = head.iter().cloned().chain(buf.drain(..)).collect::<Vec<_>>().join("\n");
         n += 1;
-        run_pipe(ctx, &store, &Source::Frame(read_data(&text, &format!("stdin#{n}"))?), &steps, &to, a.json, a.rows)
+        run_pipe(ctx, &store, &Source::Frame(raw_frame(&text, &format!("stdin#{n}"))), &steps, &to, a.json, a.rows)
     };
     for line in std::io::stdin().lines() {
         let line = line?;
         if line.trim().is_empty() {
             continue;
         }
-        if head.is_none() && buf.is_empty() && !line.trim_start().starts_with('{') {
+        if keep_header && head.is_none() && buf.is_empty() {
             head = Some(line);
             continue;
         }
