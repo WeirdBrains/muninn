@@ -2,7 +2,8 @@
 
 A plan for a public Muninn relay node on a DigitalOcean droplet. Nodes behind NAT
 reserve a slot on it and are reached through it (see [network](network.md#behind-nat)).
-Nothing here is deployed yet; `relay.example.com` stands for the real domain.
+Nothing here is deployed yet. The relay's name is `relay.muninn.weirdbrains.com`; its DNS
+record has to point at the droplet before anything else works.
 
 | what | value |
 |------|-------|
@@ -24,8 +25,8 @@ useradd --system --home-dir /var/lib/muninn --create-home --shell /usr/sbin/nolo
 
 ## 2. DNS
 
-Add `A relay.example.com → <reserved IPv4>` (and `AAAA` if the droplet has IPv6) at the
-domain's DNS host. Check with `dig +short relay.example.com` before asking for a
+`relay.muninn.weirdbrains.com` must point at the droplet: add `A relay.muninn.weirdbrains.com → <reserved IPv4>` (and `AAAA` if the droplet has IPv6) at the
+domain's DNS host. Check with `dig +short relay.muninn.weirdbrains.com` before asking for a
 certificate.
 
 ## 3. Install Muninn
@@ -57,13 +58,13 @@ for each command):
 
 ```sh
 mnnn keys init --non-interactive          # prints the 24 words and shards: keep them offline
-mnnn net config --label relay --external relay.example.com:4741 --mdns off --autostart off
+mnnn net config --label relay --external relay.muninn.weirdbrains.com:4741 --mdns off --autostart off
 mnnn net relay serve on                   # relay traffic for other nodes
-mnnn org cert acme --domain relay.example.com --email you@example.com   # Let's Encrypt, HTTP-01 on port 80
+mnnn org cert acme --domain relay.muninn.weirdbrains.com --email you@example.com   # Let's Encrypt, HTTP-01 on port 80
 mnnn org host autostart on                # the site (and its ACME renewals) runs with the node
 ```
 
-`--external` puts `/dns4/relay.example.com/tcp/4741` and `…/udp/4741/quic-v1` first in
+`--external` puts `/dns4/relay.muninn.weirdbrains.com/tcp/4741` and `…/udp/4741/quic-v1` first in
 invites and announces them to peers. In `/var/lib/muninn/preferences.toml`, set
 `[hosting] bind = "0.0.0.0"` so Let's Encrypt (port 80) and the site can reach it. The
 certificate is renewed by the running site when a third of its life is left
@@ -129,7 +130,7 @@ Print the relay's address and add it on other nodes:
 
 ```sh
 sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net status
-mnnn net relay add /dns4/relay.example.com/tcp/4741/p2p/<PEER ID>   # on each client node
+mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/<PEER ID>   # on each client node
 ```
 
 ## 8. Upgrades
