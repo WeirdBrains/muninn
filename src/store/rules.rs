@@ -242,6 +242,23 @@ pub enum Then {
     },
     /// Run a code space (only once it is approved); its result becomes its last run (2.5+).
     RunCode { space: String },
+    /// Check org certificates (2.16, the built-in `cert-expiry-watch`): ACME ones with fewer
+    /// than `renew_days` left are renewed by the host; your own notify at `notify_days`
+    /// and on expiry. See [`crate::org::tls::watch`].
+    CertWatch {
+        #[serde(default = "renew_days")]
+        renew_days: i64,
+        #[serde(default = "notify_days")]
+        notify_days: Vec<i64>,
+    },
+}
+
+fn renew_days() -> i64 {
+    30
+}
+
+fn notify_days() -> Vec<i64> {
+    vec![30, 14, 3]
 }
 
 impl Then {
@@ -263,6 +280,7 @@ impl Then {
             Then::RecordUpdate { .. } => "record-update",
             Then::RecordDelete { .. } => "record-delete",
             Then::RunCode { .. } => "run-code",
+            Then::CertWatch { .. } => "cert-watch",
         }
     }
 }
@@ -285,12 +303,25 @@ pub struct RuleSpec {
     /// Only for actions about where the rule lives (its journal, live search or projects).
     #[serde(default)]
     pub related: bool,
+    /// Run on a schedule as well (2.16): the node runs it with a `schedule` action.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule: Option<Schedule>,
 }
 
 impl Default for RuleSpec {
     fn default() -> Self {
-        Self { version: SPEC_VERSION, on: vec![], when: vec![], then: vec![], related: false }
+        Self { version: SPEC_VERSION, on: vec![], when: vec![], then: vec![], related: false, schedule: None }
     }
+}
+
+/// When a scheduled rule runs: every so often (`--every 6h`) or at cron times
+/// (`--cron "0 3 * * *"`, local time). See [`crate::rules::next_run`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Schedule {
+    /// Milliseconds between runs.
+    Every(i64),
+    Cron(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -351,6 +382,8 @@ pub struct RuleRuntime {
     pub(crate) budget: Cell<u32>,
     pub(crate) echo: Cell<bool>,
     pub(crate) off: Cell<bool>,
+    /// An org host serves from this node (scheduled runs say so; see [`crate::org::tls::watch`]).
+    pub(crate) host: Cell<bool>,
 }
 
 const COLS: &str = "id, name, description, owner_kind, owner_id, enabled, spec, author_id, created_at, updated_at, runs, last_run_at, last_status";
@@ -364,8 +397,8 @@ fn check_name(name: &str) -> Result<String> {
 }
 
 fn check_spec(s: &RuleSpec) -> Result<()> {
-    if s.on.iter().all(|o| o.trim().is_empty()) {
-        return Err(Error::invalid("rule", "needs at least one --on action kind (e.g. import, journal.*, *)"));
+    if s.schedule.is_none() && s.on.iter().all(|o| o.trim().is_empty()) {
+        return Err(Error::invalid("rule", "needs at least one --on action kind (e.g. import, journal.*, *) or a schedule (--every, --cron)"));
     }
     if s.then.is_empty() {
         return Err(Error::invalid("rule", "needs at least one --then action"));
@@ -543,6 +576,12 @@ impl Store {
         Ok(())
     }
 
+    /// A scheduled run starts now (its next one counts from here, even if it fails).
+    pub(crate) fn note_rule_scheduled(&self, id: &str) -> Result<()> {
+        self.conn.execute("UPDATE rules SET last_run_at = ?2 WHERE id = ?1", params![id, now_ms()])?;
+        Ok(())
+    }
+
     /// Recent runs of a rule from the history (`rule.run` actions), newest first.
     pub fn rule_runs(&self, id: &str, limit: usize) -> Result<Vec<super::ActionRecord>> {
         let mut v: Vec<_> = self.actions_of_kind("rule.run")?.into_iter().filter(|a| a.params["rule"].as_str() == Some(id)).collect();
@@ -554,6 +593,15 @@ impl Store {
     /// Write messages from rules to stderr (the CLI turns this on).
     pub fn set_rule_echo(&self, on: bool) {
         self.rules_rt.echo.set(on);
+    }
+
+    /// Tell rules an org host is serving from this node (the cert watcher asks it to renew).
+    pub fn set_host_running(&self, on: bool) {
+        self.rules_rt.host.set(on);
+    }
+
+    pub fn host_running(&self) -> bool {
+        self.rules_rt.host.get()
     }
 
     /// Stop evaluating rules on this connection (tests, bulk tools).

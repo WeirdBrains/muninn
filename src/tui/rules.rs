@@ -23,7 +23,7 @@ impl RAsk {
     fn title(self) -> &'static str {
         match self {
             RAsk::Name => "Rule name",
-            RAsk::On => "On (action kinds: import, journal.*, *)",
+            RAsk::On => "On (action kinds: import, journal.*, *; or every 6h / cron \"0 3 * * *\")",
             RAsk::If => "If (FIELD OP VALUE; …, empty: always)",
             RAsk::Then => "Then (status …; search …; export-report … to=…; entry …)",
             RAsk::Home => "Lives in (project:NAME, journal:NAME, search:NAME, model:NAME or empty)",
@@ -85,6 +85,8 @@ pub struct RulesState {
     pub detail: Vec<String>,
     /// Newest `rule.run` already shown on the status line.
     pub seen: Option<i64>,
+    /// When due scheduled rules were last run from here.
+    pub last_tick: Option<std::time::Instant>,
 }
 
 impl RulesState {
@@ -137,7 +139,24 @@ fn select_id(app: &mut App, id: &str) {
 }
 
 /// Put messages of rule runs (from this and other connections, e.g. imports) on the status line.
+/// Run due scheduled rules about once a minute, unless an org host serves from this
+/// node (it runs them; this keeps one runner).
+fn tick_schedules(app: &mut App) {
+    if app.rules.last_tick.is_some_and(|t| t.elapsed() < std::time::Duration::from_secs(60)) {
+        return;
+    }
+    app.rules.last_tick = Some(std::time::Instant::now());
+    if app.orgs.host.is_some() || crate::org::host::running(&app.paths.home).is_some() {
+        return;
+    }
+    app.store.set_host_running(false);
+    if let Err(e) = rules::tick(&app.store, crate::store::now_ms()) {
+        tracing::warn!("scheduled rules: {e}");
+    }
+}
+
 pub fn poll(app: &mut App) {
+    tick_schedules(app);
     let Some(seen) = app.rules.seen else {
         app.rules.seen = Some(app.store.history_stamp().map(|s| s.1).unwrap_or(0));
         return;
@@ -169,7 +188,12 @@ fn show(app: &mut App) {
     if !r.description.is_empty() {
         d.push(r.description.clone());
     }
-    d.push(format!("on {}{}", r.spec.on.join(", "), if r.spec.related { " (related only)" } else { "" }));
+    d.push(format!("on {}{}", rules::on_text(&r.spec), if r.spec.related { " (related only)" } else { "" }));
+    if r.spec.schedule.is_some()
+        && let Some(n) = rules::next_run(&r)
+    {
+        d.push(format!("next run {}", crate::ingest::time::fmt_ts(n.max(crate::store::now_ms()))));
+    }
     d.extend(r.spec.when.iter().map(|c| format!("if {}", rules::condition_text(c))));
     d.extend(r.spec.then.iter().map(|t| format!("then {}", rules::then_text(s, t))));
     let runs = s.rule_runs(&r.id, 3).unwrap_or_default();
@@ -182,7 +206,8 @@ fn show(app: &mut App) {
 fn try_rule(app: &mut App, dry: bool) {
     let Some(r) = app.rules.selected().cloned() else { return };
     let s = &app.store;
-    let Some(a) = rules::last_trigger(s).ok().flatten() else {
+    let a = if r.spec.schedule.is_some() { Some(rules::schedule_action(&r)) } else { rules::last_trigger(s).ok().flatten() };
+    let Some(a) = a else {
         app.rules.msg = Some(("nothing in the history yet".into(), true));
         return;
     };
@@ -229,7 +254,7 @@ fn start(app: &mut App, edit: bool) {
             Draft {
                 editing: Some(r.id.clone()),
                 name: r.name.clone(),
-                on: r.spec.on.join(", "),
+                on: rules::on_text(&r.spec),
                 when: r.spec.when.iter().map(rules::condition_text).collect::<Vec<_>>().join("; "),
                 then: r.spec.then.iter().map(|t| rules::then_text(s, t)).collect::<Vec<_>>().join("; "),
                 home,
@@ -266,8 +291,9 @@ fn home_of(app: &App, h: &str) -> crate::Result<Home> {
 fn check_step(app: &App, step: RAsk, v: &str) -> crate::Result<()> {
     match step {
         RAsk::Name if v.trim().is_empty() => Err(crate::Error::invalid("rule name", "must not be empty")),
-        RAsk::On => rules::parse_on(&[v.to_string()])
-            .and_then(|o| if o.is_empty() { Err(crate::Error::invalid("on", "give at least one action kind")) } else { Ok(()) }),
+        RAsk::On => rules::parse_on_text(v).and_then(|(o, sch)| {
+            if o.is_empty() && sch.is_none() { Err(crate::Error::invalid("on", "give at least one action kind or a schedule")) } else { Ok(()) }
+        }),
         RAsk::If => rules::split_list(v).iter().try_for_each(|c| rules::parse_condition(c).map(|_| ())),
         RAsk::Then => {
             let t = rules::split_list(v);
@@ -299,20 +325,20 @@ fn save(app: &mut App) {
     let Some(d) = app.rules.draft.take() else { return };
     let res = (|| -> crate::Result<(Rule, &'static str, Option<crate::store::Project>)> {
         let s = &app.store;
-        let on = rules::parse_on(std::slice::from_ref(&d.on))?;
+        let (on, schedule) = rules::parse_on_text(&d.on)?;
         let when = rules::split_list(&d.when).iter().map(|c| rules::parse_condition(c)).collect::<crate::Result<Vec<_>>>()?;
         let then = rules::split_list(&d.then).iter().map(|t| rules::parse_then(s, t)).collect::<crate::Result<Vec<_>>>()?;
         let (owner, project) = home_of(app, &d.home)?;
         Ok(match &d.editing {
             Some(id) => {
                 let old = s.rule(id)?.ok_or_else(|| crate::Error::invalid("rule", "no longer exists"))?;
-                let spec = RuleSpec { on, when, then, ..old.spec };
+                let spec = RuleSpec { on, when, then, schedule, ..old.spec };
                 let r = s.update_rule(id, &RuleChange { name: Some(d.name.clone()), description: None, owner, spec: Some(spec) })?;
                 (r, "rule.edit", project)
             }
             None => {
                 let (kind, oid) = owner.unwrap_or((OwnerKind::Standalone, None));
-                let spec = RuleSpec { on, when, then, ..Default::default() };
+                let spec = RuleSpec { on, when, then, schedule, ..Default::default() };
                 let r = s.create_rule(&NewRule {
                     name: d.name.clone(),
                     description: String::new(),
@@ -467,7 +493,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         v.rows.push(Line::from(vec![
             Span::styled(format!(" {} ", if x.enabled { "●" } else { "○" }), Style::new().fg(if x.enabled { t.accent } else { t.muted })),
             Span::styled(format!("{:<w$} ", x.name), row_style(&t, on)),
-            Span::styled(format!(" on {} → {} ", x.spec.on.join(","), x.spec.then.len()), Style::new().fg(t.accent)),
+            Span::styled(format!(" on {} → {} ", rules::on_text(&x.spec), x.spec.then.len()), Style::new().fg(t.accent)),
             Span::styled(format!(" {} · {} run{}", rules::home(&app.store, x), x.runs, if x.runs == 1 { "" } else { "s" }), Style::new().fg(t.muted)),
         ]));
     }

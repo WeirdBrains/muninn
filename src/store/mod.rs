@@ -42,7 +42,7 @@ pub use reviews::{
     NewReviewItem, Review, ReviewItem, ReviewItemKind, ReviewItemState, ReviewKind, ReviewStatus, Reviewer, ReviewerStatus, Reviewing,
     ReviewingStatus, Revision,
 };
-pub use rules::{Condition, ItemRef, NewRule, Op, OwnerKind, Rule, RuleChange, RuleSpec, Then};
+pub use rules::{Condition, ItemRef, NewRule, Op, OwnerKind, Rule, RuleChange, RuleSpec, Schedule, Then};
 pub use runs::{Artifact, ImportRun};
 pub use searches::{LiveSearch, SearchSpec, SearchTarget};
 

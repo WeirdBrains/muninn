@@ -101,6 +101,12 @@ Examples:
   mnnn rule create Collect \-\-project Halving \-\-on search.save \-\-then add\-to\-project
   mnnn rule test Collect            # against the newest action
   mnnn rule dry\-run Collect \-\-action 42
+  mnnn rule create Nightly \-\-cron "0 3 * * *" \-\-then "export\-journal Notes to=~/notes\-{date}.md"
+  mnnn rule create Watch \-\-every 6h \-\-then cert\-watch   # like the built\-in cert\-expiry\-watch
+.PP
+Scheduled rules (\-\-every, \-\-cron) run on a `schedule` action naming them, recorded when they
+are due by the TUI, a running org host or `mnnn rule tick`. `cert\-watch [renew=30]
+[notify=30,14,3]` checks org certificates.
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SUBCOMMANDS
@@ -110,6 +116,9 @@ Create a rule
 .TP
 mnnn\-rule\-edit(1)
 Change a rule: given \-\-on, \-\-if or \-\-then replace the old ones
+.TP
+mnnn\-rule\-tick(1)
+Run the scheduled rules that are due now (the TUI and a running org host do this every minute; call it from cron or a timer when neither runs)
 .TP
 mnnn\-rule\-list(1)
 List rules

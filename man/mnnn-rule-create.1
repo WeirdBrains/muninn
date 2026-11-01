@@ -8,7 +8,7 @@ mnnn\-rule\-create \- Create a rule
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn rule create\fR [\fB\-\-home\fR] [\fB\-\-on\fR] [\fB\-\-db\fR] [\fB\-\-if\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-then\fR] [\fB\-\-project\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-journal\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-search\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-model\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-related\fR] [\fB\-\-disabled\fR] [\fB\-\-description\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
+\fBmnnn rule create\fR [\fB\-\-home\fR] [\fB\-\-on\fR] [\fB\-\-db\fR] [\fB\-\-if\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-then\fR] [\fB\-\-every\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-cron\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-project\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-journal\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-search\fR] [\fB\-\-model\fR] [\fB\-\-related\fR] [\fB\-\-disabled\fR] [\fB\-\-description\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -44,14 +44,14 @@ May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable
 \fB\-\-then\fR \fI<ACTION>\fR
 A then\-action, e.g. "status Imported {inserted} bars" (repeat: run in order)
 .TP
-\fB\-\-project\fR \fI<PROJECT>\fR
-Put it in a project (as a project item)
+\fB\-\-every\fR \fI<INTERVAL>\fR
+Run it on a schedule: every 30m, 6h, 1d, 1w (the node runs it; see `mnnn rule tick`)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
 .TP
-\fB\-\-journal\fR \fI<JOURNAL>\fR
-Let it live in a journal (its default journal)
+\fB\-\-cron\fR \fI<CRON>\fR
+Run it at cron times, local time: "0 3 * * *" (minute hour day month weekday)
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -59,8 +59,8 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-search\fR \fI<SEARCH>\fR
-Let it live in a live search (its default search)
+\fB\-\-project\fR \fI<PROJECT>\fR
+Put it in a project (as a project item)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -68,8 +68,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-model\fR \fI<MODEL>\fR
-Let it live in a model (its default model for record\-… and model\-… actions)
+\fB\-\-journal\fR \fI<JOURNAL>\fR
+Let it live in a journal (its default journal)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -88,6 +88,12 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-search\fR \fI<SEARCH>\fR
+Let it live in a live search (its default search)
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR
+Let it live in a model (its default model for record\-… and model\-… actions)
 .TP
 \fB\-\-related\fR
 Only react to actions about where it lives

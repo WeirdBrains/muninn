@@ -66,6 +66,12 @@ pub enum OAsk {
     Apply,
     Join,
     Acme,
+    /// An org's domains (`add D`, `remove D`, or just `D`).
+    Domain,
+    /// Your certificate for an org (`CERT.pem KEY.pem`, or `clear`).
+    Cert,
+    /// Let's Encrypt for an org (`on [email]`, `off`).
+    OrgAcme,
 }
 
 /// Something that needs `y` first.
@@ -467,6 +473,14 @@ fn finish_ask(app: &mut App, kind: OAsk, v: String) {
                 Ok(l)
             });
         }
+        OAsk::Domain | OAsk::Cert | OAsk::OrgAcme => {
+            let Some(o) = sel_org(app) else { return };
+            if v.trim().is_empty() {
+                return;
+            }
+            let r = org_tls(app, kind, &o, v.trim());
+            done(app, r, |m| m.clone());
+        }
         OAsk::Acme => {
             let a = &mut app.prefs.hosting.acme;
             if v.eq_ignore_ascii_case("off") || v.is_empty() {
@@ -607,6 +621,29 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         (Tab::Orgs, KeyCode::Char('m')) => {
             if let Some(o) = sel_org(app) {
                 edit(app, OrgChange { member_auth: Some(!o.member_auth), ..Default::default() })
+            }
+        }
+        (Tab::Orgs, KeyCode::Char('w')) => {
+            if let Some(o) = sel_org(app) {
+                let have = crate::org::tls::domains(&app.store, &o).unwrap_or_default();
+                let title = if have.is_empty() {
+                    format!("Domain for {} (lab.example.org; remove D takes one off)", o.name)
+                } else {
+                    format!("Domains of {}: {} · add D / remove D", o.name, have.join(", "))
+                };
+                ask(app, OAsk::Domain, &title, "")
+            }
+        }
+        (Tab::Orgs, KeyCode::Char('c')) => {
+            if let Some(o) = sel_org(app) {
+                ask(app, OAsk::Cert, &format!("Your certificate for {}: CERT.pem KEY.pem (replaces one set before), or clear", o.name), "")
+            }
+        }
+        (Tab::Orgs, KeyCode::Char('L')) => {
+            if let Some(o) = sel_org(app) {
+                let a = crate::org::tls::acme(&app.store, &o).unwrap_or_default();
+                let v = if a.enabled { format!("on {}", a.email) } else { String::new() };
+                ask(app, OAsk::OrgAcme, &format!("Let's Encrypt for {}: on [email], or off", o.name), v.trim())
             }
         }
         (Tab::Orgs, KeyCode::Char('d')) => {
@@ -752,6 +789,105 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
     }
 }
 
+fn path_of(p: &str) -> std::path::PathBuf {
+    match p.strip_prefix("~/") {
+        Some(rest) => std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default().join(rest),
+        None => p.into(),
+    }
+}
+
+/// The org TLS settings from the Organizations page: domains, your certificate, ACME.
+fn org_tls(app: &mut App, kind: OAsk, o: &Org, v: &str) -> crate::Result<String> {
+    use crate::org::tls;
+    let s = &app.store;
+    let note = |kind: &str, summary: String, p: serde_json::Value| s.note_action(&crate::store::NewAction::new(kind, ORIGIN, summary).params(p));
+    let msg = match kind {
+        OAsk::Domain => {
+            let (verb, d) = match v.split_once(' ') {
+                Some((w, d)) if matches!(w, "add" | "remove" | "rm") => (w, d.trim()),
+                _ => ("add", v),
+            };
+            if verb == "add" {
+                let d = tls::check_domain(d)?;
+                if !tls::add_domain(s, o, &d)? {
+                    return Ok(format!("{} is served at {d} already", o.name));
+                }
+                note("org.domain.add", format!("{} served at {d}", o.name), serde_json::json!({ "org": o.id, "domain": d }));
+                format!("{} is served at {d}; point its DNS here (c sets your certificate, L Let's Encrypt)", o.name)
+            } else {
+                if !tls::remove_domain(s, o, d)? {
+                    return Err(crate::Error::invalid("domain", format!("{} is not served at {d}", o.name)));
+                }
+                note("org.domain.remove", format!("{} no longer served at {d}", o.name), serde_json::json!({ "org": o.id, "domain": d }));
+                format!("{} is no longer served at {d}", o.name)
+            }
+        }
+        OAsk::Cert if v.eq_ignore_ascii_case("clear") => {
+            if !tls::clear_user_cert(s, o)? {
+                return Err(crate::Error::invalid("certificate", format!("{} has no certificate of yours", o.name)));
+            }
+            note("org.cert.clear", format!("your certificate removed from {}", o.name), serde_json::json!({ "org": o.id }));
+            format!("{}: back to {}", o.name, if tls::acme(s, o)?.enabled { "ACME" } else { "a self-signed certificate" })
+        }
+        OAsk::Cert => {
+            let w = words(v);
+            let [c, k] = w.as_slice() else { return Err(crate::Error::invalid("certificate", "give the certificate file and the key file")) };
+            let read = |p: &str| std::fs::read_to_string(path_of(p)).map_err(|e| crate::Error::invalid("certificate", format!("{p}: {e}")));
+            let pem = crate::org::host::CertPem { chain: read(c)?, key: read(k)? };
+            let info = tls::set_user_cert(s, o, &pem)?;
+            note(
+                "org.cert",
+                format!("your certificate set for {}", o.name),
+                serde_json::json!({ "org": o.id, "source": tls::USER, "names": info.names, "not_after": info.not_after }),
+            );
+            format!("{}: your certificate for {} until {}", o.name, info.names.join(", "), crate::ingest::time::fmt_ts(info.not_after))
+        }
+        _ => {
+            let w = words(v);
+            let mut a = tls::acme(s, o)?;
+            match w.first().map(|x| x.to_ascii_lowercase()).as_deref() {
+                Some("off") => a.enabled = false,
+                Some("on") => {
+                    a.enabled = true;
+                    if let Some(e) = w.get(1) {
+                        a.email = e.clone();
+                    }
+                }
+                _ => return Err(crate::Error::invalid("acme", "on [email] or off")),
+            }
+            if a.enabled && tls::domains(s, o)?.is_empty() {
+                return Err(crate::Error::invalid("acme", format!("{} has no domains yet (w adds one)", o.name)));
+            }
+            if a.enabled && !a.email.contains('@') && !app.prefs.hosting.acme.email.contains('@') {
+                return Err(crate::Error::invalid("acme", "give a contact address: on you@example.org"));
+            }
+            tls::set_acme(s, o, &a)?;
+            let m = format!("ACME {} for {}", if a.enabled { "on" } else { "off" }, o.name);
+            note("org.cert.acme", m.clone(), serde_json::json!({ "org": o.id, "enabled": a.enabled }));
+            m
+        }
+    };
+    if let Some(h) = &app.orgs.host {
+        let _ = h.reload_orgs();
+    }
+    Ok(msg)
+}
+
+fn org_cert_line(c: &crate::org::tls::OrgCert) -> String {
+    let now = crate::store::now_ms();
+    let when = match &c.cert {
+        Some(i) => format!("until {} ({} days)", crate::ingest::time::fmt_ts(i.not_after), c.days_left(now).unwrap_or(0)),
+        None => "made when the site starts".into(),
+    };
+    format!(
+        "  {}  {} · {} {when}{}",
+        c.slug,
+        if c.domains.is_empty() { "no domains".to_string() } else { c.domains.join(", ") },
+        c.source,
+        if c.acme.enabled { " · ACME on" } else { "" }
+    )
+}
+
 fn switch(app: &mut App, i: usize) {
     open(app, Tab::ALL[i.min(Tab::ALL.len() - 1)]);
 }
@@ -788,6 +924,11 @@ fn site_lines(app: &App) -> Vec<String> {
     let hosted: Vec<&str> = app.orgs.orgs.iter().filter(|o| o.hosted).map(|o| o.slug.as_str()).collect();
     v.push(format!("hosted orgs  {}", if hosted.is_empty() { "none (h on an organization turns it on)".into() } else { hosted.join(", ") }));
     v.push(format!("mirrors      {}", app.orgs.mirrors.len()));
+    let certs = crate::org::tls::all(&app.store).unwrap_or_default();
+    if !certs.is_empty() {
+        v.push("org domains and certificates (w, c and L on Organizations change them)".into());
+        v.extend(certs.iter().map(org_cert_line));
+    }
     if hp.acme.enabled {
         v.push(format!("ACME         {} for {} ({}), profile {}", hp.acme.directory_url(), hp.acme.domain, hp.acme.email, hp.acme.profile));
     } else {
@@ -910,6 +1051,9 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
             ("o open", KeyCode::Char('o')),
             ("h host", KeyCode::Char('h')),
             ("m sign-in", KeyCode::Char('m')),
+            ("w domains", KeyCode::Char('w')),
+            ("c cert", KeyCode::Char('c')),
+            ("L ACME", KeyCode::Char('L')),
             ("d delete", KeyCode::Char('d')),
         ],
         Tab::Members => vec![

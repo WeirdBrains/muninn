@@ -182,3 +182,49 @@ fn two_windows_browse_apply_approve_and_sync() {
     assert!(screen_text(&mut b).contains("member"));
     a.dispatch(Action::NetStop);
 }
+
+#[test]
+fn org_settings_add_domains_and_set_or_replace_the_certificate() {
+    use crate::org::tls;
+    let (t, mut a) = app();
+    a.on_key(key(KeyCode::Char('G')));
+    a.on_key(key(KeyCode::Char('n')));
+    typ(&mut a, "Comet Lab\n");
+    let o = a.store.find_org("comet-lab").unwrap();
+    // w: a domain (refused when it is not a host name)
+    a.on_key(key(KeyCode::Char('w')));
+    typ(&mut a, "not a domain\n");
+    assert!(a.orgs.msg.as_ref().is_some_and(|m| m.1) && a.orgs.ask.is_none());
+    a.on_key(key(KeyCode::Char('w')));
+    typ(&mut a, "lab.example.org\n");
+    assert_eq!(tls::domains(&a.store, &o).unwrap(), vec!["lab.example.org".to_string()]);
+    assert!(a.store.find_rule(crate::rules::CERT_WATCH).is_ok(), "the built-in watcher comes with the first domain");
+    // c: your certificate from files, then a replacement
+    let write = |name: &str, days: u32| {
+        let c = crate::org::host::self_signed(&["lab.example.org".into()], days).unwrap();
+        let (cp, kp) = (t.path().join(format!("{name}.pem")), t.path().join(format!("{name}.key")));
+        std::fs::write(&cp, &c.chain).unwrap();
+        std::fs::write(&kp, &*c.key).unwrap();
+        format!("{} {}\n", cp.display(), kp.display())
+    };
+    a.on_key(key(KeyCode::Char('c')));
+    typ(&mut a, &write("one", 20));
+    assert_eq!(tls::status(&a.store, &o).unwrap().source, tls::USER);
+    let first = tls::status(&a.store, &o).unwrap().cert.unwrap().not_after;
+    a.on_key(key(KeyCode::Char('c')));
+    typ(&mut a, &write("two", 60));
+    assert!(tls::status(&a.store, &o).unwrap().cert.unwrap().not_after > first);
+    // L: Let's Encrypt for the org; the Site page lists where each certificate comes from
+    a.on_key(key(KeyCode::Char('L')));
+    typ(&mut a, "on ops@example.org\n");
+    assert!(tls::acme(&a.store, &o).unwrap().enabled);
+    a.on_key(key(KeyCode::Char('6')));
+    let text = screen_text(&mut a);
+    assert!(text.contains("lab.example.org") && text.contains("user"), "{text}");
+    // c clear: back to ACME
+    a.on_key(key(KeyCode::Char('1')));
+    a.on_key(key(KeyCode::Char('c')));
+    typ(&mut a, "clear\n");
+    assert_eq!(tls::status(&a.store, &o).unwrap().source, tls::SELF_SIGNED, "ACME has no certificate yet");
+    assert!(kinds(&a).iter().any(|k| k == "org.cert.clear"));
+}

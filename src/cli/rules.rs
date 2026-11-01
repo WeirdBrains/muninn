@@ -12,7 +12,7 @@ fn params(r: &Rule) -> serde_json::Value {
 }
 
 /// The `--on`, `--if` and `--then` given (`None`: not given).
-type Parts = (Option<Vec<String>>, Option<Vec<crate::store::Condition>>, Option<Vec<crate::store::Then>>);
+type Parts = (Option<Vec<String>>, Option<Vec<crate::store::Condition>>, Option<Vec<crate::store::Then>>, Option<crate::store::Schedule>);
 
 impl RuleSpecArgs {
     /// Fill a spec from the flags given (`None` for parts not given).
@@ -22,7 +22,8 @@ impl RuleSpecArgs {
             (!self.when.is_empty()).then(|| self.when.iter().map(|c| rules::parse_condition(c)).collect::<crate::Result<Vec<_>>>()).transpose()?;
         let then =
             (!self.then.is_empty()).then(|| self.then.iter().map(|t| rules::parse_then(store, t)).collect::<crate::Result<Vec<_>>>()).transpose()?;
-        Ok((on, when, then))
+        let schedule = rules::parse_schedule(self.every.as_deref(), self.cron.as_deref())?;
+        Ok((on, when, then, schedule))
     }
 }
 
@@ -41,6 +42,15 @@ fn owner(
     } else {
         None
     })
+}
+
+/// The action a rule is checked against: the one given; for a scheduled rule, its
+/// `schedule` action; otherwise the newest.
+fn action_for(store: &Store, r: &Rule, id: Option<i64>) -> anyhow::Result<ActionRecord> {
+    if id.is_none() && r.spec.schedule.is_some() {
+        return Ok(rules::schedule_action(r));
+    }
+    the_action(store, id)
 }
 
 fn the_action(store: &Store, id: Option<i64>) -> anyhow::Result<ActionRecord> {
@@ -78,7 +88,7 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
     let store = ctx.open_store()?;
     match cmd {
         RuleCommand::Create { name, spec, project, journal, search, model, related, disabled, description } => {
-            let (on, when, then) = spec.parts(&store)?;
+            let (on, when, then, schedule) = spec.parts(&store)?;
             let (kind, id) = owner(&store, &journal, &search, &model)?.unwrap_or((OwnerKind::Standalone, None));
             let project = project.map(|p| store.find_project(&p)).transpose()?;
             let spec = RuleSpec {
@@ -86,6 +96,7 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
                 when: when.unwrap_or_default(),
                 then: then.unwrap_or_default(),
                 related,
+                schedule,
                 ..Default::default()
             };
             let r = store.create_rule(&NewRule { name, description, owner_kind: kind, owner_id: id, spec, enabled: !disabled })?;
@@ -101,9 +112,9 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
             }
             ctx.io.info(format!("created rule {} ({}), {}, in {}", r.name, r.short_id(), rules::brief(&r), rules::home(&store, &r)));
         }
-        RuleCommand::Edit { rule, name, description, spec, clear_if, journal, search, model, standalone, related, unrelated } => {
+        RuleCommand::Edit { rule, name, description, spec, clear_if, journal, search, model, standalone, related, unrelated, no_schedule } => {
             let r = store.find_rule(&rule)?;
-            let (on, when, then) = spec.parts(&store)?;
+            let (on, when, then, schedule) = spec.parts(&store)?;
             let mut sp = r.spec.clone();
             let mut spec_changed = false;
             if let Some(o) = on {
@@ -120,6 +131,10 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
             }
             if let Some(t) = then {
                 sp.then = t;
+                spec_changed = true;
+            }
+            if schedule.is_some() || no_schedule {
+                sp.schedule = schedule;
                 spec_changed = true;
             }
             if related || unrelated {
@@ -173,7 +188,9 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
                 let then: Vec<_> = r.spec.then.iter().map(|t| rules::then_text(&store, t)).collect();
                 println!(
                     "{}",
-                    serde_json::to_string_pretty(&json!({ "rule": r, "lives_in": rules::home(&store, &r), "then_text": then, "runs": runs }))?
+                    serde_json::to_string_pretty(
+                        &json!({ "rule": r, "lives_in": rules::home(&store, &r), "then_text": then, "next_run": rules::next_run(&r), "runs": runs })
+                    )?
                 );
             } else {
                 println!("id:       {}", r.id);
@@ -183,7 +200,13 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
                 }
                 println!("state:    {}", if r.enabled { "on" } else { "off" });
                 println!("lives in: {}", rules::home(&store, &r));
-                println!("on:       {}{}", r.spec.on.join(", "), if r.spec.related { " (related only)" } else { "" });
+                if let Some(s) = &r.spec.schedule {
+                    let next = rules::next_run(&r).map(|t| fmt_ts(t.max(crate::store::now_ms()))).unwrap_or_else(|| "never".into());
+                    println!("runs:     {} (next {next}{})", rules::schedule_text(s), if r.enabled { "" } else { ", when on" });
+                }
+                if !r.spec.on.is_empty() || r.spec.schedule.is_none() {
+                    println!("on:       {}{}", r.spec.on.join(", "), if r.spec.related { " (related only)" } else { "" });
+                }
                 for c in &r.spec.when {
                     println!("if:       {}", rules::condition_text(c));
                 }
@@ -210,8 +233,12 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
         RuleCommand::Enable { rule } => toggle(ctx, &store, &rule, true)?,
         RuleCommand::Disable { rule } => toggle(ctx, &store, &rule, false)?,
         RuleCommand::Test { rule, action, json } => {
-            let a = the_action(&store, action)?;
-            let checks: Vec<_> = picked(&store, &rule)?.iter().map(|r| (r.clone(), rules::check(&store, r, &a))).collect();
+            let mut checks = vec![];
+            for r in picked(&store, &rule)? {
+                let a = action_for(&store, &r, action)?;
+                let c = rules::check(&store, &r, &a);
+                checks.push((r, c));
+            }
             if json {
                 println!("{}", serde_json::to_string_pretty(&checks.iter().map(|(_, c)| c).collect::<Vec<_>>())?);
             } else {
@@ -224,9 +251,10 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
             }
         }
         RuleCommand::DryRun { rule, action, json } => {
-            let a = the_action(&store, action)?;
+            store.set_host_running(crate::org::host::running(&ctx.paths.home).is_some());
             let mut out = vec![];
             for r in picked(&store, &rule)? {
+                let a = action_for(&store, &r, action)?;
                 let c = rules::check(&store, &r, &a);
                 let plan: Vec<_> = if c.matched {
                     r.spec.then.iter().map(|t| rules::plan(&store, &r, &a, t).map_err(|e| format!("{} would fail: {e}", t.verb()))).collect()
@@ -263,6 +291,17 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
                         }
                     }
                 }
+            }
+        }
+        RuleCommand::Tick { json } => {
+            store.set_host_running(crate::org::host::running(&ctx.paths.home).is_some());
+            let ran = rules::tick(&store, crate::store::now_ms())?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&json!({ "ran": ran }))?);
+            } else if ran.is_empty() {
+                ctx.io.info("no scheduled rules are due");
+            } else {
+                ctx.io.info(format!("ran {}", ran.join(", ")));
             }
         }
         RuleCommand::Events { kind, json } => {

@@ -4,7 +4,7 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-org\-cert \- The site\*(Aqs TLS certificate (self\-signed, or ACME / Let\*(Aqs Encrypt)
+mnnn\-org\-cert \- TLS certificates: the node\*(Aqs site, and each org\*(Aqs for its domains (yours, else ACME / Let\*(Aqs Encrypt, else self\-signed)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ mnnn\-org\-cert \- The site\*(Aqs TLS certificate (self\-signed, or ACME / Let\*
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-The site\*(Aqs TLS certificate (self\-signed, or ACME / Let\*(Aqs Encrypt)
+TLS certificates: the node\*(Aqs site, and each org\*(Aqs for its domains (yours, else ACME / Let\*(Aqs Encrypt, else self\-signed)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -75,13 +75,19 @@ Print help
 .SH SUBCOMMANDS
 .TP
 mnnn\-org\-cert\-status(1)
-The certificate in use (or that would be)
+The certificates in use (or that would be): the node\*(Aqs and each org\*(Aqs, where each came from and when it expires
+.TP
+mnnn\-org\-cert\-set(1)
+Use your own certificate for an org\*(Aqs domains (PEM chain and key). The key is kept in the encrypted store, never logged; it takes priority over ACME and self\-signed
+.TP
+mnnn\-org\-cert\-clear(1)
+Stop using your own certificate for an org (back to ACME or self\-signed)
 .TP
 mnnn\-org\-cert\-acme(1)
-Set up ACME (Let\*(Aqs Encrypt), or turn it off with \-\-off
+Set up ACME (Let\*(Aqs Encrypt) for the node\*(Aqs domain, or with \-\-org for an org\*(Aqs domains; \-\-off turns it off
 .TP
 mnnn\-org\-cert\-renew(1)
-Get an ACME certificate now (needs the challenge port reachable as port 80)
+Get ACME certificates now: the node\*(Aqs, or with \-\-org an org\*(Aqs (needs the challenge reachable)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION

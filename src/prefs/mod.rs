@@ -164,6 +164,10 @@ pub struct AcmePrefs {
     pub profile: String,
     /// Port the HTTP-01 challenge is answered on (the CA always asks port 80; forward it here).
     pub http_port: u16,
+    /// `http-01` (the default; port 80 must reach `http_port`) or `tls-alpn-01` (port 443
+    /// must reach the site port). Behind NAT with neither reachable, DNS-01 would be the
+    /// way; it is not built in: get a certificate elsewhere and `mnnn org cert set` it.
+    pub challenge: String,
 }
 
 impl Default for AcmePrefs {
@@ -175,11 +179,17 @@ impl Default for AcmePrefs {
             directory: "letsencrypt".into(),
             profile: "shortlived".into(),
             http_port: 80,
+            challenge: "http-01".into(),
         }
     }
 }
 
 impl AcmePrefs {
+    /// Validate through TLS-ALPN-01 rather than HTTP-01.
+    pub fn tls_alpn(&self) -> bool {
+        matches!(self.challenge.trim().to_ascii_lowercase().as_str(), "tls-alpn-01" | "tls-alpn" | "alpn")
+    }
+
     /// The ACME directory URL.
     pub fn directory_url(&self) -> String {
         match self.directory.as_str() {

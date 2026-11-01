@@ -323,14 +323,54 @@ fn certified(c: &CertPem) -> Result<Arc<CertifiedKey>> {
     Ok(Arc::new(CertifiedKey::new(chain, signer)))
 }
 
-/// Hands out the current certificate; swapped in place when it is renewed.
+/// Check that a key belongs to its certificate chain's leaf.
+pub fn check_pair(c: &CertPem) -> Result<()> {
+    certified(c)?.keys_match().map_err(|e| Error::invalid("certificate", format!("the key does not match the certificate ({e})")))
+}
+
+/// The ALPN protocol of ACME TLS-ALPN-01 validation.
+pub const ACME_TLS_ALPN: &[u8] = b"acme-tls/1";
+
+/// Hands out certificates by name (SNI): an org's for its domains, the node's for the
+/// rest, and TLS-ALPN-01 challenge certificates while one is being validated. Swapped in
+/// place when renewed.
 #[derive(Debug)]
-struct Resolver(RwLock<Arc<CertifiedKey>>);
+struct Resolver {
+    default: RwLock<Arc<CertifiedKey>>,
+    by_name: RwLock<HashMap<String, Arc<CertifiedKey>>>,
+    alpn: RwLock<HashMap<String, Arc<CertifiedKey>>>,
+}
+
+impl Resolver {
+    fn new(c: Arc<CertifiedKey>) -> Resolver {
+        Resolver { default: RwLock::new(c), by_name: RwLock::new(HashMap::new()), alpn: RwLock::new(HashMap::new()) }
+    }
+}
 
 impl ResolvesServerCert for Resolver {
-    fn resolve(&self, _: ClientHello<'_>) -> Option<Arc<CertifiedKey>> {
-        self.0.read().ok().map(|c| c.clone())
+    fn resolve(&self, hello: ClientHello<'_>) -> Option<Arc<CertifiedKey>> {
+        let name = hello.server_name().map(|n| n.to_ascii_lowercase());
+        let acme = hello.alpn().is_some_and(|mut a| a.any(|p| p == ACME_TLS_ALPN));
+        if acme {
+            // only ever the challenge certificate on an ACME validation connection
+            return name.and_then(|n| self.alpn.read().ok().and_then(|m| m.get(&n).cloned()));
+        }
+        if let Some(n) = &name
+            && let Some(c) = self.by_name.read().ok().and_then(|m| m.get(n).cloned())
+        {
+            return Some(c);
+        }
+        self.default.read().ok().map(|c| c.clone())
     }
+}
+
+/// A TLS-ALPN-01 challenge certificate for `domain` (RFC 8737).
+fn alpn_cert(domain: &str, digest: &[u8]) -> Result<Arc<CertifiedKey>> {
+    let mut p = rcgen::CertificateParams::new(vec![domain.to_string()]).map_err(tls_err)?;
+    p.custom_extensions = vec![rcgen::CustomExtension::new_acme_identifier(digest)];
+    let key = rcgen::KeyPair::generate().map_err(tls_err)?;
+    let cert = p.self_signed(&key).map_err(tls_err)?;
+    certified(&CertPem { chain: cert.pem(), key: key.serialize_pem() })
 }
 
 #[derive(Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
@@ -362,6 +402,10 @@ pub struct Acme {
     pub domain: String,
     pub email: String,
     pub profile: String,
+    /// More names on the same certificate (an org's other domains).
+    pub extra: Vec<String>,
+    /// Validate through TLS-ALPN-01 on the site port instead of HTTP-01.
+    pub tls_alpn: bool,
 }
 
 impl Acme {
@@ -378,6 +422,8 @@ impl Acme {
             domain: p.domain.trim().to_string(),
             email: p.email.trim().to_string(),
             profile: p.profile.trim().to_string(),
+            extra: vec![],
+            tls_alpn: p.tls_alpn(),
         }))
     }
 }
@@ -423,11 +469,27 @@ async fn account(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>) -> 
     Ok(account)
 }
 
-/// Get a certificate for `acme.domain` through HTTP-01 (the tokens are answered from
-/// `challenges`, served on the ACME HTTP port) and keep it in the store.
-pub async fn obtain(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>, challenges: &Challenges) -> Result<CertPem> {
+/// Get the node's certificate for `acme.domain` and keep it in the store.
+async fn obtain(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>, challenges: &Challenges, resolver: &Resolver) -> Result<CertPem> {
+    let c = order_cert(store, acme, http, challenges, resolver).await?;
+    with_store(store, |s| {
+        save_cert(s, &acme.domain, &c)?;
+        s.note_action(
+            &crate::store::NewAction::new("org.host.cert", "host", format!("certificate for {} from ACME", acme.domain))
+                .params(serde_json::json!({ "domain": acme.domain, "directory": acme.directory })),
+        );
+        Ok(())
+    })?;
+    Ok(c)
+}
+
+/// Order a certificate for `acme.domain` (and `acme.extra`) through HTTP-01 (tokens
+/// answered from `challenges` on the ACME HTTP port) or TLS-ALPN-01 (a challenge
+/// certificate served by `resolver` on the site port).
+async fn order_cert(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>, challenges: &Challenges, resolver: &Resolver) -> Result<CertPem> {
     let account = account(store, acme, http).await?;
-    let ids = [Identifier::Dns(acme.domain.clone())];
+    let names: Vec<String> = std::iter::once(acme.domain.clone()).chain(acme.extra.iter().cloned()).collect();
+    let ids: Vec<Identifier> = names.iter().map(|n| Identifier::Dns(n.clone())).collect();
     let mut order = match acme.profile.as_str() {
         "" => account.new_order(&NewOrder::new(&ids)).await,
         p => match account.new_order(&NewOrder::new(&ids).profile(p)).await {
@@ -438,6 +500,7 @@ pub async fn obtain(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>, 
     }
     .map_err(acme_err)?;
     let mut tokens = vec![];
+    let mut alpn_names = vec![];
     let ready = async {
         let mut auths = order.authorizations();
         while let Some(a) = auths.next().await {
@@ -447,11 +510,20 @@ pub async fn obtain(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>, 
                 AuthorizationStatus::Valid => continue,
                 other => return Err(acme_err(format!("authorization is {other:?}"))),
             }
-            let mut ch = a.challenge(ChallengeType::Http01).ok_or_else(|| acme_err("the CA offers no HTTP-01 challenge"))?;
-            let token = ch.token.clone();
-            challenges.write().map_err(|_| acme_err("challenge lock"))?.insert(token.clone(), ch.key_authorization().as_str().to_string());
-            tokens.push(token);
-            ch.set_ready().await.map_err(acme_err)?;
+            let Identifier::Dns(name) = a.identifier().identifier.clone() else { return Err(acme_err("not a DNS identifier")) };
+            if acme.tls_alpn {
+                let mut ch = a.challenge(ChallengeType::TlsAlpn01).ok_or_else(|| acme_err("the CA offers no TLS-ALPN-01 challenge"))?;
+                let c = alpn_cert(&name, ch.key_authorization().digest().as_ref())?;
+                resolver.alpn.write().map_err(|_| acme_err("challenge lock"))?.insert(name.to_ascii_lowercase(), c);
+                alpn_names.push(name.to_ascii_lowercase());
+                ch.set_ready().await.map_err(acme_err)?;
+            } else {
+                let mut ch = a.challenge(ChallengeType::Http01).ok_or_else(|| acme_err("the CA offers no HTTP-01 challenge"))?;
+                let token = ch.token.clone();
+                challenges.write().map_err(|_| acme_err("challenge lock"))?.insert(token.clone(), ch.key_authorization().as_str().to_string());
+                tokens.push(token);
+                ch.set_ready().await.map_err(acme_err)?;
+            }
         }
         Ok(())
     }
@@ -465,26 +537,23 @@ pub async fn obtain(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>, 
             c.remove(t);
         }
     }
+    if let Ok(mut m) = resolver.alpn.write() {
+        for n in &alpn_names {
+            m.remove(n);
+        }
+    }
     let status = status?;
     if status != OrderStatus::Ready {
         return Err(acme_err(format!("the order is {status:?}")));
     }
     let key = rcgen::KeyPair::generate().map_err(tls_err)?;
-    let mut p = rcgen::CertificateParams::new(vec![acme.domain.clone()]).map_err(tls_err)?;
+    let mut p = rcgen::CertificateParams::new(names).map_err(tls_err)?;
     p.distinguished_name = rcgen::DistinguishedName::new();
     let csr = p.serialize_request(&key).map_err(tls_err)?;
     order.finalize_csr(csr.der()).await.map_err(acme_err)?;
     let chain = order.poll_certificate(&RetryPolicy::new().timeout(Duration::from_secs(120))).await.map_err(acme_err)?;
     let c = CertPem { chain, key: key.serialize_pem() };
     cert_info(&c, "acme")?;
-    with_store(store, |s| {
-        save_cert(s, &acme.domain, &c)?;
-        s.note_action(
-            &crate::store::NewAction::new("org.host.cert", "host", format!("certificate for {} from ACME", acme.domain))
-                .params(serde_json::json!({ "domain": acme.domain, "directory": acme.directory })),
-        );
-        Ok(())
-    })?;
     Ok(c)
 }
 
@@ -700,8 +769,10 @@ pub struct HostOptions {
     pub cert_days: u32,
     pub acme: Option<Acme>,
     pub acme_http_port: u16,
-    /// Check the ACME certificate every ten minutes and renew it when due.
+    /// Check the ACME certificates every minute and renew them when due.
     pub auto_renew: bool,
+    /// ACME settings orgs use for their own domains (directory, contact, profile, challenge).
+    pub org_acme: Option<Acme>,
 }
 
 impl HostOptions {
@@ -714,6 +785,14 @@ impl HostOptions {
             acme: Acme::from_prefs(&p.acme)?,
             acme_http_port: p.acme.http_port,
             auto_renew: true,
+            org_acme: Some(Acme {
+                directory: p.acme.directory_url(),
+                domain: String::new(),
+                email: p.acme.email.trim().to_string(),
+                profile: p.acme.profile.trim().to_string(),
+                extra: vec![],
+                tls_alpn: p.acme.tls_alpn(),
+            }),
         })
     }
 
@@ -742,12 +821,149 @@ struct State {
     cert: RwLock<CertInfo>,
     acme: Option<Acme>,
     http: Option<AcmeHttp>,
+    org_acme: Option<Acme>,
+    cert_days: u32,
+    /// Each org's served certificate (by org id).
+    org_certs: RwLock<HashMap<String, OrgCertInfo>>,
+}
+
+/// An org's served certificate (for the status file).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OrgCertInfo {
+    pub org: String,
+    pub slug: String,
+    pub domains: Vec<String>,
+    pub cert: CertInfo,
 }
 
 impl State {
+    /// Serve an org's certificate for its domains.
+    fn install_org(&self, org: &crate::store::Org, domains: &[String], c: &CertPem, source: &str) -> Result<CertInfo> {
+        let info = cert_info(c, source)?;
+        let ck = certified(c)?;
+        {
+            let mut m = self.resolver.by_name.write().map_err(|_| tls_err("certificate lock"))?;
+            m.retain(|_, v| !Arc::ptr_eq(v, &ck));
+            for d in domains {
+                m.insert(d.clone(), ck.clone());
+            }
+        }
+        self.org_certs
+            .write()
+            .map_err(|_| tls_err("certificate lock"))?
+            .insert(org.id.clone(), OrgCertInfo { org: org.name.clone(), slug: org.slug.clone(), domains: domains.to_vec(), cert: info.clone() });
+        Ok(info)
+    }
+
+    /// Load every org's certificate: yours, else ACME's, else a self-signed one.
+    fn load_orgs(&self) -> Result<()> {
+        let orgs = with_store(&self.store, |s| {
+            let mut v = vec![];
+            for o in s.orgs()? {
+                let d = super::tls::domains(s, &o)?;
+                if !d.is_empty() {
+                    let c = super::tls::choose(s, &o, now_ms())?;
+                    v.push((o, d, c));
+                }
+            }
+            Ok(v)
+        })?;
+        if let Ok(mut m) = self.resolver.by_name.write() {
+            m.clear();
+        }
+        if let Ok(mut m) = self.org_certs.write() {
+            m.clear();
+        }
+        for (o, d, c) in orgs {
+            match c {
+                Some((pem, src)) => self.install_org(&o, &d, &pem, src)?,
+                None => self.install_org(&o, &d, &self_signed(&d, self.cert_days)?, super::tls::SELF_SIGNED)?,
+            };
+        }
+        Ok(())
+    }
+
+    /// Renew orgs' ACME certificates that are missing, due or asked for (backing off after failures).
+    async fn renew_orgs(&self, force: bool) -> Result<Vec<CertInfo>> {
+        let Some(base) = &self.org_acme else { return Ok(vec![]) };
+        let now = now_ms();
+        let due = with_store(&self.store, |s| {
+            let mut v = vec![];
+            for o in s.orgs()? {
+                let a = super::tls::acme(s, &o)?;
+                let d = super::tls::domains(s, &o)?;
+                if !a.enabled || d.is_empty() || super::tls::user_cert(s, &o)?.is_some_and(|c| cert_info(&c, "user").is_ok_and(|i| i.not_after > now))
+                {
+                    continue;
+                }
+                let cur = super::tls::acme_cert(s, &o)?.and_then(|c| cert_info(&c, "acme").ok());
+                let asked = super::tls::renewal_requested(s, &o)?;
+                let r = super::tls::retry(s, &o)?;
+                let needed = cur.as_ref().is_none_or(|i| i.needs_renewal(now)) || asked;
+                if force || (needed && r.next_at <= now) {
+                    v.push((o, d, a.email));
+                }
+            }
+            Ok(v)
+        })?;
+        let mut out = vec![];
+        for (o, d, email) in due {
+            let acme = Acme {
+                domain: d[0].clone(),
+                extra: d[1..].to_vec(),
+                email: if email.trim().is_empty() { base.email.clone() } else { email.trim().to_string() },
+                ..base.clone()
+            };
+            let r = if acme.email.contains('@') {
+                order_cert(&self.store, &acme, self.http.as_ref(), &self.challenges, &self.resolver).await
+            } else {
+                Err(Error::invalid("acme", format!("no contact address for {} (`mnnn org cert acme {} --email E`)", o.name, o.slug)))
+            };
+            match r {
+                Ok(c) => {
+                    with_store(&self.store, |s| {
+                        super::tls::save_acme_cert(s, &o, &c)?;
+                        super::tls::succeeded(s, &o)?;
+                        s.note_action(
+                            &crate::store::NewAction::new("org.cert", "host", format!("certificate for {} ({}) from ACME", o.name, d.join(", ")))
+                                .params(serde_json::json!({ "org": o.id, "domains": d, "source": "acme" })),
+                        );
+                        Ok(())
+                    })?;
+                    out.push(self.install_org(&o, &d, &c, super::tls::ACME)?);
+                }
+                Err(e) => {
+                    let msg = e.to_string();
+                    with_store(&self.store, |s| {
+                        let r = super::tls::failed(s, &o, &msg, now_ms())?;
+                        super::tls::notify(
+                            s,
+                            "host",
+                            "error",
+                            "cert.renew",
+                            &o,
+                            &format!(
+                                "could not renew the certificate for {}: {msg} (attempt {}, next in {} min)",
+                                o.name,
+                                r.attempts,
+                                (r.next_at - now_ms()) / 60_000
+                            ),
+                            serde_json::json!({ "attempts": r.attempts, "next_at": r.next_at }),
+                        );
+                        Ok(())
+                    })?;
+                    if force {
+                        return Err(e);
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+
     fn install(&self, c: &CertPem, source: &str) -> Result<CertInfo> {
         let info = cert_info(c, source)?;
-        *self.resolver.0.write().map_err(|_| tls_err("certificate lock"))? = certified(c)?;
+        *self.resolver.default.write().map_err(|_| tls_err("certificate lock"))? = certified(c)?;
         *self.cert.write().map_err(|_| tls_err("certificate lock"))? = info.clone();
         Ok(info)
     }
@@ -770,7 +986,7 @@ impl State {
                 return self.install(&c, "acme").map(Some);
             }
         }
-        let c = obtain(&self.store, acme, self.http.as_ref(), &self.challenges).await?;
+        let c = obtain(&self.store, acme, self.http.as_ref(), &self.challenges, &self.resolver).await?;
         self.install(&c, "acme").map(Some)
     }
 }
@@ -802,20 +1018,27 @@ impl Host {
             _ => (self_signed(&opts.cert_names(), opts.cert_days)?, "self-signed"),
         };
         let info = cert_info(&pem, source)?;
-        let resolver = Arc::new(Resolver(RwLock::new(certified(&pem)?)));
+        let resolver = Arc::new(Resolver::new(certified(&pem)?));
         let mut tls = rustls::ServerConfig::builder_with_provider(Arc::new(rustls::crypto::aws_lc_rs::default_provider()))
             .with_safe_default_protocol_versions()
             .map_err(tls_err)?
             .with_no_client_auth()
             .with_cert_resolver(resolver.clone());
-        tls.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+        tls.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec(), ACME_TLS_ALPN.to_vec()];
         let acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(tls));
         let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).thread_name("mnnn-host").enable_all().build()?;
         let listener = rt.block_on(TcpListener::bind(SocketAddr::new(ip, opts.port)))?;
         let addr = listener.local_addr()?;
-        let http_listener = match &opts.acme {
-            Some(_) => Some(rt.block_on(TcpListener::bind(SocketAddr::new(ip, opts.acme_http_port)))?),
-            None => None,
+        // HTTP-01 needs the challenge port: for the node's ACME, or any org's
+        let org_acme = opts.org_acme.is_some()
+            && store
+                .orgs()?
+                .iter()
+                .any(|o| super::tls::acme(&store, o).is_ok_and(|a| a.enabled) && super::tls::domains(&store, o).is_ok_and(|d| !d.is_empty()));
+        let wants_http = opts.acme.as_ref().is_some_and(|a| !a.tls_alpn) || (org_acme && opts.org_acme.as_ref().is_some_and(|a| !a.tls_alpn));
+        let http_listener = match wants_http {
+            true => Some(rt.block_on(TcpListener::bind(SocketAddr::new(ip, opts.acme_http_port)))?),
+            false => None,
         };
         let http_addr = http_listener.as_ref().map(|l| l.local_addr()).transpose()?;
         let state = Arc::new(State {
@@ -827,13 +1050,17 @@ impl Host {
             cert: RwLock::new(info),
             acme: opts.acme.clone(),
             http,
+            org_acme: opts.org_acme.clone(),
+            cert_days: opts.cert_days,
+            org_certs: RwLock::new(HashMap::new()),
         });
+        state.load_orgs()?;
         let (stop, rx) = watch::channel(false);
         rt.spawn(accept_tls(listener, acceptor, state.clone(), rx.clone()));
         if let Some(l) = http_listener {
             rt.spawn(accept_http(l, state.challenges.clone(), rx.clone()));
         }
-        if opts.acme.is_some() && opts.auto_renew {
+        if (opts.acme.is_some() || org_acme) && opts.auto_renew {
             rt.spawn(renew_loop(state.clone(), rx));
         }
         Ok(Host { rt: Some(rt), addr, http_addr, state, stop })
@@ -860,6 +1087,24 @@ impl Host {
         rt.block_on(self.state.renew_if_due(true))
     }
 
+    /// Get fresh ACME certificates now for the orgs with ACME on.
+    pub fn renew_orgs(&self) -> Result<Vec<CertInfo>> {
+        let rt = self.rt.as_ref().ok_or_else(|| Error::Other("the host is stopped".into()))?;
+        rt.block_on(self.state.renew_orgs(true))
+    }
+
+    /// Re-read orgs' domains and certificates (after `mnnn org domain …` or `org cert set`).
+    pub fn reload_orgs(&self) -> Result<()> {
+        self.state.load_orgs()
+    }
+
+    /// Each org's served certificate.
+    pub fn org_certs(&self) -> Vec<OrgCertInfo> {
+        let mut v: Vec<OrgCertInfo> = self.state.org_certs.read().map(|m| m.values().cloned().collect()).unwrap_or_default();
+        v.sort_by(|a, b| a.slug.cmp(&b.slug));
+        v
+    }
+
     /// Use the host's store (it holds its own connection).
     pub fn with_store<T>(&self, f: impl FnOnce(&Store) -> Result<T>) -> Result<T> {
         with_store(&self.state.store, f)
@@ -878,6 +1123,7 @@ impl Host {
             addr: self.addr.to_string(),
             http_addr: self.http_addr.map(|a| a.to_string()),
             cert: self.cert(),
+            org_certs: self.org_certs(),
             orgs,
             mirrors,
             updated_at: now_ms(),
@@ -907,9 +1153,23 @@ async fn renew_loop(state: Arc<State>, mut stop: watch::Receiver<bool>) {
         if let Err(e) = state.renew_if_due(false).await {
             tracing::warn!("certificate renewal failed: {e}");
         }
+        if let Err(e) = state.renew_orgs(false).await {
+            tracing::warn!("org certificate renewal failed: {e}");
+        }
+        // pick up certificates and domains set by another process
+        if let Err(e) = state.load_orgs() {
+            tracing::warn!("could not reload org certificates: {e}");
+        }
+        // the host runs the node's scheduled rules (the cert expiry watcher among them)
+        if let Err(e) = with_store(&state.store, |s| {
+            s.set_host_running(true);
+            crate::rules::tick(s, now_ms())
+        }) {
+            tracing::warn!("scheduled rules: {e}");
+        }
         tokio::select! {
             _ = stop.changed() => return,
-            _ = tokio::time::sleep(Duration::from_secs(600)) => {}
+            _ = tokio::time::sleep(Duration::from_secs(60)) => {}
         }
     }
 }
@@ -923,6 +1183,10 @@ async fn accept_tls(listener: TcpListener, acceptor: tokio_rustls::TlsAcceptor, 
                 let (acceptor, state) = (acceptor.clone(), state.clone());
                 tokio::spawn(async move {
                     let Ok(Ok(tls)) = tokio::time::timeout(Duration::from_secs(10), acceptor.accept(tcp)).await else { return };
+                    if tls.get_ref().1.alpn_protocol() == Some(ACME_TLS_ALPN) {
+                        // a TLS-ALPN-01 validation: the handshake was the answer
+                        return;
+                    }
                     let svc = hyper::service::service_fn(move |req| handle(state.clone(), req));
                     let _ = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new()).serve_connection(TokioIo::new(tls), svc).await;
                 });
@@ -1046,6 +1310,22 @@ async fn handle(state: Arc<State>, req: Request<Incoming>) -> std::result::Resul
     let grpc = req.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).is_some_and(|c| c.starts_with("application/grpc"));
     let auth = req.headers().get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).map(str::to_string);
     let cookie = req.headers().get(header::COOKIE).and_then(|v| v.to_str().ok()).and_then(|c| session_cookie(Some(c))).map(str::to_string);
+    let host_name = req.uri().host().map(str::to_string).or_else(|| {
+        req.headers().get(header::HOST).and_then(|v| v.to_str().ok()).map(|h| h.rsplit_once(':').map(|(a, _)| a).unwrap_or(h).to_string())
+    });
+    // an org's own domain: its site at the root
+    if !grpc
+        && path == "/"
+        && let Some(h) = host_name
+        && let Some(slug) =
+            state.org_certs.read().ok().and_then(|m| m.values().find(|c| c.domains.contains(&h.to_ascii_lowercase())).map(|c| c.slug.clone()))
+    {
+        return Ok(Response::builder()
+            .status(302)
+            .header(header::LOCATION, format!("/o/{slug}/"))
+            .body(Full::new(Bytes::new()).boxed())
+            .unwrap_or_else(|_| Response::new(Full::new(Bytes::new()).boxed())));
+    }
     if grpc && super::reflect::is_reflection(&path) {
         return Ok(reflection_stream(state, req.into_body()));
     }
@@ -1138,6 +1418,9 @@ pub struct HostFile {
     pub addr: String,
     pub http_addr: Option<String>,
     pub cert: CertInfo,
+    /// Orgs with domains: the certificate each is served with.
+    #[serde(default)]
+    pub org_certs: Vec<OrgCertInfo>,
     /// Slugs of the hosted orgs and of mirrors.
     pub orgs: Vec<String>,
     pub mirrors: Vec<String>,

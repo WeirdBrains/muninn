@@ -4,15 +4,15 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-org\-cert\-status \- The certificate in use (or that would be)
+mnnn\-org\-cert\-status \- The certificates in use (or that would be): the node\*(Aqs and each org\*(Aqs, where each came from and when it expires
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org cert status\fR [\fB\-\-home\fR] [\fB\-\-json\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn org cert status\fR [\fB\-\-home\fR] [\fB\-\-json\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIORG\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-The certificate in use (or that would be)
+The certificates in use (or that would be): the node\*(Aqs and each org\*(Aqs, where each came from and when it expires
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -73,6 +73,9 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
+.TP
+[\fIORG\fR]
+Only this org
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION

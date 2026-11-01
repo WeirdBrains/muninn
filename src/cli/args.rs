@@ -984,7 +984,13 @@ Examples:
       --then \"export-report Weekly to=~/reports/weekly-{date}.pdf\"
   mnnn rule create Collect --project Halving --on search.save --then add-to-project
   mnnn rule test Collect            # against the newest action
-  mnnn rule dry-run Collect --action 42";
+  mnnn rule dry-run Collect --action 42
+  mnnn rule create Nightly --cron \"0 3 * * *\" --then \"export-journal Notes to=~/notes-{date}.md\"
+  mnnn rule create Watch --every 6h --then cert-watch   # like the built-in cert-expiry-watch
+
+Scheduled rules (--every, --cron) run on a `schedule` action naming them, recorded when they
+are due by the TUI, a running org host or `mnnn rule tick`. `cert-watch [renew=30]
+[notify=30,14,3]` checks org certificates.";
 
 #[derive(Debug, Args)]
 pub struct RuleSpecArgs {
@@ -997,6 +1003,12 @@ pub struct RuleSpecArgs {
     /// A then-action, e.g. "status Imported {inserted} bars" (repeat: run in order).
     #[arg(long = "then", value_name = "ACTION")]
     pub then: Vec<String>,
+    /// Run it on a schedule: every 30m, 6h, 1d, 1w (the node runs it; see `mnnn rule tick`).
+    #[arg(long, value_name = "INTERVAL", conflicts_with = "cron")]
+    pub every: Option<String>,
+    /// Run it at cron times, local time: "0 3 * * *" (minute hour day month weekday).
+    #[arg(long, value_name = "CRON")]
+    pub cron: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -1058,6 +1070,15 @@ pub enum RuleCommand {
         /// React to every matching action.
         #[arg(long)]
         unrelated: bool,
+        /// Stop running it on a schedule.
+        #[arg(long, conflicts_with_all = ["every", "cron"])]
+        no_schedule: bool,
+    },
+    /// Run the scheduled rules that are due now (the TUI and a running org host do this
+    /// every minute; call it from cron or a timer when neither runs).
+    Tick {
+        #[arg(long)]
+        json: bool,
     },
     /// List rules.
     #[command(alias = "ls")]
@@ -2866,9 +2887,28 @@ pub enum OrgCommand {
     /// Serve hosted orgs over HTTPS.
     #[command(subcommand)]
     Host(OrgHostCommand),
-    /// The site's TLS certificate (self-signed, or ACME / Let's Encrypt).
+    /// TLS certificates: the node's site, and each org's for its domains (yours, else
+    /// ACME / Let's Encrypt, else self-signed).
     #[command(subcommand)]
     Cert(OrgCertCommand),
+    /// The domains an org's site is served at (its own certificate is for these).
+    #[command(subcommand)]
+    Domain(OrgDomainCommand),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OrgDomainCommand {
+    /// Serve the org at a domain (point its DNS at this machine).
+    Add { org: String, domain: String },
+    /// The org's domains (every org's without ORG).
+    #[command(alias = "ls")]
+    List {
+        org: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(alias = "rm")]
+    Remove { org: String, domain: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -3101,13 +3141,34 @@ pub enum OrgHostCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum OrgCertCommand {
-    /// The certificate in use (or that would be).
+    /// The certificates in use (or that would be): the node's and each org's, where each
+    /// came from and when it expires.
     Status {
+        /// Only this org.
+        org: Option<String>,
         #[arg(long)]
         json: bool,
     },
-    /// Set up ACME (Let's Encrypt), or turn it off with --off.
+    /// Use your own certificate for an org's domains (PEM chain and key). The key is kept
+    /// in the encrypted store, never logged; it takes priority over ACME and self-signed.
+    Set {
+        org: String,
+        #[arg(long)]
+        cert: PathBuf,
+        #[arg(long)]
+        key: PathBuf,
+    },
+    /// Stop using your own certificate for an org (back to ACME or self-signed).
+    Clear { org: String },
+    /// Set up ACME (Let's Encrypt) for the node's domain, or with --org for an org's
+    /// domains; --off turns it off.
     Acme {
+        /// An org: get its certificate for its domains (`mnnn org domain add`).
+        #[arg(long)]
+        org: Option<String>,
+        /// http-01 (port 80 reaches --http-port) or tls-alpn-01 (port 443 reaches the site port).
+        #[arg(long)]
+        challenge: Option<String>,
         /// The public name the certificate is for (it must point at this machine).
         #[arg(long)]
         domain: Option<String>,
@@ -3127,8 +3188,11 @@ pub enum OrgCertCommand {
         #[arg(long)]
         off: bool,
     },
-    /// Get an ACME certificate now (needs the challenge port reachable as port 80).
-    Renew,
+    /// Get ACME certificates now: the node's, or with --org an org's (needs the challenge reachable).
+    Renew {
+        #[arg(long)]
+        org: Option<String>,
+    },
 }
 
 pub const REVIEW_NOTES: &str = "\

@@ -128,8 +128,9 @@ fn an_org_with_roles_resources_endpoints_templates_and_a_site() {
     let h = e.ok(&["history", "list"]);
     assert!(h.contains("org.host.start") && h.contains("org.host.stop") && h.contains("org.create"), "{h}");
 
-    // ACME is opt-in and needs a domain and an email
-    assert!(!e.run(&["org", "cert", "acme", "--email", "me@example.org"]).status.success());
+    // ACME is opt-in and needs a domain and an email; an email alone keeps the settings orgs use
+    assert!(e.ok(&["org", "cert", "acme", "--email", "me@example.org"]).contains("settings kept for orgs"));
+    assert_eq!(json(&e.ok(&["org", "cert", "status", "--json"]))["acme"]["enabled"], false);
     e.ok(&["org", "cert", "acme", "--domain", "lab.example.org", "--email", "me@example.org", "--directory", "letsencrypt-staging"]);
     let cs = json(&e.ok(&["org", "cert", "status", "--json"]));
     assert_eq!(cs["acme"]["enabled"], true);
@@ -231,4 +232,23 @@ fn members_apply_join_by_invitation_give_fetch_and_get_kicked() {
     let h = a.ok(&["history", "list"]);
     assert!(h.contains("org.member.approve") && h.contains("org.member.kick"), "{h}");
     a.ok(&["net", "stop"]);
+}
+
+#[test]
+fn org_domains_and_your_own_certificate() {
+    let e = Env::new();
+    e.ok(&["org", "create", "Comet Lab"]);
+    assert!(!e.run(&["org", "domain", "add", "comet-lab", "not a host"]).status.success());
+    e.ok(&["org", "domain", "add", "comet-lab", "Lab.Example.org"]);
+    assert!(e.ok(&["org", "domain", "list"]).contains("lab.example.org"));
+    // the built-in watcher came with it, and is an ordinary scheduled rule
+    let w = e.ok(&["rule", "show", "cert-expiry-watch"]);
+    assert!(w.contains("every 6h") && w.contains("cert-watch renew=30 notify=30,14,3"), "{w}");
+    assert!(e.ok(&["rule", "dry-run", "cert-expiry-watch"]).contains("would check org certificates"));
+    // with no certificate of yours: self-signed
+    assert!(e.ok(&["org", "cert", "status", "comet-lab"]).contains("self-signed"));
+    let st = json(&e.ok(&["org", "cert", "status", "comet-lab", "--json"]));
+    assert_eq!(st["source"], "self-signed");
+    e.ok(&["org", "domain", "remove", "comet-lab", "lab.example.org"]);
+    assert!(e.ok(&["org", "domain", "list"]).contains("no domains"));
 }

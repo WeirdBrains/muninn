@@ -162,6 +162,23 @@ pub const EVENTS: &[Event] = &[
             "error: error",
         ],
     },
+    Event {
+        kind: "schedule",
+        about: "a scheduled rule's time came (only that rule reacts)",
+        fields: &["rule: rule id", "name: rule name", "schedule: every … or cron …"],
+    },
+    Event {
+        kind: "notify",
+        about: "a notification (e.g. a certificate expiring or a renewal failing)",
+        fields: &[
+            "level: info, warn or error",
+            "about: e.g. cert.expiry, cert.renew",
+            "message: text",
+            "org: org id",
+            "slug: org slug",
+            "days_left: days left",
+        ],
+    },
     Event { kind: "rule.create", about: "a rule created (never triggers rules)", fields: RULE },
     Event { kind: "rule.edit", about: "a rule changed (never triggers rules)", fields: RULE },
     Event { kind: "rule.remove", about: "a rule removed (never triggers rules)", fields: RULE },
@@ -252,6 +269,11 @@ pub const EVENTS: &[Event] = &[
     Event { kind: "org.host.stop", about: "an org site stopped", fields: ORG },
     Event { kind: "org.host.acme", about: "an org certificate set up", fields: ORG },
     Event { kind: "org.host.cert", about: "an org certificate renewed", fields: ORG },
+    Event { kind: "org.domain.add", about: "an org domain added", fields: &["org: org id", "domain: domain"] },
+    Event { kind: "org.domain.remove", about: "an org domain removed", fields: &["org: org id", "domain: domain"] },
+    Event { kind: "org.cert", about: "an org's certificate set or renewed", fields: &["org: org id", "source: user or acme"] },
+    Event { kind: "org.cert.clear", about: "your certificate removed from an org", fields: &["org: org id"] },
+    Event { kind: "org.cert.acme", about: "ACME turned on or off for an org", fields: &["org: org id", "enabled: on or off"] },
     Event { kind: "review.request", about: "a review requested", fields: REVIEW },
     Event { kind: "review.invite", about: "a review link made", fields: REVIEW },
     Event { kind: "review.join", about: "a reviewer took a review link", fields: REVIEW },
@@ -426,7 +448,7 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
         return Err(Error::invalid(
             "--then",
             format!(
-                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete)"
+                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch)"
             ),
         ));
     };
@@ -571,13 +593,25 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
                 Then::RecordDelete { model, id, filter }
             }
         }
+        "cert-watch" => {
+            if !pos.is_empty() {
+                return Err(bad("cert-watch takes renew=DAYS and notify=D,D,D".into()));
+            }
+            let num = |v: &str| v.trim().parse::<i64>().ok().filter(|n| *n >= 0).ok_or_else(|| bad(format!("`{v}` is not a number of days")));
+            let renew_days = take(&mut kv, "renew").map(|v| num(&v)).transpose()?.unwrap_or(30);
+            let notify_days = match take(&mut kv, "notify") {
+                Some(v) => v.split(',').filter(|x| !x.trim().is_empty()).map(num).collect::<Result<Vec<_>>>()?,
+                None => vec![30, 14, 3],
+            };
+            Then::CertWatch { renew_days, notify_days }
+        }
         "run-code" | "code" => match pos.as_slice() {
             [n] => Then::RunCode { space: store.find_code_space(n)?.id },
             _ => return Err(bad("run-code takes one code space".into())),
         },
         v => {
             return Err(bad(format!(
-                "unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code)"
+                "unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch)"
             )));
         }
     };
@@ -621,6 +655,10 @@ pub fn then_text(store: &Store, t: &Then) -> String {
         Then::Status { text } => return format!("status {}", quote(text)),
         Then::RunSearch { search } => opt(ItemKind::LiveSearch, search),
         Then::RunCode { space } => w.push(quote(&name_of(store, ItemKind::Code, space))),
+        Then::CertWatch { renew_days, notify_days } => {
+            w.push(format!("renew={renew_days}"));
+            w.push(format!("notify={}", notify_days.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(",")));
+        }
         Then::ExportReport { report, to, format } => {
             w.push(quote(&name_of(store, ItemKind::Report, report)));
             w.push(format!("to={}", quote(to)));
@@ -727,7 +765,12 @@ pub fn home(store: &Store, r: &Rule) -> String {
 /// One line about a rule: `on import → 2 actions, on`.
 pub fn brief(r: &Rule) -> String {
     let n = r.spec.then.len();
-    format!("on {} → {n} action{}{}", r.spec.on.join(", "), if n == 1 { "" } else { "s" }, if r.enabled { "" } else { " (off)" })
+    let when = match (&r.spec.schedule, r.spec.on.is_empty()) {
+        (Some(s), true) => schedule_text(s),
+        (Some(s), false) => format!("{}, on {}", schedule_text(s), r.spec.on.join(", ")),
+        (None, _) => format!("on {}", r.spec.on.join(", ")),
+    };
+    format!("{when} → {n} action{}{}", if n == 1 { "" } else { "s" }, if r.enabled { "" } else { " (off)" })
 }
 
 // ---------------------------------------------------------------------------- matching
@@ -888,7 +931,14 @@ pub struct CondCheck {
 }
 
 pub fn check(store: &Store, r: &Rule, a: &ActionRecord) -> Check {
-    let on = if a.kind.starts_with("rule.") { None } else { r.spec.on.iter().find(|p| pattern_matches(p, &a.kind)).cloned() };
+    let on = if a.kind.starts_with("rule.") {
+        None
+    } else if a.kind == SCHEDULE {
+        // a schedule action is only for the rule it names
+        (r.spec.schedule.is_some() && a.params["rule"].as_str() == Some(r.id.as_str())).then(|| SCHEDULE.to_string())
+    } else {
+        r.spec.on.iter().find(|p| pattern_matches(p, &a.kind)).cloned()
+    };
     let related = r.spec.related.then(|| is_related(store, r, a));
     let conditions: Vec<CondCheck> = r
         .spec
@@ -1000,6 +1050,11 @@ pub fn plan(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
             let s = store.live_search(&id)?.ok_or_else(|| Error::invalid("live search", format!("`{id}` no longer exists")))?;
             format!("run live search {}", s.name)
         }
+        Then::CertWatch { renew_days, notify_days } => format!(
+            "check org certificates: renew ACME ones with fewer than {renew_days} days left{}, notify for yours at {} days and on expiry",
+            if store.host_running() { " (the host does it)" } else { " (no host is running here, so it would notify instead)" },
+            notify_days.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(", ")
+        ),
         Then::RunCode { space } => {
             let c = code_space(store, space)?;
             format!(
@@ -1175,6 +1230,10 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
             let s = store.live_search(&id)?.ok_or_else(|| Error::invalid("live search", format!("`{id}` no longer exists")))?;
             let n = crate::live::run(store, &s.spec)?.len();
             Ok(format!("live search {}: {}", s.name, crate::live::matches(n)))
+        }
+        Then::CertWatch { renew_days, notify_days } => {
+            let v = crate::org::tls::watch(store, ORIGIN, *renew_days, notify_days, store.host_running())?;
+            Ok(if v.is_empty() { "certificates are fine".into() } else { v.join("; ") })
         }
         Then::RunCode { space } => {
             let c = code_space(store, space)?;
@@ -1452,6 +1511,265 @@ pub fn run(store: &Store, r: &Rule, a: &ActionRecord) -> RunResult {
     }
     RunResult { action: run_id, status: status.into(), messages }
 }
+
+// ---------------------------------------------------------------------------- schedules
+
+/// The action kind a scheduled rule runs on (it names the rule; no other rule reacts).
+pub const SCHEDULE: &str = "schedule";
+/// The built-in certificate expiry watcher (a scheduled rule set; edit or remove it freely).
+pub const CERT_WATCH: &str = "cert-expiry-watch";
+const CERT_WATCH_MADE: &str = "rules.builtin.cert-expiry-watch";
+
+/// `--every 6h`: a number and s, m, h, d or w (at least a minute).
+pub fn parse_every(s: &str) -> Result<crate::store::Schedule> {
+    let t = s.trim().to_ascii_lowercase();
+    let split = t.find(|c: char| !c.is_ascii_digit()).unwrap_or(t.len());
+    let (n, u) = t.split_at(split);
+    let n: i64 = n.parse().map_err(|_| Error::invalid("--every", format!("`{s}`: like 30m, 6h, 1d")))?;
+    let unit = match u.trim() {
+        "s" | "sec" | "secs" => 1_000,
+        "m" | "min" | "mins" => 60_000,
+        "h" | "hr" | "hrs" | "" => 3_600_000,
+        "d" | "day" | "days" => 86_400_000,
+        "w" | "week" | "weeks" => 7 * 86_400_000,
+        _ => return Err(Error::invalid("--every", format!("`{s}`: use s, m, h, d or w"))),
+    };
+    let ms = n.saturating_mul(unit);
+    if ms < 60_000 {
+        return Err(Error::invalid("--every", "at least a minute"));
+    }
+    Ok(crate::store::Schedule::Every(ms))
+}
+
+/// A five-field cron expression (minute hour day-of-month month day-of-week; `*`, lists,
+/// ranges and `/steps`; Sunday is 0 or 7), in local time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Cron {
+    min: Vec<bool>,
+    hour: Vec<bool>,
+    dom: Vec<bool>,
+    month: Vec<bool>,
+    dow: Vec<bool>,
+    dom_any: bool,
+    dow_any: bool,
+}
+
+fn cron_field(f: &str, lo: u32, hi: u32, what: &str) -> Result<Vec<bool>> {
+    let bad = || Error::invalid("--cron", format!("`{f}` is not a valid {what} ({lo}-{hi}, *, a-b, */n, lists)"));
+    let mut v = vec![false; hi as usize + 1];
+    for part in f.split(',') {
+        let (range, step) = match part.split_once('/') {
+            Some((r, s)) => (r, s.parse::<u32>().ok().filter(|s| *s > 0).ok_or_else(bad)?),
+            None => (part, 1),
+        };
+        let (a, b) = if range == "*" {
+            (lo, hi)
+        } else if let Some((a, b)) = range.split_once('-') {
+            (a.parse().map_err(|_| bad())?, b.parse().map_err(|_| bad())?)
+        } else {
+            let a: u32 = range.parse().map_err(|_| bad())?;
+            (a, if part.contains('/') { hi } else { a })
+        };
+        if a < lo || b > hi || a > b {
+            return Err(bad());
+        }
+        let mut i = a;
+        while i <= b {
+            v[i as usize] = true;
+            i += step;
+        }
+    }
+    Ok(v)
+}
+
+pub fn parse_cron(s: &str) -> Result<Cron> {
+    let f: Vec<&str> = s.split_whitespace().collect();
+    if f.len() != 5 {
+        return Err(Error::invalid("--cron", format!("`{s}`: five fields, minute hour day month weekday (like \"0 3 * * *\")")));
+    }
+    let mut dow = cron_field(f[4], 0, 7, "weekday")?;
+    if dow[7] {
+        dow[0] = true;
+    }
+    Ok(Cron {
+        min: cron_field(f[0], 0, 59, "minute")?,
+        hour: cron_field(f[1], 0, 23, "hour")?,
+        dom: cron_field(f[2], 1, 31, "day")?,
+        month: cron_field(f[3], 1, 12, "month")?,
+        dow,
+        dom_any: f[2] == "*",
+        dow_any: f[4] == "*",
+    })
+}
+
+impl Cron {
+    /// The first matching minute after `after` (epoch ms), within about four years.
+    pub fn next_after(&self, after: i64) -> Option<i64> {
+        use chrono::{Datelike, Duration, Local, TimeZone, Timelike};
+        let start = Local.timestamp_millis_opt(after).earliest()?;
+        let mut t = start.with_second(0)?.with_nanosecond(0)? + Duration::minutes(1);
+        let end = start + Duration::days(366 * 4);
+        while t < end {
+            if !self.month[t.month() as usize] {
+                t = (t + Duration::days(1)).with_hour(0)?.with_minute(0)?;
+                continue;
+            }
+            let dom = self.dom[t.day() as usize];
+            let dow = self.dow[t.weekday().num_days_from_sunday() as usize];
+            let day_ok = match (self.dom_any, self.dow_any) {
+                (true, true) => true,
+                (false, true) => dom,
+                (true, false) => dow,
+                (false, false) => dom || dow,
+            };
+            if !day_ok {
+                t = (t + Duration::days(1)).with_hour(0)?.with_minute(0)?;
+                continue;
+            }
+            if !self.hour[t.hour() as usize] {
+                t = (t + Duration::hours(1)).with_minute(0)?;
+                continue;
+            }
+            if self.min[t.minute() as usize] {
+                return Some(t.timestamp_millis());
+            }
+            t += Duration::minutes(1);
+        }
+        None
+    }
+}
+
+/// `--every` and `--cron` (at most one) into a schedule.
+pub fn parse_schedule(every: Option<&str>, cron: Option<&str>) -> Result<Option<crate::store::Schedule>> {
+    match (every, cron) {
+        (Some(_), Some(_)) => Err(Error::invalid("schedule", "give --every or --cron, not both")),
+        (Some(e), None) => parse_every(e).map(Some),
+        (None, Some(c)) => {
+            parse_cron(c)?;
+            Ok(Some(crate::store::Schedule::Cron(c.split_whitespace().collect::<Vec<_>>().join(" "))))
+        }
+        (None, None) => Ok(None),
+    }
+}
+
+/// `every 6h`, `cron "0 3 * * *"`.
+pub fn schedule_text(s: &crate::store::Schedule) -> String {
+    match s {
+        crate::store::Schedule::Every(ms) => {
+            let ms = *ms;
+            let (n, u) = [(7 * 86_400_000, "w"), (86_400_000, "d"), (3_600_000, "h"), (60_000, "m"), (1_000, "s")]
+                .iter()
+                .find(|(u, _)| ms % u == 0)
+                .map(|(u, n)| (ms / u, *n))
+                .unwrap_or((ms, "ms"));
+            format!("every {n}{u}")
+        }
+        crate::store::Schedule::Cron(c) => format!("cron \"{c}\""),
+    }
+}
+
+/// When a scheduled rule runs next (`None`: it has no schedule, or a cron that never fires).
+/// Every: an interval after its last run, at once if it never ran. Cron: the first time
+/// after its last run (or its creation).
+pub fn next_run(r: &Rule) -> Option<i64> {
+    match r.spec.schedule.as_ref()? {
+        crate::store::Schedule::Every(ms) => Some(r.last_run_at.map_or(r.created_at, |l| l + ms)),
+        crate::store::Schedule::Cron(c) => parse_cron(c).ok()?.next_after(r.last_run_at.unwrap_or(r.created_at)),
+    }
+}
+
+/// The TUI's "On" field: action kinds, or a schedule (`every 6h`, `cron "0 3 * * *"`)
+/// optionally followed by `; KINDS`.
+pub fn parse_on_text(s: &str) -> Result<(Vec<String>, Option<crate::store::Schedule>)> {
+    let t = s.trim();
+    let low = t.to_ascii_lowercase();
+    if !(low.starts_with("every ") || low.starts_with("cron ")) {
+        return Ok((parse_on(&[t.to_string()])?, None));
+    }
+    let (sched, kinds) = t.split_once(';').unwrap_or((t, ""));
+    let (word, arg) = sched.trim().split_once(' ').unwrap_or((sched, ""));
+    let arg = arg.trim().trim_matches('"');
+    let schedule = if word.eq_ignore_ascii_case("every") { parse_schedule(Some(arg), None)? } else { parse_schedule(None, Some(arg))? };
+    let on = if kinds.trim().is_empty() { vec![] } else { parse_on(&[kinds.to_string()])? };
+    Ok((on, schedule))
+}
+
+/// A spec's "On" in the form [`parse_on_text`] reads.
+pub fn on_text(spec: &crate::store::RuleSpec) -> String {
+    match &spec.schedule {
+        Some(s) if spec.on.is_empty() => schedule_text(s),
+        Some(s) => format!("{}; {}", schedule_text(s), spec.on.join(", ")),
+        None => spec.on.join(", "),
+    }
+}
+
+/// The `schedule` action for a rule, not recorded (for `rule test`/`dry-run`).
+pub fn schedule_action(r: &Rule) -> ActionRecord {
+    ActionRecord {
+        id: 0,
+        parent: None,
+        kind: SCHEDULE.into(),
+        summary: format!("schedule for rule {}", r.name),
+        params: json!({ "rule": r.id, "name": r.name, "schedule": r.spec.schedule.as_ref().map(schedule_text) }),
+        origin: ORIGIN.into(),
+        author_id: None,
+        created_at: crate::store::now_ms(),
+        before: None,
+        after: None,
+    }
+}
+
+/// Run every enabled scheduled rule that is due: a `schedule` action naming it is
+/// recorded and the rule runs on it like on any action. Called about once a minute by
+/// the TUI, a running org host and `mnnn rule tick`. Returns the rules started.
+pub fn tick(store: &Store, now: i64) -> Result<Vec<String>> {
+    let mut out = vec![];
+    for r in store.enabled_rules()? {
+        if r.spec.schedule.is_none() || next_run(&r).is_none_or(|t| t > now) {
+            continue;
+        }
+        // mark it first so a failing run does not repeat every minute
+        store.note_rule_scheduled(&r.id)?;
+        let a = schedule_action(&r);
+        store.record_action(&NewAction::new(SCHEDULE, ORIGIN, a.summary.clone()).params(a.params))?;
+        out.push(r.name.clone());
+    }
+    Ok(out)
+}
+
+/// The built-in cert expiry watcher's spec: every 6 hours, `cert-watch renew=30 notify=30,14,3`.
+pub fn cert_watch_spec() -> crate::store::RuleSpec {
+    crate::store::RuleSpec {
+        schedule: Some(crate::store::Schedule::Every(6 * 3_600_000)),
+        then: vec![Then::CertWatch { renew_days: 30, notify_days: vec![30, 14, 3] }],
+        ..Default::default()
+    }
+}
+
+/// Create the built-in `cert-expiry-watch` rule set once (when an org first gets a
+/// domain, a certificate or ACME). Removed or changed afterwards, it is left alone.
+pub fn ensure_cert_watch(store: &Store) -> Result<Option<Rule>> {
+    if store.setting(CERT_WATCH_MADE)?.is_some() {
+        return Ok(None);
+    }
+    store.set_setting(CERT_WATCH_MADE, Some("1"))?;
+    if store.rules()?.iter().any(|r| r.name == CERT_WATCH) {
+        return Ok(None);
+    }
+    let r = store.create_rule(&crate::store::NewRule {
+        name: CERT_WATCH.into(),
+        description: "Built in: renews Let's Encrypt certificates about 30 days before they expire and tells you when your own expire (30, 14, 3 days, expired). Edit, copy or remove it like any rule.".into(),
+        spec: cert_watch_spec(),
+        enabled: true,
+        ..Default::default()
+    })?;
+    record(store, "rule.create", format!("create built-in rule {}", r.name), json!({ "rule": r.id, "name": r.name, "builtin": true }));
+    Ok(Some(r))
+}
+
+#[cfg(test)]
+#[path = "rules_schedule_tests.rs"]
+mod schedule_tests;
 
 #[cfg(test)]
 mod tests {

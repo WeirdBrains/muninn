@@ -174,7 +174,10 @@ mnnn\-org\-host(1)
 Serve hosted orgs over HTTPS
 .TP
 mnnn\-org\-cert(1)
-The site\*(Aqs TLS certificate (self\-signed, or ACME / Let\*(Aqs Encrypt)
+TLS certificates: the node\*(Aqs site, and each org\*(Aqs for its domains (yours, else ACME / Let\*(Aqs Encrypt, else self\-signed)
+.TP
+mnnn\-org\-domain(1)
+The domains an org\*(Aqs site is served at (its own certificate is for these)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION

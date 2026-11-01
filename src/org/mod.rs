@@ -15,6 +15,7 @@ pub mod host;
 pub mod net;
 pub mod reflect;
 pub mod serve;
+pub mod tls;
 
 use crate::error::{Error, Result};
 use crate::store::{

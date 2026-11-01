@@ -1,8 +1,8 @@
 //! `mnnn org`: organizations. Thin over [`crate::org`].
 use super::net::{Net, kind, read_token, sanitize};
 use super::{
-    Ctx, OrgCertCommand, OrgCodeCommand, OrgCommand, OrgEndpointCommand, OrgHostCommand, OrgMemberCommand, OrgProjectCommand, OrgResourceCommand,
-    OrgRoleCommand, OrgTemplateCommand,
+    Ctx, OrgCertCommand, OrgCodeCommand, OrgCommand, OrgDomainCommand, OrgEndpointCommand, OrgHostCommand, OrgMemberCommand, OrgProjectCommand,
+    OrgResourceCommand, OrgRoleCommand, OrgTemplateCommand,
 };
 use crate::ingest::time::fmt_ts;
 use crate::net::client;
@@ -369,6 +369,7 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
         }
         OrgCommand::Host(c) => host_cmd(ctx, c),
         OrgCommand::Cert(c) => cert(ctx, c),
+        OrgCommand::Domain(c) => domain(ctx, c),
     }
 }
 
@@ -991,9 +992,177 @@ fn print_cert(c: &host::CertInfo) {
     println!("certificate: {} for {} until {} ({})", c.source, c.names.join(", "), fmt_ts(c.not_after), c.issuer);
 }
 
-fn cert(ctx: &Ctx, cmd: OrgCertCommand) -> anyhow::Result<()> {
+fn domain(ctx: &Ctx, cmd: OrgDomainCommand) -> anyhow::Result<()> {
+    use crate::org::tls;
+    let store = ctx.open_store()?;
     match cmd {
-        OrgCertCommand::Status { json } => {
+        OrgDomainCommand::Add { org, domain } => {
+            let o = store.find_org(&org)?;
+            let d = tls::check_domain(&domain)?;
+            if tls::add_domain(&store, &o, &d)? {
+                store.note_action(
+                    &NewAction::new("org.domain.add", ORIGIN, format!("{} served at {d}", o.name)).params(json!({ "org": o.id, "domain": d })),
+                );
+                ctx.io.info(format!("{} is served at {d}", o.name));
+                ctx.io.note("Point its DNS here. Its certificate: yours (`mnnn org cert set`), else ACME (`mnnn org cert acme --org`), else self-signed; a running host picks it up within a minute.");
+            } else {
+                ctx.io.info(format!("{} is served at {d} already", o.name));
+            }
+        }
+        OrgDomainCommand::Remove { org, domain } => {
+            let o = store.find_org(&org)?;
+            if !tls::remove_domain(&store, &o, &domain)? {
+                bail!("{} is not served at {domain}", o.name);
+            }
+            store.note_action(
+                &NewAction::new("org.domain.remove", ORIGIN, format!("{} no longer served at {domain}", o.name))
+                    .params(json!({ "org": o.id, "domain": domain })),
+            );
+            ctx.io.info(format!("{} is no longer served at {domain}", o.name));
+        }
+        OrgDomainCommand::List { org, json } => {
+            let orgs = match org {
+                Some(k) => vec![store.find_org(&k)?],
+                None => store.orgs()?,
+            };
+            let mut rows = vec![];
+            for o in orgs {
+                for d in tls::domains(&store, &o)? {
+                    rows.push((o.slug.clone(), d));
+                }
+            }
+            if json {
+                return pretty(&json!(rows.iter().map(|(o, d)| json!({ "org": o, "domain": d })).collect::<Vec<_>>()));
+            }
+            if rows.is_empty() {
+                println!("no domains (`mnnn org domain add ORG DOMAIN`)");
+            }
+            for (o, d) in rows {
+                println!("{o:<20} {d}");
+            }
+        }
+    }
+    Ok(())
+}
+
+fn print_org_cert(c: &crate::org::tls::OrgCert) {
+    let now = crate::store::now_ms();
+    let when = match &c.cert {
+        Some(i) => format!("until {} ({} days)", fmt_ts(i.not_after), c.days_left(now).unwrap_or(0)),
+        None => "made when the host starts".into(),
+    };
+    println!(
+        "{}: {} for {} {when}{}",
+        c.slug,
+        c.source,
+        if c.domains.is_empty() { "(no domains)".to_string() } else { c.domains.join(", ") },
+        if c.acme.enabled { " · ACME on" } else { "" }
+    );
+    if let Some(r) = &c.retry {
+        println!("  ACME failed {} time(s), next try {}: {}", r.attempts, fmt_ts(r.next_at), r.error);
+    }
+}
+
+fn domain_given_none(d: &str) -> bool {
+    d.trim().is_empty()
+}
+
+fn read_pem(p: &std::path::Path, what: &str) -> anyhow::Result<String> {
+    std::fs::read_to_string(p).with_context(|| format!("reading the {what} {}", p.display()))
+}
+
+fn cert(ctx: &Ctx, cmd: OrgCertCommand) -> anyhow::Result<()> {
+    use crate::org::tls;
+    match cmd {
+        OrgCertCommand::Set { org, cert, key } => {
+            let store = ctx.open_store()?;
+            let o = store.find_org(&org)?;
+            let pem = host::CertPem { chain: read_pem(&cert, "certificate")?, key: read_pem(&key, "key")? };
+            let info = tls::set_user_cert(&store, &o, &pem)?;
+            let missing: Vec<String> = tls::domains(&store, &o)?.into_iter().filter(|d| !info.names.contains(d)).collect();
+            store.note_action(
+                &NewAction::new("org.cert", ORIGIN, format!("your certificate set for {}", o.name))
+                    .params(json!({ "org": o.id, "source": tls::USER, "names": info.names, "not_after": info.not_after })),
+            );
+            ctx.io.info(format!("{}: your certificate for {} until {}", o.name, info.names.join(", "), fmt_ts(info.not_after)));
+            if !missing.is_empty() {
+                ctx.io.warn(format!("it does not name {}", missing.join(", ")));
+            }
+            Ok(())
+        }
+        OrgCertCommand::Clear { org } => {
+            let store = ctx.open_store()?;
+            let o = store.find_org(&org)?;
+            if !tls::clear_user_cert(&store, &o)? {
+                bail!("{} has no certificate of yours", o.name);
+            }
+            store.note_action(
+                &NewAction::new("org.cert.clear", ORIGIN, format!("your certificate removed from {}", o.name)).params(json!({ "org": o.id })),
+            );
+            ctx.io.info(format!("{}: back to {}", o.name, if tls::acme(&store, &o)?.enabled { "ACME" } else { "a self-signed certificate" }));
+            Ok(())
+        }
+        OrgCertCommand::Status { org: Some(k), json } => {
+            let store = ctx.open_store()?;
+            let o = store.find_org(&k)?;
+            let c = tls::status(&store, &o)?;
+            if json {
+                return pretty(&json!(c));
+            }
+            print_org_cert(&c);
+            Ok(())
+        }
+        OrgCertCommand::Acme { org: Some(k), challenge, email, off, domain, directory, profile, http_port } => {
+            if domain.is_some() || directory.is_some() || profile.is_some() || http_port.is_some() || challenge.is_some() {
+                bail!("with --org only --email and --off apply (the directory, profile, challenge and port are the node's)");
+            }
+            let store = ctx.open_store()?;
+            let o = store.find_org(&k)?;
+            let mut a = tls::acme(&store, &o)?;
+            if let Some(e) = email {
+                a.email = e.trim().to_string();
+            }
+            a.enabled = !off;
+            if a.enabled && tls::domains(&store, &o)?.is_empty() {
+                bail!("{} has no domains; add one first (`mnnn org domain add {} DOMAIN`)", o.name, o.slug);
+            }
+            if a.enabled && !a.email.contains('@') && !ctx.prefs()?.hosting.acme.email.contains('@') {
+                bail!("give a contact address: --email E (or set the node's with `mnnn org cert acme --email E`)");
+            }
+            tls::set_acme(&store, &o, &a)?;
+            let summary = format!("ACME {} for {}", if a.enabled { "on" } else { "off" }, o.name);
+            store.note_action(&NewAction::new("org.cert.acme", ORIGIN, summary.clone()).params(json!({ "org": o.id, "enabled": a.enabled })));
+            ctx.io.info(summary);
+            if a.enabled {
+                ctx.io.note(
+                    "A running host gets the certificate within a minute and renews it by itself (start it again if it was started without ACME).",
+                );
+            }
+            Ok(())
+        }
+        OrgCertCommand::Renew { org: Some(k) } => {
+            let home = &ctx.paths.home;
+            let n = Net::open(ctx)?;
+            let o = n.store.find_org(&k)?;
+            if host::running(home).is_some() {
+                tls::request_renewal(&n.store, &o)?;
+                ctx.io.info(format!("asked the running host to renew {}'s certificate", o.name));
+                return Ok(());
+            }
+            if !tls::acme(&n.store, &o)?.enabled {
+                bail!("ACME is off for {}; `mnnn org cert acme --org {} --email E`", o.name, o.slug);
+            }
+            let mut opts = HostOptions::from_prefs(&n.prefs.hosting)?;
+            opts.auto_renew = false;
+            let h = Host::start(n.second_store()?, opts)?;
+            let r = h.renew_orgs();
+            h.stop();
+            for c in r? {
+                print_cert(&c);
+            }
+            Ok(())
+        }
+        OrgCertCommand::Status { org: None, json } => {
             let home = &ctx.paths.home;
             let n = Net::open(ctx)?;
             let p = &n.prefs.hosting;
@@ -1005,8 +1174,10 @@ fn cert(ctx: &Ctx, cmd: OrgCertCommand) -> anyhow::Result<()> {
                     None => None,
                 },
             };
+            let orgs = tls::all(&n.store)?;
             if json {
                 return pretty(&json!({
+                    "orgs": orgs,
                     "certificate": info,
                     "acme": { "enabled": p.acme.enabled, "domain": p.acme.domain, "email": p.acme.email, "directory": p.acme.directory_url(), "profile": p.acme.profile, "http_port": p.acme.http_port },
                     "self_signed_days": p.cert_days,
@@ -1028,9 +1199,12 @@ fn cert(ctx: &Ctx, cmd: OrgCertCommand) -> anyhow::Result<()> {
             } else {
                 println!("ACME: off (`mnnn org cert acme --domain D --email E`)");
             }
+            for c in &orgs {
+                print_org_cert(c);
+            }
             Ok(())
         }
-        OrgCertCommand::Acme { domain, email, directory, profile, http_port, off } => {
+        OrgCertCommand::Acme { org: None, challenge, domain, email, directory, profile, http_port, off } => {
             let mut prefs = ctx.prefs()?;
             let a = &mut prefs.hosting.acme;
             if let Some(d) = domain {
@@ -1048,21 +1222,37 @@ fn cert(ctx: &Ctx, cmd: OrgCertCommand) -> anyhow::Result<()> {
             if let Some(p) = http_port {
                 a.http_port = p;
             }
-            a.enabled = !off;
+            if let Some(c) = challenge {
+                let c = c.trim().to_ascii_lowercase();
+                if !matches!(c.as_str(), "http-01" | "tls-alpn-01") {
+                    bail!("--challenge: http-01 or tls-alpn-01 (behind NAT, get a certificate elsewhere and `mnnn org cert set` it)");
+                }
+                a.challenge = c;
+            }
+            // only the contact and challenge settings, for orgs: the node's own ACME stays off
+            let settings_only = domain_given_none(&a.domain) && !off;
+            a.enabled = !off && !settings_only;
             Acme::from_prefs(a)?;
-            let summary = if a.enabled { format!("ACME on for {} ({})", a.domain, a.directory_url()) } else { "ACME off".to_string() };
+            let summary = if a.enabled {
+                format!("ACME on for {} ({})", a.domain, a.directory_url())
+            } else if settings_only {
+                format!("ACME settings kept for orgs ({}, {})", a.directory_url(), if a.tls_alpn() { "tls-alpn-01" } else { "http-01" })
+            } else {
+                "ACME off".to_string()
+            };
             let params =
                 json!({ "enabled": a.enabled, "domain": a.domain, "directory": a.directory_url(), "profile": a.profile, "http_port": a.http_port });
+            let enabled = a.enabled;
             prefs.save(&ctx.paths)?;
             let n = Net::open(ctx)?;
             n.store.note_action(&NewAction::new("org.host.acme", ORIGIN, summary.clone()).params(params));
             ctx.io.info(summary);
-            if !off {
+            if enabled {
                 ctx.io.note("The host gets a certificate when it starts and renews it by itself; the domain must point here and port 80 reach the challenge port.");
             }
             Ok(())
         }
-        OrgCertCommand::Renew => {
+        OrgCertCommand::Renew { org: None } => {
             let home = &ctx.paths.home;
             if let Some(f) = host::running(home) {
                 bail!("the host at {} renews by itself; stop it first to renew now", f.url);

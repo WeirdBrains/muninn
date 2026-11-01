@@ -8,7 +8,7 @@ mnnn\-rule\-edit \- Change a rule: given \-\-on, \-\-if or \-\-then replace the 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn rule edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-on\fR] [\fB\-\-if\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-then\fR] [\fB\-\-clear\-if\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-journal\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-search\fR] [\fB\-\-model\fR] [\fB\-\-standalone\fR] [\fB\-\-related\fR] [\fB\-\-unrelated\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIRULE\fR> 
+\fBmnnn rule edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-on\fR] [\fB\-\-if\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-then\fR] [\fB\-\-every\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-cron\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-clear\-if\fR] [\fB\-\-journal\fR] [\fB\-\-search\fR] [\fB\-\-model\fR] [\fB\-\-standalone\fR] [\fB\-\-related\fR] [\fB\-\-unrelated\fR] [\fB\-\-no\-schedule\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIRULE\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -59,8 +59,8 @@ May also be specified with the \fBMUNINN_QUIET\fR environment variable.
 \fB\-\-then\fR \fI<ACTION>\fR
 A then\-action, e.g. "status Imported {inserted} bars" (repeat: run in order)
 .TP
-\fB\-\-clear\-if\fR
-Drop every condition
+\fB\-\-every\fR \fI<INTERVAL>\fR
+Run it on a schedule: every 30m, 6h, 1d, 1w (the node runs it; see `mnnn rule tick`)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -68,8 +68,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-journal\fR \fI<JOURNAL>\fR
-Move it into a journal
+\fB\-\-cron\fR \fI<CRON>\fR
+Run it at cron times, local time: "0 3 * * *" (minute hour day month weekday)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -89,6 +89,12 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
+\fB\-\-clear\-if\fR
+Drop every condition
+.TP
+\fB\-\-journal\fR \fI<JOURNAL>\fR
+Move it into a journal
+.TP
 \fB\-\-search\fR \fI<SEARCH>\fR
 Move it into a live search
 .TP
@@ -103,6 +109,9 @@ Only react to actions about where it lives
 .TP
 \fB\-\-unrelated\fR
 React to every matching action
+.TP
+\fB\-\-no\-schedule\fR
+Stop running it on a schedule
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

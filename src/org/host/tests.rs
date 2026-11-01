@@ -45,7 +45,7 @@ fn hosted_lab(s: &Store) -> (String, String) {
 }
 
 fn opts() -> HostOptions {
-    HostOptions { bind: "127.0.0.1".into(), port: 0, names: vec![], cert_days: 2, acme: None, acme_http_port: 0, auto_renew: false }
+    HostOptions { bind: "127.0.0.1".into(), port: 0, names: vec![], cert_days: 2, acme: None, acme_http_port: 0, auto_renew: false, org_acme: None }
 }
 
 #[test]
@@ -265,6 +265,8 @@ fn the_host_answers_grpc() {
 
 struct Ca {
     http_port: u16,
+    /// Validate through TLS-ALPN-01 against this site port instead of HTTP-01.
+    alpn_port: Option<u16>,
     token: String,
     valid: bool,
     issued: Option<String>,
@@ -288,6 +290,7 @@ impl MockCa {
         let ca = p.self_signed(&key).unwrap();
         MockCa(Arc::new(Mutex::new(Ca {
             http_port: 0,
+            alpn_port: None,
             token: "tok-123".into(),
             valid: false,
             issued: None,
@@ -351,12 +354,17 @@ impl MockCa {
             ("POST", "/authz/1") => {
                 let c = self.0.lock().unwrap();
                 let st = if c.valid { "valid" } else { "pending" };
+                let ch = if c.alpn_port.is_some() {
+                    serde_json::json!({"type": "tls-alpn-01", "url": format!("{BASE}/chall/2"), "token": c.token, "status": st})
+                } else {
+                    serde_json::json!({"type": "http-01", "url": format!("{BASE}/chall/1"), "token": c.token, "status": st})
+                };
                 (
                     200,
                     vec![],
                     json(serde_json::json!({
                         "status": st, "identifier": {"type": "dns", "value": "org.example.test"},
-                        "challenges": [{"type": "http-01", "url": format!("{BASE}/chall/1"), "token": c.token, "status": st}]
+                        "challenges": [ch]
                     })),
                 )
             }
@@ -380,6 +388,21 @@ impl MockCa {
                 self.0.lock().unwrap().valid = ok;
                 let st = if ok { "valid" } else { "invalid" };
                 (200, vec![], json(serde_json::json!({"type": "http-01", "url": format!("{BASE}/chall/1"), "token": token, "status": st})))
+            }
+            ("POST", "/chall/2") => {
+                let (port, token) = {
+                    let c = self.0.lock().unwrap();
+                    (c.alpn_port.unwrap_or(0), c.token.clone())
+                };
+                // validate like a CA would: a TLS handshake offering only acme-tls/1
+                let der = handshake(port, "org.example.test", vec![b"acme-tls/1".to_vec()]).await;
+                let ok = der.as_ref().is_some_and(|d| {
+                    let (_, x) = x509_parser::parse_x509_certificate(d).unwrap();
+                    x.extensions().iter().any(|e| e.oid.to_id_string() == "1.3.6.1.5.5.7.1.31" && e.critical)
+                });
+                self.0.lock().unwrap().valid = ok;
+                let st = if ok { "valid" } else { "invalid" };
+                (200, vec![], json(serde_json::json!({"type": "tls-alpn-01", "url": format!("{BASE}/chall/2"), "token": token, "status": st})))
             }
             ("POST", "/order/1") => (200, vec![], json(Self::order(&self.0.lock().unwrap()))),
             ("POST", "/finalize/1") => {
@@ -431,8 +454,14 @@ fn acme_gets_a_short_lived_certificate_through_http_01_and_keeps_it() {
     let ca = MockCa::new();
     let ca2 = ca.clone();
     let http: AcmeHttp = Arc::new(move || Box::new(ca2.clone()) as Box<dyn HttpClient>);
-    let acme =
-        Acme { directory: format!("{BASE}/dir"), domain: "org.example.test".into(), email: "lab@example.test".into(), profile: "shortlived".into() };
+    let acme = Acme {
+        directory: format!("{BASE}/dir"),
+        domain: "org.example.test".into(),
+        email: "lab@example.test".into(),
+        profile: "shortlived".into(),
+        extra: vec![],
+        tls_alpn: false,
+    };
     let o = HostOptions { acme: Some(acme.clone()), ..opts() };
     let host = Host::start_with(s, o.clone(), Some(http.clone())).unwrap();
     assert_eq!(host.cert().source, "self-signed", "until the CA answers");
@@ -550,4 +579,160 @@ fn queries_and_join_links_round_trip() {
     assert_eq!(query_value(&format!("a=1&auth={}", query_escape(v)), "auth").as_deref(), Some(v));
     assert_eq!(join_url("https://h:1/", "lab", "muninn://join/AB"), "https://h:1/o/lab/join#muninn%3A%2F%2Fjoin%2FAB");
     assert_eq!(session_cookie(Some("a=b; muninn_session=cafe")), Some("cafe"));
+}
+
+/// A TLS handshake to the site with this SNI and ALPN: the leaf it gets.
+async fn handshake(port: u16, name: &str, alpn: Vec<Vec<u8>>) -> Option<Vec<u8>> {
+    let seen = Arc::new(Mutex::new(None));
+    let mut cfg = rustls::ClientConfig::builder_with_provider(Arc::new(provider()))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(AnyCert(seen.clone())))
+        .with_no_client_auth();
+    cfg.alpn_protocols = alpn;
+    let tcp = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.ok()?;
+    let _ = tokio_rustls::TlsConnector::from(Arc::new(cfg)).connect(ServerName::try_from(name.to_string()).unwrap(), tcp).await;
+    seen.lock().unwrap().clone()
+}
+
+fn leaf_for(port: u16, name: &str) -> (String, Vec<String>) {
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let der = rt.block_on(handshake(port, name, vec![b"http/1.1".to_vec()])).expect("a certificate");
+    let i = cert_info(&CertPem { chain: der.pipe_pem(), key: String::new() }, "x").unwrap();
+    (i.issuer, i.names)
+}
+
+trait PipePem {
+    fn pipe_pem(self) -> String;
+}
+
+impl PipePem for Vec<u8> {
+    fn pipe_pem(self) -> String {
+        let b = base64::engine::general_purpose::STANDARD.encode(self);
+        format!("-----BEGIN CERTIFICATE-----\n{b}\n-----END CERTIFICATE-----\n")
+    }
+}
+
+/// A certificate "from a provider": signed by a small CA, for these names.
+fn provider_cert(names: &[&str], days: i64) -> CertPem {
+    let mut cap = rcgen::CertificateParams::new(Vec::<String>::new()).unwrap();
+    cap.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+    cap.distinguished_name.push(rcgen::DnType::CommonName, "Provider CA");
+    let cak = rcgen::KeyPair::generate().unwrap();
+    let issuer = rcgen::Issuer::new(cap, cak);
+    let mut p = rcgen::CertificateParams::new(names.iter().map(|s| s.to_string()).collect::<Vec<_>>()).unwrap();
+    let now = time::OffsetDateTime::now_utc();
+    p.not_before = now - time::Duration::days(1);
+    p.not_after = now + time::Duration::days(days);
+    let key = rcgen::KeyPair::generate().unwrap();
+    let c = p.signed_by(&key, &issuer).unwrap();
+    CertPem { chain: c.pem(), key: key.serialize_pem() }
+}
+
+#[test]
+fn orgs_get_their_own_certificates_by_name_yours_first_else_self_signed() {
+    use crate::org::tls;
+    let s = Store::open_in_memory().unwrap();
+    hosted_lab(&s);
+    let lab = s.find_org("lab").unwrap();
+    let other = create(&s, "cli", "Other", None, "").unwrap();
+    assert!(tls::check_domain("Lab.Example.org.").unwrap() == "lab.example.org");
+    for bad in ["*.example.org", "nodot", "a..b", "-a.b", "1.2.3.4"] {
+        assert!(tls::check_domain(bad).is_err(), "{bad}");
+    }
+    assert!(tls::add_domain(&s, &lab, "lab.example.org").unwrap());
+    assert!(!tls::add_domain(&s, &lab, "LAB.example.org").unwrap(), "once");
+    assert!(tls::add_domain(&s, &other, "lab.example.org").is_err(), "one org per domain");
+    tls::add_domain(&s, &other, "other.example.org").unwrap();
+    // a mismatched key and an expired certificate are refused
+    let good = provider_cert(&["lab.example.org"], 60);
+    let wrong = CertPem { chain: good.chain.clone(), key: provider_cert(&["x.test"], 60).key.clone() };
+    assert!(tls::set_user_cert(&s, &lab, &wrong).unwrap_err().to_string().contains("does not match"));
+    assert!(tls::set_user_cert(&s, &lab, &provider_cert(&["lab.example.org"], -1)).is_err());
+    let info = tls::set_user_cert(&s, &lab, &good).unwrap();
+    assert_eq!(info.source, "user");
+    let st = tls::status(&s, &lab).unwrap();
+    assert_eq!((st.source.as_str(), st.days_left(now_ms())), ("user", Some(59)));
+    assert_eq!(tls::status(&s, &other).unwrap().source, "self-signed");
+    let host = Host::start(s, opts()).unwrap();
+    let port = host.addr.port();
+    let (issuer, names) = leaf_for(port, "lab.example.org");
+    assert!(issuer.contains("Provider CA") && names == vec!["lab.example.org".to_string()]);
+    let (issuer, names) = leaf_for(port, "other.example.org");
+    assert!(issuer.contains("self-signed") && names == vec!["other.example.org".to_string()], "{issuer}");
+    let (_, names) = leaf_for(port, "localhost");
+    assert!(names.contains(&"localhost".to_string()), "the node's own for the rest");
+    let certs = host.org_certs();
+    assert_eq!(certs.iter().map(|c| (c.slug.as_str(), c.cert.source.as_str())).collect::<Vec<_>>(), vec![("lab", "user"), ("other", "self-signed")]);
+    assert_eq!(host.status().org_certs.len(), 2);
+    // its root sends you to its site
+    let r = send(host.addr, false, "GET", "/", &[("host", "lab.example.org".into())], vec![]);
+    assert!(r.status == 302 || r.status == 200, "{}", r.status);
+    // clearing yours falls back (picked up on reload)
+    host.with_store(|s| tls::clear_user_cert(s, &s.find_org("lab")?).map(|_| ())).unwrap();
+    host.reload_orgs().unwrap();
+    assert!(leaf_for(port, "lab.example.org").0.contains("self-signed"));
+    host.stop();
+}
+
+#[test]
+fn org_acme_renews_by_http_01_and_tls_alpn_01_and_backs_off_on_failure() {
+    use crate::org::tls;
+    for alpn in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let s = Store::open(&dir.path().join("m.db"), Some(&[3u8; 32])).unwrap();
+        hosted_lab(&s);
+        let lab = s.find_org("lab").unwrap();
+        tls::add_domain(&s, &lab, "org.example.test").unwrap();
+        tls::set_acme(&s, &lab, &tls::OrgAcme { enabled: true, email: "lab@example.test".into() }).unwrap();
+        let ca = MockCa::new();
+        let ca2 = ca.clone();
+        let http: AcmeHttp = Arc::new(move || Box::new(ca2.clone()) as Box<dyn HttpClient>);
+        let base = Acme {
+            directory: format!("{BASE}/dir"),
+            domain: String::new(),
+            email: String::new(),
+            profile: "shortlived".into(),
+            extra: vec![],
+            tls_alpn: alpn,
+        };
+        let host = Host::start_with(s, HostOptions { org_acme: Some(base), ..opts() }, Some(http)).unwrap();
+        assert_eq!(host.http_addr.is_some(), !alpn, "HTTP-01 needs the challenge port");
+        assert!(leaf_for(host.addr.port(), "org.example.test").0.contains("self-signed"), "until the CA answers");
+        {
+            let mut c = ca.0.lock().unwrap();
+            if alpn {
+                c.alpn_port = Some(host.addr.port());
+            } else {
+                c.http_port = host.http_addr.unwrap().port();
+            }
+        }
+        let got = host.renew_orgs().unwrap();
+        assert_eq!(got.len(), 1, "alpn={alpn}");
+        assert!(leaf_for(host.addr.port(), "org.example.test").0.contains("Mock CA"), "served at once");
+        assert!(host.state.resolver.alpn.read().unwrap().is_empty(), "challenge certificates are gone");
+        host.with_store(|s| {
+            let lab = s.find_org("lab")?;
+            assert_eq!(tls::status(s, &lab)?.source, "acme");
+            assert!(s.actions()?.iter().any(|a| a.kind == "org.cert"));
+            Ok(())
+        })
+        .unwrap();
+        // a CA that fails: an error notification and a backoff
+        ca.0.lock().unwrap().token = "bad".into();
+        ca.0.lock().unwrap().http_port = 1;
+        ca.0.lock().unwrap().alpn_port = Some(1);
+        assert!(host.renew_orgs().is_err());
+        host.with_store(|s| {
+            let lab = s.find_org("lab")?;
+            let r = tls::retry(s, &lab)?;
+            assert_eq!(r.attempts, 1);
+            assert!(r.next_at > now_ms() + 50 * 60 * 1000);
+            assert!(s.actions()?.iter().any(|a| a.kind == "notify" && a.params["about"] == "cert.renew"));
+            Ok(())
+        })
+        .unwrap();
+        host.stop();
+    }
 }

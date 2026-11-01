@@ -143,3 +143,32 @@ fn rules_live_in_projects_journals_and_searches() {
     let echo = e.ok(&["rule", "show", "Echo"]);
     assert!(echo.contains("lives in: standalone") && echo.contains("state:    off"), "{echo}");
 }
+
+#[test]
+fn scheduled_rules_are_shown_dry_run_edited_and_ticked() {
+    let e = Env::new();
+    e.ok(&["journal", "new", "Log"]);
+    // a schedule needs no --on; bad ones are refused
+    assert!(!e.run(&["rule", "create", "Bad", "--every", "5s", "--then", "status x"]).status.success());
+    assert!(!e.run(&["rule", "create", "Bad", "--cron", "0 3 * *", "--then", "status x"]).status.success());
+    assert!(!e.run(&["rule", "create", "Bad", "--then", "status x"]).status.success());
+    e.ok(&["rule", "create", "Nightly", "--cron", "0 3 * * *", "--then", "note Log \"nightly {kind}\""]);
+    e.ok(&["rule", "create", "Hourly", "--every", "1h", "--then", "note Log \"hourly {kind}\""]);
+    let show = e.ok(&["rule", "show", "Hourly"]);
+    assert!(show.contains("every 1h (next"), "{show}");
+    assert!(e.ok(&["rule", "list"]).contains("cron \"0 3 * * *\" →"));
+    let dry = e.ok(&["rule", "dry-run", "Hourly"]);
+    assert!(dry.contains("✓ on schedule") && dry.contains("would add a note to Log: hourly schedule"), "{dry}");
+    // tick: the hourly one never ran, so it is due; the nightly one waits for 3:00
+    assert!(e.ok(&["rule", "tick", "--json"]).contains("Hourly"));
+    assert!(!e.ok(&["rule", "tick", "--json"]).contains("Hourly"), "not again within the hour");
+    let notes = e.ok(&["history", "list"]);
+    assert!(notes.contains("rule Hourly on #"), "{notes}");
+    // edit the schedule, then drop it (it then needs --on)
+    e.ok(&["rule", "edit", "Hourly", "--every", "6h"]);
+    assert!(e.ok(&["rule", "show", "Hourly"]).contains("every 6h"));
+    assert!(!e.run(&["rule", "edit", "Hourly", "--no-schedule"]).status.success());
+    e.ok(&["rule", "edit", "Hourly", "--no-schedule", "--on", "journal.create"]);
+    assert!(!e.ok(&["rule", "show", "Hourly"]).contains("every"));
+    assert!(e.ok(&["rule", "events"]).contains("schedule"));
+}

@@ -12,8 +12,10 @@ server with the node*, so it comes up whenever the node does), and by default on
 | Start | `mnnn org host start [--bind ADDR] [--port N] [--for SECS]` (foreground, Ctrl-C stops) | `S` / Enter, or Orgs ▸ Start site |
 | Stop | `mnnn org host stop` | `S` again or `X`, or Orgs ▸ Stop site |
 | Status | `mnnn org host status [--json]` | the Site page |
-| Certificate | `mnnn org cert status [--json]`, `mnnn org cert renew` | the Site page |
-| ACME | `mnnn org cert acme --domain D --email E [--directory] [--profile] [--http-port]`, `--off` | `e` "domain email" or "off" |
+| Certificate | `mnnn org cert status [ORG] [--json]`, `mnnn org cert renew [--org ORG]` | the Site page |
+| ACME | `mnnn org cert acme --domain D --email E [--directory] [--profile] [--http-port] [--challenge http-01\|tls-alpn-01]`, `--off` | `e` "domain email" or "off" |
+| Org domains | `mnnn org domain add\|list\|remove ORG DOMAIN` | Organizations page `w` (add D / remove D) |
+| Org certificate | `mnnn org cert set ORG --cert FILE --key FILE`, `mnnn org cert clear ORG`, `mnnn org cert acme --org ORG [--email E] [--off]` | Organizations page `c` ("CERT.pem KEY.pem" sets or replaces, "clear"), `L` ("on [email]" / "off"); the Site page lists each org's |
 | Mirror | `mnnn org mirror ORG` (a joined org's public pages; needs `host` there) | Joined page `m` |
 
 Settings live under `[hosting]` in the [preferences](preferences.md): `bind`
@@ -32,6 +34,34 @@ names for the self-signed certificate) and `cert_days` (7).
   in the encrypted database, never in files. `directory` is `letsencrypt`,
   `letsencrypt-staging` or a directory URL. `mnnn org cert renew` renews now (not while
   a site runs: a running site renews itself).
+
+## Org domains and certificates (2.16)
+
+An org may be served at its own domains (`mnnn org domain add lab lab.example.org`; point
+the name's DNS at this machine). The one site port serves every org: the certificate is
+picked by the name the browser asks for (SNI), and a request for the bare domain root
+goes to the org's site (`/o/SLUG/`). Each org's certificate comes from, in order:
+
+1. **Yours**: `mnnn org cert set ORG --cert chain.pem --key key.pem`. The chain and key
+   are checked (PEM, the key matches the leaf, not expired) and kept in the encrypted
+   database; the key is never logged or written out. `mnnn org cert clear ORG` stops
+   using it.
+2. **Let's Encrypt**: `mnnn org cert acme --org ORG --email E` (the email may be the
+   node's, `mnnn org cert acme --email E`). One certificate covers all the org's domains.
+   The node's ACME settings apply: directory, profile and challenge, `http-01` (port 80
+   must reach `http_port`) or `tls-alpn-01` (port 443 must reach the site port; set with
+   `--challenge`). Behind NAT, where neither port is reachable, DNS-01 is the usual way;
+   it is not built in: get a certificate elsewhere and set it as yours.
+3. **Self-signed** for the org's domains, made when the site starts.
+
+`mnnn org cert status` lists each org with where its certificate came from, its names and
+when it expires (days left), plus any ACME failures. A running site renews ACME
+certificates by itself (checked every minute; due when a third of the life is left,
+which is about 30 days for a 90-day certificate) and picks up domains and certificates
+set from another process within a minute. Failures notify (`notify`, `about =
+cert.renew`) and retry with backoff: an hour, doubling, at most a day. Your own
+certificates are not renewed by Muninn; the [expiry watcher](rules.md#scheduled-rule-sets)
+reminds you.
 
 ## Paths
 

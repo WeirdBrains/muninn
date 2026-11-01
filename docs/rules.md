@@ -96,22 +96,65 @@ A stopped run is recorded as a `rule.run` with status `blocked`.
 
 ```
 mnnn rule list [--json]
-mnnn rule create NAME --on KIND [--if COND]... --then ACTION... [--description TEXT]
+mnnn rule create NAME (--on KIND | --every 6h | --cron "0 3 * * *") [--if COND]... --then ACTION... [--description TEXT]
                 [--journal J | --search S | --model M] [--project P] [--related] [--disabled]
 mnnn rule edit RULE [--name N] [--on ...] [--if ...] [--clear-if] [--then ...]
                 [--journal J | --search S | --model M | --standalone] [--related | --unrelated]
+                [--every I | --cron C | --no-schedule]
 mnnn rule show RULE [--json]                 # spec, home, projects, recent runs
 mnnn rule enable RULE / disable RULE
 mnnn rule remove RULE                        # asks first; -y skips
 mnnn rule test [RULE] [--action ID]          # would it match? each condition shown
 mnnn rule dry-run [RULE] [--action ID]       # ... and what it would do
 mnnn rule events                             # kinds and their fields
+mnnn rule tick [--json]                      # run the scheduled rules that are due
 ```
 
 `RULE` is an id, a unique id prefix or a name; `mnnn rules` is an alias. `test` and
 `dry-run` check every rule when none is named, against the newest action you did
 (skipping rule runs) unless `--action` says otherwise. They never change anything.
 `--quiet` hides rule messages.
+
+## Scheduled rule sets
+
+A rule can run on a schedule instead of (or as well as) on actions:
+
+- `--every 30m`, `6h`, `1d`, `1w` (at least a minute): an interval after its last run; a
+  new one runs at once.
+- `--cron "0 3 * * *"`: five fields, minute hour day month weekday, in local time, with
+  `*`, lists (`0,30`), ranges (`9-17`) and steps (`*/15`); Sunday is 0 or 7.
+
+When a scheduled rule is due, a `schedule` action naming it is recorded and the rule runs
+on it like on any action (its `--if` conditions see `rule`, `name` and `schedule`). Only
+that rule reacts to its schedule action, so a `--on "*"` rule does not fire every tick.
+`show` gives the schedule and the next run; `test` and `dry-run` check a scheduled rule
+against its schedule action unless `--action` is given; `edit --every`/`--cron` changes
+the schedule and `--no-schedule` drops it (the rule then needs `--on`).
+
+Who runs them: the TUI (about once a minute) and a running org host
+(`mnnn org host start`, or the TUI's site) check for due rules; when a host serves from
+this node, it does and the TUI leaves it to it. With neither running, call
+`mnnn rule tick` from cron or a systemd timer. A run missed while nothing was running
+happens once when something next checks.
+
+### The cert expiry watcher
+
+`cert-expiry-watch` is a built-in scheduled rule set, made the first time an org gets a
+domain, a certificate of yours or ACME. It is an ordinary rule: show, edit, copy,
+switch off or remove it (removed, it is not made again). It runs every 6 hours and does
+`cert-watch renew=30 notify=30,14,3`:
+
+- **Let's Encrypt certificates** with fewer than `renew` days left (or none yet) are
+  renewed by the running host (it is asked; renewals retry with backoff, an hour doubling
+  to a day, and failures notify). With no host running it notifies you to start one.
+- **Your own certificates** notify once at each of the `notify` days and when they
+  expire, telling you to renew with your provider and `mnnn org cert set` the new one.
+
+Notifications are `notify` actions (`level`, `about` = `cert.expiry` or `cert.renew`,
+`message`, `org`, `days_left`): in the history, on the status line, and triggers for
+rules (`--on notify --if "about = cert.expiry" --then "status {message}"`). The header
+bell and node broadcasts come with Notifications (a later release) and read these same
+actions.
 
 ## Terminal UI
 
@@ -123,10 +166,10 @@ that rule.
 |-----|--------|
 | `j` / `k`, ↑ / ↓ | move |
 | Enter | show the rule, its runs and spec |
-| `n` | new rule: name, on, if, then, lives in (each step checked as you go) |
+| `n` | new rule: name, on, if, then, lives in (each step checked as you go); "on" also takes `every 6h` or `cron "0 3 * * *"`, optionally `; KINDS` |
 | `e` | edit the selected rule (the same steps, filled in) |
 | Space | switch on / off |
-| `t` / `x` | test / dry run against the newest action |
+| `t` / `x` | test / dry run against the newest action (a scheduled rule: its schedule) |
 | `p` | add to a project |
 | `d` | delete (`y` confirms) |
 | Esc | close the details, then the window |
@@ -150,8 +193,9 @@ A rule is stored as JSON (`mnnn rule show --json`):
  "then": [{"do": "status", "text": "{inserted} new bars"}]}
 ```
 
-The version and the `do` tags leave room for new triggers and then-actions (for example
-scheduled or data-driven events) without changing existing rules.
+A scheduled rule adds `"schedule": {"every": 21600000}` (milliseconds) or
+`{"cron": "0 3 * * *"}`; rules without one read as before. The version and the `do` tags
+leave room for new triggers and then-actions without changing existing rules.
 
 See also: [action history](history.md), [projects](projects.md).
 

@@ -4,21 +4,18 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-org\-cert\-acme \- Set up ACME (Let\*(Aqs Encrypt), or turn it off with \-\-off
+mnnn\-org\-cert\-acme \- Set up ACME (Let\*(Aqs Encrypt) for the node\*(Aqs domain, or with \-\-org for an org\*(Aqs domains; \-\-off turns it off
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org cert acme\fR [\fB\-\-domain\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-email\fR] [\fB\-\-directory\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-profile\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-http\-port\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-off\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn org cert acme\fR [\fB\-\-home\fR] [\fB\-\-org\fR] [\fB\-\-challenge\fR] [\fB\-\-db\fR] [\fB\-\-domain\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-email\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-directory\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-profile\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-http\-port\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-off\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-Set up ACME (Let\*(Aqs Encrypt), or turn it off with \-\-off
+Set up ACME (Let\*(Aqs Encrypt) for the node\*(Aqs domain, or with \-\-org for an org\*(Aqs domains; \-\-off turns it off
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
-.TP
-\fB\-\-domain\fR \fI<DOMAIN>\fR
-The public name the certificate is for (it must point at this machine)
 .TP
 \fB\-\-home\fR \fI<DIR>\fR
 Muninn home directory (default ~/.muninn)
@@ -26,17 +23,20 @@ Muninn home directory (default ~/.muninn)
 May also be specified with the \fBMUNINN_HOME\fR environment variable. 
 .RE
 .TP
+\fB\-\-org\fR \fI<ORG>\fR
+An org: get its certificate for its domains (`mnnn org domain add`)
+.TP
+\fB\-\-challenge\fR \fI<CHALLENGE>\fR
+http\-01 (port 80 reaches \-\-http\-port) or tls\-alpn\-01 (port 443 reaches the site port)
+.TP
 \fB\-\-db\fR \fI<PATH>\fR
 Database file (default <home>/storage/muninn.database)
 .RS
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
 .TP
-\fB\-\-email\fR \fI<EMAIL>\fR
-Contact address given to the CA
-.TP
-\fB\-\-directory\fR \fI<DIRECTORY>\fR
-letsencrypt, letsencrypt\-staging or a directory URL
+\fB\-\-domain\fR \fI<DOMAIN>\fR
+The public name the certificate is for (it must point at this machine)
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
@@ -44,14 +44,14 @@ Never prompt; missing values are errors
 May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
 .RE
 .TP
-\fB\-\-profile\fR \fI<PROFILE>\fR
-Certificate profile (shortlived; an empty value for the CA\*(Aqs default)
+\fB\-\-email\fR \fI<EMAIL>\fR
+Contact address given to the CA
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
 .TP
-\fB\-\-http\-port\fR \fI<HTTP_PORT>\fR
-Port the HTTP\-01 challenge is answered on
+\fB\-\-directory\fR \fI<DIRECTORY>\fR
+letsencrypt, letsencrypt\-staging or a directory URL
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -59,14 +59,17 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-off\fR
-Turn ACME off (back to self\-signed certificates)
+\fB\-\-profile\fR \fI<PROFILE>\fR
+Certificate profile (shortlived; an empty value for the CA\*(Aqs default)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
+.TP
+\fB\-\-http\-port\fR \fI<HTTP_PORT>\fR
+Port the HTTP\-01 challenge is answered on
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -85,6 +88,9 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-off\fR
+Turn ACME off (back to self\-signed certificates)
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
