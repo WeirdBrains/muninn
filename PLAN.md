@@ -145,7 +145,7 @@ Reports are meant for humans to read and use. That's the goal of all this.
 
 ## Rule Sets
 
-> **Phase 4 · v2.3.0 · 🚧 In progress**
+> **Phase 4 · v2.3.0 · ✅ Released**
 
 Rule sets define triggers that are processed when an action is done. An action could be a data import, an export, etc. Rule sets act as our "if this, then that" for the data world.
 
@@ -433,7 +433,7 @@ Today templates are saved from files with the CLI only (`mnnn org template save/
 
 ## Live Collaboration and Peers
 
-> **Phase 22 · v2.19.0 · ✅ Released**
+> **Phase 24 · v2.19.0 · ✅ Released**
 
 1. Real-time collaboration between key-exchanged connections over a gRPC bidirectional stream with protobuf messages (`muninn.live.v1`), end-to-end encrypted with the exchange keys
 2. Real-time collaborative editing of entries, journals, code and records (operations merged without loss; presence and cursors)
