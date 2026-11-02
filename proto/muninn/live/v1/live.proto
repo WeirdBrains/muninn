@@ -68,3 +68,21 @@ message Batch {
   uint64 head = 4;
   repeated Cursor present = 5;
 }
+
+// The stream transport (2.19): one bidirectional stream per connection to a peer, over
+// TLS authenticated with both nodes' identity keys. Calls (`call`, JSON as in
+// `crate::collab::wire`) are answered on the same `id`; a `subscribe` call follows a live
+// session, and the host pushes each change as a `Batch` (`push`, `id` of the subscribe).
+service Live {
+  rpc Open(stream Envelope) returns (stream Envelope);
+}
+
+message Envelope {
+  uint64 id = 1;
+  string exchange = 2;
+  bytes call = 3;
+  string error = 4;
+  string subscribe = 5;
+  uint64 since = 6;
+  Batch push = 7;
+}

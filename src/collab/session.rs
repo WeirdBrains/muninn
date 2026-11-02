@@ -411,14 +411,41 @@ pub fn sync_with(
 ) -> Result<(State, Vec<Cursor>)> {
     let since = s.live_head(&ls.id)?;
     let (b, meta) = send(Batch { session: ls.id.clone(), since: since as u64, frames, head: 0, present: vec![] })?;
+    let st = take(s, ls, &b, meta.get("status").and_then(|v| v.as_str()) == Some("closed"))?;
+    Ok((st, b.present))
+}
+
+/// Guest: store a batch from the host (an answer or a push); the new state.
+pub fn take(s: &Store, ls: &LiveSession, b: &Batch, closed: bool) -> Result<State> {
     for f in &b.frames {
         let op = f.op.clone().unwrap_or_default();
         s.put_live_op(&ls.id, &LiveOp { seq: f.seq as i64, site: f.site.to_string(), doc: f.doc.clone(), body: op.bytes(), created_at: now_ms() })?;
     }
     let st = state(s, &ls.id)?;
-    let status = if st.closed || meta.get("status").and_then(|v| v.as_str()) == Some("closed") { "closed" } else { "open" };
+    let status = if st.closed || closed { "closed" } else { "open" };
     s.set_live_session(&ls.id, Some(status), Some(st.head))?;
-    Ok((st, b.present))
+    Ok(st)
+}
+
+/// Host: what a subscribed guest lacks after `since`, and whether the session is over (the
+/// stream transport pushes this). The same invitation check as [`receive`]; the guest stays
+/// present (keeping its cursor) while it follows.
+pub fn pull(s: &Store, peer: &str, label: &str, session: &str, since: u64) -> Result<(Batch, bool)> {
+    let ls = s.live_session(session)?.filter(|l| l.role == "host").ok_or_else(|| Error::Other("no such live session here".into()))?;
+    if !ls.peers.iter().any(|p| p == peer) {
+        return Err(Error::Other("you were not invited to this live session".into()));
+    }
+    let me = crate::net::identity::load_or_create(s)?.public().to_peer_id().to_string();
+    absorb(s, &ls, &me)?;
+    if ls.status == "open" {
+        let cursor = s.presence(&ls.id, PRESENCE_MS)?.into_iter().find(|p| p.peer == peer).and_then(|p| p.cursor);
+        s.set_presence(&ls.id, peer, label, cursor)?;
+    }
+    let frames: Vec<Frame> = s.live_ops(&ls.id, since as i64)?.into_iter().take(MAX_FRAMES).map(frame).collect::<Result<_>>()?;
+    let head = frames.last().map(|f| f.seq).unwrap_or(since);
+    let present = s.presence(&ls.id, PRESENCE_MS)?.into_iter().map(|p| Cursor { label: p.label, offset: p.cursor }).collect();
+    let done = ls.status == "closed" && head as i64 >= s.live_head(&ls.id)?;
+    Ok((Batch { session: ls.id.clone(), since, frames, head, present }, done))
 }
 
 /// Host: edits made through the session (the CLI or TUI) rather than to the item.

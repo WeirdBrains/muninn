@@ -7,7 +7,7 @@
 use super::proto::Batch;
 use crate::error::{Error, Result};
 use crate::net::proto::serde_bytes_b64;
-use crate::store::{Exchange, Store};
+use crate::store::{Exchange, LiveSession, Store};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -26,6 +26,8 @@ pub enum CollabReq {
     /// Run one of the peer's served executables (an org endpoint); results stream back as a
     /// `run` session.
     Run { org: String, endpoint: String, input: Value },
+    /// Which transport the peer uses and where its stream listener is.
+    Hello,
 }
 
 /// A peer's answer.
@@ -44,11 +46,44 @@ pub enum CollabResp {
     Started {
         session: String,
     },
+    /// `stream` (with its listener's port, and the addresses it advertises) or `poll`.
+    Hello {
+        mode: String,
+        port: u16,
+        addrs: Vec<String>,
+    },
 }
 
 /// Reaching one peer.
 pub trait Transport {
     fn call(&self, req: CollabReq) -> Result<CollabResp>;
+
+    /// `stream` or `poll`.
+    fn name(&self) -> &'static str {
+        "poll"
+    }
+
+    /// Follow a live session (a guest's copy `ls`): `each` sees the state after every change
+    /// until it returns false or the session closes. Polling asks about once a second; a
+    /// stream has the host push each change.
+    fn follow(&self, s: &Store, ls: &LiveSession, each: &mut dyn FnMut(&super::session::State, &[super::proto::Cursor]) -> bool) -> Result<()> {
+        type Seen = (i64, Vec<(String, Option<i64>)>);
+        let mut last: Option<Seen> = None;
+        loop {
+            let (st, here) = super::session::sync_with(s, ls, vec![], |b| self.live(b))?;
+            let now = (st.head, here.iter().map(|c| (c.label.clone(), c.offset)).collect::<Vec<_>>());
+            if last.as_ref() != Some(&now) {
+                last = Some(now);
+                if !each(&st, &here) {
+                    return Ok(());
+                }
+            }
+            if st.closed {
+                return Ok(());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+        }
+    }
 
     /// One live round (see [`super::session::sync_with`]).
     fn live(&self, b: Batch) -> Result<(Batch, Value)> {
@@ -81,6 +116,17 @@ impl Transport for Libp2p<'_> {
             _ => Err(unexpected()),
         }
     }
+}
+
+/// The transport to reach the peer behind `x` (see [`super::stream::pick`]).
+pub fn open<'a>(
+    s: &'a Store,
+    node: &'a crate::net::node::Node,
+    x: &'a Exchange,
+    relays: &'a [String],
+    mode: super::stream::Mode,
+) -> Box<dyn Transport + 'a> {
+    super::stream::pick(s, node, x, relays, mode)
 }
 
 /// The exchange scopes collaboration works over.
@@ -143,6 +189,7 @@ pub fn serve(s: &mut Store, x: &Exchange, from: &str, me: &str, req: CollabReq) 
             let (out, meta) = super::session::receive(s, me, from, &x.title(), &b)?;
             CollabResp::Live { batch: out.bytes(), meta }
         }
+        CollabReq::Hello => super::stream::hello(s),
         CollabReq::Offers => CollabResp::Offers { body: super::peers::offers_for(s, from)? },
         CollabReq::Message { id, from: label, about, text, at } => {
             super::msg::receive(s, x, from, me, &id, &label, about.as_deref(), &text, at)?;

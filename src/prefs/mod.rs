@@ -227,6 +227,17 @@ pub struct NetPrefs {
     /// (e.g. `alien.duckdns.org:4741` after forwarding TCP+UDP on the router). Announced and
     /// put first in invite links; DNS names are resolved by whoever dials.
     pub external_addresses: Vec<String>,
+    /// How live collaboration reaches peers (2.19): `stream` (gRPC streams, the default) or
+    /// `poll` (requests over the peer connection; for containers). `MUNINN_COLLAB_TRANSPORT`
+    /// and `--transport` override it.
+    pub collab_transport: String,
+    /// Where the gRPC stream listener binds (`stream` only).
+    pub collab_bind: String,
+    /// Its TCP port (0: let the system pick).
+    pub collab_port: u16,
+    /// Where peers reach the stream listener from outside (`host:port`), replacing the
+    /// node's own addresses with `collab_port` (port forwarding, a different public port).
+    pub collab_advertise: Vec<String>,
 }
 
 impl Default for NetPrefs {
@@ -242,6 +253,10 @@ impl Default for NetPrefs {
             autostart: true,
             accept: "known".into(),
             external_addresses: vec![],
+            collab_transport: "stream".into(),
+            collab_bind: "0.0.0.0".into(),
+            collab_port: 4742,
+            collab_advertise: vec![],
         }
     }
 }

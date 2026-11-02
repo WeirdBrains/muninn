@@ -19,6 +19,7 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 fn main() {
+    grpc();
     let root = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let docs = root.join("docs");
     println!("cargo:rerun-if-changed=docs");
@@ -34,4 +35,17 @@ fn main() {
     src.push_str("];\n");
     let out = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("help_topics.rs");
     fs::write(out, src).unwrap();
+}
+
+/// The `muninn.live.v1` stream service, from the .proto with a pure-Rust compiler (no protoc).
+/// The messages are hand-written in `src/collab/proto.rs`; only the service is generated.
+fn grpc() {
+    println!("cargo:rerun-if-changed=proto");
+    let fds = protox::compile(["muninn/live/v1/live.proto"], ["proto"]).expect("proto/muninn/live/v1/live.proto");
+    tonic_prost_build::configure()
+        .build_client(true)
+        .build_server(true)
+        .extern_path(".muninn.live.v1", "crate::collab::proto")
+        .compile_fds(fds)
+        .expect("generating the muninn.live.v1 service");
 }

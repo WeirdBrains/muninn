@@ -50,12 +50,12 @@ pub fn deliver(s: &Store, t: &dyn Transport, m: &Message, my_label: &str) -> Res
 }
 
 /// The running node: deliver what this node wrote and has not delivered yet.
-pub fn tick(s: &Store, node: &crate::net::node::Node, relays: &[String], me: &str, my_label: &str) -> usize {
+pub fn tick(s: &Store, node: &crate::net::node::Node, relays: &[String], me: &str, my_label: &str, mode: super::stream::Mode) -> usize {
     let mut n = 0;
     for m in s.undelivered_messages(me).unwrap_or_default() {
         let Ok(x) = super::wire::exchange_to(s, &m.peer, None) else { continue };
-        let t = super::wire::Libp2p { store: s, node, exchange: &x, relays };
-        if deliver(s, &t, &m, my_label).is_ok() {
+        let t = super::wire::open(s, node, &x, relays, mode);
+        if deliver(s, t.as_ref(), &m, my_label).is_ok() {
             n += 1;
         }
     }

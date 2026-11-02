@@ -97,6 +97,11 @@ instant-acme = "0.8"
 prost = { version = "0.14", features = ["derive"] }
 hmac = "0.12"
 x509-parser = "0.18"
+tonic = { version = "0.14", default-features = false, features = ["transport", "codegen", "router"] }
+tonic-prost = "0.14"
+libp2p-tls = "0.7"
+tokio-stream = "0.1"
+tower = { version = "0.5", features = ["util"] }
 
 
 [dev-dependencies]
@@ -148,3 +153,7 @@ strip = "symbols"
 
 [workspace]
 exclude = ["vendor/python-ast"]
+
+[build-dependencies]
+protox = "0.10.0"
+tonic-prost-build = "0.14"

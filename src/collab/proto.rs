@@ -149,6 +149,25 @@ impl Batch {
     }
 }
 
+/// One message on the stream transport (see `Live.Open` in the .proto).
+#[derive(Clone, PartialEq, Message)]
+pub struct Envelope {
+    #[prost(uint64, tag = "1")]
+    pub id: u64,
+    #[prost(string, tag = "2")]
+    pub exchange: String,
+    #[prost(bytes = "vec", tag = "3")]
+    pub call: Vec<u8>,
+    #[prost(string, tag = "4")]
+    pub error: String,
+    #[prost(string, tag = "5")]
+    pub subscribe: String,
+    #[prost(uint64, tag = "6")]
+    pub since: u64,
+    #[prost(message, optional, tag = "7")]
+    pub push: Option<Batch>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

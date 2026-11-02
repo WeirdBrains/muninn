@@ -2,7 +2,7 @@
 //! org endpoints (records, rules, code); the host checks the guest's membership and role and
 //! the endpoint's consent rules exactly as an org call (`crate::org::call`), then keeps the
 //! output as a `run` session of `RunChunk`s, which the guest reads like any live session.
-use super::proto::{Batch, Kind, Op, RunChunk};
+use super::proto::{Kind, Op, RunChunk};
 use super::wire::{CollabReq, CollabResp, Transport, unexpected};
 use crate::error::{Error, Result};
 use crate::store::{LiveSession, NewAction, Store, now_ms};
@@ -92,25 +92,23 @@ pub fn run(
     let ls = super::session::joined(s, &session, host, exchange, &json!({ "kind": "run", "title": format!("{org} {endpoint}") }))?;
     let mut seen = 0;
     let mut text = String::new();
-    for round in 0..600 {
-        let (st, _) = super::session::sync_with(s, &ls, vec![], |b: Batch| t.live(b))?;
-        for c in &st.runs[seen..] {
+    let mut out: Option<Result<Value>> = None;
+    t.follow(s, &ls, &mut |st, _| {
+        for c in &st.runs[seen.min(st.runs.len())..] {
             each(c);
             text.push_str(&c.json);
-            if c.done && !c.error.is_empty() {
-                return Err(Error::Other(c.error.clone()));
+            if c.done {
+                out = Some(if c.error.is_empty() {
+                    serde_json::from_str(&text).map_err(|e| Error::Other(format!("the run's output: {e}")))
+                } else {
+                    Err(Error::Other(c.error.clone()))
+                });
             }
         }
         seen = st.runs.len();
-        if st.runs.last().is_some_and(|c| c.done) {
-            return serde_json::from_str(&text).map_err(|e| Error::Other(format!("the run's output: {e}")));
-        }
-        if st.closed {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(if round < 10 { 100 } else { 500 }));
-    }
-    Err(Error::Other("the run ended without a result".into()))
+        out.is_none()
+    })?;
+    out.unwrap_or_else(|| Err(Error::Other("the run ended without a result".into())))
 }
 
 #[cfg(test)]
