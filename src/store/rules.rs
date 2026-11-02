@@ -251,6 +251,16 @@ pub enum Then {
         #[serde(default = "notify_days")]
         notify_days: Vec<i64>,
     },
+    /// 2.18: a notification (title, body and link are templates; level info, warn or error).
+    Notify {
+        title: String,
+        #[serde(default)]
+        body: String,
+        #[serde(default)]
+        link: Option<String>,
+        #[serde(default)]
+        level: Option<String>,
+    },
 }
 
 fn renew_days() -> i64 {
@@ -281,6 +291,7 @@ impl Then {
             Then::RecordDelete { .. } => "record-delete",
             Then::RunCode { .. } => "run-code",
             Then::CertWatch { .. } => "cert-watch",
+            Then::Notify { .. } => "notify",
         }
     }
 }

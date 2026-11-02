@@ -102,3 +102,35 @@ fn the_cert_watcher_is_built_in_once_editable_and_notifies_for_your_certificates
     tls::add_domain(&s, &o, "www.lab.example.org").unwrap();
     assert!(s.find_rule(CERT_WATCH).is_err());
 }
+
+#[test]
+fn a_rule_set_notifies_and_notifications_trigger_rules() {
+    let s = Store::open_in_memory().unwrap();
+    let t = crate::rules::parse_then(&s, r#"notify "import of {name}" body="{summary}" link=journal:x level=warn"#).unwrap();
+    assert_eq!(crate::rules::parse_then(&s, &crate::rules::then_text(&s, &t)).unwrap(), t);
+    assert!(crate::rules::parse_then(&s, "notify").is_err());
+    assert!(crate::rules::parse_then(&s, "notify hi level=loud").is_err());
+    s.create_rule(&NewRule {
+        name: "tell".into(),
+        spec: RuleSpec { on: vec!["journal.create".into()], then: vec![t], ..Default::default() },
+        enabled: true,
+        ..Default::default()
+    })
+    .unwrap();
+    let chained = crate::rules::parse_then(&s, "status seen {title}").unwrap();
+    s.create_rule(&NewRule {
+        name: "chain".into(),
+        spec: RuleSpec { on: vec!["notification".into()], then: vec![chained], ..Default::default() },
+        enabled: true,
+        ..Default::default()
+    })
+    .unwrap();
+    let na = crate::store::NewAction::new("journal.create", "cli", "made Field").params(serde_json::json!({ "name": "Field" }));
+    s.record_action(&na).unwrap();
+    let n = s.notifications(false, 5).unwrap();
+    assert_eq!(n.len(), 1);
+    assert_eq!((n[0].kind.as_str(), n[0].level.as_str(), n[0].link.as_deref()), ("rule", "warn", Some("journal:x")));
+    assert!(n[0].title.starts_with("import of"), "{}", n[0].title);
+    let runs = s.actions_of_kind("rule.run").unwrap();
+    assert!(runs.iter().any(|r| r.summary.contains("chain") || r.params.to_string().contains("seen")), "{runs:?}");
+}

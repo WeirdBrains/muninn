@@ -179,6 +179,16 @@ pub const EVENTS: &[Event] = &[
             "days_left: days left",
         ],
     },
+    Event {
+        kind: "notification",
+        about: "a notification was made (by a built-in event, a rule set or a broadcast)",
+        fields: &["id: notification id", "source: what made it", "level: info, warn or error", "title: title", "body: text", "link: where it points"],
+    },
+    Event {
+        kind: "net.broadcast",
+        about: "a broadcast arrived from another node",
+        fields: &["peer: its peer id", "from: its label", "topic: topic", "text: text", "scope: node, link or organization", "org: org id"],
+    },
     Event { kind: "rule.create", about: "a rule created (never triggers rules)", fields: RULE },
     Event { kind: "rule.edit", about: "a rule changed (never triggers rules)", fields: RULE },
     Event { kind: "rule.remove", about: "a rule removed (never triggers rules)", fields: RULE },
@@ -448,7 +458,7 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
         return Err(Error::invalid(
             "--then",
             format!(
-                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch)"
+                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch, notify)"
             ),
         ));
     };
@@ -605,6 +615,18 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
             };
             Then::CertWatch { renew_days, notify_days }
         }
+        "notify" | "notification" => {
+            if pos.is_empty() {
+                return Err(bad("notify needs a title".into()));
+            }
+            let level = take(&mut kv, "level");
+            if let Some(l) = &level
+                && !matches!(l.as_str(), "info" | "warn" | "error")
+            {
+                return Err(bad(format!("level `{l}` (info, warn or error)")));
+            }
+            Then::Notify { title: pos.join(" "), body: take(&mut kv, "body").unwrap_or_default(), link: take(&mut kv, "link"), level }
+        }
         "run-code" | "code" => match pos.as_slice() {
             [n] => Then::RunCode { space: store.find_code_space(n)?.id },
             _ => return Err(bad("run-code takes one code space".into())),
@@ -653,6 +675,18 @@ pub fn then_text(store: &Store, t: &Then) -> String {
     };
     match t {
         Then::Status { text } => return format!("status {}", quote(text)),
+        Then::Notify { title, body, link, level } => {
+            w.push(quote(title));
+            if !body.is_empty() {
+                w.push(format!("body={}", quote(body)));
+            }
+            if let Some(l) = link {
+                w.push(format!("link={}", quote(l)));
+            }
+            if let Some(l) = level {
+                w.push(format!("level={l}"));
+            }
+        }
         Then::RunSearch { search } => opt(ItemKind::LiveSearch, search),
         Then::RunCode { space } => w.push(quote(&name_of(store, ItemKind::Code, space))),
         Then::CertWatch { renew_days, notify_days } => {
@@ -1042,6 +1076,7 @@ pub fn plan(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
     };
     Ok(match t {
         Then::Status { text } => format!("show \"{}\"", expand(store, r, a, text)),
+        Then::Notify { title, level, .. } => format!("notify \"{}\" ({})", expand(store, r, a, title), level.as_deref().unwrap_or("info")),
         Then::RunSearch { search } => {
             let id = search
                 .clone()
@@ -1222,6 +1257,21 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
     };
     match t {
         Then::Status { text } => Ok(expand(store, r, a, text)),
+        Then::Notify { title, body, link, level } => {
+            let n = crate::notify::add(
+                store,
+                ORIGIN,
+                &crate::store::NewNotification {
+                    kind: "rule".into(),
+                    level: level.clone().unwrap_or_else(|| "info".into()),
+                    title: expand(store, r, a, title),
+                    body: expand(store, r, a, body),
+                    link: link.as_ref().map(|l| expand(store, r, a, l)).filter(|l| !l.is_empty()),
+                    action_id: Some(a.id),
+                },
+            )?;
+            Ok(format!("notified: {}", n.title))
+        }
         Then::RunSearch { search } => {
             let id = search
                 .clone()

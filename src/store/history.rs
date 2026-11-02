@@ -140,6 +140,11 @@ impl Store {
         )?;
         let id = self.conn.last_insert_rowid();
         self.set_setting(HEAD, Some(&id.to_string()))?;
+        if !self.rules_rt.off.get()
+            && let Ok(Some(rec)) = self.action(id)
+        {
+            crate::notify::after_action(self, &rec);
+        }
         crate::rules::after_action(self, id);
         Ok(id)
     }
