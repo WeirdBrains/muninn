@@ -30,7 +30,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 20 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | ✅ Released |
 | 21 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
 | 22 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | ✅ Released |
-| 23 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 🚧 In progress |
+| 23 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | ✅ Released |
 | 24 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | post-2.0 | 📋 Planned |
 | 25 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | post-2.0 | 📋 Planned |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
@@ -412,7 +412,7 @@ Today templates are saved from files with the CLI only (`mnnn org template save/
 
 ## Notifications
 
-> **Phase 21 · v2.18.0 · 🚧 In progress**
+> **Phase 21 · v2.18.0 · ✅ Released**
 
 1. Every notification is a rule set trigger: built-in events (review comments, invites, sync conflicts, shares to you, code waiting for approval, …) are triggers rule sets can match
 2. Any rule set can emit a notification as an action (title, body, link)
