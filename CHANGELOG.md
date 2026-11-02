@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-11-02
+
 ### Added
 - Live collaboration between nodes that exchanged keys (see `docs/collaboration.md`):
   - messages, direct or about an item (`mnnn msg`), kept on both sides, retried until delivered, and notifying as `net.message`
@@ -480,7 +482,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.18.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.19.0...HEAD
+[2.19.0]: https://github.com/WeirdBrains/muninn/compare/v2.18.0...v2.19.0
 [2.18.0]: https://github.com/WeirdBrains/muninn/compare/v2.17.0...v2.18.0
 [2.17.0]: https://github.com/WeirdBrains/muninn/compare/v2.16.1...v2.17.0
 [2.16.1]: https://github.com/WeirdBrains/muninn/compare/v2.16.0...v2.16.1
