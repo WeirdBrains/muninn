@@ -26,6 +26,34 @@ CREATE TABLE org_code_copies (
 ALTER TABLE orgs ADD COLUMN gated INTEGER NOT NULL DEFAULT 0;
 "#;
 
+/// 2.17: template build steps (synced), and node-local build consent, preview tokens and
+/// the sites other nodes announced to this one.
+pub const MIGRATION_2_17: &str = r#"
+ALTER TABLE org_templates ADD COLUMN build_cmd TEXT;
+ALTER TABLE org_templates ADD COLUMN build_src TEXT;
+ALTER TABLE org_templates ADD COLUMN build_out TEXT;
+CREATE TABLE org_template_builds_ok (
+    template_id TEXT NOT NULL,
+    cmd_hash TEXT NOT NULL,
+    approved_at INTEGER NOT NULL,
+    PRIMARY KEY (template_id, cmd_hash)
+);
+CREATE TABLE org_template_previews (
+    token TEXT PRIMARY KEY,
+    template_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE TABLE site_announcements (
+    peer TEXT NOT NULL,
+    org_id TEXT NOT NULL,
+    exchange_id TEXT NOT NULL,
+    card TEXT NOT NULL,
+    open INTEGER NOT NULL,
+    received_at INTEGER NOT NULL,
+    PRIMARY KEY (peer, org_id)
+);
+"#;
+
 pub const MIGRATION: &str = r#"
 CREATE TABLE orgs (
     id TEXT PRIMARY KEY,
@@ -425,6 +453,26 @@ pub struct Template {
     pub css: String,
     pub created_at: i64,
     pub updated_at: i64,
+    /// 2.17: an optional build step (a shell command), the folder it runs in (copied to a
+    /// scratch dir first) and the output folder inside it (default `build`).
+    #[serde(default)]
+    pub build_cmd: Option<String>,
+    #[serde(default)]
+    pub build_src: Option<String>,
+    #[serde(default)]
+    pub build_out: Option<String>,
+}
+
+/// A site another node announced to this one (2.17), as stored here.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SiteAnnouncement {
+    pub peer: String,
+    pub org_id: String,
+    pub exchange_id: String,
+    /// The announced card as JSON (see `crate::org::announce::SiteCard`).
+    pub card: String,
+    pub open: bool,
+    pub received_at: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1085,7 +1133,7 @@ impl Store {
 
     pub fn templates(&self, org: &str) -> Result<Vec<Template>> {
         let mut st = self.conn.prepare(
-            "SELECT id, org_id, name, html, css, created_at, updated_at FROM org_templates WHERE org_id = ?1 ORDER BY name COLLATE NOCASE",
+            "SELECT id, org_id, name, html, css, created_at, updated_at, build_cmd, build_src, build_out FROM org_templates WHERE org_id = ?1 ORDER BY name COLLATE NOCASE",
         )?;
         let v = st
             .query_map([org], |r| {
@@ -1097,6 +1145,9 @@ impl Store {
                     css: r.get(4)?,
                     created_at: r.get(5)?,
                     updated_at: r.get(6)?,
+                    build_cmd: r.get(7)?,
+                    build_src: r.get(8)?,
+                    build_out: r.get(9)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -1172,6 +1223,103 @@ impl Store {
             params![template, name, mime, data, now_ms()],
         )?;
         Ok(())
+    }
+
+    /// Set (or with `cmd: None`, clear) a template's build step.
+    pub fn set_template_build(&self, id: &str, cmd: Option<&str>, src: Option<&str>, out: Option<&str>) -> Result<()> {
+        let n = self.conn.execute(
+            "UPDATE org_templates SET build_cmd = ?2, build_src = ?3, build_out = ?4, updated_at = ?5 WHERE id = ?1",
+            params![id, cmd, src, out, now_ms()],
+        )?;
+        if n == 0 {
+            return Err(Error::Other(format!("no template {id}")));
+        }
+        Ok(())
+    }
+
+    /// Has this node's owner approved running this exact build command for this template?
+    pub fn build_approved(&self, template: &str, cmd_hash: &str) -> Result<bool> {
+        Ok(self
+            .conn
+            .query_row("SELECT 1 FROM org_template_builds_ok WHERE template_id = ?1 AND cmd_hash = ?2", [template, cmd_hash], |_| Ok(()))
+            .optional()?
+            .is_some())
+    }
+
+    pub fn approve_build(&self, template: &str, cmd_hash: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO org_template_builds_ok(template_id, cmd_hash, approved_at) VALUES (?1, ?2, ?3)",
+            params![template, cmd_hash, now_ms()],
+        )?;
+        Ok(())
+    }
+
+    /// Replace a template's HTML, CSS and every asset at once (a build's output).
+    pub fn replace_template_files(&self, id: &str, html: &str, css: &str, assets: &[(String, String, Vec<u8>)]) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        let now = now_ms();
+        let n = tx.execute("UPDATE org_templates SET html = ?2, css = ?3, updated_at = ?4 WHERE id = ?1", params![id, html, css, now])?;
+        if n == 0 {
+            return Err(Error::Other(format!("no template {id}")));
+        }
+        tx.execute("DELETE FROM org_template_assets WHERE template_id = ?1", [id])?;
+        for (name, mime, data) in assets {
+            tx.execute(
+                "INSERT INTO org_template_assets(template_id, name, mime, data, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![id, name, mime, data, now],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// A new preview token for a template, valid for `ttl_ms`. Expired tokens are dropped.
+    pub fn create_preview(&self, template: &str, ttl_ms: i64) -> Result<String> {
+        let now = now_ms();
+        self.conn.execute("DELETE FROM org_template_previews WHERE expires_at <= ?1", [now])?;
+        let token = new_id();
+        self.conn.execute(
+            "INSERT INTO org_template_previews(token, template_id, expires_at) VALUES (?1, ?2, ?3)",
+            params![token, template, now + ttl_ms],
+        )?;
+        Ok(token)
+    }
+
+    /// The template a live preview token points at.
+    pub fn preview(&self, token: &str) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .query_row("SELECT template_id FROM org_template_previews WHERE token = ?1 AND expires_at > ?2", params![token, now_ms()], |r| r.get(0))
+            .optional()?)
+    }
+
+    pub fn put_site_announcement(&self, peer: &str, org_id: &str, exchange: &str, card: &str, open: bool) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO site_announcements(peer, org_id, exchange_id, card, open, received_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(peer, org_id) DO UPDATE SET exchange_id = ?3, card = ?4, open = ?5, received_at = ?6",
+            params![peer, org_id, exchange, card, open, now_ms()],
+        )?;
+        Ok(())
+    }
+
+    /// Announced sites, open ones first, newest first.
+    pub fn site_announcements(&self) -> Result<Vec<SiteAnnouncement>> {
+        let mut st = self
+            .conn
+            .prepare("SELECT peer, org_id, exchange_id, card, open, received_at FROM site_announcements ORDER BY open DESC, received_at DESC")?;
+        let v = st
+            .query_map([], |r| {
+                Ok(SiteAnnouncement {
+                    peer: r.get(0)?,
+                    org_id: r.get(1)?,
+                    exchange_id: r.get(2)?,
+                    card: r.get(3)?,
+                    open: r.get(4)?,
+                    received_at: r.get(5)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(v)
     }
 
     pub fn delete_template_asset(&self, template: &str, name: &str) -> Result<bool> {
@@ -1382,6 +1530,39 @@ impl Store {
 mod tests {
     use super::*;
     use crate::store::ShareKind;
+
+    #[test]
+    fn template_builds_previews_and_announcements() {
+        let s = Store::open_in_memory().unwrap();
+        let o = s.insert_org("Lab", None, "", "p").unwrap();
+        let (t, _) = s.save_template(&o.id, "site", "<p>{{content}}</p>", "").unwrap();
+        assert_eq!(t.build_cmd, None);
+        s.set_template_build(&t.id, Some("npm run build"), Some("/src"), None).unwrap();
+        let t = s.template(&t.id).unwrap().unwrap();
+        assert_eq!((t.build_cmd.as_deref(), t.build_src.as_deref(), t.build_out), (Some("npm run build"), Some("/src"), None));
+        assert!(s.set_template_build("nope", None, None, None).is_err());
+        assert!(!s.build_approved(&t.id, "h1").unwrap());
+        s.approve_build(&t.id, "h1").unwrap();
+        assert!(s.build_approved(&t.id, "h1").unwrap() && !s.build_approved(&t.id, "h2").unwrap());
+        s.put_template_asset(&t.id, "old.png", "image/png", &[1]).unwrap();
+        s.replace_template_files(&t.id, "<b>{{content}}</b>", "b{}", &[("new.js".into(), "text/javascript".into(), vec![2])]).unwrap();
+        let t2 = s.template(&t.id).unwrap().unwrap();
+        assert_eq!((t2.html.as_str(), t2.css.as_str()), ("<b>{{content}}</b>", "b{}"));
+        let names: Vec<_> = s.template_assets(&t.id).unwrap().into_iter().map(|a| a.name).collect();
+        assert_eq!(names, vec!["new.js"]);
+        let tok = s.create_preview(&t.id, 60_000).unwrap();
+        assert_eq!(s.preview(&tok).unwrap().as_deref(), Some(t.id.as_str()));
+        let old = s.create_preview(&t.id, -1).unwrap();
+        assert_eq!(s.preview(&old).unwrap(), None);
+        assert_eq!(s.preview("missing").unwrap(), None);
+        s.put_site_announcement("peerA", &o.id, "x1", "{}", true).unwrap();
+        s.put_site_announcement("peerA", &o.id, "x1", "{\"a\":1}", false).unwrap();
+        s.put_site_announcement("peerB", "o2", "x2", "{}", true).unwrap();
+        let a = s.site_announcements().unwrap();
+        assert_eq!(a.len(), 2);
+        assert_eq!((a[0].peer.as_str(), a[0].open), ("peerB", true));
+        assert_eq!((a[1].card.as_str(), a[1].open), ("{\"a\":1}", false));
+    }
 
     #[test]
     fn orgs_roles_members_and_resources_round_trip() {
