@@ -290,7 +290,9 @@ pub fn start(app: &mut App) {
         let service = Store::open(&app.paths.db, Some(&app.dek.0))?;
         let label = label(app);
         let spare = Store::open(&app.paths.db, Some(&app.dek.0))?;
+        let listener = Store::open(&app.paths.db, Some(&app.dek.0))?;
         Ok(local::Hosted::start(&app.paths.home, &app.store, service, &kp, &label, &app.prefs.net, ORIGIN)?
+            .with_stream(&app.store, listener, &kp, &app.prefs.net, ORIGIN)
             .settle_with(spare, app.prefs.net.relays.clone()))
     })();
     match r {

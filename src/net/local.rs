@@ -134,6 +134,9 @@ pub struct Hosted {
     last: Instant,
     last_addrs: Vec<String>,
     settle: Settle,
+    /// The collaboration stream listener (2.19), when the transport is `stream`.
+    stream: Option<crate::collab::stream::Server>,
+    mode: Option<crate::collab::stream::Mode>,
 }
 
 /// Background upkeep of pending exchanges ([`super::auto::settle`]) and linked-node sync
@@ -177,11 +180,26 @@ impl Hosted {
             last: Instant::now(),
             last_addrs: addrs,
             settle: Settle::default(),
+            stream: None,
+            mode: None,
         })
     }
 
     /// Keep pending exchanges moving in the background, on this store connection: ask
     /// peers about our open requests and deliver answers that did not get through.
+    /// Start the collaboration stream listener (with its own store) unless the transport is
+    /// `poll`; peers poll this node if it cannot listen.
+    pub fn with_stream(mut self, store: &Store, listener: Store, kp: &Keypair, prefs: &NetPrefs, origin: &str) -> Hosted {
+        self.mode = Some(crate::collab::stream::mode(prefs));
+        self.stream = crate::collab::stream::serve(store, listener, kp, prefs, origin);
+        self
+    }
+
+    /// The stream listener's port, if it runs.
+    pub fn stream_port(&self) -> Option<u16> {
+        self.stream.as_ref().map(|s| s.port)
+    }
+
     pub fn settle_with(mut self, store: Store, relays: Vec<String>) -> Hosted {
         self.settle = Settle { spare: Some(store), relays, running: None, last: None };
         self
@@ -214,6 +232,7 @@ impl Hosted {
             let node = self.node.clone();
             let relays = st.relays.clone();
             let label = self.label.clone();
+            let mode = self.mode.unwrap_or(crate::collab::stream::Mode::Poll);
             st.running = Some(std::thread::spawn(move || {
                 let _ = super::auto::settle(&s, &node, &relays, "network");
                 // linked nodes: pull what changed (each about once a minute)
@@ -223,7 +242,7 @@ impl Hosted {
                 // broadcasts rule sets queued
                 super::broadcast::drain(&s, &super::broadcast::From { node: &node, label: &label, relays: &relays });
                 // messages this node wrote that have not reached their peer yet
-                crate::collab::msg::tick(&s, &node, &relays, &node.peer_id().to_string(), &label);
+                crate::collab::msg::tick(&s, &node, &relays, &node.peer_id().to_string(), &label, mode);
                 s
             }));
         }
@@ -233,6 +252,10 @@ impl Hosted {
     /// Stop the node, clean up and record it.
     pub fn stop(self, store: &Store, origin: &str) {
         let peer = self.node.peer_id().to_string();
+        if let Some(s) = self.stream {
+            s.halt();
+        }
+        crate::collab::stream::stopped(store);
         self.node.halt();
         drop(self.node);
         clear(&self.home);

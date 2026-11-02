@@ -291,7 +291,24 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
             Ok(())
         }
         NetCommand::Relay(c) => relay(ctx, c),
-        NetCommand::Config { label, port, listen, mdns, autostart, accept, bootstrap, clear_bootstrap, external, clear_external, json } => {
+        NetCommand::Config {
+            label,
+            port,
+            listen,
+            mdns,
+            autostart,
+            accept,
+            bootstrap,
+            clear_bootstrap,
+            external,
+            clear_external,
+            collab_transport,
+            collab_bind,
+            collab_port,
+            collab_advertise,
+            clear_collab_advertise,
+            json,
+        } => {
             let mut prefs = ctx.prefs()?;
             let before = prefs.net.clone();
             let n = &mut prefs.net;
@@ -334,6 +351,31 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                     n.external_addresses.push(e);
                 }
             }
+            if let Some(t) = collab_transport {
+                n.collab_transport = crate::collab::stream::Mode::parse(&t)?.as_str().into();
+            }
+            if let Some(b) = collab_bind {
+                let b = b.trim().to_string();
+                if b.parse::<std::net::IpAddr>().is_err() {
+                    return Err(anyhow!("--collab-bind: an IP address (like 0.0.0.0 or 127.0.0.1)"));
+                }
+                n.collab_bind = b;
+            }
+            if let Some(p) = collab_port {
+                n.collab_port = p;
+            }
+            if clear_collab_advertise {
+                n.collab_advertise.clear();
+            }
+            for a in collab_advertise {
+                let a = a.trim().to_string();
+                if a.rsplit_once(':').is_none_or(|(_, p)| p.parse::<u16>().is_err()) {
+                    return Err(anyhow!("--collab-advertise: HOST:PORT"));
+                }
+                if !n.collab_advertise.contains(&a) {
+                    n.collab_advertise.push(a);
+                }
+            }
             n.node_config("check")?;
             if prefs.net != before {
                 prefs.save(&ctx.paths)?;
@@ -355,6 +397,15 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                 println!("external:     {}", if n.external_addresses.is_empty() { "-".to_string() } else { n.external_addresses.join(" ") });
                 println!("autostart:    {}", if n.autostart { "on (TUI)" } else { "off" });
                 println!("accept:       {}", if n.accept_anyone() { "anyone" } else { "known nodes (others ask first)" });
+                let now = crate::collab::stream::mode(n);
+                let over = if now.as_str() != n.collab_transport {
+                    format!(" (now {}: flag or {})", now.as_str(), crate::collab::stream::ENV)
+                } else {
+                    String::new()
+                };
+                println!("collab:       {}{over}", n.collab_transport);
+                println!("collab bind:  {}:{}", n.collab_bind, n.collab_port);
+                println!("collab adv.:  {}", if n.collab_advertise.is_empty() { "-".to_string() } else { n.collab_advertise.join(" ") });
             }
             Ok(())
         }
@@ -559,10 +610,16 @@ fn start(ctx: &Ctx, port: Option<u16>, listen: Vec<String>, no_mdns: bool, relay
         p.relay_server = true;
     }
     let home = ctx.paths.home.clone();
-    let mut h = local::Hosted::start(&home, &n.store, n.second_store()?, &n.kp, &n.label, &p, ORIGIN)?.settle_with(n.second_store()?, n.relays());
+    let mut h = local::Hosted::start(&home, &n.store, n.second_store()?, &n.kp, &n.label, &p, ORIGIN)?
+        .with_stream(&n.store, n.second_store()?, &n.kp, &p, ORIGIN)
+        .settle_with(n.second_store()?, n.relays());
     println!("node {} running as {}", n.label, h.node.peer_id());
     for a in h.node.reachable_addrs() {
         println!("  {a}");
+    }
+    match h.stream_port() {
+        Some(port) => println!("collaboration streams on {}:{port}", p.collab_bind),
+        None => println!("collaboration: peers poll this node"),
     }
     // the web server comes up with the node when `hosting.autostart` is on
     let site = if n.prefs.hosting.autostart && host::running(&home).is_none() {

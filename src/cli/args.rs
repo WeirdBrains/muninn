@@ -41,6 +41,11 @@ pub struct GlobalArgs {
     /// Override the theme mode for this run.
     #[arg(long, global = true, env = "MUNINN_THEME_MODE", value_enum)]
     pub theme_mode: Option<ThemeMode>,
+    /// How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll`
+    /// (requests over the peer connection; for containers). Overrides
+    /// MUNINN_COLLAB_TRANSPORT and the `net config --collab-transport` setting.
+    #[arg(long, global = true, value_name = "stream|poll")]
+    pub transport: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -743,6 +748,14 @@ pub enum LiveCommand {
         /// Where your cursor is (a character offset), shown to the others.
         #[arg(long)]
         cursor: Option<i64>,
+    },
+    /// Follow a session as it changes (until it closes, or Ctrl-C): the host pushes each
+    /// change over a stream; with polling it is asked every second.
+    Watch {
+        session: String,
+        /// One JSON object per change.
+        #[arg(long)]
+        json: bool,
     },
     /// Close a session you host (or leave one you joined).
     Stop { session: String },
@@ -2268,6 +2281,21 @@ pub enum NetCommand {
         /// Remove all external addresses first.
         #[arg(long)]
         clear_external: bool,
+        /// Live collaboration transport: `stream` (gRPC streams, default) or `poll` (containers).
+        #[arg(long, value_name = "stream|poll")]
+        collab_transport: Option<String>,
+        /// Where the collaboration stream listener binds (default 0.0.0.0).
+        #[arg(long, value_name = "ADDR")]
+        collab_bind: Option<String>,
+        /// Its TCP port (default 4742; 0 picks one).
+        #[arg(long, value_name = "PORT")]
+        collab_port: Option<u16>,
+        /// Where peers reach the stream listener from outside, `host:port` (repeatable).
+        #[arg(long = "collab-advertise", value_name = "HOST:PORT")]
+        collab_advertise: Vec<String>,
+        /// Remove the advertised stream addresses first.
+        #[arg(long)]
+        clear_collab_advertise: bool,
         #[arg(long)]
         json: bool,
     },

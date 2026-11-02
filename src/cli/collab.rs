@@ -2,7 +2,7 @@
 //! is reached through [`crate::collab::wire`].
 use super::net::Net;
 use super::{Ctx, LiveCommand, MsgCommand, PeersArgs, PeersCommand};
-use crate::collab::{msg as cmsg, peers as cpeers, run as crun, session, wire};
+use crate::collab::{msg as cmsg, peers as cpeers, run as crun, session, stream, wire};
 use crate::ingest::time::fmt_ts;
 use crate::store::{LiveSession, Message, Store};
 use anyhow::{anyhow, bail};
@@ -39,8 +39,8 @@ pub fn msg(ctx: &Ctx, cmd: MsgCommand) -> anyhow::Result<()> {
             let x = wire::exchange_to(&n.store, &peer, None)?;
             let (me, label) = (me(&n), n.label.clone());
             n.node()?;
-            let t = wire::Libp2p { store: &n.store, node: n.node.as_ref().expect("node"), exchange: &x, relays: &relays };
-            let m = cmsg::send(&n.store, &t, &x, &me, &label, about.as_deref(), &text, ORIGIN)?;
+            let t = wire::open(&n.store, n.node.as_ref().expect("node"), &x, &relays, stream::mode(&n.prefs.net));
+            let m = cmsg::send(&n.store, t.as_ref(), &x, &me, &label, about.as_deref(), &text, ORIGIN)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&m)?);
             } else if m.delivered_at.is_some() {
@@ -92,13 +92,14 @@ fn guest_sync(
     n: &mut Net,
     ls: &LiveSession,
     frames: Vec<crate::collab::proto::Frame>,
-) -> anyhow::Result<(session::State, Vec<crate::collab::proto::Cursor>)> {
+) -> anyhow::Result<(session::State, Vec<crate::collab::proto::Cursor>, &'static str)> {
     let relays = n.relays();
     let xid = ls.exchange_id.clone().ok_or_else(|| anyhow!("this session has no connection to its host"))?;
     let x = n.store.exchange(&xid)?.ok_or_else(|| anyhow!("the connection to the host is gone"))?;
     n.node()?;
-    let t = wire::Libp2p { store: &n.store, node: n.node.as_ref().expect("node"), exchange: &x, relays: &relays };
-    Ok(session::sync_with(&n.store, ls, frames, |b| wire::Transport::live(&t, b))?)
+    let t = wire::open(&n.store, n.node.as_ref().expect("node"), &x, &relays, stream::mode(&n.prefs.net));
+    let (st, here) = session::sync_with(&n.store, ls, frames, |b| t.live(b))?;
+    Ok((st, here, t.name()))
 }
 
 pub fn live(ctx: &Ctx, cmd: LiveCommand) -> anyhow::Result<()> {
@@ -132,8 +133,8 @@ pub fn live(ctx: &Ctx, cmd: LiveCommand) -> anyhow::Result<()> {
             let x = wire::exchange_to(&n.store, &peer, None)?;
             let relays = n.relays();
             n.node()?;
-            let t = wire::Libp2p { store: &n.store, node: n.node.as_ref().expect("node"), exchange: &x, relays: &relays };
-            let offers = cpeers::offers(&t)?;
+            let t = wire::open(&n.store, n.node.as_ref().expect("node"), &x, &relays, stream::mode(&n.prefs.net));
+            let offers = cpeers::offers(t.as_ref())?;
             let Some(id) = offers["live"]
                 .as_array()
                 .into_iter()
@@ -144,15 +145,16 @@ pub fn live(ctx: &Ctx, cmd: LiveCommand) -> anyhow::Result<()> {
             else {
                 bail!("{} has not invited you to a live session `{id}` (see `mnnn peers show {peer}`)", x.title());
             };
+            drop(t);
             let ls = session::joined(&n.store, &id, x.peer_id.as_deref().unwrap_or_default(), &x.id, &serde_json::json!({}))?;
-            let (st, present) = guest_sync(&mut n, &ls, vec![])?;
+            let (st, present, via) = guest_sync(&mut n, &ls, vec![])?;
             let ls = n.store.live_session(&id)?.unwrap_or(ls);
-            ctx.io.info(format!("joined {} ({} document(s), {} here)", ls.title, st.docs().len(), present.len()));
+            ctx.io.info(format!("joined {} ({} document(s), {} here, over {via})", ls.title, st.docs().len(), present.len()));
         }
         LiveCommand::Show { session: key, json } => {
             let mut n = Net::open(ctx)?;
             let ls = n.store.find_live_session(&key)?;
-            let (st, present) = if ls.role == "guest" && ls.status == "open" {
+            let (st, present, via) = if ls.role == "guest" && ls.status == "open" {
                 guest_sync(&mut n, &ls, vec![])?
             } else {
                 session::absorb(&n.store, &ls, &me(&n))?;
@@ -160,12 +162,16 @@ pub fn live(ctx: &Ctx, cmd: LiveCommand) -> anyhow::Result<()> {
                 (
                     session::state(&n.store, &ls.id)?,
                     p.into_iter().map(|p| crate::collab::proto::Cursor { label: p.label, offset: p.cursor }).collect(),
+                    "local",
                 )
             };
             let ls = n.store.live_session(&ls.id)?.unwrap_or(ls);
             if json {
                 let here: Vec<_> = present.iter().map(|c| serde_json::json!({ "label": c.label, "cursor": c.offset })).collect();
-                println!("{}", serde_json::to_string_pretty(&serde_json::json!({ "session": ls, "docs": st.docs(), "present": here }))?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({ "session": ls, "docs": st.docs(), "present": here, "transport": via }))?
+                );
             } else {
                 println!("{}", session_line(&ls));
                 for c in &present {
@@ -206,6 +212,7 @@ pub fn live(ctx: &Ctx, cmd: LiveCommand) -> anyhow::Result<()> {
             }
             ctx.io.info(format!("edited {doc} of {}", ls.title));
         }
+        LiveCommand::Watch { session: key, json } => watch(ctx, &key, json)?,
         LiveCommand::Stop { session: key } => {
             let n = Net::open(ctx)?;
             let ls = n.store.find_live_session(&key)?;
@@ -218,6 +225,57 @@ pub fn live(ctx: &Ctx, cmd: LiveCommand) -> anyhow::Result<()> {
             }
         }
     }
+    Ok(())
+}
+
+/// `mnnn live watch`: print the session at every change until it closes.
+fn watch(ctx: &Ctx, key: &str, json: bool) -> anyhow::Result<()> {
+    let mut n = Net::open(ctx)?;
+    let ls = n.store.find_live_session(key)?;
+    let show = |st: &session::State, here: &[crate::collab::proto::Cursor], via: &str| {
+        if json {
+            let here: Vec<_> = here.iter().map(|c| serde_json::json!({ "label": c.label, "cursor": c.offset })).collect();
+            println!("{}", serde_json::json!({ "head": st.head, "docs": st.docs(), "present": here, "closed": st.closed, "transport": via }));
+        } else {
+            let who: Vec<String> = here.iter().map(|c| format!("{}{}", c.label, c.offset.map(|o| format!(" at {o}")).unwrap_or_default())).collect();
+            println!("── #{} · here: {} · {via}", st.head, if who.is_empty() { "-".into() } else { who.join(", ") });
+            for (doc, text) in st.docs() {
+                println!("--- {doc}\n{text}");
+            }
+        }
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
+        true
+    };
+    if ls.role == "host" {
+        let me = me(&n);
+        let mut last = -1;
+        loop {
+            session::absorb(&n.store, &ls, &me)?;
+            let st = session::state(&n.store, &ls.id)?;
+            let here: Vec<_> = n
+                .store
+                .presence(&ls.id, session::PRESENCE_MS)?
+                .into_iter()
+                .map(|p| crate::collab::proto::Cursor { label: p.label, offset: p.cursor })
+                .collect();
+            if st.head != last {
+                last = st.head;
+                show(&st, &here, "local");
+            }
+            if st.closed {
+                return Ok(());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    }
+    let relays = n.relays();
+    let xid = ls.exchange_id.clone().ok_or_else(|| anyhow!("this session has no connection to its host"))?;
+    let x = n.store.exchange(&xid)?.ok_or_else(|| anyhow!("the connection to the host is gone"))?;
+    n.node()?;
+    let t = wire::open(&n.store, n.node.as_ref().expect("node"), &x, &relays, stream::mode(&n.prefs.net));
+    let via = t.name();
+    t.follow(&n.store, &ls, &mut |st, here| show(st, here, via))?;
     Ok(())
 }
 
@@ -248,8 +306,8 @@ pub fn peers(ctx: &Ctx, a: PeersArgs) -> anyhow::Result<()> {
                 Ok(crate::net::proto::Resp::Shared { items }) => serde_json::to_value(items)?,
                 _ => serde_json::json!([]),
             };
-            let t = wire::Libp2p { store: &n.store, node, exchange: &x, relays: &relays };
-            let offers = cpeers::offers(&t)?;
+            let t = wire::open(&n.store, node, &x, &relays, stream::mode(&n.prefs.net));
+            let offers = cpeers::offers(t.as_ref())?;
             let pid = x.peer_id.clone().unwrap_or_default();
             let sites = cpeers::list(&n.store)?.into_iter().find(|p| p.peer == pid).map(|p| p.sites).unwrap_or_default();
             let v = serde_json::json!({ "peer": pid, "label": x.title(), "shares": shares, "live": offers["live"], "executables": offers["executables"], "sites": sites });
@@ -295,10 +353,10 @@ pub fn peers(ctx: &Ctx, a: PeersArgs) -> anyhow::Result<()> {
             let relays = n.relays();
             let x = wire::exchange_to(&n.store, &peer, Some(&org))?;
             n.node()?;
-            let t = wire::Libp2p { store: &n.store, node: n.node.as_ref().expect("node"), exchange: &x, relays: &relays };
+            let t = wire::open(&n.store, n.node.as_ref().expect("node"), &x, &relays, stream::mode(&n.prefs.net));
             let host = x.peer_id.clone().unwrap_or_default();
             let mut got = 0usize;
-            let out = crun::run(&n.store, &t, &host, &x.id, &org, &endpoint, input, |c| {
+            let out = crun::run(&n.store, t.as_ref(), &host, &x.id, &org, &endpoint, input, |c| {
                 got += c.json.len();
                 if !ctx.global.quiet && !c.done {
                     eprintln!("… {got} bytes");
@@ -312,8 +370,8 @@ pub fn peers(ctx: &Ctx, a: PeersArgs) -> anyhow::Result<()> {
             let x = wire::exchange_to(&n.store, &peer, None)?;
             let (me, label) = (me(&n), n.label.clone());
             n.node()?;
-            let t = wire::Libp2p { store: &n.store, node: n.node.as_ref().expect("node"), exchange: &x, relays: &relays };
-            let m = cmsg::send(&n.store, &t, &x, &me, &label, Some("request:peers"), &text, ORIGIN)?;
+            let t = wire::open(&n.store, n.node.as_ref().expect("node"), &x, &relays, stream::mode(&n.prefs.net));
+            let m = cmsg::send(&n.store, t.as_ref(), &x, &me, &label, Some("request:peers"), &text, ORIGIN)?;
             if m.delivered_at.is_some() {
                 ctx.io.info(format!("asked {}", x.title()));
             } else {

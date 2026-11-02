@@ -115,6 +115,9 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Man { out } => return misc::man(out),
         _ => {}
     }
+    if let Some(t) = cli.global.transport.as_deref() {
+        crate::collab::stream::set_override(crate::collab::stream::Mode::parse(t)?);
+    }
     let ctx = Ctx::new(cli.global)?;
     ctx.prefs()?;
     crate::code::set_home(&ctx.paths.home);

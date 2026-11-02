@@ -5,7 +5,7 @@
 //! on a worker thread so the window stays usable.
 use super::workspace::{Ask, Typed, View, ask_key, draw_view, muted, row_style};
 use super::{App, Hit};
-use crate::collab::{msg as cmsg, peers as cpeers, run as crun, session, wire};
+use crate::collab::{msg as cmsg, peers as cpeers, run as crun, session, stream, wire};
 use crate::ingest::time::fmt_ts;
 use crate::net::{Node, identity, local};
 use crate::store::{LiveSession, Message, Store};
@@ -91,6 +91,8 @@ pub struct PeersState {
     pub msg: Option<(String, bool)>,
     pub detail: Vec<String>,
     pub job: Option<Job>,
+    /// Following a joined session: each change, pushed (stream) or polled.
+    pub watch: Option<(String, mpsc::Receiver<Result<LiveView, String>>)>,
 }
 
 impl PeersState {
@@ -151,7 +153,7 @@ fn label(app: &App) -> String {
 }
 
 /// Network work on a worker thread (with the TUI's node if it runs).
-fn spawn(app: &mut App, what: &str, f: impl FnOnce(&Store, &Node, &Keypair) -> crate::Result<Done> + Send + 'static) {
+fn spawn(app: &mut App, what: &str, f: impl FnOnce(&Store, &Node, &Keypair, stream::Mode) -> crate::Result<Done> + Send + 'static) {
     if app.peers.job.is_some() {
         return err(app, "still working on the last request");
     }
@@ -161,6 +163,7 @@ fn spawn(app: &mut App, what: &str, f: impl FnOnce(&Store, &Node, &Keypair) -> c
     };
     let node = app.network.hosted.as_ref().filter(|h| h.node.running()).map(|h| h.node.clone());
     let (db, dek, label, prefs) = (app.paths.db.clone(), app.dek.clone(), label(app), app.prefs.net.clone());
+    let mode = stream::mode(&prefs);
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let r = (|| -> crate::Result<Done> {
@@ -169,7 +172,7 @@ fn spawn(app: &mut App, what: &str, f: impl FnOnce(&Store, &Node, &Keypair) -> c
                 Some(n) => n,
                 None => Arc::new(local::ephemeral(&kp, Store::open(&db, Some(&dek.0))?, &label, &prefs)?),
             };
-            f(&s, &node, &kp)
+            f(&s, &node, &kp, mode)
         })();
         let _ = tx.send(r.map_err(|e| e.to_string()));
     });
@@ -177,8 +180,35 @@ fn spawn(app: &mut App, what: &str, f: impl FnOnce(&Store, &Node, &Keypair) -> c
     ok(app, format!("{what}… (the window stays usable)"));
 }
 
-/// Between frames: take finished work.
+/// Between frames: take what a followed session pushed, and finished work.
 pub fn poll(app: &mut App) {
+    if let Some((_, rx)) = app.peers.watch.as_ref() {
+        let mut latest = None;
+        let mut ended = false;
+        loop {
+            match rx.try_recv() {
+                Ok(v) => latest = Some(v),
+                Err(mpsc::TryRecvError::Empty) => break,
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    ended = true;
+                    break;
+                }
+            }
+        }
+        match latest {
+            Some(Ok(v)) => app.peers.view = Some(v),
+            Some(Err(e)) => err(app, e),
+            None => {}
+        }
+        if ended {
+            app.peers.watch = None;
+            reload(app);
+        }
+    }
+    poll_job(app);
+}
+
+fn poll_job(app: &mut App) {
     let Some(job) = app.peers.job.as_ref() else { return };
     let r = match job.rx.try_recv() {
         Ok(r) => r,
@@ -212,11 +242,18 @@ fn ask(app: &mut App, kind: PAsk, title: &str, v: &str) {
 }
 
 /// A guest's round with its host, on the worker.
-fn guest_round(s: &Store, node: &Node, relays: &[String], ls: &LiveSession, frames: Vec<crate::collab::proto::Frame>) -> crate::Result<Done> {
+fn guest_round(
+    s: &Store,
+    node: &Node,
+    relays: &[String],
+    mode: stream::Mode,
+    ls: &LiveSession,
+    frames: Vec<crate::collab::proto::Frame>,
+) -> crate::Result<Done> {
     let xid = ls.exchange_id.clone().unwrap_or_default();
     let x = s.exchange(&xid)?.ok_or_else(|| crate::Error::Other("the connection to the host is gone".into()))?;
-    let t = wire::Libp2p { store: s, node, exchange: &x, relays };
-    let (st, here) = session::sync_with(s, ls, frames, |b| wire::Transport::live(&t, b))?;
+    let t = wire::open(s, node, &x, relays, mode);
+    let (st, here) = session::sync_with(s, ls, frames, |b| t.live(b))?;
     let closed = s.live_session(&ls.id)?.is_some_and(|l| l.status == "closed");
     Ok(Done {
         lines: vec![format!("{} {}{}", ls.kind, ls.title, if closed { " (closed by the host)" } else { "" })],
@@ -225,12 +262,47 @@ fn guest_round(s: &Store, node: &Node, relays: &[String], ls: &LiveSession, fram
     })
 }
 
+/// Follow a joined session on a worker: the view updates at every change until it closes,
+/// another session is shown, or the window closes.
+fn follow(app: &mut App, ls: LiveSession) {
+    if app.peers.watch.as_ref().is_some_and(|w| w.0 == ls.id) {
+        return;
+    }
+    let kp = match identity::load_or_create(&app.store) {
+        Ok(k) => k,
+        Err(e) => return err(app, e.to_string()),
+    };
+    let node = app.network.hosted.as_ref().filter(|h| h.node.running()).map(|h| h.node.clone());
+    let (db, dek, label, prefs) = (app.paths.db.clone(), app.dek.clone(), label(app), app.prefs.net.clone());
+    let (tx, rx) = mpsc::channel();
+    let id = ls.id.clone();
+    let msg = format!("following {} {}…", ls.kind, ls.title);
+    std::thread::spawn(move || {
+        let r = (|| -> crate::Result<()> {
+            let s = Store::open(&db, Some(&dek.0))?;
+            let node = match node {
+                Some(n) => n,
+                None => Arc::new(local::ephemeral(&kp, Store::open(&db, Some(&dek.0))?, &label, &prefs)?),
+            };
+            let xid = ls.exchange_id.clone().unwrap_or_default();
+            let x = s.exchange(&xid)?.ok_or_else(|| crate::Error::Other("the connection to the host is gone".into()))?;
+            let t = wire::open(&s, &node, &x, &prefs.relays, stream::mode(&prefs));
+            t.follow(&s, &ls, &mut |st, here| {
+                tx.send(Ok((ls.id.clone(), st.docs(), here.iter().map(|c| (c.label.clone(), c.offset)).collect()))).is_ok()
+            })
+        })();
+        if let Err(e) = r {
+            let _ = tx.send(Err(e.to_string()));
+        }
+    });
+    app.peers.watch = Some((id, rx));
+    ok(app, msg);
+}
+
 /// Show a session: hosts read their own log, guests sync with the host.
 fn view(app: &mut App, ls: LiveSession) {
     if ls.role == "guest" && ls.status == "open" {
-        let relays = app.prefs.net.relays.clone();
-        spawn(app, "syncing", move |s, n, _| guest_round(s, n, &relays, &ls, vec![]));
-        return;
+        return follow(app, ls);
     }
     let kp = identity::load_or_create(&app.store).ok();
     if let Some(k) = &kp {
@@ -257,10 +329,10 @@ fn finish_ask(app: &mut App, kind: PAsk, v: String) {
                 return;
             }
             let about = (kind == PAsk::Request).then(|| "request:peers".to_string());
-            spawn(app, "sending", move |s, n, kp| {
+            spawn(app, "sending", move |s, n, kp, mode| {
                 let x = wire::exchange_to(s, &peer, None)?;
-                let t = wire::Libp2p { store: s, node: n, exchange: &x, relays: &relays };
-                let m = cmsg::send(s, &t, &x, &me(kp), &my, about.as_deref(), &v, ORIGIN)?;
+                let t = wire::open(s, n, &x, &relays, mode);
+                let m = cmsg::send(s, t.as_ref(), &x, &me(kp), &my, about.as_deref(), &v, ORIGIN)?;
                 Ok(Done::lines(vec![if m.delivered_at.is_some() {
                     format!("delivered to {}", x.title())
                 } else {
@@ -279,10 +351,10 @@ fn finish_ask(app: &mut App, kind: PAsk, v: String) {
             if endpoint.is_empty() {
                 return err(app, "give ORG ENDPOINT [JSON]");
             }
-            spawn(app, "running", move |s, n, _| {
+            spawn(app, "running", move |s, n, _, mode| {
                 let x = wire::exchange_to(s, &peer, Some(&org))?;
-                let t = wire::Libp2p { store: s, node: n, exchange: &x, relays: &relays };
-                let out = crun::run(s, &t, &peer, &x.id, &org, &endpoint, input, |_| {})?;
+                let t = wire::open(s, n, &x, &relays, mode);
+                let out = crun::run(s, t.as_ref(), &peer, &x.id, &org, &endpoint, input, |_| {})?;
                 let mut l = vec![format!("{endpoint} of {org} ran on {}", x.title())];
                 l.extend(serde_json::to_string_pretty(&out).unwrap_or_default().lines().take(200).map(String::from));
                 Ok(Done::lines(l))
@@ -290,15 +362,15 @@ fn finish_ask(app: &mut App, kind: PAsk, v: String) {
         }
         PAsk::Join => {
             let id = app.peers.offers.iter().find(|(s, _)| s.starts_with(v.trim())).map(|o| o.0.clone()).unwrap_or(v.trim().to_string());
-            spawn(app, "joining", move |s, n, _| {
+            spawn(app, "joining", move |s, n, _, mode| {
                 let x = wire::exchange_to(s, &peer, None)?;
-                let t = wire::Libp2p { store: s, node: n, exchange: &x, relays: &relays };
-                let offers = cpeers::offers(&t)?;
+                let t = wire::open(s, n, &x, &relays, mode);
+                let offers = cpeers::offers(t.as_ref())?;
                 if !offers["live"].as_array().into_iter().flatten().any(|o| o["session"] == id.as_str()) {
                     return Err(crate::Error::Other(format!("{} has not invited you to {id}", x.title())));
                 }
                 let ls = session::joined(s, &id, &peer, &x.id, &serde_json::json!({}))?;
-                guest_round(s, n, &relays, &ls, vec![])
+                guest_round(s, n, &relays, mode, &ls, vec![])
             });
             app.peers.tab = Tab::Live;
         }
@@ -332,11 +404,11 @@ fn edit(app: &mut App, id: &str, doc: &str, v: String) {
             Err(e) => err(app, e.to_string()),
         }
     } else {
-        spawn(app, "editing", move |s, n, kp| {
+        spawn(app, "editing", move |s, n, kp, mode| {
             let st = session::state(s, &ls.id)?;
             let cursor = changes.values().next().map(|t| t.chars().count() as i64);
             let frames = session::edits(&st, &me(kp), &my, &ls.kind, &changes, cursor)?;
-            guest_round(s, n, &relays, &ls, frames)
+            guest_round(s, n, &relays, mode, &ls, frames)
         });
     }
 }
@@ -360,8 +432,10 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         KeyCode::Esc => {
             if app.peers.view.is_some() || !app.peers.detail.is_empty() {
                 app.peers.view = None;
+                app.peers.watch = None;
                 app.peers.detail.clear();
             } else {
+                app.peers.watch = None;
                 app.modal = None;
             }
             return;
@@ -384,14 +458,14 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             let Some(p) = app.peers.peers.get(sel).cloned() else { return };
             app.peers.peer = Some(p.peer.clone());
             let relays = app.prefs.net.relays.clone();
-            spawn(app, "asking what it offers", move |s, n, _| {
+            spawn(app, "asking what it offers", move |s, n, _, mode| {
                 let x = wire::exchange_to(s, &p.peer, None)?;
                 let shares = match crate::net::client::send(s, n, &x, crate::net::proto::Req::List, &relays) {
                     Ok(crate::net::proto::Resp::Shared { items }) => items,
                     _ => vec![],
                 };
-                let t = wire::Libp2p { store: s, node: n, exchange: &x, relays: &relays };
-                let o = cpeers::offers(&t)?;
+                let t = wire::open(s, n, &x, &relays, mode);
+                let o = cpeers::offers(t.as_ref())?;
                 let st = |i: &serde_json::Value, k: &str| i.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let mut l = vec![format!("{} offers you:", p.label)];
                 l.extend(shares.iter().map(|i| format!("shared  {} {} (open it on Net ▸ Shared data)", i.kind.label(), i.name)));
