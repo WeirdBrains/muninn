@@ -8,7 +8,7 @@ mnnn\-model\-edit \- Change a model\*(Aqs draft (renames, then changes, drops, a
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn model edit\fR [\fB\-\-add\fR] [\fB\-\-home\fR] [\fB\-\-change\fR] [\fB\-\-db\fR] [\fB\-\-drop\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rename\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-move\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-name\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-description\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-apply\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIMODEL\fR> 
+\fBmnnn model edit\fR [\fB\-\-add\fR] [\fB\-\-home\fR] [\fB\-\-change\fR] [\fB\-\-db\fR] [\fB\-\-drop\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rename\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-move\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-name\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-description\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-apply\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIMODEL\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -91,6 +91,9 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 .TP
 \fB\-\-apply\fR
 Apply the draft afterwards
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

@@ -8,7 +8,7 @@ mnnn\-journal\-highlight \- Highlight selected words of an entry
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn journal highlight\fR [\fB\-\-home\fR] [\fB\-\-on\fR] [\fB\-\-db\fR] [\fB\-\-nth\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-range\fR] [\fB\-\-color\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-comment\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIENTRY\fR> 
+\fBmnnn journal highlight\fR [\fB\-\-home\fR] [\fB\-\-on\fR] [\fB\-\-db\fR] [\fB\-\-nth\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-range\fR] [\fB\-\-color\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-comment\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIENTRY\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -82,6 +82,9 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

@@ -8,7 +8,7 @@ mnnn\-net\-shard\-entrust \- Split the master key among peers: one sealed shard 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn net shard entrust\fR [\fB\-\-home\fR] <\fB\-\-to\fR> [\fB\-\-db\fR] [\fB\-\-threshold\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-words\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-words\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-shard\fR] [\fB\-\-master\-file\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn net shard entrust\fR [\fB\-\-home\fR] <\fB\-\-to\fR> [\fB\-\-db\fR] [\fB\-\-threshold\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-words\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-words\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-shard\fR] [\fB\-\-master\-file\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -85,6 +85,9 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

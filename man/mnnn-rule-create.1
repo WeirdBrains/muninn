@@ -8,7 +8,7 @@ mnnn\-rule\-create \- Create a rule
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn rule create\fR [\fB\-\-home\fR] [\fB\-\-on\fR] [\fB\-\-db\fR] [\fB\-\-if\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-then\fR] [\fB\-\-every\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-cron\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-project\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-journal\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-search\fR] [\fB\-\-model\fR] [\fB\-\-related\fR] [\fB\-\-disabled\fR] [\fB\-\-description\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
+\fBmnnn rule create\fR [\fB\-\-home\fR] [\fB\-\-on\fR] [\fB\-\-db\fR] [\fB\-\-if\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-then\fR] [\fB\-\-every\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-cron\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-project\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-journal\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-search\fR] [\fB\-\-transport\fR] [\fB\-\-model\fR] [\fB\-\-related\fR] [\fB\-\-disabled\fR] [\fB\-\-description\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -91,6 +91,9 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 .TP
 \fB\-\-search\fR \fI<SEARCH>\fR
 Let it live in a live search (its default search)
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-\-model\fR \fI<MODEL>\fR
 Let it live in a model (its default model for record\-… and model\-… actions)

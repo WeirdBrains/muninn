@@ -8,7 +8,7 @@ mnnn\-review\-request \- Ask for a review of an entry, journal, project, search 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn review request\fR [\fB\-\-home\fR] [\fB\-\-title\fR] [\fB\-\-db\fR] [\fB\-\-note\fR] [\fB\-\-allow\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-label\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-peer\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-no\-link\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fITARGET\fR> 
+\fBmnnn review request\fR [\fB\-\-home\fR] [\fB\-\-title\fR] [\fB\-\-db\fR] [\fB\-\-note\fR] [\fB\-\-allow\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-label\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-peer\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-no\-link\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fITARGET\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -85,6 +85,9 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

@@ -8,7 +8,7 @@ mnnn\-org\-endpoint\-add \- Expose a model\*(Aqs records, a rule or a code space
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org endpoint add\fR [\fB\-\-home\fR] <\fB\-\-kind\fR> [\fB\-\-db\fR] <\fB\-\-target\fR> [\fB\-\-non\-interactive\fR] [\fB\-\-perm\fR] [\fB\-\-anyone\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> <\fINAME\fR> 
+\fBmnnn org endpoint add\fR [\fB\-\-home\fR] <\fB\-\-kind\fR> [\fB\-\-db\fR] <\fB\-\-target\fR> [\fB\-\-non\-interactive\fR] [\fB\-\-perm\fR] [\fB\-\-anyone\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> <\fINAME\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -79,6 +79,9 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

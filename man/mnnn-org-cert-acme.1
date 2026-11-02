@@ -8,7 +8,7 @@ mnnn\-org\-cert\-acme \- Set up ACME (Let\*(Aqs Encrypt) for the node\*(Aqs doma
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org cert acme\fR [\fB\-\-home\fR] [\fB\-\-org\fR] [\fB\-\-challenge\fR] [\fB\-\-db\fR] [\fB\-\-domain\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-email\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-directory\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-profile\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-http\-port\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-off\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn org cert acme\fR [\fB\-\-home\fR] [\fB\-\-org\fR] [\fB\-\-challenge\fR] [\fB\-\-db\fR] [\fB\-\-domain\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-email\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-directory\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-profile\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-http\-port\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-off\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -91,6 +91,9 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 .TP
 \fB\-\-off\fR
 Turn ACME off (back to self\-signed certificates)
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

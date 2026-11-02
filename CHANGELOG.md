@@ -12,7 +12,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
   - live editing of entries, journals, code spaces and records (`mnnn live`); edits merge without loss, and presence and cursors are shared
   - the peers view (`mnnn peers`, `W` in the TUI): what each peer shares, live sessions you're invited to, org executables and sites
   - running a peer's org executables with its role checks (`mnnn peers run`), with the output streamed back in chunks
-- `muninn.live.v1` protobuf messages (`proto/muninn/live/v1/live.proto`), carried over the existing key-exchange connection behind one transport boundary
+- `muninn.live.v1` protobuf messages and the `Live/Open` gRPC bidirectional stream (`proto/muninn/live/v1/live.proto`): live sessions, messages and run output are pushed over TLS authenticated with each node's identity key (TCP 4742 by default; `net config --collab-port/--collab-bind/--collab-advertise`)
+- Polling over the peer connection as the other transport (`--transport poll`, `MUNINN_COLLAB_TRANSPORT=poll` or `net config --collab-transport poll`, for containers). Nodes fall back to it for each peer that polls, has no listener or can't be reached over a stream, and record why
+- `mnnn live watch`: follow a session as it changes
 
 ## [2.18.0] - 2026-11-02
 

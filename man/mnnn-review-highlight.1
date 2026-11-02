@@ -8,7 +8,7 @@ mnnn\-review\-highlight \- Highlight text (\-\-at) of a field
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn review highlight\fR [\fB\-\-field\fR] [\fB\-\-home\fR] [\fB\-\-at\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-nth\fR] [\fB\-\-entry\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-color\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-note\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIREVIEW\fR> 
+\fBmnnn review highlight\fR [\fB\-\-field\fR] [\fB\-\-home\fR] [\fB\-\-at\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-nth\fR] [\fB\-\-entry\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-color\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-note\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIREVIEW\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -85,6 +85,9 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

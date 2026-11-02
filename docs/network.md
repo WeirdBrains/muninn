@@ -61,6 +61,7 @@ one (a relay you added first, then a DNS name, a public, LAN, VPN and loopback a
 Invite links carry the node's reachable addresses; IPv6 link-local (`fe80::`) and Docker
 bridge (172.17/16, 172.18/16) addresses are left out. To be reachable across the internet,
 forward TCP and UDP on `net.port` (4741) on the router and allow them in the host firewall
+(and TCP 4742 for [collaboration streams](collaboration.md#ports-and-firewalls))
 (UDP 5353 too for local discovery), then name the public address:
 
 ```toml

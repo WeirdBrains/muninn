@@ -68,6 +68,7 @@ session and then edits it:
 mnnn peers show anna                       # lists the session
 mnnn live join anna 7d0c
 mnnn live show 7d0c                        # the text now and who is here
+mnnn live watch 7d0c                       # follow it as it changes (pushed over a stream)
 mnnn live edit 7d0c                        # in $VISUAL/$EDITOR
 mnnn live edit 7d0c --value "new text" --cursor 8
 mnnn live edit 7d0c 1e9b --value "…"       # one entry of a journal session
@@ -114,22 +115,88 @@ records a `live.run` action.
 - **Live**: your sessions. Enter shows the text with everyone's cursors, `e` edits a
   document, and `x` stops (host) or leaves (guest).
 
+## Transports
+
+Collaboration has two transports. Both carry the same `muninn.live.v1` messages, and
+consent, invitations and roles are checked the same way on both.
+
+- **`stream`** (the default): a gRPC bidirectional stream (`muninn.live.v1.Live/Open`)
+  straight to the peer's node. The host *pushes* every change to a live session
+  (operations, presence and cursors) as it happens, guests send their edits on the same
+  stream, and messages and remote-run output use it too. The channel is TLS 1.3, and both
+  sides prove their node identity with their identity key (libp2p TLS certificates), so
+  the peer on the stream is the peer id its key exchange names. Each call also names its
+  key exchange, which must be active and belong to that peer.
+- **`poll`**: requests over the existing peer connection (libp2p with Noise, sealed with
+  the exchange's keys). It works anywhere the node works, including through relays, and
+  guests ask about once a second while following a session. Use it where a node can't
+  take incoming TCP, for example inside a container.
+
+Choose one, in order of precedence:
+
+```sh
+mnnn --transport poll live watch 7d0c          # this command only
+export MUNINN_COLLAB_TRANSPORT=poll            # this environment
+mnnn net config --collab-transport poll        # the setting (net.collab_transport)
+```
+
+### Ports and firewalls
+
+The running node (`mnnn net start`, or the TUI's node) listens for streams on TCP **4742**
+on all interfaces (the peer connection itself uses 4741):
+
+```sh
+mnnn net config --collab-port 4742 --collab-bind 0.0.0.0
+mnnn net config --collab-advertise alien.duckdns.org:4742   # behind NAT with a port forward
+```
+
+Allow TCP 4742 in the host firewall (and forward it on the router for peers outside your
+network). A peer finds the listener by asking over the peer connection (`Hello`): it gets
+the port, and any advertised addresses, then dials the node's known addresses on that port.
+`mnnn net start` prints where the listener is. If the port is taken, the node still runs:
+it records `net.collab.fallback` and peers poll it.
+
+### Falling back
+
+A node set to `stream` uses polling for a peer, automatically, when:
+
+- the peer uses `poll` (mixed nodes work together, over polling)
+- the peer runs no listener
+- the listener doesn't answer within a few seconds (NAT, a firewall, relay-only reachability)
+
+It records why as a `net.collab.fallback` action (see `mnnn history list`) and polls that
+peer for the next 10 minutes before trying a stream again, so collaboration still works
+through relays. `mnnn live show --json` and `mnnn live watch --json` say which transport
+was used (`"transport"`).
+
+### Containers
+
+In a container that doesn't publish a port for the listener, use polling:
+
+```sh
+docker run -e MUNINN_COLLAB_TRANSPORT=poll … mnnn net start
+```
+
+Or publish the port (`-p 4742:4742`) and set `--collab-advertise HOST:4742` to the
+address peers can reach, to use streams. Muninn doesn't ship a container image; set this
+in your own.
+
 ## How it travels (design notes)
 
 - **Wire format.** Sessions speak `muninn.live.v1`, protobuf messages defined in
   `proto/muninn/live/v1/live.proto`: `Batch`, `Frame` and `Op` (insert, delete, set field,
   cursor, run chunk, closed).
-- **Transport.** Today a guest's round is one request over the existing key-exchange
-  connection (libp2p with Noise, sealed with the exchange's keys), so it works through
-  NAT and relays with the same consent and trust as the rest of the network. Guests poll
-  about once a round rather than holding a gRPC bidirectional stream open.
 - **The boundary.** Everything goes through `crate::collab::wire`: a `Transport` trait
-  for reaching a peer, and one `serve` function for answering. Swapping in a real gRPC
-  stream would only change that module.
+  (`call`, `follow`) with two implementations (`Libp2p` for polling, `StreamTransport`
+  in `crate::collab::stream`), and one `serve` function that answers both. Pushes come
+  from `session::pull`, which checks invitations like any other round.
+- **Building.** The gRPC service is generated at build time from the .proto with a
+  pure-Rust compiler (protox), so building Muninn doesn't need `protoc`.
 - **Ordering.** The host keeps the operation log and its order. Guests send their
   operations and get back everything after the last one they have, so every copy applies
   the same operations in the same order.
 - **Node-local data.** Sessions, operations and presence stay on the node. Only the
   merged item and the messages sync to linked nodes.
 - **Run results.** A remote run is computed on the host, then its output streams back in
-  chunks. The computation itself isn't streamed while it runs.
+  chunks (pushed over a stream, polled otherwise). The computation itself isn't streamed
+  while it runs.

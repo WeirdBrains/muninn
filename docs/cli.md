@@ -43,6 +43,7 @@ mnnn [GLOBAL FLAGS] <COMMAND>
 | `-q`, `--quiet` | `MUNINN_QUIET` | off | only errors and requested data (exports to `-`, secrets) |
 | `-y`, `--yes` | `MUNINN_YES` | off | answer yes to confirmations |
 | `--theme-mode MODE` | `MUNINN_THEME_MODE` | from preferences | `light`, `dark` or `system` for this run |
+| `--transport T` | `MUNINN_COLLAB_TRANSPORT` | `net.collab_transport` (`stream`) | [live collaboration](collaboration.md#transports): `stream` (gRPC streams) or `poll` (containers) |
 
 `-h` is help, `-V` the version. There is no other `-h`.
 
