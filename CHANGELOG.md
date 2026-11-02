@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-11-01
+
 ### Added
 - Org site templates in the app: edit a template's HTML and CSS in the TUI (Orgs ▸ Templates, `7`) or `$EDITOR` (`mnnn org template edit ORG T [--css]`), manage its files, and use it (`u`)
 - Live template previews through the local site, good for an hour: `mnnn org template preview ORG T`, `p` / Ctrl-P
@@ -458,7 +460,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.16.1...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.17.0...HEAD
+[2.17.0]: https://github.com/WeirdBrains/muninn/compare/v2.16.1...v2.17.0
 [2.16.1]: https://github.com/WeirdBrains/muninn/compare/v2.16.0...v2.16.1
 [2.16.0]: https://github.com/WeirdBrains/muninn/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/WeirdBrains/muninn/compare/v2.14.0...v2.15.0
