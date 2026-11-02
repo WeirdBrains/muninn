@@ -431,6 +431,8 @@ Today templates are saved from files with the CLI only (`mnnn org template save/
 4. Rule sets can call an external server's tools as actions (`mcp SERVER TOOL args…`) and use them as data sources in conditions, asking before the first call of each tool
 
 
+## Live Collaboration and Peers
+
 > **Phase 22 · v2.19.0 · 🚧 In progress**
 
 1. Real-time collaboration between key-exchanged connections over a gRPC bidirectional stream with protobuf messages (`muninn.live.v1`), end-to-end encrypted with the exchange keys
