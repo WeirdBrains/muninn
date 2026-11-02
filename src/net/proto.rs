@@ -178,6 +178,10 @@ pub enum Req {
         topic: String,
         text: String,
     },
+    /// 2.19: collaboration (messages, live sessions, peers, runs); see `crate::collab::wire`.
+    Collab {
+        req: crate::collab::wire::CollabReq,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -225,10 +229,14 @@ pub enum Resp {
     Sync {
         sealed: crate::crypto::Sealed,
     },
+    /// 2.19: a collaboration answer.
+    Collab {
+        resp: crate::collab::wire::CollabResp,
+    },
 }
 
 /// Bytes as base64 in JSON (sealed payloads are JSON).
-mod serde_bytes_b64 {
+pub(crate) mod serde_bytes_b64 {
     use base64::Engine;
     use serde::{Deserialize, Deserializer, Serializer};
     pub fn serialize<S: Serializer>(v: &[u8], s: S) -> Result<S::Ok, S::Error> {

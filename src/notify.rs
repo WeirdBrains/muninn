@@ -27,6 +27,7 @@ pub const BUILTINS: &[Builtin] = &[
     Builtin { kind: "org.code.sync", about: "an org's code arrived and waits for your approval" },
     Builtin { kind: "notify", about: "a warning from Muninn (certificates expiring or failing to renew)" },
     Builtin { kind: "net.broadcast", about: "a broadcast from another node" },
+    Builtin { kind: "net.message", about: "a message from another node" },
 ];
 
 fn s(v: &Value, k: &str) -> String {
@@ -71,6 +72,7 @@ pub fn builtin_for(a: &ActionRecord) -> Option<NewNotification> {
         "net.broadcast" if net => {
             Some(n("info", format!("{}: {}", s(p, "from"), s(p, "topic")), s(p, "text"), Some(format!("peer:{}", s(p, "peer")))))
         }
+        "net.message" if net => Some(n("info", s(p, "from"), s(p, "text"), Some(format!("messages:{}", s(p, "peer"))))),
         _ => None,
     }
 }
@@ -132,6 +134,10 @@ pub fn describe_link(store: &Store, link: &str) -> String {
         "org" => store.org(id).ok().flatten().map(|o| format!("org {}", o.name)).unwrap_or_else(|| format!("org {id}")),
         "peer" => format!("node {}", &id[id.len().saturating_sub(8)..]),
         "requests" => "network requests".into(),
+        "messages" => store.net_peer(id).ok().flatten().map(|p| format!("messages with {}", p.label)).unwrap_or_else(|| "messages".into()),
+        "live" => {
+            store.live_session(id).ok().flatten().map(|l| format!("live {} {}", l.kind, l.title)).unwrap_or_else(|| format!("live session {id}"))
+        }
         "sync" => "sync conflicts".into(),
         "code" => "code spaces".into(),
         "journal" => store.journal(id).ok().flatten().map(|j| format!("journal {}", j.name)).unwrap_or_else(|| format!("journal {id}")),

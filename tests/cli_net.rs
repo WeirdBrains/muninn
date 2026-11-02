@@ -224,3 +224,61 @@ fn broadcasts_reach_connections_as_notifications() {
     stop(&a, ca);
     stop(&b, cb);
 }
+
+fn connected(a: &Env, b: &Env, addr_b: &str) {
+    a.ok(&["net", "connect", addr_b, "--label", "ben"]);
+    b.ok(&["net", "accept", "anna"]);
+    let t = Instant::now();
+    while !a.ok(&["net", "peers"]).lines().any(|l| l.contains("ben") && l.contains("connected")) {
+        assert!(t.elapsed() < Duration::from_secs(15), "{}", a.ok(&["net", "peers"]));
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+#[test]
+fn messages_live_editing_and_the_peers_view() {
+    let a = Env::new();
+    let b = Env::new();
+    let (ca, _) = start(&a, "anna");
+    let (cb, addr_b) = start(&b, "ben");
+    connected(&a, &b, &addr_b);
+    // a message, kept on both sides, notifying ben
+    assert!(a.ok(&["msg", "send", "ben", "the comet is back", "--about", "journal:field"]).contains("delivered"));
+    let v = json(&b.ok(&["msg", "list", "--unread", "--json"]));
+    assert_eq!(v[0]["text"], "the comet is back", "{v}");
+    assert_eq!(v[0]["about"], "journal:field");
+    assert!(json(&b.ok(&["notify", "list", "--json"])).as_array().unwrap().iter().any(|n| n["kind"] == "net.message" && n["title"] == "anna"));
+    b.ok(&["msg", "read"]);
+    assert!(json(&b.ok(&["msg", "list", "--unread", "--json"])).as_array().unwrap().is_empty());
+    assert!(a.ok(&["msg", "list", "ben"]).contains("→ ben"));
+    // peers: anna is ben's peer
+    let p = json(&b.ok(&["peers", "--json"]));
+    assert_eq!(p[0]["label"], "anna", "{p}");
+    // ben hosts an entry live; anna sees the offer, joins and edits it
+    b.ok(&["journal", "new", "field notes"]);
+    b.ok(&["journal", "write", "field notes", "--title", "Comet", "--text", "a comet over the hill"]);
+    let j = json(&b.ok(&["journal", "show", "field notes", "--json"]));
+    let entry = j["entries"][0]["entry"]["id"].as_str().unwrap().to_string();
+    let session = b.ok(&["live", "share", "entry", &entry, "--with", "anna"]).lines().last().unwrap().trim().to_string();
+    let offers = json(&a.ok(&["peers", "show", "ben", "--json"]));
+    assert_eq!(offers["live"][0]["session"], session.as_str(), "{offers}");
+    assert!(a.ok(&["live", "join", "ben", &session]).contains("joined"));
+    let show = json(&a.ok(&["live", "show", &session[..8], "--json"]));
+    assert_eq!(show["docs"]["body"], "a comet over the hill", "{show}");
+    // ben edits through the session, then anna (who sees ben's edit first)
+    b.ok(&["live", "edit", &session[..8], "--value", "a bright comet over the hill"]);
+    let show = json(&a.ok(&["live", "show", &session[..8], "--json"]));
+    assert_eq!(show["docs"]["body"], "a bright comet over the hill", "{show}");
+    a.ok(&["live", "edit", &session[..8], "--value", "a bright comet over the hill tonight", "--cursor", "29"]);
+    let j = json(&b.ok(&["journal", "show", "field notes", "--json"]));
+    assert_eq!(j["entries"][0]["entry"]["body"], "a bright comet over the hill tonight", "written back: {j}");
+    let host = json(&b.ok(&["live", "show", &session[..8], "--json"]));
+    assert!(host["present"].as_array().unwrap().iter().any(|c| c["label"] == "anna" && c["cursor"] == 29), "{host}");
+    // a stranger session id is refused; ben closes it
+    assert!(!a.run(&["live", "join", "ben", "nope"]).status.success());
+    b.ok(&["live", "stop", &session[..8]]);
+    let show = json(&a.ok(&["live", "show", &session[..8], "--json"]));
+    assert_eq!(show["session"]["status"], "closed");
+    stop(&a, ca);
+    stop(&b, cb);
+}

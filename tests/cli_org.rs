@@ -299,3 +299,28 @@ fn templates_edit_build_preview_and_announced_sites() {
     e.ok(&["--yes", "org", "template", "remove", "comet-lab", "fresh"]);
     assert!(!e.run(&["org", "template", "show", "comet-lab", "fresh"]).status.success());
 }
+
+#[test]
+fn members_run_a_peers_executables_from_the_peers_view() {
+    let a = Env::new();
+    let b = Env::new();
+    let (_na, addr) = start(&a, "anna");
+    b.ok(&["net", "config", "--label", "ben", "--mdns", "off"]);
+    a.ok(&["org", "create", "Comet Lab", "--public"]);
+    a.ok(&["model", "create", "Sightings", "--fields", "name:text!; mag:real"]);
+    a.ok(&["model", "record", "create", "sightings", "name=Halley", "mag=4.5"]);
+    a.ok(&["org", "endpoint", "add", "comet-lab", "sightings", "--kind", "records", "--target", "Sightings"]);
+    b.ok(&["org", "apply", &addr, "comet-lab"]);
+    a.ok(&["org", "member", "approve", "comet-lab", "ben", "--role", "viewer"]);
+    b.ok(&["org", "sync", "comet-lab"]);
+    // anna's node is known by the org it serves
+    let p = json(&b.ok(&["peers", "show", "comet-lab", "--json"]));
+    assert_eq!(p["executables"][0]["endpoint"], "sightings", "{p}");
+    let out = json(&b.ok(&["peers", "run", "comet-lab", "comet-lab", "sightings", "--input", r#"{"op": "query"}"#]));
+    assert_eq!(out["records"][0]["name"], "Halley", "{out}");
+    // the role is checked on anna's node: viewers cannot write
+    let o = b.run(&["peers", "run", "comet-lab", "comet-lab", "sightings", "--input", r#"{"op": "create", "values": {"name": "Encke"}}"#]);
+    assert!(!o.status.success(), "viewers may not create");
+    assert!(a.ok(&["history", "list"]).contains("live.run"));
+    a.ok(&["net", "stop"]);
+}

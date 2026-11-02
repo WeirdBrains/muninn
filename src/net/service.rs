@@ -74,6 +74,9 @@ impl Service {
                 let done = match req {
                     Req::Org { org, req } => crate::org::net::serve(s, &x, from, &org, req),
                     Req::Review { review, req } => crate::review::net::serve(s, &x, from, &review, req),
+                    Req::Collab { req } => {
+                        crate::collab::wire::serve(s, &x, &from.to_string(), &self.local.to_string(), req).map(|resp| Resp::Collab { resp })
+                    }
                     req => answer(s, &x, from, req, &self.label),
                 };
                 let resp = match done {
@@ -464,6 +467,7 @@ pub fn answer(s: &Store, x: &Exchange, from: &PeerId, req: Req, label: &str) -> 
         }
         Req::Org { .. } => return Err(Error::Other("organization requests are answered by the org's node".into())),
         Req::Review { .. } => return Err(Error::Other("review requests are answered by the author's node".into())),
+        Req::Collab { .. } => return Err(Error::Other("collaboration requests are answered by the node itself".into())),
         Req::Introduce { card } => {
             let peer = from.to_string();
             super::user::take_card(s, &peer, &card, "network")?;

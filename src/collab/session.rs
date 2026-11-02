@@ -421,6 +421,34 @@ pub fn sync_with(
     Ok((st, b.present))
 }
 
+/// Host: edits made through the session (the CLI or TUI) rather than to the item.
+pub fn host_edit(s: &Store, ls: &LiveSession, me: &str, changes: &BTreeMap<String, String>) -> Result<State> {
+    if ls.role != "host" || ls.status != "open" {
+        return Err(Error::Other("this session is not open here".into()));
+    }
+    absorb(s, ls, me)?;
+    let st = state(s, &ls.id)?;
+    for f in edits(&st, me, "", &ls.kind, changes, None)? {
+        let op = f.op.unwrap_or_default();
+        if !matches!(op.kind, Some(Kind::Cursor(_))) {
+            s.append_live_op(&ls.id, me, &f.doc, &op.bytes())?;
+        }
+    }
+    write_back(s, ls)?;
+    state(s, &ls.id)
+}
+
+/// The document an edit means when none is named: an entry's body, a code space's source,
+/// or the only one there is.
+pub fn default_doc(kind: &str, docs: &BTreeMap<String, String>) -> Option<String> {
+    match kind {
+        "entry" => Some("body".into()),
+        "code" => Some("source".into()),
+        _ if docs.len() == 1 => docs.keys().next().cloned(),
+        _ => None,
+    }
+}
+
 /// The open sessions this node hosts that invite `peer` (the peers view's offers).
 pub fn offers(s: &Store, peer: &str) -> Result<Vec<Value>> {
     Ok(s.live_sessions()?

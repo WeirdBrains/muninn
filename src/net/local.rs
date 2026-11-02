@@ -222,6 +222,8 @@ impl Hosted {
                 let _ = crate::review::net::tick(&s, &node, &relays, "network");
                 // broadcasts rule sets queued
                 super::broadcast::drain(&s, &super::broadcast::From { node: &node, label: &label, relays: &relays });
+                // messages this node wrote that have not reached their peer yet
+                crate::collab::msg::tick(&s, &node, &relays, &node.peer_id().to_string(), &label);
                 s
             }));
         }
