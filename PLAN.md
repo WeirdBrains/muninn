@@ -29,8 +29,8 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 19 | [Website](#website): a single-page Jaspr site in the Muninn theme | v2.16.0 | ✅ Released |
 | 20 | [Screenshots](#screenshots): every feature with sample data, mid-action | v2.16.0 | ✅ Released |
 | 21 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
-| 22 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | 📋 Planned |
-| 23 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 📋 Planned |
+| 22 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | ✅ Released |
+| 23 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | 🚧 In progress |
 | 24 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | post-2.0 | 📋 Planned |
 | 25 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | post-2.0 | 📋 Planned |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
@@ -402,7 +402,7 @@ Launch step before the post goes out: a public relay node.
 
 ## Org Site Templates in the App
 
-> **Phase 20 · v2.17.0 · 🚧 In progress**
+> **Phase 20 · v2.17.0 · ✅ Released**
 
 Today templates are saved from files with the CLI only (`mnnn org template save/asset/list`, `org edit --template`); there is no in-app editing.
 
@@ -412,7 +412,7 @@ Today templates are saved from files with the CLI only (`mnnn org template save/
 
 ## Notifications
 
-> **Phase 21 · v2.18.0**
+> **Phase 21 · v2.18.0 · 🚧 In progress**
 
 1. Every notification is a rule set trigger: built-in events (review comments, invites, sync conflicts, shares to you, code waiting for approval, …) are triggers rule sets can match
 2. Any rule set can emit a notification as an action (title, body, link)
