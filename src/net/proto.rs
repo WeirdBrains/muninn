@@ -172,6 +172,12 @@ pub enum Req {
     SiteAnnounce {
         site: crate::org::announce::SiteCard,
     },
+    /// 2.18: a broadcast (see `crate::net::broadcast`).
+    Broadcast {
+        from: String,
+        topic: String,
+        text: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

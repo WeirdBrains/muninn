@@ -261,6 +261,15 @@ pub enum Then {
         #[serde(default)]
         level: Option<String>,
     },
+    /// 2.18: broadcast to linked nodes, connections or an org's nodes (queued; the running
+    /// node sends it). `to` is `nodes`, `connections`, `all` or `org:ID`.
+    Broadcast {
+        topic: String,
+        #[serde(default)]
+        text: String,
+        #[serde(default)]
+        to: Option<String>,
+    },
 }
 
 fn renew_days() -> i64 {
@@ -292,6 +301,7 @@ impl Then {
             Then::RunCode { .. } => "run-code",
             Then::CertWatch { .. } => "cert-watch",
             Then::Notify { .. } => "notify",
+            Then::Broadcast { .. } => "broadcast",
         }
     }
 }

@@ -134,3 +134,26 @@ fn a_rule_set_notifies_and_notifications_trigger_rules() {
     let runs = s.actions_of_kind("rule.run").unwrap();
     assert!(runs.iter().any(|r| r.summary.contains("chain") || r.params.to_string().contains("seen")), "{runs:?}");
 }
+
+#[test]
+fn a_rule_set_queues_broadcasts() {
+    let s = Store::open_in_memory().unwrap();
+    let o = org(&s);
+    for t in ["broadcast deploy text=\"v {name}\" to=connections", &format!("broadcast hi to=org:{}", o.slug), "broadcast hi"] {
+        let p = crate::rules::parse_then(&s, t).unwrap();
+        assert_eq!(crate::rules::parse_then(&s, &crate::rules::then_text(&s, &p)).unwrap(), p, "{t}");
+    }
+    assert!(crate::rules::parse_then(&s, "broadcast x to=everyone").is_err());
+    let t = crate::rules::parse_then(&s, "broadcast deploy text=\"v {name}\" to=connections").unwrap();
+    s.create_rule(&NewRule {
+        name: "tell".into(),
+        spec: RuleSpec { on: vec!["journal.create".into()], then: vec![t], ..Default::default() },
+        enabled: true,
+        ..Default::default()
+    })
+    .unwrap();
+    s.record_action(&crate::store::NewAction::new("journal.create", "cli", "made").params(serde_json::json!({ "name": "Field" }))).unwrap();
+    let q = crate::net::broadcast::queued(&s);
+    assert_eq!(q.len(), 1);
+    assert_eq!((q[0].to.clone(), q[0].topic.as_str(), q[0].text.as_str()), (crate::net::broadcast::To::Connections, "deploy", "v Field"));
+}

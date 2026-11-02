@@ -483,6 +483,27 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
             print_network_results(ctx, &res, json)
         }
         NetCommand::Shard(c) => shard(ctx, c),
+        NetCommand::Broadcast { topic, text, to, json } => {
+            let mut n = Net::open(ctx)?;
+            let relays = n.relays();
+            let to = crate::net::broadcast::To::parse(&n.store, &to)?;
+            if crate::net::broadcast::targets(&n.store, &to)?.is_empty() {
+                anyhow::bail!("no one to tell: no active {} exchanges", to.text(&n.store));
+            }
+            let label = n.label.clone();
+            n.node()?;
+            let by = crate::net::broadcast::From { node: n.node.as_ref().expect("node"), label: &label, relays: &relays };
+            let r = crate::net::broadcast::send(&n.store, &by, &to, &topic, &text, ORIGIN)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&r)?);
+            } else {
+                ctx.io.info(format!("sent to {} node(s)", r.sent.len()));
+                for (who, e) in &r.failed {
+                    ctx.io.warn(format!("{who}: {e}"));
+                }
+            }
+            Ok(())
+        }
     }
 }
 

@@ -3,6 +3,7 @@
 //! `docs/dark-shards.md`.
 pub mod auto;
 pub mod backup;
+pub mod broadcast;
 pub mod client;
 pub mod exchange;
 pub mod identity;

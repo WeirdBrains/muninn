@@ -458,7 +458,7 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
         return Err(Error::invalid(
             "--then",
             format!(
-                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch, notify)"
+                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch, notify, broadcast)"
             ),
         ));
     };
@@ -627,6 +627,20 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
             }
             Then::Notify { title: pos.join(" "), body: take(&mut kv, "body").unwrap_or_default(), link: take(&mut kv, "link"), level }
         }
+        "broadcast" => {
+            if pos.is_empty() {
+                return Err(bad("broadcast needs a topic".into()));
+            }
+            // store the org by id, so a renamed slug keeps working
+            let to = match take(&mut kv, "to") {
+                Some(t) => Some(match crate::net::broadcast::To::parse(store, &t).map_err(|e| bad(e.to_string()))? {
+                    crate::net::broadcast::To::Org(id) => format!("org:{id}"),
+                    _ => t,
+                }),
+                None => None,
+            };
+            Then::Broadcast { topic: pos.join(" "), text: take(&mut kv, "text").unwrap_or_default(), to }
+        }
         "run-code" | "code" => match pos.as_slice() {
             [n] => Then::RunCode { space: store.find_code_space(n)?.id },
             _ => return Err(bad("run-code takes one code space".into())),
@@ -685,6 +699,19 @@ pub fn then_text(store: &Store, t: &Then) -> String {
             }
             if let Some(l) = level {
                 w.push(format!("level={l}"));
+            }
+        }
+        Then::Broadcast { topic, text, to } => {
+            w.push(quote(topic));
+            if !text.is_empty() {
+                w.push(format!("text={}", quote(text)));
+            }
+            if let Some(t) = to {
+                let t = t
+                    .strip_prefix("org:")
+                    .map(|id| format!("org:{}", store.org(id).ok().flatten().map(|o| o.slug).unwrap_or_else(|| id.into())))
+                    .unwrap_or_else(|| t.clone());
+                w.push(format!("to={t}"));
             }
         }
         Then::RunSearch { search } => opt(ItemKind::LiveSearch, search),
@@ -1076,6 +1103,7 @@ pub fn plan(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
     };
     Ok(match t {
         Then::Status { text } => format!("show \"{}\"", expand(store, r, a, text)),
+        Then::Broadcast { topic, to, .. } => format!("broadcast \"{}\" to {}", expand(store, r, a, topic), to.as_deref().unwrap_or("nodes")),
         Then::Notify { title, level, .. } => format!("notify \"{}\" ({})", expand(store, r, a, title), level.as_deref().unwrap_or("info")),
         Then::RunSearch { search } => {
             let id = search
@@ -1271,6 +1299,15 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
                 },
             )?;
             Ok(format!("notified: {}", n.title))
+        }
+        Then::Broadcast { topic, text, to } => {
+            let to = match to.as_deref().and_then(|t| t.strip_prefix("org:")) {
+                Some(id) => crate::net::broadcast::To::Org(id.into()),
+                None => crate::net::broadcast::To::parse(store, to.as_deref().unwrap_or("nodes"))?,
+            };
+            let topic = expand(store, r, a, topic);
+            crate::net::broadcast::queue(store, to, &topic, &expand(store, r, a, text))?;
+            Ok(format!("broadcast {topic} queued for the node"))
         }
         Then::RunSearch { search } => {
             let id = search

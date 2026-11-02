@@ -213,12 +213,15 @@ impl Hosted {
             let s = st.spare.take().expect("spare");
             let node = self.node.clone();
             let relays = st.relays.clone();
+            let label = self.label.clone();
             st.running = Some(std::thread::spawn(move || {
                 let _ = super::auto::settle(&s, &node, &relays, "network");
                 // linked nodes: pull what changed (each about once a minute)
                 let _ = super::sync::tick(&s, &node, &relays, "network");
                 // review copies: send waiting work, refresh the copies
                 let _ = crate::review::net::tick(&s, &node, &relays, "network");
+                // broadcasts rule sets queued
+                super::broadcast::drain(&s, &super::broadcast::From { node: &node, label: &label, relays: &relays });
                 s
             }));
         }

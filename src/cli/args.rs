@@ -2190,6 +2190,19 @@ pub enum NetCommand {
         #[arg(long)]
         import: bool,
     },
+    /// Broadcast a topic and text to your linked nodes, connections or an org's nodes; each
+    /// hears it as a notification (and a `net.broadcast` action rules can trigger on).
+    Broadcast {
+        topic: String,
+        #[arg(default_value = "")]
+        text: String,
+        /// nodes (linked), connections, all, or org:SLUG.
+        #[arg(long, default_value = "nodes")]
+        to: String,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Search here and on every peer that shares with you; results say where they came from.
     Search {
         #[command(flatten)]

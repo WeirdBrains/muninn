@@ -928,7 +928,7 @@ fn remap_then(t: &mut Then, map: &dyn Fn(&str) -> String) {
         }
     };
     match t {
-        Then::Status { .. } | Then::CertWatch { .. } | Then::Notify { .. } => {}
+        Then::Status { .. } | Then::CertWatch { .. } | Then::Notify { .. } | Then::Broadcast { .. } => {}
         Then::RunSearch { search } => opt(search),
         Then::RunCode { space } => *space = map(space),
         Then::ExportReport { report, .. } => *report = map(report),

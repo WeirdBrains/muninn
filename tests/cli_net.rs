@@ -196,3 +196,31 @@ fn two_nodes_exchange_share_search_fetch_and_revoke() {
     stop(&a, ca);
     stop(&b, cb);
 }
+
+#[test]
+fn broadcasts_reach_connections_as_notifications() {
+    let a = Env::new();
+    let b = Env::new();
+    let (ca, _) = start(&a, "anna");
+    let (cb, addr_b) = start(&b, "ben");
+    // nobody to tell yet
+    let o = a.run(&["net", "broadcast", "deploy", "--to", "connections"]);
+    assert!(!o.status.success() && String::from_utf8_lossy(&o.stderr).contains("no one to tell"));
+    a.ok(&["net", "connect", &addr_b, "--label", "ben"]);
+    b.ok(&["net", "accept", "anna"]);
+    let t = Instant::now();
+    while !a.ok(&["net", "peers"]).lines().any(|l| l.contains("ben") && l.contains("connected")) {
+        assert!(t.elapsed() < Duration::from_secs(15), "{}", a.ok(&["net", "peers"]));
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    // a rule set on ben's side reacts to broadcasts too
+    b.ok(&["rule", "create", "Heard", "--on", "net.broadcast", "--if", "topic = deploy", "--then", "notify \"deploy by {from}\" level=warn"]);
+    let r = json(&a.ok(&["net", "broadcast", "deploy", "v2 is out", "--to", "connections", "--json"]));
+    assert_eq!(r["sent"].as_array().unwrap().len(), 1, "{r}");
+    let v = json(&b.ok(&["notify", "list", "--json"]));
+    let titles: Vec<&str> = v.as_array().unwrap().iter().filter_map(|n| n["title"].as_str()).collect();
+    assert!(titles.contains(&"anna: deploy") && titles.contains(&"deploy by anna"), "{v}");
+    assert!(v.as_array().unwrap().iter().any(|n| n["body"] == "v2 is out"), "{v}");
+    stop(&a, ca);
+    stop(&b, cb);
+}
