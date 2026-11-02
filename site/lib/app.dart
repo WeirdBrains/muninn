@@ -201,6 +201,7 @@ const docPages = [
   ('Rules', 'rules.md'),
   ('Organizations and hosting', 'org-hosting.md'),
   ('Org site templates', 'org-templates.md'),
+  ('Notifications', 'notifications.md'),
   ('Network and sync', 'network.md'),
   ('Encryption', 'encryption.md'),
   ('Themes', 'themes.md'),

@@ -63,6 +63,8 @@ its values does.
 | `record-update [MODEL] id=ID\|where="F OP V; …" FIELD=VALUE…` | changes one record, or all that match |
 | `record-delete [MODEL] id=ID\|where="F OP V; …"` | deletes one record, or all that match |
 | `run-code SPACE` | runs an approved [code space](code-spaces.md) (building it if needed); a changed or unapproved one fails |
+| `notify TITLE [body=T] [link=KIND:ID] [level=info\|warn\|error]` | a [notification](notifications.md); `notification` actions are triggers too |
+| `broadcast TOPIC [text=T] [to=nodes\|connections\|all\|org:SLUG]` | a [broadcast](notifications.md#broadcasts) to other nodes (queued; the running node sends it); `net.broadcast` triggers on one received |
 
 The format comes from the file extension unless `format=` says otherwise
 ([export formats](export-formats.md)); `~/` is your home folder. Texts, titles and

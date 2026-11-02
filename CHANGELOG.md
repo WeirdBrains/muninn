@@ -6,6 +6,14 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+- Notifications: built-in events (exchange requests, org applications, review comments, suggestions and votes, sync conflicts, org code waiting for approval, Muninn warnings, broadcasts) notify you; kinds can be muted
+- A header bell with the unread count, and a Notifications window (`!`) whose `Enter` opens the linked review, org, journal, project, rule or history step
+- `mnnn notify list/show/read/unread/send/kinds/mute/unmute`
+- Rule sets: a `notify` then-action, and `notification` and `net.broadcast` triggers
+- Node broadcasts: `mnnn net broadcast TOPIC TEXT --to nodes|connections|all|org:SLUG`, and a `broadcast` rule action
+- Notifications are stored in their own table and synced to linked nodes
+
 ## [2.17.0] - 2026-11-01
 
 ### Added

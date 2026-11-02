@@ -101,6 +101,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `K` | the [network](network.md) window (node status first) |
 | `G` | the [organizations](organizations.md) window |
 | `V` | the [reviews](reviews.md) window |
+| `!` | the [notifications](notifications.md) window (or click the header bell) |
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
