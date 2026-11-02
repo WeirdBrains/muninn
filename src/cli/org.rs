@@ -211,6 +211,8 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
             pretty(&v)
         }
         OrgCommand::Template(c) => template(ctx, c),
+        OrgCommand::Sites { all, json } => sites(ctx, all, json),
+        OrgCommand::Announce { org: key, closed } => announce(ctx, key.as_deref(), closed),
         OrgCommand::Browse { target: t, org: o, json } => {
             let mut n = Net::open(ctx)?;
             let relays = n.relays();
@@ -848,7 +850,133 @@ fn template(ctx: &Ctx, cmd: OrgTemplateCommand) -> anyhow::Result<()> {
             ctx.io.info(format!("template {}{}", t.name, if r#use { ", in use" } else { "" }));
             Ok(())
         }
-        OrgTemplateCommand::Asset { org: key, template: tk, file, name } => {
+        OrgTemplateCommand::Asset { org: key, template: tk, file, remove: true, .. } => {
+            let o = mine(s, &key)?;
+            let t = s.find_template(&o.id, &tk)?;
+            let name = file.to_string_lossy().replace('\\', "/");
+            org::remove_asset(s, ORIGIN, &OWNER, &o, &t, &name)?;
+            ctx.io.info(format!("asset {name} removed from {}", t.name));
+            Ok(())
+        }
+        OrgTemplateCommand::Show { org: key, template: tk, json } => {
+            let o = mine(s, &key)?;
+            let t = s.find_template(&o.id, &tk)?;
+            let assets = s.template_assets(&t.id)?;
+            let approved = org::build::approved(s, &t)?;
+            if json {
+                return pretty(
+                    &json!({ "template": t, "assets": assets, "in_use": o.template_id.as_deref() == Some(t.id.as_str()), "build_approved": approved }),
+                );
+            }
+            println!("template:  {}{}", t.name, if o.template_id.as_deref() == Some(t.id.as_str()) { " (in use)" } else { "" });
+            println!("updated:   {}", fmt_ts(t.updated_at));
+            match &t.build_cmd {
+                Some(c) => println!(
+                    "build:     {c}\n  source:  {}\n  output:  {}\n  here:    {}",
+                    t.build_src.as_deref().unwrap_or("-"),
+                    t.build_out.as_deref().unwrap_or(org::build::DEFAULT_OUT),
+                    if approved { "approved" } else { "asks before running" }
+                ),
+                None => println!("build:     -"),
+            }
+            println!("assets:    {}", if assets.is_empty() { "-".to_string() } else { String::new() });
+            for a in &assets {
+                println!("  {:<32} {:>9} bytes  {}", a.name, a.size, a.mime);
+            }
+            println!("--- html ---\n{}", t.html);
+            if !t.css.is_empty() {
+                println!("--- css ---\n{}", t.css);
+            }
+            Ok(())
+        }
+        OrgTemplateCommand::Edit { org: key, template: tk, css } => {
+            let o = mine(s, &key)?;
+            let (name, html, style) = match s.find_template(&o.id, &tk) {
+                Ok(t) => (t.name, t.html, t.css),
+                Err(_) => (tk.clone(), org::serve::DEFAULT_HTML.to_string(), org::serve::DEFAULT_CSS.to_string()),
+            };
+            let (before, ext) = if css { (&style, "css") } else { (&html, "html") };
+            let after = super::code::edit_text(before, ext)?;
+            if &after == before && s.find_template(&o.id, &tk).is_ok() {
+                ctx.io.note("no changes");
+                return Ok(());
+            }
+            let (h, c) = if css { (html.as_str(), after.as_str()) } else { (after.as_str(), style.as_str()) };
+            let t = org::save_template(s, ORIGIN, &OWNER, &o, &name, h, c)?;
+            ctx.io.info(format!("template {} saved", t.name));
+            Ok(())
+        }
+        OrgTemplateCommand::Remove { org: key, template: tk } => {
+            let o = mine(s, &key)?;
+            let t = s.find_template(&o.id, &tk)?;
+            if !ctx.io.confirm(&format!("remove template {} and its {} file(s)?", t.name, s.template_assets(&t.id)?.len()))? {
+                return Ok(());
+            }
+            org::remove_template(s, ORIGIN, &OWNER, &o, &t)?;
+            ctx.io.info(format!("template {} removed", t.name));
+            Ok(())
+        }
+        OrgTemplateCommand::Build { org: key, template: tk, cmd, src, out, clear, no_run } => {
+            let o = mine(s, &key)?;
+            let mut t = s.find_template(&o.id, &tk)?;
+            if clear {
+                org::build::configure(s, ORIGIN, &OWNER, &o, &t, None)?;
+                ctx.io.info(format!("build step of {} removed", t.name));
+                return Ok(());
+            }
+            if cmd.is_some() || src.is_some() || out.is_some() {
+                let c = cmd.or(t.build_cmd.clone()).ok_or_else(|| anyhow!("give the build command with --cmd"))?;
+                let dir = match src {
+                    Some(p) => p,
+                    None => match &t.build_src {
+                        Some(p) => p.into(),
+                        None => std::env::current_dir()?,
+                    },
+                };
+                let dir = std::fs::canonicalize(&dir).with_context(|| dir.display().to_string())?;
+                let dir = dir.to_string_lossy().into_owned();
+                let o2 = out.or(t.build_out.clone());
+                t = org::build::configure(s, ORIGIN, &OWNER, &o, &t, Some(org::build::Step { cmd: &c, src: &dir, out: o2.as_deref() }))?;
+                ctx.io.info(format!("build step of {} saved", t.name));
+            }
+            if no_run {
+                return Ok(());
+            }
+            let approve = if org::build::approved(s, &t)? { false } else { ctx.io.confirm(&org::build::question(&t))? };
+            if !approve && !org::build::approved(s, &t)? {
+                ctx.io.note("not built");
+                return Ok(());
+            }
+            let b = org::build::build(s, ORIGIN, &OWNER, &o, &t, approve)?;
+            if !b.log.trim().is_empty() {
+                println!("{}", b.log);
+            }
+            for n in &b.notes {
+                ctx.io.warn(n.clone());
+            }
+            ctx.io.info(format!(
+                "built {}: index.html{}, {} other file(s)",
+                t.name,
+                if b.css.is_empty() { "" } else { ", style.css" },
+                b.assets.len()
+            ));
+            Ok(())
+        }
+        OrgTemplateCommand::Preview { org: key, template: tk } => {
+            let o = mine(s, &key)?;
+            let t = s.find_template(&o.id, &tk)?;
+            let token = org::preview(s, ORIGIN, &OWNER, &o, &t)?;
+            let path = org::serve::preview_path(&o.slug, &token);
+            match host::running(&ctx.paths.home) {
+                Some(f) => println!("{}{}", f.url, path.trim_start_matches('/')),
+                None => {
+                    println!("{path}");
+                    ctx.io.note("the site is not running here; `mnnn org host start` serves the preview at that path (for an hour)");
+                }
+            }
+            Ok(())
+        }
+        OrgTemplateCommand::Asset { org: key, template: tk, file, name, .. } => {
             let o = mine(s, &key)?;
             let t = s.find_template(&o.id, &tk)?;
             let data = std::fs::read(&file).with_context(|| file.display().to_string())?;
@@ -857,6 +985,94 @@ fn template(ctx: &Ctx, cmd: OrgTemplateCommand) -> anyhow::Result<()> {
             ctx.io.info(format!("asset {name} ({} bytes) at {at}", data.len()));
             Ok(())
         }
+    }
+}
+
+fn sites(ctx: &Ctx, all: bool, json: bool) -> anyhow::Result<()> {
+    let n = Net::open(ctx)?;
+    let v: Vec<_> = org::announce::received(&n.store)?.into_iter().filter(|(a, _)| all || a.open).collect();
+    if json {
+        let out: Vec<Value> =
+            v.iter().map(|(a, c)| json!({ "peer": a.peer, "exchange": a.exchange_id, "received_at": a.received_at, "site": c })).collect();
+        return pretty(&out);
+    }
+    if v.is_empty() {
+        ctx.io.note(if all {
+            "No sites were announced to this node."
+        } else {
+            "No open sites were announced to this node (--all shows closed ones)."
+        });
+    }
+    for (a, c) in v {
+        println!(
+            "{:<24} {:<16} {:<7} {:<6} from {} at {}",
+            c.name,
+            c.slug,
+            c.visibility.as_str(),
+            if c.open { "open" } else { "closed" },
+            short(&a.peer),
+            fmt_ts(a.received_at)
+        );
+        for u in &c.urls {
+            println!("  {u}");
+        }
+        if !c.serves.is_empty() {
+            println!("  serves: {}", c.serves.join(", "));
+        }
+    }
+    Ok(())
+}
+
+fn announce(ctx: &Ctx, key: Option<&str>, closed: bool) -> anyhow::Result<()> {
+    let mut n = Net::open(ctx)?;
+    let relays = n.relays();
+    let running = host::running(&ctx.paths.home);
+    if running.is_none() && !closed {
+        bail!("the site is not running here; start it with `mnnn org host start` (it announces itself), or use --closed");
+    }
+    let orgs: Vec<Org> = match key {
+        Some(k) => vec![mine(&n.store, k)?],
+        None => n.store.orgs()?.into_iter().filter(|o| o.hosted).collect(),
+    };
+    if orgs.is_empty() {
+        bail!("no org is hosted (`mnnn org edit ORG --hosted on`)");
+    }
+    let addr = running.map(|f| f.addr).unwrap_or_default();
+    n.node()?;
+    let node = n.node.as_ref().expect("node");
+    for o in orgs {
+        let u = org::announce::urls(
+            &n.store,
+            &o,
+            &org::announce::bind_of(&addr, &n.prefs.hosting.bind),
+            org::announce::port_of(&addr, n.prefs.hosting.port),
+            &n.prefs.hosting.names,
+            &n.prefs.net.external_addresses,
+        )?;
+        let c = org::announce::card(&n.store, &o, u, !closed)?;
+        report_announce(ctx, &o, &org::announce::announce(&n.store, node, &o, &c, &relays)?);
+    }
+    Ok(())
+}
+
+pub(super) fn report_announce(ctx: &Ctx, o: &Org, r: &org::announce::Report) {
+    if let Some(why) = &r.skipped {
+        ctx.io.note(format!("{} not announced: {why}", o.name));
+        return;
+    }
+    if !r.sent.is_empty() {
+        ctx.io.info(format!("{} announced to {}", o.name, r.sent.join(", ")));
+    }
+    for (to, e) in &r.failed {
+        ctx.io.warn(format!("{}: {to} did not hear it: {e}", o.name));
+    }
+}
+
+/// Announce every hosted site from a host at `addr` (best effort).
+pub(super) fn announce_all(ctx: &Ctx, s: &Store, node: &crate::net::node::Node, prefs: &crate::prefs::Preferences, addr: &str, open: bool) {
+    match org::announce::announce_hosted(s, node, &prefs.hosting, &prefs.net.external_addresses, addr, open, &prefs.net.relays) {
+        Ok(v) => v.iter().for_each(|(o, r)| report_announce(ctx, o, r)),
+        Err(e) => ctx.io.warn(format!("sites not announced: {e}")),
     }
 }
 
@@ -914,6 +1130,11 @@ fn host_cmd(ctx: &Ctx, cmd: OrgHostCommand) -> anyhow::Result<()> {
             if let Some(a) = &st.http_addr {
                 println!("ACME challenges on http://{a}/");
             }
+            let mut n = n;
+            let node_ok = n.node().is_ok();
+            if node_ok {
+                announce_all(ctx, &n.store, n.node.as_ref().expect("node"), &n.prefs, &st.addr, true);
+            }
             ctx.io.note("Ctrl-C (or `mnnn org host stop`) stops it.");
             let stop = Arc::new(AtomicBool::new(false));
             let s2 = stop.clone();
@@ -933,6 +1154,9 @@ fn host_cmd(ctx: &Ctx, cmd: OrgHostCommand) -> anyhow::Result<()> {
             h.stop();
             host::clear(&home);
             n.store.note_action(&NewAction::new("org.host.stop", ORIGIN, "site stopped"));
+            if node_ok {
+                announce_all(ctx, &n.store, n.node.as_ref().expect("node"), &n.prefs, &st.addr, false);
+            }
             ctx.io.note("site stopped");
             Ok(())
         }

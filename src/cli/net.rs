@@ -555,6 +555,7 @@ fn start(ctx: &Ctx, port: Option<u16>, listen: Vec<String>, no_mdns: bool, relay
                         serde_json::json!({ "addr": st.addr, "orgs": st.orgs, "mirrors": st.mirrors, "cert": st.cert.source, "auto": true }),
                     ));
                 println!("site at {}", st.url);
+                super::org::announce_all(ctx, &n.store, &h.node, &n.prefs, &st.addr, true);
                 Some(site)
             }
             Err(e) => {
@@ -580,11 +581,17 @@ fn start(ctx: &Ctx, port: Option<u16>, listen: Vec<String>, no_mdns: bool, relay
             last_site = Instant::now();
         }
         if site.is_some() && host::stop_requested(&home) {
+            let addr = site.as_ref().map(|x| x.status().addr).unwrap_or_default();
             stop_site(&n.store, &home, site.take());
+            super::org::announce_all(ctx, &n.store, &h.node, &n.prefs, &addr, false);
         }
         std::thread::sleep(Duration::from_millis(250));
     }
-    stop_site(&n.store, &home, site);
+    if let Some(x) = &site {
+        let addr = x.status().addr;
+        stop_site(&n.store, &home, site);
+        super::org::announce_all(ctx, &n.store, &h.node, &n.prefs, &addr, false);
+    }
     h.stop(&n.store, ORIGIN);
     ctx.io.note("node stopped");
     Ok(())

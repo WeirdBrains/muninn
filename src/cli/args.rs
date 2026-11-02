@@ -2818,6 +2818,22 @@ pub enum OrgCommand {
     /// Site templates and their assets.
     #[command(subcommand)]
     Template(OrgTemplateCommand),
+    /// Sites other nodes announced to this one (open ones first).
+    Sites {
+        /// Include sites that were announced closed.
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Tell the org's nodes, your linked nodes and (public orgs) connections where its site is.
+    Announce {
+        /// One org (default: every hosted org).
+        org: Option<String>,
+        /// Announce it closed.
+        #[arg(long)]
+        closed: bool,
+    },
     /// The organizations a node lists (public ones), or one by slug or id.
     Browse {
         /// The node (`…/p2p/ID`, a peer id or a known peer).
@@ -3104,14 +3120,63 @@ pub enum OrgTemplateCommand {
         #[arg(long)]
         r#use: bool,
     },
-    /// Add an asset (image, font, script, style) to a template.
+    /// Add an asset (image, font, script, style) to a template, or remove one with --remove.
     Asset {
         org: String,
         template: String,
+        /// The file to add (with --remove: the asset's name).
         file: std::path::PathBuf,
         /// Its name under /assets/ (default: the file name).
         #[arg(long)]
         name: Option<String>,
+        /// Remove the named asset instead.
+        #[arg(long)]
+        remove: bool,
+    },
+    /// A template's HTML, CSS, files and build step.
+    Show {
+        org: String,
+        template: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Edit a template's HTML (or --css) in $VISUAL/$EDITOR; a new name starts from the built-in look.
+    Edit {
+        org: String,
+        template: String,
+        /// Edit the CSS instead of the HTML.
+        #[arg(long)]
+        css: bool,
+    },
+    /// Remove a template (orgs using it go back to the built-in look).
+    Remove {
+        org: String,
+        template: String,
+    },
+    /// Set a template's build step and run it (asks before a new or changed command).
+    Build {
+        org: String,
+        template: String,
+        /// The shell command (`sh -c`, `cmd /C` on Windows), e.g. "npm ci && npm run build".
+        #[arg(long)]
+        cmd: Option<String>,
+        /// The source folder, copied to a scratch folder for each build (default: the current folder).
+        #[arg(long)]
+        src: Option<std::path::PathBuf>,
+        /// The output folder inside it (default: build): index.html, style.css and the other files.
+        #[arg(long)]
+        out: Option<String>,
+        /// Remove the build step.
+        #[arg(long, conflicts_with_all = ["cmd", "src", "out"])]
+        clear: bool,
+        /// Only save the build step; do not run it.
+        #[arg(long)]
+        no_run: bool,
+    },
+    /// A live preview link for a template through the local host (good for an hour).
+    Preview {
+        org: String,
+        template: String,
     },
 }
 

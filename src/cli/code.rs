@@ -73,9 +73,14 @@ fn source_of(src: &CodeSourceArgs, lang: Lang, current: Option<&str>) -> anyhow:
 }
 
 fn in_editor(text: &str, lang: Lang) -> anyhow::Result<String> {
+    edit_text(text, lang.ext())
+}
+
+/// Edit text in $VISUAL/$EDITOR through a temporary file ending in `.{ext}`.
+pub(super) fn edit_text(text: &str, ext: &str) -> anyhow::Result<String> {
     let editor =
         std::env::var("VISUAL").or_else(|_| std::env::var("EDITOR")).map_err(|_| anyhow!("set $VISUAL or $EDITOR (or give --file or --source)"))?;
-    let path = std::env::temp_dir().join(format!("mnnn-code-{}.{}", std::process::id(), lang.ext()));
+    let path = std::env::temp_dir().join(format!("mnnn-code-{}.{ext}", std::process::id()));
     std::fs::write(&path, text)?;
     let mut parts = editor.split_whitespace();
     let prog = parts.next().ok_or_else(|| anyhow!("$EDITOR is empty"))?;

@@ -175,6 +175,36 @@ pub fn announce(s: &Store, node: &crate::net::node::Node, org: &Org, c: &SiteCar
     Ok(r)
 }
 
+/// The port of a host's listen address (`ip:port`), else `fallback`.
+pub fn port_of(addr: &str, fallback: u16) -> u16 {
+    addr.parse::<std::net::SocketAddr>().map(|a| a.port()).unwrap_or(fallback)
+}
+
+/// The IP of a host's listen address, else `fallback`.
+pub fn bind_of(addr: &str, fallback: &str) -> String {
+    addr.parse::<std::net::SocketAddr>().map(|a| a.ip().to_string()).unwrap_or_else(|_| fallback.to_string())
+}
+
+/// Announce every hosted org's site as open (or closed) from a host listening at `addr`.
+pub fn announce_hosted(
+    s: &Store,
+    node: &crate::net::node::Node,
+    hosting: &crate::prefs::HostingPrefs,
+    external: &[String],
+    addr: &str,
+    open: bool,
+    relays: &[String],
+) -> Result<Vec<(Org, Report)>> {
+    let mut out = vec![];
+    for org in s.orgs()?.into_iter().filter(|o| o.hosted) {
+        let u = urls(s, &org, &bind_of(addr, &hosting.bind), port_of(addr, hosting.port), &hosting.names, external)?;
+        let c = card(s, &org, u, open)?;
+        let r = announce(s, node, &org, &c, relays)?;
+        out.push((org, r));
+    }
+    Ok(out)
+}
+
 fn clip(s: &mut String) {
     if s.len() > MAX_TEXT {
         let mut end = MAX_TEXT;
@@ -218,6 +248,12 @@ mod tests {
             "verified_at": null, "revoked_at": null
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn listen_addresses_split() {
+        assert_eq!((port_of("0.0.0.0:9443", 1), bind_of("0.0.0.0:9443", "x")), (9443, "0.0.0.0".to_string()));
+        assert_eq!((port_of("junk", 8443), bind_of("junk", "127.0.0.1")), (8443, "127.0.0.1".to_string()));
     }
 
     #[test]

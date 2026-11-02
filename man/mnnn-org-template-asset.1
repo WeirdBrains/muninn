@@ -4,15 +4,15 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-org\-template\-asset \- Add an asset (image, font, script, style) to a template
+mnnn\-org\-template\-asset \- Add an asset (image, font, script, style) to a template, or remove one with \-\-remove
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org template asset\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> <\fITEMPLATE\fR> <\fIFILE\fR> 
+\fBmnnn org template asset\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-remove\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> <\fITEMPLATE\fR> <\fIFILE\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-Add an asset (image, font, script, style) to a template
+Add an asset (image, font, script, style) to a template, or remove one with \-\-remove
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -31,6 +31,9 @@ Database file (default <home>/storage/muninn.database)
 .RS
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
+.TP
+\fB\-\-remove\fR
+Remove the named asset instead
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
@@ -81,7 +84,7 @@ Print help
 
 .TP
 <\fIFILE\fR>
-
+The file to add (with \-\-remove: the asset\*(Aqs name)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION

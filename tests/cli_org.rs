@@ -252,3 +252,50 @@ fn org_domains_and_your_own_certificate() {
     e.ok(&["org", "domain", "remove", "comet-lab", "lab.example.org"]);
     assert!(e.ok(&["org", "domain", "list"]).contains("no domains"));
 }
+
+#[cfg(unix)]
+#[test]
+fn templates_edit_build_preview_and_announced_sites() {
+    let e = Env::new();
+    e.ok(&["org", "create", "Comet Lab"]);
+    let d = e.dir.path();
+    // edit in $EDITOR: a new name starts from the built-in look
+    std::fs::write(d.join("ed.sh"), "#!/bin/sh\nsed -i 's/Published with Muninn/Made by comets/' \"$1\"\n").unwrap();
+    let edit = |args: &[&str]| {
+        let o = e.cmd().env("EDITOR", format!("sh {}", d.join("ed.sh").display())).args(args).output().unwrap();
+        assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    };
+    edit(&["org", "template", "edit", "comet-lab", "fresh"]);
+    let shown = json(&e.ok(&["org", "template", "show", "comet-lab", "fresh", "--json"]));
+    assert!(shown["template"]["html"].as_str().unwrap().contains("Made by comets"));
+    assert!(!shown["template"]["css"].as_str().unwrap().is_empty());
+
+    // a build step: asks first (refused without --yes), then replaces the files
+    let src = d.join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    std::fs::write(src.join("page.html"), "<main>{{content}}</main>").unwrap();
+    let cmd = "mkdir -p build && cp page.html build/index.html && printf x > build/app.js";
+    e.ok(&["org", "template", "build", "comet-lab", "fresh", "--cmd", cmd, "--src", src.to_str().unwrap(), "--no-run"]);
+    let refused = e.run(&["org", "template", "build", "comet-lab", "fresh"]);
+    assert!(!refused.status.success() && String::from_utf8_lossy(&refused.stderr).contains("run `mkdir"), "{refused:?}");
+    e.ok(&["--yes", "org", "template", "build", "comet-lab", "fresh"]);
+    e.ok(&["org", "template", "build", "comet-lab", "fresh"]);
+    let shown = json(&e.ok(&["org", "template", "show", "comet-lab", "fresh", "--json"]));
+    assert_eq!(shown["template"]["html"], "<main>{{content}}</main>");
+    assert_eq!(shown["assets"][0]["name"], "app.js");
+    assert_eq!(shown["build_approved"], true);
+    e.ok(&["org", "template", "asset", "comet-lab", "fresh", "app.js", "--remove"]);
+    e.ok(&["org", "template", "build", "comet-lab", "fresh", "--clear"]);
+    assert_eq!(json(&e.ok(&["org", "template", "show", "comet-lab", "fresh", "--json"]))["template"]["build_cmd"], Value::Null);
+
+    // a preview link without a running host is a path to open once it runs
+    let p = e.ok(&["org", "template", "preview", "comet-lab", "fresh"]);
+    assert!(p.trim().starts_with("/o/comet-lab/_preview/"), "{p}");
+
+    // nothing announced yet; announcing needs a running site
+    assert_eq!(json(&e.ok(&["org", "sites", "--json"])), serde_json::json!([]));
+    assert!(!e.run(&["org", "announce"]).status.success());
+
+    e.ok(&["--yes", "org", "template", "remove", "comet-lab", "fresh"]);
+    assert!(!e.run(&["org", "template", "show", "comet-lab", "fresh"]).status.success());
+}

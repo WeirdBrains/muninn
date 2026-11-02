@@ -80,7 +80,22 @@ mnnn\-org\-template\-save(1)
 Save a template (placeholders: {{title}} {{org.name}} {{org.description}} {{content}} {{css}} {{assets}} {{base}})
 .TP
 mnnn\-org\-template\-asset(1)
-Add an asset (image, font, script, style) to a template
+Add an asset (image, font, script, style) to a template, or remove one with \-\-remove
+.TP
+mnnn\-org\-template\-show(1)
+A template\*(Aqs HTML, CSS, files and build step
+.TP
+mnnn\-org\-template\-edit(1)
+Edit a template\*(Aqs HTML (or \-\-css) in $VISUAL/$EDITOR; a new name starts from the built\-in look
+.TP
+mnnn\-org\-template\-remove(1)
+Remove a template (orgs using it go back to the built\-in look)
+.TP
+mnnn\-org\-template\-build(1)
+Set a template\*(Aqs build step and run it (asks before a new or changed command)
+.TP
+mnnn\-org\-template\-preview(1)
+A live preview link for a template through the local host (good for an hour)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION
