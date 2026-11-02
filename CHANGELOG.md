@@ -6,6 +6,13 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+- Org site templates in the app: edit a template's HTML and CSS in the TUI (Orgs ▸ Templates, `7`) or `$EDITOR` (`mnnn org template edit ORG T [--css]`), manage its files, and use it (`u`)
+- Live template previews through the local site, good for an hour: `mnnn org template preview ORG T`, `p` / Ctrl-P
+- Build steps for compiled templates (React, Jaspr, …), run in a scratch copy and asked for on each node before a new or changed command: `mnnn org template build ORG T --cmd CMD --src DIR [--out DIR]`, `b` / `B`
+- Site announcements: a starting or stopping site tells the org's nodes, your linked nodes and (public orgs) connections where it is; `mnnn org sites`, `mnnn org announce`, the Site page
+- `mnnn org template show` and `remove`, and `asset --remove`
+
 ## [2.16.1] - 2026-11-01
 
 ### Added

@@ -22,6 +22,10 @@ Settings live under `[hosting]` in the [preferences](preferences.md): `bind`
 (`127.0.0.1`; `0.0.0.0` or `::` serves other machines), `port` (8443), `names` (extra
 names for the self-signed certificate) and `cert_days` (7).
 
+When the site starts or stops it is announced to the org's nodes, your linked nodes and
+(public orgs) your connections; `mnnn org sites` lists what others announced. See
+[org site templates](org-templates.md#announcing-the-site).
+
 ## Certificates
 
 - **Self-signed** (default): a new short-lived certificate is made at each start, for
@@ -71,6 +75,7 @@ reminds you.
 | `/o/SLUG/` | an org's page: its published artifacts and endpoints |
 | `/o/SLUG/a/ID[.FORMAT]` | an artifact: `html`, `json`, `pdf`, `docx`, `tex`, `txt` or `mnnp` as its kind allows |
 | `/o/SLUG/assets/NAME` | template assets |
+| `/o/SLUG/_preview/TOKEN/` | a template preview (2.17, an hour; see [org site templates](org-templates.md#previews)) |
 | `GET /o/SLUG/api/org`, `/api/artifacts`, `/api/endpoints` | JSON |
 | `POST /o/SLUG/api/call/ENDPOINT` | call an endpoint with a JSON body |
 

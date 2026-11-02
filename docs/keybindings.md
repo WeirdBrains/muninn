@@ -121,13 +121,15 @@ link, `p` paste a link, `s` share, `L` their items (Enter imports), `l` label, `
 disconnect (`v` checks a short code by hand); Shared `a` share, `d` unshare; Dark shards
 `e` entrust or check (Space picks nodes), `d` drop a held shard; Search Enter runs a saved search across peers; Settings
 Enter edits or toggles.
-In the organizations window: Tab / ← → / `1`–`6` change page, `g` refresh; Orgs `n` new,
+In the organizations window: Tab / ← → / `1`–`7` change page, `g` refresh; Orgs `n` new,
 Enter pick, `r` rename, `v` visibility, `o` access, `h` hosted, `m` member sign-in, `d`
 delete; Members `i` invite, Enter details, `a` approve, `x` reject, `o` role, `k` kick;
 Roles `n` new, `e` / Enter permissions, `P` all permissions, `a` / `i` apply / invite
 default, `d` remove; Resources `a` add, `p` / Enter publish, `z` archive, `d` release;
 Joined `b` browse, `A` apply, `j` join, `s` sync, `m` mirror, `l` leave; Site `S` / Enter
-start or stop, `X` stop, `e` ACME.
+start or stop, `X` stop, `A` announce, `e` ACME; Templates `n` new, `e` / Enter edit HTML,
+`c` edit CSS (Ctrl-S save, Ctrl-P preview, Esc leave), `a` add file, `x` remove file, `b`
+build step, `B` build, `p` preview, `u` use, `d` delete.
 In the reviews window: `1`–`3` / Tab / ← → change page, `g` refresh; My reviews `n`
 new, Enter thread, `i` link, `p` view, `H` revisions, `o` close / reopen, `d` delete;
 Thread `c` comment, `e` suggest, `h` highlight, `v` vote, `r` reply, `a` / `x` accept /

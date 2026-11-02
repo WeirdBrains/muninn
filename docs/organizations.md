@@ -141,6 +141,10 @@ Orgs can be published as a web site (HTML, JSON and gRPC) over HTTPS; see
 A template fills `{{title}}`, `{{org.name}}`, `{{org.description}}`, `{{org.slug}}`,
 `{{base}}`, `{{assets}}`, `{{css}}` and `{{content}}`.
 
+Since 2.17 templates are also edited, previewed and built in the app (`mnnn org template
+edit/preview/build`, Orgs ▸ Templates), and a site that opens is announced to the org's
+nodes: see [org site templates](org-templates.md).
+
 ## Designed with reviews in mind
 
 Roles, ranks, published states and the history of who did what are the pieces

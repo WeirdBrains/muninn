@@ -200,6 +200,7 @@ const docPages = [
   ('Pipelines', 'pipelines.md'),
   ('Rules', 'rules.md'),
   ('Organizations and hosting', 'org-hosting.md'),
+  ('Org site templates', 'org-templates.md'),
   ('Network and sync', 'network.md'),
   ('Encryption', 'encryption.md'),
   ('Themes', 'themes.md'),
