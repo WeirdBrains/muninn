@@ -13,6 +13,7 @@ pub mod man;
 mod misc;
 mod models;
 mod net;
+mod notify;
 mod org;
 mod pipeline;
 mod projects;
@@ -136,6 +137,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Net(c) => net::run(&ctx, c),
         Command::Org(c) => org::run(&ctx, c),
         Command::Review(c) => review::run(&ctx, c),
+        Command::Notify(c) => notify::run(&ctx, c),
         Command::Share(a) => misc::share(&ctx, a),
         Command::Pipe(a) => code::pipe(&ctx, a),
         Command::Pipeline(c) => pipeline::run(&ctx, c),

@@ -1,0 +1,108 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-notify 1  "mnnn-notify 2.17.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-notify \- Notifications: what built\-in events, rule sets (`then notify`) and broadcasts from other nodes tell you; read, unread and muted by kind. Synced to linked nodes
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn notify\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Notifications: what built\-in events, rule sets (`then notify`) and broadcasts from other nodes tell you; read, unread and muted by kind. Synced to linked nodes
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH NOTES
+.PP
+Built\-in events notify you: exchange requests, org applications, review comments, suggestions and votes from peers, sync conflicts, org code syncs and broadcasts. A rule set's `notify TITLE [body=..] [link=..] [level=info|warn|error]` makes one too, and each notification is itself a `notification` action rules can trigger on. Links point at context: review:ID, org:ID, journal:ID, project:ID, search:ID, rule:ID, action:ID. `mnnn help notifications` has the guide.
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-notify\-list(1)
+Notifications, newest first
+.TP
+mnnn\-notify\-show(1)
+Show one (id or unique prefix) and mark it read
+.TP
+mnnn\-notify\-read(1)
+Mark one, or all, read
+.TP
+mnnn\-notify\-unread(1)
+Mark one unread again
+.TP
+mnnn\-notify\-send(1)
+Send yourself one (handy in scripts)
+.TP
+mnnn\-notify\-kinds(1)
+The built\-in kinds and whether each is muted
+.TP
+mnnn\-notify\-mute(1)
+Stop a built\-in kind from notifying
+.TP
+mnnn\-notify\-unmute(1)
+Let a muted kind notify again
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.17.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

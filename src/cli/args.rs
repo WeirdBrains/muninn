@@ -109,6 +109,10 @@ pub enum Command {
     /// entry, journal, project, live search or record; accept, reject and merge what they say.
     #[command(subcommand, alias = "reviews", after_long_help = REVIEW_NOTES)]
     Review(ReviewCommand),
+    /// Notifications: what built-in events, rule sets (`then notify`) and broadcasts from
+    /// other nodes tell you; read, unread and muted by kind. Synced to linked nodes.
+    #[command(subcommand, alias = "notifications", after_long_help = NOTIFY_NOTES)]
+    Notify(NotifyCommand),
     /// Share anything shareable to anything that takes shares: a project, a journal (a new
     /// entry about it), a code space (a model or records search as its input; --run runs
     /// it) or your exchanges (`net`).
@@ -639,6 +643,67 @@ pub enum AuthorCommand {
         #[arg(long, conflicts_with = "author")]
         none: bool,
     },
+}
+
+pub const NOTIFY_NOTES: &str = "\
+Built-in events notify you: exchange requests, org applications, review comments, \
+suggestions and votes from peers, sync conflicts, org code syncs and broadcasts. A rule \
+set's `notify TITLE [body=..] [link=..] [level=info|warn|error]` makes one too, and each \
+notification is itself a `notification` action rules can trigger on. Links point at \
+context: review:ID, org:ID, journal:ID, project:ID, search:ID, rule:ID, action:ID. \
+`mnnn help notifications` has the guide.";
+
+/// Notification commands.
+#[derive(Debug, Subcommand)]
+pub enum NotifyCommand {
+    /// Notifications, newest first.
+    #[command(alias = "ls")]
+    List {
+        /// Only unread ones.
+        #[arg(long, short = 'u')]
+        unread: bool,
+        /// Show at most this many.
+        #[arg(long, short = 'n', default_value_t = 50)]
+        limit: usize,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show one (id or unique prefix) and mark it read.
+    Show {
+        id: String,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Mark one, or all, read.
+    Read {
+        id: Option<String>,
+        #[arg(long, conflicts_with = "id")]
+        all: bool,
+    },
+    /// Mark one unread again.
+    Unread { id: String },
+    /// Send yourself one (handy in scripts).
+    Send {
+        title: String,
+        #[arg(long, default_value = "")]
+        body: String,
+        #[arg(long)]
+        link: Option<String>,
+        #[arg(long, default_value = "info", value_parser = ["info", "warn", "error"])]
+        level: String,
+    },
+    /// The built-in kinds and whether each is muted.
+    Kinds {
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Stop a built-in kind from notifying.
+    Mute { kind: String },
+    /// Let a muted kind notify again.
+    Unmute { kind: String },
 }
 
 #[derive(Debug, Subcommand)]
