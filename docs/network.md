@@ -114,7 +114,8 @@ the TUI the Search page runs a saved [live search](live-searches.md) across the 
 ## The Net menu
 
 Node ▸ (Status… `K`, Start node, Stop node, Settings…) · Connections… · Invites… ·
-Invite or connect… · Nodes… · Peers… · Relays… · Shared data… · Network search… · Dark shards ▸ (Held &
+Invite or connect… · Nodes… · Peers… · Peers, messages & live… (`W`, its own window: see
+[live collaboration](collaboration.md)) · Relays… · Shared data… · Network search… · Dark shards ▸ (Held &
 entrusted…, Entrust…)
 
 All open one window with ten pages: Tab (or ← →, or `1`–`9`, `0` for the tenth) moves

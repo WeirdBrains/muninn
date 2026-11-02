@@ -205,6 +205,7 @@ const docPages = [
   ('Org site templates', 'org-templates.md'),
   ('Notifications', 'notifications.md'),
   ('Network and sync', 'network.md'),
+  ('Live collaboration', 'collaboration.md'),
   ('Encryption', 'encryption.md'),
   ('Themes', 'themes.md'),
 ];

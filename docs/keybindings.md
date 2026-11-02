@@ -102,6 +102,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `G` | the [organizations](organizations.md) window |
 | `V` | the [reviews](reviews.md) window |
 | `!` | the [notifications](notifications.md) window (or click the header bell) |
+| `W` | the [peers](collaboration.md) window: peers, messages and live sessions |
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a

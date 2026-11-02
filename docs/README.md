@@ -48,6 +48,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Deploying a relay](deploy-relay.md): a public relay node on a droplet: DNS, systemd, firewall, ACME
 - [Org hosting](org-hosting.md): HTTPS sites with HTML, JSON and gRPC, signed member requests, Let's Encrypt
 - [Notifications](notifications.md): the header bell, `mnnn notify`, rule-set notify and broadcast actions, node broadcasts
+- [Live collaboration and peers](collaboration.md): messages, live editing with cursors, the peers view, running a peer's executables
 - [Org site templates](org-templates.md): edit, preview and build an org site's look; site announcements
 
 ## Getting data in and out

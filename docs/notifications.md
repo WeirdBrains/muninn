@@ -18,6 +18,7 @@ history step.
   | `org.code.sync` | an org's code arrived and needs your approval |
   | `notify` | Muninn warns you (for example, certificates expiring or failing to renew) |
   | `net.broadcast` | another node sent a broadcast |
+  | `net.message` | another node sent you a [message](collaboration.md#messages) |
 
   Your own actions don't notify you. Network events only notify when they come from
   another node. You can mute any built-in kind with `mnnn notify mute KIND`, or with `m`

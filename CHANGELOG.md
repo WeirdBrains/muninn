@@ -6,6 +6,14 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+- Live collaboration between nodes that exchanged keys (see `docs/collaboration.md`):
+  - messages, direct or about an item (`mnnn msg`), kept on both sides, retried until delivered, and notifying as `net.message`
+  - live editing of entries, journals, code spaces and records (`mnnn live`); edits merge without loss, and presence and cursors are shared
+  - the peers view (`mnnn peers`, `W` in the TUI): what each peer shares, live sessions you're invited to, org executables and sites
+  - running a peer's org executables with its role checks (`mnnn peers run`), with the output streamed back in chunks
+- `muninn.live.v1` protobuf messages (`proto/muninn/live/v1/live.proto`), carried over the existing key-exchange connection behind one transport boundary
+
 ## [2.18.0] - 2026-11-02
 
 ### Added
