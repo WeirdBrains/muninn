@@ -31,7 +31,7 @@ Muninn 2.0 adds the next big feature set: Authorship, Action History, Live Searc
 | 21 | [Announcement](#announcement): the 2.0 launch post | 2.0 | 📋 Planned |
 | 22 | [Org Site Templates in the App](#org-site-templates-in-the-app): edit in-app, optional build step, announced sites | v2.17.0 | ✅ Released |
 | 23 | [Notifications](#notifications): rule-set triggers, a header bell, node broadcasts | v2.18.0 | ✅ Released |
-| 24 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | post-2.0 | 📋 Planned |
+| 24 | [Live Collaboration and Peers](#live-collaboration-and-peers): after the launch: real-time editing, messages and execution between connections; a peers view | v2.19.0 | 🚧 In progress |
 | 25 | [MCP](#mcp): Muninn as an MCP server; external MCP servers for rule sets | post-2.0 | 📋 Planned |
 | — | 2.0 launch wrap-up | — | 📋 Planned |
 
@@ -431,7 +431,7 @@ Today templates are saved from files with the CLI only (`mnnn org template save/
 4. Rule sets can call an external server's tools as actions (`mcp SERVER TOOL args…`) and use them as data sources in conditions, asking before the first call of each tool
 
 
-> **Phase 22 · after the 2.0 launch**
+> **Phase 22 · v2.19.0 · 🚧 In progress**
 
 1. Real-time collaboration between key-exchanged connections over a gRPC bidirectional stream with protobuf messages (`muninn.live.v1`), end-to-end encrypted with the exchange keys
 2. Real-time collaborative editing of entries, journals, code and records (operations merged without loss; presence and cursors)
