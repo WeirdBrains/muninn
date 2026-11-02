@@ -96,6 +96,7 @@ pub enum Action {
     ReviewThread,
     ReviewsJoined,
     Notifications,
+    Peers,
     // View
     NewTile(ViewKind),
     SplitRight,
@@ -211,6 +212,7 @@ impl Action {
             ReviewThread => "review.thread".into(),
             ReviewsJoined => "review.joined".into(),
             Notifications => "notifications".into(),
+            Peers => "peers".into(),
             Quit => "quit".into(),
             NewTile(v) => format!("tile.new.{}", if v == ViewKind::List { "list" } else { "chart" }),
             SplitRight => "tile.split-right".into(),

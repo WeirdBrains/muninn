@@ -190,6 +190,7 @@ pub fn menus() -> Vec<Menu> {
                 a("Invite or connect…", 'i', "", NetInvite),
                 a("Nodes…", 'o', "", NetExchanges),
                 a("Peers…", 'p', "", NetPeers),
+                a("Peers, messages & live…", 'l', "W", Peers),
                 a("Relays…", 'r', "", NetRelays),
                 sep(),
                 a("Shared data…", 'd', "", NetShared),

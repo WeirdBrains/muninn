@@ -23,6 +23,7 @@ pub mod models;
 pub mod network;
 mod notifications;
 pub mod orgs;
+pub mod peers;
 pub mod picker;
 pub mod pipes;
 pub mod projects;
@@ -161,6 +162,7 @@ pub struct App {
     pub network: network::NetState,
     pub orgs: orgs::OrgsState,
     pub reviews: reviews::ReviewsState,
+    pub peers: peers::PeersState,
     pub notifications: notifications::NotifState,
     pub code: code::CodeState,
     pub pipes: pipes::PipesState,
@@ -214,6 +216,7 @@ impl App {
             network: Default::default(),
             orgs: Default::default(),
             reviews: Default::default(),
+            peers: Default::default(),
             notifications: Default::default(),
             code: Default::default(),
             pipes: Default::default(),
@@ -324,6 +327,7 @@ impl App {
             KeyCode::Char('K') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::NetStatus),
             KeyCode::Char('G') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Orgs),
             KeyCode::Char('V') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reviews),
+            KeyCode::Char('W') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Peers),
             KeyCode::Char('!') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Notifications),
             KeyCode::Char('C') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Code),
             KeyCode::Char('D') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Models),
@@ -439,6 +443,7 @@ impl App {
             OrgSite => orgs::open(self, orgs::Tab::Site),
             Reviews => reviews::open(self, reviews::Tab::Reviews),
             Notifications => notifications::open(self),
+            Peers => peers::open(self, peers::Tab::Peers),
             ReviewNew => reviews::open_new(self),
             ReviewThread => reviews::open(self, reviews::Tab::Thread),
             ReviewsJoined => reviews::open(self, reviews::Tab::Joined),
@@ -1326,6 +1331,7 @@ impl App {
         network::poll(self);
         orgs::poll(self);
         reviews::poll(self);
+        peers::poll(self);
     }
 }
 
@@ -1341,6 +1347,8 @@ mod network_tests;
 mod notifications_tests;
 #[cfg(test)]
 mod orgs_tests;
+#[cfg(test)]
+mod peers_tests;
 #[cfg(test)]
 mod reports_tests;
 #[cfg(test)]

@@ -60,6 +60,8 @@ pub enum Modal {
     Reviews,
     /// Projects ▸ Notifications… (`!`, or a click on the header bell)
     Notifications,
+    /// Net ▸ Peers, messages & live… (`W`)
+    Peers,
     /// Data ▸ Model designer…
     Models,
     /// Export a journal, entry, report or project as a document.
@@ -129,6 +131,7 @@ impl Modal {
             Modal::Orgs => "organizations",
             Modal::Reviews => "reviews",
             Modal::Notifications => "notifications",
+            Modal::Peers => "collaboration",
             Modal::Code => "code-spaces",
             Modal::Pipes => "pipes",
             Modal::Pipelines => "pipelines",
@@ -167,6 +170,7 @@ impl Modal {
             Modal::Orgs => app.orgs.typing(),
             Modal::Reviews => app.reviews.typing(),
             Modal::Notifications => false,
+            Modal::Peers => app.peers.typing(),
             Modal::Code => app.code.typing(),
             Modal::Pipelines => app.designer.ask.is_some(),
             Modal::Models => app.models.typing(),
@@ -287,6 +291,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             Some(Modal::Orgs) => super::orgs::on_click(app, i),
             Some(Modal::Reviews) => super::reviews::on_click(app, i),
             Some(Modal::Notifications) => super::notifications::on_click(app, i),
+            Some(Modal::Peers) => super::peers::on_click(app, i),
             Some(Modal::Code) => super::code::on_click(app, i),
             Some(Modal::Models) => super::models::on_click(app, i),
             Some(Modal::DocExport) => super::docexport::on_click(app, i),
@@ -370,6 +375,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Orgs => super::orgs::on_key(app, k),
         Modal::Reviews => super::reviews::on_key(app, k),
         Modal::Notifications => super::notifications::on_key(app, k),
+        Modal::Peers => super::peers::on_key(app, k),
         Modal::Code => super::code::on_key(app, k),
         Modal::Pipes => super::pipes::on_key(app, k),
         Modal::Pipelines => super::designer::on_key(app, k),
@@ -702,6 +708,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Orgs => super::orgs::draw(app, f, r, &mut extra),
         Modal::Reviews => super::reviews::draw(app, f, r, &mut extra),
         Modal::Notifications => super::notifications::draw(app, f, r, &mut extra),
+        Modal::Peers => super::peers::draw(app, f, r, &mut extra),
         Modal::Code => super::code::draw(app, f, r, &mut extra),
         Modal::Pipes => super::pipes::draw(app, f, r, &mut extra),
         Modal::Pipelines => super::designer::draw(app, f, r, &mut extra),

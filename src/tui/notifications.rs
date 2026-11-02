@@ -57,6 +57,11 @@ pub fn follow(app: &mut App, n: &Notification) {
         }
         "peer" | "requests" => super::network::open(app, super::network::Tab::Invites),
         "sync" => super::network::open(app, super::network::Tab::Shared),
+        "messages" => {
+            app.peers.peer = Some(id.to_string());
+            super::peers::open(app, super::peers::Tab::Messages);
+        }
+        "live" => super::peers::open(app, super::peers::Tab::Live),
         "code" => super::code::open(app),
         "journal" => super::journals::open_journal(app, id),
         "project" => super::projects::open_project(app, id),
