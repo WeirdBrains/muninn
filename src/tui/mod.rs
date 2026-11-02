@@ -21,6 +21,7 @@ pub mod menu;
 pub mod modal;
 pub mod models;
 pub mod network;
+mod notifications;
 pub mod orgs;
 pub mod picker;
 pub mod pipes;
@@ -160,6 +161,7 @@ pub struct App {
     pub network: network::NetState,
     pub orgs: orgs::OrgsState,
     pub reviews: reviews::ReviewsState,
+    pub notifications: notifications::NotifState,
     pub code: code::CodeState,
     pub pipes: pipes::PipesState,
     pub frames: frametile::FramesState,
@@ -212,6 +214,7 @@ impl App {
             network: Default::default(),
             orgs: Default::default(),
             reviews: Default::default(),
+            notifications: Default::default(),
             code: Default::default(),
             pipes: Default::default(),
             frames: Default::default(),
@@ -321,6 +324,7 @@ impl App {
             KeyCode::Char('K') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::NetStatus),
             KeyCode::Char('G') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Orgs),
             KeyCode::Char('V') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Reviews),
+            KeyCode::Char('!') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Notifications),
             KeyCode::Char('C') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Code),
             KeyCode::Char('D') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Models),
             KeyCode::Char('E') if !ctrl && !alt && !self.typing() && self.modal.is_none() => Some(Action::Pipelines),
@@ -434,6 +438,7 @@ impl App {
             OrgJoined => orgs::open(self, orgs::Tab::Joined),
             OrgSite => orgs::open(self, orgs::Tab::Site),
             Reviews => reviews::open(self, reviews::Tab::Reviews),
+            Notifications => notifications::open(self),
             ReviewNew => reviews::open_new(self),
             ReviewThread => reviews::open(self, reviews::Tab::Thread),
             ReviewsJoined => reviews::open(self, reviews::Tab::Joined),
@@ -995,6 +1000,10 @@ impl App {
         if let Ok(Some(a)) = self.store.current_author() {
             v.push(format!("author: {}", a.name));
         }
+        let n = self.store.unread_notifications().unwrap_or(0);
+        if n > 0 {
+            v.push(notifications::bell(n));
+        }
         v
     }
 
@@ -1011,6 +1020,10 @@ impl App {
         let [head, bar, body, bottom] =
             Layout::vertical([Constraint::Length(hh), Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)]).areas(area);
         header::draw(f, head, &t, &self.status_items());
+        if self.store.unread_notifications().unwrap_or(0) > 0 {
+            // the bell: a click on the header opens the notifications
+            self.hits.push((head, Hit::Press(KeyCode::Char('!'))));
+        }
         let mut hits = std::mem::take(&mut self.hits);
         let xs = menu::draw_bar(&self.menu, f, bar, &t, &mut hits);
         let main = if self.prefs.tui.history_open && body.width >= 60 + history::WIDTH {
@@ -1324,6 +1337,8 @@ mod frames_tests;
 mod models_tests;
 #[cfg(test)]
 mod network_tests;
+#[cfg(test)]
+mod notifications_tests;
 #[cfg(test)]
 mod orgs_tests;
 #[cfg(test)]

@@ -134,6 +134,11 @@ pub fn describe_link(store: &Store, link: &str) -> String {
         "requests" => "network requests".into(),
         "sync" => "sync conflicts".into(),
         "code" => "code spaces".into(),
+        "journal" => store.journal(id).ok().flatten().map(|j| format!("journal {}", j.name)).unwrap_or_else(|| format!("journal {id}")),
+        "project" => store.project(id).ok().flatten().map(|p| format!("project {}", p.name)).unwrap_or_else(|| format!("project {id}")),
+        "rule" => store.rule(id).ok().flatten().map(|r| format!("rule {}", r.name)).unwrap_or_else(|| format!("rule {id}")),
+        "search" => store.live_search(id).ok().flatten().map(|s| format!("live search {}", s.name)).unwrap_or_else(|| format!("live search {id}")),
+        "action" => format!("history #{id}"),
         other => other.to_string(),
     }
 }

@@ -161,6 +161,7 @@ pub fn menus() -> Vec<Menu> {
                     ],
                 ),
                 sep(),
+                a("Notifications…", 'n', "!", Notifications),
                 a("Rules…", 'u', "R", Rules),
                 a("Code spaces…", 'c', "C", Code),
                 a("Pipes (live)…", 'e', "", Pipes),
