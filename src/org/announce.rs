@@ -185,6 +185,18 @@ pub fn bind_of(addr: &str, fallback: &str) -> String {
     addr.parse::<std::net::SocketAddr>().map(|a| a.ip().to_string()).unwrap_or_else(|_| fallback.to_string())
 }
 
+/// Would announcing from a host at `addr` reach anyone? (A hosted org with an address others
+/// can open, and someone to tell.) Saves starting a node for nothing.
+pub fn worth_it(s: &Store, hosting: &crate::prefs::HostingPrefs, external: &[String], addr: &str, open: bool) -> Result<bool> {
+    for org in s.orgs()?.into_iter().filter(|o| o.hosted) {
+        let reach = !open || !urls(s, &org, &bind_of(addr, &hosting.bind), port_of(addr, hosting.port), &hosting.names, external)?.is_empty();
+        if reach && !targets(s, &org)?.is_empty() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 /// Announce every hosted org's site as open (or closed) from a host listening at `addr`.
 pub fn announce_hosted(
     s: &Store,

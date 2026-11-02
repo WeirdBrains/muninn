@@ -228,3 +228,68 @@ fn org_settings_add_domains_and_set_or_replace_the_certificate() {
     assert_eq!(tls::status(&a.store, &o).unwrap().source, tls::SELF_SIGNED, "ACME has no certificate yet");
     assert!(kinds(&a).iter().any(|k| k == "org.cert.clear"));
 }
+
+#[test]
+fn templates_tab_edits_previews_builds_and_uses_a_template() {
+    let (_t, mut a) = app();
+    a.on_key(key(KeyCode::Char('G')));
+    a.on_key(key(KeyCode::Char('n')));
+    typ(&mut a, "Comet Lab\n");
+    let o = a.store.find_org("comet-lab").unwrap();
+    a.on_key(key(KeyCode::Char('7')));
+    assert_eq!(a.orgs.tab, Tab::Templates);
+    assert!(screen_text(&mut a).contains("no templates yet"));
+
+    // n: a new template from the built-in look, straight into the editor
+    a.on_key(key(KeyCode::Char('n')));
+    typ(&mut a, "draft\n");
+    assert!(a.orgs.tedit.is_some());
+    assert!(screen_text(&mut a).contains("Templates · draft · HTML"));
+    typ(&mut a, "<!-- hi -->\n");
+    assert!(screen_text(&mut a).contains("modified"));
+    // Esc with changes warns first; Ctrl-S saves
+    a.on_key(key(KeyCode::Esc));
+    assert!(a.orgs.tedit.is_some());
+    a.on_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL));
+    let t = a.store.find_template(&o.id, "draft").unwrap();
+    assert!(t.html.starts_with("<!-- hi -->"), "{}", t.html);
+    // Ctrl-P: a preview link (the site is not running: the path to open)
+    a.on_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    assert!(a.orgs.detail[0].contains("/o/comet-lab/_preview/"), "{:?}", a.orgs.detail);
+    a.on_key(key(KeyCode::Esc));
+    assert!(a.orgs.tedit.is_none());
+    assert!(screen_text(&mut a).contains("draft"));
+
+    // c edits the CSS
+    a.on_key(key(KeyCode::Char('c')));
+    assert!(screen_text(&mut a).contains("· CSS"));
+    a.on_key(key(KeyCode::Esc));
+
+    // u uses it, again goes back to the built-in look
+    a.on_key(key(KeyCode::Char('u')));
+    assert_eq!(a.store.find_org("comet-lab").unwrap().template_id.as_deref(), Some(t.id.as_str()));
+    assert!(screen_text(&mut a).contains("(in use)"));
+
+    // a build step asks before its first run
+    let src = tempfile::tempdir().unwrap();
+    std::fs::write(src.path().join("index.html"), "<p>{{content}}</p>").unwrap();
+    a.on_key(key(KeyCode::Char('b')));
+    #[cfg(unix)]
+    let cmd = "mkdir -p build && cp index.html build/";
+    #[cfg(windows)]
+    let cmd = "mkdir build && copy index.html build\\";
+    typ(&mut a, &format!("{} | {cmd}\n", src.path().display()));
+    assert!(a.store.find_template(&o.id, "draft").unwrap().build_cmd.is_some());
+    a.on_key(key(KeyCode::Char('B')));
+    assert!(a.orgs.msg.as_ref().unwrap().0.contains("y/n"));
+    a.on_key(key(KeyCode::Char('y')));
+    settle(&mut a);
+    assert_eq!(a.store.find_template(&o.id, "draft").unwrap().html, "<p>{{content}}</p>");
+    assert!(kinds(&a).contains(&"org.template.build".to_string()));
+
+    // d removes it after y
+    a.on_key(key(KeyCode::Char('d')));
+    a.on_key(key(KeyCode::Char('y')));
+    assert!(a.store.templates(&o.id).unwrap().is_empty());
+    assert_eq!(a.store.find_org("comet-lab").unwrap().template_id, None);
+}

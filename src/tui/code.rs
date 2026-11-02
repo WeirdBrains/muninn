@@ -77,7 +77,7 @@ pub struct Editor {
     pub top: usize,
 }
 
-fn byte_at(s: &str, col: usize) -> usize {
+pub(crate) fn byte_at(s: &str, col: usize) -> usize {
     s.char_indices().nth(col).map(|(i, _)| i).unwrap_or(s.len())
 }
 

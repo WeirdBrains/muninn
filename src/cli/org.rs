@@ -1070,6 +1070,12 @@ pub(super) fn report_announce(ctx: &Ctx, o: &Org, r: &org::announce::Report) {
 
 /// Announce every hosted site from a host at `addr` (best effort).
 pub(super) fn announce_all(ctx: &Ctx, s: &Store, node: &crate::net::node::Node, prefs: &crate::prefs::Preferences, addr: &str, open: bool) {
+    if !org::announce::worth_it(s, &prefs.hosting, &prefs.net.external_addresses, addr, open).unwrap_or(false) {
+        if open {
+            ctx.io.note("sites not announced: none is reachable from elsewhere with anyone to tell (`mnnn help org-hosting`)");
+        }
+        return;
+    }
     match org::announce::announce_hosted(s, node, &prefs.hosting, &prefs.net.external_addresses, addr, open, &prefs.net.relays) {
         Ok(v) => v.iter().for_each(|(o, r)| report_announce(ctx, o, r)),
         Err(e) => ctx.io.warn(format!("sites not announced: {e}")),
@@ -1131,7 +1137,11 @@ fn host_cmd(ctx: &Ctx, cmd: OrgHostCommand) -> anyhow::Result<()> {
                 println!("ACME challenges on http://{a}/");
             }
             let mut n = n;
-            let node_ok = n.node().is_ok();
+            let node_ok = org::announce::worth_it(&n.store, &n.prefs.hosting, &n.prefs.net.external_addresses, &st.addr, true).unwrap_or(false)
+                && n.node().is_ok();
+            if !node_ok {
+                ctx.io.note("sites not announced: none is reachable from elsewhere with anyone to tell (`mnnn help org-hosting`)");
+            }
             if node_ok {
                 announce_all(ctx, &n.store, n.node.as_ref().expect("node"), &n.prefs, &st.addr, true);
             }

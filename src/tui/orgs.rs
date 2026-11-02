@@ -1,6 +1,7 @@
-//! Orgs ▸ … (G): my orgs, their members, roles and resources, the orgs I joined
-//! and the site. Thin over [`crate::org`]; anything that talks to other nodes runs on a
+//! Orgs ▸ … (G): my orgs, their members, roles and resources, the orgs I joined,
+//! the site (with the sites other nodes announced) and the site templates. Thin over [`crate::org`]; anything that talks to other nodes runs on a
 //! worker thread so the window stays usable.
+use super::code::{Editor, byte_at};
 use super::workspace::{Ask, Typed, View, ask_key, draw_view, muted, record, row_style};
 use super::{App, Hit};
 use crate::net::{Node, client, identity, local};
@@ -8,11 +9,12 @@ use crate::org::host::{self, Acme, Host, HostOptions};
 use crate::org::net as onet;
 use crate::org::{self, Actor, Leftovers};
 use crate::store::{
-    Access, Joined, Member, MemberStatus, Mirror, Org, OrgChange, Published, Resource, ResourceState, Role, ShareKind, Store, Visibility,
+    Access, Joined, Member, MemberStatus, Mirror, Org, OrgChange, Published, Resource, ResourceState, Role, ShareKind, Store, Template,
+    TemplateAsset, Visibility,
 };
 use libp2p::identity::Keypair;
 use ratatui::Frame;
-use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -22,7 +24,7 @@ use std::time::{Duration, Instant};
 const ORIGIN: &str = "tui";
 const OWNER: Actor = Actor::Owner;
 
-/// The window's pages (Tab / ← → / 1-6 switch).
+/// The window's pages (Tab / ← → / 1-7 switch).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tab {
     #[default]
@@ -32,10 +34,11 @@ pub enum Tab {
     Resources,
     Joined,
     Site,
+    Templates,
 }
 
 impl Tab {
-    pub const ALL: [Tab; 6] = [Tab::Orgs, Tab::Members, Tab::Roles, Tab::Resources, Tab::Joined, Tab::Site];
+    pub const ALL: [Tab; 7] = [Tab::Orgs, Tab::Members, Tab::Roles, Tab::Resources, Tab::Joined, Tab::Site, Tab::Templates];
     pub fn title(self) -> &'static str {
         match self {
             Tab::Orgs => "Organizations",
@@ -44,6 +47,7 @@ impl Tab {
             Tab::Resources => "Resources",
             Tab::Joined => "Joined",
             Tab::Site => "Site",
+            Tab::Templates => "Templates",
         }
     }
     fn index(self) -> usize {
@@ -72,6 +76,14 @@ pub enum OAsk {
     Cert,
     /// Let's Encrypt for an org (`on [email]`, `off`).
     OrgAcme,
+    /// 2.17: a new template's name.
+    NewTemplate,
+    /// A file for the selected template (`PATH [NAME]`).
+    AddAsset,
+    /// Remove one of the selected template's files (its name).
+    RemoveAsset,
+    /// The selected template's build step (`FOLDER | COMMAND [| OUTPUT]`, or `clear`).
+    BuildStep,
 }
 
 /// Something that needs `y` first.
@@ -81,6 +93,27 @@ pub enum Confirm {
     RemoveRole(String),
     Release(String),
     Leave(String),
+    /// 2.17: a template.
+    RemoveTemplate(String),
+    /// Run a template's new or changed build command.
+    Build(String),
+}
+
+/// A template being edited in the window (HTML or CSS).
+pub struct TemplateEdit {
+    pub template: String,
+    pub name: String,
+    pub css: bool,
+    pub ed: Editor,
+    pub saved: String,
+    /// Esc once more leaves without saving.
+    pub leaving: bool,
+}
+
+impl TemplateEdit {
+    pub fn dirty(&self) -> bool {
+        self.ed.text().trim_end() != self.saved.trim_end()
+    }
 }
 
 pub struct Job {
@@ -105,6 +138,12 @@ pub struct OrgsState {
     pub resources: Vec<Resource>,
     pub joined: Vec<Joined>,
     pub mirrors: Vec<Mirror>,
+    /// 2.17: the current org's templates (and the selected one's files), and the sites
+    /// other nodes announced.
+    pub templates: Vec<Template>,
+    pub assets: Vec<TemplateAsset>,
+    pub announced: Vec<(crate::store::SiteAnnouncement, org::announce::SiteCard)>,
+    pub tedit: Option<TemplateEdit>,
     /// The site this TUI serves.
     pub host: Option<Host>,
     last_status: Option<Instant>,
@@ -112,7 +151,7 @@ pub struct OrgsState {
 
 impl OrgsState {
     pub fn typing(&self) -> bool {
-        self.ask.is_some()
+        self.ask.is_some() || self.tedit.is_some()
     }
     pub fn current(&self) -> Option<&Org> {
         let id = self.org.as_deref()?;
@@ -161,7 +200,15 @@ fn reload(app: &mut App) {
     st.resources = s.resources(&id).unwrap_or_default();
     st.joined = s.joined().unwrap_or_default();
     st.mirrors = s.mirrors().unwrap_or_default();
+    st.templates = s.templates(&id).unwrap_or_default();
+    st.announced = org::announce::received(s).unwrap_or_default();
     let n = rows(app);
+    app.orgs.sel = app.orgs.sel.min(n.saturating_sub(1));
+    let st = &mut app.orgs;
+    st.assets = match (st.tab, st.templates.get(st.sel)) {
+        (Tab::Templates, Some(t)) => app.store.template_assets(&t.id).unwrap_or_default(),
+        _ => vec![],
+    };
     app.orgs.sel = app.orgs.sel.min(n.saturating_sub(1));
 }
 
@@ -174,6 +221,7 @@ fn rows(app: &App) -> usize {
         Tab::Resources => st.resources.len(),
         Tab::Joined => st.joined.len(),
         Tab::Site => 0,
+        Tab::Templates => st.templates.len(),
     }
 }
 
@@ -206,6 +254,52 @@ fn spawn(app: &mut App, what: &str, f: impl FnOnce(&Store, &Node, &Keypair) -> c
     });
     app.orgs.job = Some(Job { what: what.to_string(), rx });
     ok(app, format!("{what}… (the window stays usable)"));
+}
+
+/// Run local work (a template build) on a worker thread with its own store connection.
+fn spawn_local(app: &mut App, what: &str, f: impl FnOnce(&Store) -> crate::Result<Vec<String>> + Send + 'static) {
+    if app.orgs.job.is_some() {
+        return err(app, "still working on the last request");
+    }
+    let (db, dek) = (app.paths.db.clone(), app.dek.clone());
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let r = Store::open(&db, Some(&dek.0)).and_then(|s| f(&s));
+        let _ = tx.send(r.map_err(|e| e.to_string()));
+    });
+    app.orgs.job = Some(Job { what: what.to_string(), rx });
+    ok(app, format!("{what}… (the window stays usable)"));
+}
+
+/// Tell the org's nodes, linked nodes and (public orgs) connections that the hosted sites
+/// opened or closed (2.17), on a worker thread.
+fn announce_sites(app: &mut App, addr: String, open: bool) {
+    if app.orgs.job.is_some() {
+        return;
+    }
+    let (hosting, external, relays) = (app.prefs.hosting.clone(), app.prefs.net.external_addresses.clone(), app.prefs.net.relays.clone());
+    if !org::announce::worth_it(&app.store, &hosting, &external, &addr, open).unwrap_or(false) {
+        app.orgs.detail = vec!["not announced: no hosted org is reachable from elsewhere with anyone to tell (see Help ▸ org hosting)".into()];
+        return;
+    }
+    spawn(app, if open { "announcing the site" } else { "announcing the site closed" }, move |s, n, _| {
+        let mut l = vec![];
+        for (o, r) in org::announce::announce_hosted(s, n, &hosting, &external, &addr, open, &relays)? {
+            l.push(match (&r.skipped, r.sent.len()) {
+                (Some(why), _) => format!("{} not announced: {why}", o.name),
+                (None, n) => format!(
+                    "{} announced {} to {n} node(s){}",
+                    o.name,
+                    if open { "open" } else { "closed" },
+                    if r.failed.is_empty() { String::new() } else { format!(", {} unreachable", r.failed.len()) }
+                ),
+            });
+        }
+        if l.is_empty() {
+            l.push("no hosted org to announce".into());
+        }
+        Ok(l)
+    });
 }
 
 /// Between frames: take finished work, keep the site's status fresh.
@@ -269,6 +363,7 @@ pub fn start_host(app: &mut App) {
             app.set_status(format!("site at {}", st.url));
             ok(app, format!("serving at {}", st.url));
             app.orgs.host = Some(h);
+            announce_sites(app, st.addr, true);
         }
         Err(e) => err(app, format!("site: {e}")),
     }
@@ -277,11 +372,13 @@ pub fn start_host(app: &mut App) {
 /// Stop the site this TUI serves, or ask the one another process serves to stop.
 pub fn stop_host(app: &mut App) {
     if let Some(h) = app.orgs.host.take() {
+        let addr = h.status().addr;
         h.stop();
         host::clear(&app.paths.home);
         record(app, "org.host.stop", "site stopped".into(), serde_json::json!({}));
         app.set_status("site stopped");
         ok(app, "site stopped");
+        announce_sites(app, addr, false);
     } else if let Some(f) = host::running(&app.paths.home) {
         match host::request_stop(&app.paths.home) {
             Ok(()) => ok(app, format!("asked the site at {} to stop", f.url)),
@@ -332,6 +429,96 @@ fn sel_member(app: &App) -> Option<(Org, Member)> {
 
 fn sel_role(app: &App) -> Option<(Org, Role)> {
     Some((app.orgs.current()?.clone(), app.orgs.roles.get(app.orgs.sel)?.clone()))
+}
+
+fn sel_template(app: &App) -> Option<(Org, Template)> {
+    Some((app.orgs.current()?.clone(), app.orgs.templates.get(app.orgs.sel)?.clone()))
+}
+
+/// Open the in-window editor on a template's HTML or CSS.
+fn edit_template(app: &mut App, t: &Template, css: bool) {
+    let text = if css { &t.css } else { &t.html };
+    app.orgs.tedit =
+        Some(TemplateEdit { template: t.id.clone(), name: t.name.clone(), css, ed: Editor::new(text), saved: text.clone(), leaving: false });
+    ok(app, format!("editing {} of {}: Ctrl-S saves, Ctrl-P previews, Esc leaves", if css { "the CSS" } else { "the HTML" }, t.name));
+}
+
+fn save_edit(app: &mut App) {
+    let Some(o) = app.orgs.current().cloned() else { return };
+    let Some(te) = app.orgs.tedit.as_ref() else { return };
+    let Ok(Some(t)) = app.store.template(&te.template) else { return err(app, "that template is gone") };
+    let text = te.ed.text();
+    let (html, css) = if te.css { (t.html.as_str(), text.as_str()) } else { (text.as_str(), t.css.as_str()) };
+    match org::save_template(&app.store, ORIGIN, &OWNER, &o, &t.name, html, css) {
+        Ok(t) => {
+            if let Some(te) = app.orgs.tedit.as_mut() {
+                te.saved = text.clone();
+                te.leaving = false;
+            }
+            app.refresh_history(true);
+            app.orgs.templates = app.store.templates(&o.id).unwrap_or_default();
+            ok(app, format!("saved {} (a preview shows it on its next load)", t.name));
+        }
+        Err(e) => err(app, e.to_string()),
+    }
+}
+
+/// A preview link for a template: through the site if it runs, else the path to open once it does.
+fn preview(app: &mut App, o: &Org, t: &Template) {
+    match org::preview(&app.store, ORIGIN, &OWNER, o, t) {
+        Ok(token) => {
+            let path = org::serve::preview_path(&o.slug, &token);
+            let served = app.orgs.host.as_ref().map(|h| h.status().url).or_else(|| host::running(&app.paths.home).map(|f| f.url));
+            let line = match served {
+                Some(u) => format!("preview of {} (an hour, live): {u}{}", t.name, path.trim_start_matches('/')),
+                None => format!("preview of {} at {path} once the site runs (S on Site starts it)", t.name),
+            };
+            app.refresh_history(true);
+            app.orgs.detail = vec![line.clone()];
+            ok(app, line);
+        }
+        Err(e) => err(app, e.to_string()),
+    }
+}
+
+fn run_build(app: &mut App, o: Org, t: Template, approve: bool) {
+    spawn_local(app, "building", move |s| {
+        let b = org::build::build(s, ORIGIN, &OWNER, &o, &t, approve)?;
+        let mut l = vec![format!("built {}: {} file(s) besides index.html", t.name, b.assets.len())];
+        l.extend(b.notes);
+        l.extend(b.log.lines().map(str::to_string));
+        Ok(l)
+    });
+}
+
+fn template_key(app: &mut App, k: KeyEvent) {
+    let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+    match k.code {
+        KeyCode::Char('s') if ctrl => save_edit(app),
+        KeyCode::Char('p') if ctrl => {
+            let Some(o) = app.orgs.current().cloned() else { return };
+            let Some(id) = app.orgs.tedit.as_ref().map(|t| t.template.clone()) else { return };
+            if let Ok(Some(t)) = app.store.template(&id) {
+                preview(app, &o, &t);
+            }
+        }
+        KeyCode::Esc => {
+            let Some(te) = app.orgs.tedit.as_mut() else { return };
+            if te.dirty() && !te.leaving {
+                te.leaving = true;
+                return ok(app, "not saved: Ctrl-S saves, Esc again leaves without saving");
+            }
+            app.orgs.tedit = None;
+            reload(app);
+            ok(app, "left the editor");
+        }
+        _ => {
+            if let Some(te) = app.orgs.tedit.as_mut() {
+                te.leaving = false;
+                te.ed.key(k, 10);
+            }
+        }
+    }
 }
 
 fn sel_resource(app: &App) -> Option<(Org, Resource)> {
@@ -481,6 +668,63 @@ fn finish_ask(app: &mut App, kind: OAsk, v: String) {
             let r = org_tls(app, kind, &o, v.trim());
             done(app, r, |m| m.clone());
         }
+        OAsk::NewTemplate => {
+            let Some(o) = app.orgs.current().cloned() else { return };
+            if v.trim().is_empty() {
+                return;
+            }
+            match org::save_template(&app.store, ORIGIN, &OWNER, &o, v.trim(), org::serve::DEFAULT_HTML, org::serve::DEFAULT_CSS) {
+                Ok(t) => {
+                    reload(app);
+                    app.orgs.sel = app.orgs.templates.iter().position(|x| x.id == t.id).unwrap_or(0);
+                    app.refresh_history(true);
+                    edit_template(app, &t, false);
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
+        OAsk::AddAsset => {
+            let Some((o, t)) = sel_template(app) else { return };
+            let w = words(&v);
+            let Some(p) = w.first() else { return };
+            let path = path_of(p);
+            let name = w.get(1).cloned().unwrap_or_else(|| path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default());
+            let r = std::fs::read(&path)
+                .map_err(|e| crate::Error::invalid("asset", format!("{p}: {e}")))
+                .and_then(|d| org::put_asset(&app.store, ORIGIN, &OWNER, &o, &t, &name, &d));
+            done(app, r, |at| format!("{name} added to {} at {at}", t.name));
+        }
+        OAsk::RemoveAsset => {
+            let Some((o, t)) = sel_template(app) else { return };
+            if v.trim().is_empty() {
+                return;
+            }
+            let r = org::remove_asset(&app.store, ORIGIN, &OWNER, &o, &t, v.trim());
+            done(app, r, |_| format!("{} removed from {}", v.trim(), t.name));
+        }
+        OAsk::BuildStep => {
+            let Some((o, t)) = sel_template(app) else { return };
+            let v = v.trim();
+            if v.is_empty() {
+                return;
+            }
+            let r = if v.eq_ignore_ascii_case("clear") {
+                org::build::configure(&app.store, ORIGIN, &OWNER, &o, &t, None)
+            } else {
+                let parts: Vec<&str> = v.split('|').map(str::trim).collect();
+                if parts.len() < 2 {
+                    return err(app, "give the folder and the command: ~/site | npm run build [| dist]");
+                }
+                let src = path_of(parts[0]);
+                let src = std::fs::canonicalize(&src).unwrap_or(src).to_string_lossy().into_owned();
+                let out = parts.get(2).copied().filter(|x| !x.is_empty());
+                org::build::configure(&app.store, ORIGIN, &OWNER, &o, &t, Some(org::build::Step { cmd: parts[1], src: &src, out }))
+            };
+            done(app, r, |t| match &t.build_cmd {
+                Some(c) => format!("{}: builds with `{c}` (B runs it)", t.name),
+                None => format!("{}: no build step", t.name),
+            });
+        }
         OAsk::Acme => {
             let a = &mut app.prefs.hosting.acme;
             if v.eq_ignore_ascii_case("off") || v.is_empty() {
@@ -525,6 +769,15 @@ fn confirmed(app: &mut App, c: Confirm) {
             let r = org::release(&app.store, ORIGIN, &OWNER, &o, &res);
             done(app, r, |r| format!("{} is no longer {}'s (it stays here)", r.name, o.name));
         }
+        Confirm::RemoveTemplate(id) => {
+            let Some((o, t)) = sel_template(app).filter(|(_, t)| t.id == id) else { return };
+            let r = org::remove_template(&app.store, ORIGIN, &OWNER, &o, &t);
+            done(app, r, |_| format!("removed template {}", t.name));
+        }
+        Confirm::Build(id) => {
+            let Some((o, t)) = sel_template(app).filter(|(_, t)| t.id == id) else { return };
+            run_build(app, o, t, true);
+        }
         Confirm::Leave(id) => {
             let Some(j) = app.orgs.joined.iter().find(|j| j.org_id == id).cloned() else { return };
             spawn(app, "leave", move |s, n, _| {
@@ -536,6 +789,9 @@ fn confirmed(app: &mut App, c: Confirm) {
 }
 
 pub fn on_key(app: &mut App, k: KeyEvent) {
+    if app.orgs.tedit.is_some() && app.orgs.ask.is_none() {
+        return template_key(app, k);
+    }
     if let Some(a) = app.orgs.ask.as_mut() {
         match ask_key(a, k) {
             Typed::Cancel => app.orgs.ask = None,
@@ -568,13 +824,19 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         }
         KeyCode::Tab | KeyCode::Right => return switch(app, (app.orgs.tab.index() + 1) % Tab::ALL.len()),
         KeyCode::BackTab | KeyCode::Left => return switch(app, (app.orgs.tab.index() + Tab::ALL.len() - 1) % Tab::ALL.len()),
-        KeyCode::Char(c @ '1'..='6') => return switch(app, c as usize - '1' as usize),
+        KeyCode::Char(c @ '1'..='7') => return switch(app, c as usize - '1' as usize),
         KeyCode::Down | KeyCode::Char('j') if app.orgs.tab != Tab::Joined || k.code == KeyCode::Down => {
             app.orgs.sel = (app.orgs.sel + 1).min(n.saturating_sub(1));
+            if app.orgs.tab == Tab::Templates {
+                reload(app);
+            }
             return;
         }
         KeyCode::Up | KeyCode::Char('k') if app.orgs.tab != Tab::Members || k.code == KeyCode::Up => {
             app.orgs.sel = app.orgs.sel.saturating_sub(1);
+            if app.orgs.tab == Tab::Templates {
+                reload(app);
+            }
             return;
         }
         KeyCode::Char('g') => {
@@ -584,7 +846,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         _ => {}
     }
     let ask = |app: &mut App, kind: OAsk, title: &str, v: &str| app.orgs.ask = Some(Ask::new(kind, title, v));
-    let need_org = matches!(app.orgs.tab, Tab::Members | Tab::Roles | Tab::Resources) && app.orgs.current().is_none();
+    let need_org = matches!(app.orgs.tab, Tab::Members | Tab::Roles | Tab::Resources | Tab::Templates) && app.orgs.current().is_none();
     if need_org {
         return ok(app, "no organization yet: n on the first page makes one");
     }
@@ -780,6 +1042,75 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             }
         }
         (Tab::Site, KeyCode::Char('X')) => stop_host(app),
+        (Tab::Site, KeyCode::Char('A')) => match (&app.orgs.host, host::running(&app.paths.home)) {
+            (Some(h), _) => {
+                let addr = h.status().addr;
+                announce_sites(app, addr, true)
+            }
+            (None, Some(f)) => announce_sites(app, f.addr, true),
+            (None, None) => ok(app, "the site is not running: S starts it (and announces it)"),
+        },
+        (Tab::Templates, KeyCode::Char('n')) => ask(app, OAsk::NewTemplate, "New template name (starts from the built-in look)", ""),
+        (Tab::Templates, KeyCode::Char('e') | KeyCode::Enter | KeyCode::Char('c')) => {
+            if let Some((_, t)) = sel_template(app) {
+                edit_template(app, &t, k.code == KeyCode::Char('c'))
+            }
+        }
+        (Tab::Templates, KeyCode::Char('a')) => {
+            if sel_template(app).is_some() {
+                ask(app, OAsk::AddAsset, "Add a file: path [name under assets/]", "")
+            }
+        }
+        (Tab::Templates, KeyCode::Char('x')) => {
+            if sel_template(app).is_some() {
+                ask(app, OAsk::RemoveAsset, "Remove the file named", "")
+            }
+        }
+        (Tab::Templates, KeyCode::Char('b')) => {
+            if let Some((_, t)) = sel_template(app) {
+                let v = match &t.build_cmd {
+                    Some(c) => format!(
+                        "{} | {c}{}",
+                        t.build_src.as_deref().unwrap_or(""),
+                        t.build_out.as_deref().map(|o| format!(" | {o}")).unwrap_or_default()
+                    ),
+                    None => String::new(),
+                };
+                ask(app, OAsk::BuildStep, "Build step: folder | command [| output folder, default build], or clear", &v)
+            }
+        }
+        (Tab::Templates, KeyCode::Char('B')) => {
+            let Some((o, t)) = sel_template(app) else { return };
+            if t.build_cmd.is_none() {
+                return ok(app, format!("{} has no build step: b sets one", t.name));
+            }
+            match org::build::approved(&app.store, &t) {
+                Ok(true) => run_build(app, o, t, false),
+                Ok(false) => {
+                    let q = org::build::question(&t);
+                    app.orgs.confirm = Some(Confirm::Build(t.id.clone()));
+                    ok(app, format!("{q} y/n"));
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
+        (Tab::Templates, KeyCode::Char('p')) => {
+            if let Some((o, t)) = sel_template(app) {
+                preview(app, &o, &t)
+            }
+        }
+        (Tab::Templates, KeyCode::Char('u')) => {
+            let Some((o, t)) = sel_template(app) else { return };
+            let using = o.template_id.as_deref() == Some(t.id.as_str());
+            let r = org::edit(&app.store, ORIGIN, &OWNER, &o, &OrgChange { template_id: Some((!using).then(|| t.id.clone())), ..Default::default() });
+            done(app, r, |o| if using { format!("{} uses the built-in look", o.name) } else { format!("{} uses {}", o.name, t.name) });
+        }
+        (Tab::Templates, KeyCode::Char('d')) => {
+            if let Some((_, t)) = sel_template(app) {
+                app.orgs.confirm = Some(Confirm::RemoveTemplate(t.id.clone()));
+                ok(app, format!("remove template {} and its files? y/n", t.name));
+            }
+        }
         (Tab::Site, KeyCode::Char('e')) => {
             let a = &app.prefs.hosting.acme;
             let v = if a.enabled { format!("{} {}", a.domain, a.email) } else { String::new() };
@@ -896,11 +1227,19 @@ pub fn on_click(app: &mut App, i: usize) {
     if app.orgs.ask.is_some() {
         return;
     }
+    if let Some(te) = app.orgs.tedit.as_mut() {
+        te.ed.row = i.min(te.ed.lines.len().saturating_sub(1));
+        te.ed.col = te.ed.col.min(te.ed.lines[te.ed.row].chars().count());
+        return;
+    }
     if app.orgs.sel == i {
         on_key(app, KeyEvent::from(KeyCode::Enter));
     } else if i < rows(app) {
         app.orgs.sel = i;
         app.orgs.detail.clear();
+        if app.orgs.tab == Tab::Templates {
+            reload(app);
+        }
     }
 }
 
@@ -934,6 +1273,16 @@ fn site_lines(app: &App) -> Vec<String> {
     } else {
         v.push(format!("certificate  self-signed, {} days, made when the site starts (e sets up Let's Encrypt)", hp.cert_days));
     }
+    let open: Vec<_> = app.orgs.announced.iter().filter(|(a, _)| a.open).collect();
+    v.push(String::new());
+    v.push(format!("announced to this node  {} open site(s) (mnnn org sites; A announces yours)", open.len()));
+    for (a, c) in open {
+        let peer = &a.peer[a.peer.len().saturating_sub(8)..];
+        v.push(format!("  {} ({}) from …{peer}  {}", c.name, c.visibility.as_str(), c.urls.first().map(String::as_str).unwrap_or("-")));
+        if !c.serves.is_empty() {
+            v.push(format!("    serves {}", c.serves.join(", ")));
+        }
+    }
     v
 }
 
@@ -941,7 +1290,45 @@ fn cert_line(c: &host::CertInfo) -> String {
     format!("certificate  {} for {} until {}", c.source, c.names.join(", "), crate::ingest::time::fmt_ts(c.not_after))
 }
 
+/// The template editor in place of the Templates list.
+fn draw_edit(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) {
+    let t = app.theme.clone();
+    let Some(te) = app.orgs.tedit.as_mut() else { return };
+    let mut v = View::new(format!(
+        "Organizations · Templates · {} · {}{}",
+        te.name,
+        if te.css { "CSS" } else { "HTML" },
+        if te.dirty() { " · modified" } else { "" }
+    ));
+    v.head.push(muted(&t, " placeholders: {{title}} {{org.name}} {{org.description}} {{org.slug}} {{base}} {{assets}} {{css}} {{content}}"));
+    v.head.push(Line::raw(""));
+    let gutter = format!("{}", te.ed.lines.len()).len().max(2);
+    for (i, l) in te.ed.lines.iter().enumerate() {
+        let mut spans = vec![Span::styled(format!("{:>gutter$} ", i + 1), Style::new().fg(t.muted))];
+        if i == te.ed.row {
+            let at = byte_at(l, te.ed.col);
+            let (a, b) = l.split_at(at);
+            let mut rest = b.chars();
+            let cur = rest.next().map(String::from).unwrap_or_else(|| " ".into());
+            spans.push(Span::styled(a.to_string(), Style::new().fg(t.fg)));
+            spans.push(Span::styled(cur, Style::new().bg(t.selection_bg).fg(t.selection_fg)));
+            spans.push(Span::styled(rest.collect::<String>(), Style::new().fg(t.fg)));
+        } else {
+            spans.push(Span::styled(l.clone(), Style::new().fg(t.fg)));
+        }
+        v.rows.push(Line::from(spans));
+    }
+    v.sel = Some(te.ed.row);
+    v.ask = app.orgs.ask.as_ref().map(|a| (a.title.clone(), a.value.clone()));
+    v.msg = app.orgs.msg.clone();
+    v.keys = vec![("^S save", KeyCode::Char('s')), ("^P preview", KeyCode::Char('p')), ("Esc leave", KeyCode::Esc)];
+    draw_view(f, r, v, &t, hits);
+}
+
 pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) {
+    if app.orgs.tedit.is_some() {
+        return draw_edit(app, f, r, hits);
+    }
     let t = app.theme.clone();
     let st = &app.orgs;
     let tabs: Vec<String> = Tab::ALL
@@ -954,7 +1341,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
     v.head.push(Line::styled(tabs.join(" "), Style::new().fg(t.accent)));
     let fg = Style::new().fg(t.fg);
     let mt = Style::new().fg(t.muted);
-    if matches!(st.tab, Tab::Members | Tab::Roles | Tab::Resources) {
+    if matches!(st.tab, Tab::Members | Tab::Roles | Tab::Resources | Tab::Templates) {
         match st.current() {
             Some(o) => v.head.push(Line::styled(format!(" {} ({}) · Enter on Organizations picks another", o.name, o.slug), fg)),
             None => v.head.push(muted(&t, " no organization yet: n on the Organizations page makes one")),
@@ -1031,6 +1418,46 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 v.head.push(Line::styled(format!(" {l}"), fg));
             }
         }
+        Tab::Templates => {
+            if st.templates.is_empty() {
+                v.head.push(muted(&t, " no templates yet: n makes one from the built-in look (the site uses that look until u picks one)"));
+            }
+            let in_use = st.current().and_then(|o| o.template_id.clone());
+            if let Some(tp) = st.templates.get(st.sel) {
+                let files =
+                    if st.assets.is_empty() { "-".to_string() } else { st.assets.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", ") };
+                v.head.push(muted(&t, format!(" files: {files}")));
+                if let Some(c) = &tp.build_cmd {
+                    let ok = org::build::approved(&app.store, tp).unwrap_or(false);
+                    v.head.push(muted(
+                        &t,
+                        format!(
+                            " build: `{c}` in a copy of {} → {}/ ({})",
+                            tp.build_src.as_deref().unwrap_or("?"),
+                            tp.build_out.as_deref().unwrap_or(org::build::DEFAULT_OUT),
+                            if ok { "approved here" } else { "asks before running" }
+                        ),
+                    ));
+                }
+                v.head.push(Line::raw(""));
+            }
+            for (i, tp) in st.templates.iter().enumerate() {
+                let used = if in_use.as_deref() == Some(tp.id.as_str()) { " (in use)" } else { "" };
+                v.rows.push(Line::from(vec![
+                    Span::styled(format!(" {:<24}{used:<9}", tp.name), row_style(&t, i == st.sel)),
+                    Span::styled(
+                        format!(
+                            " html {} B · css {} B{} · updated {}",
+                            tp.html.len(),
+                            tp.css.len(),
+                            if tp.build_cmd.is_some() { " · build step" } else { "" },
+                            crate::ingest::time::fmt_ts(tp.updated_at)
+                        ),
+                        mt,
+                    ),
+                ]));
+            }
+        }
     }
     if !st.detail.is_empty() {
         v.head.push(Line::raw(""));
@@ -1086,7 +1513,19 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
             ("m mirror", KeyCode::Char('m')),
             ("l leave", KeyCode::Char('l')),
         ],
-        Tab::Site => vec![("S start/stop", KeyCode::Char('S')), ("e ACME", KeyCode::Char('e'))],
+        Tab::Site => vec![("S start/stop", KeyCode::Char('S')), ("A announce", KeyCode::Char('A')), ("e ACME", KeyCode::Char('e'))],
+        Tab::Templates => vec![
+            ("n new", KeyCode::Char('n')),
+            ("e html", KeyCode::Char('e')),
+            ("c css", KeyCode::Char('c')),
+            ("a file", KeyCode::Char('a')),
+            ("x rm file", KeyCode::Char('x')),
+            ("b build step", KeyCode::Char('b')),
+            ("B build", KeyCode::Char('B')),
+            ("p preview", KeyCode::Char('p')),
+            ("u use", KeyCode::Char('u')),
+            ("d delete", KeyCode::Char('d')),
+        ],
     });
     keys.push(("Esc", KeyCode::Esc));
     v.keys = keys;
