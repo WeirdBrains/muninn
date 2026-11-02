@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+- MCP server (`mnnn mcp serve`, stdio or HTTP on 127.0.0.1:4743): journals, entries, projects, models and records, reports, live searches, views, org resources and executables as MCP resources and tools
+- MCP clients are named, revocable and have a role (read by default; write, run, full); writes and runs are recorded in history, refusals as `mcp.denied` (`mnnn mcp client …`)
+- External MCP servers (`mnnn mcp add/list/show/edit/remove/tools/call`, Net ▸ MCP… in the TUI), with credentials kept in the encrypted store and never printed
+- Rule sets call external MCP tools (`then mcp SERVER TOOL k=v`) and read them in conditions (`mcp:SERVER/TOOL.path`); each tool needs approval before its first call (`mnnn mcp approve`)
+
 ## [2.19.0] - 2026-11-02
 
 ### Added

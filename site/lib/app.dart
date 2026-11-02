@@ -206,6 +206,7 @@ const docPages = [
   ('Notifications', 'notifications.md'),
   ('Network and sync', 'network.md'),
   ('Live collaboration', 'collaboration.md'),
+  ('MCP', 'mcp.md'),
   ('Encryption', 'encryption.md'),
   ('Themes', 'themes.md'),
 ];

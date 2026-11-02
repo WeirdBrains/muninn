@@ -1,0 +1,120 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-mcp 1  "mnnn-mcp 2.19.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-mcp \- MCP: serve Muninn to MCP clients (stdio or HTTP, named revocable clients with roles), and add external MCP servers whose tools rule sets can call
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn mcp\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+MCP: serve Muninn to MCP clients (stdio or HTTP, named revocable clients with roles), and add external MCP servers whose tools rule sets can call
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH NOTES
+.PP
+Muninn speaks the Model Context Protocol both ways. `mnnn mcp serve` makes it an MCP server (stdio for one named client, or HTTP on 127.0.0.1:4743 with client tokens); nothing is served until you start it. Every caller is a named client with a role: read (the default), write, run or full; revoke one at any time. Writes and runs are recorded in the history with origin mcp. `mnnn mcp add` adds an external MCP server whose tools rule sets can call (`then mcp SERVER TOOL k=v`) and read in conditions (`\-\-if 'mcp:SERVER/TOOL#path > 3'`); its credentials are kept in the encrypted store and never printed. Each tool must be approved before its first call. `mnnn help mcp` has the guide.
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-mcp\-serve(1)
+Serve Muninn over MCP: stdio for one client (`\-\-client NAME`), or HTTP (`\-\-http`)
+.TP
+mnnn\-mcp\-client(1)
+The clients allowed to call this node\*(Aqs MCP server
+.TP
+mnnn\-mcp\-add(1)
+Add an external MCP server: `\-\-url URL` (HTTP) or `\-\- COMMAND ARGS…` (stdio)
+.TP
+mnnn\-mcp\-list(1)
+External MCP servers
+.TP
+mnnn\-mcp\-show(1)
+One server: how it is reached, its credential names, approved tools
+.TP
+mnnn\-mcp\-edit(1)
+Change a server\*(Aqs credentials (added or replaced by name)
+.TP
+mnnn\-mcp\-remove(1)
+Remove a server (and its approvals)
+.TP
+mnnn\-mcp\-tools(1)
+The tools a server offers (asks it now)
+.TP
+mnnn\-mcp\-call(1)
+Call a tool: `mnnn mcp call SERVER TOOL key=value …` (asks before its first call)
+.TP
+mnnn\-mcp\-approve(1)
+Allow a tool to be called (rule sets need this before its first call)
+.TP
+mnnn\-mcp\-unapprove(1)
+Withdraw a tool\*(Aqs approval
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.19.0
+.SH SEE ALSO
+\fBmnnn\fR(1)

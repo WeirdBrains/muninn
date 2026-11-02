@@ -28,6 +28,8 @@ mnnn [GLOBAL FLAGS] <COMMAND>
            host start|stop|status|cert status|acme|renew
   review   request|invite|list|show|view|join|sync|comment|suggest|highlight|vote|
            withdraw|accept|reject|merge|close|reopen|drop|leave|remove|revisions
+  mcp      serve|client add|list|role|revoke|restore|remove|add|list|show|edit|remove|
+           tools|call|approve|unapprove
   tui
   help     [TOPIC] [--search TEXT]
 ```

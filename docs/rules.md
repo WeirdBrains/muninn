@@ -42,7 +42,8 @@ events` lists every kind with its fields. Rule actions (`rule.*`) never trigger 
 Fields: `kind`, `summary`, `origin` (`cli`, `tui`, `rule`), `author`, `author_id`,
 `action` (the action id), `before.X` and `after.X` (view state), and the action's own
 params (`inserted`, `name`, `journal`, `files`, …). A list field matches when any of
-its values does.
+its values does. `mcp:SERVER/TOOL(key=value,…).path` reads an external
+[MCP](mcp.md#in-rule-sets) tool's result (approved tools only).
 
 ## Then: actions
 
@@ -65,6 +66,7 @@ its values does.
 | `run-code SPACE` | runs an approved [code space](code-spaces.md) (building it if needed); a changed or unapproved one fails |
 | `notify TITLE [body=T] [link=KIND:ID] [level=info\|warn\|error]` | a [notification](notifications.md); `notification` actions are triggers too |
 | `broadcast TOPIC [text=T] [to=nodes\|connections\|all\|org:SLUG]` | a [broadcast](notifications.md#broadcasts) to other nodes (queued; the running node sends it); `net.broadcast` triggers on one received |
+| `mcp SERVER TOOL [KEY=VALUE…]` | calls an external [MCP](mcp.md) server's tool (values are templates); the tool must be approved first (`mnnn mcp approve`) |
 
 The format comes from the file extension unless `format=` says otherwise
 ([export formats](export-formats.md)); `~/` is your home folder. Texts, titles and
