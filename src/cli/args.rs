@@ -129,6 +129,10 @@ pub enum Command {
     /// run a peer's executable or ask it for something.
     #[command(after_long_help = COLLAB_NOTES)]
     Peers(PeersArgs),
+    /// MCP: serve Muninn to MCP clients (stdio or HTTP, named revocable clients with roles),
+    /// and add external MCP servers whose tools rule sets can call.
+    #[command(subcommand, after_long_help = MCP_NOTES)]
+    Mcp(McpCommand),
     /// Share anything shareable to anything that takes shares: a project, a journal (a new
     /// entry about it), a code space (a model or records search as its input; --run runs
     /// it) or your exchanges (`net`).
@@ -676,6 +680,129 @@ A live session is hosted by the node that has the item; invited peers join, edit
 each other's cursors, and every edit is merged without loss and written back to the item. \
 `mnnn peers show PEER` lists what a peer offers you; `mnnn peers run` calls an org \
 executable on it with your role's permissions. `mnnn help collaboration` has the guide.";
+
+pub const MCP_NOTES: &str = "\
+Muninn speaks the Model Context Protocol both ways. `mnnn mcp serve` makes it an MCP server \
+(stdio for one named client, or HTTP on 127.0.0.1:4743 with client tokens); nothing is served \
+until you start it. Every caller is a named client with a role: read (the default), write, run \
+or full; revoke one at any time. Writes and runs are recorded in the history with origin mcp. \
+`mnnn mcp add` adds an external MCP server whose tools rule sets can call (`then mcp SERVER \
+TOOL k=v`) and read in conditions (`--if 'mcp:SERVER/TOOL#path > 3'`); its credentials are \
+kept in the encrypted store and never printed. Each tool must be approved before its first \
+call. `mnnn help mcp` has the guide.";
+
+/// MCP commands.
+#[derive(Debug, Subcommand)]
+pub enum McpCommand {
+    /// Serve Muninn over MCP: stdio for one client (`--client NAME`), or HTTP (`--http`).
+    Serve {
+        /// The client to serve over stdio (see `mnnn mcp client add`).
+        #[arg(long, required_unless_present = "http")]
+        client: Option<String>,
+        /// Serve over HTTP instead, at ADDR (default 127.0.0.1:4743); clients send their token.
+        #[arg(long, value_name = "ADDR", num_args = 0..=1, default_missing_value = crate::mcp::DEFAULT_HTTP, conflicts_with = "client")]
+        http: Option<String>,
+    },
+    /// The clients allowed to call this node's MCP server.
+    #[command(subcommand)]
+    Client(McpClientCommand),
+    /// Add an external MCP server: `--url URL` (HTTP) or `-- COMMAND ARGS…` (stdio).
+    Add {
+        name: String,
+        /// An HTTP(S) MCP endpoint.
+        #[arg(long, conflicts_with = "command")]
+        url: Option<String>,
+        /// Environment variables for a stdio server (`KEY=VALUE`, or `KEY` to be asked, hidden).
+        #[arg(long = "env", value_name = "KEY[=VALUE]")]
+        env: Vec<String>,
+        /// HTTP headers (`NAME=VALUE`, or `NAME` to be asked, hidden).
+        #[arg(long = "header", value_name = "NAME[=VALUE]")]
+        header: Vec<String>,
+        /// A bearer token (`Authorization: Bearer …`); `-` to be asked, hidden.
+        #[arg(long)]
+        token: Option<String>,
+        /// The command (and its arguments) of a stdio server.
+        #[arg(last = true, value_name = "COMMAND")]
+        command: Vec<String>,
+    },
+    /// External MCP servers.
+    #[command(alias = "ls")]
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// One server: how it is reached, its credential names, approved tools.
+    Show {
+        name: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Change a server's credentials (added or replaced by name).
+    Edit {
+        name: String,
+        #[arg(long = "env", value_name = "KEY[=VALUE]")]
+        env: Vec<String>,
+        #[arg(long = "header", value_name = "NAME[=VALUE]")]
+        header: Vec<String>,
+        #[arg(long)]
+        token: Option<String>,
+        /// Forget every credential first.
+        #[arg(long)]
+        clear: bool,
+    },
+    /// Remove a server (and its approvals).
+    #[command(alias = "rm")]
+    Remove { name: String },
+    /// The tools a server offers (asks it now).
+    Tools {
+        name: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Call a tool: `mnnn mcp call SERVER TOOL key=value …` (asks before its first call).
+    Call {
+        name: String,
+        tool: String,
+        /// Arguments as key=value (values that parse as JSON are passed as JSON).
+        #[arg(value_name = "KEY=VALUE")]
+        args: Vec<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Allow a tool to be called (rule sets need this before its first call).
+    Approve { name: String, tool: String },
+    /// Withdraw a tool's approval.
+    Unapprove { name: String, tool: String },
+}
+
+/// MCP client commands.
+#[derive(Debug, Subcommand)]
+pub enum McpClientCommand {
+    /// Add a client; its token is printed once.
+    Add {
+        name: String,
+        /// read (default), write, run or full.
+        #[arg(long, default_value = "read", value_parser = ["read", "write", "run", "full"])]
+        role: String,
+    },
+    #[command(alias = "ls")]
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Change a client's role.
+    Role {
+        name: String,
+        #[arg(value_parser = ["read", "write", "run", "full"])]
+        role: String,
+    },
+    /// Revoke a client: its calls are refused from now on.
+    Revoke { name: String },
+    /// Let a revoked client in again.
+    Restore { name: String },
+    #[command(alias = "rm")]
+    Remove { name: String },
+}
 
 /// Message commands.
 #[derive(Debug, Subcommand)]

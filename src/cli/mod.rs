@@ -11,6 +11,7 @@ mod ingest;
 mod journals;
 mod keys;
 pub mod man;
+mod mcp;
 mod misc;
 mod models;
 mod net;
@@ -145,6 +146,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Msg(c) => collab::msg(&ctx, c),
         Command::Live(c) => collab::live(&ctx, c),
         Command::Peers(a) => collab::peers(&ctx, a),
+        Command::Mcp(c) => mcp::run(&ctx, c),
         Command::Share(a) => misc::share(&ctx, a),
         Command::Pipe(a) => code::pipe(&ctx, a),
         Command::Pipeline(c) => pipeline::run(&ctx, c),
