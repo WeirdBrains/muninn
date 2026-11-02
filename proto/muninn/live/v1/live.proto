@@ -1,0 +1,70 @@
+// muninn.live.v1: live collaboration between key-exchanged nodes (Muninn 2.19).
+// Carried inside an exchange's sealed requests; see docs/collaboration.md.
+syntax = "proto3";
+
+package muninn.live.v1;
+
+message Id {
+  uint64 site = 1;
+  uint64 counter = 2;
+}
+
+message Insert {
+  Id id = 1;
+  Id after = 2;
+  string text = 3;
+}
+
+message Span {
+  uint64 site = 1;
+  uint64 start = 2;
+  uint64 len = 3;
+}
+
+message Delete {
+  repeated Span spans = 1;
+}
+
+message SetField {
+  string field = 1;
+  string value_json = 2;
+  uint64 lamport = 3;
+  uint64 site = 4;
+}
+
+message Cursor {
+  string label = 1;
+  optional int64 offset = 2;
+}
+
+message RunChunk {
+  string json = 1;
+  bool done = 2;
+  string error = 3;
+}
+
+message Op {
+  oneof kind {
+    Insert insert = 1;
+    Delete delete = 2;
+    SetField set = 3;
+    Cursor cursor = 4;
+    RunChunk run = 5;
+    bool closed = 6;
+  }
+}
+
+message Frame {
+  uint64 seq = 1;
+  uint64 site = 2;
+  Op op = 3;
+  string doc = 4;
+}
+
+message Batch {
+  string session = 1;
+  uint64 since = 2;
+  repeated Frame frames = 3;
+  uint64 head = 4;
+  repeated Cursor present = 5;
+}

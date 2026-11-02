@@ -1,7 +1,7 @@
 //! Live collaboration (2.19): messages between nodes, live editing sessions and their
 //! operation logs, presence, and remote runs. Messages are synced to your linked nodes;
 //! sessions, operations and presence are node-local (the merged result is written to the
-//! item itself, which syncs as usual). See `crate::live` and `docs/live.md`.
+//! item itself, which syncs as usual). See `crate::collab` and `docs/collaboration.md`.
 use super::{Store, new_id, now_ms};
 use crate::error::Result;
 use rusqlite::{OptionalExtension, params};
@@ -33,6 +33,7 @@ CREATE TABLE live_sessions (
     exchange_id TEXT,
     status TEXT NOT NULL DEFAULT 'open',
     seen INTEGER NOT NULL DEFAULT 0,
+    peers TEXT NOT NULL DEFAULT '[]',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -40,6 +41,7 @@ CREATE TABLE live_ops (
     session TEXT NOT NULL,
     seq INTEGER NOT NULL,
     site TEXT NOT NULL,
+    doc TEXT NOT NULL DEFAULT '',
     body BLOB NOT NULL,
     created_at INTEGER NOT NULL,
     PRIMARY KEY (session, seq)
@@ -112,11 +114,13 @@ pub struct LiveSession {
     pub status: String,
     /// The last operation seq this node has (guests: from the host).
     pub seen: i64,
+    /// Hosts: the peer ids invited to join.
+    pub peers: Vec<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
 
-const SCOLS: &str = "id, kind, item_id, field, title, role, host_peer, exchange_id, status, seen, created_at, updated_at";
+const SCOLS: &str = "id, kind, item_id, field, title, role, host_peer, exchange_id, status, seen, peers, created_at, updated_at";
 
 fn srow(r: &rusqlite::Row) -> rusqlite::Result<LiveSession> {
     Ok(LiveSession {
@@ -130,8 +134,9 @@ fn srow(r: &rusqlite::Row) -> rusqlite::Result<LiveSession> {
         exchange_id: r.get(7)?,
         status: r.get(8)?,
         seen: r.get(9)?,
-        created_at: r.get(10)?,
-        updated_at: r.get(11)?,
+        peers: serde_json::from_str(&r.get::<_, String>(10)?).unwrap_or_default(),
+        created_at: r.get(11)?,
+        updated_at: r.get(12)?,
     })
 }
 
@@ -140,6 +145,8 @@ fn srow(r: &rusqlite::Row) -> rusqlite::Result<LiveSession> {
 pub struct LiveOp {
     pub seq: i64,
     pub site: String,
+    /// Which text in the session: `body`, `source`, an entry id, a record field.
+    pub doc: String,
     pub body: Vec<u8>,
     pub created_at: i64,
 }
@@ -230,14 +237,28 @@ impl Store {
 
     // ---------- live sessions ----------
 
-    #[allow(clippy::too_many_arguments)]
     pub fn put_live_session(&self, s: &LiveSession) -> Result<()> {
         self.conn.execute(
             &format!(
-                "INSERT INTO live_sessions({SCOLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-                 ON CONFLICT(id) DO UPDATE SET title = excluded.title, status = excluded.status, seen = excluded.seen, updated_at = excluded.updated_at"
+                "INSERT INTO live_sessions({SCOLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+                 ON CONFLICT(id) DO UPDATE SET title = excluded.title, status = excluded.status, seen = excluded.seen,
+                 peers = excluded.peers, updated_at = excluded.updated_at"
             ),
-            params![s.id, s.kind, s.item_id, s.field, s.title, s.role, s.host_peer, s.exchange_id, s.status, s.seen, s.created_at, s.updated_at],
+            params![
+                s.id,
+                s.kind,
+                s.item_id,
+                s.field,
+                s.title,
+                s.role,
+                s.host_peer,
+                s.exchange_id,
+                s.status,
+                s.seen,
+                serde_json::to_string(&s.peers)?,
+                s.created_at,
+                s.updated_at
+            ],
         )?;
         Ok(())
     }
@@ -279,11 +300,11 @@ impl Store {
     }
 
     /// Append an operation at the next seq; returns it.
-    pub fn append_live_op(&self, session: &str, site: &str, body: &[u8]) -> Result<i64> {
+    pub fn append_live_op(&self, session: &str, site: &str, doc: &str, body: &[u8]) -> Result<i64> {
         let seq: i64 = self.conn.query_row("SELECT COALESCE(MAX(seq), 0) + 1 FROM live_ops WHERE session = ?1", [session], |r| r.get(0))?;
         self.conn.execute(
-            "INSERT INTO live_ops(session, seq, site, body, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![session, seq, site, body, now_ms()],
+            "INSERT INTO live_ops(session, seq, site, doc, body, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![session, seq, site, doc, body, now_ms()],
         )?;
         Ok(seq)
     }
@@ -291,17 +312,19 @@ impl Store {
     /// Store an operation at the seq the host gave it (guests); ignored if present.
     pub fn put_live_op(&self, session: &str, op: &LiveOp) -> Result<()> {
         self.conn.execute(
-            "INSERT OR IGNORE INTO live_ops(session, seq, site, body, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![session, op.seq, op.site, op.body, op.created_at],
+            "INSERT OR IGNORE INTO live_ops(session, seq, site, doc, body, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![session, op.seq, op.site, op.doc, op.body, op.created_at],
         )?;
         Ok(())
     }
 
     /// Operations after `since`, in order.
     pub fn live_ops(&self, session: &str, since: i64) -> Result<Vec<LiveOp>> {
-        let mut st = self.conn.prepare("SELECT seq, site, body, created_at FROM live_ops WHERE session = ?1 AND seq > ?2 ORDER BY seq")?;
+        let mut st = self.conn.prepare("SELECT seq, site, doc, body, created_at FROM live_ops WHERE session = ?1 AND seq > ?2 ORDER BY seq")?;
         let v = st
-            .query_map(params![session, since], |r| Ok(LiveOp { seq: r.get(0)?, site: r.get(1)?, body: r.get(2)?, created_at: r.get(3)? }))?
+            .query_map(params![session, since], |r| {
+                Ok(LiveOp { seq: r.get(0)?, site: r.get(1)?, doc: r.get(2)?, body: r.get(3)?, created_at: r.get(4)? })
+            })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(v)
     }
@@ -367,13 +390,15 @@ mod tests {
             exchange_id: None,
             status: "open".into(),
             seen: 0,
+            peers: vec!["peerB".into()],
             created_at: now,
             updated_at: now,
         };
         s.put_live_session(&ls).unwrap();
         assert_eq!(s.hosted_session("entry", "e1", "").unwrap().unwrap().id, "s1");
-        assert_eq!(s.append_live_op("s1", "a", b"x").unwrap(), 1);
-        assert_eq!(s.append_live_op("s1", "b", b"y").unwrap(), 2);
+        assert_eq!(s.append_live_op("s1", "a", "body", b"x").unwrap(), 1);
+        assert_eq!(s.append_live_op("s1", "b", "body", b"y").unwrap(), 2);
+        assert_eq!(s.live_session("s1").unwrap().unwrap().peers, vec!["peerB".to_string()]);
         assert_eq!(s.live_ops("s1", 1).unwrap().len(), 1);
         assert_eq!(s.live_head("s1").unwrap(), 2);
         s.set_presence("s1", "peerB", "ben", Some(3)).unwrap();
