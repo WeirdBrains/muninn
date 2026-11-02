@@ -19,6 +19,8 @@ install -m755 "$bin" "$stage/$exe"
 cp -r man docs README.md CHANGELOG.md LICENSE "$stage/"
 cp assets/fonts/LICENSE-OFL.txt "$stage/LICENSE-FONTS"
 rm -rf "$stage/docs/historical"
+# macOS: drop extended attributes (provenance etc.) so tar writes no Apple xattr headers
+if [[ "$(uname -s)" == Darwin ]]; then xattr -cr "$stage" || true; fi
 cd dist
 if [[ "$target" == *windows* ]]; then
   rm -f "$name.zip"; zip -qr "$name.zip" "$name"; echo "dist/$name.zip"
