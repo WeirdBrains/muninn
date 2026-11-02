@@ -21,7 +21,7 @@ impl Drop for Daemon {
 
 /// Start a node in the background and wait for its address.
 fn start(e: &Env, label: &str) -> (Daemon, String) {
-    e.ok(&["net", "config", "--label", label, "--mdns", "off"]);
+    e.ok(&["net", "config", "--label", label, "--mdns", "off", "--collab-bind", "127.0.0.1", "--collab-port", "0"]);
     let child = Daemon(
         e.cmd()
             .args(["net", "start", "--listen", "/ip4/127.0.0.1/tcp/0", "--for", "120"])
@@ -235,10 +235,13 @@ fn connected(a: &Env, b: &Env, addr_b: &str) {
     }
 }
 
-#[test]
-fn messages_live_editing_and_the_peers_view() {
+/// The two-node collaboration scenario, with anna (the guest) and ben (the host) on the
+/// given transports; `via` is what anna should end up using.
+fn collaborate(anna: &str, ben: &str, via: &str) {
     let a = Env::new();
     let b = Env::new();
+    a.ok(&["net", "config", "--collab-transport", anna]);
+    b.ok(&["net", "config", "--collab-transport", ben]);
     let (ca, _) = start(&a, "anna");
     let (cb, addr_b) = start(&b, "ben");
     connected(&a, &b, &addr_b);
@@ -265,8 +268,33 @@ fn messages_live_editing_and_the_peers_view() {
     assert!(a.ok(&["live", "join", "ben", &session]).contains("joined"));
     let show = json(&a.ok(&["live", "show", &session[..8], "--json"]));
     assert_eq!(show["docs"]["body"], "a comet over the hill", "{show}");
+    assert_eq!(show["transport"], via, "{show}");
+    let fell_back = a.ok(&["history", "list"]).contains("net.collab.fallback");
+    assert_eq!(fell_back, anna == "stream" && ben == "poll", "a stream node falls back (and says so) only for a poll peer");
+    // anna follows the session: ben's next change reaches her without asking (pushed over
+    // a stream, polled otherwise)
+    let mut watch = Daemon(a.cmd().args(["live", "watch", &session[..8], "--json"]).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap());
+    let out = watch.0.stdout.take().unwrap();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        use std::io::BufRead;
+        for l in std::io::BufReader::new(out).lines().map_while(Result::ok) {
+            let _ = tx.send(l);
+        }
+    });
+    let first = json(&rx.recv_timeout(Duration::from_secs(20)).expect("a first state"));
+    assert_eq!(first["transport"], via);
     // ben edits through the session, then anna (who sees ben's edit first)
     b.ok(&["live", "edit", &session[..8], "--value", "a bright comet over the hill"]);
+    let t = Instant::now();
+    loop {
+        let l = rx.recv_timeout(Duration::from_secs(20)).expect("the change arrives");
+        if json(&l)["docs"]["body"] == "a bright comet over the hill" {
+            break;
+        }
+        assert!(t.elapsed() < Duration::from_secs(20));
+    }
+    drop(watch);
     let show = json(&a.ok(&["live", "show", &session[..8], "--json"]));
     assert_eq!(show["docs"]["body"], "a bright comet over the hill", "{show}");
     a.ok(&["live", "edit", &session[..8], "--value", "a bright comet over the hill tonight", "--cursor", "29"]);
@@ -279,6 +307,50 @@ fn messages_live_editing_and_the_peers_view() {
     b.ok(&["live", "stop", &session[..8]]);
     let show = json(&a.ok(&["live", "show", &session[..8], "--json"]));
     assert_eq!(show["session"]["status"], "closed");
+    stop(&a, ca);
+    stop(&b, cb);
+}
+
+#[test]
+fn collaboration_over_streams() {
+    collaborate("stream", "stream", "stream");
+}
+
+#[test]
+fn collaboration_over_polling() {
+    collaborate("poll", "poll", "poll");
+}
+
+#[test]
+fn a_stream_node_polls_a_poll_node_and_back() {
+    collaborate("stream", "poll", "poll");
+    collaborate("poll", "stream", "poll");
+}
+
+#[test]
+fn an_unreachable_stream_listener_falls_back_to_polling() {
+    let a = Env::new();
+    let b = Env::new();
+    // ben says his listener is somewhere nobody listens (a firewall, NAT, a wrong forward)
+    b.ok(&["net", "config", "--collab-advertise", "127.0.0.1:1"]);
+    let (ca, _) = start(&a, "anna");
+    let (cb, addr_b) = start(&b, "ben");
+    connected(&a, &b, &addr_b);
+    assert!(a.ok(&["msg", "send", "ben", "still there?"]).contains("delivered"), "polling still delivers");
+    let h = a.ok(&["history", "list"]);
+    assert!(h.contains("net.collab.fallback") && h.contains("did not answer"), "{h}");
+    b.ok(&["journal", "new", "notes"]);
+    b.ok(&["journal", "write", "notes", "--title", "T", "--text", "x"]);
+    let j = json(&b.ok(&["journal", "show", "notes", "--json"]));
+    let entry = j["entries"][0]["entry"]["id"].as_str().unwrap().to_string();
+    let session = b.ok(&["live", "share", "entry", &entry, "--with", "anna"]).lines().last().unwrap().trim().to_string();
+    a.ok(&["live", "join", "ben", &session]);
+    let show = json(&a.ok(&["live", "show", &session[..8], "--json"]));
+    assert_eq!(show["transport"], "poll", "{show}");
+    // it is not tried again for a while (one fallback record)
+    assert_eq!(a.ok(&["history", "list"]).matches("net.collab.fallback").count(), 1);
+    // the flag overrides the setting
+    assert!(a.ok(&["--transport", "poll", "net", "config"]).contains("now poll"));
     stop(&a, ca);
     stop(&b, cb);
 }

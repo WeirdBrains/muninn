@@ -19,7 +19,7 @@ impl Drop for Daemon {
 }
 
 fn start(e: &Env, label: &str) -> (Daemon, String) {
-    e.ok(&["net", "config", "--label", label, "--mdns", "off"]);
+    e.ok(&["net", "config", "--label", label, "--mdns", "off", "--collab-bind", "127.0.0.1", "--collab-port", "0"]);
     let child = Daemon(
         e.cmd()
             .args(["net", "start", "--listen", "/ip4/127.0.0.1/tcp/0", "--for", "120"])
