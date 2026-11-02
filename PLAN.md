@@ -402,7 +402,7 @@ Launch step before the post goes out: a public relay node.
 
 ## Org Site Templates in the App
 
-> **Phase 20 · v2.17.0**
+> **Phase 20 · v2.17.0 · 🚧 In progress**
 
 Today templates are saved from files with the CLI only (`mnnn org template save/asset/list`, `org edit --template`); there is no in-app editing.
 
