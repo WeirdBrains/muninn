@@ -16,6 +16,7 @@ pub mod help;
 pub mod history;
 pub mod ingest;
 pub mod live;
+pub mod mcp;
 pub mod model;
 pub mod net;
 pub mod notify;
