@@ -303,7 +303,32 @@ pub const EVENTS: &[Event] = &[
     Event { kind: "review.joined", about: "joined a review on another node", fields: REVIEW },
     Event { kind: "review.leave", about: "a reviewer left a review", fields: REVIEW },
     Event { kind: "review.closed", about: "a review on another node ended", fields: REVIEW },
+    Event {
+        kind: "mcp.serve",
+        about: "the MCP server started",
+        fields: &["client: client name (stdio)", "transport: stdio or http", "addr: where (http)"],
+    },
+    Event { kind: "mcp.denied", about: "an MCP client was refused a tool", fields: MCP_CLIENT },
+    Event { kind: "mcp.run", about: "an MCP client ran a search, code space or executable", fields: MCP_CLIENT },
+    Event { kind: "mcp.client.add", about: "an MCP client added", fields: MCP_CLIENT },
+    Event { kind: "mcp.client.role", about: "an MCP client's role changed", fields: MCP_CLIENT },
+    Event { kind: "mcp.client.revoke", about: "an MCP client revoked", fields: MCP_CLIENT },
+    Event { kind: "mcp.client.restore", about: "a revoked MCP client let in again", fields: MCP_CLIENT },
+    Event { kind: "mcp.client.remove", about: "an MCP client removed", fields: MCP_CLIENT },
+    Event { kind: "mcp.server.add", about: "an external MCP server added", fields: MCP_SERVER },
+    Event { kind: "mcp.server.edit", about: "an external MCP server's credentials changed", fields: MCP_SERVER },
+    Event { kind: "mcp.server.remove", about: "an external MCP server removed", fields: MCP_SERVER },
+    Event { kind: "mcp.approve", about: "an external MCP tool approved", fields: MCP_SERVER },
+    Event { kind: "mcp.unapprove", about: "an external MCP tool's approval withdrawn", fields: MCP_SERVER },
+    Event {
+        kind: "mcp.call",
+        about: "an external MCP tool called",
+        fields: &["server: server id", "name: server name", "tool: tool", "args: argument names", "ok: true or false"],
+    },
 ];
+
+const MCP_CLIENT: &[&str] = &["client: client name", "role: role", "tool: tool (denied)"];
+const MCP_SERVER: &[&str] = &["server: server id", "name: server name", "tool: tool", "transport: stdio or http", "credentials: credential names"];
 
 const ORG: &[&str] = &["org: organization id", "member: member id", "role: role id", "resource: resource id", "by: who acted"];
 const REVIEW: &[&str] = &["review: review id", "reviewer: reviewer id", "item: thread item id", "items: items decided or merged", "by: who acted"];
@@ -312,7 +337,7 @@ const NET_SHARE: &[&str] = &["kind: item kind", "item: item id", "name: item nam
 
 /// Fields every action has (besides its params).
 pub const COMMON_FIELDS: &[&str] =
-    &["kind: action kind", "summary: what happened", "origin: cli, tui or rule", "author: author name", "action: action number"];
+    &["kind: action kind", "summary: what happened", "origin: cli, tui, rule or mcp", "author: author name", "action: action number"];
 
 fn pattern_matches(p: &str, kind: &str) -> bool {
     let p = p.trim();
@@ -413,7 +438,17 @@ pub(crate) fn tokenize(s: &str) -> Result<Vec<(String, Option<String>)>> {
 /// Parse `FIELD OP VALUE`, e.g. `inserted > 0`, `format=pdf`, `title ~ "btc halving"`.
 pub fn parse_condition(s: &str) -> Result<Condition> {
     let s = s.trim();
-    let end = s.find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')).unwrap_or(s.len());
+    let end = if s.starts_with("mcp:") {
+        // mcp:SERVER/TOOL(args).path: the arguments may hold any character but `)`
+        let open = s.find('(');
+        let from = match (open, s.find(')')) {
+            (Some(o), Some(c)) if o < s.find(char::is_whitespace).unwrap_or(s.len()) => c + 1,
+            _ => 4,
+        };
+        from + s[from..].find(|c: char| !(c.is_ascii_alphanumeric() || "_.-:/".contains(c))).unwrap_or(s.len() - from)
+    } else {
+        s.find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')).unwrap_or(s.len())
+    };
     let field = &s[..end];
     if field.is_empty() {
         return Err(Error::invalid("--if", format!("`{s}`: start with a field, e.g. `inserted > 0`")));
@@ -458,10 +493,13 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
         return Err(Error::invalid(
             "--then",
             format!(
-                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch, notify, broadcast)"
+                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch, notify, broadcast, mcp)"
             ),
         ));
     };
+    if verb.eq_ignore_ascii_case("mcp") {
+        return parse_mcp(store, s, rest);
+    }
     let mut pos: Vec<String> = vec![];
     let mut kv: Vec<(String, String)> = vec![];
     for (w, v) in rest {
@@ -647,7 +685,7 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
         },
         v => {
             return Err(bad(format!(
-                "unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch)"
+                "unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch, notify, broadcast, mcp)"
             )));
         }
     };
@@ -655,6 +693,20 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
         return Err(bad(format!("`{k}=` does not belong to {}", t.verb())));
     }
     Ok(t)
+}
+
+/// `mcp SERVER TOOL key=value …` (argument names keep their case).
+fn parse_mcp(store: &Store, s: &str, rest: &[(String, Option<String>)]) -> Result<Then> {
+    let bad = |m: &str| Error::invalid("--then", format!("`{s}`: {m}"));
+    let pos: Vec<&String> = rest.iter().filter(|(_, v)| v.is_none()).map(|(w, _)| w).collect();
+    let [server, tool] = pos.as_slice() else { return Err(bad("mcp takes SERVER TOOL, then key=value arguments")) };
+    let srv = store.find_mcp_server(server)?;
+    let pairs: Vec<(String, String)> = rest.iter().filter_map(|(k, v)| v.clone().map(|v| (k.clone(), v))).collect();
+    let args = match crate::mcp::client::args_from_pairs(&pairs) {
+        Value::Object(m) => m,
+        _ => Default::default(),
+    };
+    Ok(Then::Mcp { server: srv.name, tool: tool.to_string(), args })
 }
 
 fn yes(v: &str) -> std::result::Result<bool, String> {
@@ -715,6 +767,11 @@ pub fn then_text(store: &Store, t: &Then) -> String {
             }
         }
         Then::RunSearch { search } => opt(ItemKind::LiveSearch, search),
+        Then::Mcp { server, tool, args } => {
+            w.push(quote(server));
+            w.push(quote(tool));
+            w.extend(args.iter().map(|(k, v)| format!("{k}={}", quote(&crate::designer::value_text(v)))));
+        }
         Then::RunCode { space } => w.push(quote(&name_of(store, ItemKind::Code, space))),
         Then::CertWatch { renew_days, notify_days } => {
             w.push(format!("renew={renew_days}"));
@@ -857,6 +914,7 @@ pub fn field_value(store: &Store, a: &ActionRecord, field: &str) -> Option<Value
         "author" => Some(crate::history::author_label(store, a.author_id.as_deref()).into()),
         "author_id" => a.author_id.clone().map(Into::into),
         "action" | "id" => Some(a.id.into()),
+        f if f.starts_with("mcp:") => mcp_field(store, f),
         f => {
             if let Some(p) = f.strip_prefix("before.") {
                 return a.before.as_ref().and_then(|v| path(v, p)).cloned();
@@ -867,6 +925,55 @@ pub fn field_value(store: &Store, a: &ActionRecord, field: &str) -> Option<Value
             path(&a.params, f.strip_prefix("params.").unwrap_or(f)).cloned()
         }
     }
+}
+
+/// `mcp:SERVER/TOOL[(key=value,…)][.path]`: call the tool (approved ones only; the first
+/// time an unapproved one is wanted a notification says how to allow it) and read its result.
+fn mcp_field(store: &Store, f: &str) -> Option<Value> {
+    thread_local!(static IN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) });
+    // the call records actions, which run rules, which must not call again
+    if IN.with(|i| i.replace(true)) {
+        return None;
+    }
+    let v = mcp_field_now(store, f);
+    IN.with(|i| i.set(false));
+    v
+}
+
+fn mcp_field_now(store: &Store, f: &str) -> Option<Value> {
+    let (server, tool, args, p) = parse_mcp_field(f)?;
+    let srv = store.find_mcp_server(&server).ok()?;
+    let v = match crate::mcp::client::call_for_rule(store, &srv, &tool, args, "a condition") {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("{f}: {e}");
+            return None;
+        }
+    };
+    let v = crate::mcp::result_value(&v);
+    if p.is_empty() { (!v.is_null()).then_some(v) } else { path(&v, &p).cloned() }
+}
+
+/// The parts of an `mcp:` field: server, tool, arguments, result path.
+pub fn parse_mcp_field(f: &str) -> Option<(String, String, Value, String)> {
+    let rest = f.strip_prefix("mcp:")?;
+    let (server, rest) = rest.split_once('/')?;
+    let end = rest.find(['(', '.']).unwrap_or(rest.len());
+    let tool = &rest[..end];
+    let mut rest = &rest[end..];
+    let mut pairs = vec![];
+    if let Some(r) = rest.strip_prefix('(') {
+        let close = r.find(')')?;
+        for kv in r[..close].split(',').filter(|x| !x.trim().is_empty()) {
+            let (k, v) = kv.split_once('=')?;
+            pairs.push((k.trim().to_string(), v.trim().to_string()));
+        }
+        rest = &r[close + 1..];
+    }
+    if server.is_empty() || tool.is_empty() || !(rest.is_empty() || rest.starts_with('.')) {
+        return None;
+    }
+    Some((server.into(), tool.into(), crate::mcp::client::args_from_pairs(&pairs), rest.trim_start_matches('.').into()))
 }
 
 fn text(v: &Value) -> String {
@@ -1006,6 +1113,10 @@ pub fn check(store: &Store, r: &Rule, a: &ActionRecord) -> Check {
         .when
         .iter()
         .map(|c| {
+            // an MCP data source is only asked when the rule could run
+            if c.field.starts_with("mcp:") && (on.is_none() || related == Some(false)) {
+                return CondCheck { condition: condition_text(c), ok: false, actual: None };
+            }
             let actual = field_value(store, a, &c.field);
             CondCheck { condition: condition_text(c), ok: compare(actual.as_ref(), c.op, &c.value), actual }
         })
@@ -1118,6 +1229,15 @@ pub fn plan(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
             if store.host_running() { " (the host does it)" } else { " (no host is running here, so it would notify instead)" },
             notify_days.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(", ")
         ),
+        Then::Mcp { server, tool, args } => {
+            let srv = mcp_server(store, server)?;
+            format!(
+                "call MCP tool {}/{tool} with {}{}",
+                srv.name,
+                if args.is_empty() { "no arguments".into() } else { values_text(&filled(store, r, a, args)) },
+                if store.mcp_approved(&srv.id, tool)? { "" } else { " — not approved yet, so it would fail" }
+            )
+        }
         Then::RunCode { space } => {
             let c = code_space(store, space)?;
             format!(
@@ -1225,6 +1345,10 @@ fn note(store: &Store, a: crate::designer::Act) {
 }
 
 /// The model a then-action names, else the one the rule lives in.
+fn mcp_server(store: &Store, name: &str) -> Result<crate::store::McpServer> {
+    store.find_mcp_server(name).map_err(|_| Error::invalid("MCP server", format!("`{name}` is not added on this node (`mnnn mcp add {name} …`)")))
+}
+
 fn code_space(store: &Store, id: &str) -> Result<crate::store::CodeSpace> {
     store.code_space(id)?.ok_or_else(|| Error::invalid("code space", format!("`{id}` no longer exists")))
 }
@@ -1321,6 +1445,13 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
         Then::CertWatch { renew_days, notify_days } => {
             let v = crate::org::tls::watch(store, ORIGIN, *renew_days, notify_days, store.host_running())?;
             Ok(if v.is_empty() { "certificates are fine".into() } else { v.join("; ") })
+        }
+        Then::Mcp { server, tool, args } => {
+            let srv = mcp_server(store, server)?;
+            let v = crate::mcp::client::call_for_rule(store, &srv, tool, Value::Object(filled(store, r, a, args)), &r.name)?;
+            let t = crate::mcp::result_text(&v);
+            let t: String = t.chars().take(200).collect();
+            Ok(format!("{}/{tool}: {}", srv.name, t.lines().next().unwrap_or_default()))
         }
         Then::RunCode { space } => {
             let c = code_space(store, space)?;
@@ -2119,5 +2250,36 @@ mod tests {
             assert!(ev.contains(&k), "{k}");
         }
         assert_eq!(subject(&made[0]).unwrap(), (ItemKind::Model, sig.id.clone()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mcp_tools_as_actions_and_conditions() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = Store::open_in_memory().unwrap();
+        let cmd = crate::mcp::client::tests::fake_server(dir.path());
+        let srv = s.add_mcp_server("fake", "stdio", &cmd.to_string_lossy(), &[], "", &Default::default()).unwrap();
+        assert_eq!(
+            parse_mcp_field("mcp:fake/price(symbol=BTC, n=2).price"),
+            Some(("fake".into(), "price".into(), json!({ "symbol": "BTC", "n": 2 }), "price".into()))
+        );
+        assert!(parse_mcp_field("mcp:fake").is_none());
+        let c = parse_condition("mcp:fake/price(symbol=BTC).price > 40").unwrap();
+        assert_eq!((c.field.as_str(), c.op, c.value.as_str()), ("mcp:fake/price(symbol=BTC).price", Op::Gt, "40"));
+        let t = parse_then(&s, "mcp fake price Symbol={summary}").unwrap();
+        assert_eq!(t, Then::Mcp { server: "fake".into(), tool: "price".into(), args: json!({ "Symbol": "{summary}" }).as_object().unwrap().clone() });
+        assert_eq!(then_text(&s, &t), "mcp fake price Symbol={summary}");
+        assert!(parse_then(&s, "mcp nope price").is_err());
+        let r = rule(&s, "import", &["mcp:fake/price.price > 40"], &["mcp fake price Symbol={summary}"]);
+        let a = act(&s, "import", json!({}));
+        // not approved: the condition has no value and the action is refused, with one notification
+        assert!(!check(&s, &r, &a).matched);
+        assert!(plan(&s, &r, &a, &t).unwrap().contains("not approved"));
+        assert!(exec(&s, &r, &a, &t).unwrap_err().to_string().contains("mnnn mcp approve fake price"));
+        assert_eq!(s.notifications(false, 50).unwrap().iter().filter(|n| n.kind == "mcp.approve").count(), 1);
+        crate::mcp::client::approve(&s, &srv, "price", "cli", true).unwrap();
+        assert!(check(&s, &r, &a).matched);
+        assert!(exec(&s, &r, &a, &t).unwrap().starts_with("fake/price: "));
+        assert!(s.actions_of_kind("mcp.call").unwrap().iter().any(|c| c.params["ok"] == true && c.origin == ORIGIN));
     }
 }

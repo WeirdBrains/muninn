@@ -270,6 +270,14 @@ pub enum Then {
         #[serde(default)]
         to: Option<String>,
     },
+    /// 2.20: call a tool of an external MCP server (by name: servers and their credentials are
+    /// per node); argument values are templates. The tool must be approved first (`mnnn mcp approve`).
+    Mcp {
+        server: String,
+        tool: String,
+        #[serde(default)]
+        args: serde_json::Map<String, serde_json::Value>,
+    },
 }
 
 fn renew_days() -> i64 {
@@ -302,6 +310,7 @@ impl Then {
             Then::CertWatch { .. } => "cert-watch",
             Then::Notify { .. } => "notify",
             Then::Broadcast { .. } => "broadcast",
+            Then::Mcp { .. } => "mcp",
         }
     }
 }
