@@ -6,8 +6,17 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.16.1] - 2026-11-01
+
+### Added
+- The Muninn 2.0 announcement, linking the 1.0 announcement for the core features: `mnnn help announcement-2.0`
+- A plan for deploying a public relay (systemd, DNS, firewall, ACME): `mnnn help deploy-relay`
+
 ### Changed
 - License: BSD 3-Clause, copyright Weird Brains (was MIT)
+
+### Fixed
+- In-app help no longer treats links to images as broken help topics
 
 ## [2.16.0] - 2026-11-01
 
@@ -442,7 +451,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.16.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.16.1...HEAD
+[2.16.1]: https://github.com/WeirdBrains/muninn/compare/v2.16.0...v2.16.1
 [2.16.0]: https://github.com/WeirdBrains/muninn/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/WeirdBrains/muninn/compare/v2.14.0...v2.15.0
 [2.14.0]: https://github.com/WeirdBrains/muninn/compare/v2.13.0...v2.14.0
