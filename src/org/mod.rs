@@ -9,6 +9,8 @@
 //! owner; a member reaching the node over the network or the web acts with their role; a
 //! guest (no identity) only reaches what is public, or what an open org lets anyone do.
 //! Every change is recorded in the action history. See `docs/organizations.md`.
+pub mod announce;
+pub mod build;
 pub mod builtin;
 pub mod exec;
 pub mod host;
@@ -897,6 +899,51 @@ pub fn save_template(s: &Store, origin: &str, a: &Actor, org: &Org, name: &str, 
         serde_json::json!({ "org": org.id, "template": t.id }),
     );
     Ok(t)
+}
+
+/// A preview link token for a template (needs `publish`); open it through the local host at
+/// [`serve::preview_path`]. It lasts [`serve::PREVIEW_TTL_MS`].
+pub fn preview(s: &Store, origin: &str, a: &Actor, org: &Org, t: &Template) -> Result<String> {
+    require(s, org, a, "publish")?;
+    let token = s.create_preview(&t.id, serve::PREVIEW_TTL_MS)?;
+    record(
+        s,
+        origin,
+        "org.template.preview",
+        format!("preview of template {} in {}", t.name, org.name),
+        serde_json::json!({ "org": org.id, "template": t.id }),
+    );
+    Ok(token)
+}
+
+/// Remove a template (needs `publish`); orgs using it go back to the built-in look.
+pub fn remove_template(s: &Store, origin: &str, a: &Actor, org: &Org, t: &Template) -> Result<()> {
+    require(s, org, a, "publish")?;
+    s.delete_template(&t.id)?;
+    record(
+        s,
+        origin,
+        "org.template.remove",
+        format!("template {} removed from {}", t.name, org.name),
+        serde_json::json!({ "org": org.id, "template": t.id }),
+    );
+    Ok(())
+}
+
+/// Remove one of a template's files (needs `publish`).
+pub fn remove_asset(s: &Store, origin: &str, a: &Actor, org: &Org, t: &Template, name: &str) -> Result<()> {
+    require(s, org, a, "publish")?;
+    if !s.delete_template_asset(&t.id, name)? {
+        return Err(Error::invalid("asset", format!("template {} has no file {name}", t.name)));
+    }
+    record(
+        s,
+        origin,
+        "org.template.asset_remove",
+        format!("file {name} removed from template {} in {}", t.name, org.name),
+        serde_json::json!({ "org": org.id, "template": t.id, "name": name }),
+    );
+    Ok(())
 }
 
 /// Store a file with a template (served at `/o/{slug}/assets/{template}/{name}`).

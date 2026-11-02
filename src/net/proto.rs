@@ -168,6 +168,10 @@ pub enum Req {
     Sync {
         req: crate::net::sync::SyncReq,
     },
+    /// 2.17: an org site opened or closed on the sending node.
+    SiteAnnounce {
+        site: crate::org::announce::SiteCard,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

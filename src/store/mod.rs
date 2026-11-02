@@ -32,7 +32,7 @@ pub use models::{ApplyOpts, Design, Field, FieldOp, FieldType, Model, ModelVersi
 pub use net::{Entrusted, Exchange, ExchangeStatus, Held, NetPeer, NewExchange, Share, ShareKind};
 pub use orgs::{
     Access, Endpoint, EndpointKind, Joined, Member, MemberStatus, Mirror, NewRole, Org, OrgChange, OrgNode, ProjectMember, Published, Resource,
-    ResourceState, Role, Template, TemplateAsset, Visibility,
+    ResourceState, Role, SiteAnnouncement, Template, TemplateAsset, Visibility,
 };
 pub use projects::{ItemKind, Project, ProjectItem, SeriesRef};
 pub use query::{BarSort, BarSummary};

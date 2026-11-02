@@ -276,3 +276,46 @@ fn a_gated_private_org_shows_guests_its_door_only() {
     assert_eq!(serve::route(&s, "POST", "/o/lab/api/run/other", b"{}", None).status, 404);
     assert_eq!(get("/o/lab/api/org").status, 404);
 }
+
+#[test]
+fn previews_render_a_template_live_until_they_expire() {
+    use super::serve::{preview_path, route};
+    let s = Store::open_in_memory().unwrap();
+    let o = create(&s, "cli", "Lab", None, "").unwrap();
+    let j = s.create_journal("notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    s.add_entry(&j.id, "Comet", "x", None).unwrap();
+    let (r, _) = transfer(&s, "cli", &Actor::Owner, &o, ShareKind::Journal, "notes", None).unwrap();
+    let (r2, _) = {
+        let j2 = s.create_journal("secret", None, crate::store::EntryFormat::Markdown).unwrap();
+        transfer(&s, "cli", &Actor::Owner, &o, ShareKind::Journal, &j2.id, None).unwrap()
+    };
+    set_published(&s, "cli", &Actor::Owner, &o, &r, Published::Public).unwrap();
+    set_published(&s, "cli", &Actor::Owner, &o, &r2, Published::Members).unwrap();
+    let t = save_template(&s, "cli", &Actor::Owner, &o, "draft", "<i>{{content}}</i><img src=\"{{assets}}a.svg\">", "").unwrap();
+    put_asset(&s, "cli", &Actor::Owner, &o, &t, "a.svg", b"<svg/>").unwrap();
+    // a viewer may not make previews
+    let (_, ben) = tests_member(&s, &o);
+    assert!(preview(&s, "cli", &actor_for(&s, &ben).unwrap(), &o, &t).is_err());
+    let tok = preview(&s, "cli", &Actor::Owner, &o, &t).unwrap();
+    let get = |p: &str| route(&s, "GET", p, b"", None);
+    let base = preview_path("lab", &tok);
+    // works before the org is hosted or uses the template; public artifacts only
+    let page = String::from_utf8(get(&base).body).unwrap();
+    assert!(page.starts_with("<i>") && page.contains("notes") && !page.contains("secret"));
+    assert!(page.contains(&format!("{base}assets/a.svg")));
+    assert_eq!(get(&format!("{base}assets/a.svg")).body, b"<svg/>");
+    // live: an edit shows on the next request
+    save_template(&s, "cli", &Actor::Owner, &o, "draft", "<b>{{content}}</b>", "").unwrap();
+    assert!(String::from_utf8(get(&base).body).unwrap().starts_with("<b>"));
+    // wrong slug or token: nothing
+    assert_eq!(get(&preview_path("other", &tok)).status, 404);
+    assert_eq!(get(&preview_path("lab", "nope")).status, 404);
+    let old = s.create_preview(&t.id, -1).unwrap();
+    assert_eq!(get(&preview_path("lab", &old)).status, 404);
+}
+
+fn tests_member(s: &Store, o: &Org) -> (Org, Member) {
+    let r = s.find_role(&o.id, "viewer").unwrap();
+    let m = s.upsert_member(&o.id, "12D3KooWviewerviewer", "vic", Some(&r.id), MemberStatus::Member, None, "", Some("owner")).unwrap();
+    (o.clone(), m)
+}

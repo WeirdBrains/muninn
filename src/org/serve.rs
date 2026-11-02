@@ -138,6 +138,11 @@ pub struct Asset {
 /// `{{base}}` (the site's address), `{{assets}}` (where its assets are), `{{css}}` and
 /// `{{content}}` (the page, already HTML). Everything but the content is escaped.
 pub fn fill(look: &Look, org: &OrgCard, title: &str, content: &str) -> String {
+    fill_at(look, org, title, content, &format!("/o/{}/assets/", org.slug))
+}
+
+/// [`fill`] with the assets served from `assets` (previews serve them under their token).
+pub fn fill_at(look: &Look, org: &OrgCard, title: &str, content: &str, assets: &str) -> String {
     let html = if look.html.trim().is_empty() { DEFAULT_HTML } else { &look.html };
     let css = if look.css.trim().is_empty() && look.html.trim().is_empty() { DEFAULT_CSS } else { &look.css };
     let base = format!("/o/{}/", org.slug);
@@ -146,7 +151,7 @@ pub fn fill(look: &Look, org: &OrgCard, title: &str, content: &str) -> String {
         .replace("{{org.description}}", &escape(&org.description))
         .replace("{{org.slug}}", &escape(&org.slug))
         .replace("{{base}}", &base)
-        .replace("{{assets}}", &format!("{base}assets/"))
+        .replace("{{assets}}", assets)
         .replace("{{css}}", &css.replace("</", "<\\/"))
         .replace("{{content}}", content)
 }
@@ -183,6 +188,11 @@ pub fn look(s: &Store, org: &Org) -> Result<Look> {
         None => None,
     };
     let Some(t) = t else { return Ok(Look::default()) };
+    look_of(s, t)
+}
+
+/// One template's look, with its assets.
+pub fn look_of(s: &Store, t: crate::store::Template) -> Result<Look> {
     let mut assets = vec![];
     for a in s.template_assets(&t.id)? {
         if let Some((mime, data)) = s.template_asset(&t.id, &a.name)? {
@@ -340,6 +350,7 @@ fn route_inner(s: &Store, method: &str, path: &str, body: &[u8], exchange: Optio
             let Some(site) = site(s, slug)? else { return Ok(Page::not_found()) };
             org_page(s, &site, exchange)
         }
+        ["o", slug, "_preview", token, rest @ ..] => preview(s, slug, token, rest),
         ["o", _, "assets-builtin", "join.js"] => Ok(Page::new(200, "text/javascript; charset=utf-8", JOIN_JS.as_bytes().to_vec())),
         ["o", slug, rest @ ..] => {
             let Some(site) = site(s, slug)? else { return Ok(Page::not_found()) };
@@ -348,6 +359,42 @@ fn route_inner(s: &Store, method: &str, path: &str, body: &[u8], exchange: Optio
                 Site::Mirror(snap) => mirror(&snap, method, rest),
             }
         }
+        _ => Ok(Page::not_found()),
+    }
+}
+
+/// How long a preview link lasts.
+pub const PREVIEW_TTL_MS: i64 = 60 * 60 * 1000;
+
+/// A preview's path on the local host.
+pub fn preview_path(slug: &str, token: &str) -> String {
+    format!("/o/{slug}/_preview/{token}/")
+}
+
+/// `/o/{slug}/_preview/{token}/…` (2.17): the org's page through a template (whether or not
+/// the org uses it or is hosted yet), rendered fresh on every request so edits show at once.
+/// The token is the only key; it shows public artifacts only and expires.
+fn preview(s: &Store, slug: &str, token: &str, rest: &[&str]) -> Result<Page> {
+    let Some(tid) = s.preview(token)? else { return Ok(Page::error(404, "this preview link has expired")) };
+    let Some(t) = s.template(&tid)? else { return Ok(Page::not_found()) };
+    let Some(org) = s.orgs()?.into_iter().find(|o| o.slug == slug && o.id == t.org_id) else { return Ok(Page::not_found()) };
+    match rest {
+        [] | [""] => {
+            let card = super::card(s, &org);
+            let arts: Vec<_> = s
+                .resources(&org.id)?
+                .into_iter()
+                .filter(|r| r.state == ResourceState::Active && r.published == Published::Public)
+                .map(|r| (r.id, r.kind, r.name))
+                .collect();
+            let assets = format!("{}assets/", preview_path(&org.slug, token));
+            let title = format!("{} (preview of {})", org.name, t.name);
+            Ok(Page::new(200, "text/html; charset=utf-8", fill_at(&look_of(s, t)?, &card, &title, &artifact_list(&card, &arts), &assets)))
+        }
+        ["assets", name @ ..] => match s.template_asset(&t.id, &name.join("/"))? {
+            Some((mime, data)) => Ok(Page::new(200, &mime, data)),
+            None => Ok(Page::not_found()),
+        },
         _ => Ok(Page::not_found()),
     }
 }

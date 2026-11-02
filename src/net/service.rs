@@ -482,6 +482,10 @@ pub fn answer(s: &Store, x: &Exchange, from: &PeerId, req: Req, label: &str) -> 
             Resp::Linked { card, keypair }
         }
         Req::Sync { req } => super::sync::serve(s, from, req)?,
+        Req::SiteAnnounce { site } => {
+            crate::org::announce::receive(s, x, &from.to_string(), site)?;
+            Resp::Ok
+        }
         Req::Revoke => {
             let x = s.set_exchange_status(&x.id, ExchangeStatus::Revoked, Some("peer"))?;
             crate::org::net::ended(s, &x)?;
