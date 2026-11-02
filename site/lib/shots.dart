@@ -102,8 +102,16 @@ const shots = [
     'The org site: each org\'s domains and certificate (yours, Let\'s Encrypt or self-signed)',
   ),
   (
+    'screenshots/org-templates.png',
+    'Org site templates: edit HTML and CSS (e), files, previews (p) and build steps (b)',
+  ),
+  (
     'screenshots/reviews.png',
     'Reviews: comments, suggestions, highlights and votes on shared work',
+  ),
+  (
+    'screenshots/notifications.png',
+    'Notifications: the header bell (!) and what events, rule sets and broadcasts told you; Enter opens the context',
   ),
   (
     'screenshots/network.png',

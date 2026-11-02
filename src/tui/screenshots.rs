@@ -341,6 +341,20 @@ fn feature_screenshots() {
     shot(&mut a, "org-site", "The org site: each org's domains and certificate (yours, Let's Encrypt or self-signed)");
     close(&mut a);
 
+    // org site templates (2.17)
+    let html = "<!doctype html>\n<html>\n<head><link rel=stylesheet href=style.css></head>\n<body>\n  <h1>{{org.name}}</h1>\n  <p>{{org.description}}</p>\n  {{projects}}\n</body>\n</html>\n";
+    let (lt, _) = a
+        .store
+        .save_template(&o.id, "Launch", html, "body { font-family: system-ui; max-width: 48rem; margin: auto }\nh1 { color: #5b7cfa }\n")
+        .unwrap();
+    a.store.put_template_asset(&lt.id, "logo.svg", "image/svg+xml", b"<svg xmlns='http://www.w3.org/2000/svg'/>").unwrap();
+    a.store.save_template(&o.id, "Journal digest", "<main>{{journals}}</main>\n", "").unwrap();
+    a.on_key(key(KeyCode::Char('G')));
+    a.on_key(key(KeyCode::Char('7')));
+    a.on_key(key(KeyCode::Down));
+    shot(&mut a, "org-templates", "Org site templates: edit HTML and CSS (e), files, previews (p) and build steps (b)");
+    close(&mut a);
+
     // reviews
     a.on_key(key(KeyCode::Char('V')));
     a.on_key(key(KeyCode::Char('n')));
@@ -349,6 +363,27 @@ fn feature_screenshots() {
     a.on_key(key(KeyCode::Char('c')));
     typ(&mut a, "Good call on the 2,640 retest; add the funding chart\n");
     shot(&mut a, "reviews", "Reviews: comments, suggestions, highlights and votes on shared work");
+    close(&mut a);
+
+    // notifications (2.18): the header bell and the window
+    let j = a.store.journals().unwrap().into_iter().next().map(|j| format!("journal:{}", j.id));
+    let org_link = Some(format!("org:{}", o.id));
+    for (kind, level, title, body, link) in [
+        ("net.broadcast", "info", "ben-laptop: deploy", "v2 of the funding model is out", None),
+        ("org.member.apply", "info", "Cleo applied to join Comet Lab", "", org_link.clone()),
+        ("rule", "warn", "imported 12,480 bars", "BTCUSDT 5m from binance", j),
+        ("sync.pull", "warn", "sync with ben-laptop kept 2 conflicts", "mnnn sync conflicts lists them", Some("sync".to_string())),
+        ("notify", "error", "certificate for nebula.example.net expires in 3 days", "", org_link),
+    ] {
+        crate::notify::add(
+            &a.store,
+            "tui",
+            &crate::store::NewNotification { kind: kind.into(), level: level.into(), title: title.into(), body: body.into(), link, action_id: None },
+        )
+        .unwrap();
+    }
+    a.on_key(key(KeyCode::Char('!')));
+    shot(&mut a, "notifications", "Notifications: the header bell (!) and what events, rule sets and broadcasts told you; Enter opens the context");
     close(&mut a);
 
     // network: this node and two sample nodes on localhost, connected

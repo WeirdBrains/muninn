@@ -13,7 +13,7 @@ New here? Read the [Muninn 2.0 announcement](docs/announcement-2.0.md).
 <!-- screenshots: written by scripts/screenshots.sh -->
 ![cat ticks.csv | mnnn pipeline run feed -: three views as three live columns](site/web/screenshots/pipeline-live.png)
 
-<details><summary>Every feature (pipeline-live above; 34 screens)</summary>
+<details><summary>Every feature (pipeline-live above; 36 screens)</summary>
 
 **Home: every series in a list, the header with the node's status**
 
@@ -135,9 +135,17 @@ New here? Read the [Muninn 2.0 announcement](docs/announcement-2.0.md).
 
 ![The org site: each org's domains and certificate (yours, Let's Encrypt or self-signed)](site/web/screenshots/org-site.png)
 
+**Org site templates: edit HTML and CSS (e), files, previews (p) and build steps (b)**
+
+![Org site templates: edit HTML and CSS (e), files, previews (p) and build steps (b)](site/web/screenshots/org-templates.png)
+
 **Reviews: comments, suggestions, highlights and votes on shared work**
 
 ![Reviews: comments, suggestions, highlights and votes on shared work](site/web/screenshots/reviews.png)
+
+**Notifications: the header bell (!) and what events, rule sets and broadcasts told you; Enter opens the context**
+
+![Notifications: the header bell (!) and what events, rule sets and broadcasts told you; Enter opens the context](site/web/screenshots/notifications.png)
 
 **The network: this node, relays, connections and shares, end to end encrypted**
 
