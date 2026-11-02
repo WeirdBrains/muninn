@@ -191,6 +191,7 @@ pub fn menus() -> Vec<Menu> {
                 a("Nodes…", 'o', "", NetExchanges),
                 a("Peers…", 'p', "", NetPeers),
                 a("Peers, messages & live…", 'l', "W", Peers),
+                a("MCP…", 'm', "", Mcp),
                 a("Relays…", 'r', "", NetRelays),
                 sep(),
                 a("Shared data…", 'd', "", NetShared),

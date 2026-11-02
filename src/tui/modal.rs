@@ -62,6 +62,8 @@ pub enum Modal {
     Notifications,
     /// Net ▸ Peers, messages & live… (`W`)
     Peers,
+    /// Net ▸ MCP…
+    Mcp,
     /// Data ▸ Model designer…
     Models,
     /// Export a journal, entry, report or project as a document.
@@ -132,6 +134,7 @@ impl Modal {
             Modal::Reviews => "reviews",
             Modal::Notifications => "notifications",
             Modal::Peers => "collaboration",
+            Modal::Mcp => "mcp",
             Modal::Code => "code-spaces",
             Modal::Pipes => "pipes",
             Modal::Pipelines => "pipelines",
@@ -292,6 +295,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             Some(Modal::Reviews) => super::reviews::on_click(app, i),
             Some(Modal::Notifications) => super::notifications::on_click(app, i),
             Some(Modal::Peers) => super::peers::on_click(app, i),
+            Some(Modal::Mcp) => super::mcp::on_click(app, i),
             Some(Modal::Code) => super::code::on_click(app, i),
             Some(Modal::Models) => super::models::on_click(app, i),
             Some(Modal::DocExport) => super::docexport::on_click(app, i),
@@ -376,6 +380,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Reviews => super::reviews::on_key(app, k),
         Modal::Notifications => super::notifications::on_key(app, k),
         Modal::Peers => super::peers::on_key(app, k),
+        Modal::Mcp => super::mcp::on_key(app, k),
         Modal::Code => super::code::on_key(app, k),
         Modal::Pipes => super::pipes::on_key(app, k),
         Modal::Pipelines => super::designer::on_key(app, k),
@@ -709,6 +714,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Reviews => super::reviews::draw(app, f, r, &mut extra),
         Modal::Notifications => super::notifications::draw(app, f, r, &mut extra),
         Modal::Peers => super::peers::draw(app, f, r, &mut extra),
+        Modal::Mcp => super::mcp::draw(app, f, r, &mut extra),
         Modal::Code => super::code::draw(app, f, r, &mut extra),
         Modal::Pipes => super::pipes::draw(app, f, r, &mut extra),
         Modal::Pipelines => super::designer::draw(app, f, r, &mut extra),

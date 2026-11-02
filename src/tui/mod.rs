@@ -17,6 +17,7 @@ pub mod history;
 pub mod import;
 pub mod journals;
 pub mod layout;
+mod mcp;
 pub mod menu;
 pub mod modal;
 pub mod models;
@@ -164,6 +165,7 @@ pub struct App {
     pub reviews: reviews::ReviewsState,
     pub peers: peers::PeersState,
     pub notifications: notifications::NotifState,
+    pub mcp: mcp::McpState,
     pub code: code::CodeState,
     pub pipes: pipes::PipesState,
     pub frames: frametile::FramesState,
@@ -218,6 +220,7 @@ impl App {
             reviews: Default::default(),
             peers: Default::default(),
             notifications: Default::default(),
+            mcp: Default::default(),
             code: Default::default(),
             pipes: Default::default(),
             frames: Default::default(),
@@ -444,6 +447,7 @@ impl App {
             Reviews => reviews::open(self, reviews::Tab::Reviews),
             Notifications => notifications::open(self),
             Peers => peers::open(self, peers::Tab::Peers),
+            Mcp => mcp::open(self, mcp::Tab::Servers),
             ReviewNew => reviews::open_new(self),
             ReviewThread => reviews::open(self, reviews::Tab::Thread),
             ReviewsJoined => reviews::open(self, reviews::Tab::Joined),
@@ -1339,6 +1343,8 @@ impl App {
 mod code_tests;
 #[cfg(test)]
 mod frames_tests;
+#[cfg(test)]
+mod mcp_tests;
 #[cfg(test)]
 mod models_tests;
 #[cfg(test)]

@@ -97,6 +97,7 @@ pub enum Action {
     ReviewsJoined,
     Notifications,
     Peers,
+    Mcp,
     // View
     NewTile(ViewKind),
     SplitRight,
@@ -213,6 +214,7 @@ impl Action {
             ReviewsJoined => "review.joined".into(),
             Notifications => "notifications".into(),
             Peers => "peers".into(),
+            Mcp => "mcp".into(),
             Quit => "quit".into(),
             NewTile(v) => format!("tile.new.{}", if v == ViewKind::List { "list" } else { "chart" }),
             SplitRight => "tile.split-right".into(),
