@@ -38,7 +38,7 @@ fn the_site_links_releases_docs_and_install_steps() {
         "id: 'install'",
         "apt install",
         "dnf install",
-        "makepkg",
+        "pacman -U",
         "brew install",
         "winget install",
     ] {

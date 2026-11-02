@@ -174,18 +174,20 @@ const features = [
 const installs = [
   (
     'Release tarball (Linux, macOS)',
-    'tar -xzf muninn-<ver>-<target>.tar.gz\ninstall -Dm755 muninn-<ver>-<target>/mnnn ~/.local/bin/mnnn',
+    'tar -xzf muninn-2.18.0-x86_64-unknown-linux-gnu.tar.gz\ninstall -Dm755 muninn-2.18.0-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn',
   ),
-  ('Debian / Ubuntu', 'sudo apt install ./muninn_<ver>-1_amd64.deb'),
-  ('Fedora', 'sudo dnf install ./muninn-<ver>-1.x86_64.rpm'),
+  ('Debian / Ubuntu', 'sudo apt install ./muninn_2.18.0-1_amd64.deb'),
+  ('Fedora', 'sudo dnf install ./muninn-2.18.0-1.x86_64.rpm'),
+  ('Arch Linux', 'sudo pacman -U muninn-bin-2.18.0-1-x86_64.pkg.tar.zst'),
   (
-    'Arch Linux',
-    'git clone https://github.com/WeirdBrains/muninn.git\ncd muninn/packaging/arch && makepkg -si',
+    'Homebrew (macOS, Linux)',
+    'tar -xzf muninn-2.18.0-packaging.tar.gz\nbrew install ./packaging/homebrew/muninn.rb',
   ),
-  ('Homebrew (macOS, Linux)', 'brew install ./packaging/homebrew/muninn.rb'),
   (
     'Windows (winget)',
-    r'winget install --manifest packaging\winget\manifests\k\Kommandosaldat\Muninn\<ver>',
+    r'tar -xzf muninn-2.18.0-packaging.tar.gz'
+        '\n'
+        r'winget install --manifest packaging\winget\2.18.0',
   ),
 ];
 

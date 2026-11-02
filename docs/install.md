@@ -11,9 +11,35 @@ Building code spaces is optional and needs extra tools that the packages do not 
 translated in process, so no Python install is needed. See
 [code spaces](code-spaces.md#python-in-rust).
 
-> The prebuilt downloads (release tarballs, `muninn-bin`, Homebrew, winget) only work
-> after a release has been published by the release workflow and is publicly
-> downloadable. Until then use the Arch checkout build below or *From source*.
+## Getting a release
+
+Each release is built and checked locally, and its files are attached to its page under
+[GitHub Releases](https://github.com/WeirdBrains/muninn/releases). The latest is
+[v2.18.0](https://github.com/WeirdBrains/muninn/releases/tag/v2.18.0). Every release has
+14 files:
+
+| File (v2.18.0) | For |
+|---|---|
+| `muninn-2.18.0-x86_64-unknown-linux-gnu.tar.gz`, `muninn-2.18.0-aarch64-unknown-linux-gnu.tar.gz` | any Linux |
+| `muninn-2.18.0-x86_64-apple-darwin.tar.gz`, `muninn-2.18.0-aarch64-apple-darwin.tar.gz` | macOS (Intel, Apple silicon) |
+| `muninn_2.18.0-1_amd64.deb`, `muninn_2.18.0-1_arm64.deb` | Debian, Ubuntu |
+| `muninn-2.18.0-1.x86_64.rpm`, `muninn-2.18.0-1.aarch64.rpm` | Fedora, RHEL |
+| `muninn-bin-2.18.0-1-x86_64.pkg.tar.zst`, `muninn-bin-2.18.0-1-aarch64.pkg.tar.zst` | Arch Linux |
+| `muninn-2.18.0-x86_64-pc-windows-gnullvm.zip`, `muninn-2.18.0-aarch64-pc-windows-gnullvm.zip` | Windows (x64, arm64) |
+| `muninn-2.18.0-packaging.tar.gz` | the Homebrew formula, Arch PKGBUILD and winget manifests, with this release's checksums filled in |
+| `SHA256SUMS` | checksums for all of the above |
+
+Download from the command line and check it, for example:
+
+```sh
+ver=2.18.0
+base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
+curl -LO $base/muninn-$ver-x86_64-unknown-linux-gnu.tar.gz -LO $base/SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS      # macOS: shasum -a 256 --ignore-missing -c SHA256SUMS
+```
+
+(`gh release download v2.18.0` does the same if you have the GitHub CLI.) Muninn is
+BSD-3-Clause licensed; every package carries the `LICENSE`.
 
 Installing or uninstalling never touches your data in `~/.muninn` (or `MUNINN_HOME`);
 delete that folder yourself to remove it.
@@ -21,9 +47,10 @@ delete that folder yourself to remove it.
 ## Release tarball (any Linux or macOS)
 
 ```sh
-tar -xzf muninn-<ver>-<target>.tar.gz      # e.g. x86_64-unknown-linux-gnu, aarch64-apple-darwin
-install -Dm755 muninn-<ver>-<target>/mnnn ~/.local/bin/mnnn
-mkdir -p ~/.local/share/man/man1 && cp muninn-<ver>-<target>/man/*.1 ~/.local/share/man/man1/
+t=x86_64-unknown-linux-gnu     # or aarch64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin
+tar -xzf muninn-2.18.0-$t.tar.gz
+install -Dm755 muninn-2.18.0-$t/mnnn ~/.local/bin/mnnn
+mkdir -p ~/.local/share/man/man1 && cp muninn-2.18.0-$t/man/*.1 ~/.local/share/man/man1/
 ```
 
 Uninstall: remove `~/.local/bin/mnnn` and `~/.local/share/man/man1/mnnn*.1`.
@@ -37,16 +64,16 @@ git clone git@github.com:WeirdBrains/muninn.git && cd muninn/packaging/arch
 makepkg -si            # builds the committed checkout, installs package "muninn"
 ```
 
-**Prebuilt (`muninn-bin`, no Rust):** only once a GitHub release with assets exists
-and can be downloaded without logging in (public repo):
+**Prebuilt (`muninn-bin`, no Rust):** install the release's ready-made package:
 
 ```sh
-cd packaging/arch/muninn-bin && makepkg -si
+sudo pacman -U muninn-bin-2.18.0-1-x86_64.pkg.tar.zst     # or …-aarch64.pkg.tar.zst
 ```
 
-Each release also attaches ready-made packages for both architectures,
-`muninn-bin-<ver>-1-x86_64.pkg.tar.zst` and `muninn-bin-<ver>-1-aarch64.pkg.tar.zst`
-(listed in `SHA256SUMS`); install one with `sudo pacman -U <file>`.
+Or build it yourself from the release's PKGBUILD (`packaging/arch/PKGBUILD` in
+`muninn-2.18.0-packaging.tar.gz`, which has the checksums filled in) with `makepkg -si`. If
+`muninn-bin` is in the AUR when you read this, `yay -S muninn-bin` or `paru -S muninn-bin`
+installs the same package.
 
 Both install `/usr/bin/mnnn`, man pages and `/usr/share/doc/muninn`. Uninstall:
 `sudo pacman -R muninn` (or `muninn-bin`). Remove an earlier `cargo install` first
@@ -62,7 +89,7 @@ installed it lints the package first; it is optional and never blocks the instal
 ## Debian / Ubuntu
 
 ```sh
-sudo apt install ./muninn_<ver>-1_amd64.deb
+sudo apt install ./muninn_2.18.0-1_amd64.deb      # arm64: muninn_2.18.0-1_arm64.deb
 ```
 
 Depends on `libc6 (>= 2.34)` and `libgcc-s1`. Uninstall: `sudo apt remove muninn`.
@@ -71,7 +98,7 @@ Maintainers build it with `cargo deb` (`packaging/debian/README.md`).
 ## Fedora / RHEL
 
 ```sh
-sudo dnf install ./muninn-<ver>-1.x86_64.rpm
+sudo dnf install ./muninn-2.18.0-1.x86_64.rpm     # or muninn-2.18.0-1.aarch64.rpm
 ```
 
 Requires glibc (detected from the binary). Uninstall: `sudo dnf remove muninn`.
@@ -82,24 +109,31 @@ Maintainers build it with `cargo generate-rpm` (`packaging/fedora/README.md`).
 `packaging/homebrew/muninn.rb` installs the prebuilt binary for macOS arm64/x86_64 or
 Linux arm64/x86_64:
 
+The formula is in the release's packaging tarball, with that release's checksums filled in:
+
 ```sh
-brew install ./packaging/homebrew/muninn.rb     # or from a tap: brew install muninn
+tar -xzf muninn-2.18.0-packaging.tar.gz
+brew install ./packaging/homebrew/muninn.rb
 ```
+
+Once a Homebrew tap is published, `brew install muninn` from it installs the same thing.
 
 Uninstall: `brew uninstall muninn`.
 
 ## Windows (winget)
 
 Release zips hold a portable `mnnn.exe` for x64 and arm64
-(`muninn-<ver>-<arch>-pc-windows-gnullvm.zip`). Manifests (schema 1.9) are in
-`packaging/winget/manifests/`:
+(`muninn-2.18.0-x86_64-pc-windows-gnullvm.zip`, `muninn-2.18.0-aarch64-pc-windows-gnullvm.zip`).
+The simplest install: unzip anywhere and put `mnnn.exe` on `PATH`.
+
+The release's packaging tarball has winget manifests (schema 1.9) with its checksums filled in:
 
 ```powershell
-winget install Kommandosaldat.Muninn              # once accepted into winget-pkgs
-winget install --manifest packaging\winget\manifests\k\Kommandosaldat\Muninn\<ver>
+tar -xzf muninn-2.18.0-packaging.tar.gz
+winget install --manifest packaging\winget\2.18.0
 ```
 
-Or unzip anywhere and put `mnnn.exe` on `PATH`. Uninstall: `winget uninstall
+Once the package is accepted into winget-pkgs, `winget install Kommandosaldat.Muninn` works too. Uninstall: `winget uninstall
 Kommandosaldat.Muninn` (or delete the folder). Data lives in `%USERPROFILE%\.muninn`.
 
 ## From source (any platform)

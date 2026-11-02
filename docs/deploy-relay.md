@@ -1,9 +1,9 @@
 # Deploying a public relay
 
-A plan for a public Muninn relay node on a DigitalOcean droplet. Nodes behind NAT
+How the public Muninn relay node is set up on a DigitalOcean droplet. Nodes behind NAT
 reserve a slot on it and are reached through it (see [network](network.md#behind-nat)).
-Nothing here is deployed yet. The relay's name is `relay.muninn.weirdbrains.com`; its DNS
-record has to point at the droplet before anything else works.
+The relay's name is `relay.muninn.weirdbrains.com`; its DNS record has to point at the
+droplet before anything else works. The same steps set up a relay of your own.
 
 | what | value |
 |------|-------|
@@ -35,7 +35,7 @@ Use the release `.deb` (prebuilt, no Rust needed; see [install](install.md)), ch
 against `SHA256SUMS`:
 
 ```sh
-ver=2.16.0
+ver=2.18.0
 base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
 curl -LO $base/muninn_${ver}-1_amd64.deb -LO $base/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS

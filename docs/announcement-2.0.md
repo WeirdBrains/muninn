@@ -66,8 +66,8 @@ Every package ships a prebuilt `mnnn` binary; no Rust is needed. Downloads and
 | Debian / Ubuntu | `muninn_2.18.0-1_amd64.deb`, `muninn_2.18.0-1_arm64.deb` | `sudo apt install ./muninn_2.18.0-1_amd64.deb` |
 | Fedora | `muninn-2.18.0-1.x86_64.rpm`, `muninn-2.18.0-1.aarch64.rpm` | `sudo dnf install ./muninn-2.18.0-1.x86_64.rpm` |
 | Arch Linux | `muninn-bin-2.18.0-1-x86_64.pkg.tar.zst`, `…-aarch64.pkg.tar.zst` | `sudo pacman -U muninn-bin-2.18.0-1-x86_64.pkg.tar.zst` |
-| Homebrew | `muninn.rb` in `muninn-2.18.0-packaging.tar.gz` | `brew install ./packaging/homebrew/muninn.rb` |
-| Windows (x64, arm64) | `muninn-2.18.0-x86_64-pc-windows-gnullvm.zip`, `…-aarch64-…zip` | unzip and put `mnnn.exe` on `PATH` (winget manifests are in the packaging tarball) |
+| Homebrew | `muninn.rb` in `muninn-2.18.0-packaging.tar.gz` | `tar -xzf muninn-2.18.0-packaging.tar.gz`, then `brew install ./packaging/homebrew/muninn.rb` |
+| Windows (x64, arm64) | `muninn-2.18.0-x86_64-pc-windows-gnullvm.zip`, `…-aarch64-…zip` | unzip and put `mnnn.exe` on `PATH`, or `winget install --manifest packaging\winget\2.18.0` from the packaging tarball |
 
 Then try it somewhere disposable:
 
