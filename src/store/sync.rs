@@ -96,6 +96,7 @@ pub const TABLES: &[(&str, &[&str])] = &[
     ("org_template_assets", &[]),
     ("actions", &[]),
     ("notifications", &[]),
+    ("messages", &[]),
 ];
 
 /// The log key of a model's records.

@@ -9,6 +9,7 @@ pub mod authors;
 pub mod code;
 pub mod history;
 pub mod journals;
+pub mod live;
 pub mod models;
 pub mod net;
 pub mod notifications;
@@ -29,6 +30,7 @@ pub use authors::{Author, AuthorChange};
 pub use code::{CodeChange, CodeInput, CodeScope, CodeSpace, Lang, RunInfo};
 pub use history::{ActionRecord, Move, NewAction, TreeRow};
 pub use journals::{Annotation, AnnotationKind, Attachment, Entry, EntryFormat, Journal, JournalDoc, Span};
+pub use live::{LiveOp, LiveSession, Message, Presence};
 pub use models::{ApplyOpts, Design, Field, FieldOp, FieldType, Model, ModelVersion, Plan, Step};
 pub use net::{Entrusted, Exchange, ExchangeStatus, Held, NetPeer, NewExchange, Share, ShareKind};
 pub use notifications::{NewNotification, Notification};
@@ -162,6 +164,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     orgs::MIGRATION_2_17,
     // 2.18: notifications
     notifications::MIGRATION,
+    // 2.19: messages, live sessions
+    live::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
@@ -838,7 +842,7 @@ mod tests {
 
     #[test]
     fn a_2_2_database_migrates_and_gains_rules() {
-        let upto = MIGRATIONS.len() - 10;
+        let upto = MIGRATIONS.len() - 11;
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join("v22.database");
         let key = [3u8; 32];
@@ -875,7 +879,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 10).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 11).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
             old_bars(&s, &src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0)]);
             let spec = RuleSpec { on: vec!["*".into()], then: vec![Then::Status { text: "x".into() }], ..Default::default() };
@@ -904,7 +908,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 9).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 10).unwrap();
             s.create_model("trades", "", Design { fields: vec![Field::new("note", FieldType::Text)], ..Default::default() }, true).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -927,7 +931,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 8).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 9).unwrap();
             s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -953,7 +957,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 8).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 9).unwrap();
             s.set_node_identity(b"kp", "12D3KooWx").unwrap();
             s.create_project("p", "").unwrap();
         }
@@ -986,7 +990,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 7).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 8).unwrap();
             old_org(&s, "o-lab");
             let j = s.create_journal("Lab book", None, EntryFormat::Markdown).unwrap();
             s.add_entry(&j.id, "Day 1", "teh result", None).unwrap();
@@ -1014,7 +1018,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 5).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 6).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
             let sym = Symbol::new("BTC", "USDT");
             old_bars(&s, &src, &sym, Duration(300), &[bar(0), bar(300_000), bar(600_000)]);
@@ -1088,7 +1092,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 7).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 8).unwrap();
             old_org(&s, "o-lab");
             let c = s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
             s.save_endpoint("o-lab", "calc", EndpointKind::Code, &c.id, "call", false).unwrap();
@@ -1108,7 +1112,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 6).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 7).unwrap();
             s.conn
                 .execute(
                     "INSERT INTO reviewing(review_id, title, node_peer, status, created_at, updated_at) VALUES ('r1', 'Notes', '12D3', 'joined', 1, 1)",
