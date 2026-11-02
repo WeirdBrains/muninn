@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-11-02
+
 ### Added
 - Notifications: built-in events (exchange requests, org applications, review comments, suggestions and votes, sync conflicts, org code waiting for approval, Muninn warnings, broadcasts) notify you; kinds can be muted
 - A header bell with the unread count, and a Notifications window (`!`) whose `Enter` opens the linked review, org, journal, project, rule or history step
@@ -468,7 +470,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.17.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.18.0...HEAD
+[2.18.0]: https://github.com/WeirdBrains/muninn/compare/v2.17.0...v2.18.0
 [2.17.0]: https://github.com/WeirdBrains/muninn/compare/v2.16.1...v2.17.0
 [2.16.1]: https://github.com/WeirdBrains/muninn/compare/v2.16.0...v2.16.1
 [2.16.0]: https://github.com/WeirdBrains/muninn/compare/v2.15.0...v2.16.0
