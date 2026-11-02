@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Changed
+- License: BSD 3-Clause, copyright Weird Brains (was MIT)
+
 ## [2.16.0] - 2026-11-01
 
 ### Added

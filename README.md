@@ -270,3 +270,8 @@ Semantic versioning with annotated git tags (`v1.0.0`, ...): new features bump t
 minor version, fixes/docs the patch version, breaking changes the major. See
 `CHANGELOG.md`. The 1.0 spec, announcement and changelog are archived in
 `docs/historical/1.0/`; `PLAN.md` is the plan for 2.0.
+
+## License
+
+BSD 3-Clause, copyright (c) 2026, Weird Brains: see [LICENSE](LICENSE). The bundled
+Liberation fonts are under the SIL Open Font License (`assets/fonts/LICENSE-OFL.txt`).

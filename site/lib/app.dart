@@ -129,6 +129,8 @@ class App extends StatelessComponent {
         a(href: '$repo/blob/main/CHANGELOG.md', [Component.text('changelog')]),
         Component.text(' · '),
         a(href: docs, [Component.text('docs')]),
+        Component.text(' · '),
+        a(href: '$repo/blob/main/LICENSE', [Component.text('BSD 3-Clause')]),
       ]),
     ]);
   }

@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.99"
 description = "The data ingestor for the Kommandosaldat project. It ingests data from various sources and normalizes it into a common format."
 authors = ["Michael Christenson II <m3talsmith@gmail.com>"]
-license = "MIT"
+license = "BSD-3-Clause"
 repository = "https://github.com/WeirdBrains/muninn"
 homepage = "https://github.com/WeirdBrains/muninn"
 keywords = ["data", "ingestion", "normalization", "csv", "sqlite"]
@@ -131,7 +131,7 @@ assets = [
 # Fedora/RHEL package: `cargo build --release && cargo generate-rpm` (packaging/fedora)
 [package.metadata.generate-rpm]
 summary = "Local, encrypted store for OHLCV market bars (mnnn)"
-license = "MIT"
+license = "BSD-3-Clause"
 release = "1"
 assets = [
     { source = "target/release/mnnn", dest = "/usr/bin/mnnn", mode = "755" },

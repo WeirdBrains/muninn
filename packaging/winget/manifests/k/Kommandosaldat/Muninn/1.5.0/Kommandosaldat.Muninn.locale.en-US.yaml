@@ -7,8 +7,8 @@ PublisherUrl: https://github.com/kommandosaldat
 Author: Michael Christenson II
 PackageName: Muninn
 PackageUrl: https://github.com/kommandosaldat/muninn
-License: MIT
-LicenseUrl: https://github.com/kommandosaldat/muninn/blob/main/LICENSE
+License: BSD-3-Clause
+LicenseUrl: https://github.com/WeirdBrains/muninn/blob/main/LICENSE
 ShortDescription: Local, encrypted store for OHLCV market bars (mnnn).
 Description: Muninn ingests OHLCV market bars from CSV, JSON, HTTP APIs, Redis, SQLite and Postgres, normalizes them and stores them in an encrypted SQLite (SQLCipher) database. Export to CSV, Parquet or JSON; browse in a terminal UI.
 Moniker: mnnn

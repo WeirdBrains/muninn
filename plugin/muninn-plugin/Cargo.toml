@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2021"
 rust-version = "1.82"
 description = "SDK for Muninn code space plugins: the stable C ABI (v1), the host API, frames and result views."
-license = "MIT"
+license = "BSD-3-Clause"
 publish = false
 
 # No dependencies on purpose: code spaces build offline and fast, and the ABI stays
