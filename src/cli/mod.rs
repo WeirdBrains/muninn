@@ -4,6 +4,7 @@ mod authors;
 mod backup;
 mod catalog;
 mod code;
+mod collab;
 mod export;
 mod history;
 mod ingest;
@@ -138,6 +139,9 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Org(c) => org::run(&ctx, c),
         Command::Review(c) => review::run(&ctx, c),
         Command::Notify(c) => notify::run(&ctx, c),
+        Command::Msg(c) => collab::msg(&ctx, c),
+        Command::Live(c) => collab::live(&ctx, c),
+        Command::Peers(a) => collab::peers(&ctx, a),
         Command::Share(a) => misc::share(&ctx, a),
         Command::Pipe(a) => code::pipe(&ctx, a),
         Command::Pipeline(c) => pipeline::run(&ctx, c),

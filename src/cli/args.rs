@@ -113,6 +113,17 @@ pub enum Command {
     /// other nodes tell you; read, unread and muted by kind. Synced to linked nodes.
     #[command(subcommand, alias = "notifications", after_long_help = NOTIFY_NOTES)]
     Notify(NotifyCommand),
+    /// Messages between nodes: direct, or about an item; kept in history and notifications.
+    #[command(subcommand, alias = "msgs", after_long_help = COLLAB_NOTES)]
+    Msg(MsgCommand),
+    /// Live editing of an entry, journal, code space or record with your connections:
+    /// share, join, edit, see who is there, stop.
+    #[command(subcommand, after_long_help = COLLAB_NOTES)]
+    Live(LiveCommand),
+    /// Your peers and what each has for you (shares, live sessions, executables, sites);
+    /// run a peer's executable or ask it for something.
+    #[command(after_long_help = COLLAB_NOTES)]
+    Peers(PeersArgs),
     /// Share anything shareable to anything that takes shares: a project, a journal (a new
     /// entry about it), a code space (a model or records search as its input; --run runs
     /// it) or your exchanges (`net`).
@@ -647,11 +658,128 @@ pub enum AuthorCommand {
 
 pub const NOTIFY_NOTES: &str = "\
 Built-in events notify you: exchange requests, org applications, review comments, \
-suggestions and votes from peers, sync conflicts, org code syncs and broadcasts. A rule \
+suggestions and votes from peers, sync conflicts, org code syncs, broadcasts and messages. A rule \
 set's `notify TITLE [body=..] [link=..] [level=info|warn|error]` makes one too, and each \
 notification is itself a `notification` action rules can trigger on. Links point at \
-context: review:ID, org:ID, journal:ID, project:ID, search:ID, rule:ID, action:ID. \
+context: review:ID, org:ID, messages:PEER, live:SESSION, journal:ID, project:ID, search:ID, rule:ID, action:ID. \
 `mnnn help notifications` has the guide.";
+
+pub const COLLAB_NOTES: &str = "\
+Live collaboration works between nodes that exchanged keys (connections, linked nodes, org \
+members). Messages are kept on both sides and retried by the running node until delivered. \
+A live session is hosted by the node that has the item; invited peers join, edit and see \
+each other's cursors, and every edit is merged without loss and written back to the item. \
+`mnnn peers show PEER` lists what a peer offers you; `mnnn peers run` calls an org \
+executable on it with your role's permissions. `mnnn help collaboration` has the guide.";
+
+/// Message commands.
+#[derive(Debug, Subcommand)]
+pub enum MsgCommand {
+    /// Send a message to a peer (connection label, exchange or peer id).
+    Send {
+        peer: String,
+        text: String,
+        /// What it is about: KIND:ID (journal:ID, entry:ID, review:ID, …).
+        #[arg(long, value_name = "KIND:ID")]
+        about: Option<String>,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Messages, oldest first (all, one peer's, or about one item).
+    #[command(alias = "ls")]
+    List {
+        peer: Option<String>,
+        #[arg(long, value_name = "KIND:ID")]
+        about: Option<String>,
+        /// Only unread ones.
+        #[arg(long, short = 'u')]
+        unread: bool,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Mark messages read (all, or one peer's).
+    Read { peer: Option<String> },
+}
+
+/// Live session commands.
+#[derive(Debug, Subcommand)]
+pub enum LiveCommand {
+    /// Host a live session on an item and invite peers.
+    Share {
+        /// entry, journal, code or record.
+        kind: String,
+        /// The item (records: MODEL/RECORD).
+        key: String,
+        /// A peer to invite (repeat).
+        #[arg(long = "with", value_name = "PEER", required = true)]
+        with: Vec<String>,
+    },
+    /// Sessions you host or joined.
+    #[command(alias = "ls")]
+    List {
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Join a session a peer invited you to (see `mnnn peers show PEER`).
+    Join { peer: String, session: String },
+    /// The session's text now and who is there (guests sync first).
+    Show {
+        session: String,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Edit a document of the session: in $VISUAL/$EDITOR, or set it to --value.
+    Edit {
+        session: String,
+        /// The document (an entry id in a journal, a record field); default the only one.
+        doc: Option<String>,
+        /// The new text (records: a JSON value).
+        #[arg(long)]
+        value: Option<String>,
+        /// Where your cursor is (a character offset), shown to the others.
+        #[arg(long)]
+        cursor: Option<i64>,
+    },
+    /// Close a session you host (or leave one you joined).
+    Stop { session: String },
+}
+
+/// `mnnn peers`.
+#[derive(Debug, clap::Args)]
+pub struct PeersArgs {
+    #[command(subcommand)]
+    pub cmd: Option<PeersCommand>,
+    /// Print JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+/// Peer commands.
+#[derive(Debug, Subcommand)]
+pub enum PeersCommand {
+    /// What a peer has for you: shared items, live sessions, executables and sites.
+    Show {
+        peer: String,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Run one of a peer's org executables (an endpoint); results stream as they arrive.
+    Run {
+        peer: String,
+        org: String,
+        endpoint: String,
+        /// The input, as JSON.
+        #[arg(long, default_value = "{}")]
+        input: String,
+    },
+    /// Ask a peer for something (a share, an invitation, access): sends a message.
+    Request { peer: String, text: String },
+}
 
 /// Notification commands.
 #[derive(Debug, Subcommand)]
