@@ -382,14 +382,23 @@ struct StoredCert {
 
 /// The ACME certificate kept for `domain`, if any.
 pub fn stored_cert(s: &Store, domain: &str) -> Result<Option<CertPem>> {
-    let Some(v) = s.setting(CERT_SETTING)?.map(Zeroizing::new) else { return Ok(None) };
+    stored_cert_in(s, CERT_SETTING, domain)
+}
+
+/// The ACME certificate kept under `slot` for `domain`, if any.
+pub fn stored_cert_in(s: &Store, slot: &str, domain: &str) -> Result<Option<CertPem>> {
+    let Some(v) = s.setting(slot)?.map(Zeroizing::new) else { return Ok(None) };
     let c: StoredCert = serde_json::from_str(&v)?;
     Ok((c.domain == domain).then(|| CertPem { chain: c.chain.clone(), key: c.key.clone() }))
 }
 
 fn save_cert(s: &Store, domain: &str, c: &CertPem) -> Result<()> {
+    save_cert_in(s, CERT_SETTING, domain, c)
+}
+
+fn save_cert_in(s: &Store, slot: &str, domain: &str, c: &CertPem) -> Result<()> {
     let v = Zeroizing::new(serde_json::to_string(&StoredCert { domain: domain.into(), chain: c.chain.clone(), key: c.key.clone() })?);
-    s.set_setting(CERT_SETTING, Some(&v))
+    s.set_setting(slot, Some(&v))
 }
 
 // ---------------------------------------------------------------------------------------
@@ -554,6 +563,135 @@ async fn order_cert(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>, 
     let chain = order.poll_certificate(&RetryPolicy::new().timeout(Duration::from_secs(120))).await.map_err(acme_err)?;
     let c = CertPem { chain, key: key.serialize_pem() };
     cert_info(&c, "acme")?;
+    Ok(c)
+}
+
+// ---------------------------------------------------------------------------------------
+// TLS for other servers on the node (2.20: `mnnn mcp serve --http --tls-domain`)
+
+/// TLS for a server other than the org site: a certificate from ACME for `acme.domain`
+/// (kept in the store under its own setting, renewed by [`NodeTls::renew_if_due`]), a
+/// given one, or a self-signed one until ACME answers. Shares the ACME account, the
+/// challenge answering and the certificate checks with the org site.
+pub struct NodeTls {
+    resolver: Arc<Resolver>,
+    challenges: Challenges,
+    cert: RwLock<CertInfo>,
+    acme: Option<Acme>,
+    http: Option<AcmeHttp>,
+    /// The setting the certificate is kept under, and the history kind of a new one.
+    slot: &'static str,
+    kind: &'static str,
+}
+
+impl NodeTls {
+    /// `given` wins; else the kept ACME certificate while still valid; else self-signed for `names`.
+    pub fn new(
+        store: &Store,
+        slot: &'static str,
+        kind: &'static str,
+        acme: Option<Acme>,
+        given: Option<CertPem>,
+        names: &[String],
+        http: Option<AcmeHttp>,
+    ) -> Result<NodeTls> {
+        let kept = match &acme {
+            Some(a) => stored_cert_in(store, slot, &a.domain)?.filter(|c| cert_info(c, "acme").is_ok_and(|i| i.not_after > now_ms())),
+            None => None,
+        };
+        let (pem, source) = match (given, kept) {
+            (Some(c), _) => {
+                check_pair(&c)?;
+                (c, "user")
+            }
+            (None, Some(c)) => (c, "acme"),
+            (None, None) => {
+                let mut n: Vec<String> = names.to_vec();
+                n.extend(acme.iter().map(|a| a.domain.clone()));
+                n.retain(|x| !x.is_empty());
+                if n.is_empty() {
+                    n.push("localhost".into());
+                }
+                (self_signed(&n, 7)?, "self-signed")
+            }
+        };
+        let info = cert_info(&pem, source)?;
+        Ok(NodeTls {
+            resolver: Arc::new(Resolver::new(certified(&pem)?)),
+            challenges: Arc::new(RwLock::new(HashMap::new())),
+            cert: RwLock::new(info),
+            acme: if source == "user" { None } else { acme },
+            http,
+            slot,
+            kind,
+        })
+    }
+
+    /// The TLS acceptor (HTTP/1.1, and ACME TLS-ALPN-01 validations).
+    pub fn acceptor(&self) -> Result<tokio_rustls::TlsAcceptor> {
+        let mut tls = rustls::ServerConfig::builder_with_provider(Arc::new(rustls::crypto::aws_lc_rs::default_provider()))
+            .with_safe_default_protocol_versions()
+            .map_err(tls_err)?
+            .with_no_client_auth()
+            .with_cert_resolver(self.resolver.clone());
+        tls.alpn_protocols = vec![b"http/1.1".to_vec(), ACME_TLS_ALPN.to_vec()];
+        Ok(tokio_rustls::TlsAcceptor::from(Arc::new(tls)))
+    }
+
+    pub fn challenges(&self) -> Challenges {
+        self.challenges.clone()
+    }
+
+    /// Whether ACME validates on port 80 (HTTP-01), so the caller must answer it.
+    pub fn wants_http01(&self) -> bool {
+        self.acme.as_ref().is_some_and(|a| !a.tls_alpn)
+    }
+
+    pub fn acme(&self) -> Option<&Acme> {
+        self.acme.as_ref()
+    }
+
+    pub fn cert(&self) -> CertInfo {
+        self.cert.read().map(|c| c.clone()).unwrap_or_else(|e| e.into_inner().clone())
+    }
+
+    /// Get an ACME certificate when there is none yet or it is due (always with `force`).
+    pub async fn renew_if_due(&self, store: &Mutex<Store>, force: bool) -> Result<Option<CertInfo>> {
+        let Some(acme) = &self.acme else { return Ok(None) };
+        let cur = self.cert();
+        if !force && cur.source == "acme" && !cur.needs_renewal(now_ms()) {
+            return Ok(None);
+        }
+        let c = order_cert(store, acme, self.http.as_ref(), &self.challenges, &self.resolver).await?;
+        with_store(store, |s| {
+            save_cert_in(s, self.slot, &acme.domain, &c)?;
+            s.note_action(
+                &crate::store::NewAction::new(self.kind, "host", format!("certificate for {} from ACME", acme.domain))
+                    .params(serde_json::json!({ "domain": acme.domain, "directory": acme.directory })),
+            );
+            Ok(())
+        })?;
+        let info = cert_info(&c, "acme")?;
+        *self.resolver.default.write().map_err(|_| tls_err("certificate lock"))? = certified(&c)?;
+        *self.cert.write().map_err(|_| tls_err("certificate lock"))? = info.clone();
+        Ok(Some(info))
+    }
+}
+
+/// Was this TLS connection an ACME TLS-ALPN-01 validation (the handshake was the answer)?
+pub fn is_acme_validation<IO>(tls: &tokio_rustls::server::TlsStream<IO>) -> bool {
+    tls.get_ref().1.alpn_protocol() == Some(ACME_TLS_ALPN)
+}
+
+/// Answer ACME HTTP-01 challenges on `listener` until stopped.
+pub async fn serve_challenges(listener: TcpListener, challenges: Challenges, stop: watch::Receiver<bool>) {
+    accept_http(listener, challenges, stop).await
+}
+
+/// Read a certificate chain and key from PEM files and check they belong together.
+pub fn read_pem_pair(cert: &Path, key: &Path) -> Result<CertPem> {
+    let c = CertPem { chain: std::fs::read_to_string(cert)?, key: std::fs::read_to_string(key)? };
+    check_pair(&c)?;
     Ok(c)
 }
 
