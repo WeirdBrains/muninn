@@ -109,6 +109,28 @@ pub struct Preferences {
     /// Organization web hosting (`mnnn org host`, `[hosting]`).
     #[serde(default)]
     pub hosting: HostingPrefs,
+    /// The MCP server over HTTP (`mnnn mcp serve --http`, `[mcp]`); written only when set.
+    #[serde(default, skip_serializing_if = "McpPrefs::is_default")]
+    pub mcp: McpPrefs,
+}
+
+/// `mnnn mcp serve --http` settings; command-line flags override them.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct McpPrefs {
+    /// `HOST:PORT` to listen on; empty: `127.0.0.1:4743`, or `0.0.0.0:443` with TLS.
+    pub bind: String,
+    /// Built-in HTTPS with a Let's Encrypt certificate (on with a domain and an email).
+    pub acme: AcmePrefs,
+    /// Or a certificate chain and key of your own (PEM files).
+    pub tls_cert: String,
+    pub tls_key: String,
+}
+
+impl McpPrefs {
+    pub fn is_default(&self) -> bool {
+        *self == McpPrefs::default()
+    }
 }
 
 impl Default for Preferences {
@@ -120,6 +142,7 @@ impl Default for Preferences {
             tui: TuiPrefs::default(),
             net: NetPrefs::default(),
             hosting: HostingPrefs::default(),
+            mcp: McpPrefs::default(),
         }
     }
 }

@@ -697,11 +697,37 @@ pub enum McpCommand {
     /// Serve Muninn over MCP: stdio for one client (`--client NAME`), or HTTP (`--http`).
     Serve {
         /// The client to serve over stdio (see `mnnn mcp client add`).
-        #[arg(long, required_unless_present = "http")]
+        #[arg(long, required_unless_present_any = ["http", "tls_domain", "tls_cert"])]
         client: Option<String>,
-        /// Serve over HTTP instead, at ADDR (default 127.0.0.1:4743); clients send their token.
-        #[arg(long, value_name = "ADDR", num_args = 0..=1, default_missing_value = crate::mcp::DEFAULT_HTTP, conflicts_with = "client")]
+        /// Serve over HTTP instead, at ADDR (default 127.0.0.1:4743, or 0.0.0.0:443 with TLS;
+        /// `[mcp] bind`); clients send their token.
+        #[arg(long, value_name = "ADDR", num_args = 0..=1, default_missing_value = "", conflicts_with = "client")]
         http: Option<String>,
+        /// Serve HTTPS with a Let's Encrypt certificate for DOMAIN, got and renewed while
+        /// running (`[mcp.acme] domain`). It must point at this machine.
+        #[arg(long, value_name = "DOMAIN", conflicts_with_all = ["client", "tls_cert"])]
+        tls_domain: Option<String>,
+        /// Contact address given to the CA (default `[mcp.acme] email`, else `[hosting.acme] email`).
+        #[arg(long, value_name = "EMAIL")]
+        tls_email: Option<String>,
+        /// Serve HTTPS with your own certificate chain (PEM; with --tls-key, no renewal).
+        #[arg(long, value_name = "FILE", requires = "tls_key", conflicts_with = "client")]
+        tls_cert: Option<std::path::PathBuf>,
+        /// The key for --tls-cert (PEM).
+        #[arg(long, value_name = "FILE", requires = "tls_cert")]
+        tls_key: Option<std::path::PathBuf>,
+        /// Use Let's Encrypt's staging CA (untrusted certificates, for trying it out).
+        #[arg(long, conflicts_with = "acme_directory")]
+        acme_staging: bool,
+        /// letsencrypt, letsencrypt-staging or a directory URL (`[mcp.acme] directory`).
+        #[arg(long, value_name = "URL")]
+        acme_directory: Option<String>,
+        /// http-01 (port 80 reaches --acme-http-port) or tls-alpn-01 (443 reaches the server).
+        #[arg(long, value_name = "CHALLENGE")]
+        acme_challenge: Option<String>,
+        /// Port the HTTP-01 challenge is answered on (default 80).
+        #[arg(long, value_name = "PORT")]
+        acme_http_port: Option<u16>,
     },
     /// The clients allowed to call this node's MCP server.
     #[command(subcommand)]

@@ -37,11 +37,46 @@ fn secrets(ctx: &Ctx, into: &mut Secrets, env: &[String], header: &[String], tok
 pub fn run(ctx: &Ctx, cmd: McpCommand) -> anyhow::Result<()> {
     let store = ctx.open_store()?;
     match cmd {
-        McpCommand::Serve { client, http } => {
-            if let Some(addr) = http {
-                let mut h = mcp::serve::Http::start(store, &addr)?;
-                if !h.addr.ip().is_loopback() {
-                    ctx.io.warn("listening beyond this machine without TLS: put it behind an HTTPS proxy, and keep client tokens secret");
+        McpCommand::Serve {
+            client,
+            http,
+            tls_domain,
+            tls_email,
+            tls_cert,
+            tls_key,
+            acme_staging,
+            acme_directory,
+            acme_challenge,
+            acme_http_port,
+        } => {
+            let wants_http = http.is_some() || tls_domain.is_some() || tls_cert.is_some();
+            if wants_http {
+                let prefs = ctx.prefs()?;
+                let tls = serve_tls(
+                    &prefs,
+                    ServeTls { tls_domain, tls_email, tls_cert, tls_key, acme_staging, acme_directory, acme_challenge, acme_http_port },
+                )?;
+                let bind = match http.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
+                    Some(a) => a.to_string(),
+                    None if !prefs.mcp.bind.trim().is_empty() => prefs.mcp.bind.trim().to_string(),
+                    None if tls.is_some() => mcp::DEFAULT_HTTPS.to_string(),
+                    None => mcp::DEFAULT_HTTP.to_string(),
+                };
+                let has_tls = tls.is_some();
+                let mut h = mcp::serve::Http::start_with(store, &bind, tls, None)?;
+                if !has_tls && !h.addr.ip().is_loopback() {
+                    ctx.io.warn(
+                        "listening beyond this machine without TLS: use --tls-domain, or put it behind an HTTPS proxy, and keep client tokens secret",
+                    );
+                }
+                if let Some(c) = h.cert() {
+                    ctx.io.note(format!("certificate: {} ({}, until {})", c.names.join(", "), c.source, crate::ingest::time::fmt_ts(c.not_after)));
+                    if c.source == "self-signed" {
+                        ctx.io.note("asking the CA for a certificate now; it is served as soon as it arrives");
+                    }
+                }
+                if let Some(a) = h.http_addr {
+                    ctx.io.note(format!("answering ACME HTTP-01 challenges on {a}"));
                 }
                 ctx.io.note(format!("MCP server on {} (Ctrl-C stops)", h.url()));
                 let (tx, rx) = std::sync::mpsc::channel();
@@ -236,4 +271,60 @@ fn client(ctx: &Ctx, store: &Store, cmd: McpClientCommand) -> anyhow::Result<()>
         }
     }
     Ok(())
+}
+
+struct ServeTls {
+    tls_domain: Option<String>,
+    tls_email: Option<String>,
+    tls_cert: Option<std::path::PathBuf>,
+    tls_key: Option<std::path::PathBuf>,
+    acme_staging: bool,
+    acme_directory: Option<String>,
+    acme_challenge: Option<String>,
+    acme_http_port: Option<u16>,
+}
+
+/// TLS for `mcp serve --http`: flags over `[mcp]`, the contact address falling back to `[hosting.acme]`.
+fn serve_tls(prefs: &crate::prefs::Preferences, f: ServeTls) -> anyhow::Result<Option<mcp::serve::TlsSetup>> {
+    let mut a = prefs.mcp.acme.clone();
+    if let Some(d) = f.tls_domain {
+        a.domain = d;
+        a.enabled = true;
+    }
+    if let Some(e) = f.tls_email {
+        a.email = e;
+    }
+    if a.email.trim().is_empty() {
+        a.email = prefs.hosting.acme.email.clone();
+    }
+    if f.acme_staging {
+        a.directory = "letsencrypt-staging".into();
+    }
+    if let Some(d) = f.acme_directory {
+        a.directory = d;
+    }
+    if let Some(c) = f.acme_challenge {
+        a.challenge = c;
+    }
+    if let Some(p) = f.acme_http_port {
+        a.http_port = p;
+    }
+    let cert = f.tls_cert.or_else(|| Some(prefs.mcp.tls_cert.trim()).filter(|p| !p.is_empty()).map(Into::into));
+    let key = f.tls_key.or_else(|| Some(prefs.mcp.tls_key.trim()).filter(|p| !p.is_empty()).map(Into::into));
+    let given = match (cert, key) {
+        (Some(c), Some(k)) => Some(crate::org::host::read_pem_pair(&c, &k)?),
+        (None, None) => None,
+        _ => anyhow::bail!("give both a certificate and its key (--tls-cert FILE --tls-key FILE)"),
+    };
+    if given.is_some() {
+        return Ok(Some(mcp::serve::TlsSetup { acme: None, given, http_port: a.http_port, auto_renew: false }));
+    }
+    if !a.enabled {
+        return Ok(None);
+    }
+    if !a.email.contains('@') {
+        anyhow::bail!("Let's Encrypt needs a contact address: --tls-email you@example.org (or `[mcp.acme] email`)");
+    }
+    let acme = crate::org::host::Acme::from_prefs(&a)?;
+    Ok(acme.map(|acme| mcp::serve::TlsSetup { acme: Some(acme), given: None, http_port: a.http_port, auto_renew: true }))
 }

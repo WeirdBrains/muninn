@@ -736,3 +736,88 @@ fn org_acme_renews_by_http_01_and_tls_alpn_01_and_backs_off_on_failure() {
         host.stop();
     }
 }
+
+// -----------------------------------------------------------------------------------------
+// The MCP server's own TLS (`mnnn mcp serve --http --tls-domain`) reuses the ACME code
+
+fn mcp_post(addr: SocketAddr, token: Option<&str>, origin: Option<&str>) -> Reply {
+    let mut hs = vec![("content-type", "application/json".to_string())];
+    if let Some(t) = token {
+        hs.push(("authorization", format!("Bearer {t}")));
+    }
+    if let Some(o) = origin {
+        hs.push(("origin", o.to_string()));
+    }
+    send(addr, false, "POST", "/mcp", &hs, br#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#.to_vec())
+}
+
+#[test]
+fn mcp_over_https_gets_a_certificate_from_acme_and_keeps_it_apart() {
+    use crate::mcp::serve::{Http, TlsSetup};
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("m.db");
+    let s = Store::open(&db, Some(&[3u8; 32])).unwrap();
+    let (_, token) = s.add_mcp_client("agent", crate::store::McpRole::Read).unwrap();
+    let ca = MockCa::new();
+    let ca2 = ca.clone();
+    let http: AcmeHttp = Arc::new(move || Box::new(ca2.clone()) as Box<dyn HttpClient>);
+    let acme = Acme {
+        directory: format!("{BASE}/dir"),
+        domain: "org.example.test".into(),
+        email: "lab@example.test".into(),
+        profile: "shortlived".into(),
+        extra: vec![],
+        tls_alpn: false,
+    };
+    let setup = TlsSetup { acme: Some(acme), given: None, http_port: 0, auto_renew: false };
+    let mut h = Http::start_with(s, "127.0.0.1:0", Some(setup.clone()), Some(http.clone())).unwrap();
+    assert_eq!(h.cert().unwrap().source, "self-signed", "until the CA answers");
+    assert_eq!(h.url(), format!("https://org.example.test:{}/mcp", h.addr.port()));
+    ca.0.lock().unwrap().http_port = h.http_addr.expect("answers HTTP-01").port();
+    let info = h.renew().unwrap().unwrap();
+    assert_eq!((info.source.as_str(), info.names.clone()), ("acme", vec!["org.example.test".to_string()]));
+    // served at once, and MCP answers over it
+    let r = mcp_post(h.addr, Some(&token), None);
+    assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
+    assert!(String::from_utf8_lossy(&r.body).contains("read_entry") || String::from_utf8_lossy(&r.body).contains("\"tools\""));
+    let (_, x) = x509_parser::parse_x509_certificate(&r.cert).unwrap();
+    assert!(x.issuer().to_string().contains("Mock CA"));
+    assert_eq!(mcp_post(h.addr, None, None).status, 401);
+    // a page on the server's own name may call it; another site may not
+    assert_eq!(mcp_post(h.addr, Some(&token), Some("https://org.example.test")).status, 200);
+    assert_eq!(mcp_post(h.addr, Some(&token), Some("https://evil.test")).status, 403);
+    h.halt();
+    drop(h);
+    // kept under its own setting (not the org site's), and the account is reused
+    let s = Store::open(&db, Some(&[3u8; 32])).unwrap();
+    assert!(stored_cert_in(&s, crate::mcp::serve::CERT_SETTING, "org.example.test").unwrap().is_some());
+    assert!(stored_cert(&s, "org.example.test").unwrap().is_none());
+    assert!(s.actions().unwrap().iter().any(|a| a.kind == "mcp.cert"));
+    let mut h = Http::start_with(s, "127.0.0.1:0", Some(setup), Some(http)).unwrap();
+    assert_eq!(h.cert().unwrap().source, "acme", "the kept certificate is served after a restart");
+    ca.0.lock().unwrap().http_port = h.http_addr.unwrap().port();
+    h.renew().unwrap();
+    assert_eq!(ca.0.lock().unwrap().accounts, 1, "the account is kept in the store");
+    h.halt();
+}
+
+#[test]
+fn mcp_over_https_serves_a_given_certificate() {
+    use crate::mcp::serve::{Http, TlsSetup};
+    let s = Store::open_in_memory().unwrap();
+    let (_, token) = s.add_mcp_client("agent", crate::store::McpRole::Read).unwrap();
+    let pem = self_signed(&["localhost".to_string()], 2).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let (c, k) = (dir.path().join("c.pem"), dir.path().join("k.pem"));
+    std::fs::write(&c, &pem.chain).unwrap();
+    std::fs::write(&k, &pem.key).unwrap();
+    let given = read_pem_pair(&c, &k).unwrap();
+    assert!(read_pem_pair(&c, &c).is_err(), "a chain is not a key");
+    let setup = TlsSetup { acme: None, given: Some(given), http_port: 0, auto_renew: true };
+    let mut h = Http::start_with(s, "127.0.0.1:0", Some(setup), None).unwrap();
+    assert_eq!(h.cert().unwrap().source, "user");
+    assert!(h.http_addr.is_none() && h.url().starts_with("https://127.0.0.1:"));
+    assert!(h.renew().unwrap().is_none(), "nothing to renew");
+    assert_eq!(mcp_post(h.addr, Some(&token), None).status, 200);
+    h.halt();
+}

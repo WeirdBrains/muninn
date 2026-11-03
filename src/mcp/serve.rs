@@ -55,50 +55,138 @@ pub fn stdio(store: &Store, c: &McpClient, input: impl BufRead, mut out: impl Wr
     Ok(())
 }
 
+/// TLS for the HTTP server: a certificate from ACME (Let's Encrypt by default), or given.
+#[derive(Clone)]
+pub struct TlsSetup {
+    /// Get and renew a certificate for `acme.domain`.
+    pub acme: Option<crate::org::host::Acme>,
+    /// A certificate chain and key of your own (no renewal).
+    pub given: Option<crate::org::host::CertPem>,
+    /// Where ACME HTTP-01 validations are answered (80; 0 picks one).
+    pub http_port: u16,
+    /// Check the certificate every minute and renew it when due.
+    pub auto_renew: bool,
+}
+
+/// Where an ACME certificate for the MCP server is kept (separate from the org site's).
+pub const CERT_SETTING: &str = "mcp.acme.cert";
+
 /// A running HTTP MCP server.
 pub struct Http {
     pub addr: SocketAddr,
+    /// Where ACME HTTP-01 validations are answered (only with ACME over HTTP-01).
+    pub http_addr: Option<SocketAddr>,
+    tls: Option<Arc<crate::org::host::NodeTls>>,
+    store: Arc<Mutex<Store>>,
     stop: watch::Sender<bool>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Http {
-    /// Listen on `bind` (`127.0.0.1:4743`; port 0 picks one).
+    /// Listen on `bind` (`127.0.0.1:4743`; port 0 picks one), plain HTTP.
     pub fn start(store: Store, bind: &str) -> Result<Http> {
+        Http::start_with(store, bind, None, None)
+    }
+
+    /// Listen on `bind`, over HTTPS when `tls` is given (`acme_http` is the ACME client; tests use a mock CA).
+    pub fn start_with(store: Store, bind: &str, tls: Option<TlsSetup>, acme_http: Option<crate::org::host::AcmeHttp>) -> Result<Http> {
         let addr: SocketAddr = bind.parse().map_err(|_| Error::invalid("bind", format!("`{bind}`: HOST:PORT, e.g. 127.0.0.1:4743")))?;
+        let node_tls = match &tls {
+            Some(t) => Some(Arc::new(crate::org::host::NodeTls::new(
+                &store,
+                CERT_SETTING,
+                "mcp.cert",
+                t.acme.clone(),
+                t.given.clone(),
+                &["localhost".to_string(), "127.0.0.1".to_string()],
+                acme_http,
+            )?)),
+            None => None,
+        };
+        let acceptor = node_tls.as_ref().map(|t| t.acceptor()).transpose()?;
         let std_listener = std::net::TcpListener::bind(addr)?;
         std_listener.set_nonblocking(true)?;
         let addr = std_listener.local_addr()?;
+        let http_listener = match (&tls, &node_tls) {
+            (Some(t), Some(n)) if n.wants_http01() => {
+                let l = std::net::TcpListener::bind(SocketAddr::new(addr.ip(), t.http_port))?;
+                l.set_nonblocking(true)?;
+                Some(l)
+            }
+            _ => None,
+        };
+        let http_addr = http_listener.as_ref().map(|l| l.local_addr()).transpose()?;
+        let scheme = if node_tls.is_some() { "https" } else { "http" };
         store.note_action(
-            &NewAction::new("mcp.serve", super::ORIGIN, format!("MCP server listening on http://{addr}/mcp"))
-                .params(json!({ "transport": "http", "addr": addr.to_string() })),
+            &NewAction::new("mcp.serve", super::ORIGIN, format!("MCP server listening on {scheme}://{addr}/mcp"))
+                .params(json!({ "transport": scheme, "addr": addr.to_string() })),
         );
+        // a browser page may come from the server's own public name
+        let own: Arc<Vec<String>> = Arc::new(node_tls.as_ref().and_then(|t| t.acme().map(|a| a.domain.clone())).into_iter().collect());
         let (stop, mut rx) = watch::channel(false);
         let store = Arc::new(Mutex::new(store));
+        let (st, nt, auto) = (store.clone(), node_tls.clone(), tls.as_ref().is_some_and(|t| t.auto_renew));
         let thread = std::thread::spawn(move || {
             let Ok(rt) = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build() else { return };
+            let store = st;
             rt.block_on(async move {
                 let Ok(listener) = tokio::net::TcpListener::from_std(std_listener) else { return };
+                if let (Some(l), Some(t)) = (http_listener, &nt)
+                    && let Ok(l) = tokio::net::TcpListener::from_std(l)
+                {
+                    tokio::spawn(crate::org::host::serve_challenges(l, t.challenges(), rx.clone()));
+                }
+                if let Some(t) = nt.clone().filter(|_| auto) {
+                    tokio::spawn(renew_loop(t, store.clone(), rx.clone()));
+                }
                 loop {
                     tokio::select! {
                         _ = rx.changed() => break,
                         a = listener.accept() => {
                             let Ok((tcp, _)) = a else { continue };
-                            let store = store.clone();
+                            let (store, own, acceptor) = (store.clone(), own.clone(), acceptor.clone());
                             tokio::spawn(async move {
-                                let svc = hyper::service::service_fn(move |req| answer(store.clone(), req));
-                                let _ = hyper::server::conn::http1::Builder::new().serve_connection(TokioIo::new(tcp), svc).await;
+                                let svc = hyper::service::service_fn(move |req| answer(store.clone(), own.clone(), req));
+                                match acceptor {
+                                    None => {
+                                        let _ = hyper::server::conn::http1::Builder::new().serve_connection(TokioIo::new(tcp), svc).await;
+                                    }
+                                    Some(acc) => {
+                                        let Ok(Ok(tls)) = tokio::time::timeout(std::time::Duration::from_secs(10), acc.accept(tcp)).await else { return };
+                                        if crate::org::host::is_acme_validation(&tls) {
+                                            return;
+                                        }
+                                        let _ = hyper::server::conn::http1::Builder::new().serve_connection(TokioIo::new(tls), svc).await;
+                                    }
+                                }
                             });
                         }
                     }
                 }
             });
         });
-        Ok(Http { addr, stop, thread: Some(thread) })
+        Ok(Http { addr, http_addr, tls: node_tls, store, stop, thread: Some(thread) })
     }
 
     pub fn url(&self) -> String {
-        format!("http://{}/mcp", self.addr)
+        match self.tls.as_ref().and_then(|t| t.acme().map(|a| a.domain.clone())) {
+            Some(d) if self.addr.port() == 443 => format!("https://{d}/mcp"),
+            Some(d) => format!("https://{d}:{}/mcp", self.addr.port()),
+            None if self.tls.is_some() => format!("https://{}/mcp", self.addr),
+            None => format!("http://{}/mcp", self.addr),
+        }
+    }
+
+    /// The served certificate (with TLS).
+    pub fn cert(&self) -> Option<crate::org::host::CertInfo> {
+        self.tls.as_ref().map(|t| t.cert())
+    }
+
+    /// Get a fresh ACME certificate now (with ACME).
+    pub fn renew(&self) -> Result<Option<crate::org::host::CertInfo>> {
+        let Some(t) = &self.tls else { return Ok(None) };
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        rt.block_on(t.renew_if_due(&self.store, true))
     }
 
     pub fn halt(&mut self) {
@@ -115,6 +203,28 @@ impl Drop for Http {
     }
 }
 
+/// Renew the certificate when due, checking every minute (backing off to an hour after failures).
+async fn renew_loop(tls: Arc<crate::org::host::NodeTls>, store: Arc<Mutex<Store>>, mut stop: watch::Receiver<bool>) {
+    let mut wait = 60;
+    loop {
+        match tls.renew_if_due(&store, false).await {
+            Ok(Some(c)) => {
+                tracing::info!("MCP certificate renewed, valid until {}", c.not_after);
+                wait = 60;
+            }
+            Ok(None) => wait = 60,
+            Err(e) => {
+                tracing::warn!("MCP certificate renewal failed: {e}");
+                wait = (wait * 2).min(3600);
+            }
+        }
+        tokio::select! {
+            _ = stop.changed() => return,
+            _ = tokio::time::sleep(std::time::Duration::from_secs(wait)) => {}
+        }
+    }
+}
+
 fn reply(status: u16, body: Option<Value>) -> Response<Full<Bytes>> {
     let b = Response::builder().status(status);
     match body {
@@ -125,20 +235,21 @@ fn reply(status: u16, body: Option<Value>) -> Response<Full<Bytes>> {
 }
 
 /// A browser page on another site must not reach a local server (DNS rebinding).
-fn local_origin(o: &str) -> bool {
+/// Local, or the server's own public name.
+fn allowed_origin(o: &str, own: &[String]) -> bool {
     let rest = o.split_once("://").map_or(o, |(_, r)| r);
     let host = rest.split('/').next().unwrap_or_default();
     let host =
         if host.starts_with('[') { host.split(']').next().map(|h| &h[1..]).unwrap_or_default() } else { host.split(':').next().unwrap_or_default() };
-    matches!(host, "localhost" | "127.0.0.1" | "::1")
+    matches!(host, "localhost" | "127.0.0.1" | "::1") || own.iter().any(|d| d.eq_ignore_ascii_case(host))
 }
 
-async fn answer(store: Arc<Mutex<Store>>, req: Request<Incoming>) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+async fn answer(store: Arc<Mutex<Store>>, own: Arc<Vec<String>>, req: Request<Incoming>) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
     if req.uri().path() != "/mcp" {
         return Ok(reply(404, Some(json!({ "error": "not found: the MCP endpoint is /mcp" }))));
     }
     if let Some(o) = req.headers().get("origin").and_then(|v| v.to_str().ok())
-        && !local_origin(o)
+        && !allowed_origin(o, &own)
     {
         return Ok(reply(403, Some(json!({ "error": "cross-origin requests are refused" }))));
     }

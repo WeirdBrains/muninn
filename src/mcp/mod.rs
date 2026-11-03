@@ -18,6 +18,8 @@ pub const PROTOCOLS: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
 pub const ORIGIN: &str = "mcp";
 /// Where `mnnn mcp serve --http` listens unless told otherwise (local only).
 pub const DEFAULT_HTTP: &str = "127.0.0.1:4743";
+/// Where `mcp serve --http` listens with TLS: every address, the HTTPS port.
+pub const DEFAULT_HTTPS: &str = "0.0.0.0:443";
 
 pub const PARSE_ERROR: i64 = -32700;
 pub const INVALID_REQUEST: i64 = -32600;

@@ -8,7 +8,7 @@ mnnn\-mcp\-serve \- Serve Muninn over MCP: stdio for one client (`\-\-client NAM
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn mcp serve\fR [\fB\-\-client\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-http\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn mcp serve\fR [\fB\-\-client\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-http\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-tls\-domain\fR] [\fB\-\-tls\-email\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-tls\-cert\fR] [\fB\-\-tls\-key\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-acme\-staging\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-acme\-directory\fR] [\fB\-\-transport\fR] [\fB\-\-acme\-challenge\fR] [\fB\-\-acme\-http\-port\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -33,13 +33,19 @@ May also be specified with the \fBMUNINN_DB\fR environment variable.
 .RE
 .TP
 \fB\-\-http\fR [\fI<ADDR>\fR]
-Serve over HTTP instead, at ADDR (default 127.0.0.1:4743); clients send their token
+Serve over HTTP instead, at ADDR (default 127.0.0.1:4743, or 0.0.0.0:443 with TLS; `[mcp] bind`); clients send their token
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
 .RS
 May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
 .RE
+.TP
+\fB\-\-tls\-domain\fR \fI<DOMAIN>\fR
+Serve HTTPS with a Let\*(Aqs Encrypt certificate for DOMAIN, got and renewed while running (`[mcp.acme] domain`). It must point at this machine
+.TP
+\fB\-\-tls\-email\fR \fI<EMAIL>\fR
+Contact address given to the CA (default `[mcp.acme] email`, else `[hosting.acme] email`)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
@@ -50,11 +56,20 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
+\fB\-\-tls\-cert\fR \fI<FILE>\fR
+Serve HTTPS with your own certificate chain (PEM; with \-\-tls\-key, no renewal)
+.TP
+\fB\-\-tls\-key\fR \fI<FILE>\fR
+The key for \-\-tls\-cert (PEM)
+.TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
+.TP
+\fB\-\-acme\-staging\fR
+Use Let\*(Aqs Encrypt\*(Aqs staging CA (untrusted certificates, for trying it out)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -74,8 +89,17 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
+\fB\-\-acme\-directory\fR \fI<URL>\fR
+letsencrypt, letsencrypt\-staging or a directory URL (`[mcp.acme] directory`)
+.TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-\-acme\-challenge\fR \fI<CHALLENGE>\fR
+http\-01 (port 80 reaches \-\-acme\-http\-port) or tls\-alpn\-01 (443 reaches the server)
+.TP
+\fB\-\-acme\-http\-port\fR \fI<PORT>\fR
+Port the HTTP\-01 challenge is answered on (default 80)
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

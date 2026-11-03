@@ -45,3 +45,20 @@ fn one_muninn_calls_another_over_mcp() {
     a.ok(&["-y", "mcp", "remove", "b"]);
     assert!(a.ok(&["mcp", "list"]).contains("no MCP servers"));
 }
+
+#[test]
+fn mcp_serve_tls_needs_a_contact_and_both_files() {
+    let e = Env::new();
+    let err = |args: &[&str]| {
+        let o = e.run(args);
+        assert!(!o.status.success(), "{args:?} should fail");
+        String::from_utf8_lossy(&o.stderr).to_string()
+    };
+    let no_email = err(&["mcp", "serve", "--tls-domain", "mcp.example.test", "--http", "127.0.0.1:0"]);
+    assert!(no_email.contains("--tls-email"), "{no_email}");
+    assert!(err(&["mcp", "serve", "--tls-cert", "c.pem"]).contains("--tls-key"));
+    assert!(err(&["mcp", "serve", "--client", "bot", "--tls-domain", "mcp.example.test"]).contains("cannot be used with"));
+    let missing = e.home().join("none.pem");
+    let m = missing.display().to_string();
+    assert!(!err(&["mcp", "serve", "--tls-cert", &m, "--tls-key", &m, "--http", "127.0.0.1:0"]).is_empty());
+}
