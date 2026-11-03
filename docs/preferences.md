@@ -69,6 +69,9 @@ A `version` key records the file's format; older files are upgraded on load (2.9
 | `hosting.names`, `hosting.cert_days` | `[]`, `7` | extra self-signed certificate names; its life in days |
 | `hosting.acme.enabled`, `.domain`, `.email` | off | Let's Encrypt, on with a domain and an email (`mnnn org cert acme`) |
 | `hosting.acme.directory`, `.profile`, `.http_port` | `letsencrypt`, `shortlived`, `80` | the CA, certificate profile and HTTP-01 port |
+| `mcp.bind` | empty | where `mnnn mcp serve --http` listens; empty: `127.0.0.1:4743`, or `0.0.0.0:443` with TLS ([MCP](mcp.md#https-with-lets-encrypt)) |
+| `mcp.acme.enabled`, `.domain`, `.email`, `.directory`, `.challenge`, `.http_port` | off | built-in HTTPS for the MCP server with a Let's Encrypt certificate (`--tls-domain`, `--tls-email`); same meanings as `hosting.acme` |
+| `mcp.tls_cert`, `mcp.tls_key` | empty | or a certificate chain and key of your own (`--tls-cert`, `--tls-key`) |
 | `tui.layout` | one list tile | the current [tiling layout](tiling.md), saved on every change |
 | `tui.layouts.<name>` | none | named layouts |
 

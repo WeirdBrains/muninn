@@ -57,16 +57,133 @@ replace a lost token, remove the client and add it again.
 
   ```
   mnnn mcp serve --http                    # http://127.0.0.1:4743/mcp
-  mnnn mcp serve --http 0.0.0.0:4743       # beyond this machine: see below
+  mnnn mcp serve --tls-domain mcp.example.com --tls-email you@example.com
+                                           # https://mcp.example.com/mcp: see below
   ```
 
   Each request sends a client token as `Authorization: Bearer mnnn_mcp_…`. A missing,
   unknown or revoked token gets `401`. Requests from a browser page on another site
   (any `Origin` other than localhost) get `403`. Ctrl-C stops the server.
 
-The HTTP server has no TLS of its own. It listens on 127.0.0.1 by default. If you bind it
-beyond this machine, Muninn warns you; put it behind an HTTPS proxy and keep the tokens
-secret.
+Plain HTTP listens on 127.0.0.1 by default. If you bind it beyond this machine without TLS,
+Muninn warns you. To serve other machines, use HTTPS: built in, or through a proxy.
+
+### HTTPS with Let's Encrypt
+
+Give the server a public name and it gets its own certificate from Let's Encrypt, serves
+HTTPS on every address at port 443, and renews the certificate while it runs:
+
+```
+mnnn mcp serve --tls-domain mcp.example.com --tls-email you@example.com
+# https://mcp.example.com/mcp
+```
+
+1. **DNS**: an `A` (and `AAAA`, if the machine has IPv6) record for the name, pointing at
+   the machine. Check with `dig +short mcp.example.com`.
+2. **Firewall**: open TCP 80 (the HTTP-01 challenge; Muninn answers only
+   `/.well-known/acme-challenge/` there) and 443. Keep 4743 closed.
+   `sudo ufw allow 80/tcp && sudo ufw allow 443/tcp` (or `firewall-cmd --add-service=http
+   --add-service=https --permanent && firewall-cmd --reload`).
+3. **Ports below 1024 without root**: run it as a systemd service with
+   `AmbientCapabilities=CAP_NET_BIND_SERVICE` (below), or give the binary the capability
+   once: `sudo setcap 'cap_net_bind_service=+ep' "$(command -v mnnn)"` (again after every
+   upgrade, since a new binary loses it). Or pick other ports: `--http 0.0.0.0:8443` with
+   `--acme-challenge tls-alpn-01` validates through the HTTPS port itself, so it needs only
+   443 forwarded to 8443; `--acme-http-port 8080` needs 80 forwarded to 8080.
+4. **Try it on staging first**: `--acme-staging` uses Let's Encrypt's staging CA, whose
+   certificates browsers don't trust but whose rate limits are generous. Drop it once that
+   works (the staging certificate is replaced on the next start, since it is for a
+   different CA).
+
+Until the first certificate arrives (a few seconds), the server answers with a self-signed
+one. The certificate is kept in the database (setting `mcp.acme.cert`, apart from the
+[org site's](org-hosting.md)); the ACME account is shared with org hosting. It is
+Let's Encrypt's short-lived profile (about six days), checked every minute and renewed
+when a third of its life is left; failures are retried with back-off and logged. A
+restart serves the kept certificate at once.
+
+The same settings can live in `preferences.toml`, so `mnnn mcp serve --http` alone serves
+HTTPS (flags override them):
+
+```toml
+[mcp]
+bind = ""                 # default: 127.0.0.1:4743, or 0.0.0.0:443 with TLS
+
+[mcp.acme]
+enabled = true
+domain = "mcp.example.com"
+email = "you@example.com" # default: [hosting.acme] email
+directory = "letsencrypt" # letsencrypt-staging, or another ACME directory URL
+challenge = "http-01"     # or tls-alpn-01
+http_port = 80
+```
+
+**A certificate of your own** instead: `--tls-cert fullchain.pem --tls-key privkey.pem`
+(or `[mcp] tls_cert`, `tls_key`). It is not renewed; restart the server after replacing
+the files.
+
+With TLS on, a browser page on the server's own name may call it; other origins still
+get `403`.
+
+#### As a service
+
+```ini
+# /etc/systemd/system/muninn-mcp.service
+[Unit]
+Description=Muninn MCP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=muninn
+Environment=MUNINN_HOME=/var/lib/muninn
+Environment=MUNINN_NON_INTERACTIVE=true
+EnvironmentFile=/etc/muninn/mcp.env
+ExecStart=/usr/bin/mnnn mcp serve --tls-domain mcp.example.com --tls-email you@example.com
+KillSignal=SIGINT
+Restart=on-failure
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/muninn
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`/etc/muninn/mcp.env` (mode 0600) holds `MUNINN_PASSWORD=…` when the database key is not in
+a keyring. Then `sudo systemctl enable --now muninn-mcp` and
+`journalctl -u muninn-mcp -f` to watch it get the certificate.
+
+#### Checking it
+
+```
+curl -sS https://mcp.example.com/mcp -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://mcp.example.com/mcp   # 401
+openssl s_client -connect mcp.example.com:443 -servername mcp.example.com </dev/null 2>/dev/null \
+  | openssl x509 -noout -issuer -dates
+```
+
+#### When it fails
+
+- **"Let's Encrypt needs a contact address"**: add `--tls-email`.
+- **Permission denied on :443 or :80**: see step 3.
+- **Address already in use**: another web server holds the port. Stop it, or use
+  [nginx in front](mcp-proxy.md) instead.
+- **Still self-signed after a minute**: the CA could not reach the challenge. Check DNS,
+  that port 80 (or 443 with `tls-alpn-01`) is open and forwarded, and the log
+  (failures are logged as warnings; `MUNINN_LOG=info` shows renewals too). Too many failures on production hit Let's Encrypt's rate
+  limits; use `--acme-staging` while you fix it.
+
+### HTTPS through nginx
+
+When nginx already serves ports 80 and 443 on the machine, run Muninn on plain HTTP at
+127.0.0.1:4743 and let nginx and certbot handle TLS: see [MCP behind nginx](mcp-proxy.md)
+and [`packaging/nginx/muninn-mcp.conf`](../packaging/nginx/muninn-mcp.conf).
 
 ### What it offers
 
