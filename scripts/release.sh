@@ -12,7 +12,15 @@ git rev-parse -q --verify "refs/tags/v$ver" >/dev/null && { echo "tag v$ver exis
 sed -i "0,/^version = \".*\"/s//version = \"$ver\"/" Cargo.toml
 # keep packaging versions in step
 sed -i "s/^pkgver=.*/pkgver=$ver/" packaging/arch/PKGBUILD packaging/arch/muninn-bin/PKGBUILD
-sed -i "0,/^  version \".*\"/s//  version \"$ver\"/" packaging/homebrew/muninn.rb
+sed -i "0,/^  version \".*\"/s//  version \"$ver\"/" packaging/homebrew/Formula/muninn.rb
+sed -i "0,/^  version \".*\"/s//  version \"$ver\"/" packaging/homebrew/Casks/muninn.rb
+# winget: move the template directory to the new version
+wd=packaging/winget/manifests/w/WeirdBrains/Muninn
+old=$(ls "$wd" | sort -V | tail -1)
+if [[ $old != "$ver" ]]; then
+  git mv "$wd/$old" "$wd/$ver"
+  sed -i "s/$old/$ver/g" "$wd/$ver"/*.yaml
+fi
 cargo build -q
 cargo run -q -- man --out man >/dev/null
 python3 - "$ver" "$@" <<'PY'

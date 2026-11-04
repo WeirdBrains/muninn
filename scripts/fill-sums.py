@@ -3,7 +3,8 @@
 
 Usage: scripts/fill-sums.py <version> <dist-dir>
 Reads <dist-dir>/SHA256SUMS and writes into <dist-dir>/packaging/:
-  arch/PKGBUILD (muninn-bin), homebrew/muninn.rb, winget/<version>/*.yaml
+  arch/PKGBUILD (muninn-bin), homebrew/Formula/muninn.rb, homebrew/Casks/muninn.rb,
+  winget/manifests/w/WeirdBrains/Muninn/<version>/*.yaml (ready for winget-pkgs)
 """
 import pathlib, re, sys
 
@@ -32,24 +33,31 @@ s = re.sub(r"^sha256sums_aarch64=.*$", f"sha256sums_aarch64=('{sha('aarch64-unkn
 write("arch/PKGBUILD", s)
 
 # Homebrew: each url line is followed by its sha256 line
-s = (root / "packaging/homebrew/muninn.rb").read_text()
+s = (root / "packaging/homebrew/Formula/muninn.rb").read_text()
 s = re.sub(r'version ".*?"', f'version "{ver}"', s, count=1)
 lines = s.splitlines()
 for i, l in enumerate(lines):
     m = re.search(r"muninn-#\{version\}-([\w-]+)\.tar\.gz", l)
     if m:
         lines[i + 1] = re.sub(r'sha256 ".*"', f'sha256 "{sha(m.group(1))}"', lines[i + 1])
-write("homebrew/muninn.rb", "\n".join(lines) + "\n")
+write("homebrew/Formula/muninn.rb", "\n".join(lines) + "\n")
 
-# winget: newest template directory, retargeted to this version
-tdir = sorted((root / "packaging/winget/manifests/k/Kommandosaldat/Muninn").iterdir(),
+# Homebrew cask: the universal Muninn.app dmg
+s = (root / "packaging/homebrew/Casks/muninn.rb").read_text()
+s = re.sub(r'version ".*?"', f'version "{ver}"', s, count=1)
+s = re.sub(r'sha256 ".*?"', f'sha256 "{sums[f"muninn-{ver}-macos.dmg"]}"', s, count=1)
+write("homebrew/Casks/muninn.rb", s)
+
+# winget: newest template directory, retargeted to this version; Inno Setup installers
+wroot = "winget/manifests/w/WeirdBrains/Muninn"
+tdir = sorted((root / "packaging" / wroot).iterdir(),
               key=lambda p: [int(x) for x in p.name.split(".")])[-1]
 for f in sorted(tdir.glob("*.yaml")):
     s = f.read_text().replace(tdir.name, ver)
     if "installer" in f.name:
         for arch in ("x86_64", "aarch64"):
-            t = f"{arch}-pc-windows-gnullvm"
-            s = re.sub(rf"({re.escape(t)}\.zip\n\s+InstallerSha256: )\"?[0-9a-fA-F]+\"?",
-                       rf'\g<1>"{sha(t, "zip").upper()}"', s)
+            n = f"muninn-{ver}-{arch}-windows-setup.exe"
+            s = re.sub(rf"({re.escape(n)}\n\s+InstallerSha256: )\"?[0-9a-fA-F]+\"?",
+                       rf'\g<1>"{sums[n].upper()}"', s)
         s = re.sub(r'ReleaseDate: .*', f'ReleaseDate: "{__import__("datetime").date.today()}"', s)
-    write(f"winget/{ver}/{f.name}", s)
+    write(f"{wroot}/{ver}/{f.name}", s)

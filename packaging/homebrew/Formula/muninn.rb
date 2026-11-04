@@ -1,6 +1,6 @@
 # Homebrew formula for Muninn (mnnn): installs prebuilt release binaries, no Rust needed.
-# For a tap copy to Formula/muninn.rb. On release, set each sha256 from SHA256SUMS
-# (the release workflow prints a filled-in formula).
+# Published in the tap github.com/WeirdBrains/homebrew-tap as Formula/muninn.rb:
+#   brew install weirdbrains/tap/muninn   (scripts/fill-sums.py fills in the sums)
 class Muninn < Formula
   desc "Local, encrypted store for OHLCV market bars"
   homepage "https://github.com/WeirdBrains/muninn"

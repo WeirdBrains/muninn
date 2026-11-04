@@ -1,12 +1,12 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
-PackageIdentifier: Kommandosaldat.Muninn
-PackageVersion: 1.5.0
+PackageIdentifier: WeirdBrains.Muninn
+PackageVersion: 2.20.0
 PackageLocale: en-US
-Publisher: Kommandosaldat
+Publisher: WeirdBrains
 PublisherUrl: https://github.com/WeirdBrains
 Author: Michael Christenson II
 PackageName: Muninn
-PackageUrl: https://github.com/WeirdBrains/muninn
+PackageUrl: https://muninn.weirdbrains.com
 License: BSD-3-Clause
 LicenseUrl: https://github.com/WeirdBrains/muninn/blob/main/LICENSE
 ShortDescription: Local, encrypted store for OHLCV market bars (mnnn).
@@ -17,6 +17,6 @@ Tags:
   - market-data
   - sqlite
   - cli
-ReleaseNotesUrl: https://github.com/WeirdBrains/muninn/blob/main/CHANGELOG.md
+ReleaseNotesUrl: https://github.com/WeirdBrains/muninn/releases/tag/v2.20.0
 ManifestType: defaultLocale
 ManifestVersion: 1.9.0

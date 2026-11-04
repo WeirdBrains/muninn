@@ -8,9 +8,13 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Added
 - Markdown is rendered in the TUI: journal entries and help topics show headings, bold and italic, code, lists, quotes, tables, links and rules in the theme's colours; `r` switches to the source
+- Windows installer `muninn-<ver>-<arch>-windows-setup.exe`: per-user, no admin, adds `mnnn` to PATH and a Start Menu entry
+- macOS `muninn-<ver>-macos.dmg` with a universal Muninn.app that opens the TUI in Terminal
+- Homebrew tap: `brew install weirdbrains/tap/muninn` (or `--cask` for the app); winget id `WeirdBrains.Muninn`
 - Global `--log-file PATH` (`MUNINN_LOG_FILE`) sends logs to a file instead of stderr, for the TUI and every other command
 
 ### Changed
+- The `.deb` requires glibc 2.39 (Ubuntu 24.04, Debian 13 or newer)
 - HTML exports and org sites drop unsafe link targets (`javascript:`, `data:` …) from Markdown
 - The relay guide generates the password with `openssl rand -hex 32`
 - A relay announces only routable addresses (just its `--external` ones when set), and invites skip circuits through unroutable relays; the relay guide lists the public relay's peer ID and the port 80 ACME needs
