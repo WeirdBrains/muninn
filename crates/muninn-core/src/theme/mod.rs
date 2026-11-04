@@ -37,13 +37,13 @@ pub const DEFAULT_THEME: &str = "tokyo-night";
 
 /// Built-in themes compiled into the binary.
 pub const BUILTINS: &[(&str, &str)] = &[
-    ("tokyo-night", include_str!("../../assets/themes/tokyo-night.toml")),
-    ("catppuccin", include_str!("../../assets/themes/catppuccin.toml")),
-    ("gruvbox", include_str!("../../assets/themes/gruvbox.toml")),
-    ("dracula", include_str!("../../assets/themes/dracula.toml")),
-    ("nord", include_str!("../../assets/themes/nord.toml")),
-    ("one", include_str!("../../assets/themes/one.toml")),
-    ("solarized", include_str!("../../assets/themes/solarized.toml")),
+    ("tokyo-night", include_str!("../../../../assets/themes/tokyo-night.toml")),
+    ("catppuccin", include_str!("../../../../assets/themes/catppuccin.toml")),
+    ("gruvbox", include_str!("../../../../assets/themes/gruvbox.toml")),
+    ("dracula", include_str!("../../../../assets/themes/dracula.toml")),
+    ("nord", include_str!("../../../../assets/themes/nord.toml")),
+    ("one", include_str!("../../../../assets/themes/one.toml")),
+    ("solarized", include_str!("../../../../assets/themes/solarized.toml")),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

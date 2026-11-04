@@ -20,7 +20,7 @@
 //! runs only after its owner approved the exact source (or library file) — new or changed
 //! code asks first. Run logs never contain secrets the host has (keys, passwords): the host
 //! API has no method that returns them.
-#[path = "../../plugin/muninn-plugin/src/abi.rs"]
+#[path = "../../../../plugin/muninn-plugin/src/abi.rs"]
 pub mod abi;
 pub mod bars;
 pub mod host;
@@ -48,12 +48,12 @@ pub const SDK_VERSION: &str = "1.0.0";
 
 /// The SDK crate, embedded so code spaces build without the Muninn sources.
 pub const SDK_FILES: &[(&str, &str)] = &[
-    ("Cargo.toml", include_str!("../../plugin/muninn-plugin/Cargo.toml")),
-    ("src/lib.rs", include_str!("../../plugin/muninn-plugin/src/lib.rs")),
-    ("src/abi.rs", include_str!("../../plugin/muninn-plugin/src/abi.rs")),
-    ("src/json.rs", include_str!("../../plugin/muninn-plugin/src/json.rs")),
-    ("src/series.rs", include_str!("../../plugin/muninn-plugin/src/series.rs")),
-    ("src/columns.rs", include_str!("../../plugin/muninn-plugin/src/columns.rs")),
+    ("Cargo.toml", include_str!("../../../../plugin/muninn-plugin/Cargo.toml")),
+    ("src/lib.rs", include_str!("../../../../plugin/muninn-plugin/src/lib.rs")),
+    ("src/abi.rs", include_str!("../../../../plugin/muninn-plugin/src/abi.rs")),
+    ("src/json.rs", include_str!("../../../../plugin/muninn-plugin/src/json.rs")),
+    ("src/series.rs", include_str!("../../../../plugin/muninn-plugin/src/series.rs")),
+    ("src/columns.rs", include_str!("../../../../plugin/muninn-plugin/src/columns.rs")),
 ];
 
 fn hex16(h: blake3::Hash) -> String {

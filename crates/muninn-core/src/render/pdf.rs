@@ -13,11 +13,11 @@ use std::collections::{BTreeMap, HashMap};
 use subsetter::GlyphRemapper;
 
 static FONTS: [&[u8]; 5] = [
-    include_bytes!("../../assets/fonts/LiberationSerif-Regular.ttf"),
-    include_bytes!("../../assets/fonts/LiberationSerif-Bold.ttf"),
-    include_bytes!("../../assets/fonts/LiberationSerif-Italic.ttf"),
-    include_bytes!("../../assets/fonts/LiberationSerif-BoldItalic.ttf"),
-    include_bytes!("../../assets/fonts/LiberationMono-Regular.ttf"),
+    include_bytes!("../../../../assets/fonts/LiberationSerif-Regular.ttf"),
+    include_bytes!("../../../../assets/fonts/LiberationSerif-Bold.ttf"),
+    include_bytes!("../../../../assets/fonts/LiberationSerif-Italic.ttf"),
+    include_bytes!("../../../../assets/fonts/LiberationSerif-BoldItalic.ttf"),
+    include_bytes!("../../../../assets/fonts/LiberationMono-Regular.ttf"),
 ];
 const NAMES: [&str; 5] = ["LiberationSerif", "LiberationSerif-Bold", "LiberationSerif-Italic", "LiberationSerif-BoldItalic", "LiberationMono"];
 const MONO: usize = 4;

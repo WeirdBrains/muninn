@@ -20,8 +20,8 @@ pub struct Builtin {
 }
 
 pub const BUILTINS: &[Builtin] = &[
-    Builtin { name: "invite-redeem", summary: "check an invite link for this org", contract: include_str!("../../builtin/invite-redeem.md") },
-    Builtin { name: "membership-apply", summary: "how to apply to this org", contract: include_str!("../../builtin/membership-apply.md") },
+    Builtin { name: "invite-redeem", summary: "check an invite link for this org", contract: include_str!("../../../../builtin/invite-redeem.md") },
+    Builtin { name: "membership-apply", summary: "how to apply to this org", contract: include_str!("../../../../builtin/membership-apply.md") },
 ];
 
 pub fn find(name: &str) -> Option<&'static Builtin> {

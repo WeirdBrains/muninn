@@ -20,9 +20,9 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
 
 fn main() {
     grpc();
-    let root = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    let root = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let docs = root.join("docs");
-    println!("cargo:rerun-if-changed=docs");
+    println!("cargo:rerun-if-changed={}", docs.display());
     let mut files = vec![];
     walk(&docs, &mut files);
     let mut src = String::from("/// (topic id, markdown) generated from docs/ by build.rs\npub const TOPICS: &[(&str, &str)] = &[\n");
@@ -40,8 +40,9 @@ fn main() {
 /// The `muninn.live.v1` stream service, from the .proto with a pure-Rust compiler (no protoc).
 /// The messages are hand-written in `src/collab/proto.rs`; only the service is generated.
 fn grpc() {
-    println!("cargo:rerun-if-changed=proto");
-    let fds = protox::compile(["muninn/live/v1/live.proto"], ["proto"]).expect("proto/muninn/live/v1/live.proto");
+    let proto = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../proto");
+    println!("cargo:rerun-if-changed={}", proto.display());
+    let fds = protox::compile(["muninn/live/v1/live.proto"], [proto]).expect("proto/muninn/live/v1/live.proto");
     tonic_prost_build::configure()
         .build_client(true)
         .build_server(true)

@@ -68,7 +68,7 @@ fn shot(a: &mut App, name: &str, caption: &str) {
         html.push('\n');
     }
     html.push_str("</pre>");
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/screenshots");
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("target/screenshots");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join(format!("{name}.html")), html).unwrap();
     let text: String =
@@ -123,7 +123,7 @@ fn ticks(n: i64) -> String {
 #[test]
 #[ignore = "writes screenshots; run on demand"]
 fn feature_screenshots() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/screenshots");
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("target/screenshots");
     let _ = std::fs::remove_dir_all(&dir);
     let (_t, mut a) = app();
     // display only: the home stays the scratch one

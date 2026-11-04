@@ -1,6 +1,6 @@
 [package]
 name = "muninn"
-version = "2.20.1"
+version.workspace = true
 edition = "2024"
 rust-version = "1.99"
 description = "The data ingestor for the Kommandosaldat project. It ingests data from various sources and normalizes it into a common format."
@@ -22,12 +22,13 @@ name = "muninn"
 path = "src/lib.rs"
 
 [dependencies]
+muninn-core = { path = "crates/muninn-core" }
 # Python code spaces: parsed in pure Rust (ruff, pinned) and translated with the vendored
 # python-ast code generation (no pyo3, no libpython); see vendor/python-ast/VENDORED.md
 ruff_python_parser = "=0.0.20"
 ruff_python_ast = "=0.0.20"
 ruff_text_size = "=0.0.20"
-python-ast = { path = "vendor/python-ast" }
+python-ast = { workspace = true }
 clap = { version = "4.6", features = ["env", "string", "unicode", "derive", "cargo"] }
 clap_mangen = "0.2"
 polars = { version = "0.55", features = ["lazy", "csv", "json", "parquet", "dtype-datetime", "strings", "temporal"] }
@@ -152,8 +153,13 @@ assets = [
 strip = "symbols"
 
 [workspace]
+members = ["crates/muninn-core", "crates/muninn-ffi"]
+# plain `cargo build/test/clippy` at the root covers all three (not the vendored crate)
+default-members = [".", "crates/muninn-core", "crates/muninn-ffi"]
 exclude = ["vendor/python-ast"]
 
-[build-dependencies]
-protox = "0.10.0"
-tonic-prost-build = "0.14"
+[workspace.dependencies]
+python-ast = { path = "vendor/python-ast" }
+
+[workspace.package]
+version = "2.20.1"

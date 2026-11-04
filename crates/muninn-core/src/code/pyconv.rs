@@ -528,7 +528,7 @@ mod tests {
     /// (tests/python/golden, made by scripts/py-golden.sh), or is rejected like it was.
     #[test]
     fn corpus_matches_cpython_rythonc() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let root = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
         let golden = root.join("tests/python/golden");
         let mut inputs = vec![];
         for d in ["tests/python/rythonc", "vendor/python-ast/pytests"] {

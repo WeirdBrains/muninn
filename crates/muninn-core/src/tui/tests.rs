@@ -23,7 +23,7 @@ pub fn app() -> (tempfile::TempDir, App) {
     paths.ensure().unwrap();
     let dek = crate::crypto::Key32::random().unwrap();
     let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let root = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     for f in ["ETHUSDT_5m.csv", "BTCUSDT_5m.csv"] {
         let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
         crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &root.join(f), &Default::default()).unwrap();
@@ -482,7 +482,7 @@ fn snapshots() {
         }
         Err(_) => app(),
     };
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/tui-snapshots");
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("target/tui-snapshots");
     std::fs::create_dir_all(&dir).unwrap();
     let shot = |a: &mut App, name: &str, w: u16, h: u16| {
         let started = std::time::Instant::now();
@@ -582,7 +582,7 @@ fn sidebar_toggle_search_sort_filter() {
 fn import_popup_browses_and_imports_in_background() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("SOLUSDT_5m.csv")).unwrap();
     std::fs::copy(fx.join("BTCUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
     std::fs::create_dir(d.path().join("sub")).unwrap();
@@ -628,7 +628,7 @@ fn import_popup_browses_and_imports_in_background() {
 #[test]
 fn ingest_progress_counts_and_cancel_aborts() {
     let (_t, mut a) = app();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ETHUSDT_5m.csv");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures/ETHUSDT_5m.csv");
     let p = std::sync::Arc::new(crate::ingest::Progress::default());
     let opts = crate::ingest::IngestOptions { source: Some("p".into()), progress: Some(p.clone()), ..Default::default() };
     crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts.clone(), &fx, &Default::default()).unwrap();
@@ -679,7 +679,7 @@ fn fullscale() {
     a.layout = layout::TileLayout::single(Some(layout::SeriesKey::of(&a.series[0])));
     a.caches.clear();
     a.refresh_rows();
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/tui-snapshots/fullscale");
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("target/tui-snapshots/fullscale");
     std::fs::create_dir_all(&dir).unwrap();
     let mut worst: Vec<(String, Duration)> = vec![];
     let mut step = |a: &mut App, name: &str, f: &mut dyn FnMut(&mut App)| {
@@ -865,7 +865,7 @@ fn cancel_mid_file_rolls_back_the_whole_file() {
 fn tui_cancel_keeps_finished_files_and_discards_current() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
     big_csv(&d.path().join("SOLUSDT_5m.csv"), 400_000);
     a.on_key(key(KeyCode::Char('i')));
@@ -1152,7 +1152,7 @@ fn wait_import(a: &mut App) -> String {
 fn import_folder_recursively_from_tui() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::create_dir_all(d.path().join("sub/deeper")).unwrap();
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("sub/SOLUSDT_5m.csv")).unwrap();
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("sub/deeper/ADAUSDT_5m.csv")).unwrap();
@@ -1197,7 +1197,7 @@ fn click_on(a: &mut App, p: impl Fn(&Hit) -> bool) {
 fn import_picker_entries_inputs_and_keys_are_clickable() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::create_dir(d.path().join("sub")).unwrap();
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("sub/SOLUSDT_5m.csv")).unwrap();
     a.on_key(key(KeyCode::Char('i')));
@@ -1266,7 +1266,7 @@ fn popup_rows_forms_and_list_rows_are_clickable() {
 fn import_asks_for_a_symbol_it_cannot_guess() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("unnamed.csv"), d.path().join("mystery_5m.csv")).unwrap();
     std::fs::copy(fx.join("unnamed.csv"), d.path().join("other_5m.csv")).unwrap();
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("SOLUSDT_5m.csv")).unwrap();
@@ -1314,7 +1314,7 @@ fn import_asks_for_a_symbol_it_cannot_guess() {
 fn finished_import_loads_into_an_empty_view_only() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("SOLUSDT_5m.csv")).unwrap();
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
     let ids: Vec<u32> = a.layout.tiles().iter().map(|t| t.id).collect();
@@ -1448,7 +1448,7 @@ fn symbol_popup_keeps_the_file_name_visible_with_long_paths() {
     let d = tempfile::tempdir().unwrap();
     let deep = d.path().join("a_very_long_directory_name_for_market_data/exchange_exports/2026/october/raw");
     std::fs::create_dir_all(&deep).unwrap();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     for n in ["mystery_5m.csv", "second_mystery_file_with_a_long_name_5m.csv", "third_5m.csv"] {
         std::fs::copy(fx.join("unnamed.csv"), deep.join(n)).unwrap();
     }
@@ -1627,7 +1627,7 @@ fn tile_focus_next_previous_and_direct_jump() {
 fn import_source_defaults_to_the_exchange_in_the_name_then_local() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("kraken_SOLUSDT_5m.csv")).unwrap();
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
     a.on_key(key(KeyCode::Char('i')));
@@ -1666,7 +1666,7 @@ fn symbols_are_guessed_searched_and_filtered_with_exchange_prefixed_names() {
     }
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    let fx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("BTCUSDT_5m.csv"), d.path().join("coinbase_BTC-USD_5m.csv")).unwrap();
     a.on_key(key(KeyCode::Char('i')));
     a.import.cd(d.path().to_path_buf());

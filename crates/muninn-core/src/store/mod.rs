@@ -272,6 +272,17 @@ impl Store {
         Ok(s)
     }
 
+    /// Open an existing store read-only: no migrations, no writes (front ends that only display,
+    /// such as the Flutter app's dashboard). Fails if the file is missing or the key is wrong.
+    pub fn open_readonly(path: &Path, key: Option<&[u8; 32]>) -> Result<Self> {
+        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        Self::apply_key(&conn, key)?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get::<_, i64>(0))
+            .map_err(|e| Error::Unlock(format!("wrong key or not a muninn database ({e})")))?;
+        Ok(Self::wrap(conn))
+    }
+
     /// Bigger page cache for bulk reads (TUI loader connection).
     pub fn tune_for_reads(&self) {
         let _ = self.conn.execute_batch("PRAGMA cache_size = -262144; PRAGMA temp_store = MEMORY;");

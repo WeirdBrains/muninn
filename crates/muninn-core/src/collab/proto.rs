@@ -175,7 +175,7 @@ mod tests {
     /// The published .proto names the same messages and field tags as the Rust types.
     #[test]
     fn the_proto_file_matches() {
-        let proto = include_str!("../../proto/muninn/live/v1/live.proto");
+        let proto = include_str!("../../../../proto/muninn/live/v1/live.proto");
         let rust = include_str!("proto.rs");
         assert!(proto.contains(&format!("package {PACKAGE};")));
         let mut msg = "";

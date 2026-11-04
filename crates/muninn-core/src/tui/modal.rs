@@ -186,15 +186,9 @@ impl Modal {
     }
 }
 
+/// The About box text, from [`crate::about`] (shared with the Flutter app and the site).
 pub fn about_lines() -> Vec<String> {
-    vec![
-        format!("Muninn v{}", env!("CARGO_PKG_VERSION")),
-        String::new(),
-        "Local, encrypted store for OHLCV market bars.".into(),
-        "Odin's raven of memory: it remembers every bar.".into(),
-        String::new(),
-        "Help: ? or F1 · Menus: F10 or Alt+letter · Quit: q".into(),
-    ]
+    crate::about::lines()
 }
 
 pub fn cli_hint(cmd: &str, why: &str) -> Vec<String> {

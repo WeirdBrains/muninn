@@ -211,7 +211,7 @@ mod tests {
         }
         assert!(top.contains("muninn.database"));
         // The committed pages are in sync with the clap definitions.
-        let committed = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("man");
+        let committed = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("man");
         if committed.exists() {
             for p in &expected {
                 let a = std::fs::read_to_string(dir.path().join(format!("{p}.1"))).unwrap();
