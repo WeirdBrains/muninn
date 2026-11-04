@@ -11,6 +11,10 @@ const docs = '/docs/';
 const shotWidth = 1464;
 const shotHeight = 890;
 const installDoc = '/docs/install/';
+const homepage = 'https://muninn.weirdbrains.com';
+
+/// The released version (scripts/release.sh bumps it; tests/site.rs checks it).
+const version = '2.20.1';
 
 /// The whole site: one page, no client-side code.
 class App extends StatelessComponent {
@@ -130,15 +134,28 @@ class App extends StatelessComponent {
           Component.text(' or ? in the TUI, and man pages for every command.'),
         ]),
       ]),
-      footer([
-        Component.text('Muninn · '),
-        a(href: releases, [Component.text('releases')]),
-        Component.text(' · '),
-        a(href: '$repo/blob/main/CHANGELOG.md', [Component.text('changelog')]),
-        Component.text(' · '),
-        a(href: docs, [Component.text('docs')]),
-        Component.text(' · '),
-        a(href: '$repo/blob/main/LICENSE', [Component.text('BSD 3-Clause')]),
+      footer(classes: 'about', [
+        span(
+          classes: 'logo about-logo',
+          attributes: {'aria-hidden': 'true'},
+          [RawText(ravenMark)],
+        ),
+        p([
+          Component.text('Muninn $version · published by WeirdBrains · '),
+          a(href: homepage, [Component.text('muninn.weirdbrains.com')]),
+        ]),
+        p([
+          Component.text('Muninn · '),
+          a(href: releases, [Component.text('releases')]),
+          Component.text(' · '),
+          a(href: '$repo/blob/main/CHANGELOG.md', [
+            Component.text('changelog'),
+          ]),
+          Component.text(' · '),
+          a(href: docs, [Component.text('docs')]),
+          Component.text(' · '),
+          a(href: '$repo/blob/main/LICENSE', [Component.text('BSD 3-Clause')]),
+        ]),
       ]),
     ]);
   }
@@ -181,23 +198,20 @@ const features = [
 
 const installs = [
   (
+    'Windows (setup.exe)',
+    'Download muninn-2.20.1-x86_64-windows-setup.exe from the release and run it.\nSmartScreen: More info, then Run anyway. Or: winget install WeirdBrains.Muninn',
+  ),
+  (
+    'macOS (dmg)',
+    'Download muninn-2.20.1-macos.dmg, drag Muninn to Applications,\nthen right-click Muninn and choose Open the first time.',
+  ),
+  ('Homebrew (macOS, Linux)', 'brew install weirdbrains/tap/muninn'),
+  ('Debian / Ubuntu', 'sudo apt install ./muninn_2.20.1-1_amd64.deb'),
+  ('Fedora', 'sudo dnf install ./muninn-2.20.1-1.x86_64.rpm'),
+  ('Arch Linux', 'sudo pacman -U muninn-bin-2.20.1-1-x86_64.pkg.tar.zst'),
+  (
     'Release tarball (Linux, macOS)',
-    'tar -xzf muninn-2.20.0-x86_64-unknown-linux-gnu.tar.gz\nmkdir -p ~/.local/bin\ninstall -m755 muninn-2.20.0-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn',
-  ),
-  ('Debian / Ubuntu', 'sudo apt install ./muninn_2.20.0-1_amd64.deb'),
-  ('Fedora', 'sudo dnf install ./muninn-2.20.0-1.x86_64.rpm'),
-  ('Arch Linux', 'sudo pacman -U muninn-bin-2.20.0-1-x86_64.pkg.tar.zst'),
-  (
-    'Homebrew (macOS, Linux)',
-    'tar -xzf muninn-2.20.0-packaging.tar.gz\nbrew tap-new --no-git local/muninn\ncp packaging/homebrew/muninn.rb "\$(brew --repository local/muninn)/Formula/"\nbrew install local/muninn/muninn',
-  ),
-  (
-    'Windows (PowerShell)',
-    r'curl.exe -LO https://github.com/WeirdBrains/muninn/releases/download/v2.20.0/muninn-2.20.0-x86_64-pc-windows-gnullvm.zip'
-        '\n'
-        r'Expand-Archive muninn-2.20.0-x86_64-pc-windows-gnullvm.zip $env:LOCALAPPDATA\Programs -Force'
-        '\n'
-        r'# then add the folder to your user PATH and open a new terminal: see muninn.weirdbrains.com/docs/install',
+    'tar -xzf muninn-2.20.1-x86_64-unknown-linux-gnu.tar.gz\nmkdir -p ~/.local/bin\ninstall -m755 muninn-2.20.1-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn',
   ),
 ];
 

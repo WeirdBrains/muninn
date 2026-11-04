@@ -40,7 +40,9 @@ fn the_site_links_releases_docs_and_install_steps() {
         "dnf install",
         "pacman -U",
         "brew install",
-        "Expand-Archive",
+        "windows-setup.exe",
+        "macos.dmg",
+        "winget install WeirdBrains.Muninn",
     ] {
         assert!(app.contains(want), "site/lib/app.dart lacks {want}");
     }
@@ -183,7 +185,12 @@ fn the_raven_logo_is_inlined_verbatim_and_themed() {
     let dart = read("site/lib/logo.dart");
     for (name, file) in [("ravenTile", "site/web/logo/muninn-raven.svg"), ("ravenMark", "site/web/logo/muninn-raven-mark.svg")] {
         let svg = read(file);
-        assert!(dart.contains(&format!("const {name} = r'''{svg}''';")), "{name} in logo.dart differs from {file}");
+        let body = dart
+            .split_once(&format!("const {name} ="))
+            .and_then(|(_, r)| r.trim_start().strip_prefix("r\'\'\'"))
+            .and_then(|r| r.split_once("\'\'\';"))
+            .map(|(b, _)| b);
+        assert_eq!(body, Some(svg.as_str()), "{name} in logo.dart differs from {file}");
     }
     assert_eq!(read("site/web/favicon.svg"), read("site/web/logo/muninn-raven-small.svg"));
     assert_eq!(read("assets/icons/muninn.svg"), read("site/web/logo/muninn-raven.svg"), "the app icon is the same tile");
@@ -196,5 +203,20 @@ fn the_raven_logo_is_inlined_verbatim_and_themed() {
     let head = read("site/lib/main.server.dart");
     for f in ["favicon.svg", "favicon-16.png", "favicon-32.png", "apple-touch-icon.png"] {
         assert!(head.contains(f) && Path::new(env!("CARGO_MANIFEST_DIR")).join("site/web").join(f).exists(), "favicon {f}");
+    }
+}
+
+#[test]
+fn the_site_about_shows_publisher_homepage_version_and_mark() {
+    let app = read("site/lib/app.dart");
+    let ver = env!("CARGO_PKG_VERSION");
+    for want in [
+        format!("const version = '{ver}';"),
+        "const homepage = 'https://muninn.weirdbrains.com';".into(),
+        "published by WeirdBrains".into(),
+        "RawText(ravenMark)".into(),
+        "BSD 3-Clause".into(),
+    ] {
+        assert!(app.contains(&want), "site/lib/app.dart lacks {want}");
     }
 }

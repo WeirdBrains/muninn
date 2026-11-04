@@ -14,6 +14,7 @@ sed -i "0,/^version = \".*\"/s//version = \"$ver\"/" Cargo.toml
 sed -i "s/^pkgver=.*/pkgver=$ver/" packaging/arch/PKGBUILD packaging/arch/muninn-bin/PKGBUILD
 sed -i "0,/^  version \".*\"/s//  version \"$ver\"/" packaging/homebrew/Formula/muninn.rb
 sed -i "0,/^  version \".*\"/s//  version \"$ver\"/" packaging/homebrew/Casks/muninn.rb
+sed -i "s/^const version = '.*';/const version = '$ver';/" site/lib/app.dart
 # winget: move the template directory to the new version
 wd=packaging/winget/manifests/w/WeirdBrains/Muninn
 old=$(ls "$wd" | sort -V | tail -1)

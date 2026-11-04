@@ -20,6 +20,8 @@ for f in favicon.svg favicon-16.png favicon-32.png apple-touch-icon.png; do
   grep -qF "href=\"$f\"" "$html" || { echo "index.html does not link $f" >&2; exit 1; }
 done
 grep -qF '<span class="logo" aria-hidden="true"><svg' "$out/docs/index.html" || { echo "no inline raven in the docs header" >&2; exit 1; }
+tr '\n' ' ' <"$html" | grep -qE 'class="logo about-logo"[^>]*>[[:space:]]*<svg' || { echo "no raven in the About footer" >&2; exit 1; }
+grep -qF "published by WeirdBrains" "$html" || { echo "no publisher in the About footer" >&2; exit 1; }
 # Every screenshot the page shows must be in the build, with alt text.
 srcs=$(grep -oE 'src="screenshots/[^"]+\.png"' "$html" | sed 's/^src="//;s/"$//' | sort -u)
 [ -n "$srcs" ] || { echo "index.html shows no screenshots" >&2; exit 1; }
