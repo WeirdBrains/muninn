@@ -423,7 +423,7 @@ Today templates are saved from files with the CLI only (`mnnn org template save/
 
 ## MCP
 
-> **Phase 25 · v2.20.0 · 🚧 In progress**
+> **Phase 25 · v2.20.0 · ✅ Released**
 
 1. Muninn publishes an MCP server: `mnnn mcp serve` over stdio and HTTP (off until started), exposing journals, entries, projects, models and records, reports, live searches, org resources, views and executables as MCP resources and tools
 2. Every MCP call is checked like any other access: the caller is a named, revocable MCP client with a role (read only by default); writes and runs need permissions and are recorded in history
