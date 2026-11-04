@@ -199,7 +199,7 @@ const features = [
 const installs = [
   (
     'Windows (setup.exe)',
-    'Download muninn-2.20.1-x86_64-windows-setup.exe from the release and run it.\nSmartScreen: More info, then Run anyway. Or: winget install WeirdBrains.Muninn',
+    'Download muninn-2.20.1-x86_64-windows-setup.exe from the release and run it.\nSmartScreen: More info, then Run anyway. Firewall prompt: Allow for peer-to-peer.\nOr: winget install WeirdBrains.Muninn',
   ),
   (
     'macOS (dmg)',

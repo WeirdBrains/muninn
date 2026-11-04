@@ -38,9 +38,21 @@ translated in process, so no Python install is needed. See
 Open a **new** terminal (old ones keep the old `PATH`) and run `mnnn --version`.
 Silent install, e.g. for scripts: `muninn-2.20.1-x86_64-windows-setup.exe /VERYSILENT /SUPPRESSMSGBOXES`.
 
+**Windows Firewall:** the first time Muninn starts its network node, Windows Defender
+Firewall asks whether `mnnn.exe` may communicate on private and public networks. That is
+expected: the node listens for your other nodes and connections. **Allow access** (private
+networks are enough at home) for peer-to-peer sync, sharing and collaboration. **Cancel**
+keeps Muninn local-only: ingest, search, charts, journals, models, reports and exports all
+still work. The firewall only blocks incoming connections, so other nodes can't reach this
+one directly; connections it makes itself (for example through a relay) still go out.
+Change your answer later in **Windows Security ▸ Firewall & network protection ▸ Allow an
+app through firewall**.
+
 Uninstall from **Settings ▸ Apps ▸ Installed apps ▸ Muninn ▸ Uninstall** (or Start Menu ▸
 Muninn ▸ Uninstall Muninn). That removes the program folder and its `PATH` entry; your
-data in `%USERPROFILE%\.muninn` stays.
+data in `%USERPROFILE%\.muninn` stays. Windows keeps the firewall entry for `mnnn.exe`;
+remove it under **Allow an app through firewall** (Change settings, select `mnnn`, Remove)
+if you like.
 
 ### Windows: winget
 
