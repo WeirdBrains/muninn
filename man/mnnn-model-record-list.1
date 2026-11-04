@@ -8,7 +8,7 @@ mnnn\-model\-record\-list \- List records: filter, find text, sort, group and pa
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn model record list\fR [\fB\-\-home\fR] [\fB\-\-where\fR] [\fB\-\-db\fR] [\fB\-\-text\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-sort\fR] [\fB\-\-group\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-agg\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-limit\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-offset\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-json\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIMODEL\fR> 
+\fBmnnn model record list\fR [\fB\-\-home\fR] [\fB\-\-where\fR] [\fB\-\-db\fR] [\fB\-\-text\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-sort\fR] [\fB\-\-group\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-agg\fR] [\fB\-\-log\-file\fR] [\fB\-\-limit\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-offset\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-json\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIMODEL\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -53,14 +53,23 @@ More output (repeatable)
 \fB\-\-agg\fR \fI<AGG>\fR
 With \-\-group: sum:F, avg:F, min:F or max:F (repeatable)
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-\-limit\fR \fI<LIMIT>\fR
+At most this many (bars: 50 unless given; 0 = all)
+.TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-limit\fR \fI<LIMIT>\fR
-At most this many (bars: 50 unless given; 0 = all)
+\fB\-\-offset\fR \fI<OFFSET>\fR [default: 0]
+
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -68,7 +77,7 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-offset\fR \fI<OFFSET>\fR [default: 0]
+\fB\-\-json\fR
 
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
@@ -88,9 +97,6 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
-.TP
-\fB\-\-json\fR
-
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting

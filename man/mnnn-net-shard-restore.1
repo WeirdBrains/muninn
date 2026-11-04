@@ -8,7 +8,7 @@ mnnn\-net\-shard\-restore \- Gather shards back from peers and rebuild the maste
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn net shard restore\fR [\fB\-\-backup\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-set\fR] [\fB\-\-from\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-recover\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-print\-words\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn net shard restore\fR [\fB\-\-backup\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-set\fR] [\fB\-\-from\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-recover\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-print\-words\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -49,6 +49,12 @@ Set a new Muninn password with the restored key (default with \-\-backup)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
+.TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
 .TP
 \fB\-\-print\-words\fR
 Print the 24 recovery words

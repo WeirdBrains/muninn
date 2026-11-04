@@ -8,7 +8,7 @@ mnnn\-ingest\-service\-sqlite \- Flags shared by every service
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn ingest service sqlite\fR [\fB\-\-home\fR] <\fB\-\-path\fR> [\fB\-\-db\fR] [\fB\-\-table\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-query\fR] [\fB\-\-key\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-duration\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-map\fR] [\fB\-\-transport\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn ingest service sqlite\fR [\fB\-\-home\fR] <\fB\-\-path\fR> [\fB\-\-db\fR] [\fB\-\-table\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-query\fR] [\fB\-\-key\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-source\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-map\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-rejects\fR] [\fB\-\-transport\fR] [\fB\-\-force\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -50,17 +50,26 @@ Key if the source database is SQLCipher\-encrypted
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-\-source\fR \fI<SOURCE>\fR
+Where the data came from, e.g. coinbase (created if unknown). Default: an exchange named in the file name (binance_…, coinbase_…), else a prompt
+.TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-source\fR \fI<SOURCE>\fR
-Where the data came from, e.g. coinbase (created if unknown). Default: an exchange named in the file name (binance_…, coinbase_…), else a prompt
-.TP
 \fB\-\-symbol\fR \fI<SYMBOL>\fR
 Symbol, e.g. BTC/USDT, BTC\-USD or BTCUSDT
+.TP
+\fB\-\-duration\fR \fI<DURATION>\fR
+Bar duration, e.g. 5m, 1h, 1d
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -68,8 +77,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-duration\fR \fI<DURATION>\fR
-Bar duration, e.g. 5m, 1h, 1d
+\fB\-\-map\fR \fI<COL=FIELD>\fR
+Column mapping `<col>=<field>` (fields: timestamp, open, high, low, close, volume). Repeatable
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -89,14 +98,11 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
-\fB\-\-map\fR \fI<COL=FIELD>\fR
-Column mapping `<col>=<field>` (fields: timestamp, open, high, low, close, volume). Repeatable
+\fB\-\-rejects\fR \fI<FILE>\fR
+Write rejected rows (with reasons) to this CSV
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
-.TP
-\fB\-\-rejects\fR \fI<FILE>\fR
-Write rejected rows (with reasons) to this CSV
 .TP
 \fB\-\-force\fR
 Re\-process even if this exact input was already ingested

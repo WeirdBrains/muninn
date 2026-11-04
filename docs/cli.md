@@ -42,6 +42,7 @@ mnnn [GLOBAL FLAGS] <COMMAND>
 | `--db PATH` | `MUNINN_DB` | `<home>/storage/muninn.database` | database file |
 | `--non-interactive` | `MUNINN_NON_INTERACTIVE` | off | never prompt; missing values are errors |
 | `-v`, `--verbose` | | | more logging (repeat for more); conflicts with `-q` |
+| `--log-file PATH` | `MUNINN_LOG_FILE` | stderr (TUI: `<home>/logs/tui.log`) | append logs to this file, no colours; parent folders are created |
 | `-q`, `--quiet` | `MUNINN_QUIET` | off | only errors and requested data (exports to `-`, secrets) |
 | `-y`, `--yes` | `MUNINN_YES` | off | answer yes to confirmations |
 | `--theme-mode MODE` | `MUNINN_THEME_MODE` | from preferences | `light`, `dark` or `system` for this run |

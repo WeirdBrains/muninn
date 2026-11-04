@@ -8,7 +8,7 @@ mnnn\-ingest\-service\-redis \- Flags shared by every service
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn ingest service redis\fR [\fB\-\-home\fR] <\fB\-\-uri\fR> [\fB\-\-db\fR] [\fB\-\-port\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-username\fR] [\fB\-\-password\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-password\-env\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-password\-stdin\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-db\-index\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-tls\fR] [\fB\-\-transport\fR] [\fB\-\-key\fR] [\fB\-\-pattern\fR] [\fB\-\-type\fR] [\fB\-\-value\-format\fR] [\fB\-\-from\fR] [\fB\-\-to\fR] [\fB\-\-batch\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-\-map\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn ingest service redis\fR [\fB\-\-home\fR] <\fB\-\-uri\fR> [\fB\-\-db\fR] [\fB\-\-port\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-username\fR] [\fB\-\-password\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-password\-env\fR] [\fB\-\-password\-stdin\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-db\-index\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-tls\fR] [\fB\-\-key\fR] [\fB\-\-transport\fR] [\fB\-\-pattern\fR] [\fB\-\-type\fR] [\fB\-\-value\-format\fR] [\fB\-\-from\fR] [\fB\-\-to\fR] [\fB\-\-batch\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-\-map\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -50,8 +50,17 @@ Password (prefer \-\-password\-env / \-\-password\-stdin: flags end up in shell 
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
 \fB\-\-password\-env\fR \fI<VAR>\fR
 Read the password from this environment variable
+.TP
+\fB\-\-password\-stdin\fR
+Read the password from stdin
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -59,17 +68,14 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-password\-stdin\fR
-Read the password from stdin
+\fB\-\-db\-index\fR \fI<DB_INDEX>\fR [default: 0]
+Logical database index (`\-\-db` is taken by the global database\-file flag)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
-.TP
-\fB\-\-db\-index\fR \fI<DB_INDEX>\fR [default: 0]
-Logical database index (`\-\-db` is taken by the global database\-file flag)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -92,11 +98,11 @@ May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable.
 \fB\-\-tls\fR
 
 .TP
-\fB\-\-transport\fR \fI<stream|poll>\fR
-How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
-.TP
 \fB\-\-key\fR \fI<KEY>\fR
 
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-\-pattern\fR \fI<PATTERN>\fR
 

@@ -54,6 +54,9 @@ Password for key exports and encrypted backups (falls back to MUNINN_PASSWORD).
 .B MUNINN_LOG
 Tracing filter, e.g. debug.
 .TP
+.B MUNINN_LOG_FILE
+Write logs to this file instead of stderr (same as \fB--log-file\fR; the TUI defaults to <home>/logs/tui.log).
+.TP
 .B MUNINN_RAW_DATA
 Directory with full raw CSV files for the ignored full-file tests.
 .SH EXIT STATUS

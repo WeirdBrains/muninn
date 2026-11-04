@@ -8,7 +8,7 @@ mnnn\-org\-cert\-acme \- Set up ACME (Let\*(Aqs Encrypt) for the node\*(Aqs doma
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org cert acme\fR [\fB\-\-home\fR] [\fB\-\-org\fR] [\fB\-\-challenge\fR] [\fB\-\-db\fR] [\fB\-\-domain\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-email\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-directory\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-profile\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-http\-port\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-off\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn org cert acme\fR [\fB\-\-home\fR] [\fB\-\-org\fR] [\fB\-\-challenge\fR] [\fB\-\-db\fR] [\fB\-\-domain\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-email\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-directory\fR] [\fB\-\-log\-file\fR] [\fB\-\-profile\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-http\-port\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-off\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -53,14 +53,23 @@ More output (repeatable)
 \fB\-\-directory\fR \fI<DIRECTORY>\fR
 letsencrypt, letsencrypt\-staging or a directory URL
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-\-profile\fR \fI<PROFILE>\fR
+Certificate profile (shortlived; an empty value for the CA\*(Aqs default)
+.TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-profile\fR \fI<PROFILE>\fR
-Certificate profile (shortlived; an empty value for the CA\*(Aqs default)
+\fB\-\-http\-port\fR \fI<HTTP_PORT>\fR
+Port the HTTP\-01 challenge is answered on
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -68,8 +77,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-http\-port\fR \fI<HTTP_PORT>\fR
-Port the HTTP\-01 challenge is answered on
+\fB\-\-off\fR
+Turn ACME off (back to self\-signed certificates)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -88,9 +97,6 @@ system
 .RS
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
-.TP
-\fB\-\-off\fR
-Turn ACME off (back to self\-signed certificates)
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting

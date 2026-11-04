@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+- Global `--log-file PATH` (`MUNINN_LOG_FILE`) sends logs to a file instead of stderr, for the TUI and every other command
+
 ## [2.20.0] - 2026-11-03
 
 ### Added

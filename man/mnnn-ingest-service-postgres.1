@@ -8,7 +8,7 @@ mnnn\-ingest\-service\-postgres \- Flags shared by every service
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn ingest service postgres\fR [\fB\-\-home\fR] [\fB\-\-url\fR] [\fB\-\-db\fR] [\fB\-\-username\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-password\fR] [\fB\-\-password\-env\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-password\-stdin\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-host\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-port\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-database\fR] [\fB\-\-transport\fR] [\fB\-\-secure\fR] [\fB\-\-ca\-cert\fR] [\fB\-\-schema\fR] [\fB\-\-table\fR] [\fB\-\-query\fR] [\fB\-\-batch\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-\-map\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn ingest service postgres\fR [\fB\-\-home\fR] [\fB\-\-url\fR] [\fB\-\-db\fR] [\fB\-\-username\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-password\fR] [\fB\-\-password\-env\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-password\-stdin\fR] [\fB\-\-host\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-port\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-database\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-secure\fR] [\fB\-\-transport\fR] [\fB\-\-ca\-cert\fR] [\fB\-\-schema\fR] [\fB\-\-table\fR] [\fB\-\-query\fR] [\fB\-\-batch\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-\-map\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -50,8 +50,17 @@ Read the password from this environment variable
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
 \fB\-\-password\-stdin\fR
 Read the password from stdin
+.TP
+\fB\-\-host\fR \fI<HOST>\fR
+
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -59,7 +68,7 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-host\fR \fI<HOST>\fR
+\fB\-\-port\fR \fI<PORT>\fR
 
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
@@ -68,7 +77,7 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-port\fR \fI<PORT>\fR
+\fB\-\-database\fR \fI<DATABASE>\fR
 
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
@@ -89,14 +98,11 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
-\fB\-\-database\fR \fI<DATABASE>\fR
-
+\fB\-\-secure\fR
+sslmode=require (otherwise prefer)
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
-.TP
-\fB\-\-secure\fR
-sslmode=require (otherwise prefer)
 .TP
 \fB\-\-ca\-cert\fR \fI<CA_CERT>\fR
 CA certificate to verify the server (verify\-full)

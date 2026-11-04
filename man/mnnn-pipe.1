@@ -8,7 +8,7 @@ mnnn\-pipe \- Pipe data through code spaces: a source (a live search of any kind
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn pipe\fR [\fB\-\-home\fR] [\fB\-\-to\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rows\fR] [\fB\-\-chunk\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-format\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-keep\-header\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISOURCE\fR> [\fISTEPS\fR] 
+\fBmnnn pipe\fR [\fB\-\-home\fR] [\fB\-\-to\fR] [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-rows\fR] [\fB\-\-chunk\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-format\fR] [\fB\-\-log\-file\fR] [\fB\-\-keep\-header\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISOURCE\fR> [\fISTEPS\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -53,14 +53,20 @@ More output (repeatable)
 \fB\-\-format\fR \fI<FORMAT>\fR
 With `\-`: parse standard input with a built\-in parser code space first (csv, json, ndjson), shown as the pipe\*(Aqs first step. Without it the data arrives raw (a `text` column) for your own parser step
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-\-keep\-header\fR
+With \-\-chunk: repeat the first line (a header) at the top of every chunk (implied by \-\-format csv)
+.TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
-.TP
-\fB\-\-keep\-header\fR
-With \-\-chunk: repeat the first line (a header) at the top of every chunk (implied by \-\-format csv)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation

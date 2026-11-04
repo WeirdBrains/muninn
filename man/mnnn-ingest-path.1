@@ -8,7 +8,7 @@ mnnn\-ingest\-path \- Ingest a whole path: every CSV and JSON file in a director
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn ingest path\fR [\fB\-\-home\fR] [\fB\-p\fR|\fB\-\-path\fR] [\fB\-\-db\fR] [\fB\-\-source\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-map\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-rejects\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-force\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-transport\fR] [\fB\-\-delimiter\fR] [\fB\-\-no\-header\fR] [\fB\-\-records\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIPATH\fR] 
+\fBmnnn ingest path\fR [\fB\-\-home\fR] [\fB\-p\fR|\fB\-\-path\fR] [\fB\-\-db\fR] [\fB\-\-source\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-map\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-delimiter\fR] [\fB\-\-transport\fR] [\fB\-\-no\-header\fR] [\fB\-\-records\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIPATH\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -50,6 +50,12 @@ Bar duration, e.g. 5m, 1h, 1d
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
 \fB\-\-map\fR \fI<COL=FIELD>\fR
 Column mapping `<col>=<field>` (fields: timestamp, open, high, low, close, volume). Repeatable
 .TP
@@ -62,14 +68,17 @@ May also be specified with the \fBMUNINN_QUIET\fR environment variable.
 \fB\-\-rejects\fR \fI<FILE>\fR
 Write rejected rows (with reasons) to this CSV
 .TP
+\fB\-\-force\fR
+Re\-process even if this exact input was already ingested
+.TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-force\fR
-Re\-process even if this exact input was already ingested
+\fB\-\-no\-recursive\fR
+For a directory \-\-path: only its top level (default: search subdirectories too)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -89,14 +98,11 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
-\fB\-\-no\-recursive\fR
-For a directory \-\-path: only its top level (default: search subdirectories too)
+\fB\-\-delimiter\fR \fI<DELIMITER>\fR [default: ,]
+CSV field delimiter
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
-.TP
-\fB\-\-delimiter\fR \fI<DELIMITER>\fR [default: ,]
-CSV field delimiter
 .TP
 \fB\-\-no\-header\fR
 CSV files have no header row

@@ -8,7 +8,7 @@ mnnn\-net\-start \- Run this node in the foreground until Ctrl\-C (or \-\-for SE
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn net start\fR [\fB\-\-home\fR] [\fB\-\-port\fR] [\fB\-\-db\fR] [\fB\-\-listen\fR] [\fB\-\-no\-mdns\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-relay\-server\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-for\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn net start\fR [\fB\-\-home\fR] [\fB\-\-port\fR] [\fB\-\-db\fR] [\fB\-\-listen\fR] [\fB\-\-no\-mdns\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-relay\-server\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-for\fR] [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -52,6 +52,12 @@ More output (repeatable)
 .TP
 \fB\-\-for\fR \fI<SECS>\fR
 Stop after this many seconds
+.TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data

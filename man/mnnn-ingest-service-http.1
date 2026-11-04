@@ -8,7 +8,7 @@ mnnn\-ingest\-service\-http \- Flags shared by every service
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn ingest service http\fR [\fB\-\-home\fR] <\fB\-\-url\fR> [\fB\-\-db\fR] [\fB\-X\fR|\fB\-\-method\fR] [\fB\-\-body\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-param\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-H\fR|\fB\-\-header\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-format\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-records\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-paginate\fR] [\fB\-\-transport\fR] [\fB\-\-cursor\-path\fR] [\fB\-\-cursor\-param\fR] [\fB\-\-start\-param\fR] [\fB\-\-from\fR] [\fB\-\-to\fR] [\fB\-\-max\-pages\fR] [\fB\-\-rate\-limit\fR] [\fB\-\-retries\fR] [\fB\-\-insecure\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-\-map\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn ingest service http\fR [\fB\-\-home\fR] <\fB\-\-url\fR> [\fB\-\-db\fR] [\fB\-X\fR|\fB\-\-method\fR] [\fB\-\-body\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-param\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-H\fR|\fB\-\-header\fR] [\fB\-\-log\-file\fR] [\fB\-\-format\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-records\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-paginate\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-cursor\-path\fR] [\fB\-\-transport\fR] [\fB\-\-cursor\-param\fR] [\fB\-\-start\-param\fR] [\fB\-\-from\fR] [\fB\-\-to\fR] [\fB\-\-max\-pages\fR] [\fB\-\-rate\-limit\fR] [\fB\-\-retries\fR] [\fB\-\-insecure\fR] [\fB\-\-source\fR] [\fB\-\-symbol\fR] [\fB\-\-duration\fR] [\fB\-\-map\fR] [\fB\-\-rejects\fR] [\fB\-\-force\fR] [\fB\-\-no\-recursive\fR] [\fB\-\-timeout\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -69,10 +69,10 @@ More output (repeatable)
 \fB\-H\fR, \fB\-\-header\fR \fI<KEY: VALUE>\fR
 Header "KEY: VALUE" (repeatable, overrides defaults)
 .TP
-\fB\-q\fR, \fB\-\-quiet\fR
-Print nothing but errors and requested data
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
 .RS
-May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
 .RE
 .TP
 \fB\-\-format\fR \fI<FORMAT>\fR
@@ -90,14 +90,33 @@ csv
 ndjson
 .RE
 .TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-records\fR \fI<RECORDS>\fR
+Where the array of bars lives in the JSON response
+.TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-records\fR \fI<RECORDS>\fR
-Where the array of bars lives in the JSON response
+\fB\-\-paginate\fR \fI<PAGINATE>\fR [default: none]
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+none
+.IP \(bu 2
+cursor
+.IP \(bu 2
+time
+.RE
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -117,24 +136,11 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
-\fB\-\-paginate\fR \fI<PAGINATE>\fR [default: none]
-
-.br
-\fIPossible values:\fR
-.RS 14
-.IP \(bu 2
-none
-.IP \(bu 2
-cursor
-.IP \(bu 2
-time
-.RE
+\fB\-\-cursor\-path\fR \fI<CURSOR_PATH>\fR [default: next]
+cursor pagination: path of the next cursor in the response
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
-.TP
-\fB\-\-cursor\-path\fR \fI<CURSOR_PATH>\fR [default: next]
-cursor pagination: path of the next cursor in the response
 .TP
 \fB\-\-cursor\-param\fR \fI<CURSOR_PARAM>\fR [default: cursor]
 cursor pagination: query parameter that carries the cursor

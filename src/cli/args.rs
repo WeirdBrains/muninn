@@ -32,6 +32,9 @@ pub struct GlobalArgs {
     /// More output (repeatable).
     #[arg(short, long, global = true, action = clap::ArgAction::Count, conflicts_with = "quiet")]
     pub verbose: u8,
+    /// Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log).
+    #[arg(long, global = true, env = "MUNINN_LOG_FILE", value_name = "PATH")]
+    pub log_file: Option<PathBuf>,
     /// Print nothing but errors and requested data.
     #[arg(short, long, global = true, env = "MUNINN_QUIET")]
     pub quiet: bool,

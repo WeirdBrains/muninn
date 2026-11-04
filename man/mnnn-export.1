@@ -8,7 +8,7 @@ mnnn\-export \- Export bars
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn export\fR <\fB\-\-format\fR> [\fB\-\-home\fR] [\fB\-\-db\fR] <\fB\-\-out\fR> [\fB\-\-non\-interactive\fR] [\fB\-\-symbol\fR] [\fB\-\-source\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-from\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-to\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-duration\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn export\fR <\fB\-\-format\fR> [\fB\-\-home\fR] [\fB\-\-db\fR] <\fB\-\-out\fR> [\fB\-\-non\-interactive\fR] [\fB\-\-symbol\fR] [\fB\-\-source\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-from\fR] [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-to\fR] [\fB\-\-duration\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -73,6 +73,12 @@ More output (repeatable)
 \fB\-\-from\fR \fI<FROM>\fR
 
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
@@ -82,14 +88,14 @@ May also be specified with the \fBMUNINN_QUIET\fR environment variable.
 \fB\-\-to\fR \fI<TO>\fR
 
 .TP
+\fB\-\-duration\fR \fI<DURATION>\fR
+
+.TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
-.TP
-\fB\-\-duration\fR \fI<DURATION>\fR
-
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run

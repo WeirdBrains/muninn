@@ -8,7 +8,7 @@ mnnn\-org\-member\-invite \- Invite a node: prints the token to give them (or se
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org member invite\fR [\fB\-\-home\fR] [\fB\-\-peer\fR] [\fB\-\-db\fR] [\fB\-\-label\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-role\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> 
+\fBmnnn org member invite\fR [\fB\-\-home\fR] [\fB\-\-peer\fR] [\fB\-\-db\fR] [\fB\-\-label\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-role\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -46,6 +46,12 @@ Default: the org\*(Aqs invite role
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
+.TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data

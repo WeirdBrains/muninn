@@ -8,7 +8,7 @@ mnnn\-org\-edit \- Change an organization
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-slug\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-visibility\fR] [\fB\-\-access\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-hosted\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-member\-auth\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-gated\fR] [\fB\-\-transport\fR] [\fB\-\-template\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> 
+\fBmnnn org edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-slug\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-visibility\fR] [\fB\-\-access\fR] [\fB\-\-log\-file\fR] [\fB\-\-hosted\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-member\-auth\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-gated\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-template\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -53,14 +53,33 @@ public or private
 \fB\-\-access\fR \fI<ACCESS>\fR
 members or open
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-\-hosted\fR \fI<on|off>\fR
+Serve its site with `mnnn org host start`
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+on
+.IP \(bu 2
+off
+.RE
+.TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-hosted\fR \fI<on|off>\fR
-Serve its site with `mnnn org host start`
+\fB\-\-member\-auth\fR \fI<on|off>\fR
+Members may sign web requests with their exchange key
 .br
 
 .br
@@ -78,8 +97,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-member\-auth\fR \fI<on|off>\fR
-Members may sign web requests with their exchange key
+\fB\-\-gated\fR \fI<on|off>\fR
+A private org\*(Aqs site shows guests a landing, sign\-in and join page
 .br
 
 .br
@@ -109,24 +128,11 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
-\fB\-\-gated\fR \fI<on|off>\fR
-A private org\*(Aqs site shows guests a landing, sign\-in and join page
-.br
-
-.br
-\fIPossible values:\fR
-.RS 14
-.IP \(bu 2
-on
-.IP \(bu 2
-off
-.RE
+\fB\-\-template\fR \fI<TEMPLATE>\fR
+The site template (a template name, or `default`)
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
-.TP
-\fB\-\-template\fR \fI<TEMPLATE>\fR
-The site template (a template name, or `default`)
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

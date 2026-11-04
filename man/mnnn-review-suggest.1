@@ -8,7 +8,7 @@ mnnn\-review\-suggest \- Suggest a change: replace the \-\-at text, or the whole
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn review suggest\fR [\fB\-\-home\fR] <\fB\-\-to\fR> [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-why\fR] [\fB\-\-field\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-at\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-nth\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-entry\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIREVIEW\fR> 
+\fBmnnn review suggest\fR [\fB\-\-home\fR] <\fB\-\-to\fR> [\fB\-\-db\fR] [\fB\-\-json\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-why\fR] [\fB\-\-field\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-at\fR] [\fB\-\-log\-file\fR] [\fB\-\-nth\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-entry\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIREVIEW\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -53,23 +53,29 @@ More output (repeatable)
 \fB\-\-at\fR \fI<AT>\fR
 Anchor on this text of the field
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-\-nth\fR \fI<NTH>\fR [default: 1]
+Which occurrence of \-\-at (1\-based)
+.TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-nth\fR \fI<NTH>\fR [default: 1]
-Which occurrence of \-\-at (1\-based)
+\fB\-\-entry\fR \fI<ENTRY>\fR
+Journal reviews: the entry (an id or id prefix)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
-.TP
-\fB\-\-entry\fR \fI<ENTRY>\fR
-Journal reviews: the entry (an id or id prefix)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run

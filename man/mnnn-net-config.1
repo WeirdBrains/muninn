@@ -8,7 +8,7 @@ mnnn\-net\-config \- Show or change network settings
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn net config\fR [\fB\-\-home\fR] [\fB\-\-label\fR] [\fB\-\-db\fR] [\fB\-\-port\fR] [\fB\-\-listen\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-mdns\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-autostart\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-accept\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-bootstrap\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-clear\-bootstrap\fR] [\fB\-\-transport\fR] [\fB\-\-external\fR] [\fB\-\-clear\-external\fR] [\fB\-\-collab\-transport\fR] [\fB\-\-collab\-bind\fR] [\fB\-\-collab\-port\fR] [\fB\-\-collab\-advertise\fR] [\fB\-\-clear\-collab\-advertise\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBmnnn net config\fR [\fB\-\-home\fR] [\fB\-\-label\fR] [\fB\-\-db\fR] [\fB\-\-port\fR] [\fB\-\-listen\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-mdns\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-autostart\fR] [\fB\-\-log\-file\fR] [\fB\-\-accept\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-bootstrap\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-clear\-bootstrap\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-external\fR] [\fB\-\-transport\fR] [\fB\-\-clear\-external\fR] [\fB\-\-collab\-transport\fR] [\fB\-\-collab\-bind\fR] [\fB\-\-collab\-port\fR] [\fB\-\-collab\-advertise\fR] [\fB\-\-clear\-collab\-advertise\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -73,14 +73,23 @@ on
 off
 .RE
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-\-accept\fR \fI<known|anyone>\fR
+Connect on its own with `known` nodes only (default) or `anyone`
+.TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-accept\fR \fI<known|anyone>\fR
-Connect on its own with `known` nodes only (default) or `anyone`
+\fB\-\-bootstrap\fR \fI<ADDR>\fR
+Add a bootstrap node (repeatable)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -88,8 +97,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-bootstrap\fR \fI<ADDR>\fR
-Add a bootstrap node (repeatable)
+\fB\-\-clear\-bootstrap\fR
+Remove all bootstrap nodes first
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -109,14 +118,11 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
-\fB\-\-clear\-bootstrap\fR
-Remove all bootstrap nodes first
+\fB\-\-external\fR \fI<HOST[:PORT]>\fR
+Add an address other hosts reach this node at from outside: `host`, `host:port` or a multiaddr (repeatable; DNS names are fine). Goes first in invite links
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
-.TP
-\fB\-\-external\fR \fI<HOST[:PORT]>\fR
-Add an address other hosts reach this node at from outside: `host`, `host:port` or a multiaddr (repeatable; DNS names are fine). Goes first in invite links
 .TP
 \fB\-\-clear\-external\fR
 Remove all external addresses first

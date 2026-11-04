@@ -8,7 +8,7 @@ mnnn\-review\-request \- Ask for a review of an entry, journal, project, search 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn review request\fR [\fB\-\-home\fR] [\fB\-\-title\fR] [\fB\-\-db\fR] [\fB\-\-note\fR] [\fB\-\-allow\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-label\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-peer\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-no\-link\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fITARGET\fR> 
+\fBmnnn review request\fR [\fB\-\-home\fR] [\fB\-\-title\fR] [\fB\-\-db\fR] [\fB\-\-note\fR] [\fB\-\-allow\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-label\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-peer\fR] [\fB\-\-no\-link\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fITARGET\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -50,17 +50,23 @@ Who the first link is for
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
 .TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
 \fB\-\-peer\fR \fI<PEER>\fR
 Send the link to this peer (a known peer, peer id or address)
+.TP
+\fB\-\-no\-link\fR
+Make no link yet (`mnnn review invite` makes them)
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
-.TP
-\fB\-\-no\-link\fR
-Make no link yet (`mnnn review invite` makes them)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation

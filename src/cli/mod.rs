@@ -110,7 +110,24 @@ fn log_filter(g: &GlobalArgs) -> tracing_subscriber::EnvFilter {
 }
 
 fn init_tracing(g: &GlobalArgs) {
+    if let Some(path) = g.log_file.as_deref() {
+        match open_log(path) {
+            Some(f) => {
+                let _ = tracing_subscriber::fmt().with_env_filter(log_filter(g)).with_ansi(false).with_writer(std::sync::Mutex::new(f)).try_init();
+                return;
+            }
+            None => eprintln!("warning: cannot open log file {}; logging to stderr", path.display()),
+        }
+    }
     let _ = tracing_subscriber::fmt().with_env_filter(log_filter(g)).with_writer(std::io::stderr).try_init();
+}
+
+/// Opens `path` for appending, creating its parent directories.
+fn open_log(path: &std::path::Path) -> Option<std::fs::File> {
+    if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
+        std::fs::create_dir_all(dir).ok()?;
+    }
+    std::fs::OpenOptions::new().create(true).append(true).open(path).ok()
 }
 
 /// The TUI's log file, `<home>/logs/tui.log`.
@@ -121,13 +138,7 @@ pub fn tui_log_path(home: &std::path::Path) -> std::path::PathBuf {
 /// While the TUI draws on the terminal, every log line goes to a file so
 /// nothing (libp2p included) writes over the screen.
 fn init_tui_tracing(g: &GlobalArgs, home: &std::path::Path) {
-    let path = tui_log_path(home);
-    let file = path
-        .parent()
-        .map(std::fs::create_dir_all)
-        .transpose()
-        .ok()
-        .and_then(|_| std::fs::OpenOptions::new().create(true).append(true).open(&path).ok());
+    let file = g.log_file.as_deref().and_then(open_log).or_else(|| open_log(&tui_log_path(home)));
     let b = tracing_subscriber::fmt().with_env_filter(log_filter(g)).with_ansi(false);
     let _ = match file {
         Some(f) => b.with_writer(std::sync::Mutex::new(f)).try_init(),
@@ -139,6 +150,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
     let tui = matches!(cli.command, Command::Tui);
     if !tui {
         init_tracing(&cli.global);
+        tracing::debug!("mnnn {} started", env!("CARGO_PKG_VERSION"));
     }
     // Commands that never touch ~/.muninn.
     match &cli.command {
