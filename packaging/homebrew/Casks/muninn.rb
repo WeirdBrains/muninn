@@ -10,8 +10,6 @@ cask "muninn" do
   desc "Local, encrypted store for OHLCV market bars"
   homepage "https://muninn.weirdbrains.com"
 
-  conflicts_with formula: "weirdbrains/tap/muninn"
-
   app "Muninn.app"
   binary "#{appdir}/Muninn.app/Contents/Resources/mnnn"
 
