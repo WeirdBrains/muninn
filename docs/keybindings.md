@@ -106,7 +106,7 @@ Window commands are `Ctrl-w` followed by a key: `v` split right, `s` split below
 | `a` | add the selected series to a project (sidebar focused) |
 
 Inside them: `n` new, `r` rename, `d` delete (`y` confirms), `f` fork, `p` add to a
-project, Enter open, Esc back. In an entry: ← → move by word, `v` select, `m`
+project, Enter open, Esc back. In an entry: `r` rendered ↔ Markdown source, ← → move by word, `v` select, `m`
 highlight, `n` note, `i` image; the editor saves with Ctrl-S and switches Markdown ↔
 LaTeX with Ctrl-T. `E` exports (journals, entries, reports, projects) and `P` prints
 (journals, entries); `I` in the projects list imports an archive; in a report `a` adds a section, `J` / `K` move it, `v` previews.

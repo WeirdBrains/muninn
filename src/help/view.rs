@@ -1,10 +1,10 @@
 //! The TUI help screen: topic view with link navigation, history and live search.
-use super::{Topic, inline_links, resolve_href, search, topic};
+use super::{Topic, resolve_href, search, topic};
 use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{List, ListItem, ListState, Paragraph};
 
@@ -18,6 +18,8 @@ pub struct HelpView {
     pub query: String,
     pub results: Vec<Topic>,
     pub result_sel: ListState,
+    /// Show the Markdown source instead of the rendered topic (`r` switches).
+    pub raw: bool,
 }
 
 impl HelpView {
@@ -32,6 +34,7 @@ impl HelpView {
             query: String::new(),
             results: vec![],
             result_sel: ListState::default(),
+            raw: false,
         };
         v.reset_link();
         v
@@ -159,6 +162,7 @@ impl HelpView {
             KeyCode::Char('i') => {
                 self.go("README");
             }
+            KeyCode::Char('r') => self.raw = !self.raw,
             _ => {}
         }
         false
@@ -197,6 +201,7 @@ impl HelpView {
                 ("/ search", KeyCode::Char('/')),
                 ("Esc close", KeyCode::Esc),
                 ("i index", KeyCode::Char('i')),
+                (if self.raw { "r rendered" } else { "r raw" }, KeyCode::Char('r')),
                 ("S-Tab prev link", KeyCode::BackTab),
                 ("PgUp", KeyCode::PageUp),
                 ("PgDn", KeyCode::PageDown),
@@ -212,7 +217,8 @@ impl HelpView {
         let blk = crate::tui::block(&title, !self.searching, t);
         let inner = blk.inner(main);
         f.render_widget(blk, main);
-        let (lines, links) = layout(render_tagged(self.current.id, self.current.body, t, self.link), inner.width.max(1));
+        let (lines, links) =
+            layout(render_tagged(self.current.id, self.current.body, t, self.link, inner.width.max(1), self.raw), inner.width.max(1));
         // keep the selected link on screen
         if let Some((row, ..)) = self.link.and_then(|n| links.iter().find(|l| l.3 == n)) {
             let h = inner.height.max(1) as usize;
@@ -319,102 +325,27 @@ pub fn layout(tagged: Vec<Vec<(Span<'static>, Option<usize>)>>, width: u16) -> (
     (out, links)
 }
 
-/// Render markdown with theme colors: headings, lists, code spans/blocks and links.
+/// Render markdown with theme colors (see [`crate::tui::markdown`]).
 #[cfg(test)]
 pub fn render(id: &str, body: &str, t: &Theme, selected_link: Option<usize>) -> Vec<Line<'static>> {
-    render_tagged(id, body, t, selected_link).into_iter().map(|l| Line::from(l.into_iter().map(|(s, _)| s).collect::<Vec<_>>())).collect()
+    render_tagged(id, body, t, selected_link, 100, false).into_iter().map(|l| Line::from(l.into_iter().map(|(s, _)| s).collect::<Vec<_>>())).collect()
 }
 
-/// Like [`render`], but every span carries the index of the internal link it belongs to.
-pub fn render_tagged(id: &str, body: &str, t: &Theme, selected_link: Option<usize>) -> Vec<Vec<(Span<'static>, Option<usize>)>> {
-    let mut out: Vec<Vec<(Span<'static>, Option<usize>)>> = vec![];
-    let mut in_code = false;
-    let mut link_idx = 0usize;
-    for raw in body.lines() {
-        if raw.trim_start().starts_with("```") {
-            in_code = !in_code;
-            continue;
-        }
-        if in_code {
-            out.push(vec![(Span::styled(format!("    {raw}"), Style::new().fg(t.info)), None)]);
-            continue;
-        }
-        if let Some(h) = raw.strip_prefix("# ") {
-            out.push(vec![(Span::styled(h.to_uppercase(), Style::new().fg(t.header).add_modifier(Modifier::BOLD | Modifier::UNDERLINED)), None)]);
-            continue;
-        }
-        if let Some(h) = raw.strip_prefix("## ").or_else(|| raw.strip_prefix("### ")) {
-            out.push(vec![(Span::styled(h.to_string(), Style::new().fg(t.header).add_modifier(Modifier::BOLD)), None)]);
-            continue;
-        }
-        let (prefix, rest) = if let Some(r) = raw.strip_prefix("- ").or_else(|| raw.strip_prefix("* ")) {
-            ("  • ".to_string(), r)
-        } else if let Some(r) = raw.strip_prefix("  - ") {
-            ("      ◦ ".to_string(), r)
-        } else {
-            (String::new(), raw)
-        };
-        let mut spans = vec![(Span::styled(prefix, Style::new().fg(t.accent)), None)];
-        spans.extend(inline(id, rest, t, selected_link, &mut link_idx));
-        out.push(spans);
+/// The topic as lines wrapped to `width`; every span carries the index of the internal
+/// link it belongs to. `raw` shows the Markdown source as it is.
+pub fn render_tagged(
+    id: &str,
+    body: &str,
+    t: &Theme,
+    selected_link: Option<usize>,
+    width: u16,
+    raw: bool,
+) -> Vec<Vec<(Span<'static>, Option<usize>)>> {
+    if raw {
+        return body.lines().map(|l| vec![(Span::styled(l.to_string(), Style::new().fg(t.fg)), None)]).collect();
     }
-    out
-}
-
-fn inline(id: &str, s: &str, t: &Theme, selected: Option<usize>, link_idx: &mut usize) -> Vec<(Span<'static>, Option<usize>)> {
-    let mut spans = vec![];
-    let links = inline_links(s);
-    let mut li = links.into_iter().peekable();
-    let mut buf = String::new();
-    let chars: Vec<char> = s.chars().collect();
-    let mut i = 0;
-    let flush = |buf: &mut String, spans: &mut Vec<(Span<'static>, Option<usize>)>| {
-        if !buf.is_empty() {
-            spans.push((Span::styled(std::mem::take(buf), Style::new().fg(t.fg)), None));
-        }
-    };
-    while i < chars.len() {
-        let c = chars[i];
-        if c == '`'
-            && let Some(end) = (i + 1..chars.len()).find(|&j| chars[j] == '`')
-        {
-            flush(&mut buf, &mut spans);
-            let code: String = chars[i + 1..end].iter().collect();
-            spans.push((Span::styled(code, Style::new().fg(t.accent)), None));
-            i = end + 1;
-            continue;
-        }
-        if c == '['
-            && let Some((text, href)) = li.peek().cloned()
-        {
-            let pat: Vec<char> = format!("[{text}]({href})").chars().collect();
-            if chars[i..].starts_with(&pat) {
-                li.next();
-                flush(&mut buf, &mut spans);
-                let internal = resolve_href(id, &href).is_some();
-                let mut st = Style::new().fg(t.info).add_modifier(Modifier::UNDERLINED);
-                if internal {
-                    if selected == Some(*link_idx) {
-                        st = Style::new().bg(t.selection_bg).fg(t.selection_fg).add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
-                    }
-                    spans.push((Span::styled(text, st), Some(*link_idx)));
-                    *link_idx += 1;
-                } else {
-                    spans.push((Span::styled(format!("{text} <{href}>"), st), None));
-                }
-                i += pat.len();
-                continue;
-            }
-        }
-        if c == '*' && chars.get(i + 1) == Some(&'*') {
-            i += 2;
-            continue;
-        }
-        buf.push(c);
-        i += 1;
-    }
-    flush(&mut buf, &mut spans);
-    spans
+    let internal = |h: &str| resolve_href(id, h).is_some();
+    crate::tui::markdown::tagged(body, t, width, &crate::tui::markdown::Links { internal: &internal, selected: selected_link })
 }
 
 #[cfg(test)]
@@ -463,5 +394,29 @@ mod tests {
         for tp in super::super::topics() {
             assert!(!render(tp.id, tp.body, &t, Some(0)).is_empty());
         }
+    }
+
+    #[test]
+    fn rendered_links_match_the_topic_links() {
+        let t = crate::theme::builtin("tokyo-night").unwrap().resolved(crate::theme::Variant::Dark);
+        for tp in super::super::topics() {
+            let v = HelpView::open(tp.id);
+            let want = v.internal_links().len();
+            let tags: std::collections::BTreeSet<usize> =
+                render_tagged(tp.id, tp.body, &t, None, 100, false).into_iter().flatten().filter_map(|(_, n)| n).collect();
+            assert_eq!(tags.len(), want, "{}: rendered {} internal links, topic has {want}", tp.id, tags.len());
+        }
+    }
+
+    #[test]
+    fn r_shows_the_markdown_source() {
+        let mut v = HelpView::open("README");
+        v.on_key(key(KeyCode::Char('r')));
+        assert!(v.raw);
+        let t = crate::theme::builtin("tokyo-night").unwrap().resolved(crate::theme::Variant::Dark);
+        let l = render_tagged(v.current.id, v.current.body, &t, None, 100, true);
+        assert!(l[0][0].0.content.starts_with("# "));
+        v.on_key(key(KeyCode::Char('r')));
+        assert!(!v.raw);
     }
 }

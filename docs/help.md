@@ -18,6 +18,7 @@ Help opens on the topic for what you are doing: the export dialog opens
 | Backspace / Alt-← | back (history is shown on the right) |
 | `/` | search from any topic: type to filter, results update as you type; ↑/↓ and Enter to open, Esc stops searching |
 | `i` | index ([documentation home](README.md)) |
+| `r` | show the Markdown source (raw); `r` again renders it |
 | ↑/↓, PgUp/PgDn, Home | scroll |
 | Esc, q, F1 | close |
 
@@ -29,8 +30,10 @@ With the mouse: click a link to follow it, click a search result or a history en
 Selecting a link with Tab scrolls it into view.
 
 Search matches titles and bodies (substring); titles also match fuzzily, so `bckprcv`
-finds "Backup and recovery". Headings, lists, `code` and links are rendered in the
-active theme's colors.
+finds "Backup and recovery". Topics are rendered Markdown in the active theme's colours:
+headings, **bold** and *italic*, `code` and code blocks, lists, block quotes, tables
+(cells wrap to fit), rules, and links (other topics are selectable; web links show their
+URL in `<…>`). `r` switches to the raw source and back.
 
 ## On the command line
 

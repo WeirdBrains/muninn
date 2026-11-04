@@ -9,7 +9,13 @@ use super::{Block, Inline};
 /// Parse Markdown into blocks.
 pub fn parse(src: &str) -> Vec<Block> {
     let lines: Vec<&str> = src.lines().collect();
-    blocks(&lines)
+    blocks(&lines, false)
+}
+
+/// Like [`parse`], but table cells keep their inline Markdown (for the TUI, which styles them).
+pub fn parse_keep_cells(src: &str) -> Vec<Block> {
+    let lines: Vec<&str> = src.lines().collect();
+    blocks(&lines, true)
 }
 
 fn indent(l: &str) -> usize {
@@ -55,7 +61,7 @@ fn table_sep(l: &str) -> bool {
     t.contains('-') && t.chars().all(|c| matches!(c, '|' | '-' | ':' | ' '))
 }
 
-fn cells(l: &str) -> Vec<String> {
+fn cells(l: &str, keep: bool) -> Vec<String> {
     let t = l.trim().trim_start_matches('|');
     let t = t.strip_suffix('|').unwrap_or(t);
     let mut out = vec![];
@@ -73,7 +79,7 @@ fn cells(l: &str) -> Vec<String> {
         esc = false;
     }
     out.push(cur);
-    out.into_iter().map(|c| super::plain(&inlines(c.trim()))).collect()
+    out.into_iter().map(|c| if keep { c.trim().to_string() } else { super::plain(&inlines(c.trim())) }).collect()
 }
 
 /// `![alt](target)` alone on a line.
@@ -90,7 +96,7 @@ fn image_line(t: &str) -> Option<(String, String)> {
     Some((alt.to_string(), target.strip_prefix("attachment:").unwrap_or(target).to_string()))
 }
 
-fn blocks(lines: &[&str]) -> Vec<Block> {
+fn blocks(lines: &[&str], keep: bool) -> Vec<Block> {
     let mut out = vec![];
     let mut i = 0;
     let mut para: Vec<&str> = vec![];
@@ -164,16 +170,16 @@ fn blocks(lines: &[&str]) -> Vec<Block> {
                 q.push(s.strip_prefix(' ').unwrap_or(s));
                 i += 1;
             }
-            out.push(Block::Quote(blocks(&q)));
+            out.push(Block::Quote(blocks(&q, keep)));
             continue;
         }
         if t.starts_with('|') && i + 1 < lines.len() && table_sep(lines[i + 1]) {
             flush(&mut out, &mut para);
-            let head = cells(t);
+            let head = cells(t, keep);
             i += 2;
             let mut rows = vec![];
             while i < lines.len() && lines[i].trim().starts_with('|') {
-                rows.push(cells(lines[i]));
+                rows.push(cells(lines[i], keep));
                 i += 1;
             }
             out.push(Block::Table { head, rows });
@@ -217,7 +223,7 @@ fn blocks(lines: &[&str]) -> Vec<Block> {
                         break;
                     }
                 }
-                items.push(blocks(&item));
+                items.push(blocks(&item, keep));
             }
             out.push(Block::List { ordered, items });
             continue;

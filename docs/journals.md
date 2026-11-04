@@ -104,8 +104,12 @@ again with everything. Printing makes a PDF and hands it to `lp`/`lpr`, or keeps
 | `E` / `P` | export / print the marked entries (none marked: the whole journal) |
 | Esc | back to the list |
 
-Reading an entry shows its text, with highlights and noted words marked, then its
-notes, highlights and images. The cursor is a word:
+Reading an entry shows its text, then its notes, highlights and images. A Markdown entry
+is rendered (headings, bold and italic, code, lists, quotes, tables, links with their
+URL, rules) in the theme's colours; `r` shows its source and back. Highlights, noted
+words and the word cursor are marked on the source, so moving the cursor (← →, `h` `l`,
+`w` `b`, Home, End), `v` and `m` switch to the source by themselves. LaTeX entries are
+always shown as their source. The cursor is a word:
 
 | key (entry) | action |
 |-----|--------|
@@ -119,6 +123,7 @@ notes, highlights and images. The cursor is a word:
 | Enter | edit the selected note (or the highlight's comment) |
 | `x` | delete the selected note or highlight (`y` confirms) |
 | `i` | attach an image (type its path; `~/` works) |
+| `r` | Markdown entries: rendered ↔ source |
 | `e` / `d` | edit / delete the entry |
 | `E` / `P` | export / print this entry |
 | PgUp / PgDn | scroll |

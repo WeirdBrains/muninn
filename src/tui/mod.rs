@@ -17,6 +17,7 @@ pub mod history;
 pub mod import;
 pub mod journals;
 pub mod layout;
+pub mod markdown;
 mod mcp;
 pub mod menu;
 pub mod modal;

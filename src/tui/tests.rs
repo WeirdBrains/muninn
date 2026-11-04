@@ -2007,3 +2007,30 @@ fn collapsed_history_has_a_clickable_handle() {
     a.on_mouse(click(x, y));
     assert!(a.prefs.tui.history_open);
 }
+
+#[test]
+fn markdown_entries_render_and_r_shows_the_source() {
+    let (_t, mut a) = app();
+    let j = a.store.create_journal("Notes", None, crate::store::EntryFormat::Markdown).unwrap();
+    let body = "# Plan\n\nBuy **BTC** above `3800`, see [chart](https://x.io).\n\n- one\n- two\n\n> wait for the close\n\n| sym | tf |\n|---|---|\n| BTC | 5m |\n\n---\n";
+    a.store.add_entry(&j.id, "Monday", body, None).unwrap();
+    a.dispatch(Action::Journals);
+    a.on_key(key(KeyCode::Enter));
+    a.on_key(key(KeyCode::Enter));
+    let s = render(&mut a, 120, 45);
+    if std::env::var_os("MUNINN_PRINT_CAPTURE").is_some() {
+        println!("{s}");
+    }
+    assert!(s.contains("Plan") && !s.contains("# Plan"), "heading rendered\n{s}");
+    assert!(s.contains("Buy BTC above 3800, see chart <https://x.io>.") && !s.contains("**BTC**"), "inlines rendered\n{s}");
+    assert!(s.contains("• one") && s.contains("▌ wait for the close") && s.contains("sym │ tf"), "blocks rendered\n{s}");
+    assert!(s.contains("[r raw]"), "toggle in the key bar\n{s}");
+    a.on_key(key(KeyCode::Char('r')));
+    let s = render(&mut a, 120, 45);
+    assert!(s.contains("# Plan") && s.contains("**BTC**") && s.contains("[r rendered]"), "raw source\n{s}");
+    a.on_key(key(KeyCode::Char('r')));
+    // moving the word cursor shows the source, where marks are made
+    a.on_key(key(KeyCode::Right));
+    let s = render(&mut a, 120, 45);
+    assert!(s.contains("**BTC**"), "{s}");
+}

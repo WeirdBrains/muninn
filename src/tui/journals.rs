@@ -97,6 +97,9 @@ pub struct JournalsState {
     pub msg: Option<(String, bool)>,
     /// Open this journal when the popup comes back (after a fork).
     pub focus_journal: Option<String>,
+    /// Show a Markdown entry's source instead of rendering it (`r` switches; moving the
+    /// word cursor or selecting shows the source too, since marks are made on it).
+    pub raw: bool,
 }
 
 impl JournalsState {
@@ -242,6 +245,7 @@ fn open_entry(app: &mut App, id: &str, from_found: bool) {
     let st = &mut app.journals;
     st.screen = JScreen::Entry(id.to_string());
     st.entry_from_found = from_found;
+    st.raw = false;
     st.cursor = 0;
     st.anchor = None;
     st.asel = 0;
@@ -716,7 +720,13 @@ fn entry_key(app: &mut App, k: KeyEvent) {
     let st = &mut app.journals;
     let Some(e) = st.entry.clone() else { return };
     let nw = words(&e.body).len();
+    if e.format == EntryFormat::Markdown
+        && matches!(k.code, KeyCode::Right | KeyCode::Left | KeyCode::Home | KeyCode::End | KeyCode::Char('l' | 'h' | 'w' | 'b' | 'v' | 'm'))
+    {
+        st.raw = true;
+    }
     match k.code {
+        KeyCode::Char('r') => st.raw = !st.raw,
         KeyCode::Right | KeyCode::Char('l') => st.cursor = (st.cursor + 1).min(nw.saturating_sub(1)),
         KeyCode::Left | KeyCode::Char('h') => st.cursor = st.cursor.saturating_sub(1),
         KeyCode::Char('w') => st.cursor = (st.cursor + 5).min(nw.saturating_sub(1)),
@@ -985,7 +995,15 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ),
             ));
             v.head.push(Line::raw(""));
-            v.head.extend(body_lines(app, &e, r.width.saturating_sub(4) as usize));
+            let md = e.format == EntryFormat::Markdown;
+            if md && !st.raw {
+                v.head.extend(super::markdown::lines(&e.body, &t, r.width.saturating_sub(4)).into_iter().map(|mut l| {
+                    l.spans.insert(0, Span::raw(" "));
+                    l
+                }));
+            } else {
+                v.head.extend(body_lines(app, &e, r.width.saturating_sub(4) as usize));
+            }
             v.head.push(Line::raw(""));
             for a in &st.atts {
                 v.head.push(Line::styled(
@@ -1001,6 +1019,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
             let sel_on = st.anchor.is_some();
             v.keys = vec![
                 ("←→ word", KeyCode::Right),
+                (if st.raw { "r rendered" } else { "r raw" }, KeyCode::Char('r')),
                 (if sel_on { "v end select" } else { "v select" }, KeyCode::Char('v')),
                 ("m highlight", KeyCode::Char('m')),
                 (if sel_on { "n note words" } else { "n note entry" }, KeyCode::Char('n')),
@@ -1011,6 +1030,9 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ("x remove note", KeyCode::Char('x')),
                 ("Esc back", KeyCode::Esc),
             ];
+            if !md {
+                v.keys.retain(|(_, k)| *k != KeyCode::Char('r'));
+            }
             v
         }
         JScreen::Edit => {
