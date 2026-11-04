@@ -1,7 +1,6 @@
 import 'package:jaspr/jaspr.dart';
 import 'package:jaspr/dom.dart';
 
-import 'banner.dart';
 import 'logo.dart';
 import 'shots.dart';
 
@@ -29,11 +28,7 @@ class App extends StatelessComponent {
           attributes: {'aria-hidden': 'true'},
           [RawText(ravenTile)],
         ),
-        pre(
-          classes: 'banner',
-          attributes: {'aria-label': 'Muninn'},
-          [Component.text(banner.join('\n'))],
-        ),
+        h1(classes: 'sr-only', [Component.text('Muninn')]),
         figure(classes: 'hero-shot', [
           img(
             src: heroShot.$1,

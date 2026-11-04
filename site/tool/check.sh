@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Check a built site (build/jaspr): one page with the banner, the theme and every link.
+# Check a built site (build/jaspr): one page with the raven on top, the theme and every link.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 out=build/jaspr
 html="$out/index.html"
 test -f "$html" || { echo "no $html: run jaspr build first" >&2; exit 1; }
 test -f "$out/styles.css" || { echo "no styles.css in $out" >&2; exit 1; }
-for want in '███╗   ███╗' 'https://github.com/WeirdBrains/muninn/releases' \
+for want in '<h1 class="sr-only">Muninn</h1>' 'https://github.com/WeirdBrains/muninn/releases' \
   'href="/docs/"' 'href="/docs/install/"' 'id="install"' 'styles.css' \
   'class="hero-shot"' 'id="screenshots"' 'href="#screenshots"' 'loading="lazy"'; do
   grep -qF -- "$want" "$html" || { echo "index.html is missing: $want" >&2; exit 1; }
 done
+! grep -qF '███' "$html" || { echo "index.html still has the block-letter title" >&2; exit 1; }
 grep -qF -- '--header: #7aa2f7' "$out/styles.css" || { echo "styles.css lost the theme" >&2; exit 1; }
 # The raven logo: inline (not <img>) in the hero and every docs header, themed, plus favicons.
 grep -qF -- '--muninn-header: var(--header)' "$out/styles.css" || { echo "styles.css does not theme the logo" >&2; exit 1; }

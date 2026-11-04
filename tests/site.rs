@@ -6,11 +6,15 @@ fn read(p: &str) -> String {
 }
 
 #[test]
-fn the_site_uses_the_header_art() {
-    let dart = read("site/lib/banner.dart");
-    for row in muninn::tui::header::banner() {
-        assert!(dart.contains(&format!("'{row}'")), "site/lib/banner.dart lacks the header row {row}");
-    }
+fn the_hero_is_the_raven_and_a_screenshot_with_no_block_letter_title() {
+    let app = read("site/lib/app.dart");
+    assert!(!Path::new(env!("CARGO_MANIFEST_DIR")).join("site/lib/banner.dart").exists(), "the block-letter title is gone");
+    assert!(!app.contains("banner"), "app.dart still draws the block-letter title");
+    assert!(app.contains("h1(classes: 'sr-only', [Component.text('Muninn')])"), "the page keeps a (visually hidden) h1");
+    let hero = app.split("header(classes: 'hero'").nth(1).unwrap();
+    let (logo, shot) = (hero.find("hero-logo").unwrap(), hero.find("hero-shot").unwrap());
+    assert!(logo < shot, "the raven sits above the hero screenshot");
+    assert!(read("site/web/styles.css").contains(".sr-only {"));
 }
 
 #[test]
