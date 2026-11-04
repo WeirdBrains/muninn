@@ -10,6 +10,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Global `--log-file PATH` (`MUNINN_LOG_FILE`) sends logs to a file instead of stderr, for the TUI and every other command
 
 ### Changed
+- HTML exports and org sites drop unsafe link targets (`javascript:`, `data:` …) from Markdown
 - The relay guide generates the password with `openssl rand -hex 32`
 - A relay announces only routable addresses (just its `--external` ones when set), and invites skip circuits through unroutable relays; the relay guide lists the public relay's peer ID and the port 80 ACME needs
 

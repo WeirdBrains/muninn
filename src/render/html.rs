@@ -126,6 +126,23 @@ fn block(s: &mut String, b: &Block, doc: &Doc) {
     }
 }
 
+/// A link target that is safe in a page: http(s), mailto, relative paths and `#anchors`
+/// pass; anything else (`javascript:`, `data:`, `vbscript:` ...) becomes `#`.
+pub fn safe_href(u: &str) -> &str {
+    let t = u.trim();
+    let lower: String = t.chars().filter(|c| !c.is_ascii_whitespace() && !c.is_ascii_control()).collect::<String>().to_ascii_lowercase();
+    match lower.find(':') {
+        Some(i) if !lower[..i].contains(['/', '?', '#']) => {
+            if matches!(&lower[..i], "http" | "https" | "mailto") {
+                t
+            } else {
+                "#"
+            }
+        }
+        _ => t,
+    }
+}
+
 fn inlines(v: &[Inline]) -> String {
     let mut s = String::new();
     for i in v {
@@ -136,7 +153,7 @@ fn inlines(v: &[Inline]) -> String {
             Inline::Mono(t) => s.push_str(&format!("<code>{}</code>", esc(t))),
             Inline::Math(m) => s.push_str(&format!("<span class=\"math\">{}</span>", esc(&super::text::math(m)))),
             Inline::Mark(c) => s.push_str(&format!("<mark>{}</mark>", inlines(c))),
-            Inline::Link(c, u) => s.push_str(&format!("<a href=\"{}\">{}</a>", esc(u), inlines(c))),
+            Inline::Link(c, u) => s.push_str(&format!("<a href=\"{}\">{}</a>", esc(safe_href(u)), inlines(c))),
             Inline::Note(c) => s.push_str(&format!("<small>({})</small>", inlines(c))),
             Inline::NoteRef(n) => s.push_str(&format!("<sup><a href=\"#note-{n}\">{n}</a></sup>")),
             Inline::Break => s.push_str("<br>\n"),
@@ -148,6 +165,23 @@ fn inlines(v: &[Inline]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn markdown_renders_to_sanitized_html() {
+        let d = Doc {
+            blocks: crate::render::markdown::parse(
+                "<script>alert(1)</script> **b**\n\n[x](javascript:alert(1)) [y](JaVa\tScript:alert(2)) [d](data:text/html,hi) [ok](https://a.io/?q=1&r=2) [rel](notes.md#top) [m](mailto:a@b.c)",
+            ),
+            ..Default::default()
+        };
+        let h = write(&d);
+        assert!(!h.contains("<script>") && h.contains("&lt;script&gt;") && h.contains("<strong>b</strong>"), "{h}");
+        assert!(!h.to_ascii_lowercase().contains("javascript:") && !h.contains("data:text"), "{h}");
+        assert!(
+            h.contains("href=\"https://a.io/?q=1&amp;r=2\"") && h.contains("href=\"notes.md#top\"") && h.contains("href=\"mailto:a@b.c\""),
+            "{h}"
+        );
+    }
 
     #[test]
     fn html_is_self_contained() {
