@@ -76,6 +76,8 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 ## Look and feel
 
 - [Themes](themes.md): built-ins, light/dark/system modes, selector and editor
+- [Flutter app](flutter-app.md): the desktop and mobile app
+- [Architecture](architecture.md): the workspace crates and front ends
 
 ## Quick start
 
