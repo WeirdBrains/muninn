@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <base href="/"/>
+    <meta charset="utf-8"/>
+    <link href="styles.css" rel="stylesheet"/>
+    <!--$-->
+    <title>Muninn</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content="Muninn: a local, encrypted workbench for market data, with a terminal UI and a CLI."/>
+    <meta name="color-scheme" content="dark light"/>
+    <!--/-->
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <pre class="banner" aria-label="Muninn">███╗   ███╗██╗   ██╗███╗   ██╗██╗███╗   ██╗███╗   ██╗
+████╗ ████║██║   ██║████╗  ██║██║████╗  ██║████╗  ██║
+██╔████╔██║██║   ██║██╔██╗ ██║██║██╔██╗ ██║██╔██╗ ██║
+██║╚██╔╝██║██║   ██║██║╚██╗██║██║██║╚██╗██║██║╚██╗██║
+██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██║██║ ╚████║██║ ╚████║
+╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝</pre>
+        <figure class="hero-shot">
+          <img alt="cat ticks.csv | mnnn pipeline run feed -: three views as three live columns" width="1464" height="890" src="screenshots/pipeline-live.png"/>
+          <figcaption>cat ticks.csv | mnnn pipeline run feed -: three views as three live columns</figcaption>
+        </figure>
+        <p class="tagline">
+          A local, encrypted workbench for market data: ingest, search, journal, model and share, in a terminal UI and a CLI.
+        </p>
+        <nav class="links">
+          <a class="button primary" href="https://github.com/WeirdBrains/muninn/releases">Releases</a>
+          <a class="button" href="#install">Install</a>
+          <a class="button" href="#screenshots">Screenshots</a>
+          <a class="button" href="https://github.com/WeirdBrains/muninn/tree/main/docs">Docs</a>
+          <a class="button" href="https://github.com/WeirdBrains/muninn">Source</a>
+        </nav>
+      </header>
+      <section class="features">
+        <div class="card">
+          <h3>Encrypted and local</h3>
+          <p>A SQLCipher database under an envelope key scheme. Nothing leaves your machine unless you share it.</p>
+        </div>
+        <div class="card">
+          <h3>Ingest anything</h3>
+          <p>CSV, JSON, HTTP APIs, Redis, SQLite, Postgres and standard input, as structured data.</p>
+        </div>
+        <div class="card">
+          <h3>Live searches, journals, reports</h3>
+          <p>Saved questions that rerun on new data, notes beside the charts, reports exported to PDF and Docx.</p>
+        </div>
+        <div class="card">
+          <h3>Models and code spaces</h3>
+          <p>Design model tables, then run math, Polars, Rust or Python over data piped through them.</p>
+        </div>
+        <div class="card">
+          <h3>Pipelines</h3>
+          <p>Graphs of sources, code, views and filters ending in model tables, watched live in tiles.</p>
+        </div>
+        <div class="card">
+          <h3>Rules and schedules</h3>
+          <p>If this happens, do that, or every 6 hours: exports, entries, records, certificate checks.</p>
+        </div>
+        <div class="card">
+          <h3>Organizations</h3>
+          <p>Members, roles and a hosted site with your own domains and Let's Encrypt certificates.</p>
+        </div>
+        <div class="card">
+          <h3>Peer to peer</h3>
+          <p>Your nodes sync end to end encrypted; share and review with connections, no server needed.</p>
+        </div>
+      </section>
+      <section id="screenshots" class="screenshots">
+        <h2>Screenshots</h2>
+        <p class="muted">Every view in the TUI, rendered from the app itself by scripts/screenshots.sh.</p>
+        <div class="shots">
+          <figure>
+            <a href="screenshots/home.png">
+              <img alt="Home: every series in a list, the header with the node's status" width="1464" height="890" loading="lazy" src="screenshots/home.png"/>
+            </a>
+            <figcaption>Home: every series in a list, the header with the node's status</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/home-chart.png">
+              <img alt="A chart tile beside the list: ETH/USDT 5m candles in the Muninn theme" width="1464" height="890" loading="lazy" src="screenshots/home-chart.png"/>
+            </a>
+            <figcaption>A chart tile beside the list: ETH/USDT 5m candles in the Muninn theme</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/history.png">
+              <img alt="The action history bar: every step, forks kept, step back and on" width="1464" height="890" loading="lazy" src="screenshots/history.png"/>
+            </a>
+            <figcaption>The action history bar: every step, forks kept, step back and on</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/live-searches.png">
+              <img alt="Live searches: saved questions that rerun on new data" width="1464" height="890" loading="lazy" src="screenshots/live-searches.png"/>
+            </a>
+            <figcaption>Live searches: saved questions that rerun on new data</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/share-view-name.png">
+              <img alt="Share view, mid-action: saving the view as a live search" width="1464" height="890" loading="lazy" src="screenshots/share-view-name.png"/>
+            </a>
+            <figcaption>Share view, mid-action: saving the view as a live search</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/share-view-picker.png">
+              <img alt="Share: pick where it goes (a project, an org, a connection)" width="1464" height="890" loading="lazy" src="screenshots/share-view-picker.png"/>
+            </a>
+            <figcaption>Share: pick where it goes (a project, an org, a connection)</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/journals.png">
+              <img alt="Journals with their entries" width="1464" height="890" loading="lazy" src="screenshots/journals.png"/>
+            </a>
+            <figcaption>Journals with their entries</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/journal-entries.png">
+              <img alt="A journal's entries in Markdown" width="1464" height="890" loading="lazy" src="screenshots/journal-entries.png"/>
+            </a>
+            <figcaption>A journal's entries in Markdown</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/share-picker.png">
+              <img alt="Sharing a journal entry: the picker open" width="1464" height="890" loading="lazy" src="screenshots/share-picker.png"/>
+            </a>
+            <figcaption>Sharing a journal entry: the picker open</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/reports.png">
+              <img alt="Reports: sections of text, series and journals, exported to PDF, Docx or HTML" width="1464" height="890" loading="lazy" src="screenshots/reports.png"/>
+            </a>
+            <figcaption>Reports: sections of text, series and journals, exported to PDF, Docx or HTML</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/report-sections.png">
+              <img alt="A report's sections" width="1464" height="890" loading="lazy" src="screenshots/report-sections.png"/>
+            </a>
+            <figcaption>A report's sections</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/rules.png">
+              <img alt="Rule sets: on actions or on a schedule (every 1h, cron), with the built-in cert watcher" width="1464" height="890" loading="lazy" src="screenshots/rules.png"/>
+            </a>
+            <figcaption>Rule sets: on actions or on a schedule (every 1h, cron), with the built-in cert watcher</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/rule-scheduled.png">
+              <img alt="A scheduled rule: its schedule, next run and then-actions" width="1464" height="890" loading="lazy" src="screenshots/rule-scheduled.png"/>
+            </a>
+            <figcaption>A scheduled rule: its schedule, next run and then-actions</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/rule-new.png">
+              <img alt="New rule, mid-action: &quot;on&quot; takes action kinds or a schedule" width="1464" height="890" loading="lazy" src="screenshots/rule-new.png"/>
+            </a>
+            <figcaption>New rule, mid-action: "on" takes action kinds or a schedule</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/models.png">
+              <img alt="Model designer: models, the built-in bars model among them" width="1464" height="890" loading="lazy" src="screenshots/models.png"/>
+            </a>
+            <figcaption>Model designer: models, the built-in bars model among them</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/model-plan.png">
+              <img alt="Designing a model: the migration plan before apply" width="1464" height="890" loading="lazy" src="screenshots/model-plan.png"/>
+            </a>
+            <figcaption>Designing a model: the migration plan before apply</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/model-records.png">
+              <img alt="Records of the new model" width="1464" height="890" loading="lazy" src="screenshots/model-records.png"/>
+            </a>
+            <figcaption>Records of the new model</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/model-template-import.png">
+              <img alt="Model templates, mid-action: importing a design (planned first, rename or merge)" width="1464" height="890" loading="lazy" src="screenshots/model-template-import.png"/>
+            </a>
+            <figcaption>Model templates, mid-action: importing a design (planned first, rename or merge)</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/code-new.png">
+              <img alt="New code space, mid-action: choosing a language (math, Polars, Rust, Python)" width="1464" height="890" loading="lazy" src="screenshots/code-new.png"/>
+            </a>
+            <figcaption>New code space, mid-action: choosing a language (math, Polars, Rust, Python)</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/code-editor.png">
+              <img alt="Editing a code space" width="1464" height="890" loading="lazy" src="screenshots/code-editor.png"/>
+            </a>
+            <figcaption>Editing a code space</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/code-list.png">
+              <img alt="Code spaces and their scope" width="1464" height="890" loading="lazy" src="screenshots/code-list.png"/>
+            </a>
+            <figcaption>Code spaces and their scope</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/code-chart.png">
+              <img alt="A code space's result as a live chart tile beside the series" width="1464" height="890" loading="lazy" src="screenshots/code-chart.png"/>
+            </a>
+            <figcaption>A code space's result as a live chart tile beside the series</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/pipeline-live.png">
+              <img alt="cat ticks.csv | mnnn pipeline run feed -: three views as three live columns" width="1464" height="890" loading="lazy" src="screenshots/pipeline-live.png"/>
+            </a>
+            <figcaption>cat ticks.csv | mnnn pipeline run feed -: three views as three live columns</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/pipeline-monitor.png">
+              <img alt="The pipeline monitor: each node's status, rows, rate and what landed" width="1464" height="890" loading="lazy" src="screenshots/pipeline-monitor.png"/>
+            </a>
+            <figcaption>The pipeline monitor: each node's status, rows, rate and what landed</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/pipes.png">
+              <img alt="Pipes: data from stdin or any search through code spaces, followed live" width="1464" height="890" loading="lazy" src="screenshots/pipes.png"/>
+            </a>
+            <figcaption>Pipes: data from stdin or any search through code spaces, followed live</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/pipeline-designer.png">
+              <img alt="The pipeline designer: a graph of sources, code, views and model tables" width="1464" height="890" loading="lazy" src="screenshots/pipeline-designer.png"/>
+            </a>
+            <figcaption>The pipeline designer: a graph of sources, code, views and model tables</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/pipeline-designer-add.png">
+              <img alt="Pipeline designer, mid-action: adding a code node" width="1464" height="890" loading="lazy" src="screenshots/pipeline-designer-add.png"/>
+            </a>
+            <figcaption>Pipeline designer, mid-action: adding a code node</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/orgs.png">
+              <img alt="Organizations: visibility, access, hosting, domains (w), certificate (c), ACME (L)" width="1464" height="890" loading="lazy" src="screenshots/orgs.png"/>
+            </a>
+            <figcaption>Organizations: visibility, access, hosting, domains (w), certificate (c), ACME (L)</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/org-domain.png">
+              <img alt="Org TLS, mid-action: adding a domain" width="1464" height="890" loading="lazy" src="screenshots/org-domain.png"/>
+            </a>
+            <figcaption>Org TLS, mid-action: adding a domain</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/org-site.png">
+              <img alt="The org site: each org's domains and certificate (yours, Let's Encrypt or self-signed)" width="1464" height="890" loading="lazy" src="screenshots/org-site.png"/>
+            </a>
+            <figcaption>The org site: each org's domains and certificate (yours, Let's Encrypt or self-signed)</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/org-templates.png">
+              <img alt="Org site templates: edit HTML and CSS (e), files, previews (p) and build steps (b)" width="1464" height="890" loading="lazy" src="screenshots/org-templates.png"/>
+            </a>
+            <figcaption>Org site templates: edit HTML and CSS (e), files, previews (p) and build steps (b)</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/reviews.png">
+              <img alt="Reviews: comments, suggestions, highlights and votes on shared work" width="1464" height="890" loading="lazy" src="screenshots/reviews.png"/>
+            </a>
+            <figcaption>Reviews: comments, suggestions, highlights and votes on shared work</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/notifications.png">
+              <img alt="Notifications: the header bell (!) and what events, rule sets and broadcasts told you; Enter opens the context" width="1464" height="890" loading="lazy" src="screenshots/notifications.png"/>
+            </a>
+            <figcaption>
+              Notifications: the header bell (!) and what events, rule sets and broadcasts told you; Enter opens the context
+            </figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/network.png">
+              <img alt="The network: this node, relays, connections and shares, end to end encrypted" width="1464" height="890" loading="lazy" src="screenshots/network.png"/>
+            </a>
+            <figcaption>The network: this node, relays, connections and shares, end to end encrypted</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/peers.png">
+              <img alt="Peers: nodes seen nearby and through relays" width="1464" height="890" loading="lazy" src="screenshots/peers.png"/>
+            </a>
+            <figcaption>Peers: nodes seen nearby and through relays</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/connections.png">
+              <img alt="Connections: people you trust, made through invites" width="1464" height="890" loading="lazy" src="screenshots/connections.png"/>
+            </a>
+            <figcaption>Connections: people you trust, made through invites</figcaption>
+          </figure>
+        </div>
+      </section>
+      <section id="install" class="install">
+        <h2>Install</h2>
+        <p>
+          Every package ships a prebuilt <code>mnnn</code> binary; no Rust toolchain is needed. Downloads and SHA256SUMS are on the 
+          <a href="https://github.com/WeirdBrains/muninn/releases">releases page</a>. Full steps, uninstalling and building from source: 
+          <a href="https://github.com/WeirdBrains/muninn/blob/main/docs/install.md">docs/install.md</a>.
+        </p>
+        <div class="step">
+          <h4>Release tarball (Linux, macOS)</h4>
+          <pre><code>tar -xzf muninn-2.18.0-x86_64-unknown-linux-gnu.tar.gz
+install -Dm755 muninn-2.18.0-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn</code></pre>
+        </div>
+        <div class="step"><h4>Debian / Ubuntu</h4><pre><code>sudo apt install ./muninn_2.18.0-1_amd64.deb</code></pre></div>
+        <div class="step"><h4>Fedora</h4><pre><code>sudo dnf install ./muninn-2.18.0-1.x86_64.rpm</code></pre></div>
+        <div class="step"><h4>Arch Linux</h4><pre><code>sudo pacman -U muninn-bin-2.18.0-1-x86_64.pkg.tar.zst</code></pre></div>
+        <div class="step">
+          <h4>Homebrew (macOS, Linux)</h4>
+          <pre><code>tar -xzf muninn-2.18.0-packaging.tar.gz
+brew install ./packaging/homebrew/muninn.rb</code></pre>
+        </div>
+        <div class="step">
+          <h4>Windows (winget)</h4>
+          <pre><code>tar -xzf muninn-2.18.0-packaging.tar.gz
+winget install --manifest packaging\winget\2.18.0</code></pre>
+        </div>
+        <p class="muted">Your data stays in ~/.muninn (or MUNINN_HOME); installing or uninstalling never touches it.</p>
+      </section>
+      <section class="docs">
+        <h2>Docs</h2>
+        <ul>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/tui.md">Getting around the TUI</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/cli.md">Command line</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/import.md">Importing data</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/live-searches.md">Live searches</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/journals.md">Journals</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/models.md">Models</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/code-spaces.md">Code spaces</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/pipelines.md">Pipelines</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/rules.md">Rules</a></li>
+          <li>
+            <a href="https://github.com/WeirdBrains/muninn/blob/main/docs/org-hosting.md">Organizations and hosting</a>
+          </li>
+          <li>
+            <a href="https://github.com/WeirdBrains/muninn/blob/main/docs/org-templates.md">Org site templates</a>
+          </li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/notifications.md">Notifications</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/network.md">Network and sync</a></li>
+          <li>
+            <a href="https://github.com/WeirdBrains/muninn/blob/main/docs/collaboration.md">Live collaboration</a>
+          </li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/mcp.md">MCP</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/encryption.md">Encryption</a></li>
+          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/themes.md">Themes</a></li>
+        </ul>
+        <p class="muted">
+          The same pages are in the app: <code>mnnn help</code> or ? in the TUI, and man pages for every command.
+        </p>
+      </section>
+      <footer>
+        Muninn · 
+        <a href="https://github.com/WeirdBrains/muninn/releases">releases</a>
+         · 
+        <a href="https://github.com/WeirdBrains/muninn/blob/main/CHANGELOG.md">changelog</a>
+         · 
+        <a href="https://github.com/WeirdBrains/muninn/tree/main/docs">docs</a>
+         · 
+        <a href="https://github.com/WeirdBrains/muninn/blob/main/LICENSE">BSD 3-Clause</a>
+      </footer>
+    </div>
+  </body>
+</html>
