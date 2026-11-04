@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Muninn
+GenericName=Market data store
+Comment=Local, encrypted store for OHLCV market bars
+Exec=muninn
+Icon=com.weirdbrains.muninn
+Categories=Office;Finance;
+Keywords=OHLCV;market;bars;crypto;
+X-Homepage=https://muninn.weirdbrains.com
