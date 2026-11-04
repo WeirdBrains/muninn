@@ -50,3 +50,22 @@ are there, and every screenshot the site or the README shows exists. `tool/check
 same in the built page.
 
 When the header art or the default theme changes, change the site with it.
+
+## Deploying
+
+The site is served by GitHub Pages from the `gh-pages` branch at
+<https://muninn.weirdbrains.com> (a DNS-only CNAME to `weirdbrains.github.io`; GitHub
+issues the Let's Encrypt certificate). The branch holds only the built page, a `CNAME`
+file and `.nojekyll`. To redeploy by hand after a change:
+
+```sh
+cd site && jaspr build && tool/check.sh && cd ..
+git worktree add /tmp/muninn-pages gh-pages
+rsync -a --delete --exclude .git --exclude CNAME --exclude .nojekyll site/build/jaspr/ /tmp/muninn-pages/
+git -C /tmp/muninn-pages add -A
+git -C /tmp/muninn-pages commit -m "site: build of main $(git rev-parse --short HEAD)"
+git -C /tmp/muninn-pages push origin gh-pages
+git worktree remove /tmp/muninn-pages
+```
+
+Pages rebuilds within a minute or two (`gh api repos/WeirdBrains/muninn/pages/builds/latest`).
