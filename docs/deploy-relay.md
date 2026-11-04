@@ -72,36 +72,19 @@ certificate is renewed by the running site when a third of its life is left
 
 ## 5. systemd unit
 
-`/etc/systemd/system/muninn-relay.service`:
-
-```ini
-[Unit]
-Description=Muninn relay node
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=muninn
-Group=muninn
-Environment=MUNINN_HOME=/var/lib/muninn
-Environment=MUNINN_NON_INTERACTIVE=true
-EnvironmentFile=/etc/muninn/relay.env
-ExecStart=/usr/bin/mnnn net start --relay-server --no-mdns
-Restart=on-failure
-RestartSec=5
-# port 80 for the ACME HTTP-01 challenge
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/muninn
-PrivateTmp=true
-
-[Install]
-WantedBy=multi-user.target
-```
+The unit ships in the repository as
+[`packaging/systemd/muninn-relay.service`](https://github.com/WeirdBrains/muninn/blob/main/packaging/systemd/muninn-relay.service):
+it runs `mnnn net start --relay-server --no-mdns` as the `muninn` user with
+`MUNINN_HOME=/var/lib/muninn`, reads `MUNINN_PASSWORD` from `/etc/muninn/relay.env`
+(root-only, mode 600), may bind port 80 for the Let's Encrypt HTTP-01 challenge, stops
+with SIGINT (the same clean shutdown as Ctrl-C) and is sandboxed (`ProtectSystem=strict`,
+only `/var/lib/muninn` writable). Install it from a checkout or straight from GitHub:
 
 ```sh
+install -m 644 packaging/systemd/muninn-relay.service /etc/systemd/system/
+# or
+curl -fsSL -o /etc/systemd/system/muninn-relay.service \
+  https://raw.githubusercontent.com/WeirdBrains/muninn/main/packaging/systemd/muninn-relay.service
 systemctl daemon-reload
 systemctl enable --now muninn-relay
 ```
@@ -121,8 +104,12 @@ ufw allow OpenSSH
 ufw allow 4741/tcp
 ufw allow 4741/udp
 ufw allow 80/tcp
+ufw allow 4742/tcp   # only if live collaboration (gRPC streams) goes through this node
 ufw enable
 ```
+
+Port 4742/tcp is the live collaboration stream listener (`net.collab_port`); open it only
+if peers collaborate with this node directly, otherwise they fall back to polling.
 
 ## 7. Using it
 
