@@ -8,6 +8,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 
 - [Install](install.md): packages per platform, building from source, uninstalling
 - [Muninn 2.0](announcement-2.0.md): the launch post: what Muninn is, the headline features, install
+- [2.0 archive](https://github.com/WeirdBrains/muninn/tree/main/docs/historical/2.0): the 2.0 plan with every phase, the announcement and the changelog as of the wrap-up
 - [Releasing](release.md): the release script, local builds of all 14 files, and publishing
 - [Website](website.md): the single-page Jaspr site in `site/`, how it is built and checked
 - [Command line](cli.md): global flags, environment, exit codes, man pages
