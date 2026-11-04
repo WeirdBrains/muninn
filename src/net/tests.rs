@@ -888,3 +888,32 @@ fn shared_pipelines_arrive_as_drafts_with_their_code_and_models() {
     let (_, name2, _) = client::import_item_as(&mut b, &it, "ada", "test").unwrap();
     assert_ne!(name2, name);
 }
+
+#[test]
+fn routable_drops_private_and_loopback_addresses() {
+    use crate::net::node::routable;
+    let ok = |s: &str| routable(&s.parse().unwrap());
+    for a in [
+        "/dns4/relay.muninn.weirdbrains.com/tcp/4741",
+        "/ip4/164.90.253.128/tcp/4741",
+        "/ip4/137.184.139.132/udp/4741/quic-v1",
+        "/ip6/2604:a880:400:d1::1/tcp/4741",
+    ] {
+        assert!(ok(a), "{a}");
+    }
+    for a in [
+        "/ip4/10.116.0.2/tcp/4741",
+        "/ip4/10.10.0.5/tcp/4741",
+        "/ip4/192.168.1.4/tcp/4741",
+        "/ip4/172.20.0.3/tcp/4741",
+        "/ip4/100.64.1.2/tcp/4741",
+        "/ip4/169.254.3.4/tcp/4741",
+        "/ip4/127.0.0.1/tcp/4741",
+        "/ip4/0.0.0.0/tcp/4741",
+        "/ip6/::1/tcp/4741",
+        "/ip6/fd00::5/tcp/4741",
+        "/ip6/fe80::1/tcp/4741",
+    ] {
+        assert!(!ok(a), "{a}");
+    }
+}

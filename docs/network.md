@@ -74,6 +74,21 @@ or `mnnn net config --external alien.duckdns.org:4741` (`--clear-external` remov
 A DNS name (dynamic DNS works) becomes `/dns4/NAME/tcp/PORT` and `/dns4/NAME/udp/PORT/quic-v1`;
 it is announced to peers and put first in invites.
 
+### Running a relay
+
+A node started with `--relay-server` announces only addresses others can reach. With
+`external_addresses` set it announces exactly those and hides its listen addresses;
+without them it announces only routable listen addresses (never private, CGNAT
+100.64/10, link-local, IPv6 ULA or loopback ones). Normal nodes are unaffected: mDNS and
+LAN addresses still work between them. See [deploying a relay](deploy-relay.md).
+
+The public relay is
+`/dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz`:
+
+```sh
+mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz
+```
+
 ## Sharing
 
 ```

@@ -125,6 +125,24 @@ sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn
 mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/<PEER ID>   # on each client node
 ```
 
+The public relay `relay.muninn.weirdbrains.com` has peer ID
+`12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz`, so on any node:
+
+```sh
+mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz
+```
+
+With `--external` set, a relay announces only those addresses. Without it, it announces
+only routable listen addresses: private (10/8, 172.16/12, 192.168/16), CGNAT
+(100.64/10), link-local, IPv6 ULA (fc00::/7) and loopback ones are never announced,
+and circuit addresses through a relay with no routable address are left out of invites.
+Set `--external` to exactly the public name or address(es) clients should use
+(repeat it for several); a droplet's extra public IPs and an IPv6 address missing from
+DNS are then not announced either.
+
+`mnnn org cert acme` uses the HTTP-01 challenge, so port 80/tcp must be open in the
+firewall (section 6) while it runs and at every renewal; with port 80 closed it fails.
+
 ## 8. Upgrades
 
 ```sh

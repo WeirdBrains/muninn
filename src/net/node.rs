@@ -145,7 +145,11 @@ fn behaviour(key: &Keypair, relay_client: relay::client::Behaviour, cfg: &NodeCo
     if !cfg.label.trim().is_empty() {
         agent += &format!(" ({})", cfg.label.trim());
     }
-    let identify = identify::Behaviour::new(identify::Config::new("/muninn/id/1".into(), key.public()).with_agent_version(agent));
+    // A relay with explicit external addresses announces only those, not every
+    // interface it listens on (private VPC and loopback ones are useless to clients).
+    let hide = cfg.relay_server && !cfg.external.is_empty();
+    let identify =
+        identify::Behaviour::new(identify::Config::new("/muninn/id/1".into(), key.public()).with_agent_version(agent).with_hide_listen_addrs(hide));
     let mut kcfg = kad::Config::new(StreamProtocol::new(KAD_PROTOCOL));
     kcfg.set_query_timeout(Duration::from_secs(30));
     let kad = kad::Behaviour::with_config(peer, MemoryStore::new(peer), kcfg);
@@ -227,6 +231,26 @@ pub fn shareable(a: &Multiaddr) -> bool {
     !a.iter().any(|p| match p {
         Protocol::Ip4(ip) => ip.is_unspecified() || (ip.octets()[0] == 172 && matches!(ip.octets()[1], 17 | 18)),
         Protocol::Ip6(ip) => ip.is_unspecified() || (ip.segments()[0] & 0xffc0) == 0xfe80,
+        _ => false,
+    })
+}
+
+/// Whether hosts elsewhere on the internet can reach `a`: not loopback, private
+/// (RFC 1918), CGNAT (100.64/10), link-local, IPv6 ULA (fc00::/7) or unspecified.
+/// DNS names count as routable. A relay only announces these.
+pub fn routable(a: &Multiaddr) -> bool {
+    if !shareable(a) {
+        return false;
+    }
+    !a.iter().any(|p| match p {
+        Protocol::Ip4(ip) => {
+            let o = ip.octets();
+            ip.is_loopback() || ip.is_private() || ip.is_link_local() || (o[0] == 100 && (o[1] & 0xc0) == 64)
+        }
+        Protocol::Ip6(ip) => {
+            let s0 = ip.segments()[0];
+            ip.is_loopback() || (s0 & 0xfe00) == 0xfc00 || (s0 & 0xffc0) == 0xfe80
+        }
         _ => false,
     })
 }
@@ -321,8 +345,10 @@ impl Node {
         let s = self.status();
         let mut v: Vec<String> = vec![];
         for a in s.external.iter().chain(s.listening.iter()) {
+            // a circuit through a relay is only useful if the relay's own address is routable
             if let Ok(m) = a.parse::<Multiaddr>()
                 && shareable(&m)
+                && (!m.iter().any(|p| p == Protocol::P2pCircuit) || routable(&m))
             {
                 let full = if addr_peer(&m).is_some() { m } else { m.with(Protocol::P2p(self.peer_id)) };
                 let t = full.to_string();
@@ -592,7 +618,7 @@ impl Loop {
             SwarmEvent::NewListenAddr { listener_id, address } => {
                 tracing::info!("network: listening on {address}");
                 // a relay announces where it listens: reservations carry those addresses
-                if self.cfg.relay_server && shareable(&address) && !address.iter().any(|p| p == Protocol::P2pCircuit) {
+                if self.cfg.relay_server && self.cfg.external.is_empty() && routable(&address) && !address.iter().any(|p| p == Protocol::P2pCircuit) {
                     self.swarm.add_external_address(address.clone());
                 }
                 if let Some(tx) = self.listens.remove(&listener_id) {
@@ -606,9 +632,14 @@ impl Loop {
                 }
                 self.refresh();
             }
-            SwarmEvent::ExternalAddrConfirmed { .. } | SwarmEvent::ExternalAddrExpired { .. } | SwarmEvent::ExpiredListenAddr { .. } => {
+            SwarmEvent::ExternalAddrConfirmed { address } => {
+                // a relay keeps to its configured addresses (or at least routable ones)
+                if self.cfg.relay_server && (!routable(&address) || (!self.cfg.external.is_empty() && !self.cfg.external.contains(&address))) {
+                    self.swarm.remove_external_address(&address);
+                }
                 self.refresh()
             }
+            SwarmEvent::ExternalAddrExpired { .. } | SwarmEvent::ExpiredListenAddr { .. } => self.refresh(),
             SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                 let addr = endpoint.get_remote_address().clone();
                 let mut i = 0;
