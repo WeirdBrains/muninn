@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 HERO=${HERO:-pipeline-live}
 out=site/web/screenshots
-cargo test -q --lib screenshots -- --ignored >/dev/null
+cargo test -q -j "${CARGO_BUILD_JOBS:-8}" -p muninn-core --lib screenshots -- --ignored >/dev/null   # tui::screenshots in crates/muninn-core
 mkdir -p "$out"
 rm -f "$out"/*.png
 profile=$(mktemp -d)

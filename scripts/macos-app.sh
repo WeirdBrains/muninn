@@ -12,7 +12,7 @@
 # when there are none; then the TUI starts.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ver=${VER:-$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)}
+ver=${VER:-$(scripts/version.sh)}
 dist=${DIST:-dist}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

@@ -8,7 +8,7 @@
 # The Windows host needs OpenSSH server and Inno Setup 6.3+ (winget install JRSoftware.InnoSetup).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ver=${VER:-$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)}
+ver=${VER:-$(scripts/version.sh)}
 dist=${DIST:-dist}
 host=${WIN_SSH:-m3talsmith@127.0.0.1}
 port=${WIN_PORT:-2222}

@@ -21,7 +21,7 @@ source=("muninn::git+file://$_checkout")
 sha256sums=('SKIP')
 
 pkgver() {
-  sed -n 's/^version = "\(.*\)"/\1/p' "$srcdir/muninn/Cargo.toml" | head -1
+  "$srcdir/muninn/scripts/version.sh" "$srcdir/muninn/Cargo.toml"   # [workspace.package] version
 }
 
 prepare() {

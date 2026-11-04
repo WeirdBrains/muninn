@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """Write release-ready packaging files with real versions and SHA-256 sums.
 
-Usage: scripts/fill-sums.py <version> <dist-dir>
+Usage: scripts/fill-sums.py [<version>] <dist-dir>
+(the version defaults to [workspace.package] in Cargo.toml, via scripts/version.sh)
 Reads <dist-dir>/SHA256SUMS and writes into <dist-dir>/packaging/:
   arch/PKGBUILD (muninn-bin), homebrew/Formula/muninn.rb, homebrew/Casks/muninn.rb,
   winget/manifests/w/WeirdBrains/Muninn/<version>/*.yaml (ready for winget-pkgs)
 """
-import pathlib, re, sys
+import pathlib, re, subprocess, sys
 
-ver, dist = sys.argv[1], pathlib.Path(sys.argv[2])
 root = pathlib.Path(__file__).resolve().parent.parent
+if len(sys.argv) == 2:
+    ver = subprocess.check_output([root / "scripts/version.sh"], text=True).strip()
+else:
+    ver = sys.argv[1]
+dist = pathlib.Path(sys.argv[-1])
 sums = {}
 for line in (dist / "SHA256SUMS").read_text().splitlines():
     h, name = line.split(maxsplit=1)

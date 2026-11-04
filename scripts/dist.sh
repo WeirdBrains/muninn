@@ -5,7 +5,7 @@
 # Defaults: host triple, target/release/mnnn (or target/<triple>/release/mnnn).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ver="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+ver="$(scripts/version.sh)"
 target="${1:-$(rustc -vV | sed -n 's/host: //p')}"
 exe=mnnn; [[ "$target" == *windows* ]] && exe=mnnn.exe
 bin="${2:-}"
