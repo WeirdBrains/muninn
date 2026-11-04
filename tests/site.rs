@@ -176,3 +176,25 @@ fn the_announcement_shows_existing_screenshots() {
         assert!(root.join("docs").join(&r).exists(), "the announcement shows {r}, which is missing");
     }
 }
+
+#[test]
+fn the_raven_logo_is_inlined_verbatim_and_themed() {
+    // site/lib/logo.dart holds byte-for-byte copies of the delivered artwork.
+    let dart = read("site/lib/logo.dart");
+    for (name, file) in [("ravenTile", "site/web/logo/muninn-raven.svg"), ("ravenMark", "site/web/logo/muninn-raven-mark.svg")] {
+        let svg = read(file);
+        assert!(dart.contains(&format!("const {name} = r'''{svg}''';")), "{name} in logo.dart differs from {file}");
+    }
+    assert_eq!(read("site/web/favicon.svg"), read("site/web/logo/muninn-raven-small.svg"));
+    assert_eq!(read("assets/icons/muninn.svg"), read("site/web/logo/muninn-raven.svg"), "the app icon is the same tile");
+    let css = read("site/web/styles.css");
+    for want in ["--muninn-header: var(--header)", "--muninn-accent: var(--accent)", "--muninn-bg: var(--bg)"] {
+        assert!(css.contains(want), "styles.css lacks {want}");
+    }
+    assert!(read("site/lib/app.dart").contains("RawText(ravenTile)"), "the hero inlines the tile");
+    assert!(read("site/tool/docs.dart").contains("$ravenMark"), "the docs header inlines the mark");
+    let head = read("site/lib/main.server.dart");
+    for f in ["favicon.svg", "favicon-16.png", "favicon-32.png", "apple-touch-icon.png"] {
+        assert!(head.contains(f) && Path::new(env!("CARGO_MANIFEST_DIR")).join("site/web").join(f).exists(), "favicon {f}");
+    }
+}

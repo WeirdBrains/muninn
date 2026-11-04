@@ -7,6 +7,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ## [Unreleased]
 
 ### Added
+- The Muninn raven logo on the website (themed for dark and light), its favicons, and the Windows and macOS installer and app icons
 - Markdown is rendered in the TUI: journal entries and help topics show headings, bold and italic, code, lists, quotes, tables, links and rules in the theme's colours; `r` switches to the source
 - Windows installer `muninn-<ver>-<arch>-windows-setup.exe`: per-user, no admin, adds `mnnn` to PATH and a Start Menu entry
 - macOS `muninn-<ver>-macos.dmg` with a universal Muninn.app that opens the TUI in Terminal

@@ -12,6 +12,14 @@ for want in '███╗   ███╗' 'https://github.com/WeirdBrains/muninn
   grep -qF -- "$want" "$html" || { echo "index.html is missing: $want" >&2; exit 1; }
 done
 grep -qF -- '--header: #7aa2f7' "$out/styles.css" || { echo "styles.css lost the theme" >&2; exit 1; }
+# The raven logo: inline (not <img>) in the hero and every docs header, themed, plus favicons.
+grep -qF -- '--muninn-header: var(--header)' "$out/styles.css" || { echo "styles.css does not theme the logo" >&2; exit 1; }
+tr '\n' ' ' <"$html" | grep -qE 'class="logo hero-logo"[^>]*>[[:space:]]*<svg' || { echo "no inline raven in the hero" >&2; exit 1; }
+for f in favicon.svg favicon-16.png favicon-32.png apple-touch-icon.png; do
+  test -f "$out/$f" || { echo "missing $out/$f" >&2; exit 1; }
+  grep -qF "href=\"$f\"" "$html" || { echo "index.html does not link $f" >&2; exit 1; }
+done
+grep -qF '<span class="logo" aria-hidden="true"><svg' "$out/docs/index.html" || { echo "no inline raven in the docs header" >&2; exit 1; }
 # Every screenshot the page shows must be in the build, with alt text.
 srcs=$(grep -oE 'src="screenshots/[^"]+\.png"' "$html" | sed 's/^src="//;s/"$//' | sort -u)
 [ -n "$srcs" ] || { echo "index.html shows no screenshots" >&2; exit 1; }

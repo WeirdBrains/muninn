@@ -18,7 +18,10 @@ The pages are generated from `docs/` on every build, so they never drift.
 | `site/web/screenshots/` | the screenshots (PNG, 1464x890) |
 | `site/lib/banner.dart` | the header art (the same rows as `src/tui/header.rs`) |
 | `site/lib/main.server.dart` | the entry point: the document and its stylesheet |
-| `site/web/styles.css` | the theme colours as CSS variables, and the layout |
+| `site/web/styles.css` | the theme colours as CSS variables (including the logo's `--muninn-header`, `--muninn-accent`, `--muninn-bg`), and the layout |
+| `site/web/logo/` | the Muninn raven (by Matematik): `muninn-raven.svg` (tile), `-mark` (bare raven), `-small` (16–32 px); used exactly as delivered |
+| `site/lib/logo.dart` | verbatim copies of the tile and mark, inlined in the hero and the docs header so they follow the theme |
+| `site/web/favicon.svg`, `favicon-16.png`, `favicon-32.png`, `apple-touch-icon.png` | favicons: the small mark (SVG and its 16/32 px renders) and the tile at 180 px |
 | `site/tool/docs.dart` | publishes `docs/` as pages in `build/jaspr/docs/` (the `markdown` package, run after `jaspr build`) |
 | `site/tool/check.sh` | checks a build: the front page, the banner, the links, the theme, a page per doc and every link in them |
 
@@ -58,6 +61,13 @@ are there, and every screenshot the site or the README shows exists. `tool/check
 same in the built page.
 
 When the header art or the default theme changes, change the site with it.
+
+To change the logo, replace the files in `site/web/logo/` with the new artwork, copy the
+tile and mark into `site/lib/logo.dart` (the test checks they match byte for byte), copy
+the small mark to `site/web/favicon.svg`, its 16/32 px renders to `favicon-16.png` and
+`favicon-32.png`, render `apple-touch-icon.png` with
+`rsvg-convert -w 180 -h 180 site/web/logo/muninn-raven.svg`, and drop the tile into
+`assets/icons/muninn.svg` for the installer icons (`assets/icons/README.md`).
 
 ## Deploying
 

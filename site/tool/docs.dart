@@ -7,6 +7,8 @@ import 'dart:io';
 
 import 'package:markdown/markdown.dart' as md;
 
+import 'package:muninn_site/logo.dart';
+
 const repo = 'https://github.com/WeirdBrains/muninn';
 
 /// A doc: its path under docs/ (`services/redis.md`), slug and title.
@@ -163,9 +165,13 @@ String page(Doc d, List<(String, List<Doc>)> nav, Set<String> pages) {
 <meta name="color-scheme" content="dark light">
 <title>${esc(d.title)} · Muninn docs</title>
 <link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 </head>
 <body class="docs-page">
-<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="$repo/releases">Releases</a><a href="$repo">Source</a></nav></header>
+<header class="docs-top"><a class="brand" href="/"><span class="logo" aria-hidden="true">$ravenMark</span>MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="$repo/releases">Releases</a><a href="$repo">Source</a></nav></header>
 <div class="docs-layout">
 <nav class="docs-nav" aria-label="Documentation">$side</nav>
 <main class="doc">

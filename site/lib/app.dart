@@ -2,6 +2,7 @@ import 'package:jaspr/jaspr.dart';
 import 'package:jaspr/dom.dart';
 
 import 'banner.dart';
+import 'logo.dart';
 import 'shots.dart';
 
 const repo = 'https://github.com/WeirdBrains/muninn';
@@ -19,6 +20,11 @@ class App extends StatelessComponent {
   Component build(BuildContext context) {
     return div(classes: 'page', [
       header(classes: 'hero', [
+        span(
+          classes: 'logo hero-logo',
+          attributes: {'aria-hidden': 'true'},
+          [RawText(ravenTile)],
+        ),
         pre(
           classes: 'banner',
           attributes: {'aria-label': 'Muninn'},
