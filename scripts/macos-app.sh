@@ -27,13 +27,11 @@ chmod 755 "$app/Contents/Resources/mnnn"
 cp -R "$src/man" "$src/README.md" "$src/CHANGELOG.md" "$src/LICENSE" "$app/Contents/Resources/"
 [[ -f $src/LICENSE-FONTS ]] && cp "$src/LICENSE-FONTS" "$app/Contents/Resources/"
 
-# icon
-set_dir="$work/muninn.iconset"; mkdir -p "$set_dir"
-for s in 16 32 128 256 512; do
-  sips -z $s $s assets/icons/muninn.png --out "$set_dir/icon_${s}x${s}.png" >/dev/null
-  sips -z $((s * 2)) $((s * 2)) assets/icons/muninn.png --out "$set_dir/icon_${s}x${s}@2x.png" >/dev/null
-done
-iconutil -c icns "$set_dir" -o "$app/Contents/Resources/muninn.icns"
+# icon: from assets/icons/muninn.png (scripts/icons.sh); also the dmg's volume icon
+scripts/icons.sh icns "$app/Contents/Resources/muninn.icns" >/dev/null
+cp "$app/Contents/Resources/muninn.icns" "$work/dmg/.VolumeIcon.icns"
+# the volume shows .VolumeIcon.icns when the root has the custom-icon flag (Xcode tools)
+command -v SetFile >/dev/null && SetFile -a C "$work/dmg"
 
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

@@ -25,7 +25,8 @@ for a in "${archs[@]}"; do
   [[ -f $z ]] || { echo "missing $z (run scripts/cross-windows.sh $a)" >&2; exit 1; }
   unzip -q "$z" -d "$stage/$work/$a"
 done
-cp packaging/windows/muninn.iss packaging/windows/muninn-launch.cmd assets/icons/muninn.ico "$stage/$work/"
+cp packaging/windows/muninn.iss packaging/windows/muninn-launch.cmd "$stage/$work/"
+scripts/icons.sh ico "$stage/$work/muninn.ico" >/dev/null   # from assets/icons/muninn.png
 win "if exist %USERPROFILE%\\$work rmdir /s /q %USERPROFILE%\\$work"
 scp -q -P "$port" -r "$stage/$work" "$host:"
 for a in "${archs[@]}"; do

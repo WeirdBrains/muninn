@@ -33,17 +33,29 @@ fn the_windows_setup_installs_per_user_and_manages_path() {
 #[test]
 fn the_macos_app_is_universal_signed_and_versioned() {
     let sh = read("scripts/macos-app.sh");
-    for want in ["lipo -create", "iconutil", "CFBundleShortVersionString", "codesign --force --deep --sign -", "hdiutil create", "keys init", " tui"]
-    {
+    for want in [
+        "lipo -create",
+        "scripts/icons.sh icns",
+        ".VolumeIcon.icns",
+        "CFBundleShortVersionString",
+        "codesign --force --deep --sign -",
+        "hdiutil create",
+        "keys init",
+        " tui",
+    ] {
         assert!(sh.contains(want), "scripts/macos-app.sh lacks {want}");
     }
 }
 
 #[test]
-fn the_icons_exist() {
-    for f in ["assets/icons/muninn.png", "assets/icons/muninn.ico"] {
-        assert!(Path::new(env!("CARGO_MANIFEST_DIR")).join(f).metadata().unwrap().len() > 1000, "{f} missing");
-    }
+fn every_installer_icon_comes_from_the_one_source_image() {
+    let png = std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/icons/muninn.png")).unwrap();
+    assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n", "assets/icons/muninn.png must be a PNG");
+    let (w, h) = (u32::from_be_bytes(png[16..20].try_into().unwrap()), u32::from_be_bytes(png[20..24].try_into().unwrap()));
+    assert!(w == h && w >= 1024, "assets/icons/muninn.png must be square and >= 1024 px, is {w}x{h}");
+    assert!(read("scripts/windows-setup.sh").contains("scripts/icons.sh ico"));
+    assert!(read("scripts/macos-app.sh").contains("scripts/icons.sh icns"));
+    assert!(!Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/icons/muninn.ico").exists(), "muninn.ico is generated, not committed");
 }
 
 #[test]
