@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.20.1] - 2026-11-04
+
 ### Added
 - The Muninn raven logo on the website (themed for dark and light), its favicons, and the Windows and macOS installer and app icons
 - Markdown is rendered in the TUI: journal entries and help topics show headings, bold and italic, code, lists, quotes, tables, links and rules in the theme's colours; `r` switches to the source
@@ -509,7 +511,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.20.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.20.1...HEAD
+[2.20.1]: https://github.com/WeirdBrains/muninn/compare/v2.20.0...v2.20.1
 [2.20.0]: https://github.com/WeirdBrains/muninn/compare/v2.19.0...v2.20.0
 [2.19.0]: https://github.com/WeirdBrains/muninn/compare/v2.18.0...v2.19.0
 [2.18.0]: https://github.com/WeirdBrains/muninn/compare/v2.17.0...v2.18.0

@@ -164,7 +164,8 @@ New here? Read the [Muninn 2.0 announcement](docs/announcement-2.0.md).
 
 ## Install
 
-Packages for Arch, Debian/Ubuntu, Fedora, Homebrew and winget, plus uninstall steps:
+Windows `setup.exe`, macOS `.dmg`, Homebrew (`brew install weirdbrains/tap/muninn`), winget,
+Arch, Debian/Ubuntu and Fedora packages, plus uninstall steps:
 see [docs/install.md](docs/install.md) (also `mnnn help install`).
 
 ## Build

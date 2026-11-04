@@ -76,17 +76,18 @@ every shape after that is made by code you can open and change.
 ## Install
 
 Every package ships a prebuilt `mnnn` binary; no Rust is needed. Downloads and
-`SHA256SUMS` are on the [v2.20.0 release](https://github.com/WeirdBrains/muninn/releases/tag/v2.20.0)
+`SHA256SUMS` are on the [v2.20.1 release](https://github.com/WeirdBrains/muninn/releases/tag/v2.20.1)
 (full steps in [install](install.md)).
 
 | Platform | Download | Install |
 |----------|----------|---------|
-| Linux or macOS (tarball) | `muninn-2.20.0-<target>.tar.gz` for `x86_64`/`aarch64-unknown-linux-gnu` and `x86_64`/`aarch64-apple-darwin` | `tar -xzf …` then `install -Dm755 muninn-2.20.0-<target>/mnnn ~/.local/bin/mnnn` |
-| Debian / Ubuntu | `muninn_2.20.0-1_amd64.deb`, `muninn_2.20.0-1_arm64.deb` | `sudo apt install ./muninn_2.20.0-1_amd64.deb` |
-| Fedora | `muninn-2.20.0-1.x86_64.rpm`, `muninn-2.20.0-1.aarch64.rpm` | `sudo dnf install ./muninn-2.20.0-1.x86_64.rpm` |
-| Arch Linux | `muninn-bin-2.20.0-1-x86_64.pkg.tar.zst`, `…-aarch64.pkg.tar.zst` | `sudo pacman -U muninn-bin-2.20.0-1-x86_64.pkg.tar.zst` |
-| Homebrew | `muninn.rb` in `muninn-2.20.0-packaging.tar.gz` | `tar -xzf muninn-2.20.0-packaging.tar.gz`, then `brew install ./packaging/homebrew/muninn.rb` |
-| Windows (x64, arm64) | `muninn-2.20.0-x86_64-pc-windows-gnullvm.zip`, `…-aarch64-…zip` | unzip and put `mnnn.exe` on `PATH`, or `winget install --manifest packaging\winget\2.20.0` from the packaging tarball |
+| Linux or macOS (tarball) | `muninn-2.20.1-<target>.tar.gz` for `x86_64`/`aarch64-unknown-linux-gnu` and `x86_64`/`aarch64-apple-darwin` | `tar -xzf …` then `install -Dm755 muninn-2.20.1-<target>/mnnn ~/.local/bin/mnnn` |
+| Debian / Ubuntu | `muninn_2.20.1-1_amd64.deb`, `muninn_2.20.1-1_arm64.deb` | `sudo apt install ./muninn_2.20.1-1_amd64.deb` |
+| Fedora | `muninn-2.20.1-1.x86_64.rpm`, `muninn-2.20.1-1.aarch64.rpm` | `sudo dnf install ./muninn-2.20.1-1.x86_64.rpm` |
+| Arch Linux | `muninn-bin-2.20.1-1-x86_64.pkg.tar.zst`, `…-aarch64.pkg.tar.zst` | `sudo pacman -U muninn-bin-2.20.1-1-x86_64.pkg.tar.zst` |
+| Homebrew | tap `weirdbrains/tap` | `brew install weirdbrains/tap/muninn` (or `--cask` for Muninn.app) |
+| Windows (x64, arm64) | `muninn-2.20.1-x86_64-windows-setup.exe`, `…-aarch64-windows-setup.exe` (and portable zips) | run the setup.exe, or `winget install WeirdBrains.Muninn` |
+| macOS app | `muninn-2.20.1-macos.dmg` | open it and drag Muninn to Applications |
 
 Then try it somewhere disposable:
 

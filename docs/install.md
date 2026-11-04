@@ -13,36 +13,107 @@ Building code spaces is optional and needs extra tools that the packages do not 
 translated in process, so no Python install is needed. See
 [code spaces](code-spaces.md#python-in-rust).
 
+## Quick install
+
+| System | Easiest way |
+|---|---|
+| Windows 10/11 (x64, arm64) | [`setup.exe`](#windows-setupexe), or [`winget`](#windows-winget) |
+| macOS (Apple silicon, Intel) | [`.dmg` with Muninn.app](#macos-dmg), or [Homebrew](#homebrew-macos-and-linux) |
+| Ubuntu 24.04+, Debian 13+ | [`.deb`](#debian--ubuntu) |
+| Fedora, RHEL | [`.rpm`](#fedora--rhel) |
+| Arch Linux | [`muninn-bin`](#arch-linux) |
+| any other Linux | [Homebrew](#homebrew-macos-and-linux) or the [tarball](#release-tarball-any-linux-or-macos) |
+
+### Windows: setup.exe
+
+1. Download `muninn-2.20.1-x86_64-windows-setup.exe` (on an ARM PC,
+   `muninn-2.20.1-aarch64-windows-setup.exe`) from the
+   [v2.20.1 release](https://github.com/WeirdBrains/muninn/releases/tag/v2.20.1).
+2. Run it. It is not code-signed, so Windows SmartScreen says "Windows protected your PC":
+   click **More info**, then **Run anyway**.
+3. Click through the wizard. It installs for your user only (no admin prompt) into
+   `%LOCALAPPDATA%\Programs\Muninn`, adds that folder to your user `PATH`, and adds a
+   **Muninn** Start Menu entry that opens the TUI (setting up keys the first time).
+
+Open a **new** terminal (old ones keep the old `PATH`) and run `mnnn --version`.
+Silent install, e.g. for scripts: `muninn-2.20.1-x86_64-windows-setup.exe /VERYSILENT /SUPPRESSMSGBOXES`.
+
+Uninstall from **Settings ▸ Apps ▸ Installed apps ▸ Muninn ▸ Uninstall** (or Start Menu ▸
+Muninn ▸ Uninstall Muninn). That removes the program folder and its `PATH` entry; your
+data in `%USERPROFILE%\.muninn` stays.
+
+### Windows: winget
+
+```powershell
+winget install WeirdBrains.Muninn
+```
+
+This runs the same `setup.exe` silently. Muninn's entry was submitted to the public winget
+catalogue with v2.20.1; until Microsoft merges it, winget reports "No package found", so
+use `setup.exe` meanwhile. Uninstall: `winget uninstall WeirdBrains.Muninn`.
+
+### macOS: dmg
+
+1. Download `muninn-2.20.1-macos.dmg` from the
+   [v2.20.1 release](https://github.com/WeirdBrains/muninn/releases/tag/v2.20.1). One
+   universal app runs on Apple silicon and Intel.
+2. Open the dmg and drag **Muninn** onto **Applications**.
+3. Muninn.app is not notarized, so the first time, **right-click** (or Control-click)
+   Muninn in Applications and choose **Open**, then **Open** again. (On macOS 15 and newer,
+   if there is no Open button: try to open it once, then go to **System Settings ▸ Privacy &
+   Security** and click **Open Anyway**.) Or in Terminal:
+   `xattr -dr com.apple.quarantine /Applications/Muninn.app`.
+
+Muninn opens Terminal running `mnnn`. The first time it offers to put the `mnnn` command on
+your `PATH` (`/usr/local/bin`, or `~/.local/bin`) and sets up keys, then starts the TUI.
+Uninstall: drag Muninn from Applications to the Bin, and remove the `mnnn` link it made
+(`/usr/local/bin/mnnn` or `~/.local/bin/mnnn`). Your data in `~/.muninn` stays.
+
+### Homebrew (macOS and Linux)
+
+```sh
+brew install weirdbrains/tap/muninn            # the mnnn command (macOS or Linux, arm64 or x86_64)
+brew install --cask weirdbrains/tap/muninn     # or Muninn.app plus mnnn (macOS)
+```
+
+Install one or the other, not both. Both come from the
+[WeirdBrains/homebrew-tap](https://github.com/WeirdBrains/homebrew-tap) tap and are updated
+with each release (`brew upgrade`). The cask's app is not notarized; if macOS blocks it, see
+step 3 under [macOS: dmg](#macos-dmg). Uninstall: `brew uninstall muninn` (or
+`brew uninstall --cask muninn`), then `brew untap weirdbrains/tap` if you like.
+
 ## Getting a release
 
 Each release is built and checked locally, and its files are attached to its page under
 [GitHub Releases](https://github.com/WeirdBrains/muninn/releases). The latest is
-[v2.20.0](https://github.com/WeirdBrains/muninn/releases/tag/v2.20.0). Every release has
-14 files:
+[v2.20.1](https://github.com/WeirdBrains/muninn/releases/tag/v2.20.1). Every release has
+17 files:
 
-| File (v2.20.0) | For |
+| File (v2.20.1) | For |
 |---|---|
-| `muninn-2.20.0-x86_64-unknown-linux-gnu.tar.gz`, `muninn-2.20.0-aarch64-unknown-linux-gnu.tar.gz` | any Linux |
-| `muninn-2.20.0-x86_64-apple-darwin.tar.gz`, `muninn-2.20.0-aarch64-apple-darwin.tar.gz` | macOS (Intel, Apple silicon) |
-| `muninn_2.20.0-1_amd64.deb`, `muninn_2.20.0-1_arm64.deb` | Debian, Ubuntu |
-| `muninn-2.20.0-1.x86_64.rpm`, `muninn-2.20.0-1.aarch64.rpm` | Fedora, RHEL |
-| `muninn-bin-2.20.0-1-x86_64.pkg.tar.zst`, `muninn-bin-2.20.0-1-aarch64.pkg.tar.zst` | Arch Linux |
-| `muninn-2.20.0-x86_64-pc-windows-gnullvm.zip`, `muninn-2.20.0-aarch64-pc-windows-gnullvm.zip` | Windows (x64, arm64) |
-| `muninn-2.20.0-packaging.tar.gz` | the Homebrew formula, Arch PKGBUILD and winget manifests, with this release's checksums filled in |
+| `muninn-2.20.1-x86_64-unknown-linux-gnu.tar.gz`, `muninn-2.20.1-aarch64-unknown-linux-gnu.tar.gz` | any Linux |
+| `muninn-2.20.1-x86_64-apple-darwin.tar.gz`, `muninn-2.20.1-aarch64-apple-darwin.tar.gz` | macOS (Intel, Apple silicon) |
+| `muninn_2.20.1-1_amd64.deb`, `muninn_2.20.1-1_arm64.deb` | Debian, Ubuntu |
+| `muninn-2.20.1-1.x86_64.rpm`, `muninn-2.20.1-1.aarch64.rpm` | Fedora, RHEL |
+| `muninn-bin-2.20.1-1-x86_64.pkg.tar.zst`, `muninn-bin-2.20.1-1-aarch64.pkg.tar.zst` | Arch Linux |
+| `muninn-2.20.1-x86_64-windows-setup.exe`, `muninn-2.20.1-aarch64-windows-setup.exe` | Windows installer (x64, arm64) |
+| `muninn-2.20.1-macos.dmg` | macOS Muninn.app (universal) |
+| `muninn-2.20.1-x86_64-pc-windows-gnullvm.zip`, `muninn-2.20.1-aarch64-pc-windows-gnullvm.zip` | Windows, portable (x64, arm64) |
+| `muninn-2.20.1-packaging.tar.gz` | the Homebrew formula and cask, Arch PKGBUILD and winget manifests, with this release's checksums filled in |
 | `SHA256SUMS` | checksums for all of the above |
 
 Download from the command line and check it, for example:
 
 ```sh
-ver=2.20.0
+ver=2.20.1
 base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
 curl -LO $base/muninn-$ver-x86_64-unknown-linux-gnu.tar.gz -LO $base/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS      # macOS: shasum -a 256 --ignore-missing -c SHA256SUMS
 ```
 
-On Windows (PowerShell) see [Windows](#windows) below.
+On Windows (PowerShell) see [Windows (portable zip)](#windows-portable-zip) below.
 
-(`gh release download v2.20.0` does the same if you have the GitHub CLI.) Muninn is
+(`gh release download v2.20.1` does the same if you have the GitHub CLI.) Muninn is
 BSD-3-Clause licensed; every package carries the `LICENSE`.
 
 Installing or uninstalling never touches your data in `~/.muninn` (or `MUNINN_HOME`);
@@ -52,10 +123,10 @@ delete that folder yourself to remove it.
 
 ```sh
 t=x86_64-unknown-linux-gnu     # or aarch64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin
-tar -xzf muninn-2.20.0-$t.tar.gz
+tar -xzf muninn-2.20.1-$t.tar.gz
 mkdir -p ~/.local/bin ~/.local/share/man/man1
-install -m755 muninn-2.20.0-$t/mnnn ~/.local/bin/mnnn
-cp muninn-2.20.0-$t/man/*.1 ~/.local/share/man/man1/
+install -m755 muninn-2.20.1-$t/mnnn ~/.local/bin/mnnn
+cp muninn-2.20.1-$t/man/*.1 ~/.local/share/man/man1/
 ```
 
 If `mnnn` is not found afterwards, `~/.local/bin` is not on your `PATH` (the default on
@@ -64,7 +135,7 @@ or `~/.bashrc` and open a new terminal.
 
 macOS: the binary is not notarized. Downloaded with `curl` it runs as is; downloaded in a
 browser, Gatekeeper blocks it ("cannot be opened"), so clear the flag first:
-`xattr -d com.apple.quarantine muninn-2.20.0-$t.tar.gz` (before extracting) or
+`xattr -d com.apple.quarantine muninn-2.20.1-$t.tar.gz` (before extracting) or
 `xattr -d com.apple.quarantine ~/.local/bin/mnnn`.
 
 Uninstall: remove `~/.local/bin/mnnn` and `~/.local/share/man/man1/mnnn*.1`.
@@ -81,11 +152,11 @@ makepkg -si            # builds the committed checkout, installs package "muninn
 **Prebuilt (`muninn-bin`, no Rust):** install the release's ready-made package:
 
 ```sh
-sudo pacman -U muninn-bin-2.20.0-1-x86_64.pkg.tar.zst     # or …-aarch64.pkg.tar.zst
+sudo pacman -U muninn-bin-2.20.1-1-x86_64.pkg.tar.zst     # or …-aarch64.pkg.tar.zst
 ```
 
 Or build it yourself from the release's PKGBUILD (`packaging/arch/PKGBUILD` in
-`muninn-2.20.0-packaging.tar.gz`, which has the checksums filled in) with `makepkg -si`. If
+`muninn-2.20.1-packaging.tar.gz`, which has the checksums filled in) with `makepkg -si`. If
 `muninn-bin` is in the AUR when you read this, `yay -S muninn-bin` or `paru -S muninn-bin`
 installs the same package.
 
@@ -103,7 +174,7 @@ installed it lints the package first; it is optional and never blocks the instal
 ## Debian / Ubuntu
 
 ```sh
-sudo apt install ./muninn_2.20.0-1_amd64.deb      # arm64: muninn_2.20.0-1_arm64.deb
+sudo apt install ./muninn_2.20.1-1_amd64.deb      # arm64: muninn_2.20.1-1_arm64.deb
 ```
 
 Needs Ubuntu 24.04+ or Debian 13+ (glibc 2.39); on Ubuntu 22.04 it installs but
@@ -113,41 +184,20 @@ Maintainers build it with `cargo deb` (`packaging/debian/README.md`).
 ## Fedora / RHEL
 
 ```sh
-sudo dnf install ./muninn-2.20.0-1.x86_64.rpm     # or muninn-2.20.0-1.aarch64.rpm
+sudo dnf install ./muninn-2.20.1-1.x86_64.rpm     # or muninn-2.20.1-1.aarch64.rpm
 ```
 
 Requires glibc (detected from the binary). Uninstall: `sudo dnf remove muninn`.
 Maintainers build it with `cargo generate-rpm` (`packaging/fedora/README.md`).
 
-## macOS and Linux (Homebrew)
+## Windows (portable zip)
 
-`packaging/homebrew/muninn.rb` installs the prebuilt binary for macOS arm64/x86_64 or
-Linux arm64/x86_64:
-
-The formula is in the release's packaging tarball, with that release's checksums filled in.
-Homebrew only installs formulae from a tap (`brew install ./muninn.rb` fails with
-"Homebrew requires formulae to be in a tap"), so put it in a local one:
-
-```sh
-tar -xzf muninn-2.20.0-packaging.tar.gz
-brew tap-new --no-git local/muninn
-cp packaging/homebrew/muninn.rb "$(brew --repository local/muninn)/Formula/"
-brew install local/muninn/muninn
-brew developer off      # tap-new turns Homebrew's developer mode on
-```
-
-Once a Homebrew tap is published, `brew install` from it installs the same thing.
-
-Uninstall: `brew uninstall muninn && brew untap local/muninn`.
-
-## Windows
-
-Release zips hold a portable `mnnn.exe` for x64 and arm64. In PowerShell (no admin rights
+The [setup.exe](#windows-setupexe) is simpler. Release zips hold a portable `mnnn.exe` for x64 and arm64. In PowerShell (no admin rights
 needed), download, check, unpack into `%LOCALAPPDATA%\Programs\Muninn` and add it to your
 user `PATH`:
 
 ```powershell
-$ver = "2.20.0"; $arch = "x86_64"     # or aarch64
+$ver = "2.20.1"; $arch = "x86_64"     # or aarch64
 $zip = "muninn-$ver-$arch-pc-windows-gnullvm.zip"
 $base = "https://github.com/WeirdBrains/muninn/releases/download/v$ver"
 curl.exe -LO "$base/$zip" -LO "$base/SHA256SUMS"
@@ -164,23 +214,6 @@ Open a **new** PowerShell or terminal window (the old one keeps the old `PATH`) 
 `mnnn --version`. Uninstall: delete `%LOCALAPPDATA%\Programs\Muninn` and remove it from
 your user `PATH` (Settings ▸ System ▸ About ▸ Advanced system settings ▸ Environment
 Variables). Data lives in `%USERPROFILE%\.muninn`.
-
-### winget (local manifest)
-
-The release's packaging tarball has winget manifests with its checksums filled in.
-Installing from a local manifest is off by default and must be enabled once **in an
-administrator PowerShell**; without it winget only prints "This feature needs to be
-enabled by administrators":
-
-```powershell
-winget settings --enable LocalManifestFiles     # once, as administrator
-tar -xzf muninn-2.20.0-packaging.tar.gz
-winget install --manifest packaging\winget\2.20.0
-```
-
-winget adds `mnnn` to `PATH`; open a new terminal before running it. Muninn is not in the
-public winget catalogue yet, so `winget install Kommandosaldat.Muninn` reports "No package
-found". Uninstall: `winget uninstall --manifest packaging\winget\2.20.0`.
 
 ## From source (any platform)
 

@@ -35,7 +35,7 @@ Use the release `.deb` (prebuilt, no Rust needed; see [install](install.md)), ch
 against `SHA256SUMS`:
 
 ```sh
-ver=2.20.0
+ver=2.20.1
 base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
 curl -LO $base/muninn_${ver}-1_amd64.deb -LO $base/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS
