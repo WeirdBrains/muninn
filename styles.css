@@ -12,6 +12,10 @@
   --accent: #bb9af7;
   --info: #7dcfff;
   --success: #9ece6a;
+  /* the raven logo's colours (site/web/logo) follow the theme */
+  --muninn-header: var(--header);
+  --muninn-accent: var(--accent);
+  --muninn-bg: var(--bg);
 }
 @media (prefers-color-scheme: light) {
   :root {
@@ -38,6 +42,10 @@ a { color: var(--info); }
 code, pre { font-family: "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", Menlo, monospace; }
 .page { max-width: 64rem; margin: 0 auto; padding: 3rem 1.5rem; }
 .hero { text-align: center; }
+.logo { display: inline-block; line-height: 0; }
+.logo svg { width: 100%; height: auto; }
+.hero-logo { width: clamp(6rem, 18vw, 9rem); margin-bottom: 1rem; }
+.docs-top .brand .logo { width: 1.6rem; margin-right: 0.5rem; vertical-align: middle; }
 .banner {
   color: var(--header);
   font-weight: bold;
@@ -78,6 +86,8 @@ pre:not(.banner) {
 }
 .muted { color: var(--muted); }
 .docs ul { columns: 2; padding-left: 1.2rem; }
+footer p { margin: 0.3rem 0; }
+.about-logo { width: 2.5rem; margin-bottom: 0.4rem; }
 footer { margin-top: 3rem; color: var(--muted); text-align: center; border-top: 1px solid var(--border); padding-top: 1rem; }
 img { max-width: 100%; height: auto; display: block; }
 figure { margin: 0; }

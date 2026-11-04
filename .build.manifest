@@ -1,4 +1,11 @@
 .dart_tool/package_config.json
+apple-touch-icon.png
+favicon-16.png
+favicon-32.png
+favicon.svg
+logo/muninn-raven-mark.svg
+logo/muninn-raven-small.svg
+logo/muninn-raven.svg
 packages/$sdk/dev_compiler/amd/require.js
 packages/$sdk/dev_compiler/ddc/ddc_module_loader.js
 packages/$sdk/dev_compiler/web/dart_stack_trace_mapper.js
