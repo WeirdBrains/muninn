@@ -4315,7 +4315,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-core"
-version = "2.20.0"
+version = "2.20.1"
 dependencies = [
  "age",
  "anyhow",
@@ -4397,7 +4397,7 @@ dependencies = [
 
 [[package]]
 name = "muninn_ffi"
-version = "2.20.0"
+version = "2.20.1"
 dependencies = [
  "anyhow",
  "flutter_rust_bridge",
