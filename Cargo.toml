@@ -123,7 +123,7 @@ Postgres, normalizes them and stores them in an encrypted SQLite (SQLCipher) dat
 Export to CSV, Parquet or JSON; browse in a terminal UI."""
 section = "utils"
 priority = "optional"
-depends = "libc6 (>= 2.34), libgcc-s1"
+depends = "libc6 (>= 2.39), libgcc-s1"
 assets = [
     ["target/release/mnnn", "usr/bin/", "755"],
     ["man/*.1", "usr/share/man/man1/", "644"],
