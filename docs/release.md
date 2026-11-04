@@ -14,7 +14,7 @@ releases are made.
 
 | Built on | Files |
 |---|---|
-| Linux x86_64 (cross-compiling aarch64) | `cargo build --locked --release --target T`, strip, `scripts/dist.sh T`, `cargo deb`, `cargo generate-rpm`: tarballs, `.deb` and `.rpm` for x86_64 and aarch64 |
+| Linux x86_64 (cross-compiling aarch64) | `cargo build --locked --release -p muninn --target T`, strip, `scripts/dist.sh T`, `cargo deb`, `cargo generate-rpm`: tarballs, `.deb` and `.rpm` for x86_64 and aarch64 |
 | Linux, llvm-mingw | `scripts/cross-windows.sh x86_64 aarch64`: `muninn-<ver>-{x86_64,aarch64}-pc-windows-gnullvm.zip` |
 | macOS | `COPYFILE_DISABLE=1`, `scripts/dist.sh` (which runs `xattr -cr` on the staged files before `tar`) for `aarch64-apple-darwin` and `x86_64-apple-darwin` |
 | Windows host with Inno Setup, from Linux | `scripts/windows-setup.sh`: `muninn-<ver>-{x86_64,aarch64}-windows-setup.exe` from the zips (`packaging/windows/`) |

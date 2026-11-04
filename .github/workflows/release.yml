@@ -31,7 +31,7 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - name: Build
-        run: cargo build --locked --release --target ${{ matrix.target }}
+        run: cargo build --locked --release -p muninn --target ${{ matrix.target }}
       - name: Tarball
         run: scripts/dist.sh ${{ matrix.target }}
       - name: Install cargo-deb and cargo-generate-rpm

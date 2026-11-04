@@ -36,6 +36,8 @@ pinned=(
   packaging/homebrew/Casks/muninn.rb
   site/lib/app.dart
   docs/install.md
+  docs/deploy-relay.md
+  packaging/windows/muninn.iss
 )
 sed -i "s/$oldre/$ver/g" "${pinned[@]}"
 # winget: move the template directory to the new version

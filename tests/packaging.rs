@@ -107,7 +107,14 @@ fn every_packaging_template_pins_the_workspace_version() {
         .collect();
     assert_eq!(winget, [ver], "one winget template directory, named for the version");
     let release = read("scripts/release.sh");
-    for p in ["packaging/arch/PKGBUILD", "packaging/arch/muninn-bin/PKGBUILD", "packaging/homebrew/Formula/muninn.rb", "packaging/homebrew/Casks/muninn.rb", "site/lib/app.dart", "docs/install.md"] {
+    for p in [
+        "packaging/arch/PKGBUILD",
+        "packaging/arch/muninn-bin/PKGBUILD",
+        "packaging/homebrew/Formula/muninn.rb",
+        "packaging/homebrew/Casks/muninn.rb",
+        "site/lib/app.dart",
+        "docs/install.md",
+    ] {
         assert!(release.contains(p), "scripts/release.sh does not bump {p}");
     }
 }

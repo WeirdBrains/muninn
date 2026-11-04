@@ -21,7 +21,7 @@ if [[ $source -eq 1 ]]; then
   pkgbuild="$root/packaging/arch/PKGBUILD"
   (cd "$root/packaging/arch" && PKGDEST="$out" SRCDEST="$out/srcdest" BUILDDIR="$out/build" makepkg -f --noconfirm "${args[@]}")
 else
-  (cd "$root" && cargo build --locked --release)
+  (cd "$root" && cargo build --locked --release -p muninn)
   tarball="$("$root/scripts/dist.sh" x86_64-unknown-linux-gnu "$root/target/release/mnnn")"
   ver="$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/Cargo.toml" | head -1)"
   sed "s/^pkgver=.*/pkgver=$ver/" "$root/packaging/arch/muninn-bin/PKGBUILD" > "$out/PKGBUILD"

@@ -28,7 +28,7 @@ for arch in "${@:-x86_64 aarch64}"; do
       fi
       export OPENSSL_NO_VENDOR=1 OPENSSL_STATIC=1 OPENSSL_DIR="$ossl"
     fi
-    cargo build --locked --release --target "$t"
+    cargo build --locked --release -p muninn --target "$t"   # the mnnn bin only, not the FFI crate
     unset OPENSSL_NO_VENDOR OPENSSL_STATIC OPENSSL_DIR
     scripts/dist.sh "$t"
   done
