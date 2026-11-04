@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Keys · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a class="current" aria-current="page" href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="keys">Keys</h1>
+<pre><code>mnnn keys init [--json]
+mnnn keys status
+mnnn keys rotate  [MASTER INPUT]
+mnnn keys rekey   [MASTER INPUT]
+mnnn keys export  --out DIR [--only master,words,service,shards] [MASTER INPUT]
+mnnn keys recover [MASTER INPUT] [--print-words]
+mnnn keys shards  [--out DIR] [MASTER INPUT]
+
+MASTER INPUT: --words-file FILE | --shard FILE --shard FILE --shard FILE | --master-file FILE | --words &quot;...&quot;
+</code></pre>
+<h2 id="the-pieces">The pieces</h2>
+<table>
+<thead>
+<tr>
+<th>item</th>
+<th>what it is</th>
+<th>stored?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>master key</td>
+<td>256 random bits from the OS</td>
+<td><strong>never</strong></td>
+</tr>
+<tr>
+<td>24 words</td>
+<td>BIP39 encoding of the same 256 bits</td>
+<td><strong>never</strong></td>
+</tr>
+<tr>
+<td>dark shards</td>
+<td>Shamir 3-of-5 split of the master key</td>
+<td><strong>never</strong></td>
+</tr>
+<tr>
+<td>service key v{n}</td>
+<td><code>HKDF-SHA256(master, salt = db_id, info = &quot;muninn/service/v{n}&quot;)</code></td>
+<td><code>keys/service/v{n}.toml</code>, wrapped by your password (Argon2id + XChaCha20-Poly1305)</td>
+</tr>
+<tr>
+<td>data key (DEK)</td>
+<td>random 256-bit SQLCipher key</td>
+<td><code>keys/envelope.toml</code>, wrapped by the service key <strong>and</strong> by a master-derived KEK</td>
+</tr>
+</tbody>
+</table>
+<p>The password is <strong>not</strong> mixed into the master key: the 24 words (or any 3 shards)
+alone recover it. The password only protects key material on disk and in exports.</p>
+<h2 id="init">init</h2>
+<p>Creates the master key, data key, envelope and service key v1, and creates the
+encrypted database (an existing plaintext database is encrypted in place). It prints
+the 24 words and the 5 shards <strong>once</strong>. Write the words down and store the shards in
+different places. <code>--json</code> prints <code>{db_id, words, shards}</code> for scripting.</p>
+<p>The password comes from <code>MUNINN_PASSWORD</code> or a hidden prompt (asked twice).</p>
+<h2 id="normal-use">Normal use</h2>
+<p>Every database command unlocks the data key with the password-wrapped service key.
+Set <code>MUNINN_PASSWORD</code> for scripts, or type it at the prompt.</p>
+<h2 id="rotate">rotate</h2>
+<p>Derives service key <code>v{n+1}</code> from the master, re-wraps the data key, and retires the
+old service key (its wrapped copy is deleted). Instant; the database is not rewritten.
+Needs the master key and asks for confirmation (<code>-y</code>).</p>
+<h2 id="rekey">rekey</h2>
+<p>Generates a new data key and runs SQLCipher <code>PRAGMA rekey</code> (rewrites the whole file),
+then re-wraps it for the service key and the master. Use it if you suspect the data
+key leaked. Needs the master key.</p>
+<h2 id="recover">recover</h2>
+<p>From the words, 3 shards or an exported master file: verifies the master against the
+envelope, then re-wraps the current service key with a (new) password. Use this when
+the password is lost. <code>--print-words</code> shows the 24 words again.</p>
+<h2 id="shards">shards</h2>
+<p>Re-issues a new 3-of-5 set. A new set cannot be mixed with shards from an older set
+(each shard carries a set id and a checksum). Older sets still recover the same master
+key, so destroy them if they may be compromised. Without <code>--out</code> the shards are
+printed; with <code>--out</code> they are written as <code>shard-N.age</code>.</p>
+<p>Shards can also be entrusted to peers over the network, sealed so they cannot read
+them: see <a href="/docs/dark-shards/">dark shards</a>.</p>
+<p>Shard text format: <code>muninn-shard-v1:&lt;set&gt;:&lt;threshold&gt;:&lt;index&gt;:&lt;hex&gt;:&lt;checksum&gt;</code>.</p>
+<h2 id="export">export</h2>
+<p>Writes each item as its own password-encrypted <a href="https://age-encryption.org">age</a> file
+so they can live in different places:
+<code>master.key.age</code>, <code>words.txt.age</code>, <code>service-keys.json.age</code>, <code>shard-1.age</code> ... <code>shard-5.age</code>.
+The export password is <code>MUNINN_EXPORT_PASSWORD</code>, else <code>MUNINN_PASSWORD</code>, else a prompt.
+Writing the master/words and the shards to one directory triggers a warning and needs
+confirmation. Exported files are accepted back by <code>--words-file</code>, <code>--shard</code> and
+<code>--master-file</code> (age files are detected and decrypted).</p>
+<h2 id="example">Example</h2>
+<pre><code>export MUNINN_HOME=/tmp/mnnn-demo MUNINN_PASSWORD='a long passphrase'
+mnnn keys init
+mnnn keys export --out /media/usb --only shards
+mnnn keys rotate --words-file ~/words.txt -y
+mnnn keys recover --shard a.age --shard b.age --shard c.age
+</code></pre>
+<h2 id="failure-modes">Failure modes</h2>
+<ul>
+<li>Commands before <code>keys init</code>: &quot;keys are not initialized ... run <code>mnnn keys init</code>&quot;.</li>
+<li>Wrong password: &quot;wrong password&quot;; nothing is changed.</li>
+<li>Fewer than 3 shards, shards from different sets, or a typo: a clear error; a typo is
+caught by the checksum.</li>
+<li>Words or shards from another database: &quot;master key does not match this database&quot;.</li>
+</ul>
+<p>See <a href="/docs/encryption/">encryption</a> and <a href="/docs/backup-recovery/">backup and recovery</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/keys.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

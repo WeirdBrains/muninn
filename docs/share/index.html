@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Share · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a class="current" aria-current="page" href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="share">Share</h1>
+<p>One action shares anything shareable to anything that takes shares.</p>
+<table>
+<thead>
+<tr>
+<th>item ↓ / target →</th>
+<th>project</th>
+<th>journal</th>
+<th>code</th>
+<th>net</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>model</td>
+<td>added as an item</td>
+<td>a new entry about it</td>
+<td>runs over it</td>
+<td>exchange share</td>
+</tr>
+<tr>
+<td>live search (any kind)</td>
+<td>added as an item</td>
+<td>a new entry about it</td>
+<td>runs over its matches</td>
+<td>exchange share</td>
+</tr>
+<tr>
+<td>code space</td>
+<td>added as an item</td>
+<td>a new entry about it</td>
+<td>runs over its output (not into itself)</td>
+<td>exchange share</td>
+</tr>
+<tr>
+<td>journal</td>
+<td>added as an item</td>
+<td>a new entry (not into itself)</td>
+<td>runs over its entries</td>
+<td>exchange share</td>
+</tr>
+<tr>
+<td>report</td>
+<td>added as an item</td>
+<td>a new entry about it</td>
+<td>–</td>
+<td>exchange share</td>
+</tr>
+<tr>
+<td>project</td>
+<td>–</td>
+<td>a new entry about it</td>
+<td>–</td>
+<td>exchange share</td>
+</tr>
+<tr>
+<td>pipeline</td>
+<td>added as an item</td>
+<td>a new entry about it</td>
+<td>–</td>
+<td>exchange share (peers get a draft)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>project</strong>: the item is added to the project (once; sharing again changes nothing).</li>
+<li><strong>journal</strong>: a new Markdown entry &quot;Shared: NAME&quot; naming the item, with your note.</li>
+<li><strong>code</strong>: the code space runs over the data (<a href="/docs/pipes/">pipes</a>); the space keeps none of
+it and its input is not changed. Records, series (their bars) and journal entries all
+work. The TUI opens the space and runs it, showing the output (a new or changed source
+asks to be approved first, as <code>r</code> does), and <code>&gt;</code> pipes the result on; the CLI runs it
+and prints the result (<code>-y</code> approves, as <code>mnnn code run</code>).</li>
+<li><strong>net</strong>: the same as <code>mnnn net share</code> (with exchanges named, or all of them).</li>
+</ul>
+<p>A model fetched from a peer arrives as a draft to approve (<a href="/docs/model-templates/">model templates</a>).</p>
+<p>Every share is recorded in <a href="/docs/history/">history</a>.</p>
+<h2 id="cli">CLI</h2>
+<pre><code>mnnn share KIND ITEM TARGET [TO…] [--note TEXT] [--json]
+mnnn share KIND --targets
+mnnn share search usdt project Alpha
+mnnn share code calc journal Notes --note &quot;worth a look&quot;
+mnnn share model signals code calc
+mnnn share search usdt code calc -y        # run calc over the search's bars
+mnnn share report summary net            # every exchange
+</code></pre>
+<p>KIND: model, search, journal, project, report, code. TARGET: project, journal, code, net.</p>
+<h2 id="tui">TUI</h2>
+<p>In the Models, Code spaces, Journals, Live searches, Reports and Projects windows, <code>S</code> or
+the <code>[S share]</code> button on the window's top border shares the selected item: pick a target
+from the list (<code>target · name</code>), Enter shares, Esc goes back.</p>
+<p>Every key named in hint text anywhere in the TUI (key bars, the status bar, prompts such as
+<code>y confirms</code>) can be clicked: the click presses that key. See <a href="/docs/keybindings/">keybindings</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/share.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

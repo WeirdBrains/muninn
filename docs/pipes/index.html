@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Pipes · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a class="current" aria-current="page" href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="pipes">Pipes</h1>
+<p>A code space is the right side of a pipe: data is piped in, the code works on it, and its
+result can be piped on, into another code space, a filter, or saved somewhere. Code spaces
+work <strong>on</strong> data; they keep none of it. A stored default input is only a convenience for
+<code>mnnn code run</code>; whatever is piped in is what a run works on. (Named, saved pipelines that
+end in a model table are being designed: <a href="/docs/pipelines/">pipelines</a>.)</p>
+<pre><code>mnnn pipe SOURCE [STEP…] [--to TARGET]… [--json] [--rows N]
+mnnn pipe search:usdt code:fast journal:Raw code:smooth --to journal:Notes
+mnnn pipe &quot;bars where symbol = BTC/USDT limit 500&quot; fast
+mnnn pipe journal:Notes search:alphas --to model:picks
+</code></pre>
+<h2 id="sources">Sources</h2>
+<table>
+<thead>
+<tr>
+<th>source</th>
+<th>the frame it gives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code></td>
+<td>no data</td>
+</tr>
+<tr>
+<td>a model query (<code>bars where … group … sort … limit N</code>, or <code>model:…</code>)</td>
+<td>the model's fields, as <code>mnnn code edit --model</code></td>
+</tr>
+<tr>
+<td><code>search:NAME</code>, any live search, run when the pipe runs</td>
+<td>records: the model's fields (several models: a <code>model</code> column and every field); series: the rows stored for each matching series as structured data, whatever fields their model has, loaded like any records (in the search's time range, no grouping imposed; shape them into bars with a code space such as <code>to-bars</code> if you want bars); journal entries: <code>journal title body words _created_at _updated_at</code></td>
+</tr>
+<tr>
+<td><code>journal:NAME</code></td>
+<td>that journal's entries, as above</td>
+</tr>
+<tr>
+<td><code>code:SPACE</code></td>
+<td>that space's output, run on its own default input</td>
+</tr>
+<tr>
+<td><code>-</code> (CLI)</td>
+<td>standard input, <strong>raw</strong>: one <code>text</code> column holding the bytes as text, nothing parsed (see <a href="#parsers">Parsers</a>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="steps">Steps</h2>
+<ul>
+<li><code>code:SPACE</code> (or a space name): runs the space over the frame; its result becomes the
+frame: a table's columns, a chart's x and lines, text as a <code>text</code> column (tiles: the
+first table or chart). Each run is approved like any run and recorded as <code>code.run</code>
+with where its input came from.</li>
+<li><code>search:NAME</code>: keeps the rows matching the search's text (over the row's values) and,
+for a records search, its conditions.</li>
+<li><code>project:NAME[/JOURNAL]</code>, <code>org:ORG[/JOURNAL]</code>, <code>net[:EXCHANGE|all][/JOURNAL]</code>: saves the
+frame as an entry in a journal (default <code>Pipe output</code>; on the network <code>Shared pipe output</code>) kept in the project, given to the
+organization, or shared on the network; the data flows on.</li>
+<li><code>journal:NAME</code>, <code>model:NAME</code>: <strong>saves</strong> (like <code>tee</code>): the frame goes into a new journal
+entry (a Markdown table, with the pipe that made it) or becomes new records of the model
+(columns named like its fields), and <strong>flows on unchanged</strong>. Save at any step, as often
+as you like; <code>--to</code> saves the final output.</li>
+</ul>
+<p>A code space may appear once per pipe, and a default input that leads back to itself is
+refused (a cycle). Every pipe is recorded as <code>pipe.run</code> with its hops and saves.</p>
+<p>Muninn does not define the structure of incoming data: sources hand on what they have
+(records and entries as their fields, standard input as raw text), and every shape after
+that, a table, bars, anything, is made by a code space step.</p>
+<h2 id="parsers">Parsers</h2>
+<p>Parsing is a code space's job, placed as a step. Built-in parser code spaces ship as
+templates (Rust, through the SDK), not as code in Muninn:</p>
+<table>
+<thead>
+<tr>
+<th>built-in</th>
+<th>does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>parse-csv</code></td>
+<td>raw text → rows: CSV with a header line, quotes as usual, numbers as numbers</td>
+</tr>
+<tr>
+<td><code>parse-json</code></td>
+<td>raw text → rows: a JSON array of objects (or one object)</td>
+</tr>
+<tr>
+<td><code>parse-ndjson</code></td>
+<td>raw text → rows: one JSON object a line</td>
+</tr>
+<tr>
+<td><code>to-bars</code></td>
+<td>rows → price bars (<code>timestamp open high low close volume</code>) by column names</td>
+</tr>
+</tbody>
+</table>
+<p><code>mnnn code parsers</code> lists them, <code>--install</code> makes them code spaces, <code>--show NAME</code> prints
+one; <code>mnnn code create mine --from parse-csv</code> starts your own from a copy. Installed, they
+are ordinary code spaces: view, edit, share them; like any code they run once approved.</p>
+<h2 id="standard-input-and-live-runs">Standard input and live runs</h2>
+<pre><code>cat trades.csv | mnnn pipe - code:parse-csv code:fast --to model:trades
+cat trades.csv | mnnn pipe - --format csv code:fast --to model:trades   # the same
+tail -f feed.ndjson | mnnn pipe - --format ndjson code:fast --chunk 100 --to journal:Feed
+</code></pre>
+<p><code>--format csv|json|ndjson</code> is a convenience: it installs the built-in parser if there is
+none of that name and puts it first, a visible <code>code:parse-…</code> step in the pipe, its hops
+and its history like any other. <code>--chunk N</code> runs the pipe on every N lines as they arrive
+(<code>--keep-header</code> repeats the first line in every chunk, implied by <code>--format csv</code>), so long or endless input flows through. Every pipe records <code>pipe.start</code>, a
+<code>pipe.hop</code> per node (rows, columns, ms, status, error) and <code>pipe.run</code>, as it goes. A TUI
+open on the same home shows them live in <strong>Projects ▸ Pipes (live)…</strong>: each pipe with
+its status and origin, and the selected one's nodes with rows, time and errors; the
+status line says when one finishes or fails. Nothing to install and no daemon: the TUI
+reads the history on every tick.</p>
+<h2 id="share-and-the-tui">Share and the TUI</h2>
+<p>Sharing data (a model, any live search, a journal, a code space's output) to a code space
+runs the space over it (<a href="/docs/share/">share</a>); the space is not changed. In the TUI the
+editor then shows <code>piped in: …</code> (<code>x</code> goes back to the default input), and <code>&gt;</code> pipes the
+result on: into another code space (which opens and runs over it) or saved to a journal
+or model, staying where you are so you can keep piping.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/pipes.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

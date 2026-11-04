@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Key exchanges · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a class="current" aria-current="page" href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="key-exchanges">Key exchanges</h1>
+<p>Two nodes share data only over a completed key exchange: an authenticated X25519
+Diffie-Hellman between their Ed25519 node identities. <strong>The nodes do it on their own.</strong>
+You connect, apply, invite, join a review or share; what you see is the action and where
+it stands: <em>pending</em>, <em>requested</em>, <em>connected</em>, <em>ended</em> or <em>failed</em>.</p>
+<h2 id="what-you-do">What you do</h2>
+<table>
+<thead>
+<tr>
+<th>You want to</th>
+<th>CLI</th>
+<th>TUI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Connect to a node</td>
+<td><code>mnnn net connect ADDR|PEER|NAME</code></td>
+<td>Net ▸ Nodes, <code>c</code></td>
+</tr>
+<tr>
+<td>Invite a node</td>
+<td><code>mnnn invite create</code> or <code>mnnn net invite</code> (prints <code>muninn://join/…</code>)</td>
+<td>Net ▸ Invites, <code>n</code></td>
+</tr>
+<tr>
+<td>Use an invite link</td>
+<td><code>mnnn invite accept LINK</code> or <code>mnnn net connect LINK</code></td>
+<td>Invites, <code>p</code> (paste)</td>
+</tr>
+<tr>
+<td>See requests</td>
+<td><code>mnnn invite list</code>, <code>mnnn net requests</code></td>
+<td>Invites, or Nodes: rows marked <em>requested</em></td>
+</tr>
+<tr>
+<td>Accept / decline</td>
+<td><code>mnnn net accept X</code>, <code>mnnn net decline X</code></td>
+<td><code>a</code> / <code>d</code> on a request</td>
+</tr>
+<tr>
+<td>Disconnect</td>
+<td><code>mnnn net disconnect X</code></td>
+<td><code>r</code>, then <code>y</code></td>
+</tr>
+</tbody>
+</table>
+<p>The same happens for <a href="/docs/organizations/">organizations</a> (apply, invite, join with a
+link or by the org's name) and <a href="/docs/reviews/">reviews</a> (join with a link, by title, or
+by accepting the invitation that arrived).</p>
+<ul>
+<li>A node you were already connected to (its key is pinned here), or one you asked
+first, is connected <strong>at once</strong>.</li>
+<li>Anyone else <strong>asks first</strong>: their request waits for your <em>accept</em> or <em>decline</em>. With
+<code>mnnn net config --accept anyone</code> (TUI: Settings ▸ <em>connect at once</em>) every node is
+connected at once; the default is <code>known</code>.</li>
+<li>Joining an org or a review still needs the owner's or author's yes where it did
+before; the keys never need anything from you.</li>
+<li>Nothing is shared by connecting: you still choose what to <a href="/docs/network/#sharing">share</a>.</li>
+</ul>
+<p>An invite link holds only public keys, addresses and a signature, so it is safe to
+send by mail or chat. It is single-use, expires after 7 days, and is revoked with
+<code>mnnn net disconnect</code> (or <code>mnnn org kick</code>, <code>mnnn review drop</code>). When the other node
+cannot be reached at that moment, the answer is kept and delivered on its own once it
+can be (the running node retries every 20 seconds).</p>
+<h2 id="who-is-who-trust-on-first-use">Who is who: trust on first use</h2>
+<p>A node is its Ed25519 key. Its peer id is a hash of that key, and libp2p's Noise
+handshake proves the other end holds it, so a connection to <code>12D3KooW…</code> cannot be
+answered by anyone else.</p>
+<ul>
+<li><strong>Pinned on first contact.</strong> The first completed exchange pins the node's key to the
+name you know it by. Later connects, shares, org syncs and review syncs go to that
+pinned node; a name resolves to the pinned peer before anything else.</li>
+<li><strong>Signed links.</strong> Every offer and answer is signed by the node key and bound to the
+exchange transcript; a tampered, replayed or expired link is refused.</li>
+<li><strong>A changed key is a different node.</strong> When a node with a new key uses a name you
+already know, you are warned (<code>warning: … is not the node you know as ben</code>) and it
+is treated as a stranger: it has to ask, and nothing shared with the known one
+reaches it.</li>
+<li><strong>Checking by hand</strong> stays possible: both sides still derive the same short code,
+shown by <code>mnnn net exchange show X</code>, and <code>mnnn net exchange verify X CODE</code> marks
+the exchange verified.</li>
+</ul>
+<h2 id="the-protocol">The protocol</h2>
+<pre><code class="language-text">offer      = {node key, X25519 public A, addrs, scope, expiry}  signed by the offerer
+answer     = {node key, X25519 public B, offer hash, addrs}      signed by the answerer
+transcript = SHA-256(&quot;muninn/net/exchange/v1&quot; ‖ offer ‖ answer)
+key        = HKDF-SHA256(X25519(a, B), salt = transcript, info = &quot;muninn/net/exchange/v1/key&quot;)
+short code = HKDF(…, info = &quot;…/sas&quot;) as ten digits
+fingerprint= first 8 bytes of the transcript, grouped
+</code></pre>
+<p>Offers travel as <code>Connect</code> requests (<code>/muninn/net/1</code>): the other node answers at once
+(<code>Answered</code>) or keeps it as a request; the asking node polls for the answer later.
+Older nodes get the offer as before. Each request over an exchange is sealed with its
+key (aad <code>muninn/net/msg/v1|exchange|from|to</code>), on top of libp2p's Noise channel.
+Scopes are carried in every exchange: <code>{&quot;kind&quot;:&quot;node&quot;}</code>, an organization's, or a
+review's.</p>
+<h2 id="advanced-by-hand">Advanced: by hand</h2>
+<p><code>mnnn net exchange …</code> (hidden from the command list, but always there) does each step
+by hand: <code>create</code> (a token), <code>accept TOKEN</code>, <code>verify X CODE</code>, <code>list</code>, <code>show X [--tokens]</code>, <code>label</code>, <code>revoke</code>. Tokens <code>mnnn-x1-offer:</code> / <code>mnnn-x1-answer:</code> and links
+<code>muninn://join/</code> / <code>muninn://answer/</code> are the same thing in two spellings.</p>
+<h2 id="backups">Backups</h2>
+<p><code>mnnn net exchange export</code> writes the node identity, the exchange keys and known peers
+to an age-encrypted file (your export password). <code>mnnn net exchange restore</code> brings
+them back — on the same machine or a new one, where the node keeps its peer id and its
+exchanges keep working. With it, <a href="/docs/dark-shards/">dark shards</a> can be gathered even
+when the database itself is lost. See <a href="/docs/backup-recovery/">backup and recovery</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/key-exchanges.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

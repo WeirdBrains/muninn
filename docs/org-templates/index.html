@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Org site templates (2.17) · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a class="current" aria-current="page" href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="org-site-templates-217">Org site templates (2.17)</h1>
+<p>A template gives an org's <a href="/docs/org-hosting/">site</a> its look: an HTML page, a stylesheet and
+files (images, fonts, scripts) served under <code>assets/</code>. Since 2.17 you can write and preview
+templates in the app, build them from a framework (React, Jaspr, …), and other nodes hear
+when your site opens.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>CLI</th>
+<th>TUI (Orgs ▸ Templates, <code>7</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>List</td>
+<td><code>mnnn org template list ORG</code></td>
+<td>the page</td>
+</tr>
+<tr>
+<td>Show</td>
+<td><code>mnnn org template show ORG T [--json]</code></td>
+<td>the page shows the selected one's files and build step</td>
+</tr>
+<tr>
+<td>New / edit HTML</td>
+<td><code>mnnn org template edit ORG T</code> (opens <code>$VISUAL</code> / <code>$EDITOR</code>; a new name starts from the built-in look)</td>
+<td><code>n</code> new, <code>e</code> / Enter edit</td>
+</tr>
+<tr>
+<td>Edit CSS</td>
+<td><code>mnnn org template edit ORG T --css</code></td>
+<td><code>c</code></td>
+</tr>
+<tr>
+<td>Save from files</td>
+<td><code>mnnn org template save ORG T --html FILE [--css FILE] [--use]</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Files</td>
+<td><code>mnnn org template asset ORG T FILE [--name N]</code>, <code>… asset ORG T NAME --remove</code></td>
+<td><code>a</code> add (<code>PATH [NAME]</code>), <code>x</code> remove</td>
+</tr>
+<tr>
+<td>Use it for the site</td>
+<td><code>mnnn org edit ORG --template T</code> (or <code>save --use</code>)</td>
+<td><code>u</code> (again: back to the built-in look)</td>
+</tr>
+<tr>
+<td>Preview</td>
+<td><code>mnnn org template preview ORG T</code></td>
+<td><code>p</code>, or Ctrl-P while editing</td>
+</tr>
+<tr>
+<td>Build step</td>
+<td><code>mnnn org template build ORG T --cmd CMD [--src DIR] [--out DIR] [--no-run]</code>, <code>--clear</code></td>
+<td><code>b</code> (<code>FOLDER | COMMAND [| OUTPUT]</code>, or <code>clear</code>), <code>B</code> runs it</td>
+</tr>
+<tr>
+<td>Remove</td>
+<td><code>mnnn org template remove ORG T</code></td>
+<td><code>d</code></td>
+</tr>
+</tbody>
+</table>
+<p>All of it needs <code>publish</code> in the org. Every change is in the <a href="/docs/history/">history</a>
+(<code>org.template.save</code>, <code>.asset</code>, <code>.asset_remove</code>, <code>.build_set</code>, <code>.build</code>, <code>.preview</code>, <code>.remove</code>).</p>
+<h2 id="placeholders">Placeholders</h2>
+<p>A template fills <code>{{title}}</code>, <code>{{org.name}}</code>, <code>{{org.description}}</code>, <code>{{org.slug}}</code>,
+<code>{{base}}</code> (the site's address), <code>{{assets}}</code> (where its files are, ending in <code>/</code>),
+<code>{{css}}</code> (the stylesheet, to put in a <code>&lt;style&gt;</code>) and <code>{{content}}</code> (the page, already
+HTML). Everything but the content is escaped.</p>
+<h2 id="editing-in-the-tui">Editing in the TUI</h2>
+<p><code>e</code> (HTML) or <code>c</code> (CSS) opens the template in the window's editor: arrows, Home/End,
+PgUp/PgDn, Tab indents. <strong>Ctrl-S</strong> saves, <strong>Ctrl-P</strong> makes a preview link, <strong>Esc</strong> leaves
+(with unsaved changes, Esc once warns and Esc again leaves without saving).</p>
+<h2 id="previews">Previews</h2>
+<p>A preview shows the org's page through a template, whether or not the org uses it or is
+hosted yet, at <code>/o/SLUG/_preview/TOKEN/</code> on the local site (with its files under
+<code>…/TOKEN/assets/</code>). The page is rendered again on every load, so save and reload to see an
+edit. A preview:</p>
+<ul>
+<li>lasts <strong>an hour</strong>; make a new one after that;</li>
+<li>shows <strong>public artifacts only</strong>, whatever you could see yourself;</li>
+<li>is reached by its token alone: anyone with the link and access to the site can open it
+while it lasts, so share it as you would a draft.</li>
+</ul>
+<p>If the site is not running, the command prints the path; <code>mnnn org host start</code> (or <code>S</code> on
+the Site page) serves it.</p>
+<h2 id="build-steps">Build steps</h2>
+<p>A compiled template (React, Jaspr, Svelte, …) can be built by Muninn:</p>
+<pre><code class="language-sh">mnnn org template build comet-lab site --cmd &quot;npm ci &amp;&amp; npm run build&quot; --src ~/sites/comet --out dist
+</code></pre>
+<ul>
+<li>The source folder is <strong>copied to a scratch folder</strong> (without <code>.git</code>) and the command runs
+there with <code>sh -c</code> (<code>cmd /C</code> on Windows); your folder is never changed.</li>
+<li>The output folder (default <code>build</code>) must have an <code>index.html</code>; it becomes the template's
+HTML. A <code>style.css</code> becomes its CSS; every other file becomes one of its files, by its
+path (<code>img/logo.png</code>), and the old files are replaced. The output may be up to 64 MB.</li>
+<li>The command's output is shown (its last 40 lines); a failing command changes nothing.</li>
+<li>An <code>index.html</code> without <code>{{content}}</code> builds, with a warning: such a page shows only the
+template.</li>
+</ul>
+<p><strong>Consent.</strong> A build runs only after the person at this node approved that exact command,
+source folder and output folder for that template: the CLI asks (<code>--yes</code> answers), the TUI
+asks <code>y/n</code>. Any change to the three asks again. Approvals are kept on this node only and
+never sync, so a build step set on another of your nodes, or by another member, never runs
+here without being approved here. The build step itself (command and folders) syncs with
+the template; the source folder must exist on the node that builds.</p>
+<h2 id="announcing-the-site">Announcing the site</h2>
+<p>When the site starts (<code>mnnn org host start</code>, the node's autostart, or <code>S</code> in the TUI),
+Muninn tells others where it is and what it serves; when it stops, that it closed.
+<code>mnnn org announce [ORG] [--closed]</code> (or <code>A</code> on the Site page) announces again.</p>
+<ul>
+<li><strong>Who hears it:</strong> the org's members' nodes (their membership exchanges with this node),
+your own linked nodes, and, <strong>for public orgs only</strong>, your connections.</li>
+<li><strong>What they hear:</strong> the org's name, slug, description, visibility, whether the site is
+gated, its addresses and its public artifacts (<code>journal: Field notes</code>), open or closed.</li>
+<li><strong>Addresses:</strong> the org's domains, then <code>https://HOST:PORT/o/SLUG/</code> for each external
+address (<code>mnnn net external</code>), each <code>[hosting] names</code> entry and a non-loopback bind
+address. A site bound to <code>127.0.0.1</code> with none of these is only reachable from this
+machine, so it is not announced (you are told why).</li>
+<li>Announcing is best effort: unreachable nodes are listed and skipped.</li>
+</ul>
+<p>What others announced to this node: <code>mnnn org sites [--all] [--json]</code> and the Site page
+(open ones; <code>--all</code> adds closed ones). A node accepts an announcement only over an exchange
+that may carry it: a membership of that org, a node link, or a connection for a public org.
+Text is clipped and only <code>https://</code> addresses are kept.</p>
+<h2 id="decisions">Decisions</h2>
+<p>Choices made for 2.17 where the plan left room:</p>
+<ul>
+<li>Build approvals are a hash of command + source + output folder, per template and per
+node; nothing approves builds for other nodes.</li>
+<li>Builds copy the source to a scratch folder instead of running in place, so a build can't
+change your working tree, and the output replaces the template's files wholesale.</li>
+<li>Previews use an unguessable, expiring token on the local site rather than a member
+sign-in, so they work before the org is hosted; they show public artifacts only.</li>
+<li>Announcements reuse existing key exchanges (no new discovery) and go to connections only
+for public orgs, so a private org's existence is never told to people outside it.</li>
+<li>The TUI edits templates in its own editor; the CLI uses <code>$VISUAL</code> / <code>$EDITOR</code>.</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/org-templates.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

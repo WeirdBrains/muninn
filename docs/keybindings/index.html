@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Keybindings · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a class="current" aria-current="page" href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="keybindings">Keybindings</h1>
+<p>Every key runs the same named action as its <a href="/docs/menus/">menu</a> item.</p>
+<h2 id="everywhere">Everywhere</h2>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F10</td>
+<td>open the menu bar</td>
+</tr>
+<tr>
+<td>Alt+F/V/D/P/K/T/H</td>
+<td>open File / View / Data / Projects / Keys / Theme / Help</td>
+</tr>
+<tr>
+<td><code>?</code>, F1</td>
+<td>help for the current context (<a href="/docs/help/">in-app help</a>)</td>
+</tr>
+<tr>
+<td>F5</td>
+<td>refresh data</td>
+</tr>
+<tr>
+<td>Tab / Shift-Tab</td>
+<td>focus the next / previous tile</td>
+</tr>
+<tr>
+<td>Alt-1 … Alt-9</td>
+<td>focus tile [1] … [9]</td>
+</tr>
+<tr>
+<td>q</td>
+<td>quit (when no dialog is open and you are not typing)</td>
+</tr>
+<tr>
+<td>Ctrl-C</td>
+<td>quit</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>close the open menu or dialog</td>
+</tr>
+<tr>
+<td>S</td>
+<td>share the selected item of a window (<a href="/docs/share/">share</a>)</td>
+</tr>
+<tr>
+<td>click a key in a hint</td>
+<td>the same as pressing it (<code>[x label]</code> buttons, <code>q quit</code>, <code>y confirms</code>, <code>(Ctrl-T switches)</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="dialogs">Dialogs</h2>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>↑ ↓</td>
+<td>select a field or action</td>
+</tr>
+<tr>
+<td>Enter</td>
+<td>edit the field / run the action</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>stop editing, then close</td>
+</tr>
+</tbody>
+</table>
+<h2 id="tiles">Tiles</h2>
+<p>Window commands are <code>Ctrl-w</code> followed by a key: <code>v</code> split right, <code>s</code> split below,
+<code>q</code> close, <code>h j k l</code> focus, <code>Tab</code> next, <code>W</code> or <code>p</code> previous, <code>&lt; &gt; + -</code> resize, <code>=</code> equalize, <code>x</code> swap,
+<code>z</code> zoom, <code>t</code> list ↔ chart, <code>e</code> new-tile direction, <code>y</code> link. See <a href="/docs/tiling/">tiling</a>.</p>
+<table>
+<thead>
+<tr>
+<th>key (list tile)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>↑ ↓ j k PgUp PgDn Home End</td>
+<td>move</td>
+</tr>
+<tr>
+<td><code>s</code> / <code>S</code></td>
+<td>next / previous sort column</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>reverse sort</td>
+</tr>
+<tr>
+<td><code>[</code> / <code>]</code> / <code>\</code></td>
+<td>list range from / to (date and time picker) / clear</td>
+</tr>
+<tr>
+<td><code>,</code> / <code>.</code></td>
+<td>previous / next series</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>key (chart tile)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>c b n a e v m w g z # x y t</code></td>
+<td>toggle a layer (<a href="/docs/charts/">charts</a>)</td>
+</tr>
+<tr>
+<td><code>L</code></td>
+<td>layer menu</td>
+</tr>
+<tr>
+<td><code>N</code> / <code>M</code></td>
+<td>line metric / moving averages</td>
+</tr>
+<tr>
+<td><code>h</code> <code>l</code>, PgUp PgDn</td>
+<td>pan a quarter / a full screen</td>
+</tr>
+<tr>
+<td><code>+</code> <code>-</code></td>
+<td>zoom in / out</td>
+</tr>
+<tr>
+<td>← →</td>
+<td>move the crosshair</td>
+</tr>
+<tr>
+<td><code>[</code> <code>]</code></td>
+<td>period start / end (date and time picker)</td>
+</tr>
+<tr>
+<td><code>{</code> <code>}</code> <code>@</code></td>
+<td>type start / type end / jump to date</td>
+</tr>
+<tr>
+<td>Home / End, <code>0</code></td>
+<td>first bars / latest (live)</td>
+</tr>
+<tr>
+<td><code>,</code> / <code>.</code></td>
+<td>previous / next series</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>key (data tile: a code result or pipeline view)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>t</code></td>
+<td>chart ↔ table</td>
+</tr>
+<tr>
+<td><code>c</code></td>
+<td>columns (table) or series (chart) to show, comma separated</td>
+</tr>
+<tr>
+<td>↑ ↓ j k</td>
+<td>scroll the table</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>key (pipeline monitor tile)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>↑ ↓ j k</td>
+<td>select a node</td>
+</tr>
+<tr>
+<td>Enter</td>
+<td>open the node: a view or code space as its tile, else its details</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>run the pipeline (on a thread)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="sidebar">Sidebar</h2>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Ctrl-b</code></td>
+<td>show / hide the <a href="/docs/sidebar/">sidebar</a></td>
+</tr>
+<tr>
+<td><code>/</code></td>
+<td>search series</td>
+</tr>
+<tr>
+<td><code>o</code></td>
+<td>toggle sort order</td>
+</tr>
+<tr>
+<td><code>X</code></td>
+<td>clear filters</td>
+</tr>
+<tr>
+<td><code>T</code></td>
+<td>time range for every view (date and time picker: from, then to)</td>
+</tr>
+<tr>
+<td><code>s</code>, <code>f m p d y</code>, <code>t</code>, Enter</td>
+<td>sort key, filter editors (source, symbol, price, period, year), time range, assign (sidebar focused)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="history-and-authors">History and authors</h2>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Y</code></td>
+<td>show and focus / hide the <a href="/docs/history/">history</a> bar</td>
+</tr>
+<tr>
+<td><code>u</code> / <code>U</code></td>
+<td>step back / forward in the history</td>
+</tr>
+<tr>
+<td><code>j k</code>, Enter, Esc</td>
+<td>move, go to the action, leave (history bar focused)</td>
+</tr>
+<tr>
+<td><code>A</code></td>
+<td>the <a href="/docs/authors/">authors</a> popup (<code>a</code> add, <code>e</code> edit, <code>d</code> delete, Enter current)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="projects-live-searches-and-journals">Projects, live searches and journals</h2>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>P</code></td>
+<td>the <a href="/docs/projects/">projects</a> page</td>
+</tr>
+<tr>
+<td><code>F</code></td>
+<td>the <a href="/docs/live-searches/">live searches</a> list</td>
+</tr>
+<tr>
+<td><code>B</code></td>
+<td>save the sidebar's search as a live search</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td>the Pipeline Designer (<a href="/docs/pipelines/">pipelines</a>)</td>
+</tr>
+<tr>
+<td><code>J</code></td>
+<td>the <a href="/docs/journals/">journals</a> list</td>
+</tr>
+<tr>
+<td><code>O</code></td>
+<td>the <a href="/docs/reports/">reports</a> list</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>the <a href="/docs/rules/">rules</a> window (<code>n</code> new, <code>e</code> edit, Space on/off, <code>t</code> test, <code>x</code> dry run)</td>
+</tr>
+<tr>
+<td><code>D</code></td>
+<td>the <a href="/docs/models/">model designer</a></td>
+</tr>
+<tr>
+<td><code>C</code></td>
+<td>the <a href="/docs/code-spaces/">code spaces</a> window (<code>n</code> new, Enter edit, <code>r</code> run)</td>
+</tr>
+<tr>
+<td><code>K</code></td>
+<td>the <a href="/docs/network/">network</a> window (node status first)</td>
+</tr>
+<tr>
+<td><code>G</code></td>
+<td>the <a href="/docs/organizations/">organizations</a> window</td>
+</tr>
+<tr>
+<td><code>V</code></td>
+<td>the <a href="/docs/reviews/">reviews</a> window</td>
+</tr>
+<tr>
+<td><code>!</code></td>
+<td>the <a href="/docs/notifications/">notifications</a> window (or click the header bell)</td>
+</tr>
+<tr>
+<td><code>W</code></td>
+<td>the <a href="/docs/collaboration/">peers</a> window: peers, messages and live sessions</td>
+</tr>
+<tr>
+<td><code>a</code></td>
+<td>add the selected series to a project (sidebar focused)</td>
+</tr>
+</tbody>
+</table>
+<p>Inside them: <code>n</code> new, <code>r</code> rename, <code>d</code> delete (<code>y</code> confirms), <code>f</code> fork, <code>p</code> add to a
+project, Enter open, Esc back. In an entry: <code>r</code> rendered ↔ Markdown source, ← → move by word, <code>v</code> select, <code>m</code>
+highlight, <code>n</code> note, <code>i</code> image; the editor saves with Ctrl-S and switches Markdown ↔
+LaTeX with Ctrl-T. <code>E</code> exports (journals, entries, reports, projects) and <code>P</code> prints
+(journals, entries); <code>I</code> in the projects list imports an archive; in a report <code>a</code> adds a section, <code>J</code> / <code>K</code> move it, <code>v</code> previews.
+In the model designer: <code>m</code> design, <code>r</code> records, <code>h</code> history, <code>f</code> rules; in the design
+<code>a</code> add, <code>e</code> edit, <code>x</code> drop, <code>u</code> undo, <code>K</code> / <code>J</code> move, <code>A</code> apply, <code>z</code> discard; in history
+<code>b</code> rolls back; in records <code>w</code> where, <code>/</code> text, <code>s</code> sort, <code>g</code> group, <code>U</code> / <code>D</code> update /
+delete all matching.
+In the network window: Tab / ← → / <code>1</code>–<code>9</code>, <code>0</code> change page, <code>S</code> start and <code>X</code> stop the
+node, <code>g</code> refresh; Peers <code>c</code> connect, <code>l</code> label, <code>d</code> forget; Relays <code>a</code> add, <code>d</code> remove,
+<code>r</code> serve; Connections Enter shows a user's nodes, <code>t</code> trust or untrust, <code>d</code> forget;
+Invites <code>n</code> invite link, <code>p</code> paste a link, <code>a</code> accept and <code>d</code> decline a request, <code>r</code>
+withdraw an invite; Nodes <code>c</code> connect, <code>a</code> accept and <code>d</code> decline a request, <code>n</code> invite
+link, <code>p</code> paste a link, <code>s</code> share, <code>L</code> their items (Enter imports), <code>l</code> label, <code>r</code>
+disconnect (<code>v</code> checks a short code by hand); Shared <code>a</code> share, <code>d</code> unshare; Dark shards
+<code>e</code> entrust or check (Space picks nodes), <code>d</code> drop a held shard; Search Enter runs a saved search across peers; Settings
+Enter edits or toggles.
+In the organizations window: Tab / ← → / <code>1</code>–<code>7</code> change page, <code>g</code> refresh; Orgs <code>n</code> new,
+Enter pick, <code>r</code> rename, <code>v</code> visibility, <code>o</code> access, <code>h</code> hosted, <code>m</code> member sign-in, <code>d</code>
+delete; Members <code>i</code> invite, Enter details, <code>a</code> approve, <code>x</code> reject, <code>o</code> role, <code>k</code> kick;
+Roles <code>n</code> new, <code>e</code> / Enter permissions, <code>P</code> all permissions, <code>a</code> / <code>i</code> apply / invite
+default, <code>d</code> remove; Resources <code>a</code> add, <code>p</code> / Enter publish, <code>z</code> archive, <code>d</code> release;
+Joined <code>b</code> browse, <code>A</code> apply, <code>j</code> join, <code>s</code> sync, <code>m</code> mirror, <code>l</code> leave; Site <code>S</code> / Enter
+start or stop, <code>X</code> stop, <code>A</code> announce, <code>e</code> ACME; Templates <code>n</code> new, <code>e</code> / Enter edit HTML,
+<code>c</code> edit CSS (Ctrl-S save, Ctrl-P preview, Esc leave), <code>a</code> add file, <code>x</code> remove file, <code>b</code>
+build step, <code>B</code> build, <code>p</code> preview, <code>u</code> use, <code>d</code> delete.
+In the reviews window: <code>1</code>–<code>3</code> / Tab / ← → change page, <code>g</code> refresh; My reviews <code>n</code>
+new, Enter thread, <code>i</code> link, <code>p</code> view, <code>H</code> revisions, <code>o</code> close / reopen, <code>d</code> delete;
+Thread <code>c</code> comment, <code>e</code> suggest, <code>h</code> highlight, <code>v</code> vote, <code>r</code> reply, <code>a</code> / <code>x</code> accept /
+reject, <code>A</code> / <code>X</code> all, <code>m</code> merge, <code>F</code> force, <code>w</code> withdraw, <code>D</code> drop; Reviewing <code>j</code> join,
+Enter view, <code>s</code> sync, <code>l</code> leave (<a href="/docs/reviews/">reviews</a>).
+In a code space's editor: <code>e</code> edits the source (Esc stops), <code>s</code> / Ctrl-S saves, <code>b</code>
+builds, <code>r</code> / Ctrl-R runs, <code>c</code> checks, <code>i</code> sets the input, <code>t</code> widens the result tile.
+Full tables: <a href="/docs/code-spaces/">code spaces</a>, <a href="/docs/models/">models</a>, <a href="/docs/live-searches/">live searches</a>,
+<a href="/docs/projects/">projects</a>, <a href="/docs/journals/">journals</a>, <a href="/docs/reports/">reports</a>, <a href="/docs/rules/">rules</a>,
+<a href="/docs/export-formats/">export formats</a>.</p>
+<h2 id="import">Import</h2>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>i</code></td>
+<td>open the <a href="/docs/import/">import</a> popup</td>
+</tr>
+<tr>
+<td>Space, <code>a</code>, <code>.</code>, <code>/</code>, Tab</td>
+<td>select, whole folder, hidden, filter, path completion (in the popup)</td>
+</tr>
+<tr>
+<td>Esc, <code>c</code>, [Cancel]</td>
+<td>cancel a running import (asks first; <code>y</code>/<code>n</code>)</td>
+</tr>
+<tr>
+<td><code>p</code>, <code>1</code>–<code>9</code>, <code>b</code></td>
+<td>places column, jump to a place, bookmark the folder (in the popup)</td>
+</tr>
+<tr>
+<td>Tab / Shift-Tab</td>
+<td>path input: complete, list, then cycle candidates; Esc reverts</td>
+</tr>
+<tr>
+<td>click [X]</td>
+<td>close any popup (during an import: asks to cancel)</td>
+</tr>
+</tbody>
+</table>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/keybindings.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

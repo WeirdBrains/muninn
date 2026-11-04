@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Pipelines · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a class="current" aria-current="page" href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="pipelines">Pipelines</h1>
+<p>Status: the pipe layer (<a href="/docs/pipes/">pipes</a>) and the Pipeline object ship: storage with
+versions, the DAG run (fan-out, fan-in with named inputs, every leaf a model table),
+validation, <code>mnnn pipeline create|edit|show|list|run|remove|export|import</code> and history
+records, the Designer window, the Monitor tile, views as tiles, and pipelines over
+Share and <code>net</code> (peer pipelines arrive as drafts).</p>
+<pre><code class="language-sh">mnnn pipeline create flow --node src=search:usdt --node a=code:fast --node b=code:slow \
+  --node fa=model:Fast --node sb=model:Slow --edge 'src&gt;a&gt;fa' --edge 'src&gt;b&gt;sb'
+mnnn pipeline show flow        # in order, with anything wrong marked !
+mnnn pipeline run flow         # asks to approve new code first
+cat trades.csv | mnnn pipeline run feed - --chunk 500 --keep-header   # feed: in=- &gt; c=code:parse-csv &gt; …
+mnnn pipeline export flow --out flow.json
+mnnn pipeline import flow.json --dry-run      # the plan; then without --dry-run
+</code></pre>
+<p>Nodes are <code>ID=KIND</code>: <code>search:NAME</code>, <code>journal:NAME</code>, <code>source:QUERY</code> or <code>-</code> (stdin, raw
+text: follow it with a parser node such as <code>code:parse-csv</code>, see <a href="/docs/pipes/#parsers">pipes</a>) as
+sources; <code>code:SPACE</code>; <code>view:table|chart[:col,col]</code>; <code>filter:SEARCH</code>; <code>model:NAME</code>.
+Saves along the way: <code>raw=code:fast+journal:Raw</code>. Edges are <code>FROM&gt;TO[:NAME]</code> and chain
+(<code>a&gt;b&gt;c</code>); a code space with several inputs reads <code>host.input()</code> (the first) or
+<code>host.input_named(&quot;NAME&quot;)</code> and <code>host.inputs()</code> (the names); a math space writes
+<code>NAME.field</code>. A node that fails marks
+those downstream <code>skipped</code>; an unapproved space is <code>waiting approval</code>; the rest still run.
+<code>pipeline edit</code> adds or replaces nodes and edges (<code>--remove-node</code>, <code>--remove-edge</code>); a
+changed graph is a new version.</p>
+<p>The file (<code>format: muninn-pipeline</code>, <code>version: 1</code>) holds the graph, each code space's
+lang, source and trust hash (a source that does not match its hash is refused), and the
+sink models by name with their templates (<code>--no-templates</code> leaves them out). Import plans
+first: a code space already here with the same hash is used as is, different code of the
+same name lands as <code>NAME (imported)</code>, new code is created unapproved; missing models are
+created from their templates; a pipeline name clash is refused unless <code>--name OTHER</code> or
+<code>--merge</code> (a new version); missing sources are listed as problems.</p>
+<p>Share a pipeline (<code>mnnn share pipeline NAME project|journal|net …</code>, or <code>S</code> in the
+Designer) like anything else. A peer fetching it with <code>mnnn net fetch … --import</code> gets the
+same file and the same plan, but as a <strong>draft</strong>: it does not run, and the models it makes
+are drafts too, until <code>mnnn pipeline approve NAME</code> (or <code>A</code> in the Designer); its code
+spaces still need their own approval when it first runs.</p>
+<h2 id="principles">Principles</h2>
+<ul>
+<li><strong>Code spaces work on data; they do not own it.</strong> A code space is a stateless
+transform (frames in, a result out). A stored default input is a convenience only.</li>
+<li><strong>A pipeline is a graph (DAG), not a chain.</strong> Nodes and edges. A node's output is
+computed once and broadcast to every node downstream of it (fan-out); a node may take
+several upstreams (fan-in).</li>
+<li><strong>Every leaf is a model table.</strong> Pipelines run between sources, views and code spaces
+and terminate in model tables; there may be several. The designer asks for each leaf's
+model (or creates it from the columns arriving).</li>
+<li><strong>Saves are side branches.</strong> Tees (journal, project, org, network, another model) save
+what passes; the stream keeps flowing. A node may have several.</li>
+<li><strong>Nothing is hidden.</strong> Every run, node and save is recorded in the history; pipelines are
+versioned, exportable and shareable like model templates, and code in them is approved.</li>
+</ul>
+<h2 id="the-object">The object</h2>
+<pre><code>Pipeline { id, name, version, nodes: [Node], edges: [Edge], author, times }
+Node  { id, kind, config, tees: [Tee] }
+kind  = source(stdin | search:NAME | model query | journal:NAME | net:…)
+      | code(SPACE)               # a transform
+      | view(chart | table, columns, x)   # shows what passes, passes it on
+      | filter(search:NAME)       # keeps the rows a search matches
+      | sink(model:NAME)          # a leaf: rows land in this model table
+Edge  { from, to, as: NAME? }     # `as` names the input on fan-in
+Tee   = journal | project | org | net | model
+</code></pre>
+<p>Stored in <code>pipelines</code> (design JSON) and <code>pipeline_versions</code>, as models are, with drafts.</p>
+<h2 id="fan-out-and-fan-in">Fan-out and fan-in</h2>
+<ul>
+<li><strong>Fan-out</strong>: a node runs once per pipeline run; every edge out of it gets the same frame.</li>
+<li><strong>Fan-in</strong>: a node with several upstreams waits for all of them. Each input is a named
+frame (<code>as</code>, default the upstream node's name); code reads <code>host.input()</code> (the first, or
+the only one) or <code>host.input_named(&quot;NAME&quot;)</code>; <code>host.inputs()</code> lists them. A view shows
+them side by side; a sink takes their rows in order (union by column name).</li>
+</ul>
+<h2 id="validation">Validation</h2>
+<p>At least one source; acyclic (topological order exists); every leaf is a sink model and
+every sink is a leaf; a sink's model must take the columns arriving (missing fields are
+offered as a migration plan, the Model Designer's plan/apply); code nodes are checked as
+<code>mnnn code check</code> does. Unapproved code leaves the pipeline &quot;waiting approval&quot;, not
+invalid.</p>
+<h2 id="running">Running</h2>
+<p>Nodes run in topological order; independent branches may run as soon as their inputs are
+ready. Each node records a hop (status idle, running, error or waiting approval; rows in
+and out; ms; error) and the run records rows landed per sink. A CLI run
+(<code>cat data.csv | mnnn pipeline run NAME -</code>, <code>--chunk N</code> to stream) writes hops as it
+goes; an open TUI on the same home sees them on its next tick (history polling, as the
+Pipes window does today: nothing to install, no daemon).</p>
+<h2 id="export-import-and-sharing">Export, import and sharing</h2>
+<p><code>mnnn pipeline export NAME --out FILE</code> writes a versioned template: nodes, edges, view
+configs, code space sources with their trust hashes, and the sink models by name with
+optional embedded model templates. <code>mnnn pipeline import FILE</code> shows a plan first, renames
+or merges on clashes, imports code as unapproved, and can create missing models from the
+embedded templates. Share and <code>net share</code>/<code>net fetch</code> carry pipelines; a peer's arrive as
+drafts to approve, as models do.</p>
+<h2 id="surfaces">Surfaces</h2>
+<ul>
+<li><strong>CLI</strong> (thin): <code>mnnn pipeline create|edit|show|list|run|remove|export|import</code>; the
+graph is edited by node and edge (<code>--node ID=KIND:CONFIG</code>, <code>--edge A&gt;B[:as]</code>).
+<code>mnnn pipe …</code> stays the one-off chain form.</li>
+<li><strong>Designer</strong> (<code>E</code>, Projects ▸ Pipelines…): the list (n new, Enter edit, r run,
+m monitor, x export, i import, d remove) and a pipeline's nodes in run order with what
+each feeds and what is still wrong. <code>a</code> adds a node (<code>ID=KIND</code>), <code>e</code> connects the
+selected node (<code>A&gt;B[:NAME]</code>), <code>t</code> adds a save there, <code>M</code> ends its branch in a model
+table (a new model takes its fields from the columns last seen at that node), <code>D</code>
+removes it, Enter opens its view or code result as a tile. Import shows the plan and
+asks; type <code>PATH as NAME</code> to rename or <code>PATH merge</code> for a new version. Runs go to a
+worker thread.</li>
+<li><strong>Monitor</strong> (TUI tile): the graph while it runs, each node with status, rows in/out,
+throughput, last update and errors, and rows landed per sink; Enter opens a node's
+view or code tile; <code>r</code> runs. See <a href="/docs/tiling/#data-tiles">tiling</a>.</li>
+<li><strong>Views</strong>: running a pipeline, here or on the command line with a TUI open, opens its
+view nodes as tiles side by side (three views: three columns), updated in place by the
+next run or chunk.</li>
+</ul>
+<h2 id="order-of-work">Order of work</h2>
+<ol>
+<li>Pipe layer: sources of every kind, code steps, filters, tees, cycles, history (done).</li>
+<li>Stdin source (raw, parsed by parser code spaces; chunked) and live hop records with the Pipes window (done).</li>
+<li>Pipeline object: storage, DAG run with fan-out/fan-in, validation, CLI, export/import (done).</li>
+<li>Designer window, monitor tile, code space tile with a result chart, views as tiles (done).</li>
+<li>Pipelines over Share and <code>net share</code>/<code>net fetch</code> (peer pipelines as drafts) (done).</li>
+<li>Saves to projects, orgs and the network.</li>
+</ol>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/pipelines.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

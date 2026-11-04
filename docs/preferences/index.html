@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Preferences · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a class="current" aria-current="page" href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="preferences">Preferences</h1>
+<p><code>~/.muninn/preferences.toml</code> is plain, human-editable TOML. It is created with
+defaults on first run:</p>
+<pre><code class="language-toml">[theme]
+name = &quot;tokyo-night&quot;
+mode = &quot;system&quot;
+
+[ingest]
+drop_zero_volume = false
+
+[tui]
+header = &quot;auto&quot;
+sidebar_collapsed = false
+history_open = false
+
+[net]
+label = &quot;&quot;
+port = 4741
+listen = []
+mdns = true
+relay_server = false
+relays = []
+bootstrap = []
+autostart = true
+accept = &quot;known&quot;
+external_addresses = []
+collab_transport = &quot;stream&quot;
+collab_bind = &quot;0.0.0.0&quot;
+collab_port = 4742
+collab_advertise = []
+
+[hosting]
+autostart = false
+</code></pre>
+<p>A <code>version</code> key records the file's format; older files are upgraded on load (2.9 turns
+<code>net.autostart</code> on once, as the new default).</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>default</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>theme.name</code></td>
+<td><code>tokyo-night</code></td>
+<td>active theme folder under <code>themes/</code></td>
+</tr>
+<tr>
+<td><code>theme.mode</code></td>
+<td><code>system</code></td>
+<td><code>light</code>, <code>dark</code> or <code>system</code> (see <a href="/docs/themes/">themes</a>)</td>
+</tr>
+<tr>
+<td><code>ingest.drop_zero_volume</code></td>
+<td><code>false</code></td>
+<td>drop zero-volume bars instead of keeping them flagged</td>
+</tr>
+<tr>
+<td><code>tui.header</code></td>
+<td><code>auto</code></td>
+<td><code>auto</code> (large when the terminal has ≥ 30 rows), <code>compact</code> or <code>large</code> (<a href="/docs/tui/">TUI</a>)</td>
+</tr>
+<tr>
+<td><code>tui.sidebar_collapsed</code></td>
+<td><code>false</code></td>
+<td>start with the sidebar hidden</td>
+</tr>
+<tr>
+<td><code>tui.history_open</code></td>
+<td><code>false</code></td>
+<td>show the <a href="/docs/history/">history</a> bar on the left</td>
+</tr>
+<tr>
+<td><code>tui.sidebar</code></td>
+<td></td>
+<td><a href="/docs/sidebar/">sidebar</a> sort (<code>sort</code>, <code>desc</code>) and <code>filters</code> (sources, durations, years, price metric/min/max)</td>
+</tr>
+<tr>
+<td><code>tui.import_recent</code></td>
+<td><code>[]</code></td>
+<td>recently imported folders (<a href="/docs/import/">import</a>)</td>
+</tr>
+<tr>
+<td><code>tui.import_bookmarks</code></td>
+<td><code>[]</code></td>
+<td>bookmarked import folders (Places)</td>
+</tr>
+<tr>
+<td><code>net.label</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>how the node introduces itself (empty: the current author) (<a href="/docs/network/">network</a>)</td>
+</tr>
+<tr>
+<td><code>net.port</code></td>
+<td><code>4741</code></td>
+<td>TCP and QUIC port (0: any)</td>
+</tr>
+<tr>
+<td><code>net.listen</code></td>
+<td><code>[]</code></td>
+<td>listen addresses replacing all interfaces on <code>port</code></td>
+</tr>
+<tr>
+<td><code>net.mdns</code></td>
+<td><code>true</code></td>
+<td>find peers on the local network while the node runs</td>
+</tr>
+<tr>
+<td><code>net.relay_server</code></td>
+<td><code>false</code></td>
+<td>relay traffic for other nodes</td>
+</tr>
+<tr>
+<td><code>net.relays</code>, <code>net.bootstrap</code></td>
+<td><code>[]</code></td>
+<td>relays to reserve a slot on; nodes to join the wide network through</td>
+</tr>
+<tr>
+<td><code>net.autostart</code></td>
+<td><code>true</code></td>
+<td>start the node when the TUI opens (<code>mnnn net config --autostart off</code>)</td>
+</tr>
+<tr>
+<td><code>net.accept</code></td>
+<td><code>known</code></td>
+<td><code>known</code>: nodes you were never connected to ask first; <code>anyone</code>: connect at once (<a href="/docs/key-exchanges/">key exchanges</a>)</td>
+</tr>
+<tr>
+<td><code>net.collab_transport</code></td>
+<td><code>stream</code></td>
+<td>how <a href="/docs/collaboration/#transports">live collaboration</a> reaches peers: <code>stream</code> (gRPC streams) or <code>poll</code> (requests over the peer connection, for containers); <code>MUNINN_COLLAB_TRANSPORT</code> and <code>--transport</code> override it</td>
+</tr>
+<tr>
+<td><code>net.collab_bind</code></td>
+<td><code>0.0.0.0</code></td>
+<td>where the running node's collaboration stream listener binds</td>
+</tr>
+<tr>
+<td><code>net.collab_port</code></td>
+<td><code>4742</code></td>
+<td>its TCP port (0 picks one); allow it in the firewall, or forward it, for peers outside your network</td>
+</tr>
+<tr>
+<td><code>net.collab_advertise</code></td>
+<td><code>[]</code></td>
+<td>where peers reach the listener from outside (<code>host:port</code>), replacing this node's addresses with <code>collab_port</code></td>
+</tr>
+<tr>
+<td><code>net.external_addresses</code></td>
+<td><code>[]</code></td>
+<td>how other hosts reach this node from outside: <code>host</code>, <code>host:port</code> or a multiaddr, e.g. <code>[&quot;alien.duckdns.org:4741&quot;]</code> after forwarding TCP+UDP 4741 on the router; announced and listed first in invite links (DNS names resolve when dialed)</td>
+</tr>
+<tr>
+<td><code>hosting.autostart</code></td>
+<td><code>false</code></td>
+<td>start the <a href="/docs/org-hosting/">org web server</a> with the node (<code>mnnn org host autostart on</code>)</td>
+</tr>
+<tr>
+<td><code>hosting.bind</code></td>
+<td><code>127.0.0.1</code></td>
+<td>address <a href="/docs/org-hosting/">org sites</a> listen on (<code>0.0.0.0</code> or <code>::</code>: other machines)</td>
+</tr>
+<tr>
+<td><code>hosting.port</code></td>
+<td><code>8443</code></td>
+<td>HTTPS port for pages, JSON and gRPC</td>
+</tr>
+<tr>
+<td><code>hosting.names</code>, <code>hosting.cert_days</code></td>
+<td><code>[]</code>, <code>7</code></td>
+<td>extra self-signed certificate names; its life in days</td>
+</tr>
+<tr>
+<td><code>hosting.acme.enabled</code>, <code>.domain</code>, <code>.email</code></td>
+<td>off</td>
+<td>Let's Encrypt, on with a domain and an email (<code>mnnn org cert acme</code>)</td>
+</tr>
+<tr>
+<td><code>hosting.acme.directory</code>, <code>.profile</code>, <code>.http_port</code></td>
+<td><code>letsencrypt</code>, <code>shortlived</code>, <code>80</code></td>
+<td>the CA, certificate profile and HTTP-01 port</td>
+</tr>
+<tr>
+<td><code>mcp.bind</code></td>
+<td>empty</td>
+<td>where <code>mnnn mcp serve --http</code> listens; empty: <code>127.0.0.1:4743</code>, or <code>0.0.0.0:443</code> with TLS (<a href="/docs/mcp/#https-with-lets-encrypt">MCP</a>)</td>
+</tr>
+<tr>
+<td><code>mcp.acme.enabled</code>, <code>.domain</code>, <code>.email</code>, <code>.directory</code>, <code>.challenge</code>, <code>.http_port</code></td>
+<td>off</td>
+<td>built-in HTTPS for the MCP server with a Let's Encrypt certificate (<code>--tls-domain</code>, <code>--tls-email</code>); same meanings as <code>hosting.acme</code></td>
+</tr>
+<tr>
+<td><code>mcp.tls_cert</code>, <code>mcp.tls_key</code></td>
+<td>empty</td>
+<td>or a certificate chain and key of your own (<code>--tls-cert</code>, <code>--tls-key</code>)</td>
+</tr>
+<tr>
+<td><code>tui.layout</code></td>
+<td>one list tile</td>
+<td>the current <a href="/docs/tiling/">tiling layout</a>, saved on every change</td>
+</tr>
+<tr>
+<td><code>tui.layouts.&lt;name&gt;</code></td>
+<td>none</td>
+<td>named layouts</td>
+</tr>
+</tbody>
+</table>
+<p><code>mnnn theme set &lt;name&gt;</code>, <code>mnnn theme mode &lt;mode&gt;</code> and <strong>File ▸ Preferences…</strong> in the TUI edit the file for you.
+Preferences are part of every backup (<a href="/docs/backup-recovery/">backup and recovery</a>).</p>
+<p>Failure modes: invalid TOML makes every command fail with a <code>toml:</code> error naming
+the problem; fix or delete the file (it is recreated with defaults).</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/preferences.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

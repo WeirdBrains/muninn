@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Backup and recovery · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a class="current" aria-current="page" href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="backup-and-recovery">Backup and recovery</h1>
+<pre><code>mnnn backup create  --out DIR [--encrypt]
+mnnn backup restore --from FILE|DIR
+</code></pre>
+<h2 id="what-a-backup-contains">What a backup contains</h2>
+<p><code>muninn-backup-&lt;UTC timestamp&gt;.tar.zst</code> (or <code>.tar.zst.age</code> with <code>--encrypt</code>):</p>
+<table>
+<thead>
+<tr>
+<th>path</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>storage/muninn.database</code></td>
+<td>SQLite online-backup copy, <strong>still SQLCipher-encrypted</strong></td>
+</tr>
+<tr>
+<td><code>keys/</code></td>
+<td>envelope and password-wrapped service keys (already encrypted)</td>
+</tr>
+<tr>
+<td><code>preferences.toml</code></td>
+<td>as-is</td>
+</tr>
+<tr>
+<td><code>themes/</code></td>
+<td>every <code>&lt;theme_name&gt;/</code> folder with <code>interface.toml</code> and <code>assets/</code></td>
+</tr>
+<tr>
+<td><code>manifest.json</code></td>
+<td>format, version, created_at, service-key version, BLAKE3 of every file</td>
+</tr>
+</tbody>
+</table>
+<p><code>--encrypt</code> additionally age-encrypts the whole archive with a password
+(<code>MUNINN_EXPORT_PASSWORD</code>, else <code>MUNINN_PASSWORD</code>, else a prompt). Without it,
+preferences and themes inside the archive are readable, the database is not.</p>
+<p>Key exports (master, words, shards) are <strong>not</strong> part of a backup; they are separate
+files from <code>mnnn keys export</code> (see <a href="/docs/keys/">keys</a>).</p>
+<h2 id="restore">Restore</h2>
+<p><code>--from</code> takes an archive, or a directory (the newest <code>muninn-backup-*</code> in it is used).</p>
+<ol>
+<li>The archive is decrypted if needed and every file is checked against the manifest.</li>
+<li>Database and <code>keys/</code>: if either already exists you are asked before overwriting.</li>
+<li><code>preferences.toml</code> is replaced.</li>
+<li>Themes: each folder is restored; an existing theme with different content is only
+overwritten after confirmation. Without a TTY and without <code>-y</code> such themes are
+kept and listed as skipped.</li>
+</ol>
+<p>After a restore the database opens with the password that was current when the
+backup was made. If you lost it, use <code>mnnn keys recover</code> with the words or 3 shards.</p>
+<h2 id="recovery-cheat-sheet">Recovery cheat sheet</h2>
+<table>
+<thead>
+<tr>
+<th>lost</th>
+<th>recover with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>password</td>
+<td><code>mnnn keys recover --words-file ...</code> or <code>--shard</code> x3</td>
+</tr>
+<tr>
+<td>master key</td>
+<td>the 24 words, or any 3 of 5 shards</td>
+</tr>
+<tr>
+<td>24 words</td>
+<td>re-derived from the master (<code>keys recover --print-words</code>)</td>
+</tr>
+<tr>
+<td>service keys</td>
+<td>re-derived from the master + version (<code>keys rotate</code> / <code>keys recover</code>)</td>
+</tr>
+<tr>
+<td>shards</td>
+<td>re-issued from the master (<code>keys shards</code>, a new set)</td>
+</tr>
+<tr>
+<td>database / preferences / themes</td>
+<td><code>mnnn backup restore</code></td>
+</tr>
+<tr>
+<td>node identity and key exchanges</td>
+<td><code>mnnn net exchange restore FILE</code> (<a href="/docs/key-exchanges/#backups">key exchanges</a>)</td>
+</tr>
+<tr>
+<td>master key, with no words or shards at hand</td>
+<td><code>mnnn net shard restore</code> from peers (<a href="/docs/dark-shards/">dark shards</a>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="example">Example</h2>
+<pre><code>MUNINN_HOME=/tmp/mnnn-demo mnnn backup create --out ~/backups --encrypt
+MUNINN_HOME=/tmp/mnnn-new  mnnn backup restore --from ~/backups -y
+</code></pre>
+<h2 id="failure-modes">Failure modes</h2>
+<ul>
+<li>Corrupted archive: &quot;file hashes do not match the manifest&quot;; nothing is written.</li>
+<li>Overwrite without a TTY: &quot;confirmation required ... -y&quot;.</li>
+<li>Wrong archive password: &quot;could not decrypt export (wrong password?)&quot;.</li>
+</ul>
+<p>See also <a href="/docs/storage-layout/">storage layout</a>, <a href="/docs/encryption/">encryption</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/backup-recovery.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Linked-node sync · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a class="current" aria-current="page" href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="linked-node-sync">Linked-node sync</h1>
+<p>Every node <a href="/docs/users/">linked to your user</a> keeps all of your data. A running node
+(<code>mnnn net start</code>, the TUI, or <code>mnnn host</code>) pulls what changed on each of your other
+nodes about once a minute; <code>mnnn sync now</code> does it right away.</p>
+<table>
+<thead>
+<tr>
+<th>You want to</th>
+<th>CLI</th>
+<th>TUI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>See when each node last synced</td>
+<td><code>mnnn sync status [--json]</code></td>
+<td>Net ▸ Connections… (top lines)</td>
+</tr>
+<tr>
+<td>Sync now</td>
+<td><code>mnnn sync now [NODE]</code></td>
+<td></td>
+</tr>
+<tr>
+<td>See conflicts</td>
+<td><code>mnnn sync conflicts [--all] [--json]</code></td>
+<td></td>
+</tr>
+<tr>
+<td>See both sides of one</td>
+<td><code>mnnn sync show ID</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Settle one</td>
+<td><code>mnnn sync resolve ID [--take-other]</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Fetch bars</td>
+<td><code>mnnn sync bars [--from NODE] [--source S] [--symbol BASE/QUOTE]</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-syncs">What syncs</h2>
+<p>Journals and entries, models and their records, projects, live searches, reports, code
+spaces, rules, orgs, reviews, revisions, authors, assets, users and connections, and
+history. Your other nodes' history is added to each node's own (it does not move the
+history position, so <code>mnnn history back</code> still steps through what was done here). Each node keeps its own copy of:</p>
+<ul>
+<li>secrets: your user key, the node's identity, key exchanges, shards and passwords;</li>
+<li>settings and <code>preferences.toml</code>;</li>
+<li>what is about this node only: rule run counts, code-space approvals and last runs,
+whether this node hosts an org, which exchange an org member or reviewer is reached by;</li>
+<li>imported sources and bars (see below).</li>
+</ul>
+<h2 id="how-it-works">How it works</h2>
+<p>Every change to a synced row is noted in a change log. A node asks each linked node for
+the changes after the last one it has, a page at a time, over the <a href="/docs/key-exchanges/">key exchange</a>.
+Pages are sealed a second time with a key derived from your user key, so only your own
+nodes can read them, and a node answers only nodes that are linked to its user and not
+revoked. A revoked node gets nothing more.</p>
+<h2 id="conflicts">Conflicts</h2>
+<p>For every row the two nodes remember what they last agreed on, so a node knows who
+changed what:</p>
+<ul>
+<li>changed only there: it is taken;</li>
+<li>changed only here: it stays, and the other node takes it when it asks;</li>
+<li>changed on both: the newer one is kept and the other is saved as a <strong>conflict</strong>;</li>
+<li>deleted on one and edited on the other: the edit is kept, the delete becomes a conflict.</li>
+</ul>
+<p>Nothing is lost: <code>mnnn sync conflicts</code> lists what was set aside, <code>mnnn sync show ID</code>
+shows both rows, and <code>mnnn sync resolve ID --take-other</code> puts the set-aside row back
+(<code>mnnn sync resolve ID</code> keeps what is there). A row that cannot be applied (for example
+a model this node cannot rebuild) is kept as a conflict too.</p>
+<h2 id="bars">Bars</h2>
+<p>Bars can be large, so they do not sync on their own. <code>mnnn sync bars</code> asks your linked
+nodes what series they have and fetches the bars you do not have yet, all series or the
+ones you name with <code>--source</code> and <code>--symbol</code>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/sync.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

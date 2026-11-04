@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Install · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a class="current" aria-current="page" href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="install">Install</h1>
+<p>Every package ships a prebuilt <code>mnnn</code> binary: <strong>no Rust or other toolchain is needed to
+install</strong>. SQLCipher and OpenSSL are compiled into the binary, so the only runtime
+dependencies are the C runtime: glibc 2.39 or newer and libgcc (Linux: Ubuntu 24.04+,
+Debian 13+, Fedora 40+, Arch; older systems such as Ubuntu 22.04 or Debian 12 need a
+<a href="#from-source-any-platform">source build</a>), the system libraries (macOS),
+nothing extra (Windows). Downloads are on the GitHub Releases page with a <code>SHA256SUMS</code>
+file. Packaging files live in <code>packaging/</code>.</p>
+<p>Building code spaces is optional and needs extra tools that the packages do not bundle:
+<code>cargo</code> (from <a href="https://rustup.rs">rustup</a>) for math, Polars, Rust and Python; Python is
+translated in process, so no Python install is needed. See
+<a href="/docs/code-spaces/#python-in-rust">code spaces</a>.</p>
+<h2 id="getting-a-release">Getting a release</h2>
+<p>Each release is built and checked locally, and its files are attached to its page under
+<a href="https://github.com/WeirdBrains/muninn/releases">GitHub Releases</a>. The latest is
+<a href="https://github.com/WeirdBrains/muninn/releases/tag/v2.20.0">v2.20.0</a>. Every release has
+14 files:</p>
+<table>
+<thead>
+<tr>
+<th>File (v2.20.0)</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>muninn-2.20.0-x86_64-unknown-linux-gnu.tar.gz</code>, <code>muninn-2.20.0-aarch64-unknown-linux-gnu.tar.gz</code></td>
+<td>any Linux</td>
+</tr>
+<tr>
+<td><code>muninn-2.20.0-x86_64-apple-darwin.tar.gz</code>, <code>muninn-2.20.0-aarch64-apple-darwin.tar.gz</code></td>
+<td>macOS (Intel, Apple silicon)</td>
+</tr>
+<tr>
+<td><code>muninn_2.20.0-1_amd64.deb</code>, <code>muninn_2.20.0-1_arm64.deb</code></td>
+<td>Debian, Ubuntu</td>
+</tr>
+<tr>
+<td><code>muninn-2.20.0-1.x86_64.rpm</code>, <code>muninn-2.20.0-1.aarch64.rpm</code></td>
+<td>Fedora, RHEL</td>
+</tr>
+<tr>
+<td><code>muninn-bin-2.20.0-1-x86_64.pkg.tar.zst</code>, <code>muninn-bin-2.20.0-1-aarch64.pkg.tar.zst</code></td>
+<td>Arch Linux</td>
+</tr>
+<tr>
+<td><code>muninn-2.20.0-x86_64-pc-windows-gnullvm.zip</code>, <code>muninn-2.20.0-aarch64-pc-windows-gnullvm.zip</code></td>
+<td>Windows (x64, arm64)</td>
+</tr>
+<tr>
+<td><code>muninn-2.20.0-packaging.tar.gz</code></td>
+<td>the Homebrew formula, Arch PKGBUILD and winget manifests, with this release's checksums filled in</td>
+</tr>
+<tr>
+<td><code>SHA256SUMS</code></td>
+<td>checksums for all of the above</td>
+</tr>
+</tbody>
+</table>
+<p>Download from the command line and check it, for example:</p>
+<pre><code class="language-sh">ver=2.20.0
+base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
+curl -LO $base/muninn-$ver-x86_64-unknown-linux-gnu.tar.gz -LO $base/SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS      # macOS: shasum -a 256 --ignore-missing -c SHA256SUMS
+</code></pre>
+<p>On Windows (PowerShell) see <a href="#windows">Windows</a> below.</p>
+<p>(<code>gh release download v2.20.0</code> does the same if you have the GitHub CLI.) Muninn is
+BSD-3-Clause licensed; every package carries the <code>LICENSE</code>.</p>
+<p>Installing or uninstalling never touches your data in <code>~/.muninn</code> (or <code>MUNINN_HOME</code>);
+delete that folder yourself to remove it.</p>
+<h2 id="release-tarball-any-linux-or-macos">Release tarball (any Linux or macOS)</h2>
+<pre><code class="language-sh">t=x86_64-unknown-linux-gnu     # or aarch64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin
+tar -xzf muninn-2.20.0-$t.tar.gz
+mkdir -p ~/.local/bin ~/.local/share/man/man1
+install -m755 muninn-2.20.0-$t/mnnn ~/.local/bin/mnnn
+cp muninn-2.20.0-$t/man/*.1 ~/.local/share/man/man1/
+</code></pre>
+<p>If <code>mnnn</code> is not found afterwards, <code>~/.local/bin</code> is not on your <code>PATH</code> (the default on
+macOS and on some Linux images): add <code>export PATH=&quot;$HOME/.local/bin:$PATH&quot;</code> to <code>~/.zshrc</code>
+or <code>~/.bashrc</code> and open a new terminal.</p>
+<p>macOS: the binary is not notarized. Downloaded with <code>curl</code> it runs as is; downloaded in a
+browser, Gatekeeper blocks it (&quot;cannot be opened&quot;), so clear the flag first:
+<code>xattr -d com.apple.quarantine muninn-2.20.0-$t.tar.gz</code> (before extracting) or
+<code>xattr -d com.apple.quarantine ~/.local/bin/mnnn</code>.</p>
+<p>Uninstall: remove <code>~/.local/bin/mnnn</code> and <code>~/.local/share/man/man1/mnnn*.1</code>.</p>
+<h2 id="arch-linux">Arch Linux</h2>
+<p><strong>From a checkout (works today, needs Rust):</strong></p>
+<pre><code class="language-sh">git clone git@github.com:WeirdBrains/muninn.git &amp;&amp; cd muninn/packaging/arch
+makepkg -si            # builds the committed checkout, installs package &quot;muninn&quot;
+</code></pre>
+<p><strong>Prebuilt (<code>muninn-bin</code>, no Rust):</strong> install the release's ready-made package:</p>
+<pre><code class="language-sh">sudo pacman -U muninn-bin-2.20.0-1-x86_64.pkg.tar.zst     # or …-aarch64.pkg.tar.zst
+</code></pre>
+<p>Or build it yourself from the release's PKGBUILD (<code>packaging/arch/PKGBUILD</code> in
+<code>muninn-2.20.0-packaging.tar.gz</code>, which has the checksums filled in) with <code>makepkg -si</code>. If
+<code>muninn-bin</code> is in the AUR when you read this, <code>yay -S muninn-bin</code> or <code>paru -S muninn-bin</code>
+installs the same package.</p>
+<p>Both install <code>/usr/bin/mnnn</code>, man pages and <code>/usr/share/doc/muninn</code>. Uninstall:
+<code>sudo pacman -R muninn</code> (or <code>muninn-bin</code>). Remove an earlier <code>cargo install</code> first
+(<code>cargo uninstall muninn</code>), or <code>~/.cargo/bin/mnnn</code> may shadow the package, depending on
+your <code>PATH</code>.</p>
+<p><strong>Build and install from a checkout in one step:</strong> <code>packaging/arch/build-local.sh</code>
+builds <code>muninn-bin</code> from the current checkout (no download) and installs it with
+<code>sudo pacman -U --needed</code>. <code>--source</code> builds <code>packaging/arch/PKGBUILD</code> (package
+<code>muninn</code>) instead, <code>--no-install</code> only builds into <code>target/pkg/arch/</code>. If <code>namcap</code> is
+installed it lints the package first; it is optional and never blocks the install.</p>
+<h2 id="debian--ubuntu">Debian / Ubuntu</h2>
+<pre><code class="language-sh">sudo apt install ./muninn_2.20.0-1_amd64.deb      # arm64: muninn_2.20.0-1_arm64.deb
+</code></pre>
+<p>Needs Ubuntu 24.04+ or Debian 13+ (glibc 2.39); on Ubuntu 22.04 it installs but
+<code>mnnn</code> fails with <code>GLIBC_2.38' not found</code>. Uninstall: <code>sudo apt remove muninn</code>.
+Maintainers build it with <code>cargo deb</code> (<code>packaging/debian/README.md</code>).</p>
+<h2 id="fedora--rhel">Fedora / RHEL</h2>
+<pre><code class="language-sh">sudo dnf install ./muninn-2.20.0-1.x86_64.rpm     # or muninn-2.20.0-1.aarch64.rpm
+</code></pre>
+<p>Requires glibc (detected from the binary). Uninstall: <code>sudo dnf remove muninn</code>.
+Maintainers build it with <code>cargo generate-rpm</code> (<code>packaging/fedora/README.md</code>).</p>
+<h2 id="macos-and-linux-homebrew">macOS and Linux (Homebrew)</h2>
+<p><code>packaging/homebrew/muninn.rb</code> installs the prebuilt binary for macOS arm64/x86_64 or
+Linux arm64/x86_64:</p>
+<p>The formula is in the release's packaging tarball, with that release's checksums filled in.
+Homebrew only installs formulae from a tap (<code>brew install ./muninn.rb</code> fails with
+&quot;Homebrew requires formulae to be in a tap&quot;), so put it in a local one:</p>
+<pre><code class="language-sh">tar -xzf muninn-2.20.0-packaging.tar.gz
+brew tap-new --no-git local/muninn
+cp packaging/homebrew/muninn.rb &quot;$(brew --repository local/muninn)/Formula/&quot;
+brew install local/muninn/muninn
+brew developer off      # tap-new turns Homebrew's developer mode on
+</code></pre>
+<p>Once a Homebrew tap is published, <code>brew install</code> from it installs the same thing.</p>
+<p>Uninstall: <code>brew uninstall muninn &amp;&amp; brew untap local/muninn</code>.</p>
+<h2 id="windows">Windows</h2>
+<p>Release zips hold a portable <code>mnnn.exe</code> for x64 and arm64. In PowerShell (no admin rights
+needed), download, check, unpack into <code>%LOCALAPPDATA%\Programs\Muninn</code> and add it to your
+user <code>PATH</code>:</p>
+<pre><code class="language-powershell">$ver = &quot;2.20.0&quot;; $arch = &quot;x86_64&quot;     # or aarch64
+$zip = &quot;muninn-$ver-$arch-pc-windows-gnullvm.zip&quot;
+$base = &quot;https://github.com/WeirdBrains/muninn/releases/download/v$ver&quot;
+curl.exe -LO &quot;$base/$zip&quot; -LO &quot;$base/SHA256SUMS&quot;
+(Get-FileHash $zip).Hash -eq ((Select-String $zip SHA256SUMS).Line -split ' ')[0].ToUpper()   # True
+$dest = &quot;$env:LOCALAPPDATA\Programs\Muninn&quot;
+Expand-Archive $zip &quot;$env:TEMP\muninn&quot; -Force
+New-Item -ItemType Directory $dest -Force | Out-Null
+Copy-Item &quot;$env:TEMP\muninn\muninn-$ver-$arch-pc-windows-gnullvm\*&quot; $dest -Recurse -Force
+$p = [Environment]::GetEnvironmentVariable(&quot;Path&quot;, &quot;User&quot;)
+if ($p -notlike &quot;*$dest*&quot;) { [Environment]::SetEnvironmentVariable(&quot;Path&quot;, &quot;$p;$dest&quot;, &quot;User&quot;) }
+</code></pre>
+<p>Open a <strong>new</strong> PowerShell or terminal window (the old one keeps the old <code>PATH</code>) and run
+<code>mnnn --version</code>. Uninstall: delete <code>%LOCALAPPDATA%\Programs\Muninn</code> and remove it from
+your user <code>PATH</code> (Settings ▸ System ▸ About ▸ Advanced system settings ▸ Environment
+Variables). Data lives in <code>%USERPROFILE%\.muninn</code>.</p>
+<h3 id="winget-local-manifest">winget (local manifest)</h3>
+<p>The release's packaging tarball has winget manifests with its checksums filled in.
+Installing from a local manifest is off by default and must be enabled once <strong>in an
+administrator PowerShell</strong>; without it winget only prints &quot;This feature needs to be
+enabled by administrators&quot;:</p>
+<pre><code class="language-powershell">winget settings --enable LocalManifestFiles     # once, as administrator
+tar -xzf muninn-2.20.0-packaging.tar.gz
+winget install --manifest packaging\winget\2.20.0
+</code></pre>
+<p>winget adds <code>mnnn</code> to <code>PATH</code>; open a new terminal before running it. Muninn is not in the
+public winget catalogue yet, so <code>winget install Kommandosaldat.Muninn</code> reports &quot;No package
+found&quot;. Uninstall: <code>winget uninstall --manifest packaging\winget\2.20.0</code>.</p>
+<h2 id="from-source-any-platform">From source (any platform)</h2>
+<p>Needs Rust &gt;= 1.99, a C compiler, <code>perl</code> and <code>make</code>:</p>
+<pre><code class="language-sh">cargo install --locked --path .
+</code></pre>
+<p>Uninstall: <code>cargo uninstall muninn</code>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/install.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

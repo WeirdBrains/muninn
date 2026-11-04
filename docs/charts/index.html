@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Charts · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a class="current" aria-current="page" href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="charts">Charts</h1>
+<p>A chart tile (<code>Ctrl-w t</code> on a list tile, <strong>View ▸ New tile ▸ Chart</strong>, or a preset)
+draws its series over a time window with toggleable layers. Each chart tile has its
+own series, window, zoom and layers; all of it is saved with the
+<a href="/docs/tiling/">layout</a>.</p>
+<pre><code>start ◂ 2017-09-01 10:00 ▸   end ◂ 2017-09-02 10:00 ▸   5m/col · live
+2017-09-02 09:55:00  o 4580.0  h 4590.1  l 4575.2  c 4588.8  v 12.3  +0.19%
+│ candles, lines, markers                                       │  4590.10
+│                                                               │  4580.00
+│ volume sub-pane                                               │
+└09-01 10:00     └09-01 11:20 ...
+</code></pre>
+<h2 id="window-zoom-and-pan">Window, zoom and pan</h2>
+<p>The window ends at <strong>end</strong> (or the latest bar when <code>live</code>) and spans one bucket per
+column. Zoom sets the bucket size in bars per column (1×, 2×, 4×, …); buckets
+aggregate bars (open = first, close = last, high/low = extremes, volume = sum), so even
+a full million-bar series zoomed out reads only one row per column.</p>
+<table>
+<thead>
+<tr>
+<th>input</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>+</code> / <code>-</code>, mouse wheel</td>
+<td>zoom in / out (keeps the centre)</td>
+</tr>
+<tr>
+<td><code>h</code> / <code>l</code></td>
+<td>pan a quarter screen earlier / later</td>
+</tr>
+<tr>
+<td>PgUp / PgDn, <code>H</code></td>
+<td>pan a full screen</td>
+</tr>
+<tr>
+<td>Home</td>
+<td>first bars of the series</td>
+</tr>
+<tr>
+<td>End, <code>0</code></td>
+<td>back to the latest bar (<code>live</code>, follows new data)</td>
+</tr>
+<tr>
+<td><code>[</code>, click the start date</td>
+<td>pick the period <strong>start</strong> (keeps the end, zooms to fit)</td>
+</tr>
+<tr>
+<td><code>]</code>, click the end date</td>
+<td>pick the period <strong>end</strong> (<code>x</code> in the picker: back to live)</td>
+</tr>
+<tr>
+<td><code>{</code> / <code>}</code></td>
+<td>type the start / end instead</td>
+</tr>
+<tr>
+<td><code>@</code></td>
+<td>jump to a date (centres it and puts the crosshair there)</td>
+</tr>
+<tr>
+<td>click <code>◂</code> / <code>▸</code></td>
+<td>move start or end by a quarter of the window</td>
+</tr>
+<tr>
+<td>← / →, click in the chart</td>
+<td>move the crosshair</td>
+</tr>
+<tr>
+<td><code>,</code> / <code>.</code></td>
+<td>previous / next series</td>
+</tr>
+</tbody>
+</table>
+<h2 id="date-and-time-picker">Date and time picker</h2>
+<p><code>[</code> / <code>]</code> (and clicking a date) open a picker with year, month, day, hour and minute
+(UTC). The same picker sets a list tile's range (<a href="/docs/tiling/">tiling</a>) and, with <code>T</code>
+in any view, the time range of every tile (<a href="/docs/sidebar/#filters">sidebar</a>).</p>
+<table>
+<thead>
+<tr>
+<th>input</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>← / →, Tab / Shift-Tab, click a field</td>
+<td>select a field</td>
+</tr>
+<tr>
+<td>↑ / ↓, click <code>▲</code> / <code>▼</code></td>
+<td>change it (months and years keep the day valid); PgUp / PgDn by 10</td>
+</tr>
+<tr>
+<td>digits</td>
+<td>type the field, e.g. <code>2017-08-17 06:30</code> fills every field</td>
+</tr>
+<tr>
+<td><code>n</code></td>
+<td>now</td>
+</tr>
+<tr>
+<td>Enter / <code>[Enter OK]</code></td>
+<td>apply</td>
+</tr>
+<tr>
+<td><code>x</code> / <code>[x clear]</code></td>
+<td>clear a list range end, or make the chart end live</td>
+</tr>
+<tr>
+<td>Esc / <code>[Esc cancel]</code> / <code>[X]</code></td>
+<td>close without changes</td>
+</tr>
+</tbody>
+</table>
+<p>Typed dates (<code>{</code> <code>}</code> <code>@</code>) are <code>YYYY-MM-DD</code>, <code>YYYY-MM-DD HH:MM[:SS]</code> (UTC) or epoch seconds/ms.</p>
+<h2 id="layers">Layers</h2>
+<p>Every element is a layer, toggled independently with its key, from the layer menu
+(<code>L</code>, or <strong>View ▸ Chart layers…</strong>), and saved per tile.</p>
+<table>
+<thead>
+<tr>
+<th>layer</th>
+<th>key</th>
+<th>default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Candles</td>
+<td><code>c</code></td>
+<td>on</td>
+</tr>
+<tr>
+<td>OHLC bars (<code>┤</code> open, <code>├</code> close; shown when candles are off)</td>
+<td><code>b</code></td>
+<td>off</td>
+</tr>
+<tr>
+<td>Line (metric: open/high/low/close/typical/median/OHLC avg; <code>N</code> cycles)</td>
+<td><code>n</code></td>
+<td>off</td>
+</tr>
+<tr>
+<td>Area under the line</td>
+<td><code>a</code></td>
+<td>off</td>
+</tr>
+<tr>
+<td>High/low envelope (20-bucket highest high / lowest low, <code>┄</code>)</td>
+<td><code>e</code></td>
+<td>off</td>
+</tr>
+<tr>
+<td>Volume bars (sub-pane, up/down colours)</td>
+<td><code>v</code></td>
+<td>on</td>
+</tr>
+<tr>
+<td>Moving averages (default SMA 20 and 50; <code>M</code> sets e.g. <code>sma20, ema50, sma200</code>)</td>
+<td><code>m</code></td>
+<td>off</td>
+</tr>
+<tr>
+<td>Wick markers (upper wick longer than the body highlighted; <code>▼</code> over shooting stars)</td>
+<td><code>w</code></td>
+<td>off</td>
+</tr>
+<tr>
+<td>Gap markers (<code>┊</code> where buckets are missing)</td>
+<td><code>g</code></td>
+<td>on</td>
+</tr>
+<tr>
+<td>Zero-volume markers (<code>○</code>)</td>
+<td><code>z</code></td>
+<td>off</td>
+</tr>
+<tr>
+<td>Grid</td>
+<td><code>#</code></td>
+<td>on</td>
+</tr>
+<tr>
+<td>Crosshair + value readout</td>
+<td><code>x</code></td>
+<td>on</td>
+</tr>
+<tr>
+<td>Price axis / time axis</td>
+<td><code>y</code> / <code>t</code></td>
+<td>on</td>
+</tr>
+</tbody>
+</table>
+<p>Layers draw in a fixed order: grid &lt; area &lt; volume &lt; candles/bars &lt; lines (line,
+envelope, moving averages) &lt; markers &lt; crosshair, coloured with the theme roles
+<code>up</code>, <code>down</code>, <code>chart_1</code>…<code>chart_6</code>, <code>warning</code> and <code>muted</code> (<a href="/docs/themes/">themes</a>).</p>
+<p>A shooting star is a bar whose upper wick is at least twice the body and at least 60%
+of the range, with a lower wick under 25% of the range.</p>
+<h2 id="linking">Linking</h2>
+<p>Link a chart to a list (<code>Ctrl-w y</code>) to keep them in step: see
+<a href="/docs/tiling/">linked tiles</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/charts.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Reports · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a class="current" aria-current="page" href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="reports">Reports</h1>
+<p>A report is an ordered list of sections that are read from the data, journals and
+projects <strong>when the report is previewed or exported</strong>, so a report always shows what
+they hold now. Reports can stand alone or be added to <a href="/docs/projects/">projects</a>, and are
+exported to PDF, HTML, Word (.docx), LaTeX, JSON, CSV or plain text (see
+<a href="/docs/export-formats/">export formats</a>).</p>
+<table>
+<thead>
+<tr>
+<th>section</th>
+<th>shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td>written text, Markdown or LaTeX</td>
+</tr>
+<tr>
+<td><code>records</code></td>
+<td>one series (with an optional time range): a summary (bars, first and last, open, close, high, low, change, volume) and the latest bars (<code>--rows</code>, default 20, 0 = every bar)</td>
+</tr>
+<tr>
+<td><code>series</code></td>
+<td>every series a <a href="/docs/live-searches/">live search</a> matches now, or every series, one summary row each</td>
+</tr>
+<tr>
+<td><code>journal</code></td>
+<td>a <a href="/docs/journals/">journal</a>, or some of its entries, with notes as footnotes and highlights marked</td>
+</tr>
+<tr>
+<td><code>project</code></td>
+<td>a project's contents: live searches, results, journals and reports</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>the records of a <a href="/docs/models/">model</a>, optionally only those meeting <code>--where</code> conditions, as a table of its fields (<code>--rows</code>, default 20, 0 = all)</td>
+</tr>
+<tr>
+<td><code>authors</code></td>
+<td>who created the report, added its sections or entries, and later edited it</td>
+</tr>
+<tr>
+<td><code>code</code></td>
+<td>a <a href="/docs/code-spaces/">code space</a>: its last result (tables, charts as images, text) and its source</td>
+</tr>
+</tbody>
+</table>
+<h2 id="command-line">Command line</h2>
+<pre><code>mnnn report list [--json]                               # alias: reports
+mnnn report create NAME [--description TEXT] [--project PROJECT]
+mnnn report show REPORT [--json]                        # sections with what they show
+mnnn report edit REPORT [--name NAME] [--description TEXT]
+mnnn report remove REPORT                               # asks first; -y skips
+
+mnnn report add REPORT [--title T] [--at N] (
+      --text TEXT | --file PATH|- [--format markdown|latex]
+    | --records SOURCE:SYMBOL:PERIOD [--from TIME] [--to TIME] [--rows N]
+    | --series [SEARCH]                                 # no SEARCH: every series
+    | --journal JOURNAL [--entry ENTRY]...
+    | --project PROJECT
+    | --model MODEL [--where &quot;FIELD OP VALUE&quot;]... [--rows N]
+    | --authors
+    | --code SPACE )
+mnnn report edit-section REPORT SECTION [--title T] [--text T | --file F] [--format F] [--rows N]
+mnnn report remove-section REPORT SECTION
+mnnn report move REPORT SECTION --to N
+
+mnnn report preview REPORT [--width 100]                # as text in the terminal
+mnnn report export REPORT [--format pdf|html|docx|latex|json|csv|text] [--out PATH]
+mnnn project add PROJECT --report REPORT
+</code></pre>
+<p><code>REPORT</code> is an id, unique id prefix or name; <code>SECTION</code> is the position <code>show</code> prints or
+a section id prefix. Without <code>--out</code>, export writes <code>&lt;report-name&gt;.&lt;ext&gt;</code> in the
+current directory. Sections without a title take one from what they show.</p>
+<pre><code>mnnn report create &quot;Week 12&quot; --project &quot;ETH summer&quot;
+mnnn report add &quot;Week 12&quot; --title Summary --text &quot;ETH held **3800** all week.&quot;
+mnnn report add &quot;Week 12&quot; --records binance:ETH/USDT:1h --from 2024-03-18 --to 2024-03-25 --rows 10
+mnnn report add &quot;Week 12&quot; --series &quot;eth 5m&quot;
+mnnn report add &quot;Week 12&quot; --journal &quot;Summer notes&quot;
+mnnn report add &quot;Week 12&quot; --authors --at 1
+mnnn report preview &quot;Week 12&quot;
+mnnn report export &quot;Week 12&quot; --out week12.pdf
+</code></pre>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p><strong>Projects ▸ Reports…</strong> (<code>O</code>) lists the reports; <strong>Projects ▸ New report…</strong> starts one.</p>
+<table>
+<thead>
+<tr>
+<th>key (list)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Enter, →</td>
+<td>open the report</td>
+</tr>
+<tr>
+<td><code>n</code> / <code>a</code></td>
+<td>new report</td>
+</tr>
+<tr>
+<td><code>r</code> / <code>e</code></td>
+<td>rename / describe</td>
+</tr>
+<tr>
+<td><code>v</code></td>
+<td>preview</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td>export (choose a format, then a path)</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>add to a project</td>
+</tr>
+<tr>
+<td><code>d</code>, <code>D</code></td>
+<td>delete (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td>Esc, <code>q</code></td>
+<td>close</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>key (in a report)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>j</code> / <code>k</code></td>
+<td>move</td>
+</tr>
+<tr>
+<td><code>a</code></td>
+<td>add a section: choose its kind; text opens the editor, journal, project and series ask which one, records use the series selected in the sidebar with the current time range</td>
+</tr>
+<tr>
+<td>Enter, <code>e</code></td>
+<td>edit: text in the editor (Ctrl-S saves, Ctrl-T Markdown ↔ LaTeX), records ask for the number of bars, others for a title</td>
+</tr>
+<tr>
+<td><code>t</code></td>
+<td>retitle the section</td>
+</tr>
+<tr>
+<td><code>J</code> / <code>K</code></td>
+<td>move the section down / up</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>remove the section (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td><code>v</code>, <code>E</code>, <code>p</code>, <code>r</code></td>
+<td>preview, export, add to a project, rename</td>
+</tr>
+<tr>
+<td>Esc, ←</td>
+<td>back to the list</td>
+</tr>
+</tbody>
+</table>
+<p>In a project, Enter on a report opens it here.</p>
+<p>Creating, editing, moving, removing and exporting reports and sections are recorded in
+the <a href="/docs/history/">history</a> and attributed to the current <a href="/docs/authors/">author</a>.</p>
+<p>See also: <a href="/docs/export-formats/">export formats</a>, <a href="/docs/projects/">projects</a>,
+<a href="/docs/journals/">journals</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/reports.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

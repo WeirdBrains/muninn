@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Muninn documentation · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home current" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="muninn-documentation">Muninn documentation</h1>
+<p>Muninn (<code>mnnn</code>) ingests crypto market data from files and services, normalizes it into
+bars and stores them in an encrypted SQLite database. These pages are also the in-app
+help (<code>?</code> or F1 in the TUI, <code>mnnn help &lt;topic&gt;</code> on the command line).</p>
+<h2 id="using-muninn">Using Muninn</h2>
+<ul>
+<li><a href="/docs/install/">Install</a>: packages per platform, building from source, uninstalling</li>
+<li><a href="/docs/announcement-2.0/">Muninn 2.0</a>: the launch post: what Muninn is, the headline features, install</li>
+<li><a href="https://github.com/WeirdBrains/muninn/tree/main/docs/historical/2.0">2.0 archive</a>: the 2.0 plan with every phase, the announcement and the changelog as of the wrap-up</li>
+<li><a href="/docs/release/">Releasing</a>: the release script, local builds of all 14 files, and publishing</li>
+<li><a href="/docs/website/">Website</a>: the single-page Jaspr site in <code>site/</code>, how it is built and checked</li>
+<li><a href="/docs/cli/">Command line</a>: global flags, environment, exit codes, man pages</li>
+<li><a href="/docs/tui/">Terminal UI</a>: header, menus, content area</li>
+<li><a href="/docs/menus/">Menus</a> and <a href="/docs/keybindings/">keybindings</a></li>
+<li><a href="/docs/tiling/">Tiling layout</a>: splitting tiles, list tiles, presets, linking</li>
+<li><a href="/docs/charts/">Charts</a>: period, zoom, layers</li>
+<li><a href="/docs/sidebar/">Sidebar</a>: search, sort and filter series</li>
+<li><a href="/docs/import/">Import</a>: file browser and background import</li>
+<li><a href="/docs/help/">In-app help</a>: searching and following links</li>
+<li><a href="/docs/authors/">Authors</a>: who actions are attributed to, the current author</li>
+<li><a href="/docs/history/">Action history</a>: the history bar, stepping back and forward, forks</li>
+</ul>
+<h2 id="research">Research</h2>
+<ul>
+<li><a href="/docs/live-searches/">Live searches</a>: saved searches that always run on current data; fork and optimize</li>
+<li><a href="/docs/projects/">Projects</a>: live searches, results and journals together</li>
+<li><a href="/docs/journals/">Journals</a>: Markdown or LaTeX entries with images, notes and highlights</li>
+<li><a href="/docs/reports/">Reports</a>: sections built from records, journals, projects and authors</li>
+<li><a href="/docs/rules/">Rules</a>: when an action happens, run searches, export, write entries or notes, feed models</li>
+<li><a href="/docs/models/">Models</a>: design record tables, migrate them with previews and roll back; records</li>
+<li><a href="/docs/model-templates/">Model design templates</a>: export, import and share model designs; built-in templates</li>
+<li><a href="/docs/code-spaces/">Code spaces</a>: math, Polars, Rust or Python compiled to native plugins over your data</li>
+<li><a href="/docs/export-formats/">Export formats</a>: PDF, HTML, Word, LaTeX, JSON, CSV; printing; project archives and import</li>
+</ul>
+<h2 id="network">Network</h2>
+<ul>
+<li><a href="/docs/network/">Network</a>: the node, peers, relays, sharing and searching across peers; the Net menu</li>
+<li><a href="/docs/users/">Users and connections</a>: your user identity, linked nodes, trusted connections, invites</li>
+<li><a href="/docs/sync/">Linked-node sync</a>: all of your data on all of your nodes, conflicts, bars on request</li>
+<li><a href="/docs/key-exchanges/">Key exchanges</a>: offers, answers, short codes, verifying, revoking, backups</li>
+<li><a href="/docs/dark-shards/">Dark shards</a>: the master key split among peers, sealed so they cannot read it</li>
+<li><a href="/docs/organizations/">Organizations</a>: roles, members, resources, endpoints and templates; the Orgs menu</li>
+<li><a href="/docs/pipes/">Pipes</a>: pipe any data through code spaces, filter it, save it on the way</li>
+<li><a href="/docs/pipelines/">Pipelines</a>: design note for saved pipelines that end in a model table</li>
+<li><a href="/docs/share/">Share</a>: share anything to a project, a journal, a code space or your exchanges</li>
+<li><a href="/docs/reviews/">Reviews</a>: review links, comments, suggestions, highlights, votes, merges and revisions</li>
+<li><a href="/docs/deploy-relay/">Deploying a relay</a>: a public relay node on a droplet: DNS, systemd, firewall, ACME</li>
+<li><a href="/docs/org-hosting/">Org hosting</a>: HTTPS sites with HTML, JSON and gRPC, signed member requests, Let's Encrypt</li>
+<li><a href="/docs/notifications/">Notifications</a>: the header bell, <code>mnnn notify</code>, rule-set notify and broadcast actions, node broadcasts</li>
+<li><a href="/docs/collaboration/">Live collaboration and peers</a>: messages, live editing with cursors, the peers view, running a peer's executables</li>
+<li><a href="/docs/mcp/">MCP</a>: Muninn as an MCP server (stdio, HTTP, HTTPS with Let's Encrypt; named clients with roles), external MCP servers for rule sets</li>
+<li><a href="/docs/mcp-proxy/">MCP behind nginx</a>: the MCP HTTP server behind nginx with a certbot certificate</li>
+<li><a href="/docs/org-templates/">Org site templates</a>: edit, preview and build an org site's look; site announcements</li>
+</ul>
+<h2 id="getting-data-in-and-out">Getting data in and out</h2>
+<ul>
+<li><a href="/docs/ingest-csv/">CSV ingest</a></li>
+<li><a href="/docs/ingest-json/">JSON ingest</a></li>
+<li>Services: <a href="/docs/services/http/">HTTP</a>, <a href="/docs/services/redis/">Redis</a>, <a href="/docs/services/sqlite/">SQLite</a>, <a href="/docs/services/postgres/">Postgres</a></li>
+<li><a href="/docs/export/">Export</a></li>
+</ul>
+<h2 id="data-and-storage">Data and storage</h2>
+<ul>
+<li><a href="/docs/data-model/">Data model</a>: bars, sources, symbols, bar ids, models and records</li>
+<li><a href="/docs/storage-layout/">Storage layout</a>: the <code>~/.muninn</code> folder</li>
+<li><a href="/docs/preferences/">Preferences</a></li>
+</ul>
+<h2 id="security">Security</h2>
+<ul>
+<li><a href="/docs/keys/">Keys</a>: master key, 24 words, shards, service keys, rotation, rekey</li>
+<li><a href="/docs/encryption/">Encryption at rest</a></li>
+<li><a href="/docs/backup-recovery/">Backup and recovery</a></li>
+</ul>
+<h2 id="look-and-feel">Look and feel</h2>
+<ul>
+<li><a href="/docs/themes/">Themes</a>: built-ins, light/dark/system modes, selector and editor</li>
+</ul>
+<h2 id="quick-start">Quick start</h2>
+<pre><code>export MUNINN_HOME=/tmp/mnnn-demo          # never touches ~/.muninn
+mnnn keys init                             # write down the words and shards
+mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data --source binance -y
+mnnn export --format parquet --out /tmp/btc.parquet --symbol BTC/USDT
+mnnn search save &quot;btc 5m&quot; --symbol BTC/USDT --period 5m
+mnnn project create Research &amp;&amp; mnnn project add Research --search &quot;btc 5m&quot;
+mnnn tui
+</code></pre>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/README.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

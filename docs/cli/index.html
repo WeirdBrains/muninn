@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Command line · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a class="current" aria-current="page" href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="command-line">Command line</h1>
+<pre><code>mnnn [GLOBAL FLAGS] &lt;COMMAND&gt;
+
+  ingest csv|json|path|service &lt;http|redis|sqlite|postgres&gt;
+  export
+  sources  list|add|rename|remove
+  symbols  list|add
+  keys     init|status|rotate|rekey|export|recover|shards
+  backup   create|restore
+  theme    list|show|set|mode|export|import|reset
+  author   list|show|add|edit|remove|use
+  history  list|show|tree|back|forward|goto
+  search   list|show|run|find|save|fork|edit|remove
+  project  list|create|show|edit|remove|add|drop|export|import
+  journal  list|new|show|edit|remove|fork|write|entry|edit-entry|remove-entry|copy|
+           note|highlight|edit-note|remove-note|attach|image|export|import|print
+  report   list|create|show|edit|remove|add|edit-section|remove-section|move|export|preview
+  rule     list|create|show|edit|remove|enable|disable|test|dry-run|events
+  model    list|types|create|edit|show|plan|apply|discard|history|rollback|remove|
+           record create|update|list|show|delete
+  code     list|create|edit|show|remove|approve|build|run|check|sdk
+  net      start|stop|status|peers|connect|forget|relay|config|exchange|share|unshare|
+           shared|list|fetch|search|shard
+  org      create|edit|remove|list|show|role|member|resource|publish|unpublish|project|
+           endpoint|call|template|browse|apply|join|sync|leave|fetch|give|mirror|sign|
+           host start|stop|status|cert status|acme|renew
+  review   request|invite|list|show|view|join|sync|comment|suggest|highlight|vote|
+           withdraw|accept|reject|merge|close|reopen|drop|leave|remove|revisions
+  mcp      serve|client add|list|role|revoke|restore|remove|add|list|show|edit|remove|
+           tools|call|approve|unapprove
+  tui
+  help     [TOPIC] [--search TEXT]
+</code></pre>
+<h2 id="global-flags">Global flags</h2>
+<table>
+<thead>
+<tr>
+<th>flag</th>
+<th>env</th>
+<th>default</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--home DIR</code></td>
+<td><code>MUNINN_HOME</code></td>
+<td><code>~/.muninn</code></td>
+<td>root folder (<a href="/docs/storage-layout/">storage layout</a>)</td>
+</tr>
+<tr>
+<td><code>--db PATH</code></td>
+<td><code>MUNINN_DB</code></td>
+<td><code>&lt;home&gt;/storage/muninn.database</code></td>
+<td>database file</td>
+</tr>
+<tr>
+<td><code>--non-interactive</code></td>
+<td><code>MUNINN_NON_INTERACTIVE</code></td>
+<td>off</td>
+<td>never prompt; missing values are errors</td>
+</tr>
+<tr>
+<td><code>-v</code>, <code>--verbose</code></td>
+<td></td>
+<td></td>
+<td>more logging (repeat for more); conflicts with <code>-q</code></td>
+</tr>
+<tr>
+<td><code>--log-file PATH</code></td>
+<td><code>MUNINN_LOG_FILE</code></td>
+<td>stderr (TUI: <code>&lt;home&gt;/logs/tui.log</code>)</td>
+<td>append logs to this file, no colours; parent folders are created</td>
+</tr>
+<tr>
+<td><code>-q</code>, <code>--quiet</code></td>
+<td><code>MUNINN_QUIET</code></td>
+<td>off</td>
+<td>only errors and requested data (exports to <code>-</code>, secrets)</td>
+</tr>
+<tr>
+<td><code>-y</code>, <code>--yes</code></td>
+<td><code>MUNINN_YES</code></td>
+<td>off</td>
+<td>answer yes to confirmations</td>
+</tr>
+<tr>
+<td><code>--theme-mode MODE</code></td>
+<td><code>MUNINN_THEME_MODE</code></td>
+<td>from preferences</td>
+<td><code>light</code>, <code>dark</code> or <code>system</code> for this run</td>
+</tr>
+<tr>
+<td><code>--transport T</code></td>
+<td><code>MUNINN_COLLAB_TRANSPORT</code></td>
+<td><code>net.collab_transport</code> (<code>stream</code>)</td>
+<td><a href="/docs/collaboration/#transports">live collaboration</a>: <code>stream</code> (gRPC streams) or <code>poll</code> (containers)</td>
+</tr>
+</tbody>
+</table>
+<p><code>-h</code> is help, <code>-V</code> the version. There is no other <code>-h</code>.</p>
+<p>Prompts only happen when stdin is a terminal and <code>--non-interactive</code> is not set, so
+scripts and tests never hang. <code>-y</code> answers confirmations (overwrite on restore, rotate,
+rekey, re-issue shards, writing all keys to one directory, dropping rejected rows) but
+never invents a missing source, symbol or duration.</p>
+<h2 id="other-environment-variables">Other environment variables</h2>
+<table>
+<thead>
+<tr>
+<th>variable</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MUNINN_PASSWORD</code></td>
+<td>password that unlocks the service key (else a hidden prompt)</td>
+</tr>
+<tr>
+<td><code>MUNINN_EXPORT_PASSWORD</code></td>
+<td>password for key exports and encrypted backups (falls back to <code>MUNINN_PASSWORD</code>)</td>
+</tr>
+<tr>
+<td><code>MUNINN_SHARD_PASSWORD</code></td>
+<td>password that seals <a href="/docs/dark-shards/">dark shards</a> (else asked for)</td>
+</tr>
+<tr>
+<td><code>MUNINN_LOG</code></td>
+<td>tracing filter, e.g. <code>debug</code></td>
+</tr>
+<tr>
+<td><code>MUNINN_RAW_DATA</code></td>
+<td>folder with the full raw CSVs for the ignored full-file tests</td>
+</tr>
+<tr>
+<td><code>MUNINN_CARGO</code></td>
+<td>cargo used to build <a href="/docs/code-spaces/">code spaces</a> (default: <code>cargo</code> on <code>PATH</code>)</td>
+</tr>
+<tr>
+<td><code>MUNINN_CODE_TARGET</code></td>
+<td>cargo target directory for code space builds (default: <code>&lt;home&gt;/code/target</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="exit-status">Exit status</h2>
+<p><code>0</code> on success, <code>1</code> on any error (the message goes to stderr), <code>2</code> for invalid
+command-line usage (clap).</p>
+<h2 id="examples">Examples</h2>
+<pre><code>mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance -y
+mnnn -q export --format csv --out - --symbol BTC/USDT --from 2026-10-01 | head
+mnnn sources list
+mnnn author add --name &quot;Ada Lovelace&quot; --email ada@example.org
+mnnn history tree
+mnnn model create trades --fields &quot;symbol:text!; price:real; side:text choices=buy|sell&quot;
+mnnn model record list trades --where &quot;price &gt; 3000&quot; --sort -price
+mnnn code create fast --lang math --model bars --group symbol --source &quot;fast = sma(close, 10)&quot;
+mnnn code run fast -y
+mnnn org create &quot;Comet Lab&quot; --public
+mnnn org host start --port 8443
+mnnn review request journal &quot;field notes&quot; --allow comment,suggest
+mnnn help keys
+mnnn help --search shard
+</code></pre>
+<h2 id="man-pages">Man pages</h2>
+<p>Man pages are generated from the same clap definitions, so they never drift:
+<code>mnnn.1</code> plus one page per subcommand (<code>mnnn-ingest-csv.1</code>, <code>mnnn-keys-rotate.1</code>, ...).
+They are committed under <code>man/</code> and regenerated with:</p>
+<pre><code>cargo run -- man --out man          # hidden subcommand
+</code></pre>
+<p>Install for your user and read:</p>
+<pre><code>mkdir -p ~/.local/share/man/man1
+cp man/*.1 ~/.local/share/man/man1/
+man mnnn
+man mnnn-ingest-csv
+</code></pre>
+<p>See also <a href="/docs/tui/">TUI</a>, <a href="/docs/help/">in-app help</a>.</p>
+<h2 id="importing-a-whole-path">Importing a whole path</h2>
+<pre><code class="language-sh">mnnn ingest path ~/Projects/kommandosaldat/raw/data -y              # source from each name (binance_…, coinbase_…)
+mnnn ingest path ~/Downloads/export --source coinbase -y           # set it explicitly
+mnnn ingest path ./exports --no-recursive --records data.bars
+</code></pre>
+<p><code>mnnn ingest path &lt;PATH&gt;</code> (or <code>--path</code>) ingests every CSV-like (<code>.csv .tsv .txt</code>) and
+JSON-like (<code>.json .ndjson .jsonl</code>) file under a directory, recursively; hidden entries
+are skipped. CSV options: <code>--delimiter</code>, <code>--no-header</code>; JSON: <code>--records</code>. Each file
+prints <code>[i/n] relative/path</code> on stderr, and on a terminal a live <code>file % · overall %</code>
+line. Each file is its own transaction; Ctrl-C keeps finished files, rolls back the
+current one and is recorded in the run ledger (<code>mnnn ingest runs</code>). <code>ingest csv</code> and
+<code>ingest json</code> also search directories recursively now; <code>--no-recursive</code> limits any
+of them to the top level.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/cli.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

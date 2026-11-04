@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Postgres service · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a class="current" aria-current="page" href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="postgres-service">Postgres service</h1>
+<pre><code>mnnn ingest service postgres (--url URL | --username USER --host HOST [--port 5432]
+     [--database postgres] [--secure]) [--password P | --password-env VAR | --password-stdin]
+     [--ca-cert FILE] [--schema public] (--table NAME | --query SQL|@FILE) [--batch 10000]
+     [--timeout 30] [--source NAME] [--symbol PAIR] [--duration 5m] [--map COL=FIELD]...
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>flag</th>
+<th>default</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--url</code></td>
+<td></td>
+<td><code>postgres://user:pass@host:port/db?sslmode=...</code>; conflicts with the connection flags</td>
+</tr>
+<tr>
+<td><code>--username</code></td>
+<td>required unless <code>--url</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>--password</code></td>
+<td>empty</td>
+<td>prefer <code>--password-env</code> / <code>--password-stdin</code></td>
+</tr>
+<tr>
+<td><code>--host</code></td>
+<td>required unless <code>--url</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>--port</code></td>
+<td>5432</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--database</code></td>
+<td><code>postgres</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>--secure</code></td>
+<td>off</td>
+<td>on: <code>sslmode=require</code>; off: <code>sslmode=prefer</code></td>
+</tr>
+<tr>
+<td><code>--ca-cert</code></td>
+<td></td>
+<td>verify the server certificate and host name (verify-full)</td>
+</tr>
+<tr>
+<td><code>--schema</code></td>
+<td><code>public</code></td>
+<td>used with <code>--table</code></td>
+</tr>
+<tr>
+<td><code>--table</code> / <code>--query</code></td>
+<td>one required</td>
+<td></td>
+</tr>
+<tr>
+<td><code>--batch</code></td>
+<td>10000</td>
+<td>rows per fetch from a server-side cursor</td>
+</tr>
+</tbody>
+</table>
+<p>Each row is fetched as JSON (<code>row_to_json</code>), so any column types work. With <code>--table</code>
+the table name is used to derive the symbol and duration. The source defaults to the
+database host when <code>--source</code> is not given.</p>
+<h2 id="example">Example</h2>
+<pre><code>mnnn ingest service postgres --username quant --host db.local --database market \
+  --password-env PGPASSWORD --table btcusdt_5m --source binance --symbol BTC/USDT
+</code></pre>
+<h2 id="failure-modes">Failure modes</h2>
+<ul>
+<li><code>--url</code> together with <code>--host</code> etc.: usage error.</li>
+<li>Neither <code>--table</code> nor <code>--query</code>: usage error.</li>
+<li>TLS required by the server without <code>--secure</code>: &quot;prefer&quot; negotiates TLS if offered.</li>
+<li>Authentication failure: reported without echoing the password.</li>
+</ul>
+<p>See also <a href="/docs/services/sqlite/">SQLite</a>, <a href="/docs/services/http/">HTTP</a>, <a href="/docs/services/redis/">Redis</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/services/postgres.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

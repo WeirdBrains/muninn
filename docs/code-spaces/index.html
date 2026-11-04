@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Code spaces · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a class="current" aria-current="page" href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="code-spaces">Code spaces</h1>
+<p>A code space is a program kept in your Muninn database. It reads records (bars or any
+<a href="/docs/models/">model</a>), can change and create records and models, and returns a <strong>result</strong>:
+a table, a chart, text, or tiles of these. Code spaces are written in one of four
+languages and always end up as a <strong>native plugin</strong>, a shared library that Muninn loads
+and runs.</p>
+<table>
+<thead>
+<tr>
+<th>language</th>
+<th><code>--lang</code></th>
+<th>you write</th>
+<th>needs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Math</td>
+<td><code>math</code></td>
+<td>one formula per line: <code>fast = sma(close, 10)</code></td>
+<td>cargo</td>
+</tr>
+<tr>
+<td>Polars</td>
+<td><code>polars</code></td>
+<td>one Polars expression per line: <code>ret = col(&quot;close&quot;).pct_change(lit(1))</code></td>
+<td>cargo (first build compiles polars, a few minutes)</td>
+</tr>
+<tr>
+<td>Rust</td>
+<td><code>rust</code></td>
+<td>a <code>run(host)</code> function against the <a href="#the-sdk">SDK</a></td>
+<td>cargo</td>
+</tr>
+<tr>
+<td>Python</td>
+<td><code>python</code></td>
+<td>typed functions, one column each</td>
+<td>cargo (<a href="#python-in-rust">Python in Rust</a>)</td>
+</tr>
+<tr>
+<td>prebuilt</td>
+<td><code>plugin</code></td>
+<td>the path of a library built elsewhere</td>
+<td>nothing</td>
+</tr>
+</tbody>
+</table>
+<pre><code>mnnn code create fast --lang math --model bars --where &quot;symbol = BTC/USDT&quot; --sort timestamp \
+    --source $'@title SMA cross\nfast = sma(close, 10)\nslow = sma(close, 30)\ncross = if(fast &gt; slow, 1, 0)'
+mnnn code run fast -y
+</code></pre>
+<h2 id="trust-what-a-code-space-can-do">Trust: what a code space can do</h2>
+<p>A code space runs <strong>as native code inside Muninn, with your rights</strong>: it can do anything
+your user can (read files, open connections), not only what the host API offers. So:</p>
+<ul>
+<li>a new code space, and every change to its source (or to the library file of a prebuilt
+plugin), has to be <strong>approved</strong> before it runs. <code>mnnn code run</code> asks (<code>-y</code> says yes;
+<code>--non-interactive</code> without <code>-y</code> refuses), <code>mnnn code approve</code> approves without running,
+and the TUI asks with <code>y</code>/<code>n</code>. The approval is bound to a hash of the exact source (and
+language), shown by <code>mnnn code show</code>.</li>
+<li>code spaces from a <a href="/docs/projects/">project archive</a> arrive <strong>not approved</strong>, without
+builds or results: read them before you run them.</li>
+<li>rules run only approved code spaces (<code>run-code</code> fails otherwise).</li>
+<li>the host API has no way to read your keys, passwords or secrets, and run logs never
+contain them. A code space still runs as you, so only approve code you trust.</li>
+</ul>
+<p>Nothing a code space does is hidden: the run is a <code>code.run</code> action in the
+<a href="/docs/history/">action history</a> (origin <code>cli</code>, <code>tui</code> or <code>rule</code>, the current
+<a href="/docs/authors/">author</a>), and every record it changes or creates is recorded under it, with
+the previous values of changed fields.</p>
+<h2 id="input">Input</h2>
+<p>A code space may name its <strong>input</strong>, the records it gets with <code>host.input()</code> (math,
+Polars and Python always work on it):</p>
+<pre><code>--model MODEL [--where &quot;FIELD OP VALUE&quot;]… [--matching TEXT] [--group F] [--sort F|-F] [--limit N]
+</code></pre>
+<p>In the TUI (and in <code>mnnn code show</code>) the input is one line:
+<code>bars where symbol = BTC/USDT; close &gt; 3 group symbol sort -timestamp limit 500</code>
+(<code>none</code> for no input). Conditions are those of <a href="/docs/models/">model records</a>; <code>-F</code> sorts
+descending. With <code>--group</code>, math, Polars and Python compute per group (for example per
+symbol), so a moving average never runs across two symbols.</p>
+<p>In the TUI, <code>i</code> or the <strong>[Input]</strong> button (in the list's key bar and on the editor's input
+line) opens the input picker: pick a model (or <code>none</code>), then edit its where, matching,
+group, sort and limit parts while the resulting line is shown above them; &quot;use this
+input&quot; (or <code>u</code>) saves it, &quot;type the whole line…&quot; edits it as text. The picker also lists
+whole sources: any live search, a journal, another code space's output.</p>
+<p>The input is a <strong>default</strong>, a convenience: a code space works on whatever is piped into
+it and keeps none of it. <code>mnnn code run SPACE --input SOURCE</code> runs it over other data
+without changing it; <code>mnnn code edit SPACE --input search:NAME</code> (or <code>journal:NAME</code>,
+<code>code:SPACE</code>) sets a default from another source. Sharing data into a code space
+(<a href="/docs/share/">share</a>) runs it over that data, and <a href="/docs/pipes/">pipes</a> chain sources, code
+spaces, filters and saves.</p>
+<h2 id="math">Math</h2>
+<p>One line per formula, <code>NAME = EXPRESSION</code>. A name is an input field (<code>close</code>, <code>volume</code>,
+a designed field) or an earlier line. Every value is a column: one number per record,
+missing values are <code>NaN</code>. Operators: <code>+ - * / %</code>, comparisons, <code>and</code>, <code>or</code>, <code>not</code>.
+In a pipeline with several inputs (fan-in), plain names are fields of the first input and
+<code>INPUT.field</code> reads a named one (<code>spread = fast.close - slow.close</code>), row by row beside the
+first input's rows (<code>NaN</code> past its end).</p>
+<table>
+<thead>
+<tr>
+<th>functions</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rolling, window <code>N</code></td>
+<td><code>sma(x, N)</code> <code>ema(x, N)</code> <code>rolling_sum</code> <code>rolling_min</code> <code>rolling_max</code> <code>rolling_std</code> <code>lag(x, N)</code> <code>lead(x, N)</code></td>
+</tr>
+<tr>
+<td>along the column</td>
+<td><code>diff(x)</code> <code>pct_change(x)</code> <code>cumsum(x)</code> <code>zscore(x)</code></td>
+</tr>
+<tr>
+<td>one value per group</td>
+<td><code>sum</code> <code>mean</code> (<code>avg</code>) <code>min</code> <code>max</code> <code>std</code> <code>count</code> <code>first</code> <code>last</code></td>
+</tr>
+<tr>
+<td>per value</td>
+<td><code>abs</code> <code>sqrt</code> <code>ln</code> (<code>log</code>) <code>log10</code> <code>exp</code> <code>round</code> <code>floor</code> <code>ceil</code> <code>sign</code> <code>missing(x)</code> <code>min(a, b)</code> <code>max(a, b)</code> <code>pow(a, b)</code> <code>coalesce(a, b)</code> <code>if(c, a, b)</code></td>
+</tr>
+</tbody>
+</table>
+<p>Directives shape the result and write values back:</p>
+<table>
+<thead>
+<tr>
+<th>directive</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>@title TEXT</code></td>
+<td>the result's title</td>
+</tr>
+<tr>
+<td><code>@view chart|table|value</code></td>
+<td>a chart (the default; one stacked tile per group), every row as a table, or one row per group with its last value</td>
+</tr>
+<tr>
+<td><code>@x FIELD</code></td>
+<td>the chart's x axis (default <code>timestamp</code> when there is one)</td>
+</tr>
+<tr>
+<td><code>@show a, b</code></td>
+<td>the columns shown (default: every computed one)</td>
+</tr>
+<tr>
+<td><code>@update FIELD = NAME</code></td>
+<td>write a computed column into a field of the input records</td>
+</tr>
+</tbody>
+</table>
+<p><code>#</code> starts a comment.</p>
+<h2 id="polars">Polars</h2>
+<p>One expression of the Polars Rust DSL per line (a <code>pl.</code> prefix is allowed):
+<code>NAME = EXPR</code> adds a column, <code>where EXPR</code> keeps the rows where it holds. The input is a
+<code>DataFrame</code>: numbers as <code>Float64</code>, integers and timestamps as <code>Int64</code>, text as <code>String</code>,
+plus <code>id</code>. Directives are those of math.</p>
+<pre><code>@title Returns
+where col(&quot;volume&quot;).gt(lit(0))
+ret = col(&quot;close&quot;).pct_change(lit(1)) * lit(100)
+</code></pre>
+<p>The first Polars build compiles the polars crate (minutes); later builds reuse it.</p>
+<h2 id="rust">Rust</h2>
+<p>A Rust code space is the body of a plugin crate: a <code>pub fn run(host: &amp;Host) -&gt; Result&lt;View&gt;</code>.
+Muninn adds the crate, the <a href="#the-sdk">SDK</a> and the export macro around it.</p>
+<pre><code class="language-rust">use muninn_plugin::prelude::*;
+
+pub fn run(host: &amp;Host) -&gt; Result&lt;View&gt; {
+    let bars = host.input()?;
+    let close = bars.f64(&quot;close&quot;)?;
+    host.create_model(&quot;signals&quot;, &quot;symbol:text; score:real&quot;, &quot;made by a plugin&quot;)?;
+    for g in bars.groups() { /* per symbol */ }
+    host.update_where(&quot;bars&quot;, &amp;[&quot;symbol = BTC/USDT&quot;], Json::obj().with(&quot;note&quot;, &quot;seen&quot;))?;
+    Ok(View::chart(&quot;Close&quot;).x(&quot;timestamp&quot;, bars.f64(&quot;timestamp&quot;)?, true).line(&quot;close&quot;, close))
+}
+</code></pre>
+<h2 id="python-in-rust">Python in Rust</h2>
+<p>Python code spaces are translated to Rust inside Muninn, then built like the others;
+Python itself is never needed. Every top-level
+<code>def</code> without a leading <code>_</code> is a column: it runs once per record, its parameters are the
+record's fields by name (<code>float</code>, <code>int</code>, <code>bool</code> or <code>str</code>) and it returns <code>float</code>, <code>int</code>
+or <code>bool</code>. <code>_helpers</code> are plain functions. Directives are math's, as <code># @…</code> comments.</p>
+<pre><code class="language-python"># @title Range
+# @update spread = spread
+def spread(high: float, low: float) -&gt; float:
+    return high - low
+</code></pre>
+<p>The source is parsed by <code>ruff_python_parser</code> (pure Rust, pinned to 0.0.20) and turned
+into Rust by the code generator of <a href="https://crates.io/crates/python-ast">python-ast</a> 1.1.0,
+the engine behind Rython, vendored without its pyo3 parser (Apache-2.0, see
+<code>vendor/python-ast</code>). Muninn never embeds Python or links libpython; <code>mnnn code check</code>
+catches unsupported Python before a build.</p>
+<h2 id="prebuilt-plugins">Prebuilt plugins</h2>
+<p><code>--lang plugin</code> takes the path of a library (<code>.so</code>, <code>.dylib</code>, <code>.dll</code>) built elsewhere,
+for example with the SDK from <code>mnnn code sdk --out DIR</code>. Nothing is compiled, so it needs
+no Rust toolchain. Muninn copies the library into its cache before loading it, and the
+approval covers the file's contents: a rebuilt library has to be approved again.</p>
+<h2 id="without-a-rust-toolchain">Without a Rust toolchain</h2>
+<p>Muninn itself installs and runs without Rust. Building math, Polars, Rust and Python code
+spaces needs <code>cargo</code> (from <a href="https://rustup.rs">rustup</a>); without it these fail with a
+message saying so, while prebuilt plugins still run. <code>mnnn code check</code> lists what is
+there:</p>
+<pre><code>cargo    cargo 1.92.0
+python   built in (ruff_python_parser 0.0.20, python-ast 1.1.0)
+ABI      1 (SDK 1.0.0)
+</code></pre>
+<p><code>MUNINN_CARGO</code> points at a cargo binary that is not on <code>PATH</code>.</p>
+<h2 id="builds-and-the-cache">Builds and the cache</h2>
+<p>Builds live under <code>MUNINN_HOME/code</code> (<a href="/docs/storage-layout/">storage layout</a>):</p>
+<table>
+<thead>
+<tr>
+<th>path</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>code/sdk/muninn-plugin-HASH/</code></td>
+<td>the SDK crate the plugins build against</td>
+</tr>
+<tr>
+<td><code>code/build/KEY/</code></td>
+<td>the generated crate of one source</td>
+</tr>
+<tr>
+<td><code>code/target/</code></td>
+<td>cargo's shared target directory (<code>MUNINN_CODE_TARGET</code> moves it)</td>
+</tr>
+<tr>
+<td><code>code/plugins/KEY.so</code></td>
+<td>built libraries, by content hash</td>
+</tr>
+</tbody>
+</table>
+<p><code>KEY</code> is a hash of the language, the source, the SDK and the code generator, so an
+unchanged source is never built twice, and changing it back finds the old build. A build
+is a <code>code.build</code> action; a cached one is not. Deleting <code>code/</code> is safe: it is rebuilt
+when needed. <code>mnnn code build SPACE</code> builds without running.</p>
+<h2 id="results">Results</h2>
+<p>A run ends with an <strong>error</strong> (the plugin's error, a panic, which is caught, or a build
+error) or a <strong>result view</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>view</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>table</td>
+<td>columns and rows</td>
+</tr>
+<tr>
+<td>chart</td>
+<td>lines over an x axis (time or numbers)</td>
+</tr>
+<tr>
+<td>text</td>
+<td>Markdown</td>
+</tr>
+<tr>
+<td>tiles</td>
+<td>views side by side or stacked</td>
+</tr>
+</tbody>
+</table>
+<p>The last run is kept with the code space: its status, time, duration, writes, logs and
+view. Views follow the content view rules: tiles split side by side or stacked like
+<a href="/docs/tiling/">tiling</a>, tables and charts look as they do elsewhere. <a href="/docs/reports/">Reports</a>
+show them (<code>report add --code SPACE</code>: the last result, then the source; charts become
+images in HTML, PDF, LaTeX and Word, plus a table of each line; tables stop at 200 rows),
+the TUI shows them in the result tile, and <code>mnnn code run</code> prints them as text
+(<code>--rows N</code>, <code>--json</code>).</p>
+<h2 id="projects-reports-rules-and-archives">Projects, reports, rules and archives</h2>
+<ul>
+<li><code>mnnn project add P --code SPACE</code> (or <code>p</code> in the TUI) puts a code space in a project;
+the project's documents show it like a report section.</li>
+<li><code>mnnn report add R --code SPACE</code> adds a section with its last result and its source.</li>
+<li>the then-action <code>run-code SPACE</code> runs it from a <a href="/docs/rules/">rule</a> (approved only); its
+result line is the rule's message. Rules can react to <code>code.run</code>, <code>code.build</code> and the
+other <code>code.*</code> events (<code>mnnn rule events</code>).</li>
+<li><a href="/docs/export-formats/">project archives</a> (<code>.mnnp</code>) carry the code spaces of the project,
+of its report sections and of its rules: the source and input only, never builds,
+approvals or results. Imported spaces get <code>(imported)</code> added to a name that is taken.</li>
+</ul>
+<h2 id="changing-data">Changing data</h2>
+<p>Muninn is a general research store, so code spaces are not fenced in: they can change
+any field of any model, <strong>including bars and their built-in fields</strong> (<code>open</code> … <code>flags</code>,
+and the key fields <code>source</code>, <code>symbol</code>, <code>period</code>, <code>timestamp</code>), create records and bars,
+and create models. Bars fields go by the names the bars model gives them (see
+<a href="/docs/models/">models</a>). Nothing is deleted or silently replaced: changing a key field re-keys
+the bar, and is refused when another bar already has that key. Previous values are kept
+in the history entry of the change (up to 10,000 records per call).</p>
+<h2 id="the-host-api">The host API</h2>
+<p>Through the SDK's <code>Host</code> (and in ABI terms, a method name and a JSON request):</p>
+<table>
+<thead>
+<tr>
+<th>method</th>
+<th>SDK</th>
+<th>does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input</code></td>
+<td><code>host.input()</code></td>
+<td>the code space's input as a <code>Frame</code></td>
+</tr>
+<tr>
+<td><code>inputs</code></td>
+<td><code>host.inputs()</code></td>
+<td>the names of its inputs (several in a pipeline fan-in)</td>
+</tr>
+<tr>
+<td><code>input_named</code></td>
+<td><code>host.input_named(&quot;NAME&quot;)</code></td>
+<td>one named input as a <code>Frame</code></td>
+</tr>
+<tr>
+<td><code>input_request</code></td>
+<td><code>host.input_request()</code></td>
+<td>the input's definition</td>
+</tr>
+<tr>
+<td><code>models</code></td>
+<td><code>host.models()</code></td>
+<td>the models and their fields</td>
+</tr>
+<tr>
+<td><code>load</code></td>
+<td><code>host.load(&amp;Load::model(&quot;bars&quot;).filter(&quot;close &gt; 3&quot;).sort(&quot;-timestamp&quot;).group(&quot;symbol&quot;).limit(100))</code></td>
+<td>any records, filtered, grouped and sorted</td>
+</tr>
+<tr>
+<td><code>update</code></td>
+<td><code>host.update(model, id, values)</code></td>
+<td>change one record by id</td>
+</tr>
+<tr>
+<td><code>update_where</code></td>
+<td><code>host.update_where(model, &amp;[conditions], values)</code></td>
+<td>change every record that matches</td>
+</tr>
+<tr>
+<td><code>update_each</code></td>
+<td><code>host.update_each(model, vec![(id, values)])</code></td>
+<td>many single-record changes in one call</td>
+</tr>
+<tr>
+<td><code>create</code> / <code>create_many</code></td>
+<td><code>host.create(model, values)</code></td>
+<td>new records (bars too)</td>
+</tr>
+<tr>
+<td><code>model_create</code></td>
+<td><code>host.create_model(name, &quot;a:text; b:real&quot;, about)</code></td>
+<td>a model through the <a href="/docs/models/">designer</a> (false when it exists)</td>
+</tr>
+<tr>
+<td><code>log</code></td>
+<td><code>host.log(text)</code></td>
+<td>a line in the run's log</td>
+</tr>
+<tr>
+<td><code>result</code> / <code>error</code></td>
+<td>returned by <code>run</code></td>
+<td>the view, or the error</td>
+</tr>
+<tr>
+<td><code>methods</code></td>
+<td><code>host.methods()</code></td>
+<td>the methods this host knows</td>
+</tr>
+</tbody>
+</table>
+<p>A <code>Frame</code> holds records as columns: <code>len()</code>, <code>f64(name)</code>, <code>text(name)</code>, <code>column(name)</code>,
+<code>get(row, name)</code>, <code>ids</code>, <code>groups()</code>, <code>slice</code>, <code>take</code>. <code>series::</code> has the rolling and
+column functions math uses. <code>View::table(title, &amp;[cols]).row(…)</code>, <code>View::chart(title) .x(…).line(…)</code>, <code>View::text(title, markdown)</code> and <code>View::tiles(title, below, views)</code>
+build results.</p>
+<h2 id="the-abi">The ABI</h2>
+<p>A plugin is a shared library exporting three C symbols; this is <strong>ABI version 1</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>symbol</th>
+<th>signature</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>muninn_plugin_abi</code></td>
+<td><code>extern &quot;C&quot; fn() -&gt; u32</code></td>
+<td>the ABI version it was built for</td>
+</tr>
+<tr>
+<td><code>muninn_plugin_info</code></td>
+<td><code>extern &quot;C&quot; fn() -&gt; MnStr</code></td>
+<td>static JSON: <code>{&quot;sdk&quot;: &quot;1.0.0&quot;, &quot;lang&quot;: &quot;rust&quot;}</code></td>
+</tr>
+<tr>
+<td><code>muninn_plugin_run</code></td>
+<td><code>unsafe extern &quot;C&quot; fn(*const MnHost) -&gt; i32</code></td>
+<td>run once: 0 ok, 1 error, 2 panic</td>
+</tr>
+</tbody>
+</table>
+<p>Everything else goes through the <code>MnHost</code> table: <code>call(ctx, method, request, out)</code> takes
+a method name and a JSON request and fills <code>out</code> with the JSON reply (or an error
+message), which the plugin hands back with <code>free</code>. Memory never crosses allocators.
+Within an ABI version the types and symbols never change; new methods may be added (a
+plugin can ask with <code>methods</code>; an unknown method is an error, never a crash). Muninn
+refuses a library whose ABI version it does not support. The SDK's <code>plugin!(run)</code> macro
+writes the three symbols and catches panics.</p>
+<h2 id="the-sdk">The SDK</h2>
+<p>The <code>muninn-plugin</code> crate (version 1.0.0) is embedded in Muninn: it is written next to
+every build, and <code>mnnn code sdk --out DIR</code> writes a copy to build prebuilt plugins with
+(<code>crate-type = [&quot;cdylib&quot;]</code>, depend on it by path, end with <code>muninn_plugin::plugin!(run);</code>).</p>
+<h2 id="command-line">Command line</h2>
+<pre><code>mnnn code list [--scope user|org|org:NAME|global] [--json]   # scope: an org resource is org:SLUG
+mnnn code create NAME --lang math|polars|rust|python|plugin [--file F | --source S | --editor]
+                 [--model M --where C… --matching T --group F --sort F --limit N]
+                 [--description D] [--project P]          # no source: a starting template
+mnnn code edit SPACE [--name N] [--description D] [--lang L] [--file F | --source S | --editor]
+                 [--model M …] [--no-input]
+mnnn code show SPACE [--json | --source]       # input, approval, trust hash, last run, source
+mnnn code approve SPACE                        # asks; -y skips
+mnnn code build SPACE                          # compile (cached)
+mnnn code run SPACE [--json] [--rows N]        # asks to approve a new or changed source
+mnnn code check [SPACE]                        # the toolchains, or check a source without running it
+mnnn code remove SPACE                         # asks; -y skips (the source stays in the history)
+mnnn code sdk [--out DIR]                      # the plugin SDK
+</code></pre>
+<p><code>SPACE</code> is an id, a unique id prefix or a name; <code>mnnn codes</code> is an alias. <code>--file -</code>
+reads standard input; <code>--editor</code> opens <code>$VISUAL</code> or <code>$EDITOR</code>. <code>--from SPACE</code> starts from a
+copy of another code space or a built-in parser (<code>parse-csv</code>, <code>parse-json</code>, <code>parse-ndjson</code>,
+<code>to-bars</code>; <code>mnnn code parsers</code>). Parsers are code spaces: Muninn passes raw data through
+and code shapes it (<a href="/docs/pipes/#parsers">pipes</a>).</p>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p><code>C</code> or <strong>Projects ▸ Code spaces…</strong> opens the list: each space with <code>●</code> approved / <code>○</code>
+not, its language, its scope (<code>user</code>, <code>global</code> or <code>org:NAME</code>), input and last run.</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>list</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>j</code> / <code>k</code>, ↑ / ↓</td>
+<td>move</td>
+</tr>
+<tr>
+<td>Enter / <code>e</code></td>
+<td>open the editor</td>
+</tr>
+<tr>
+<td><code>n</code></td>
+<td>new code space: a name, then a language (starts from a template)</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>run</td>
+</tr>
+<tr>
+<td><code>m</code></td>
+<td>rename</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>add to a project</td>
+</tr>
+<tr>
+<td><code>g</code></td>
+<td>give it to one of your organizations (members get it with <code>mnnn org sync-code</code>)</td>
+</tr>
+<tr>
+<td><code>f</code></td>
+<td>cycle the scope filter: all, user, organization</td>
+</tr>
+<tr>
+<td><code>i</code></td>
+<td>the input picker for the selected space</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>delete (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>close</td>
+</tr>
+</tbody>
+</table>
+<p>The editor window has the source on the left, the <strong>result tile</strong> on the right and the
+<strong>build output</strong> below it. Keys go to the source while you edit (Esc stops editing);
+otherwise:</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>editor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>e</code> / Enter</td>
+<td>edit the source (arrows, Home/End, PgUp/PgDn, Tab = 4 spaces)</td>
+</tr>
+<tr>
+<td><code>s</code> (Ctrl+S while editing)</td>
+<td>save</td>
+</tr>
+<tr>
+<td><code>b</code></td>
+<td>build (in the background; the window stays usable)</td>
+</tr>
+<tr>
+<td><code>r</code> (Ctrl+R while editing)</td>
+<td>save, build if needed, and run; a new or changed source asks <code>y</code>/<code>n</code> first</td>
+</tr>
+<tr>
+<td><code>c</code></td>
+<td>check the source without running it</td>
+</tr>
+<tr>
+<td><code>i</code> / [Input]</td>
+<td>the default input picker (a source, or a model then where/matching/group/sort/limit)</td>
+</tr>
+<tr>
+<td><code>&gt;</code></td>
+<td>pipe the result on: into another code space, or save it to a journal or model (and keep going)</td>
+</tr>
+<tr>
+<td><code>x</code></td>
+<td>drop piped-in data (runs use the default input again)</td>
+</tr>
+<tr>
+<td><code>t</code></td>
+<td>widen the result tile / back</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>add to a project</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>back to the list (asks when there are unsaved changes: <code>y</code> discards, <code>s</code> saves)</td>
+</tr>
+</tbody>
+</table>
+<p>Opening a code space item in a project opens its editor. Runs happen in the foreground
+(the plugin works on the open database); builds happen in the background.</p>
+<h2 id="served-as-executables">Served as executables</h2>
+<p>An org node can serve code spaces as protobuf <em>executables</em> (<code>mnnn org code serve</code>):
+listed by <code>muninn.code.v1.Executables/List</code>, run by <code>&lt;package&gt;.&lt;Service&gt;/Run</code> or
+<code>POST /o/ORG/api/run/NAME</code>, with <code>.proto</code> files at <code>/o/ORG/proto/</code>. Declare the view a
+caller gets with an <code>@view table|chart|text</code> comment. The host also answers gRPC server
+reflection (<code>grpc.reflection.v1</code>, as a guest), so <code>grpcurl HOST list</code> works; see
+<a href="/docs/org-hosting/#executables-213">org-hosting</a>.</p>
+<h2 id="several-inputs">Several inputs</h2>
+<p>In a <a href="/docs/pipelines/">pipeline</a> a code space can have several upstream nodes (fan-in). It
+runs once they have all finished: <code>input()</code> is the first, <code>input_named(&quot;NAME&quot;)</code> any of
+them by its edge name (default: the upstream node's id), and <code>inputs()</code> lists the names.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/code-spaces.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

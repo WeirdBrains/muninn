@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Dark shards · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a class="current" aria-current="page" href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="dark-shards">Dark shards</h1>
+<p>The master key can be split among peers you exchanged keys with, so that losing every
+copy of the <a href="/docs/keys/">24 words and paper shards</a> is not the end. Shards go to nodes of
+<a href="/docs/users/">trusted connections</a> (and your own nodes): <code>mnnn net shard entrust</code> asks
+before using a node whose user you have not trusted, and the TUI lists only trusted ones.</p>
+<pre><code>mnnn net shard entrust --to ben --to cleo --to dev --threshold 2
+mnnn net shard list
+mnnn net shard restore [--backup net-backup.age] [--recover] [--print-words]
+mnnn net shard drop ID          # stop holding someone's shard
+</code></pre>
+<h2 id="what-happens">What happens</h2>
+<ul>
+<li><strong>Entrust.</strong> The master key (from the words, <code>--words-file</code>, 3 <code>--shard</code> files
+or an exported <code>--master-file</code>; it is never stored, so an unlocked database alone
+is not enough) is split with Shamir's scheme: one shard per exchange, any <em>threshold</em>
+of them restore it (default: a majority, at least 2; the peers must be different
+nodes). Each shard is sealed with your <strong>shard password</strong> (Argon2id + XChaCha20,
+bound to the set and shard number) before it leaves, and travels inside the
+exchange's sealed channel. Peers store a blob they cannot open — a <em>dark</em> shard.
+An exchange whose short code was never verified asks first, unless its node belongs to a trusted connection.</li>
+<li><strong>Restore.</strong> <code>restore</code> asks your peers for the shards they hold for you, opens
+them with the shard password and rebuilds the key; it checks the key against the
+database, or with <code>--recover</code> (default with <code>--backup</code>) sets a new Muninn
+password. <code>--print-words</code> shows the 24 words again.</li>
+<li><strong>From nothing.</strong> With an <a href="/docs/key-exchanges/#backups">exchange backup</a> the node
+restores its identity and can ask its peers. Each shard is also stored under a
+<em>claim</em> derived from the shard password, so even a fresh identity can claim it.</li>
+</ul>
+<p>The shard password comes from <code>MUNINN_SHARD_PASSWORD</code>, else it is asked for. Keep it
+apart from the Muninn password. Nothing secret is logged; the history records only
+which sets went to which exchanges (<code>net.shard.entrust</code>, <code>net.shard.restore</code>) and
+the holders record <code>net.shard.hold</code>.</p>
+<h2 id="in-the-tui">In the TUI</h2>
+<p>Net ▸ Dark shards ▸ Held &amp; entrusted… lists the shards you entrusted and those you hold for others
+(<code>d</code> drops one you hold). <code>e</code> (or Net ▸ Dark shards ▸ Entrust…) opens the entrust form:</p>
+<ul>
+<li><strong>Nodes.</strong> Every node of a trusted connection is listed (the others are counted as
+hidden; trust one under Net ▸ Connections…, <code>t</code>); Space picks it. Each picked node
+gets one shard.</li>
+<li><strong>Key file.</strong> The master key is never stored, so the form reads it from a file:
+<code>master.key.age</code> or <code>words.txt.age</code> from <code>mnnn keys export --out DIR --only master,words</code>, or your 24 words saved to a plain file (<em>file pass</em> opens <code>.age</code>
+files). It is checked against this database. The words are never typed in or shown
+by the TUI.</li>
+<li><strong>Shard password</strong> (twice) and <strong>threshold</strong>: suggested as a majority (at least 2)
+and editable. Passwords are masked, cleared after use and never logged.</li>
+<li><strong>Entrust</strong> first checks that every picked node is online (so a set is never half
+placed), then shows each node's status: <code>✓ ben: holds shard 1/3</code>.</li>
+<li><strong>Check restore</strong> asks your connections for their shards with the shard password
+and tells you whether they rebuild this database's key. It changes nothing; to
+actually recover, use <code>mnnn net shard restore</code>.</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/dark-shards.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

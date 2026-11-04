@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Themes · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a class="current" aria-current="page" href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="themes">Themes</h1>
+<pre><code>mnnn theme list
+mnnn theme show
+mnnn theme set &lt;NAME&gt;
+mnnn theme mode &lt;light|dark|system&gt;
+mnnn theme export &lt;NAME&gt; --out FILE
+mnnn theme import FILE
+mnnn theme reset &lt;NAME&gt;
+</code></pre>
+<h2 id="built-in-themes">Built-in themes</h2>
+<p>Each has a dark and a light variant, with palettes from the published theme specs:</p>
+<table>
+<thead>
+<tr>
+<th>theme</th>
+<th>dark</th>
+<th>light</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tokyo-night</code> (default)</td>
+<td>Tokyo Night (Night)</td>
+<td>Tokyo Night Day</td>
+</tr>
+<tr>
+<td><code>catppuccin</code></td>
+<td>Mocha</td>
+<td>Latte</td>
+</tr>
+<tr>
+<td><code>gruvbox</code></td>
+<td>Gruvbox Dark</td>
+<td>Gruvbox Light</td>
+</tr>
+<tr>
+<td><code>dracula</code></td>
+<td>Dracula</td>
+<td>Alucard</td>
+</tr>
+<tr>
+<td><code>nord</code></td>
+<td>Nord (Polar Night)</td>
+<td>Nord Light (Snow Storm base)</td>
+</tr>
+<tr>
+<td><code>one</code></td>
+<td>One Dark</td>
+<td>One Light</td>
+</tr>
+<tr>
+<td><code>solarized</code></td>
+<td>Solarized Dark</td>
+<td>Solarized Light</td>
+</tr>
+</tbody>
+</table>
+<p>Built-ins are compiled in and written to <code>~/.muninn/themes/&lt;name&gt;/</code> on first use. Edit
+them there, or <code>mnnn theme reset &lt;name&gt;</code> to get the shipped version back.</p>
+<h2 id="modes">Modes</h2>
+<ul>
+<li><code>light</code> / <code>dark</code>: use that variant.</li>
+<li><code>system</code>: ask the terminal for its background color (OSC 11; luminance &lt; 0.5 means
+dark), then the OS preference (freedesktop portal <code>org.freedesktop.appearance color-scheme</code> on Linux, <code>AppleInterfaceStyle</code> on macOS, <code>AppsUseLightTheme</code> on
+Windows), else dark. Re-checked when the terminal regains focus.</li>
+<li><code>--theme-mode</code> / <code>MUNINN_THEME_MODE</code> override the mode for one run.</li>
+</ul>
+<p>Defaults in <a href="/docs/preferences/">preferences</a>: <code>name = &quot;tokyo-night&quot;</code>, <code>mode = &quot;system&quot;</code>.</p>
+<h2 id="interfacetoml">interface.toml</h2>
+<pre><code class="language-toml">[meta]
+name = &quot;my-theme&quot;          # folder name: letters, digits, - and _
+display_name = &quot;My Theme&quot;
+author = &quot;me&quot;
+base = &quot;Tokyo Night&quot;
+
+[dark]
+variant_name = &quot;My Theme Dark&quot;
+bg = &quot;bg&quot;                  # a palette name ...
+fg = &quot;#c0caf5&quot;             # ... or a literal #rrggbb
+# every role below is required
+muted = &quot;comment&quot;
+# border, border_focus, selection_bg, selection_fg, accent, header, up, down,
+# warning, error, success, info, chart_1 .. chart_6
+
+[dark.palette]
+bg = &quot;#1a1b26&quot;
+comment = &quot;#565f89&quot;
+
+[light]
+# same roles
+
+[light.palette]
+</code></pre>
+<p>Roles: <code>bg</code>, <code>fg</code>, <code>muted</code>, <code>border</code>, <code>border_focus</code>, <code>selection_bg</code>, <code>selection_fg</code>,
+<code>accent</code>, <code>header</code>, <code>up</code> (bull candle), <code>down</code> (bear candle), <code>warning</code>, <code>error</code>,
+<code>success</code>, <code>info</code>, <code>chart_1</code> ... <code>chart_6</code>. A theme missing <code>[dark]</code> or <code>[light]</code>, a role,
+or with a value that is neither <code>#rrggbb</code> nor a palette name fails validation; the TUI
+then falls back to the default theme and says why. <code>assets/</code> next to the file is free
+for your own extras.</p>
+<p>Terminals without truecolor get the nearest 256-colour (or 16-colour) approximation,
+based on <code>COLORTERM</code> and <code>TERM</code>.</p>
+<h2 id="selector-tui-screen-5">Selector (TUI, screen 5)</h2>
+<p>↑/↓ choose a theme; the right side previews the navigator, a bar table and candles in
+<strong>both</strong> variants side by side. Enter applies it, <code>m</code> cycles the mode
+(system → dark → light), <code>e</code> opens the editor, <code>R</code> resets a built-in.</p>
+<h2 id="editor">Editor</h2>
+<p>↑/↓ pick a role, ←/→ cycle through the theme's palette, Enter types a hex value,
+<code>v</code> switches between the dark and light variant, <code>g</code> generates a starting variant
+from the other one, <code>s</code> saves as a new theme, <code>R</code> resets to the base, Esc leaves. The
+preview updates live and a warning appears when fg/bg, selection or header contrast
+drops below 4.5:1 (WCAG AA). Solarized Light's published body text is 4.13:1, so it
+shows that warning by design.</p>
+<p>Themes are part of every backup (<a href="/docs/backup-recovery/">backup and recovery</a>).</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/themes.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

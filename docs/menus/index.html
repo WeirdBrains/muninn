@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Menus · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a class="current" aria-current="page" href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="menus">Menus</h1>
+<p>The menu bar sits under the header: <strong>File, View, Data, Projects, Net, Orgs, Keys, Theme, Help</strong>.
+The nine categories fit in 80 columns; the <code>F10 menu · Alt+letter</code> hint follows them when
+there is room. Dropdowns open directly below their category and never cover the bar (on a
+short terminal a long dropdown is clipped at the bottom instead).</p>
+<h2 id="opening-and-moving">Opening and moving</h2>
+<table>
+<thead>
+<tr>
+<th>input</th>
+<th>effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F10</td>
+<td>open the first menu (File)</td>
+</tr>
+<tr>
+<td>Alt+letter</td>
+<td>open the menu with that underlined letter (Alt+F File, Alt+V View, Alt+D Data, Alt+P Projects, Alt+N Net, Alt+O Orgs, Alt+K Keys, Alt+T Theme, Alt+H Help)</td>
+</tr>
+<tr>
+<td>mouse click</td>
+<td>click a menu title to open or close it, click an item to run it</td>
+</tr>
+<tr>
+<td>← → / h l</td>
+<td>previous / next menu; ← also closes a submenu</td>
+</tr>
+<tr>
+<td>↑ ↓ / k j</td>
+<td>move inside a dropdown</td>
+</tr>
+<tr>
+<td>Enter, Space, →</td>
+<td>run the item, or open its submenu (<code>▸</code>)</td>
+</tr>
+<tr>
+<td>underlined letter</td>
+<td>run that item directly (letters win over h/j/k/l)</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>close the submenu, then the menu</td>
+</tr>
+</tbody>
+</table>
+<p>Each item shows its keyboard shortcut on the right. Greyed-out items are not available
+right now (for example <strong>Keys ▸ Initialize…</strong> once keys exist, or <strong>Recover</strong> while the
+database is unlocked).</p>
+<h2 id="actions">Actions</h2>
+<p>Every menu item runs a named action. The same actions are bound to keys
+(<a href="/docs/keybindings/">keybindings</a>), so a menu item and its shortcut always do the same thing.</p>
+<table>
+<thead>
+<tr>
+<th>menu</th>
+<th>items</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>File</td>
+<td>Import… · Export… · Backup ▸ (Create, Restore) · Authors… · Preferences… · Quit</td>
+</tr>
+<tr>
+<td>View</td>
+<td>New tile ▸ · Split ▸ · Close tile · Zoom tile · Equalize · Change view · Link tile · Chart layers… · Container ▸ · Layouts ▸ · Toggle sidebar · History ▸ (Show/hide history bar, Step back, Step forward)</td>
+</tr>
+<tr>
+<td>Data</td>
+<td>Sources… · Symbols… · Filters ▸ (Source, Symbol, Time range…, Price, Period, Year, Clear all) · Sort ▸ · Coverage &amp; gaps · Model designer… · Refresh</td>
+</tr>
+<tr>
+<td>Projects</td>
+<td>Projects… · New project… · Live searches… · Save search as live search… · Journals… · New journal… · Reports… · New report… · Reviews ▸ (Reviews…, Ask for a review…, Thread…, Reviewing (joined)…) (<a href="/docs/reviews/">reviews</a>) · Rules… · Code spaces… · Pipes (live)… (<a href="/docs/pipes/">pipes</a>) · Pipelines… (<code>E</code>, <a href="/docs/pipelines/">pipelines</a>) · Add selected series to project…</td>
+</tr>
+<tr>
+<td>Net</td>
+<td>Node ▸ (Status… <code>K</code>, Start node, Stop node, Settings…) · Connections… · Invites… · Invite or connect… · Nodes… · Peers… · Peers, messages &amp; live… <code>W</code> · Relays… · Shared data… · Network search… · Dark shards ▸ (Held &amp; entrusted…, Entrust…) (<a href="/docs/network/">network</a>, <a href="/docs/collaboration/">collaboration</a>, <a href="/docs/key-exchanges/">key exchanges</a>, <a href="/docs/dark-shards/">dark shards</a>)</td>
+</tr>
+<tr>
+<td>Orgs</td>
+<td>Organizations… <code>G</code> · New organization… · Members… · Roles… · Resources… · Joined &amp; browse… · Site &amp; certificate… · Start site · Stop site (<a href="/docs/organizations/">organizations</a>, <a href="/docs/org-hosting/">org hosting</a>)</td>
+</tr>
+<tr>
+<td>Keys</td>
+<td>Initialize… · Lock · Rotate service key · Rekey database · Export… · Recover ▸ · Re-issue shards</td>
+</tr>
+<tr>
+<td>Theme</td>
+<td>Select… · Mode ▸ (Light, Dark, System) · Edit current… · New from current… · Import… · Export…</td>
+</tr>
+<tr>
+<td>Help</td>
+<td>Help topics · Search help… · Keybindings · About Muninn</td>
+</tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li><strong>Backup ▸ Restore</strong>, <strong>Keys ▸ Rekey database</strong> and <strong>Keys ▸ Export…</strong> show the
+command to run from the shell: they replace or rewrite the open database, or handle
+the 24 words, so they don't run inside the TUI. See <a href="/docs/keys/">keys</a> and
+<a href="/docs/backup-recovery/">backup and recovery</a>.</li>
+<li><strong>Keys ▸ Lock</strong> closes the TUI; the key material is dropped from memory.</li>
+<li><strong>Backup ▸ Create</strong>, <strong>Rotate service key</strong> and <strong>Re-issue shards</strong> open the keys
+dialog on that action.</li>
+<li><strong>Theme</strong> items open the <a href="/docs/themes/">theme</a> selector or editor; <strong>Import…/Export…</strong>
+ask for a file path.</li>
+<li><strong>Projects</strong> opens <a href="/docs/projects/">projects</a>, <a href="/docs/live-searches/">live searches</a>,
+<a href="/docs/journals/">journals</a>, <a href="/docs/reports/">reports</a>, <a href="/docs/rules/">rules</a> and
+<a href="/docs/code-spaces/">code spaces</a>.</li>
+<li><strong>File ▸ Authors…</strong> manages <a href="/docs/authors/">authors</a> and the current author.</li>
+<li><strong>View ▸ History</strong> shows the <a href="/docs/history/">history</a> bar and steps through it.</li>
+<li><strong>File ▸ Preferences…</strong> toggles the header size, the sidebar, the history bar and zero-volume
+handling (<a href="/docs/preferences/">preferences</a>).</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/menus.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

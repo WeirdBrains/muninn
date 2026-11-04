@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Rules · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a class="current" aria-current="page" href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="rules">Rules</h1>
+<p>A rule says <strong>when this happens, do that</strong>. Every action Muninn records in the
+<a href="/docs/history/">action history</a> is an event; a rule names the kinds it reacts to
+(<code>on</code>), optional conditions on the action (<code>if</code>), and then-actions to run in order
+(<code>then</code>).</p>
+<pre><code>mnnn rule create &quot;Weekly after import&quot; --on import --if &quot;inserted &gt; 0&quot; \
+    --then &quot;export-report Weekly to=~/reports/weekly-{date}.pdf&quot; \
+    --then &quot;status exported the weekly report&quot;
+</code></pre>
+<h2 id="where-rules-live">Where rules live</h2>
+<p>A rule lives in one place, its <strong>home</strong>: standalone, a <a href="/docs/journals/">journal</a>, a
+<a href="/docs/live-searches/">live search</a> or a <a href="/docs/models/">model</a>. Independently, it can be in any number of
+<a href="/docs/projects/">projects</a>; a project's rules are its <strong>rule set</strong> (<code>project add --rule</code>,
+or <code>--project</code> on <code>rule create</code>). The home is also the default target: a then-action
+without a journal, live search, model or project uses the rule's own.</p>
+<p><code>--related</code> (or &quot;Lives in&quot; with a journal or live search) makes the rule only react to
+actions that mention its home, for example entries written in its journal.</p>
+<p>Removing a journal, live search or model keeps its rules, as standalone rules that are
+switched off. Removing a rule takes it out of every project.</p>
+<h2 id="when-events-and-fields">When: events and fields</h2>
+<p><code>--on</code> takes action kinds: <code>import</code>, <code>journal.create</code>, <code>journal.*</code> or <code>*</code>. <code>mnnn rule events</code> lists every kind with its fields. Rule actions (<code>rule.*</code>) never trigger rules.</p>
+<p><code>--if</code> conditions all have to hold: <code>FIELD OP VALUE</code>.</p>
+<table>
+<thead>
+<tr>
+<th>op</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>=</code> <code>!=</code></td>
+<td>equal (text ignores case; <code>*</code> is a wildcard) / not equal</td>
+</tr>
+<tr>
+<td><code>~</code> <code>!~</code></td>
+<td>contains / does not contain</td>
+</tr>
+<tr>
+<td><code>&gt;</code> <code>&gt;=</code> <code>&lt;</code> <code>&lt;=</code></td>
+<td>numbers compare as numbers</td>
+</tr>
+<tr>
+<td><code>FIELD ?</code> / <code>FIELD !?</code></td>
+<td>present / missing</td>
+</tr>
+</tbody>
+</table>
+<p>Fields: <code>kind</code>, <code>summary</code>, <code>origin</code> (<code>cli</code>, <code>tui</code>, <code>rule</code>), <code>author</code>, <code>author_id</code>,
+<code>action</code> (the action id), <code>before.X</code> and <code>after.X</code> (view state), and the action's own
+params (<code>inserted</code>, <code>name</code>, <code>journal</code>, <code>files</code>, …). A list field matches when any of
+its values does. <code>mcp:SERVER/TOOL(key=value,…).path</code> reads an external
+<a href="/docs/mcp/#in-rule-sets">MCP</a> tool's result (approved tools only).</p>
+<h2 id="then-actions">Then: actions</h2>
+<table>
+<thead>
+<tr>
+<th>then</th>
+<th>does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>status TEXT</code></td>
+<td>a message: the TUI status line, or stderr on the command line</td>
+</tr>
+<tr>
+<td><code>search [SEARCH]</code></td>
+<td>runs a live search and reports how many it matches</td>
+</tr>
+<tr>
+<td><code>export-report REPORT to=PATH [format=F]</code></td>
+<td>exports a <a href="/docs/reports/">report</a></td>
+</tr>
+<tr>
+<td><code>export-journal [JOURNAL] to=PATH [format=F]</code></td>
+<td>exports a journal</td>
+</tr>
+<tr>
+<td><code>add-to-project [PROJECT] [item=subject|search:S|journal:J|report:R]</code></td>
+<td>adds an item to a project; <code>subject</code> is what the action was about</td>
+</tr>
+<tr>
+<td><code>entry [JOURNAL] &quot;TEXT&quot; [title=T]</code></td>
+<td>writes a journal entry</td>
+</tr>
+<tr>
+<td><code>note [JOURNAL] &quot;TEXT&quot;</code></td>
+<td>adds a note to a journal</td>
+</tr>
+<tr>
+<td><code>model-create NAME fields=&quot;a:text; b:real&quot; [about=T] [draft=yes]</code></td>
+<td>creates a <a href="/docs/models/">model</a> (applied as v1 unless <code>draft=yes</code>; nothing happens if it exists)</td>
+</tr>
+<tr>
+<td><code>model-edit [MODEL] add=SPEC change=SPEC drop=F rename=A:B move=F:N [apply=yes] [destructive=yes]</code></td>
+<td>changes a model's draft, in the order given; <code>apply=yes</code> applies it</td>
+</tr>
+<tr>
+<td><code>model-apply [MODEL] [destructive=yes]</code></td>
+<td>applies a model's draft</td>
+</tr>
+<tr>
+<td><code>model-remove [MODEL] [destructive=yes]</code></td>
+<td>removes a model (with records: <code>destructive=yes</code>)</td>
+</tr>
+<tr>
+<td><code>record-create [MODEL] FIELD=VALUE…</code></td>
+<td>adds a record</td>
+</tr>
+<tr>
+<td><code>record-update [MODEL] id=ID|where=&quot;F OP V; …&quot; FIELD=VALUE…</code></td>
+<td>changes one record, or all that match</td>
+</tr>
+<tr>
+<td><code>record-delete [MODEL] id=ID|where=&quot;F OP V; …&quot;</code></td>
+<td>deletes one record, or all that match</td>
+</tr>
+<tr>
+<td><code>run-code SPACE</code></td>
+<td>runs an approved <a href="/docs/code-spaces/">code space</a> (building it if needed); a changed or unapproved one fails</td>
+</tr>
+<tr>
+<td><code>notify TITLE [body=T] [link=KIND:ID] [level=info|warn|error]</code></td>
+<td>a <a href="/docs/notifications/">notification</a>; <code>notification</code> actions are triggers too</td>
+</tr>
+<tr>
+<td><code>broadcast TOPIC [text=T] [to=nodes|connections|all|org:SLUG]</code></td>
+<td>a <a href="/docs/notifications/#broadcasts">broadcast</a> to other nodes (queued; the running node sends it); <code>net.broadcast</code> triggers on one received</td>
+</tr>
+<tr>
+<td><code>mcp SERVER TOOL [KEY=VALUE…]</code></td>
+<td>calls an external <a href="/docs/mcp/">MCP</a> server's tool (values are templates); the tool must be approved first (<code>mnnn mcp approve</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The format comes from the file extension unless <code>format=</code> says otherwise
+(<a href="/docs/export-formats/">export formats</a>); <code>~/</code> is your home folder. Texts, titles and
+paths take templates: <code>{kind}</code>, <code>{summary}</code>, <code>{origin}</code>, <code>{author}</code>, <code>{action}</code>,
+<code>{rule}</code>, <code>{date}</code> (2026-10-29), <code>{time}</code> (143005), <code>{now}</code> (2026-10-29 14:30) and
+any field, like <code>{inserted}</code> or <code>{name}</code>; so do record values and <code>where=</code> values.
+Separate several then-actions in one string with <code>;</code>.</p>
+<p>Migrations a rule applies are noted <code>rule NAME</code> in the model's history. One that would
+throw values away fails unless it says <code>destructive=yes</code>, and a refused <code>model-edit … apply=yes</code> leaves the draft as it was. A model's own <strong>Rules</strong> screen (<code>D</code>, then <code>f</code>)
+makes rules that live in the model, starting from a <code>record-create</code> that copies the
+trigger's fields.</p>
+<p>What a rule does is recorded like anything else: a <code>rule.run</code> action under the action
+that triggered it, with the then-actions as its children (origin <code>rule</code>, the current
+<a href="/docs/authors/">author</a>). A failing then-action does not stop the others; the run is
+marked <code>failed</code> with the reason.</p>
+<h2 id="loops">Loops</h2>
+<p>Rules may trigger rules, within limits:</p>
+<ul>
+<li>a rule never runs again inside its own chain (A → B → A stops at the second A);</li>
+<li>chains stop at depth 3;</li>
+<li>at most 50 rule runs follow one action.</li>
+</ul>
+<p>A stopped run is recorded as a <code>rule.run</code> with status <code>blocked</code>.</p>
+<h2 id="command-line">Command line</h2>
+<pre><code>mnnn rule list [--json]
+mnnn rule create NAME (--on KIND | --every 6h | --cron &quot;0 3 * * *&quot;) [--if COND]... --then ACTION... [--description TEXT]
+                [--journal J | --search S | --model M] [--project P] [--related] [--disabled]
+mnnn rule edit RULE [--name N] [--on ...] [--if ...] [--clear-if] [--then ...]
+                [--journal J | --search S | --model M | --standalone] [--related | --unrelated]
+                [--every I | --cron C | --no-schedule]
+mnnn rule show RULE [--json]                 # spec, home, projects, recent runs
+mnnn rule enable RULE / disable RULE
+mnnn rule remove RULE                        # asks first; -y skips
+mnnn rule test [RULE] [--action ID]          # would it match? each condition shown
+mnnn rule dry-run [RULE] [--action ID]       # ... and what it would do
+mnnn rule events                             # kinds and their fields
+mnnn rule tick [--json]                      # run the scheduled rules that are due
+</code></pre>
+<p><code>RULE</code> is an id, a unique id prefix or a name; <code>mnnn rules</code> is an alias. <code>test</code> and
+<code>dry-run</code> check every rule when none is named, against the newest action you did
+(skipping rule runs) unless <code>--action</code> says otherwise. They never change anything.
+<code>--quiet</code> hides rule messages.</p>
+<h2 id="scheduled-rule-sets">Scheduled rule sets</h2>
+<p>A rule can run on a schedule instead of (or as well as) on actions:</p>
+<ul>
+<li><code>--every 30m</code>, <code>6h</code>, <code>1d</code>, <code>1w</code> (at least a minute): an interval after its last run; a
+new one runs at once.</li>
+<li><code>--cron &quot;0 3 * * *&quot;</code>: five fields, minute hour day month weekday, in local time, with
+<code>*</code>, lists (<code>0,30</code>), ranges (<code>9-17</code>) and steps (<code>*/15</code>); Sunday is 0 or 7.</li>
+</ul>
+<p>When a scheduled rule is due, a <code>schedule</code> action naming it is recorded and the rule runs
+on it like on any action (its <code>--if</code> conditions see <code>rule</code>, <code>name</code> and <code>schedule</code>). Only
+that rule reacts to its schedule action, so a <code>--on &quot;*&quot;</code> rule does not fire every tick.
+<code>show</code> gives the schedule and the next run; <code>test</code> and <code>dry-run</code> check a scheduled rule
+against its schedule action unless <code>--action</code> is given; <code>edit --every</code>/<code>--cron</code> changes
+the schedule and <code>--no-schedule</code> drops it (the rule then needs <code>--on</code>).</p>
+<p>Who runs them: the TUI (about once a minute) and a running org host
+(<code>mnnn org host start</code>, or the TUI's site) check for due rules; when a host serves from
+this node, it does and the TUI leaves it to it. With neither running, call
+<code>mnnn rule tick</code> from cron or a systemd timer. A run missed while nothing was running
+happens once when something next checks.</p>
+<h3 id="the-cert-expiry-watcher">The cert expiry watcher</h3>
+<p><code>cert-expiry-watch</code> is a built-in scheduled rule set, made the first time an org gets a
+domain, a certificate of yours or ACME. It is an ordinary rule: show, edit, copy,
+switch off or remove it (removed, it is not made again). It runs every 6 hours and does
+<code>cert-watch renew=30 notify=30,14,3</code>:</p>
+<ul>
+<li><strong>Let's Encrypt certificates</strong> with fewer than <code>renew</code> days left (or none yet) are
+renewed by the running host (it is asked; renewals retry with backoff, an hour doubling
+to a day, and failures notify). With no host running it notifies you to start one.</li>
+<li><strong>Your own certificates</strong> notify once at each of the <code>notify</code> days and when they
+expire, telling you to renew with your provider and <code>mnnn org cert set</code> the new one.</li>
+</ul>
+<p>Notifications are <code>notify</code> actions (<code>level</code>, <code>about</code> = <code>cert.expiry</code> or <code>cert.renew</code>,
+<code>message</code>, <code>org</code>, <code>days_left</code>): in the history, on the status line, and triggers for
+rules (<code>--on notify --if &quot;about = cert.expiry&quot; --then &quot;status {message}&quot;</code>). The header
+bell and node broadcasts come with Notifications (a later release) and read these same
+actions.</p>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p><code>R</code> or <strong>Projects ▸ Rules…</strong> opens the Rules window: each rule with <code>●</code> on / <code>○</code> off,
+its trigger, then-actions, home and last run. Opening a rule item in a project shows
+that rule.</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>j</code> / <code>k</code>, ↑ / ↓</td>
+<td>move</td>
+</tr>
+<tr>
+<td>Enter</td>
+<td>show the rule, its runs and spec</td>
+</tr>
+<tr>
+<td><code>n</code></td>
+<td>new rule: name, on, if, then, lives in (each step checked as you go); &quot;on&quot; also takes <code>every 6h</code> or <code>cron &quot;0 3 * * *&quot;</code>, optionally <code>; KINDS</code></td>
+</tr>
+<tr>
+<td><code>e</code></td>
+<td>edit the selected rule (the same steps, filled in)</td>
+</tr>
+<tr>
+<td>Space</td>
+<td>switch on / off</td>
+</tr>
+<tr>
+<td><code>t</code> / <code>x</code></td>
+<td>test / dry run against the newest action (a scheduled rule: its schedule)</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>add to a project</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>delete (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>close the details, then the window</td>
+</tr>
+</tbody>
+</table>
+<p>&quot;Lives in&quot; takes <code>journal:NAME</code>, <code>search:NAME</code>, <code>model:NAME</code>, <code>project:NAME</code> (stays standalone and
+joins the project) or nothing. Rule messages appear on the status line as rules run,
+also after background imports.</p>
+<h2 id="archives">Archives</h2>
+<p>Project archives (<code>.mnnp</code>, <a href="/docs/export-formats/">export formats</a>) carry the project's
+rules and the rules owned by its journals, live searches and models. Imported rules come in
+<strong>switched off</strong>, so a file from someone else never acts until you turn it on.</p>
+<h2 id="rule-specs">Rule specs</h2>
+<p>A rule is stored as JSON (<code>mnnn rule show --json</code>):</p>
+<pre><code class="language-json">{&quot;version&quot;: 1, &quot;on&quot;: [&quot;import&quot;], &quot;if&quot;: [{&quot;field&quot;: &quot;inserted&quot;, &quot;op&quot;: &quot;&gt;&quot;, &quot;value&quot;: 0}],
+ &quot;then&quot;: [{&quot;do&quot;: &quot;status&quot;, &quot;text&quot;: &quot;{inserted} new bars&quot;}]}
+</code></pre>
+<p>A scheduled rule adds <code>&quot;schedule&quot;: {&quot;every&quot;: 21600000}</code> (milliseconds) or
+<code>{&quot;cron&quot;: &quot;0 3 * * *&quot;}</code>; rules without one read as before. The version and the <code>do</code> tags
+leave room for new triggers and then-actions without changing existing rules.</p>
+<p>See also: <a href="/docs/history/">action history</a>, <a href="/docs/projects/">projects</a>.</p>
+<h2 id="more-commands">More commands</h2>
+<pre><code>mnnn rule disable RULE           # switch a rule off (enable turns it back on)
+</code></pre>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/rules.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

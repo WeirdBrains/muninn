@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Storage layout · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a class="current" aria-current="page" href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="storage-layout">Storage layout</h1>
+<pre><code>~/.muninn/
+  storage/
+    muninn.database       # SQLCipher-encrypted SQLite (bars, authors, history, projects, journals, models, records and code spaces)
+  keys/
+    envelope.toml         # wrapped data key + service-key version
+    service/              # password-wrapped service key per version
+  themes/
+    &lt;theme_name&gt;/
+      interface.toml      # palette + role mapping, [dark] and [light]
+      assets/             # optional extras
+  preferences.toml        # active theme and mode, ingest defaults
+  net/                    # node.json while a node runs (pid, label, addresses; no secrets)
+  prints/                 # PDFs made by `journal print` (and P in the TUI)
+  code/                   # code space builds (safe to delete; rebuilt when needed)
+    sdk/                  # the muninn-plugin SDK the builds use
+    build/&lt;key&gt;/          # generated crate per source
+    target/               # cargo's shared target directory (MUNINN_CODE_TARGET moves it)
+    plugins/&lt;key&gt;.so      # built and prebuilt plugins, by content hash
+</code></pre>
+<ul>
+<li>The root is <code>~/.muninn</code> unless <code>--home &lt;DIR&gt;</code> or <code>MUNINN_HOME</code> is set. Tests and
+examples always use a temporary home.</li>
+<li><code>--db &lt;PATH&gt;</code> / <code>MUNINN_DB</code> points at a different database file; keys still come
+from <code>&lt;home&gt;/keys/</code>.</li>
+<li>Directories are created with mode <code>0700</code>, files with <code>0600</code>.</li>
+<li>Built-in themes are written to <code>themes/&lt;name&gt;/</code> on first use if missing.</li>
+<li><code>keys/</code> never holds the master key, the 24 words or the shards. See <a href="/docs/keys/">keys</a>.</li>
+</ul>
+<p>Everything here is included in a backup; see <a href="/docs/backup-recovery/">backup and recovery</a>.
+Preferences are described in <a href="/docs/preferences/">preferences</a>, themes in <a href="/docs/themes/">themes</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/storage-layout.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>MCP · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a class="current" aria-current="page" href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="mcp">MCP</h1>
+<p>Muninn speaks the <a href="https://modelcontextprotocol.io">Model Context Protocol</a> (MCP) both ways:</p>
+<ul>
+<li><strong>As a server</strong>, so an AI assistant or another MCP client can read your journals,
+projects, models and records, reports, live searches, code-space results and org
+executables. If its role allows, it can also write and run things.</li>
+<li><strong>As a client</strong>, so your rule sets can call the tools of external MCP servers and use
+them as data sources.</li>
+</ul>
+<p>Nothing is served until you start <code>mnnn mcp serve</code>. External servers are only called by
+you or by a rule set, and only after you approve each tool.</p>
+<h2 id="muninn-as-an-mcp-server">Muninn as an MCP server</h2>
+<h3 id="clients-and-roles">Clients and roles</h3>
+<p>Every caller is a named MCP client with a role:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>May</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>read</code> (default)</td>
+<td>list and read: the <code>list</code> and <code>read</code> tools and every resource</td>
+</tr>
+<tr>
+<td><code>write</code></td>
+<td>read, plus <code>write_entry</code>, <code>add_note</code>, <code>create_record</code>, <code>update_record</code>, <code>delete_record</code></td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td>read, plus <code>run_search</code>, <code>run_code</code> (approved code spaces only), <code>run_executable</code></td>
+</tr>
+<tr>
+<td><code>full</code></td>
+<td>everything above</td>
+</tr>
+</tbody>
+</table>
+<pre><code>mnnn mcp client add claude                 # read only; prints its token once
+mnnn mcp client add notebook --role write
+mnnn mcp client list
+mnnn mcp client role notebook full
+mnnn mcp client revoke notebook            # refused from its next call on
+mnnn mcp client restore notebook
+mnnn mcp client remove notebook
+</code></pre>
+<p>A client's token is printed only when you add it. Muninn keeps only the token's hash. To
+replace a lost token, remove the client and add it again.</p>
+<h3 id="serving">Serving</h3>
+<ul>
+<li>
+<p><strong>stdio</strong>, for one client that starts Muninn itself, such as a desktop assistant:</p>
+<pre><code>mnnn mcp serve --client claude
+</code></pre>
+<p>A client configuration that starts it looks like this:</p>
+<pre><code class="language-json">{ &quot;mcpServers&quot;: { &quot;muninn&quot;: { &quot;command&quot;: &quot;mnnn&quot;, &quot;args&quot;: [&quot;mcp&quot;, &quot;serve&quot;, &quot;--client&quot;, &quot;claude&quot;] } } }
+</code></pre>
+<p>Use <code>--home DIR</code> or <code>MUNINN_HOME</code> to serve a Muninn home other than the default. The
+database must open without prompting, so keep its key in the keyring as usual.</p>
+</li>
+<li>
+<p><strong>HTTP</strong> (Streamable HTTP, with JSON responses), for clients that connect by URL:</p>
+<pre><code>mnnn mcp serve --http                    # http://127.0.0.1:4743/mcp
+mnnn mcp serve --tls-domain mcp.example.com --tls-email you@example.com
+                                         # https://mcp.example.com/mcp: see below
+</code></pre>
+<p>Each request sends a client token as <code>Authorization: Bearer mnnn_mcp_…</code>. A missing,
+unknown or revoked token gets <code>401</code>. Requests from a browser page on another site
+(any <code>Origin</code> other than localhost) get <code>403</code>. Ctrl-C stops the server.</p>
+</li>
+</ul>
+<p>Plain HTTP listens on 127.0.0.1 by default. If you bind it beyond this machine without TLS,
+Muninn warns you. To serve other machines, use HTTPS: built in, or through a proxy.</p>
+<h3 id="https-with-lets-encrypt">HTTPS with Let's Encrypt</h3>
+<p>Give the server a public name and it gets its own certificate from Let's Encrypt, serves
+HTTPS on every address at port 443, and renews the certificate while it runs:</p>
+<pre><code>mnnn mcp serve --tls-domain mcp.example.com --tls-email you@example.com
+# https://mcp.example.com/mcp
+</code></pre>
+<ol>
+<li><strong>DNS</strong>: an <code>A</code> (and <code>AAAA</code>, if the machine has IPv6) record for the name, pointing at
+the machine. Check with <code>dig +short mcp.example.com</code>.</li>
+<li><strong>Firewall</strong>: open TCP 80 (the HTTP-01 challenge; Muninn answers only
+<code>/.well-known/acme-challenge/</code> there) and 443. Keep 4743 closed.
+<code>sudo ufw allow 80/tcp &amp;&amp; sudo ufw allow 443/tcp</code> (or <code>firewall-cmd --add-service=http --add-service=https --permanent &amp;&amp; firewall-cmd --reload</code>).</li>
+<li><strong>Ports below 1024 without root</strong>: run it as a systemd service with
+<code>AmbientCapabilities=CAP_NET_BIND_SERVICE</code> (below), or give the binary the capability
+once: <code>sudo setcap 'cap_net_bind_service=+ep' &quot;$(command -v mnnn)&quot;</code> (again after every
+upgrade, since a new binary loses it). Or pick other ports: <code>--http 0.0.0.0:8443</code> with
+<code>--acme-challenge tls-alpn-01</code> validates through the HTTPS port itself, so it needs only
+443 forwarded to 8443; <code>--acme-http-port 8080</code> needs 80 forwarded to 8080.</li>
+<li><strong>Try it on staging first</strong>: <code>--acme-staging</code> uses Let's Encrypt's staging CA, whose
+certificates browsers don't trust but whose rate limits are generous. Drop it once that
+works (the staging certificate is replaced on the next start, since it is for a
+different CA).</li>
+</ol>
+<p>Until the first certificate arrives (a few seconds), the server answers with a self-signed
+one. The certificate is kept in the database (setting <code>mcp.acme.cert</code>, apart from the
+<a href="/docs/org-hosting/">org site's</a>); the ACME account is shared with org hosting. It is
+Let's Encrypt's short-lived profile (about six days), checked every minute and renewed
+when a third of its life is left; failures are retried with back-off and logged. A
+restart serves the kept certificate at once.</p>
+<p>The same settings can live in <code>preferences.toml</code>, so <code>mnnn mcp serve --http</code> alone serves
+HTTPS (flags override them):</p>
+<pre><code class="language-toml">[mcp]
+bind = &quot;&quot;                 # default: 127.0.0.1:4743, or 0.0.0.0:443 with TLS
+
+[mcp.acme]
+enabled = true
+domain = &quot;mcp.example.com&quot;
+email = &quot;you@example.com&quot; # default: [hosting.acme] email
+directory = &quot;letsencrypt&quot; # letsencrypt-staging, or another ACME directory URL
+challenge = &quot;http-01&quot;     # or tls-alpn-01
+http_port = 80
+</code></pre>
+<p><strong>A certificate of your own</strong> instead: <code>--tls-cert fullchain.pem --tls-key privkey.pem</code>
+(or <code>[mcp] tls_cert</code>, <code>tls_key</code>). It is not renewed; restart the server after replacing
+the files.</p>
+<p>With TLS on, a browser page on the server's own name may call it; other origins still
+get <code>403</code>.</p>
+<h4 id="as-a-service">As a service</h4>
+<pre><code class="language-ini"># /etc/systemd/system/muninn-mcp.service
+[Unit]
+Description=Muninn MCP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=muninn
+Environment=MUNINN_HOME=/var/lib/muninn
+Environment=MUNINN_NON_INTERACTIVE=true
+EnvironmentFile=/etc/muninn/mcp.env
+ExecStart=/usr/bin/mnnn mcp serve --tls-domain mcp.example.com --tls-email you@example.com
+KillSignal=SIGINT
+Restart=on-failure
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/muninn
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+</code></pre>
+<p><code>/etc/muninn/mcp.env</code> (mode 0600) holds <code>MUNINN_PASSWORD=…</code> when the database key is not in
+a keyring. Then <code>sudo systemctl enable --now muninn-mcp</code> and
+<code>journalctl -u muninn-mcp -f</code> to watch it get the certificate.</p>
+<h4 id="checking-it">Checking it</h4>
+<pre><code>curl -sS https://mcp.example.com/mcp -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H 'Content-Type: application/json' -d '{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;tools/list&quot;}'
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://mcp.example.com/mcp   # 401
+openssl s_client -connect mcp.example.com:443 -servername mcp.example.com &lt;/dev/null 2&gt;/dev/null \
+  | openssl x509 -noout -issuer -dates
+</code></pre>
+<h4 id="when-it-fails">When it fails</h4>
+<ul>
+<li><strong>&quot;Let's Encrypt needs a contact address&quot;</strong>: add <code>--tls-email</code>.</li>
+<li><strong>Permission denied on :443 or :80</strong>: see step 3.</li>
+<li><strong>Address already in use</strong>: another web server holds the port. Stop it, or use
+<a href="/docs/mcp-proxy/">nginx in front</a> instead.</li>
+<li><strong>Still self-signed after a minute</strong>: the CA could not reach the challenge. Check DNS,
+that port 80 (or 443 with <code>tls-alpn-01</code>) is open and forwarded, and the log
+(failures are logged as warnings; <code>MUNINN_LOG=info</code> shows renewals too). Too many failures on production hit Let's Encrypt's rate
+limits; use <code>--acme-staging</code> while you fix it.</li>
+</ul>
+<h3 id="https-through-nginx">HTTPS through nginx</h3>
+<p>When nginx already serves ports 80 and 443 on the machine, run Muninn on plain HTTP at
+127.0.0.1:4743 and let nginx and certbot handle TLS: see <a href="/docs/mcp-proxy/">MCP behind nginx</a>
+and <a href="https://github.com/WeirdBrains/muninn/blob/main/packaging/nginx/muninn-mcp.conf"><code>packaging/nginx/muninn-mcp.conf</code></a>.</p>
+<h3 id="what-it-offers">What it offers</h3>
+<p><strong>Tools:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Needs</th>
+<th>Arguments</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>list</code></td>
+<td>read</td>
+<td><code>what</code>: journals, entries, projects, models, records, reports, searches, org_resources, executables, views, history; <code>of</code>: the journal, model or org; <code>limit</code></td>
+</tr>
+<tr>
+<td><code>read</code></td>
+<td>read</td>
+<td><code>uri</code>: a resource URI</td>
+</tr>
+<tr>
+<td><code>write_entry</code></td>
+<td>write</td>
+<td><code>journal</code>, <code>text</code>, <code>title</code></td>
+</tr>
+<tr>
+<td><code>add_note</code></td>
+<td>write</td>
+<td><code>journal</code>, <code>text</code></td>
+</tr>
+<tr>
+<td><code>create_record</code></td>
+<td>write</td>
+<td><code>model</code>, <code>values</code></td>
+</tr>
+<tr>
+<td><code>update_record</code></td>
+<td>write</td>
+<td><code>model</code>, <code>id</code>, <code>values</code></td>
+</tr>
+<tr>
+<td><code>delete_record</code></td>
+<td>write</td>
+<td><code>model</code>, <code>id</code></td>
+</tr>
+<tr>
+<td><code>run_search</code></td>
+<td>run</td>
+<td><code>search</code>, <code>limit</code></td>
+</tr>
+<tr>
+<td><code>run_code</code></td>
+<td>run</td>
+<td><code>space</code> (only once approved with <code>mnnn code approve</code>)</td>
+</tr>
+<tr>
+<td><code>run_executable</code></td>
+<td>run</td>
+<td><code>org</code>, <code>executable</code>, <code>input</code> (<code>where</code>, <code>text</code>, <code>sort</code>, <code>group</code>, <code>limit</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><code>tools/list</code> shows a client only the tools its role allows. Names and ids are accepted
+wherever Muninn's CLI accepts them.</p>
+<p><strong>Resources</strong> (<code>resources/list</code>, <code>resources/read</code>; JSON):</p>
+<table>
+<thead>
+<tr>
+<th>URI</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>muninn://journal/ID</code></td>
+<td>a journal and its entries</td>
+</tr>
+<tr>
+<td><code>muninn://project/ID</code></td>
+<td>a project and its items</td>
+</tr>
+<tr>
+<td><code>muninn://model/ID</code></td>
+<td>a model's design</td>
+</tr>
+<tr>
+<td><code>muninn://model/ID/records</code></td>
+<td>its records (first 500)</td>
+</tr>
+<tr>
+<td><code>muninn://report/ID</code></td>
+<td>a report and its sections</td>
+</tr>
+<tr>
+<td><code>muninn://search/ID</code></td>
+<td>a live search</td>
+</tr>
+<tr>
+<td><code>muninn://view/ID</code></td>
+<td>a code space's last result</td>
+</tr>
+<tr>
+<td><code>muninn://org/ID/resources</code></td>
+<td>what an org holds</td>
+</tr>
+<tr>
+<td><code>muninn://org/ID/executables</code></td>
+<td>what this node serves for an org</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-is-recorded">What is recorded</h3>
+<ul>
+<li>Every write and run goes into the history with origin <code>mcp</code> and the client's name, for
+example <code>write entry Day 1 in Lab (MCP client notebook)</code>. You can see it, undo it and
+react to it like any other action.</li>
+<li>A refused call is recorded as <code>mcp.denied</code>.</li>
+<li>Starting the server is recorded as <code>mcp.serve</code>.</li>
+<li>Reads are not recorded. Each client's &quot;last seen&quot; time is updated on every call.</li>
+</ul>
+<h2 id="external-mcp-servers">External MCP servers</h2>
+<h3 id="adding-one">Adding one</h3>
+<pre><code>mnnn mcp add weather --url https://weather.example/mcp --token -     # asks for the token, hidden
+mnnn mcp add files --env API_KEY -- npx -y @example/files-mcp       # asks for API_KEY, hidden
+mnnn mcp add local --env API_KEY=sk-… -- ./my-server --flag
+mnnn mcp list
+mnnn mcp show weather
+mnnn mcp edit weather --header X-Team=research      # add or replace a credential
+mnnn mcp edit weather --clear --token -             # forget them all, then set one
+mnnn mcp remove weather
+</code></pre>
+<p>How credentials are passed:</p>
+<ul>
+<li>A <strong>stdio</strong> server is started for each use with its <code>--env</code> variables. Its standard
+error is discarded.</li>
+<li>An <strong>HTTP</strong> server is sent its <code>--header</code> values with every request. <code>--token T</code> is
+short for <code>--header &quot;Authorization=Bearer T&quot;</code>.</li>
+</ul>
+<p>Credentials are kept in the encrypted database and are never printed. <code>show</code>, <code>list</code> and
+<code>--json</code> name them without their values, and the history records only their names.
+Leave out a value (<code>--env KEY</code>, <code>--header NAME</code>, <code>--token -</code>) and Muninn asks for it with
+hidden input, so the value stays out of your shell history.</p>
+<p>External servers, their credentials and approvals stay on the node where you added them.
+They are not synced to your linked nodes.</p>
+<h3 id="tools-and-approval">Tools and approval</h3>
+<pre><code>mnnn mcp tools weather                    # what it offers (✓ approved)
+mnnn mcp call weather forecast city=Oslo days=3
+mnnn mcp approve weather forecast
+mnnn mcp unapprove weather forecast
+</code></pre>
+<p>A tool must be approved before its first call:</p>
+<ul>
+<li><code>mnnn mcp call</code> asks you the first time. <code>-y</code> answers yes.</li>
+<li>A rule set never approves on its own. The first time one wants an unapproved tool, it
+fails and you get a notification saying how to allow it.</li>
+</ul>
+<p>Every call is recorded as <code>mcp.call</code>, with the server, the tool, the argument names (not
+their values) and whether it worked.</p>
+<p>Argument values that parse as JSON (numbers, <code>true</code>, lists, objects) are sent as JSON. Any
+other value is sent as a string.</p>
+<h3 id="in-rule-sets">In rule sets</h3>
+<ul>
+<li>
+<p><strong>As an action</strong>, use <code>mcp SERVER TOOL key=value …</code>. The values are templates:</p>
+<pre><code>mnnn rule create &quot;Tell the team&quot; --on import --if &quot;inserted &gt; 0&quot; \
+  --then 'mcp chat post channel=markets text=&quot;imported {inserted} bars of {params.symbol}&quot;'
+</code></pre>
+</li>
+<li>
+<p><strong>As a data source in conditions</strong>, use a field of the form
+<code>mcp:SERVER/TOOL(key=value,…).path</code>. Muninn calls the tool when the rule could run and
+reads the result:</p>
+<ul>
+<li><code>path</code> is looked up in the tool's structured result, or in its text parsed as JSON.</li>
+<li>With no path, the field is the whole result.</li>
+<li>The arguments in parentheses are optional.</li>
+</ul>
+<pre><code>mnnn rule create &quot;Only when it's windy&quot; --on import \
+  --if 'mcp:weather/current(city=Oslo).wind_ms &gt; 10' --then 'notify &quot;windy import&quot;'
+</code></pre>
+<p>An unreachable server or an unapproved tool leaves the field empty. In that case <code>?</code>
+is false and <code>!?</code> is true.</p>
+</li>
+<li>
+<p><strong>In templates</strong>, <code>{mcp:SERVER/TOOL.path}</code> works in texts too.</p>
+</li>
+</ul>
+<p><code>mnnn rule dry-run</code> says whether a tool is approved. <code>mnnn rule events</code> lists the <code>mcp.*</code>
+actions you can react to.</p>
+<h2 id="in-the-tui">In the TUI</h2>
+<p>Net ▸ MCP… (<code>M</code>) has two tabs:</p>
+<ul>
+<li><strong>Servers</strong>: your external servers. <code>Enter</code> lists a server's tools (asking it now), <code>a</code>
+approves or unapproves the selected tool, <code>d</code> removes the server.</li>
+<li><strong>Clients</strong>: the MCP clients. <code>r</code> revokes or restores one, <code>o</code> changes its role, <code>d</code>
+removes it.</li>
+</ul>
+<p>Add servers and clients with the commands above; the TUI never shows tokens or credential
+values.</p>
+<h2 id="failure-modes">Failure modes</h2>
+<ul>
+<li><strong><code>401</code> or &quot;this MCP client was revoked or removed&quot;</strong>: the token is wrong, or the client
+was revoked. Use <code>mnnn mcp client list</code> to check.</li>
+<li><strong>&quot;<code>X</code> needs write&quot; (or run)</strong>: the client's role doesn't allow the tool. Change it with
+<code>mnnn mcp client role NAME write</code>.</li>
+<li><strong>&quot;not approved yet&quot;</strong>: run <code>mnnn mcp approve SERVER TOOL</code>.</li>
+<li><strong>&quot;could not start&quot; or &quot;no answer to … (it stopped or took over 30s)&quot;</strong>: a stdio
+server's command is wrong or it crashed. Its standard error is discarded, so run the
+command yourself to see why.</li>
+<li><strong>&quot;refused (401 Unauthorized)&quot;</strong> from an external server: check its credentials with
+<code>mnnn mcp show NAME</code>, then fix them with <code>mnnn mcp edit NAME --token -</code>.</li>
+</ul>
+<h2 id="design-notes">Design notes</h2>
+<ul>
+<li>The MCP protocol revision is 2025-06-18; clients asking for 2025-03-26 or 2024-11-05 are
+answered in that revision.</li>
+<li>The HTTP server answers every request with JSON. It keeps no sessions and offers no
+server-to-client stream (<code>GET</code> gets <code>405</code>).</li>
+<li>Muninn makes no prompts and no subscriptions yet.</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/mcp.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Projects · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a class="current" aria-current="page" href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="projects">Projects</h1>
+<p>A project collects the things you work on together:</p>
+<ul>
+<li><strong>live searches</strong> (<a href="/docs/live-searches/">live searches</a>), shown with how many matches
+they have now;</li>
+<li><strong>results</strong>: a series (source, symbol, period), optionally with a time range,
+shown with how many bars it has now;</li>
+<li><strong>journals</strong> (<a href="/docs/journals/">journals</a>): a journal can belong to one project (a
+<em>project journal</em>), and any journal can also be linked into other projects;</li>
+<li><strong>reports</strong> (<a href="/docs/reports/">reports</a>);</li>
+<li><strong>rules</strong> (<a href="/docs/rules/">rules</a>): the project's <em>rule set</em>;</li>
+<li><strong>models</strong> (<a href="/docs/models/">models</a>);</li>
+<li><strong>code spaces</strong> (<a href="/docs/code-spaces/">code spaces</a>), shown with their language and last run.</li>
+</ul>
+<p>Items are references: a project never copies data, so everything in it reflects the
+current data. Taking an item out of a project keeps the item. Removing a project keeps
+its journals, as standalone journals.</p>
+<p>Removing a project keeps its rules too.</p>
+<h2 id="command-line">Command line</h2>
+<pre><code>mnnn project list [--json]
+mnnn project create NAME [--description TEXT]        # alias: new
+mnnn project show PROJECT [--json]                   # items with what they hold now
+mnnn project edit PROJECT [--name NAME] [--description TEXT]
+mnnn project remove PROJECT                          # asks first; -y skips
+mnnn project add PROJECT --search SEARCH
+mnnn project add PROJECT --journal JOURNAL
+mnnn project add PROJECT --result SOURCE:SYMBOL:PERIOD [--from TIME] [--to TIME]
+mnnn project add PROJECT --report REPORT
+mnnn project add PROJECT --rule RULE
+mnnn project add PROJECT --model MODEL
+mnnn project add PROJECT --code SPACE
+mnnn project drop PROJECT ITEM                       # ITEM: the number `show` prints
+mnnn project export PROJECT [--format archive|json|pdf|html|docx|latex|csv|text] [--out PATH] [--rows N] [--no-data]
+mnnn project import FILE [--name NAME]               # an archive (.mnnp) or JSON export
+</code></pre>
+<p><code>PROJECT</code> is an id, a unique id prefix or a name. <code>mnnn projects</code> is an alias.
+Adding an item that is already in the project changes nothing.</p>
+<pre><code>mnnn project create &quot;ETH summer&quot; --description &quot;Breakouts, June to August&quot;
+mnnn project add &quot;ETH summer&quot; --search &quot;eth 5m&quot;
+mnnn project add &quot;ETH summer&quot; --result binance:ETH/USDT:5m --from 2024-06-01 --to 2024-09-01
+mnnn journal new &quot;Summer notes&quot; --project &quot;ETH summer&quot;
+mnnn project show &quot;ETH summer&quot;
+mnnn project export &quot;ETH summer&quot; --out eth-summer.mnnp
+mnnn project import eth-summer.mnnp --name &quot;ETH summer (copy)&quot;
+</code></pre>
+<p><code>export</code> writes one archive by default: the project with its journals, images, live
+searches, reports, authors and the bars it refers to, importable with <code>import</code>. Other
+formats render the project as a document; see <a href="/docs/export-formats/">export formats</a>.</p>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p>The <strong>Projects</strong> menu (Alt+P) holds everything in this page and in
+<a href="/docs/live-searches/">live searches</a> and <a href="/docs/journals/">journals</a>:</p>
+<table>
+<thead>
+<tr>
+<th>item</th>
+<th>key</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Projects…</td>
+<td><code>P</code></td>
+</tr>
+<tr>
+<td>New project…</td>
+<td></td>
+</tr>
+<tr>
+<td>Live searches…</td>
+<td><code>F</code></td>
+</tr>
+<tr>
+<td>Save search as live search…</td>
+<td><code>B</code></td>
+</tr>
+<tr>
+<td>Journals…</td>
+<td><code>J</code></td>
+</tr>
+<tr>
+<td>New journal…</td>
+<td></td>
+</tr>
+<tr>
+<td>Reports…</td>
+<td><code>O</code></td>
+</tr>
+<tr>
+<td>New report…</td>
+<td></td>
+</tr>
+<tr>
+<td>Add selected series to project…</td>
+<td><code>a</code> (sidebar focused)</td>
+</tr>
+</tbody>
+</table>
+<p>The projects page lists the projects; <code>n</code> (or <strong>New project…</strong>) creates one.</p>
+<table>
+<thead>
+<tr>
+<th>key (list)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Enter, →</td>
+<td>open the project</td>
+</tr>
+<tr>
+<td><code>n</code> / <code>a</code></td>
+<td>new project</td>
+</tr>
+<tr>
+<td><code>r</code> / <code>e</code></td>
+<td>rename / describe</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td>export (archive first; any document format)</td>
+</tr>
+<tr>
+<td><code>I</code></td>
+<td>import a project archive (<code>.mnnp</code>) or JSON pack as a new project</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>delete (<code>y</code> confirms; its journals stay)</td>
+</tr>
+<tr>
+<td>Esc, <code>q</code></td>
+<td>close</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>key (in a project)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>j</code> / <code>k</code></td>
+<td>move</td>
+</tr>
+<tr>
+<td>Enter</td>
+<td>open the item: a live search is shown in the sidebar, a result opens its series in the focused tile (its time range becomes the time range), a journal or <a href="/docs/reports/">report</a> opens</td>
+</tr>
+<tr>
+<td><code>s</code></td>
+<td>save the current search as a live search in this project</td>
+</tr>
+<tr>
+<td><code>a</code></td>
+<td>add the series selected in the sidebar (with the current time range) as a result</td>
+</tr>
+<tr>
+<td><code>n</code></td>
+<td>new journal in this project</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>take the item out of the project</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td>export the project</td>
+</tr>
+<tr>
+<td><code>r</code> / <code>e</code></td>
+<td>rename / describe the project</td>
+</tr>
+<tr>
+<td>Esc, ←</td>
+<td>back to the list</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Add to project</strong> is also available on live searches (<code>p</code>), journals (<code>p</code>), reports (<code>p</code>) and the
+sidebar's series (<code>a</code>): a picker lists the projects, with <strong>+ New project…</strong> at the
+end (or <code>n</code>).</p>
+<p>Creating, changing and removing projects and their items are recorded in the
+<a href="/docs/history/">history</a> and attributed to the current <a href="/docs/authors/">author</a>.</p>
+<p>See also: <a href="/docs/live-searches/">live searches</a>, <a href="/docs/journals/">journals</a>, <a href="/docs/reports/">reports</a>,
+<a href="/docs/export-formats/">export formats</a>,
+<a href="/docs/data-model/">data model</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/projects.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

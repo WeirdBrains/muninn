@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Authors · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a class="current" aria-current="page" href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="authors">Authors</h1>
+<p>An author is a person Muninn attributes work to: a name, an optional email and any
+extra details (<code>key=value</code>, e.g. <code>org=Acme</code>, <code>role=analyst</code>). Authors live in the
+encrypted database. One of them can be the <strong>current author</strong>: every action in the
+<a href="/docs/history/">history</a> is stamped with the author who was current when it ran, and later
+features (reports, reviews, organizations) will use it as well.</p>
+<p>The first author you add becomes the current one.</p>
+<h2 id="command-line">Command line</h2>
+<pre><code>mnnn author list [--json]                       # * marks the current author
+mnnn author show [AUTHOR] [--json]              # default: the current author
+mnnn author add --name NAME [--email EMAIL] [--detail KEY=VALUE]... [--current]
+mnnn author edit AUTHOR [--name NAME] [--email EMAIL] [--detail KEY=VALUE]... [--replace-details]
+mnnn author remove AUTHOR                        # asks first; -y skips the question
+mnnn author use AUTHOR | --none                  # set or clear the current author
+</code></pre>
+<p><code>AUTHOR</code> is an id, a unique id prefix (the 8 characters <code>list</code> shows), a name or an
+email (names and emails ignore case). In <code>edit</code>, <code>--email &quot;&quot;</code> clears the email,
+<code>--detail key=</code> removes a detail, and <code>--replace-details</code> replaces all details with the
+ones given. <code>mnnn authors</code> is an alias of <code>mnnn author</code>.</p>
+<pre><code>mnnn author add --name &quot;Ada Lovelace&quot; --email ada@example.org --detail org=Analytical
+mnnn author use ada@example.org
+mnnn author edit Ada --detail org= --detail team=engines
+</code></pre>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p><strong>File ▸ Authors…</strong> or <code>A</code> opens the authors popup. The current author is marked <code>★</code>
+and is also shown in the header (<code>author: NAME</code>).</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>j</code> / <code>k</code>, ↑ / ↓</td>
+<td>move</td>
+</tr>
+<tr>
+<td>Enter, Space, click a selected row</td>
+<td>make it the current author</td>
+</tr>
+<tr>
+<td><code>a</code></td>
+<td>add an author (form: Name, Email, Details)</td>
+</tr>
+<tr>
+<td><code>e</code></td>
+<td>edit the selected author</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>delete the selected author (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td><code>x</code></td>
+<td>clear the current author</td>
+</tr>
+<tr>
+<td>Esc, [X]</td>
+<td>close</td>
+</tr>
+</tbody>
+</table>
+<p>In the form, Tab / ↓ and ↑ move between fields, Enter saves and Esc cancels. Details
+are written <code>key=value; key=value</code>.</p>
+<h2 id="notes">Notes</h2>
+<ul>
+<li>Removing an author keeps its id on past actions; <code>mnnn history show</code> then prints
+<code>(removed author)</code>.</li>
+<li>Adding, editing, removing and choosing the current author are themselves recorded in
+the <a href="/docs/history/">history</a>.</li>
+</ul>
+<p>See also: <a href="/docs/history/">history</a>, <a href="/docs/data-model/">data model</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/authors.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

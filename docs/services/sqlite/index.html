@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>SQLite service · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a class="current" aria-current="page" href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="sqlite-service">SQLite service</h1>
+<pre><code>mnnn ingest service sqlite --path FILE (--table NAME | --query SQL|@FILE) [--key KEY]
+     [--timeout 30] [--source NAME] [--symbol PAIR] [--duration 5m] [--map COL=FIELD]...
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>flag</th>
+<th>default</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--path</code></td>
+<td>required</td>
+<td>opened <strong>read-only</strong></td>
+</tr>
+<tr>
+<td><code>--table</code> / <code>--query</code></td>
+<td>one required</td>
+<td><code>--query @file.sql</code> reads the SQL from a file</td>
+</tr>
+<tr>
+<td><code>--key</code></td>
+<td></td>
+<td>passphrase if the source database is SQLCipher-encrypted</td>
+</tr>
+</tbody>
+</table>
+<p>Columns are matched by the usual aliases (or <code>--map</code>). Values of any SQLite type are
+accepted. With <code>--table</code>, the table name is also used to derive the symbol and
+duration (e.g. a table named <code>BTCUSDT_5m</code>). The source defaults to the file's stem when
+<code>--source</code> is not given.</p>
+<h2 id="example">Example</h2>
+<pre><code>mnnn ingest service sqlite --path ~/data/klines.db --table BTCUSDT_5m --source binance
+mnnn ingest service sqlite --path ~/data/klines.db \
+  --query &quot;SELECT open_time AS ts, o, h, l, c, v FROM klines WHERE pair = 'ETHUSDT'&quot; \
+  --map ts=timestamp --symbol ETH/USDT --duration 1m --source binance
+</code></pre>
+<h2 id="failure-modes">Failure modes</h2>
+<ul>
+<li>Missing file: error; the file is never created.</li>
+<li>Unknown table / bad SQL: the SQLite error is shown.</li>
+<li>Encrypted file without <code>--key</code> (or a wrong key): &quot;file is not a database&quot;.</li>
+</ul>
+<p>See also <a href="/docs/services/postgres/">Postgres</a>, <a href="/docs/services/http/">HTTP</a>, <a href="/docs/services/redis/">Redis</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/services/sqlite.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

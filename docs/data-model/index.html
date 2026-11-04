@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Data model · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a class="current" aria-current="page" href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="data-model">Data model</h1>
+<p>Everything Muninn ingests becomes <strong>bars</strong> (OHLCV candles) stored in one SQLite
+database (encrypted, see <a href="/docs/encryption/">encryption</a>). Your own record tables are
+<a href="#models-and-records">models</a>.</p>
+<h2 id="bars">Bars</h2>
+<table>
+<thead>
+<tr>
+<th>column</th>
+<th>type</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>BLOB PK</td>
+<td>32-byte BLAKE3 hash, see below</td>
+</tr>
+<tr>
+<td><code>base</code></td>
+<td>TEXT</td>
+<td>e.g. <code>BTC</code></td>
+</tr>
+<tr>
+<td><code>quote</code></td>
+<td>TEXT</td>
+<td>e.g. <code>USDT</code>, <code>USD</code> (kept separate: Binance USDT is not Coinbase USD)</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>INTEGER</td>
+<td>UTC epoch <strong>milliseconds</strong>, bar <strong>open</strong> time</td>
+</tr>
+<tr>
+<td><code>open</code>, <code>high</code>, <code>low</code>, <code>close</code></td>
+<td>REAL</td>
+<td>f64</td>
+</tr>
+<tr>
+<td><code>volume</code></td>
+<td>REAL</td>
+<td>base-asset volume</td>
+</tr>
+<tr>
+<td><code>source_id</code></td>
+<td>TEXT</td>
+<td>references <code>sources.id</code></td>
+</tr>
+<tr>
+<td><code>duration_s</code></td>
+<td>INTEGER</td>
+<td>seconds; shown as <code>5m</code>, <code>1h</code>, <code>1d</code></td>
+</tr>
+<tr>
+<td><code>flags</code></td>
+<td>INTEGER</td>
+<td>bit 1 = zero-volume bar</td>
+</tr>
+</tbody>
+</table>
+<p>The UI shows a symbol as <code>base/quote</code>, for example <code>BTC/USDT</code>.</p>
+<h2 id="bar-id">Bar id</h2>
+<pre><code>id = BLAKE3(&quot;{timestamp_ms}|{source.name}|{base}/{quote}|{duration_s}&quot;)
+</code></pre>
+<ul>
+<li>The duration is part of the id, so a 5m bar and a 1h bar at the same time never collide.</li>
+<li><code>|</code> separators prevent ambiguous concatenations (source names may not contain <code>|</code>).</li>
+<li>The source <strong>name</strong> (not its uuid) is hashed so ids are stable across databases.
+Renaming a source recomputes all of its bar ids in one transaction
+(<code>mnnn sources rename old new</code>).</li>
+</ul>
+<h2 id="sources">Sources</h2>
+<p><code>sources(id uuid, name unique, kind, locator, created_at)</code>. <code>kind</code> is <code>file</code>,
+<code>directory</code>, <code>url</code> or <code>service</code>; <code>locator</code> is the path or URL it came from.</p>
+<pre><code>mnnn sources list
+mnnn sources add binance --kind file --locator ~/Projects/kommandosaldat/raw/data
+mnnn sources rename binance binance-spot
+mnnn sources remove binance-spot      # asks for confirmation, -y to skip
+</code></pre>
+<h2 id="symbols-and-aliases">Symbols and aliases</h2>
+<p>The known symbol list seeds common base assets (BTC, ETH, SOL, ...) and quote
+currencies (USDT, USDC, USD, EUR, ...), plus aliases such as <code>XBT -&gt; BTC</code>. It is
+used to derive a symbol from a file name (see <a href="/docs/ingest-csv/">CSV ingest</a>).</p>
+<pre><code>mnnn symbols list
+mnnn symbols add FOO/USD --alias FO
+</code></pre>
+<h2 id="other-tables">Other tables</h2>
+<ul>
+<li><code>ingest_runs</code>: content hash, source, series, counts. An identical input is
+skipped the next time (use <code>--force</code> to re-process).</li>
+<li><code>authors</code>: name, email, details (JSON); see <a href="/docs/authors/">authors</a>.</li>
+<li><code>actions</code>: the <a href="/docs/history/">action history</a> tree (parent, kind, summary, params,
+origin, author, time, view state before and after).</li>
+<li><code>settings</code>: small key/value pairs (current author, history head).</li>
+<li><code>live_searches</code>: name, target (series, journals or records), the search as JSON, the search it
+was forked from, author, times (<a href="/docs/live-searches/">live searches</a>). Results are never
+stored; a live search runs on the current data.</li>
+<li><code>projects</code> and <code>project_items</code>: a project's name and description, and its items by
+kind (<code>live_search</code>, <code>result</code>, <code>journal</code>, <code>report</code>, <code>rule_set</code>, <code>model</code>) and reference; a result's series and time range are in the item's payload
+(<a href="/docs/projects/">projects</a>).</li>
+<li><code>journals</code>, <code>journal_entries</code>, <code>journal_annotations</code>, <code>journal_attachments</code>: journals
+(standalone or in a project, default format, forked from), entries (title, text,
+Markdown or LaTeX, position), notes and highlights (on the journal, an entry or a
+character range of an entry with the quoted words) and images (encrypted with the
+rest of the database) (<a href="/docs/journals/">journals</a>). Every row carries its author.</li>
+<li><code>reports</code> and <code>report_sections</code>: a report's name and description, and its sections in
+order with their kind (<code>text</code>, <code>records</code>, <code>series</code>, <code>journal</code>, <code>project</code>, <code>authors</code>,
+<code>code</code>, <code>model</code>), title, text and format, and what they show as JSON (series and range, live
+search, journal and entries, project, code space, model and filter) (<a href="/docs/reports/">reports</a>).</li>
+<li><code>rules</code>: name, description, home (standalone, journal, live search or model), on/off, the
+spec as JSON (on, if, then), author, times, and run count, last run and status
+(<a href="/docs/rules/">rules</a>).</li>
+<li><code>schema_version</code>: migrations, applied automatically on open. Version 4 adds
+<code>authors</code> and <code>settings</code>, version 5 <code>actions</code>, version 6 <code>live_searches</code>, version 7
+<code>projects</code> and <code>project_items</code>, version 8 the journal tables, version 9 <code>reports</code> and
+<code>report_sections</code>; project items may now be reports; version 10 <code>rules</code>; version 11
+<code>models</code> and <code>model_versions</code> (with the built-in bars model). All of them only add
+tables, so older databases upgrade in place on the first open.</li>
+</ul>
+<h2 id="models-and-records">Models and records</h2>
+<p><a href="/docs/models/">Models</a> are record tables you design. <code>models</code> holds each model's name,
+description, applied version, design and draft as JSON, author and times. <code>model_versions</code>
+holds every applied version's design, migration steps, note, the rule that made it (if
+any), author and time. A model's records live in their own table, <code>m_NAME</code>, with <code>id</code>,
+<code>_version</code>, <code>_created_at</code>, <code>_updated_at</code>, <code>_author</code> and one column per field. Text, JSON
+and refs are TEXT; integers, bools and timestamps (epoch ms) are INTEGER; reals are REAL.
+Required fields are <code>NOT NULL</code>, and unique and indexed fields get their own indexes.
+These tables are created and rebuilt only by migrations.</p>
+<p>The bars are the records of the built-in <code>bars</code> model and live in its table, <code>m_bars</code>,
+like any model's: the bars' own columns (<code>_base</code>, <code>_quote</code>, <code>_timestamp</code>, <code>_open</code> …
+<code>_volume</code>, <code>_source_id</code>, <code>_duration_s</code>, <code>_flags</code>) next to a column per field added to
+it, so removing a bar removes its values too. A bar's id is the BLAKE3 hash of its
+timestamp, source, symbol and period. Reads go through the <code>bar_rows</code> view (the bars'
+columns under their plain names). Upgrading to 2.16 moves the old <code>bars</code> and <code>mx_bars</code>
+tables into <code>m_bars</code> in one transaction, keeping every id, value, stamp and version.</p>
+<h2 id="decisions">Decisions</h2>
+<ul>
+<li>Prices are REAL (f64), not scaled integers.</li>
+<li>Zero-volume bars are kept and flagged; set <code>ingest.drop_zero_volume = true</code> in
+<a href="/docs/preferences/">preferences</a> to drop them.</li>
+</ul>
+<p>See also: <a href="/docs/storage-layout/">storage layout</a>, <a href="/docs/export/">export</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/data-model.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

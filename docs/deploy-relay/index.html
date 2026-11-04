@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Deploying a public relay · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a class="current" aria-current="page" href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="deploying-a-public-relay">Deploying a public relay</h1>
+<p>How the public Muninn relay node is set up on a DigitalOcean droplet. Nodes behind NAT
+reserve a slot on it and are reached through it (see <a href="/docs/network/#behind-nat">network</a>).
+The relay's name is <code>relay.muninn.weirdbrains.com</code>; its DNS record has to point at the
+droplet before anything else works. The same steps set up a relay of your own.</p>
+<table>
+<thead>
+<tr>
+<th>what</th>
+<th>value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>node and relay port</td>
+<td>4741, TCP and UDP (QUIC); one port does both</td>
+</tr>
+<tr>
+<td>ACME HTTP-01</td>
+<td>TCP 80 (<code>hosting.acme.http_port</code>)</td>
+</tr>
+<tr>
+<td>site (optional)</td>
+<td>TCP 8443 (<code>hosting.port</code>)</td>
+</tr>
+<tr>
+<td>home</td>
+<td><code>/var/lib/muninn</code> (<code>MUNINN_HOME</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-droplet">1. Droplet</h2>
+<ul>
+<li>Ubuntu 24.04 LTS, the smallest Basic droplet is enough (a relay forwards, it stores little); add your SSH key</li>
+<li>Reserve a static IP and assign it to the droplet (the DNS record points at it)</li>
+<li>Update it and add a service user with no login:</li>
+</ul>
+<pre><code class="language-sh">apt update &amp;&amp; apt upgrade -y
+useradd --system --home-dir /var/lib/muninn --create-home --shell /usr/sbin/nologin muninn
+</code></pre>
+<h2 id="2-dns">2. DNS</h2>
+<p><code>relay.muninn.weirdbrains.com</code> must point at the droplet: add <code>A relay.muninn.weirdbrains.com → &lt;reserved IPv4&gt;</code> (and <code>AAAA</code> if the droplet has IPv6) at the
+domain's DNS host. Check with <code>dig +short relay.muninn.weirdbrains.com</code> before asking for a
+certificate.</p>
+<h2 id="3-install-muninn">3. Install Muninn</h2>
+<p>Use the release <code>.deb</code> (prebuilt, no Rust needed; see <a href="/docs/install/">install</a>), checking it
+against <code>SHA256SUMS</code>:</p>
+<pre><code class="language-sh">ver=2.20.0
+base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
+curl -LO $base/muninn_${ver}-1_amd64.deb -LO $base/SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+apt install ./muninn_${ver}-1_amd64.deb
+mnnn --version
+</code></pre>
+<h2 id="4-keys-and-settings">4. Keys and settings</h2>
+<p>The node's password goes in a root-only environment file that the unit reads:</p>
+<pre><code class="language-sh">install -d -m 700 /etc/muninn
+install -m 600 /dev/null /etc/muninn/relay.env
+echo &quot;MUNINN_PASSWORD=$(openssl rand -hex 32)&quot; &gt; /etc/muninn/relay.env
+cat /etc/muninn/relay.env                 # copy the password somewhere safe
+</code></pre>
+<p>This generates a random 64-character password. Save it in a password manager
+or other safe place as well: it unlocks the relay's keys, and without it (or the
+24 words from <code>keys init</code>) a restored <code>/var/lib/muninn</code> can't be opened.</p>
+<p>Then, as the service user (<code>sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) …</code>
+for each command):</p>
+<pre><code class="language-sh">mnnn keys init --non-interactive          # prints the 24 words and shards: keep them offline
+mnnn net config --label relay --external relay.muninn.weirdbrains.com:4741 --mdns off --autostart off
+mnnn net relay serve on                   # relay traffic for other nodes
+mnnn org cert acme --domain relay.muninn.weirdbrains.com --email you@example.com   # Let's Encrypt, HTTP-01 on port 80
+mnnn org host autostart on                # the site (and its ACME renewals) runs with the node
+</code></pre>
+<p><code>--external</code> puts <code>/dns4/relay.muninn.weirdbrains.com/tcp/4741</code> and <code>…/udp/4741/quic-v1</code> first in
+invites and announces them to peers. In <code>/var/lib/muninn/preferences.toml</code>, set
+<code>[hosting] bind = &quot;0.0.0.0&quot;</code> so Let's Encrypt (port 80) and the site can reach it. The
+certificate is renewed by the running site when a third of its life is left
+(<a href="/docs/org-hosting/#certificates">org hosting</a>); <code>mnnn org cert status</code> shows it.</p>
+<h2 id="5-systemd-unit">5. systemd unit</h2>
+<p>The unit ships in the repository as
+<a href="https://github.com/WeirdBrains/muninn/blob/main/packaging/systemd/muninn-relay.service"><code>packaging/systemd/muninn-relay.service</code></a>:
+it runs <code>mnnn net start --relay-server --no-mdns</code> as the <code>muninn</code> user with
+<code>MUNINN_HOME=/var/lib/muninn</code>, reads <code>MUNINN_PASSWORD</code> from <code>/etc/muninn/relay.env</code>
+(root-only, mode 600), may bind port 80 for the Let's Encrypt HTTP-01 challenge, stops
+with SIGINT (the same clean shutdown as Ctrl-C) and is sandboxed (<code>ProtectSystem=strict</code>,
+only <code>/var/lib/muninn</code> writable). Install it from a checkout or straight from GitHub:</p>
+<pre><code class="language-sh">install -m 644 packaging/systemd/muninn-relay.service /etc/systemd/system/
+# or
+curl -fsSL -o /etc/systemd/system/muninn-relay.service \
+  https://raw.githubusercontent.com/WeirdBrains/muninn/main/packaging/systemd/muninn-relay.service
+systemctl daemon-reload
+systemctl enable --now muninn-relay
+</code></pre>
+<p><code>mnnn net start</code> runs the node in the foreground until stopped, which is what systemd
+wants; there is no separate daemon.</p>
+<h2 id="6-firewall">6. Firewall</h2>
+<p>Allow only SSH, the node and relay port, and port 80 for ACME (8443 only if the site
+should be public). With <code>ufw</code> on the droplet, or the same rules in a DigitalOcean Cloud
+Firewall:</p>
+<pre><code class="language-sh">ufw default deny incoming
+ufw allow OpenSSH
+ufw allow 4741/tcp
+ufw allow 4741/udp
+ufw allow 80/tcp
+ufw allow 4742/tcp   # only if live collaboration (gRPC streams) goes through this node
+ufw enable
+</code></pre>
+<p>Port 4742/tcp is the live collaboration stream listener (<code>net.collab_port</code>); open it only
+if peers collaborate with this node directly, otherwise they fall back to polling.</p>
+<h2 id="7-using-it">7. Using it</h2>
+<p>Print the relay's address and add it on other nodes:</p>
+<pre><code class="language-sh">sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net status
+mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/&lt;PEER ID&gt;   # on each client node
+</code></pre>
+<p>The public relay <code>relay.muninn.weirdbrains.com</code> has peer ID
+<code>12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz</code>, so on any node:</p>
+<pre><code class="language-sh">mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz
+</code></pre>
+<p>With <code>--external</code> set, a relay announces only those addresses. Without it, it announces
+only routable listen addresses: private (10/8, 172.16/12, 192.168/16), CGNAT
+(100.64/10), link-local, IPv6 ULA (fc00::/7) and loopback ones are never announced,
+and circuit addresses through a relay with no routable address are left out of invites.
+Set <code>--external</code> to exactly the public name or address(es) clients should use
+(repeat it for several); a droplet's extra public IPs and an IPv6 address missing from
+DNS are then not announced either.</p>
+<p><code>mnnn org cert acme</code> uses the HTTP-01 challenge, so port 80/tcp must be open in the
+firewall (section 6) while it runs and at every renewal; with port 80 closed it fails.</p>
+<h2 id="8-upgrades">8. Upgrades</h2>
+<pre><code class="language-sh">curl -LO $base/muninn_${new}-1_amd64.deb -LO $base/SHA256SUMS &amp;&amp; sha256sum --ignore-missing -c SHA256SUMS
+apt install ./muninn_${new}-1_amd64.deb
+systemctl restart muninn-relay
+</code></pre>
+<p>The data in <code>/var/lib/muninn</code> stays across upgrades; back it up first with
+<code>mnnn backup create</code> (<a href="/docs/backup-recovery/">backup and recovery</a>).</p>
+<h2 id="9-logs">9. Logs</h2>
+<pre><code class="language-sh">journalctl -u muninn-relay -f            # follow
+systemctl status muninn-relay
+</code></pre>
+<p>For more detail add <code>Environment=MUNINN_LOG=debug</code> (or <code>libp2p=info,debug</code>) to the unit
+and restart.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/deploy-relay.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

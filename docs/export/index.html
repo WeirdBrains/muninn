@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Export · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a class="current" aria-current="page" href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="export">Export</h1>
+<pre><code>mnnn export --format &lt;csv|parquet|json|pdf|html|docx|latex|text&gt; --out &lt;PATH|-&gt; [--symbol PAIR]
+            [--source NAME] [--duration 5m] [--from TIME] [--to TIME]
+</code></pre>
+<p>Writes stored bars through Polars. <code>--out -</code> writes CSV or JSON to stdout (parquet
+needs a file). <code>--from</code>/<code>--to</code> accept the same formats as ingest timestamps (epoch or
+<code>YYYY-MM-DD HH:MM:SS</code>, UTC) and are inclusive.</p>
+<p>Columns: <code>timestamp</code> (epoch ms, open time), <code>datetime_utc</code>, <code>source</code>, <code>symbol</code>,
+<code>base</code>, <code>quote</code>, <code>duration</code>, <code>duration_s</code>, <code>open</code>, <code>high</code>, <code>low</code>, <code>close</code>, <code>volume</code>,
+<code>zero_volume</code>. Rows are ordered by source, symbol, duration, then time.</p>
+<p>JSON is an array of objects, one per bar.</p>
+<h2 id="examples">Examples</h2>
+<pre><code>mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_ETHUSDT_5m.csv --source binance -y
+mnnn export --format parquet --out /tmp/eth.parquet --symbol ETH/USDT
+mnnn export --format csv --out - --symbol ETH/USDT --from 2024-01-01 --to 2024-01-31 | head
+mnnn -q export --format json --out - --source binance --duration 5m &gt; bars.json
+</code></pre>
+<h2 id="as-a-document">As a document</h2>
+<p><code>--format pdf|html|docx|latex|text</code> writes the matching bars as a document: per series
+a summary (bars, first and last, open, close, high, low, change, volume) and a table of
+every bar. <code>--out -</code> works for text, HTML and LaTeX. These are made by the built-in
+document layer; see <a href="/docs/export-formats/">export formats</a>.</p>
+<p>An exported CSV can be ingested again (the <code>timestamp</code> column is recognized).</p>
+<h2 id="failure-modes">Failure modes</h2>
+<ul>
+<li><code>--format parquet --out -</code>: error, parquet needs a file.</li>
+<li>Unparseable <code>--from</code>/<code>--to</code>/<code>--symbol</code>/<code>--duration</code>: error naming the flag.</li>
+<li>No matching bars: an empty file with only the header (CSV) or <code>[]</code> (JSON).</li>
+</ul>
+<p>See also <a href="/docs/data-model/">data model</a>, <a href="/docs/export-formats/">export formats</a>, <a href="/docs/tui/">TUI</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/export.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

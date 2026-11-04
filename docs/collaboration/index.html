@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Live collaboration and peers · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a class="current" aria-current="page" href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="live-collaboration-and-peers">Live collaboration and peers</h1>
+<p>Since 2.19, nodes that exchanged keys can work together as it happens. You can message
+each other, edit the same entry, journal, code space or record at once and see each
+other's cursors, and run each other's served executables. The <strong>peers</strong> view shows who
+you're connected to and what each of them has for you.</p>
+<p>Collaboration works over any active key exchange that is a connection (node scope), a
+linked node of yours, or an org membership. Share-only exchanges can't collaborate.</p>
+<h2 id="peers">Peers</h2>
+<pre><code class="language-sh">mnnn peers                     # your peers: label, how you're connected, sites, unread messages
+mnnn peers show ben            # what ben has for you
+mnnn peers run comet-lab comet-lab sightings --input '{&quot;op&quot;: &quot;query&quot;}'
+mnnn peers request ben &quot;could you share the field notes journal?&quot;
+</code></pre>
+<p><code>peers show</code> asks the peer what it offers you:</p>
+<ul>
+<li>items it shares with you (open them with <code>mnnn net fetch</code>)</li>
+<li>live sessions it invited you to (<code>mnnn live join</code>)</li>
+<li>org executables you may run (<code>mnnn peers run</code>)</li>
+<li>sites it announced</li>
+</ul>
+<p>A peer is named by its connection label, its exchange, its node label, its peer id, or
+(for an org membership) the org's slug or name.</p>
+<p><code>peers request</code> sends a message about <code>request:peers</code>; that's how you ask for a share, an
+invitation or access.</p>
+<h2 id="messages">Messages</h2>
+<pre><code class="language-sh">mnnn msg send ben &quot;the comet is back&quot; --about journal:4f2a
+mnnn msg list                 # everything, oldest first (● unread, → sent, ← received)
+mnnn msg list ben --unread
+mnnn msg list --about journal:4f2a
+mnnn msg read                 # mark all read (or: mnnn msg read ben)
+</code></pre>
+<p>Each message is kept on both nodes and syncs to each side's linked nodes. If the peer
+can't be reached, the message stays marked <em>waiting</em>, and your running node retries it
+(only the node that wrote a message sends it, so linked nodes never send it twice).</p>
+<p>An arriving message is a <code>net.message</code> action. It shows up in history and as a
+<a href="/docs/notifications/">notification</a> that links to the conversation, and rule sets can
+trigger on it (<code>--on net.message</code>, with the fields <code>from</code>, <code>peer</code>, <code>about</code> and <code>text</code>).</p>
+<h2 id="live-sessions">Live sessions</h2>
+<p>The node that has the item hosts the session and invites peers:</p>
+<pre><code class="language-sh">mnnn live share entry 4f2a --with ben --with cleo
+mnnn live share journal &quot;field notes&quot; --with ben     # every entry of the journal
+mnnn live share code calc --with ben
+mnnn live share record Sightings/9c1e --with ben     # MODEL/RECORD
+mnnn live list
+mnnn live stop 7d0c
+</code></pre>
+<p>The host's node must be running (<code>mnnn net start</code>) to answer guests. A guest joins the
+session and then edits it:</p>
+<pre><code class="language-sh">mnnn peers show anna                       # lists the session
+mnnn live join anna 7d0c
+mnnn live show 7d0c                        # the text now and who is here
+mnnn live watch 7d0c                       # follow it as it changes (pushed over a stream)
+mnnn live edit 7d0c                        # in $VISUAL/$EDITOR
+mnnn live edit 7d0c --value &quot;new text&quot; --cursor 8
+mnnn live edit 7d0c 1e9b --value &quot;…&quot;       # one entry of a journal session
+mnnn live edit 7d0c mag --value 4.7        # a record field (a JSON value)
+mnnn live stop 7d0c                        # a guest leaves
+</code></pre>
+<ul>
+<li><strong>Merging.</strong> Every edit becomes a set of operations, and they merge without loss.
+<ul>
+<li>Text (entry bodies, journal entries, code sources) is a replicated text: if two people
+type at the same place, both insertions are kept, and a deletion never removes text it
+didn't see.</li>
+<li>Record fields are last writer wins, per field.</li>
+</ul>
+</li>
+<li><strong>Writing back.</strong> The host writes the merged text back to the item, so it syncs to the
+host's linked nodes like any edit. Edits the host makes to the item some other way
+(the TUI, the CLI, a rule) become operations too.</li>
+<li><strong>Presence.</strong> Each round also says where your cursor is. <code>live show</code> lists who was here
+in the last 30 seconds and at which offset; the TUI marks their cursors in the text.</li>
+<li><strong>Who may join.</strong> Only the peers the host invited can join. A guest can't forge another
+node's operations, close the session or send run results.</li>
+<li><strong>Journals.</strong> A journal session covers the journal's existing entries. New entries
+written on the host join it; guests can't create entries.</li>
+<li><strong>Code.</strong> A code space edited live changes its source, so it has to be approved again
+before it runs, as with any edit.</li>
+<li><strong>History.</strong> History records <code>live.host</code>, <code>live.stop</code>, and <code>live.edit</code> (at most one per
+guest per minute).</li>
+</ul>
+<h2 id="running-a-peers-executables">Running a peer's executables</h2>
+<p><code>mnnn peers run PEER ORG ENDPOINT --input JSON</code> calls one of the org endpoints on the
+peer's node, the same way an org call does: the peer checks your membership and your
+role's permission for that endpoint (<code>records.read</code>, <code>records.write</code>, …), and code
+endpoints only run approved code. The output comes back in chunks of a <code>run</code> session
+(you'll see progress on stderr), and the whole result is printed as JSON. The peer
+records a <code>live.run</code> action.</p>
+<h2 id="in-the-tui">In the TUI</h2>
+<p><code>W</code> (or Net ▸ Peers, messages &amp; live…) opens the Peers window with three tabs:</p>
+<ul>
+<li><strong>Peers</strong>: Enter asks the selected peer what it offers. <code>m</code> messages it, <code>a</code> asks it for
+something, <code>J</code> joins an offered live session, <code>s</code> shares one of your items live with
+it, and <code>x</code> runs one of its executables (<code>ORG ENDPOINT [JSON]</code>).</li>
+<li><strong>Messages</strong>: the conversation with the selected peer. <code>m</code> writes and <code>r</code> marks it read.</li>
+<li><strong>Live</strong>: your sessions. Enter shows the text with everyone's cursors, <code>e</code> edits a
+document, and <code>x</code> stops (host) or leaves (guest).</li>
+</ul>
+<h2 id="transports">Transports</h2>
+<p>Collaboration has two transports. Both carry the same <code>muninn.live.v1</code> messages, and
+consent, invitations and roles are checked the same way on both.</p>
+<ul>
+<li><strong><code>stream</code></strong> (the default): a gRPC bidirectional stream (<code>muninn.live.v1.Live/Open</code>)
+straight to the peer's node. The host <em>pushes</em> every change to a live session
+(operations, presence and cursors) as it happens, guests send their edits on the same
+stream, and messages and remote-run output use it too. The channel is TLS 1.3, and both
+sides prove their node identity with their identity key (libp2p TLS certificates), so
+the peer on the stream is the peer id its key exchange names. Each call also names its
+key exchange, which must be active and belong to that peer.</li>
+<li><strong><code>poll</code></strong>: requests over the existing peer connection (libp2p with Noise, sealed with
+the exchange's keys). It works anywhere the node works, including through relays, and
+guests ask about once a second while following a session. Use it where a node can't
+take incoming TCP, for example inside a container.</li>
+</ul>
+<p>Choose one, in order of precedence:</p>
+<pre><code class="language-sh">mnnn --transport poll live watch 7d0c          # this command only
+export MUNINN_COLLAB_TRANSPORT=poll            # this environment
+mnnn net config --collab-transport poll        # the setting (net.collab_transport)
+</code></pre>
+<h3 id="ports-and-firewalls">Ports and firewalls</h3>
+<p>The running node (<code>mnnn net start</code>, or the TUI's node) listens for streams on TCP <strong>4742</strong>
+on all interfaces (the peer connection itself uses 4741):</p>
+<pre><code class="language-sh">mnnn net config --collab-port 4742 --collab-bind 0.0.0.0
+mnnn net config --collab-advertise alien.duckdns.org:4742   # behind NAT with a port forward
+</code></pre>
+<p>Allow TCP 4742 in the host firewall (and forward it on the router for peers outside your
+network). A peer finds the listener by asking over the peer connection (<code>Hello</code>): it gets
+the port, and any advertised addresses, then dials the node's known addresses on that port.
+<code>mnnn net start</code> prints where the listener is. If the port is taken, the node still runs:
+it records <code>net.collab.fallback</code> and peers poll it.</p>
+<h3 id="falling-back">Falling back</h3>
+<p>A node set to <code>stream</code> uses polling for a peer, automatically, when:</p>
+<ul>
+<li>the peer uses <code>poll</code> (mixed nodes work together, over polling)</li>
+<li>the peer runs no listener</li>
+<li>the listener doesn't answer within a few seconds (NAT, a firewall, relay-only reachability)</li>
+</ul>
+<p>It records why as a <code>net.collab.fallback</code> action (see <code>mnnn history list</code>) and polls that
+peer for the next 10 minutes before trying a stream again, so collaboration still works
+through relays. <code>mnnn live show --json</code> and <code>mnnn live watch --json</code> say which transport
+was used (<code>&quot;transport&quot;</code>).</p>
+<h3 id="containers">Containers</h3>
+<p>In a container that doesn't publish a port for the listener, use polling:</p>
+<pre><code class="language-sh">docker run -e MUNINN_COLLAB_TRANSPORT=poll … mnnn net start
+</code></pre>
+<p>Or publish the port (<code>-p 4742:4742</code>) and set <code>--collab-advertise HOST:4742</code> to the
+address peers can reach, to use streams. Muninn doesn't ship a container image; set this
+in your own.</p>
+<h2 id="how-it-travels-design-notes">How it travels (design notes)</h2>
+<ul>
+<li><strong>Wire format.</strong> Sessions speak <code>muninn.live.v1</code>, protobuf messages defined in
+<code>proto/muninn/live/v1/live.proto</code>: <code>Batch</code>, <code>Frame</code> and <code>Op</code> (insert, delete, set field,
+cursor, run chunk, closed).</li>
+<li><strong>The boundary.</strong> Everything goes through <code>crate::collab::wire</code>: a <code>Transport</code> trait
+(<code>call</code>, <code>follow</code>) with two implementations (<code>Libp2p</code> for polling, <code>StreamTransport</code>
+in <code>crate::collab::stream</code>), and one <code>serve</code> function that answers both. Pushes come
+from <code>session::pull</code>, which checks invitations like any other round.</li>
+<li><strong>Building.</strong> The gRPC service is generated at build time from the .proto with a
+pure-Rust compiler (protox), so building Muninn doesn't need <code>protoc</code>.</li>
+<li><strong>Ordering.</strong> The host keeps the operation log and its order. Guests send their
+operations and get back everything after the last one they have, so every copy applies
+the same operations in the same order.</li>
+<li><strong>Node-local data.</strong> Sessions, operations and presence stay on the node. Only the
+merged item and the messages sync to linked nodes.</li>
+<li><strong>Run results.</strong> A remote run is computed on the host, then its output streams back in
+chunks (pushed over a stream, polled otherwise). The computation itself isn't streamed
+while it runs.</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/collaboration.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

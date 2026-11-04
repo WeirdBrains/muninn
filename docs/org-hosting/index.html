@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Org hosting · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a class="current" aria-current="page" href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="org-hosting">Org hosting</h1>
+<p>Any node can serve the sites of its organizations over HTTPS: HTML pages, a JSON API,
+template assets and gRPC, all on one port. <strong>Nothing listens until you start it</strong> (or
+turn on <code>hosting.autostart</code>: <code>mnnn org host autostart on</code>, TUI Net ▸ Node ▸ Settings ▸ <em>web
+server with the node</em>, so it comes up whenever the node does), and by default only on
+<code>127.0.0.1</code>. Which orgs are served is each org's <em>hosted</em> flag
+(<code>mnnn org edit ORG --hosted on</code>), plus mirrors of joined orgs.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>CLI</th>
+<th>TUI (Orgs ▸ Site &amp; certificate…)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Start</td>
+<td><code>mnnn org host start [--bind ADDR] [--port N] [--for SECS]</code> (foreground, Ctrl-C stops)</td>
+<td><code>S</code> / Enter, or Orgs ▸ Start site</td>
+</tr>
+<tr>
+<td>Stop</td>
+<td><code>mnnn org host stop</code></td>
+<td><code>S</code> again or <code>X</code>, or Orgs ▸ Stop site</td>
+</tr>
+<tr>
+<td>Status</td>
+<td><code>mnnn org host status [--json]</code></td>
+<td>the Site page</td>
+</tr>
+<tr>
+<td>Certificate</td>
+<td><code>mnnn org cert status [ORG] [--json]</code>, <code>mnnn org cert renew [--org ORG]</code></td>
+<td>the Site page</td>
+</tr>
+<tr>
+<td>ACME</td>
+<td><code>mnnn org cert acme --domain D --email E [--directory] [--profile] [--http-port] [--challenge http-01|tls-alpn-01]</code>, <code>--off</code></td>
+<td><code>e</code> &quot;domain email&quot; or &quot;off&quot;</td>
+</tr>
+<tr>
+<td>Org domains</td>
+<td><code>mnnn org domain add|list|remove ORG DOMAIN</code></td>
+<td>Organizations page <code>w</code> (add D / remove D)</td>
+</tr>
+<tr>
+<td>Org certificate</td>
+<td><code>mnnn org cert set ORG --cert FILE --key FILE</code>, <code>mnnn org cert clear ORG</code>, <code>mnnn org cert acme --org ORG [--email E] [--off]</code></td>
+<td>Organizations page <code>c</code> (&quot;CERT.pem KEY.pem&quot; sets or replaces, &quot;clear&quot;), <code>L</code> (&quot;on [email]&quot; / &quot;off&quot;); the Site page lists each org's</td>
+</tr>
+<tr>
+<td>Mirror</td>
+<td><code>mnnn org mirror ORG</code> (a joined org's public pages; needs <code>host</code> there)</td>
+<td>Joined page <code>m</code></td>
+</tr>
+</tbody>
+</table>
+<p>Settings live under <code>[hosting]</code> in the <a href="/docs/preferences/">preferences</a>: <code>bind</code>
+(<code>127.0.0.1</code>; <code>0.0.0.0</code> or <code>::</code> serves other machines), <code>port</code> (8443), <code>names</code> (extra
+names for the self-signed certificate) and <code>cert_days</code> (7).</p>
+<p>When the site starts or stops it is announced to the org's nodes, your linked nodes and
+(public orgs) your connections; <code>mnnn org sites</code> lists what others announced. See
+<a href="/docs/org-templates/#announcing-the-site">org site templates</a>.</p>
+<h2 id="certificates">Certificates</h2>
+<ul>
+<li><strong>Self-signed</strong> (default): a new short-lived certificate is made at each start, for
+<code>localhost</code>, the bind address and <code>names</code>.</li>
+<li><strong>ACME / Let's Encrypt</strong>: opt-in with a domain and an email. Muninn's pure-Rust ACME
+client asks for a <code>shortlived</code> certificate (about six days; falls back to the CA's
+default profile) through the HTTP-01 challenge, answered on <code>http_port</code> (80; forward
+port 80 there if needed). It is renewed when a third of its life is left (checked
+every ten minutes while the site runs). The ACME account key and certificates are kept
+in the encrypted database, never in files. <code>directory</code> is <code>letsencrypt</code>,
+<code>letsencrypt-staging</code> or a directory URL. <code>mnnn org cert renew</code> renews now (not while
+a site runs: a running site renews itself).</li>
+</ul>
+<h2 id="org-domains-and-certificates-216">Org domains and certificates (2.16)</h2>
+<p>An org may be served at its own domains (<code>mnnn org domain add lab lab.example.org</code>; point
+the name's DNS at this machine). The one site port serves every org: the certificate is
+picked by the name the browser asks for (SNI), and a request for the bare domain root
+goes to the org's site (<code>/o/SLUG/</code>). Each org's certificate comes from, in order:</p>
+<ol>
+<li><strong>Yours</strong>: <code>mnnn org cert set ORG --cert chain.pem --key key.pem</code>. The chain and key
+are checked (PEM, the key matches the leaf, not expired) and kept in the encrypted
+database; the key is never logged or written out. <code>mnnn org cert clear ORG</code> stops
+using it.</li>
+<li><strong>Let's Encrypt</strong>: <code>mnnn org cert acme --org ORG --email E</code> (the email may be the
+node's, <code>mnnn org cert acme --email E</code>). One certificate covers all the org's domains.
+The node's ACME settings apply: directory, profile and challenge, <code>http-01</code> (port 80
+must reach <code>http_port</code>) or <code>tls-alpn-01</code> (port 443 must reach the site port; set with
+<code>--challenge</code>). Behind NAT, where neither port is reachable, DNS-01 is the usual way;
+it is not built in: get a certificate elsewhere and set it as yours.</li>
+<li><strong>Self-signed</strong> for the org's domains, made when the site starts.</li>
+</ol>
+<p><code>mnnn org cert status</code> lists each org with where its certificate came from, its names and
+when it expires (days left), plus any ACME failures. A running site renews ACME
+certificates by itself (checked every minute; due when a third of the life is left,
+which is about 30 days for a 90-day certificate) and picks up domains and certificates
+set from another process within a minute. Failures notify (<code>notify</code>, <code>about = cert.renew</code>) and retry with backoff: an hour, doubling, at most a day. Your own
+certificates are not renewed by Muninn; the <a href="/docs/rules/#scheduled-rule-sets">expiry watcher</a>
+reminds you.</p>
+<h2 id="paths">Paths</h2>
+<table>
+<thead>
+<tr>
+<th>path</th>
+<th>what</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/</code></td>
+<td>the public orgs served here</td>
+</tr>
+<tr>
+<td><code>/o/SLUG/</code></td>
+<td>an org's page: its published artifacts and endpoints</td>
+</tr>
+<tr>
+<td><code>/o/SLUG/a/ID[.FORMAT]</code></td>
+<td>an artifact: <code>html</code>, <code>json</code>, <code>pdf</code>, <code>docx</code>, <code>tex</code>, <code>txt</code> or <code>mnnp</code> as its kind allows</td>
+</tr>
+<tr>
+<td><code>/o/SLUG/assets/NAME</code></td>
+<td>template assets</td>
+</tr>
+<tr>
+<td><code>/o/SLUG/_preview/TOKEN/</code></td>
+<td>a template preview (2.17, an hour; see <a href="/docs/org-templates/#previews">org site templates</a>)</td>
+</tr>
+<tr>
+<td><code>GET /o/SLUG/api/org</code>, <code>/api/artifacts</code>, <code>/api/endpoints</code></td>
+<td>JSON</td>
+</tr>
+<tr>
+<td><code>POST /o/SLUG/api/call/ENDPOINT</code></td>
+<td>call an endpoint with a JSON body</td>
+</tr>
+</tbody>
+</table>
+<p>Guests see what is published <code>public</code>; signed members also see what is published to
+<code>members</code>, and call endpoints their role allows. Pages carry <code>nosniff</code>, <code>no-referrer</code>,
+a same-origin Content-Security-Policy and, with ACME, HSTS. Bodies are capped at 8 MiB.</p>
+<h2 id="signed-requests">Signed requests</h2>
+<p>Member sign-in is on by default (<code>mnnn org edit ORG --member-auth off</code> turns it off):
+members authenticate with the key of their org key exchange:</p>
+<pre><code>Authorization: Muninn exchange=ID, ts=MS, sig=HEX
+sig = HMAC-SHA256(HKDF-SHA256(exchange key, info &quot;muninn/org/web/v1&quot;),
+                  &quot;METHOD\nPATH?QUERY\nTS\nhex(SHA256(BODY))&quot;)
+</code></pre>
+<p>Requests more than five minutes off, or replayed, are refused. For gRPC the body is the
+length-prefixed frame. <code>mnnn org sign ORG METHOD PATH [--body FILE]</code> prints the header
+for a joined org (the key never leaves the encrypted database).</p>
+<h2 id="grpc">gRPC</h2>
+<p>Unary calls on the same port (HTTP/2, <code>application/grpc</code>, uncompressed):</p>
+<pre><code class="language-proto">syntax = &quot;proto3&quot;;
+package muninn.org.v1;
+
+service Org {
+  rpc GetOrg(OrgRequest) returns (JsonReply);
+  rpc ListArtifacts(OrgRequest) returns (JsonReply);
+  rpc ListEndpoints(OrgRequest) returns (JsonReply);
+  rpc GetArtifact(ArtifactRequest) returns (ArtifactReply);
+  rpc Call(CallRequest) returns (JsonReply);
+}
+
+message OrgRequest { string org = 1; }                      // slug or id
+message ArtifactRequest { string org = 1; string id = 2; string format = 3; } // json by default
+message CallRequest { string org = 1; string endpoint = 2; string input_json = 3; }
+message JsonReply { string json = 1; }
+message ArtifactReply { string mime = 1; bytes data = 2; }
+</code></pre>
+<p>Errors use the usual gRPC status codes (<code>UNAUTHENTICATED</code>, <code>PERMISSION_DENIED</code>,
+<code>NOT_FOUND</code>, <code>INVALID_ARGUMENT</code>).</p>
+<h2 id="executables-213">Executables (2.13)</h2>
+<p>Every code space a node serves (<code>mnnn org code serve ORG SPACE</code>) is an <em>executable</em>,
+described in protobuf and callable by anyone holding <code>code.run</code> in the org:</p>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Web</th>
+<th>gRPC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>list</td>
+<td><code>GET /o/ORG/api/executables</code></td>
+<td><code>muninn.code.v1.Executables/List</code> (<code>ListRequest{org}</code>)</td>
+</tr>
+<tr>
+<td>run</td>
+<td><code>POST /o/ORG/api/run/NAME</code> (JSON)</td>
+<td><code>muninn.code.v1.o.ORG.Name/Run</code></td>
+</tr>
+<tr>
+<td>protos</td>
+<td><code>GET /o/ORG/proto/muninn/code/v1/executable.proto</code>, <code>GET /o/ORG/proto/Name.proto</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>The input is the space's own record query, narrowed: <code>where</code> adds conditions to the
+space's, <code>text</code>, <code>sort</code> and <code>group</code> replace them, and <code>limit</code> can never raise the space's.
+A run returns a <code>RunResult</code> (status, error, the <code>@view</code> the source declares, logs, writes,
+ms, and the full JSON). The node runs only the source it has approved; an edited space must
+be approved again before it runs. Every run is recorded as an <code>org.run</code> action.</p>
+<h2 id="gated-private-sites-213">Gated private sites (2.13)</h2>
+<p>A private org's site shows guests nothing. Turn on its door with
+<code>mnnn org edit ORG --gated on</code>: guests then see a landing page (name and description),
+<code>/o/ORG/sign-in</code> and <code>/o/ORG/join</code>; everything else stays for members.</p>
+<p><strong>Browser sign-in.</strong> A member runs <code>mnnn org sign-in ORG --site https://HOST:PORT</code> on
+their own node. It prints a link signed with their exchange key, good once and for five
+minutes. Opening it sets an <code>HttpOnly; Secure; SameSite=Strict</code> cookie for that org's
+pages for 12 hours. The node keeps only a hash of the session, in memory, so restarting the
+host signs everyone out. <code>/o/ORG/sign-out</code> ends a session early. Sessions cover GET pages;
+API calls stay signed requests.</p>
+<p><strong>Invite links.</strong> When the site is being served, <code>mnnn org member invite</code> also prints a web
+link, <code>https://HOST/o/ORG/join#muninn://join/…</code>. The invite stays in the <code>#fragment</code>,
+which browsers never send, so it never reaches the host or its logs. The join page reads
+it in the browser and offers to open it in Muninn, or shows the <code>mnnn org join</code> command.
+Accepting the invite starts the key exchange from the invitee's node.</p>
+<h2 id="built-in-executables-213">Built-in executables (2.13)</h2>
+<p>Muninn ships global executables, versioned with it, that every hosted org serves to
+anyone, including guests at a gated door:</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>what</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>invite-redeem</code></td>
+<td><code>{ &quot;link&quot;: … }</code> → is this invite for this org, still open, and which role</td>
+</tr>
+<tr>
+<td><code>membership-apply</code></td>
+<td>how to apply: the org node's peer id, addresses, and the <code>mnnn org apply</code> command</td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>mnnn code builtin list</code> to see them and <code>mnnn code builtin show NAME</code> for a contract.
+<code>mnnn code builtin override NAME ORG</code> asks first, then creates an editable code space of
+the same name and serves it in place of the built-in. An override runs as ordinary code,
+so callers need <code>code.run</code> and the source must be approved.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/org-hosting.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

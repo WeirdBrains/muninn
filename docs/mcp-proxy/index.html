@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>MCP behind nginx · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a class="current" aria-current="page" href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="mcp-behind-nginx">MCP behind nginx</h1>
+<p>Muninn's MCP server can <a href="/docs/mcp/#https-with-lets-encrypt">serve HTTPS itself</a> with a
+Let's Encrypt certificate it gets and renews on its own (<code>mnnn mcp serve --tls-domain</code>).
+Use that unless nginx already owns ports 80 and 443 on the machine. This guide is the
+alternative: Muninn on plain HTTP at 127.0.0.1:4743, nginx in front with a certificate
+from certbot. The configuration is <a href="https://github.com/WeirdBrains/muninn/blob/main/packaging/nginx/muninn-mcp.conf"><code>packaging/nginx/muninn-mcp.conf</code></a>.</p>
+<p>Muninn needs no proxy settings. It checks every request's client token
+(<code>Authorization: Bearer mnnn_mcp_…</code>, passed through unchanged) and builds no URLs from
+the <code>Host</code> header. It answers only <code>POST /mcp</code>, with JSON: no server-sent event stream and
+no session, so no WebSocket or SSE settings are needed. Requests with an <code>Origin</code> other
+than localhost get <code>403</code>, so browser-based clients can't call it through the proxy;
+desktop and server-side MCP clients send no <code>Origin</code>.</p>
+<p>Replace <code>mcp.example.com</code> and <code>you@example.com</code> throughout.</p>
+<h2 id="1-dns">1. DNS</h2>
+<p>Add an <code>A</code> record (and <code>AAAA</code> if the machine has IPv6) for <code>mcp.example.com</code> pointing at
+the machine. Check it before going on, since Let's Encrypt validates by name:</p>
+<pre><code>dig +short mcp.example.com A
+dig +short mcp.example.com AAAA
+</code></pre>
+<h2 id="2-install-nginx-and-certbot">2. Install nginx and certbot</h2>
+<pre><code># Debian, Ubuntu
+sudo apt install nginx certbot python3-certbot-nginx
+# Fedora
+sudo dnf install nginx certbot python3-certbot-nginx
+sudo systemctl enable --now nginx
+# Arch
+sudo pacman -S nginx certbot certbot-nginx
+sudo systemctl enable --now nginx
+</code></pre>
+<h2 id="3-firewall">3. Firewall</h2>
+<p>Open 80 (challenges and the redirect) and 443. Keep 4743 closed: Muninn listens on
+127.0.0.1 only, and nothing outside should reach it.</p>
+<pre><code># ufw (Debian, Ubuntu)
+sudo ufw allow 80/tcp &amp;&amp; sudo ufw allow 443/tcp
+# firewalld (Fedora)
+sudo firewall-cmd --permanent --add-service=http --add-service=https &amp;&amp; sudo firewall-cmd --reload
+</code></pre>
+<h2 id="4-muninn-as-a-service">4. Muninn as a service</h2>
+<p>Create a user, a home and a client token as that user:</p>
+<pre><code>sudo useradd --system --home /var/lib/muninn --create-home muninn
+sudo -u muninn MUNINN_HOME=/var/lib/muninn mnnn mcp client add assistant --role read
+</code></pre>
+<p>The token is printed once; keep it for the client. Then the unit:</p>
+<pre><code class="language-ini"># /etc/systemd/system/muninn-mcp.service
+[Unit]
+Description=Muninn MCP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=muninn
+Environment=MUNINN_HOME=/var/lib/muninn
+Environment=MUNINN_NON_INTERACTIVE=true
+EnvironmentFile=-/etc/muninn/mcp.env
+ExecStart=/usr/bin/mnnn mcp serve --http 127.0.0.1:4743
+KillSignal=SIGINT
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/muninn
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+</code></pre>
+<p><code>/etc/muninn/mcp.env</code> (mode 0600, owned by root) holds <code>MUNINN_PASSWORD=…</code> when the
+database key is not in a keyring. Start it and check it answers locally:</p>
+<pre><code>sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now muninn-mcp
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:4743/mcp   # 401: no token
+</code></pre>
+<h2 id="5-nginx-and-the-first-certificate">5. nginx and the first certificate</h2>
+<p>nginx refuses to start with a missing certificate, so the first one comes before the
+HTTPS server block is turned on.</p>
+<pre><code>sudo mkdir -p /var/www/letsencrypt
+# Debian, Ubuntu
+sudo cp packaging/nginx/muninn-mcp.conf /etc/nginx/sites-available/muninn-mcp.conf
+sudo ln -s ../sites-available/muninn-mcp.conf /etc/nginx/sites-enabled/
+# Fedora, Arch (Arch: make sure nginx.conf has `include /etc/nginx/conf.d/*.conf;` in http {})
+sudo cp packaging/nginx/muninn-mcp.conf /etc/nginx/conf.d/muninn-mcp.conf
+</code></pre>
+<p>Edit the copy: replace <code>mcp.example.com</code> (5 places) and comment out the whole
+<code>listen 443</code> server block. Then:</p>
+<pre><code>sudo nginx -t &amp;&amp; sudo systemctl reload nginx
+sudo certbot certonly --webroot -w /var/www/letsencrypt -d mcp.example.com \
+  --email you@example.com --agree-tos --no-eff-email
+</code></pre>
+<p>Uncomment the 443 block, then <code>sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code>.</p>
+<p><code>certbot --nginx -d mcp.example.com</code> works too, but it edits the file itself. The webroot
+way keeps the shipped file as it is.</p>
+<p>Add <code>--staging</code> to the certbot command to try it out against Let's Encrypt's staging CA
+first (untrusted certificate, generous rate limits), then run it again without
+<code>--staging</code> and with <code>--force-renewal</code>.</p>
+<h2 id="6-renewal">6. Renewal</h2>
+<p>The certbot package installs a timer (<code>systemctl list-timers | grep certbot</code>; on Arch,
+enable it: <code>sudo systemctl enable --now certbot-renew.timer</code>). nginx must reload to serve
+a renewed certificate:</p>
+<pre><code>sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh &gt;/dev/null &lt;&lt;'SH'
+#!/bin/sh
+systemctl reload nginx
+SH
+sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+sudo certbot renew --dry-run
+</code></pre>
+<h2 id="7-check-it">7. Check it</h2>
+<pre><code>TOKEN=mnnn_mcp_…
+curl -sS https://mcp.example.com/mcp -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H 'Content-Type: application/json' -d '{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;tools/list&quot;}'
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://mcp.example.com/mcp      # 401
+curl -s -o /dev/null -w '%{http_code}\n' http://mcp.example.com/mcp               # 301
+curl -s -o /dev/null -w '%{http_code}\n' https://mcp.example.com/                 # 404
+</code></pre>
+<p>Clients use <code>https://mcp.example.com/mcp</code> with the token as a bearer token, for example
+<code>mnnn mcp add home --url https://mcp.example.com/mcp --token -</code> on another Muninn.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<ul>
+<li><strong><code>502 Bad Gateway</code></strong>: Muninn isn't running or isn't on 127.0.0.1:4743. Check
+<code>systemctl status muninn-mcp</code> and <code>journalctl -u muninn-mcp</code>.</li>
+<li><strong><code>401</code></strong>: the token is missing, wrong or revoked (<code>mnnn mcp client list</code>). nginx passes
+<code>Authorization</code> through; check no other config strips it.</li>
+<li><strong><code>403</code></strong>: the request carried a browser <code>Origin</code>. Use a non-browser client.</li>
+<li><strong><code>405</code></strong>: a <code>GET</code> (or <code>DELETE</code>). Muninn keeps no stream or session; clients fall back to
+<code>POST</code>.</li>
+<li><strong><code>413</code></strong>: the request is over 4 MiB, Muninn's limit (nginx's <code>client_max_body_size 4m</code>
+matches it).</li>
+<li><strong>certbot &quot;Timeout during connect&quot; or &quot;unauthorized&quot;</strong>: DNS doesn't point here yet, port
+80 is closed, or the challenge <code>location</code> isn't served (<code>curl http://mcp.example.com/.well-known/acme-challenge/x</code> should give nginx's 404, not a
+redirect).</li>
+<li><strong>nginx won't start, certificate file missing</strong>: the 443 block was on before the first
+certificate; see step 5.</li>
+<li><strong>Muninn fails at start without a prompt</strong>: it runs non-interactively; put the database
+password in <code>/etc/muninn/mcp.env</code> or the keyring.</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/mcp-proxy.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

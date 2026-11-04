@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Notifications · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a class="current" aria-current="page" href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="notifications">Notifications</h1>
+<p>Muninn tells you when something happens that you should know about. A notification has a
+title, an optional body, a level (<code>info</code>, <code>warn</code> or <code>error</code>) and an optional <strong>link</strong> to
+what it is about. Open the link and you land on that review, org, journal, project, rule or
+history step.</p>
+<h2 id="where-they-come-from">Where they come from</h2>
+<ul>
+<li>
+<p><strong>Built-in events.</strong> Run <code>mnnn notify kinds</code> to list them:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>net.exchange.incoming</code></td>
+<td>another node asks to connect, or invites you</td>
+</tr>
+<tr>
+<td><code>org.member.apply</code></td>
+<td>someone applies to join one of your orgs</td>
+</tr>
+<tr>
+<td><code>review.comment</code>, <code>review.suggest</code>, <code>review.vote</code></td>
+<td>a reviewer comments, suggests a change or votes</td>
+</tr>
+<tr>
+<td><code>sync.pull</code></td>
+<td>a sync with a linked node kept conflicts</td>
+</tr>
+<tr>
+<td><code>org.code.sync</code></td>
+<td>an org's code arrived and needs your approval</td>
+</tr>
+<tr>
+<td><code>notify</code></td>
+<td>Muninn warns you (for example, certificates expiring or failing to renew)</td>
+</tr>
+<tr>
+<td><code>net.broadcast</code></td>
+<td>another node sent a broadcast</td>
+</tr>
+<tr>
+<td><code>net.message</code></td>
+<td>another node sent you a <a href="/docs/collaboration/#messages">message</a></td>
+</tr>
+</tbody>
+</table>
+<p>Your own actions don't notify you. Network events only notify when they come from
+another node. You can mute any built-in kind with <code>mnnn notify mute KIND</code>, or with <code>m</code>
+in the window.</p>
+</li>
+<li>
+<p><strong>Rule sets.</strong> Add <code>notify TITLE [body=…] [link=KIND:ID] [level=info|warn|error]</code> as a
+then-action. The title, body and link are templates, so <code>{name}</code>, <code>{summary}</code> and the
+other fields work. Example:</p>
+<pre><code>mnnn rule create &quot;Big import&quot; --on import --if &quot;inserted &gt; 1000&quot; \
+  --then 'notify &quot;imported {inserted} bars&quot; level=warn'
+</code></pre>
+</li>
+<li>
+<p><strong>Broadcasts</strong> from other nodes (see below).</p>
+</li>
+</ul>
+<h2 id="notifications-are-triggers-too">Notifications are triggers too</h2>
+<p>Every notification is also recorded as a <code>notification</code> action, with the fields <code>id</code>,
+<code>source</code>, <code>level</code>, <code>title</code>, <code>body</code> and <code>link</code>. That means a rule set can react to any
+notification, whatever made it: <code>--on notification --if &quot;level = error&quot;</code>. The usual chain
+and loop protection applies, so a rule that notifies about a notification won't run forever.</p>
+<h2 id="reading-them">Reading them</h2>
+<ul>
+<li><strong>TUI.</strong> The header shows a bell (🔔 N unread) when something is unread. Click the
+header, press <code>!</code>, or use Projects ▸ Notifications… to open the window:
+<ul>
+<li><code>Enter</code> opens what the notification links to and marks it read.</li>
+<li><code>r</code> toggles read or unread on one; <code>R</code> marks all read.</li>
+<li><code>u</code> shows only unread ones.</li>
+<li><code>m</code> mutes or unmutes that built-in kind.</li>
+</ul>
+</li>
+<li><strong>CLI:</strong>
+<ul>
+<li><code>mnnn notify list [--unread] [--json]</code></li>
+<li><code>mnnn notify show ID</code> (also marks it read)</li>
+<li><code>mnnn notify read ID|--all</code> and <code>mnnn notify unread ID</code></li>
+<li><code>mnnn notify send TITLE [--body] [--link] [--level]</code>, for scripts</li>
+<li><code>mnnn notify kinds</code>, <code>mnnn notify mute KIND</code>, <code>mnnn notify unmute KIND</code></li>
+</ul>
+</li>
+</ul>
+<p>Notifications are stored additively, in their own table. They sync to your linked nodes,
+along with their read state.</p>
+<h2 id="broadcasts">Broadcasts</h2>
+<p>A broadcast is a short topic (up to 64 characters) plus text (up to 2000) that you send to
+other nodes:</p>
+<ul>
+<li><code>nodes</code>: your linked nodes (the default)</li>
+<li><code>connections</code>: nodes you exchanged keys with</li>
+<li><code>org:SLUG</code>: an org's member nodes</li>
+<li><code>all</code>: everyone above</li>
+</ul>
+<p>To send one:</p>
+<pre><code>mnnn net broadcast deploy &quot;v2 is out&quot; --to connections
+</code></pre>
+<p>A rule set can broadcast with <code>broadcast TOPIC [text=…] [to=nodes|connections|all|org:SLUG]</code>.
+On the receiving node a broadcast arrives as a <code>net.broadcast</code> action, with the fields
+<code>peer</code>, <code>from</code>, <code>topic</code>, <code>text</code>, <code>scope</code> and <code>org</code>. It notifies you unless muted, and rule
+sets can trigger on it:</p>
+<pre><code>mnnn rule create &quot;Deploys&quot; --on net.broadcast --if &quot;topic = deploy&quot; \
+  --then 'notify &quot;deploy by {from}&quot; body=&quot;{text}&quot;'
+</code></pre>
+<p>Broadcasts only travel over active key exchanges, the same consent and trust as all other
+network traffic. A node only accepts them over link, connection or org exchanges, and it
+checks the size limits.</p>
+<h2 id="decisions">Decisions</h2>
+<ul>
+<li><strong>Rule-set broadcasts are queued.</strong> A broadcast from a rule set goes into a node-local
+outbox. The running node (<code>mnnn net start</code> or the TUI) sends it on its next settle pass,
+within about 20 seconds. A broadcast that can't be delivered then is dropped and recorded
+as a <code>net.broadcast.send</code> action with failures; it is not retried. <code>mnnn net broadcast</code>
+sends right away.</li>
+<li><strong>No &quot;shared with you&quot; notification.</strong> Shares are pulled when you list or fetch them, so
+no event arrives when someone shares with you. Instead, a node can broadcast that it has
+shared something.</li>
+<li><strong>Your own actions don't notify you.</strong> The exceptions are sync conflicts, org code
+waiting for approval, and Muninn's own warnings.</li>
+<li><strong>The outbox and mutes stay on this node.</strong> They are settings, so they don't sync.
+Notifications themselves do sync.</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/notifications.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

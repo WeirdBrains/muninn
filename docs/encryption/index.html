@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Encryption at rest · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a class="current" aria-current="page" href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="encryption-at-rest">Encryption at rest</h1>
+<p>The database <code>storage/muninn.database</code> is a SQLCipher database (rusqlite with
+<code>bundled-sqlcipher-vendored-openssl</code>; no system OpenSSL needed), keyed with a raw
+256-bit data key (DEK). Without the key the file is indistinguishable from random data.</p>
+<h2 id="envelope">Envelope</h2>
+<pre><code>password --Argon2id--&gt; wrapping key --XChaCha20-Poly1305--&gt; service key v{n}   (keys/service/v{n}.toml)
+service key --XChaCha20-Poly1305--&gt; DEK                                          (keys/envelope.toml: service_wrap)
+master --HKDF &quot;muninn/kek&quot;--&gt; KEK --XChaCha20-Poly1305--&gt; DEK                    (keys/envelope.toml: master_wrap)
+DEK --SQLCipher--&gt; muninn.database
+</code></pre>
+<p>So the database can be unlocked by the service key (normal use, via your password) or
+by the master key (words, shards or exported master), and rotating the service key only
+re-wraps the DEK. See <a href="/docs/keys/">keys</a> for the commands.</p>
+<p>Key material is held in zeroize-on-drop types; passwords use <code>secrecy</code>. Secrets are never
+logged; SQLCipher's own logging is turned off.</p>
+<h2 id="what-is-and-isnt-encrypted">What is and isn't encrypted</h2>
+<table>
+<thead>
+<tr>
+<th>file</th>
+<th>protection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>storage/muninn.database</code></td>
+<td>SQLCipher (DEK)</td>
+</tr>
+<tr>
+<td><code>keys/envelope.toml</code></td>
+<td>DEK only in wrapped form</td>
+</tr>
+<tr>
+<td><code>keys/service/v{n}.toml</code></td>
+<td>service key wrapped by the password</td>
+</tr>
+<tr>
+<td><code>preferences.toml</code>, <code>themes/</code></td>
+<td>plain text by design (human-editable)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="failure-modes">Failure modes</h2>
+<ul>
+<li>Wrong key or password: &quot;wrong password&quot; / &quot;wrong key or not a muninn database&quot;.</li>
+<li>A database copied without its <code>keys/</code> folder cannot be opened by the password; it
+needs the master key <em>and</em> the matching envelope. Back them up together
+(<a href="/docs/backup-recovery/">backup and recovery</a>).</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/encryption.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

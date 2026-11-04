@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Website · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a class="current" aria-current="page" href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="website">Website</h1>
+<p>The Muninn website is a static front page, built with <a href="https://jaspr.site">Jaspr</a> (Dart) in
+<code>site/</code>, plus these docs as pages under <code>/docs/</code>. It uses the app's default theme (Tokyo Night: its colours, dark and light) and
+the MUNINN header art, shows a hero screenshot under the header and a Screenshots section
+(one captioned shot per feature, lazy-loaded), and links the releases, the docs and the install steps.</p>
+<p>Every <code>docs/**/*.md</code> except <code>docs/historical</code> is published at <code>/docs/&lt;slug&gt;/</code> (<code>docs/README.md</code>
+is <code>/docs/</code>, <code>services/redis.md</code> is <code>/docs/services/redis/</code>), with a sidebar grouped like
+<code>docs/README.md</code> and an &quot;Edit this page on GitHub&quot; link. Links between docs point at those
+pages, screenshots at <code>/screenshots/</code>, and anything else in the repository at GitHub.
+The pages are generated from <code>docs/</code> on every build, so they never drift.</p>
+<table>
+<thead>
+<tr>
+<th>file</th>
+<th>what</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>site/lib/app.dart</code></td>
+<td>the page: header art, hero shot, features, screenshots, install steps, docs links</td>
+</tr>
+<tr>
+<td><code>site/lib/shots.dart</code></td>
+<td>the hero and screenshot list (written by <code>scripts/screenshots.sh</code>)</td>
+</tr>
+<tr>
+<td><code>site/web/screenshots/</code></td>
+<td>the screenshots (PNG, 1464x890)</td>
+</tr>
+<tr>
+<td><code>site/lib/banner.dart</code></td>
+<td>the header art (the same rows as <code>src/tui/header.rs</code>)</td>
+</tr>
+<tr>
+<td><code>site/lib/main.server.dart</code></td>
+<td>the entry point: the document and its stylesheet</td>
+</tr>
+<tr>
+<td><code>site/web/styles.css</code></td>
+<td>the theme colours as CSS variables, and the layout</td>
+</tr>
+<tr>
+<td><code>site/tool/docs.dart</code></td>
+<td>publishes <code>docs/</code> as pages in <code>build/jaspr/docs/</code> (the <code>markdown</code> package, run after <code>jaspr build</code>)</td>
+</tr>
+<tr>
+<td><code>site/tool/check.sh</code></td>
+<td>checks a build: the front page, the banner, the links, the theme, a page per doc and every link in them</td>
+</tr>
+</tbody>
+</table>
+<h2 id="building">Building</h2>
+<p>It needs the Dart SDK (3.8 or later; Flutter's bundled <code>dart</code> works) and the Jaspr CLI; <code>site/pubspec.lock</code> pins the packages; neither is needed for Muninn
+itself, and the Rust build and the release workflow never run them.</p>
+<pre><code class="language-sh">cd site
+dart pub get
+dart pub global activate jaspr_cli 0.23.5
+jaspr serve          # http://localhost:8080, reloads on change
+jaspr build          # static output in site/build/jaspr
+dart run tool/docs.dart   # the docs pages, into build/jaspr/docs
+tool/check.sh
+</code></pre>
+<h2 id="screenshots">Screenshots</h2>
+<p><code>scripts/screenshots.sh</code> redoes every screenshot: it runs the ignored test
+<code>tui::screenshots::feature_screenshots</code> (a scratch home with sample ETH/BTC data, never
+<code>~/.muninn</code>), which drives the TUI through each feature, some mid-action, and renders each
+screen to HTML; headless Chromium turns those into PNGs and ImageMagick shrinks them into
+<code>site/web/screenshots/</code>. It then rewrites <code>site/lib/shots.dart</code> and the README's screenshot
+block. <code>HERO=name</code> picks the hero (default <code>pipeline-live</code>). It needs <code>chromium</code> and
+<code>magick</code>. Run it when a view changes, then rebuild the site.</p>
+<h2 id="checks">Checks</h2>
+<p>CI (<code>.github/workflows/ci.yml</code>, job <code>site</code>) installs Dart in the runner, checks the
+formatting, builds the site and its docs pages, analyzes it, runs <code>tool/check.sh</code> and keeps the built page
+as the <code>site</code> artifact. <code>cargo test</code> (<code>tests/site.rs</code>) keeps the page honest without
+Dart: the header art matches the TUI's, the colours match <code>assets/themes/tokyo-night.toml</code>,
+every docs page it links exists, every doc has a title and its links to other docs resolve, the hero and the Screenshots section and header link
+are there, and every screenshot the site or the README shows exists. <code>tool/check.sh</code> checks the
+same in the built page.</p>
+<p>When the header art or the default theme changes, change the site with it.</p>
+<h2 id="deploying">Deploying</h2>
+<p>The site is served by GitHub Pages from the <code>gh-pages</code> branch at
+<a href="https://muninn.weirdbrains.com">https://muninn.weirdbrains.com</a> (a DNS-only CNAME to <code>weirdbrains.github.io</code>; GitHub
+issues the Let's Encrypt certificate). The branch holds only the built page, a <code>CNAME</code>
+file and <code>.nojekyll</code>. To redeploy by hand after a change:</p>
+<pre><code class="language-sh">cd site &amp;&amp; jaspr build &amp;&amp; dart run tool/docs.dart &amp;&amp; tool/check.sh &amp;&amp; cd ..
+git worktree add /tmp/muninn-pages gh-pages
+rsync -a --delete --exclude .git --exclude CNAME --exclude .nojekyll site/build/jaspr/ /tmp/muninn-pages/
+git -C /tmp/muninn-pages add -A
+git -C /tmp/muninn-pages commit -m &quot;site: build of main $(git rev-parse --short HEAD)&quot;
+git -C /tmp/muninn-pages push origin gh-pages
+git worktree remove /tmp/muninn-pages
+</code></pre>
+<p>Pages rebuilds within a minute or two (<code>gh api repos/WeirdBrains/muninn/pages/builds/latest</code>).</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/website.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

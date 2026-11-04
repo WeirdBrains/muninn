@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Releasing · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a class="current" aria-current="page" href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="releasing">Releasing</h1>
+<p>Releases are built, checked and published locally. A GitHub Actions workflow
+(<code>.github/workflows/release.yml</code>) can build the same files, but it is not how current
+releases are made.</p>
+<ol>
+<li><code>scripts/release.sh X.Y.Z &quot;Summary&quot; &quot;Changelog bullet&quot; ...</code> bumps the version,
+regenerates man pages, adds the <code>CHANGELOG.md</code> entry, commits <code>release: vX.Y.Z</code> and
+creates the annotated tag <code>vX.Y.Z</code>. It never pushes. Also bump <code>pkgver</code> in both Arch
+PKGBUILDs and <code>version</code> in <code>packaging/homebrew/muninn.rb</code>. Then
+<code>git push origin main --follow-tags</code>.</li>
+<li>Build the 14 files from the tag:</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Built on</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linux x86_64 (cross-compiling aarch64)</td>
+<td><code>cargo build --locked --release --target T</code>, strip, <code>scripts/dist.sh T</code>, <code>cargo deb</code>, <code>cargo generate-rpm</code>: tarballs, <code>.deb</code> and <code>.rpm</code> for x86_64 and aarch64</td>
+</tr>
+<tr>
+<td>Linux, llvm-mingw</td>
+<td><code>scripts/cross-windows.sh x86_64 aarch64</code>: <code>muninn-&lt;ver&gt;-{x86_64,aarch64}-pc-windows-gnullvm.zip</code></td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>COPYFILE_DISABLE=1</code>, <code>scripts/dist.sh</code> (which runs <code>xattr -cr</code> on the staged files before <code>tar</code>) for <code>aarch64-apple-darwin</code> and <code>x86_64-apple-darwin</code></td>
+</tr>
+<tr>
+<td>Arch (makepkg)</td>
+<td><code>packaging/arch/muninn-bin</code> built from the local tarballs, <code>x86_64</code> and (with <code>CARCH=aarch64</code>) <code>aarch64</code></td>
+</tr>
+</tbody>
+</table>
+<ol start="3">
+<li>In <code>dist/</code>, run <code>sha256sum -- * &gt; SHA256SUMS</code> and <code>scripts/fill-sums.py X.Y.Z dist</code>
+(the Arch PKGBUILD, Homebrew formula and winget manifests, with real checksums). Tar
+<code>dist/packaging</code> into <code>muninn-&lt;ver&gt;-packaging.tar.gz</code>, add its checksum, then check
+with <code>sha256sum -c SHA256SUMS</code>, the entry counts and the <code>LICENSE</code> in every package.</li>
+<li>Publish only when all 14 files are there:
+<code>gh release create vX.Y.Z --verify-tag --title &quot;Muninn vX.Y.Z&quot; --notes-file &lt;(scripts/release-notes.sh X.Y.Z) dist/*</code>.
+Only the highest version is marked <strong>Latest</strong>: an older tag published later gets
+<code>--latest=false</code>. Assets can't change once a release is published.</li>
+</ol>
+<p>The release is named <code>Muninn vX.Y.Z</code> and its notes are the version's <code>CHANGELOG.md</code>
+section (<code>scripts/release-notes.sh X.Y.Z</code>). Write each bullet as the feature plus how to
+use it (the command or key), e.g. <code>Import a whole folder: `mnnn ingest path &lt;DIR&gt;` …</code>.
+<code>release.sh</code> puts bullets under <code>### Added</code>, or <code>### Fixed</code> / <code>### Changed</code> when they
+start with <code>Fixed: </code> / <code>Changed: </code>.</p>
+<p>To rewrite the notes of already-published releases from <code>CHANGELOG.md</code> (allowed for
+immutable releases; only assets and tags are locked) and mark the highest tag Latest:</p>
+<pre><code class="language-sh">scripts/sync-release-notes.sh --dry-run --latest   # preview
+scripts/sync-release-notes.sh --latest             # every release (or list tags: v1.7.0 v1.8.0)
+</code></pre>
+<p><code>.github/workflows/ci.yml</code> builds, lints and tests
+pushes to <code>main</code> and pull requests.</p>
+<p>After publishing, the packaging tarball's files are what get submitted to
+microsoft/winget-pkgs, the Homebrew tap and the AUR.</p>
+<h2 id="local-checks">Local checks</h2>
+<pre><code class="language-sh">actionlint                                  # workflow syntax (user-local install)
+scripts/dist.sh                             # host tarball into dist/
+LLVM_MINGW=~/.local/opt/llvm-mingw-... scripts/cross-windows.sh
+packaging/arch/build-local.sh               # muninn-bin package
+cargo deb &amp;&amp; cargo generate-rpm             # after cargo build --release
+</code></pre>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/release.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

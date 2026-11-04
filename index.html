@@ -31,7 +31,7 @@
           <a class="button primary" href="https://github.com/WeirdBrains/muninn/releases">Releases</a>
           <a class="button" href="#install">Install</a>
           <a class="button" href="#screenshots">Screenshots</a>
-          <a class="button" href="https://github.com/WeirdBrains/muninn/tree/main/docs">Docs</a>
+          <a class="button" href="/docs/">Docs</a>
           <a class="button" href="https://github.com/WeirdBrains/muninn">Source</a>
         </nav>
       </header>
@@ -298,54 +298,52 @@
         <p>
           Every package ships a prebuilt <code>mnnn</code> binary; no Rust toolchain is needed. Downloads and SHA256SUMS are on the 
           <a href="https://github.com/WeirdBrains/muninn/releases">releases page</a>. Full steps, uninstalling and building from source: 
-          <a href="https://github.com/WeirdBrains/muninn/blob/main/docs/install.md">docs/install.md</a>.
+          <a href="/docs/install/">the install guide</a>.
         </p>
         <div class="step">
           <h4>Release tarball (Linux, macOS)</h4>
-          <pre><code>tar -xzf muninn-2.18.0-x86_64-unknown-linux-gnu.tar.gz
-install -Dm755 muninn-2.18.0-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn</code></pre>
+          <pre><code>tar -xzf muninn-2.20.0-x86_64-unknown-linux-gnu.tar.gz
+mkdir -p ~/.local/bin
+install -m755 muninn-2.20.0-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn</code></pre>
         </div>
-        <div class="step"><h4>Debian / Ubuntu</h4><pre><code>sudo apt install ./muninn_2.18.0-1_amd64.deb</code></pre></div>
-        <div class="step"><h4>Fedora</h4><pre><code>sudo dnf install ./muninn-2.18.0-1.x86_64.rpm</code></pre></div>
-        <div class="step"><h4>Arch Linux</h4><pre><code>sudo pacman -U muninn-bin-2.18.0-1-x86_64.pkg.tar.zst</code></pre></div>
+        <div class="step"><h4>Debian / Ubuntu</h4><pre><code>sudo apt install ./muninn_2.20.0-1_amd64.deb</code></pre></div>
+        <div class="step"><h4>Fedora</h4><pre><code>sudo dnf install ./muninn-2.20.0-1.x86_64.rpm</code></pre></div>
+        <div class="step"><h4>Arch Linux</h4><pre><code>sudo pacman -U muninn-bin-2.20.0-1-x86_64.pkg.tar.zst</code></pre></div>
         <div class="step">
           <h4>Homebrew (macOS, Linux)</h4>
-          <pre><code>tar -xzf muninn-2.18.0-packaging.tar.gz
-brew install ./packaging/homebrew/muninn.rb</code></pre>
+          <pre><code>tar -xzf muninn-2.20.0-packaging.tar.gz
+brew tap-new --no-git local/muninn
+cp packaging/homebrew/muninn.rb "$(brew --repository local/muninn)/Formula/"
+brew install local/muninn/muninn</code></pre>
         </div>
         <div class="step">
-          <h4>Windows (winget)</h4>
-          <pre><code>tar -xzf muninn-2.18.0-packaging.tar.gz
-winget install --manifest packaging\winget\2.18.0</code></pre>
+          <h4>Windows (PowerShell)</h4>
+          <pre><code>curl.exe -LO https://github.com/WeirdBrains/muninn/releases/download/v2.20.0/muninn-2.20.0-x86_64-pc-windows-gnullvm.zip
+Expand-Archive muninn-2.20.0-x86_64-pc-windows-gnullvm.zip $env:LOCALAPPDATA\Programs -Force
+# then add the folder to your user PATH and open a new terminal: see muninn.weirdbrains.com/docs/install</code></pre>
         </div>
         <p class="muted">Your data stays in ~/.muninn (or MUNINN_HOME); installing or uninstalling never touches it.</p>
       </section>
       <section class="docs">
         <h2>Docs</h2>
         <ul>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/tui.md">Getting around the TUI</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/cli.md">Command line</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/import.md">Importing data</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/live-searches.md">Live searches</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/journals.md">Journals</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/models.md">Models</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/code-spaces.md">Code spaces</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/pipelines.md">Pipelines</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/rules.md">Rules</a></li>
-          <li>
-            <a href="https://github.com/WeirdBrains/muninn/blob/main/docs/org-hosting.md">Organizations and hosting</a>
-          </li>
-          <li>
-            <a href="https://github.com/WeirdBrains/muninn/blob/main/docs/org-templates.md">Org site templates</a>
-          </li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/notifications.md">Notifications</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/network.md">Network and sync</a></li>
-          <li>
-            <a href="https://github.com/WeirdBrains/muninn/blob/main/docs/collaboration.md">Live collaboration</a>
-          </li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/mcp.md">MCP</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/encryption.md">Encryption</a></li>
-          <li><a href="https://github.com/WeirdBrains/muninn/blob/main/docs/themes.md">Themes</a></li>
+          <li><a href="/docs/tui/">Getting around the TUI</a></li>
+          <li><a href="/docs/cli/">Command line</a></li>
+          <li><a href="/docs/import/">Importing data</a></li>
+          <li><a href="/docs/live-searches/">Live searches</a></li>
+          <li><a href="/docs/journals/">Journals</a></li>
+          <li><a href="/docs/models/">Models</a></li>
+          <li><a href="/docs/code-spaces/">Code spaces</a></li>
+          <li><a href="/docs/pipelines/">Pipelines</a></li>
+          <li><a href="/docs/rules/">Rules</a></li>
+          <li><a href="/docs/org-hosting/">Organizations and hosting</a></li>
+          <li><a href="/docs/org-templates/">Org site templates</a></li>
+          <li><a href="/docs/notifications/">Notifications</a></li>
+          <li><a href="/docs/network/">Network and sync</a></li>
+          <li><a href="/docs/collaboration/">Live collaboration</a></li>
+          <li><a href="/docs/mcp/">MCP</a></li>
+          <li><a href="/docs/encryption/">Encryption</a></li>
+          <li><a href="/docs/themes/">Themes</a></li>
         </ul>
         <p class="muted">
           The same pages are in the app: <code>mnnn help</code> or ? in the TUI, and man pages for every command.
@@ -357,7 +355,7 @@ winget install --manifest packaging\winget\2.18.0</code></pre>
          · 
         <a href="https://github.com/WeirdBrains/muninn/blob/main/CHANGELOG.md">changelog</a>
          · 
-        <a href="https://github.com/WeirdBrains/muninn/tree/main/docs">docs</a>
+        <a href="/docs/">docs</a>
          · 
         <a href="https://github.com/WeirdBrains/muninn/blob/main/LICENSE">BSD 3-Clause</a>
       </footer>

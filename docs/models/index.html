@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Models · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a class="current" aria-current="page" href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="models">Models</h1>
+<p>A <strong>model</strong> is a record table that you design: typed fields, references to other models,
+constraints and defaults. You change a design in a <strong>draft</strong>. <strong>Applying</strong> the draft turns it into
+the next <strong>version</strong>, which is a migration you can preview first and roll back later. Every
+record carries the version it was last written or migrated under. Rules can create and edit
+models, and they can feed records into them. Projects, <code>.mnnp</code> archives and backups carry
+models with their history, records and rules.</p>
+<p>Imported bars are the records of the built-in <strong>bars</strong> model. It is designed like any other
+model: rename, retype, change or drop its fields (<code>source</code>, <code>symbol</code>, <code>period</code>, <code>timestamp</code>,
+<code>open</code> … <code>flags</code>, shown as <em>from imports</em>), add your own (a <code>flag</code> or a <code>note</code> on each bar),
+rename the model, or remove it. Muninn does not decide what your bars mean.</p>
+<h2 id="fields">Fields</h2>
+<p>A field spec is <code>NAME:TYPE</code> followed by constraints:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td>text (aliases <code>string</code>, <code>str</code>)</td>
+</tr>
+<tr>
+<td><code>integer</code></td>
+<td>whole numbers (<code>int</code>)</td>
+</tr>
+<tr>
+<td><code>real</code></td>
+<td>numbers (<code>float</code>, <code>number</code>, <code>decimal</code>)</td>
+</tr>
+<tr>
+<td><code>bool</code></td>
+<td>true/false (<code>yes</code>/<code>no</code>, <code>1</code>/<code>0</code>)</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>a time: epoch seconds or milliseconds, or a date such as <code>2024-04-20 12:00</code></td>
+</tr>
+<tr>
+<td><code>json</code></td>
+<td>any JSON value</td>
+</tr>
+<tr>
+<td><code>ref:MODEL</code></td>
+<td>the id of a record of another model (or of the same model)</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Constraint</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>required</code> or a trailing <code>!</code> (<code>price:real!</code>)</td>
+<td>every record has a value</td>
+</tr>
+<tr>
+<td><code>unique</code></td>
+<td>no two records share a value</td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td>indexed for fast filters (refs always are)</td>
+</tr>
+<tr>
+<td><code>default=V</code></td>
+<td>used when a record leaves the field out, and for existing records when the field is added</td>
+</tr>
+<tr>
+<td><code>choices=a|b|c</code></td>
+<td>text fields only: the allowed values</td>
+</tr>
+<tr>
+<td><code>about=&quot;…&quot;</code></td>
+<td>a description</td>
+</tr>
+<tr>
+<td><code>optional</code>, <code>-unique</code>, <code>-index</code>, <code>-default</code>, <code>-choices</code>, <code>-about</code></td>
+<td>take a constraint away</td>
+</tr>
+</tbody>
+</table>
+<p>Several specs are separated by <code>;</code>, for example
+<code>symbol:text!; price:real!; side:text choices=buy|sell; idea:ref:ideas</code>.</p>
+<h2 id="drafts-plans-and-migrations">Drafts, plans and migrations</h2>
+<p>Every change goes to the model's draft: adding, changing, dropping, renaming or moving a
+field. The <strong>plan</strong> compares the draft with the applied version, record by record:</p>
+<ul>
+<li><code>+</code> adds a field (existing records get its default)</li>
+<li><code>-</code> drops a field and says how many values that throws away</li>
+<li><code>~</code> changes a type or a constraint; it says how many values would not convert, and which
+records break a new <code>required</code> or <code>unique</code></li>
+<li>renames keep the values, because fields are matched by an id that never changes</li>
+</ul>
+<p>A plan that cannot work is <strong>blocked</strong>, and it tells you what to fix (for example, add a
+default before making a field with empty values required). A plan that loses values asks
+for confirmation (<code>-y</code> on the command line, <code>y</code> in the TUI, <code>destructive=yes</code> in a rule).
+A migration is a single transaction, so it either completes or changes nothing.</p>
+<p><code>history</code> lists the versions: when each was made, by which author, whether a rule made it,
+and its steps. <strong>Rolling back</strong> to v<em>N</em> applies the design of v<em>N</em> as a new version, so the
+history only grows. The rollback has its own plan, because values written since v<em>N</em> may not
+fit.</p>
+<p>How the built-in bars model changes:</p>
+<ul>
+<li>the bars keep their imported values whatever the design says, so imports, charts, the
+sidebar, symbol and time filters and bar ids work as before;</li>
+<li>renaming a field from imports, or changing its about, default, index, required, unique or
+choices, loses nothing (required, unique and choices are checked against the bars);</li>
+<li>dropping one hides it from the model (nothing is lost: the bars keep the values, and a
+rollback shows them again). Searches, rules and code that name it get an error saying it
+was dropped, or what it is called now;</li>
+<li>giving one another type copies its converted values into the model's own table, where
+they can then hold anything; the plan counts values that do not convert, and changing the
+type back reads the imported values again;</li>
+<li>a field you make required needs a default (new bars from imports get it);</li>
+<li>rolling back to v0 restores the design as shipped;</li>
+<li>removing the bars model deletes every bar (it asks first) and starts the model again as
+shipped.</li>
+</ul>
+<p>Models that other models refer to cannot be removed until those references are dropped.</p>
+<h2 id="records">Records</h2>
+<p>Records have an <code>id</code> and the hidden fields <code>_version</code>, <code>_created_at</code>, <code>_updated_at</code> and
+<code>_author</code>. Values are converted to the field's type (<code>price=42000</code> is a number). Conditions
+take the same form as rule conditions: <code>FIELD OP VALUE</code> with <code>= != ~ !~ &gt; &gt;= &lt; &lt;=</code>, or
+<code>FIELD ?</code> (present) and <code>FIELD !?</code> (missing). <code>=</code> takes <code>*</code> wildcards, and text comparisons ignore
+case. On bars, comparisons on <code>timestamp</code>, <code>open</code> … <code>volume</code>, and <code>=</code> on <code>period</code>, <code>source</code>,
+<code>base</code> and <code>quote</code>, go straight to the bars' own indexed columns, so they stay fast on millions of bars.</p>
+<p>Grouping counts the records per value of one or more fields, and can add <code>sum:F</code>,
+<code>avg:F</code>, <code>min:F</code> or <code>max:F</code> for each group.</p>
+<p>Every change is recorded in the <a href="/docs/history/">action history</a> with the current author:
+<code>model.create</code>, <code>model.edit</code>, <code>model.apply</code>, <code>model.rollback</code>, <code>model.remove</code>,
+<code>record.create</code>, <code>record.update</code> and <code>record.delete</code>.</p>
+<h2 id="command-line">Command line</h2>
+<pre><code>mnnn model list                                    # every model, its version and records
+mnnn model types
+mnnn model create signals --fields &quot;symbol:text!; price:real!; side:text choices=buy|sell&quot; \
+    --description &quot;trade ideas&quot; [--draft] [--project P]
+mnnn model edit signals --add &quot;note:text default=new&quot; --rename side:direction \
+    --change &quot;price:real default=0&quot; --drop old --move note:1 [--apply]
+mnnn model edit signals --name trade_signals --description &quot;…&quot;
+mnnn model show signals [--json]
+mnnn model plan signals [--json] [--then]          # --then prints a model-edit rule action
+mnnn model apply signals [--dry-run]               # -y when values are lost
+mnnn model discard signals
+mnnn model history signals [--json]
+mnnn model rollback signals 2 [--dry-run]
+mnnn -y model remove signals
+mnnn model export signals --out signals.json [--records]   # a template file
+mnnn model import signals.json [--name N | --merge] [--draft] [--dry-run]
+mnnn model templates                                       # built-in templates (builtin:bars)
+
+mnnn model record create signals symbol=BTC/USDT price=42000 side=buy
+mnnn model record update signals --id 3f2a note=checked
+mnnn model record update signals --where &quot;side = buy&quot; --where &quot;price &gt; 40000&quot; note=big
+mnnn model record list signals --where &quot;price &gt; 40000&quot; --sort -price --limit 20 [--json]
+mnnn model record list signals --text btc
+mnnn model record list signals --group side --agg avg:price --agg max:price
+mnnn model record show signals 3f2a
+mnnn model record delete signals 3f2a … | --where &quot;side = sell&quot; [--dry-run]
+</code></pre>
+<p>In <code>edit</code>, the operations run in this order: renames, then changes, drops, adds and moves.
+Assignments are <code>FIELD=VALUE</code>, and an empty value clears a field. Changing or deleting
+records with <code>--where</code> asks first. Bars are records like any other: create them (give the
+source, symbol, period, timestamp and prices, under the names the model gives them; fields
+left out get their defaults), update any field (a change to source, symbol, period or
+timestamp gives the bar a new id) and delete them. <code>model record list</code> on bars shows
+50 records unless <code>--limit</code> is given (<code>--limit 0</code> lists all).</p>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p><strong>D</strong> (or <strong>Data ▸ Model designer…</strong>) opens the designer.</p>
+<table>
+<thead>
+<tr>
+<th>Screen</th>
+<th>Keys</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Models</td>
+<td><strong>Enter</strong> design · <strong>n</strong> new (name, then fields) · <strong>r</strong> records · <strong>h</strong> history · <strong>f</strong> rules · <strong>p</strong> add to a project · <strong>x</strong> export a template · <strong>i</strong> import one · <strong>d</strong> remove</td>
+</tr>
+<tr>
+<td>Design</td>
+<td><strong>a</strong> add a field · <strong>e</strong>/<strong>Enter</strong> edit it (the whole spec; the field keeps its id, so a rename keeps values) · <strong>x</strong> drop · <strong>u</strong> undo the draft's change to the field · <strong>K</strong>/<strong>J</strong> move up/down · <strong>A</strong> apply (asks when values are lost) · <strong>z</strong> discard the draft · <strong>N</strong> rename the model · <strong>i</strong> description · <strong>d</strong> remove</td>
+</tr>
+<tr>
+<td>History</td>
+<td><strong>Enter</strong> show a version (fields, steps, what rolling back to it would do) · <strong>b</strong>/<strong>R</strong> roll back to it (asks)</td>
+</tr>
+<tr>
+<td>Records</td>
+<td><strong>Enter</strong> show · <strong>n</strong> new · <strong>e</strong> edit · <strong>d</strong> delete · <strong>w</strong> where · <strong>/</strong> text · <strong>s</strong> sort (<code>price</code>, <code>-price</code>) · <strong>g</strong> group (<code>side, sum:price</code>) · <strong>U</strong> update all matching · <strong>D</strong> delete all matching · <strong>c</strong> clear · <strong>PgUp</strong>/<strong>PgDn</strong></td>
+</tr>
+<tr>
+<td>Rules</td>
+<td><strong>n</strong> new rule living in the model (name → on → if → then) · <strong>x</strong> dry run on the newest action · <strong>Enter</strong> run now · <strong>Space</strong> on/off · <strong>d</strong> delete</td>
+</tr>
+</tbody>
+</table>
+<p><strong>m</strong>, <strong>h</strong>, <strong>r</strong> and <strong>f</strong> switch screens, and <strong>Esc</strong> goes back. The design screen shows the
+draft's fields with their marks (<code>+</code> new, <code>~</code> changed, <code>-</code> dropped, <code>was price</code> after a
+rename), and next to them the migration plan for the records as they are now. A new rule
+is prefilled with a <code>record-create</code> action that copies the trigger's fields into the model.</p>
+<h2 id="rules">Rules</h2>
+<p>Rules can react to <code>model.*</code> and <code>record.*</code> actions, and they can act on models (see
+<a href="/docs/rules/">Rules</a>):</p>
+<pre><code>model-create NAME fields=&quot;a:text; b:real&quot; [about=T] [draft=yes]
+model-edit [MODEL] add=SPEC change=SPEC drop=F rename=A:B move=F:N [apply=yes] [destructive=yes]
+model-apply [MODEL] [destructive=yes]
+model-remove [MODEL] [destructive=yes]
+record-create [MODEL] FIELD=VALUE…
+record-update [MODEL] id=ID|where=&quot;F OP V; …&quot; FIELD=VALUE…
+record-delete [MODEL] id=ID|where=&quot;F OP V; …&quot;
+</code></pre>
+<ul>
+<li>If a rule leaves the model out, it uses the model it lives in (<code>mnnn rule create … --model signals</code>).</li>
+<li>Values and conditions take templates: <code>{summary}</code>, <code>{FIELD}</code> and the rest.</li>
+<li><code>model-create</code> does nothing when the model already exists.</li>
+<li>Versions a rule makes have the note <code>rule NAME</code>.</li>
+<li>If an <code>apply=yes</code> edit is refused, the draft stays as it was.</li>
+</ul>
+<pre><code>mnnn rule create Feed --model notes --on entry.add --then &quot;record-create text={summary} kind=entry&quot;
+mnnn rule create Grow --on record.create --if &quot;name = notes&quot; \
+    --then 'model-edit notes add=&quot;seen:bool default=false&quot; apply=yes'
+</code></pre>
+<h2 id="live-searches-reports-and-projects">Live searches, reports and projects</h2>
+<ul>
+<li>
+<p><strong>Live searches</strong> can search records: across every model (not bars) or one model, with
+text and conditions (see <a href="/docs/live-searches/">Live searches</a>).</p>
+</li>
+<li>
+<p><strong>Reports</strong> have a <em>model records</em> section: a model's fields and a table of its records,
+optionally filtered (see <a href="/docs/reports/">Reports</a>).</p>
+</li>
+<li>
+<p><strong>Projects</strong> can hold models (<code>mnnn project add P --model signals</code>).</p>
+</li>
+<li>
+<p><strong>Project archives</strong> (<code>.mnnp</code>) carry:</p>
+<ul>
+<li>the models used by their items, report sections, live searches and rules, plus the
+models those refer to;</li>
+<li>each model's versions, records (record ids are kept), the rules that live in it and the rules that
+created or migrated it.</li>
+</ul>
+<p>On import:</p>
+<ul>
+<li>a model whose name is taken is imported as <code>NAME_imported</code>;</li>
+<li>imported rules start switched off;</li>
+<li>fields added to bars arrive as optional fields on the local bars model, with their
+values on the archive's bars (the local names of the fields from imports stay).</li>
+</ul>
+</li>
+<li>
+<p><strong>Backups</strong> contain everything.</p>
+</li>
+</ul>
+<p>See <a href="/docs/model-templates/">Model design templates</a> for exporting, importing and sharing designs.</p>
+<h2 id="more-commands">More commands</h2>
+<pre><code>mnnn model remove MODEL          # removes the model and its records; rules in it become standalone and off
+</code></pre>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/models.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

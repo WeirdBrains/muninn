@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Network · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a class="current" aria-current="page" href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="network">Network</h1>
+<p>Muninn nodes find each other, exchange keys and share what their owners choose:
+journals, projects, reports, models (their records, and the imported bars), live
+searches and code spaces. A search can run across every peer at once, and the master
+key can be split into <a href="/docs/dark-shards/">dark shards</a> held by peers.</p>
+<p><strong>Nothing is shared by default.</strong> The node starts with the TUI (turn off <em>start with
+the TUI</em> to stop that), and a peer sees an item only once your nodes are connected —
+the <a href="/docs/key-exchanges/">key exchange</a> happens on its own — and after you share that
+item. A node you do not know asks before it is connected.</p>
+<h2 id="the-node">The node</h2>
+<p>Built on libp2p: TCP and QUIC, Noise encryption, Yamux, mDNS on the local network,
+Kademlia for the wide network, identify, ping, AutoNAT, relays (client and server) with
+DCUtR hole punching, and Muninn's own request-response protocol <code>/muninn/net/1</code>
+(CBOR). The node's identity is an Ed25519 key kept in the encrypted database; its peer
+id (<code>12D3KooW…</code>) is how others know it.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>CLI</th>
+<th>TUI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Start</td>
+<td><code>mnnn net start [--port N] [--listen ADDR] [--no-mdns] [--relay-server] [--for SECS]</code></td>
+<td>Net ▸ Node ▸ Start node, or <code>S</code> in the Network window</td>
+</tr>
+<tr>
+<td>Stop</td>
+<td><code>mnnn net stop</code> (or Ctrl-C)</td>
+<td>Net ▸ Node ▸ Stop node, or <code>X</code></td>
+</tr>
+<tr>
+<td>Status</td>
+<td><code>mnnn net status [--json]</code></td>
+<td>Net ▸ Node ▸ Status… (<code>K</code>)</td>
+</tr>
+<tr>
+<td>Peers</td>
+<td><code>mnnn net peers</code> (with the user each node belongs to; a connection's name works wherever a peer is asked for), <code>forget PEER</code></td>
+<td>Peers page: <code>c</code> connect, <code>l</code> label, <code>d</code> forget</td>
+</tr>
+<tr>
+<td>Nodes</td>
+<td><code>mnnn net connect X</code>, <code>invite</code>, <code>requests</code>, <code>accept X</code>, <code>decline X</code>, <code>disconnect X</code></td>
+<td>Nodes page: <code>c</code> <code>n</code> <code>p</code> <code>a</code> <code>d</code> <code>r</code></td>
+</tr>
+<tr>
+<td>Users, invites</td>
+<td><code>mnnn user …</code>, <code>mnnn connection …</code>, <code>mnnn invite …</code> (<a href="/docs/users/">users</a>)</td>
+<td>Connections and Invites pages</td>
+</tr>
+<tr>
+<td>Sync your nodes</td>
+<td><code>mnnn sync …</code> (<a href="/docs/sync/">sync</a>)</td>
+<td>runs on its own with the node</td>
+</tr>
+<tr>
+<td>Relays</td>
+<td><code>mnnn net relay list/add/remove/serve on|off</code></td>
+<td>Relays page: <code>a</code> add, <code>d</code> remove, <code>r</code> serve</td>
+</tr>
+<tr>
+<td>Settings</td>
+<td><code>mnnn net config [--label] [--port] [--listen] [--mdns] [--autostart] [--accept] [--bootstrap] [--external]</code></td>
+<td>Settings page</td>
+</tr>
+</tbody>
+</table>
+<p><code>mnnn net start</code> runs in the foreground. While it runs it writes
+<code>MUNINN_HOME/net/node.json</code> (no secrets: pid, label, addresses), so other commands and
+the TUI show its status, and <code>mnnn net stop</code> asks it to stop. Only one node runs per
+home. Other <code>mnnn net</code> commands that need to talk bring up a short-lived node with the
+same identity that dials out but does not listen.</p>
+<p>Settings live in <a href="/docs/preferences/">preferences</a> under <code>net</code>: <code>label</code> (empty: the
+current <a href="/docs/authors/">author</a>), <code>port</code> (4741; 0 picks one), <code>listen</code>, <code>mdns</code> (on),
+<code>relay_server</code> (off), <code>relays</code>, <code>bootstrap</code>, <code>autostart</code> (on: the TUI starts the
+node), <code>accept</code> (<code>known</code>: nodes you do not know ask first; <code>anyone</code>). With
+<code>hosting.autostart</code> (off; <code>mnnn org host autostart on</code>, TUI Settings ▸ <em>web server with
+the node</em>) the <a href="/docs/org-hosting/">org web server</a> starts with the node too.</p>
+<p>A running node (the TUI's or <code>mnnn net start</code>) also settles exchanges in the background:
+it asks for answers to requests you made, notices declines, and re-delivers answers its
+peers missed. Muninn has no separate daemon: the TUI or <code>mnnn net start</code> is the node.</p>
+<h3 id="behind-nat">Behind NAT</h3>
+<p>AutoNAT tells the node whether others can reach it. A node that cannot be reached
+reserves a slot on a relay (<code>mnnn net relay add /ip4/…/tcp/4741/p2p/ID</code>, or one it
+learns about) and is reachable through it; DCUtR then tries a direct connection. Any
+node can serve as a relay for others with <code>--relay-server</code> (or <code>relay serve on</code>).
+A peer reached through a relay is dialed over one circuit per relay, the most reachable
+one (a relay you added first, then a DNS name, a public, LAN, VPN and loopback address).</p>
+<h3 id="reaching-a-node-from-outside">Reaching a node from outside</h3>
+<p>Invite links carry the node's reachable addresses; IPv6 link-local (<code>fe80::</code>) and Docker
+bridge (172.17/16, 172.18/16) addresses are left out. To be reachable across the internet,
+forward TCP and UDP on <code>net.port</code> (4741) on the router and allow them in the host firewall
+(and TCP 4742 for <a href="/docs/collaboration/#ports-and-firewalls">collaboration streams</a>)
+(UDP 5353 too for local discovery), then name the public address:</p>
+<pre><code class="language-toml">[net]
+external_addresses = [&quot;alien.duckdns.org:4741&quot;]
+</code></pre>
+<p>or <code>mnnn net config --external alien.duckdns.org:4741</code> (<code>--clear-external</code> removes them).</p>
+<p>A DNS name (dynamic DNS works) becomes <code>/dns4/NAME/tcp/PORT</code> and <code>/dns4/NAME/udp/PORT/quic-v1</code>;
+it is announced to peers and put first in invites.</p>
+<h3 id="running-a-relay">Running a relay</h3>
+<p>A node started with <code>--relay-server</code> announces only addresses others can reach. With
+<code>external_addresses</code> set it announces exactly those and hides its listen addresses;
+without them it announces only routable listen addresses (never private, CGNAT
+100.64/10, link-local, IPv6 ULA or loopback ones). Normal nodes are unaffected: mDNS and
+LAN addresses still work between them. See <a href="/docs/deploy-relay/">deploying a relay</a>.</p>
+<p>The public relay is
+<code>/dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz</code>:</p>
+<pre><code class="language-sh">mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz
+</code></pre>
+<h2 id="sharing">Sharing</h2>
+<pre><code>mnnn net share journal &quot;field notes&quot;             # with every exchange
+mnnn net share project lab --with ben            # with one exchange
+mnnn net unshare journal &quot;field notes&quot;
+mnnn net shared                                  # what you share, and with whom
+mnnn net list ben                                # what ben shares with you
+mnnn net fetch ben &quot;field notes&quot; --import        # copy it into your database
+</code></pre>
+<p>Kinds: <code>model</code>, <code>search</code> (live search), <code>journal</code>, <code>project</code>, <code>report</code>, <code>code</code>,
+<code>pipeline</code>. Sharing
+a project shares its journals and models for searches too. Sharing the <code>bars</code> model
+lets peers search your imported series. Fetched items come as JSON (or a project
+archive, or a document format with <code>--format</code>); <code>--import</code> adds journals, projects,
+code spaces, live searches, models (as drafts to approve, see
+<a href="/docs/model-templates/">model templates</a>) and pipelines (the <a href="/docs/pipelines/">pipeline file</a>:
+the pipeline and any models it brings arrive as drafts, its code unapproved;
+<code>mnnn pipeline approve NAME</code> or <code>A</code> in the Designer lets it run) to your database, under a free name, recorded in the
+<a href="/docs/history/">history</a> as <code>net.import</code>.</p>
+<p><code>--with NAME</code> connects to that node first if needed. In the TUI: Shared page <code>a</code> shares
+with every connection, <code>d</code> stops; on the Nodes page <code>s</code> shares with the selected
+one, <code>L</code> lists what that node shares, and Enter imports an item.</p>
+<h2 id="searching-across-the-network">Searching across the network</h2>
+<pre><code>mnnn net search --journals --query comet          # here and on every peer
+mnnn net search --saved &quot;btc 5m&quot; --only ben
+mnnn search run &quot;btc 5m&quot; --network
+</code></pre>
+<p>Each result line starts with where it came from (<code>local</code> or the peer's label). A peer
+runs the search only over what it shares with you and never returns anything else. In
+the TUI the Search page runs a saved <a href="/docs/live-searches/">live search</a> across the network.</p>
+<h2 id="the-net-menu">The Net menu</h2>
+<p>Node ▸ (Status… <code>K</code>, Start node, Stop node, Settings…) · Connections… · Invites… ·
+Invite or connect… · Nodes… · Peers… · Peers, messages &amp; live… (<code>W</code>, its own window: see
+<a href="/docs/collaboration/">live collaboration</a>) · Relays… · Shared data… · Network search… · Dark shards ▸ (Held &amp;
+entrusted…, Entrust…)</p>
+<p>All open one window with ten pages: Tab (or ← →, or <code>1</code>–<code>9</code>, <code>0</code> for the tenth) moves
+between them.
+Work that talks to other nodes runs in the background; the title shows it, and the
+window stays usable. <code>g</code> refreshes. See <a href="/docs/keybindings/">keybindings</a>.</p>
+<h2 id="security">Security</h2>
+<ul>
+<li>Requests between nodes travel inside libp2p's Noise channel <strong>and</strong> are sealed with
+the exchange key (XChaCha20-Poly1305, bound to the exchange id and both peer ids);
+a node answers sealed requests only from the peer of that exchange.</li>
+<li>Invite links (and the tokens behind them) hold only public keys and signatures.</li>
+<li>A node's key is pinned the first time; a node with another key using a known name
+gets a warning and is a stranger (see <a href="/docs/key-exchanges/#who-is-who-trust-on-first-use">trust on first use</a>).</li>
+<li>Secrets (node key, exchange keys, words, shards, passwords) are never logged or
+written outside the encrypted database and encrypted backups.</li>
+<li>Every network action is in the <a href="/docs/history/">history</a> (<code>net.*</code>) under the current
+author, and <a href="/docs/rules/">rules</a> can react to them.</li>
+<li>Scopes are carried in every exchange: <code>{&quot;kind&quot;:&quot;node&quot;}</code>, an organization's, or
+<code>{&quot;kind&quot;:&quot;resource&quot;,&quot;as&quot;:&quot;review&quot;}</code> for a <a href="/docs/reviews/">review</a> link.</li>
+</ul>
+<h2 id="more-commands">More commands</h2>
+<pre><code>mnnn net forget PEER             # forget a known peer; exchanges with it are kept
+mnnn net relay remove RELAY      # stop using a relay
+mnnn net relay serve on|off      # be a relay for others
+</code></pre>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/network.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Users and connections · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a class="current" aria-current="page" href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="users-and-connections">Users and connections</h1>
+<p>People own their work, not machines. Your <strong>user</strong> is an identity of its own: an Ed25519
+signing key, made on first use and named after the current <a href="/docs/authors/">author</a>. It
+certifies each node that acts for you, so a second computer or a phone is recognised as
+you. Other people's users become your <strong>connections</strong>, trusted or untrusted.</p>
+<h2 id="you-and-your-nodes">You and your nodes</h2>
+<table>
+<thead>
+<tr>
+<th>You want to</th>
+<th>CLI</th>
+<th>TUI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>See who you are</td>
+<td><code>mnnn user show</code>, <code>mnnn user list</code></td>
+<td>Net ▸ Connections… (top line)</td>
+</tr>
+<tr>
+<td>Change your name</td>
+<td><code>mnnn user label &quot;Ada Lovelace&quot;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Link a new node</td>
+<td>on the new node: <code>mnnn user link ADDR|PEER|LINK</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Approve it</td>
+<td>on one of your nodes: <code>mnnn user approve [REQUEST]</code></td>
+<td>Net ▸ Invites…, <code>a</code> on a <em>link node</em> request, then <code>y</code></td>
+</tr>
+<tr>
+<td>See your nodes</td>
+<td><code>mnnn user nodes [USER]</code></td>
+<td>Connections, Enter</td>
+</tr>
+<tr>
+<td>Revoke a node</td>
+<td><code>mnnn user revoke NODE</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Linking is an invite plus an approval:</p>
+<ol>
+<li>The new node asks one of your nodes to link (<code>mnnn user link</code>, with that node's
+address, peer id or an invite link it made). The request shows as <em>link node</em>.</li>
+<li>You approve it on that node. Approving says <em>let this node act as you</em>: the new node
+gets your user key and a certificate for its peer id, signed by your user.</li>
+<li>The new node takes the key on its own, the next time it talks to the approver. From
+then on <code>mnnn user show</code> is the same user on both. Orgs this node owned move to the
+user.</li>
+</ol>
+<p>A revoked node stays revoked: its certificate is withdrawn with a signed revocation,
+your peers learn it the next time your nodes talk to them, and it no longer acts for
+you anywhere (orgs included). You cannot revoke the node you are on.</p>
+<p>Linked nodes keep all of your data in step: see <a href="/docs/sync/">linked-node sync</a>.</p>
+<h2 id="connections">Connections</h2>
+<p>When two nodes connect (<a href="/docs/key-exchanges/">invite link</a> or <code>mnnn net connect</code>), they
+also tell each other whom they act for: a card with the user's name, key and node
+certificates. Cards are only taken when the certificate for the sending node checks out.
+Another user becomes a connection, <strong>untrusted</strong> until you trust it.</p>
+<table>
+<thead>
+<tr>
+<th>You want to</th>
+<th>CLI</th>
+<th>TUI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>List connections</td>
+<td><code>mnnn connection list [--json]</code></td>
+<td>Net ▸ Connections…</td>
+</tr>
+<tr>
+<td>Trust / untrust</td>
+<td><code>mnnn connection trust USER [--off]</code></td>
+<td><code>t</code> on a connection</td>
+</tr>
+<tr>
+<td>Forget one</td>
+<td><code>mnnn connection remove USER</code></td>
+<td><code>d</code>, then <code>y</code></td>
+</tr>
+</tbody>
+</table>
+<p>Trust is a decision you make; every change is in <a href="/docs/history/">history</a>
+(<code>connection.trust</code>, <code>connection.add</code>, <code>connection.remove</code>) and rules can react to it.
+Pickers follow it: shares and reviews go to any connection, <a href="/docs/dark-shards/">dark shards</a>
+only to trusted ones (<code>mnnn net shard entrust</code> asks before using an untrusted one; the
+TUI lists only trusted ones).</p>
+<p>When a user links another node, their card changes and your node hears of it the next
+time they talk, quietly.</p>
+<h2 id="invites">Invites</h2>
+<p>One invite system covers connections, org membership, reviews and node links. An
+invite is a signed, expiring, single-use link (<code>muninn://join/…</code>) that holds no secret.</p>
+<table>
+<thead>
+<tr>
+<th>You want to</th>
+<th>CLI</th>
+<th>TUI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Invite someone to connect</td>
+<td><code>mnnn invite create [--label NAME] [--peer PEER]</code></td>
+<td>Net ▸ Invites…, <code>n</code></td>
+</tr>
+<tr>
+<td>… to an org</td>
+<td><code>mnnn invite create --org ORG [--role ROLE]</code></td>
+<td>Orgs ▸ Members</td>
+</tr>
+<tr>
+<td>… to a review</td>
+<td><code>mnnn invite create --review REVIEW</code></td>
+<td>Reviews</td>
+</tr>
+<tr>
+<td>Use a link</td>
+<td><code>mnnn invite accept LINK</code></td>
+<td>Invites, <code>p</code> (paste)</td>
+</tr>
+<tr>
+<td>Accept / decline a request</td>
+<td><code>mnnn invite accept X</code>, <code>mnnn invite decline X</code></td>
+<td><code>a</code> / <code>d</code> on a request</td>
+</tr>
+<tr>
+<td>See open invites and requests</td>
+<td><code>mnnn invite list [--all] [--json]</code></td>
+<td>Net ▸ Invites…</td>
+</tr>
+<tr>
+<td>Withdraw an invite</td>
+<td><code>mnnn invite revoke ID</code></td>
+<td><code>r</code> on an invite, then <code>y</code></td>
+</tr>
+</tbody>
+</table>
+<p>A withdrawn, used or expired link is turned down by your node; whoever uses it is told
+so and nothing is connected. <code>mnnn net invite</code>, <code>mnnn org member invite</code> and
+<code>mnnn review invite</code> keep working.</p>
+<h2 id="orgs-and-reviews">Orgs and reviews</h2>
+<p>Orgs belong to users: existing orgs move to the current user when it is made, and a
+member's other linked nodes act with the member's role. Reviewers are named after their
+user when they have set a name.</p>
+<h2 id="security">Security</h2>
+<ul>
+<li>The user key is separate from node keys and kept in the encrypted database, like
+the node key. It only leaves a node when you approve a link, sealed with that
+exchange's key.</li>
+<li>Certificates sign <code>muninn-node-cert/1</code>, the user id, the peer id and the time;
+revocations sign <code>muninn-node-revoke/1</code> the same way. A card claiming a node it has no
+valid certificate for is refused.</li>
+<li>Nothing about keys is printed, logged or put in <code>-v</code> output.</li>
+</ul>
+<p>See also: <a href="/docs/network/">network</a>, <a href="/docs/key-exchanges/">key exchanges</a>,
+<a href="/docs/organizations/">organizations</a>, <a href="/docs/reviews/">reviews</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/users.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

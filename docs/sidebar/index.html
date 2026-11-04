@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Sidebar · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a class="current" aria-current="page" href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="sidebar">Sidebar</h1>
+<p>The sidebar sits at the right of the content area and lists every series
+(<code>source · SYMBOL · duration</code>). Toggle it with <code>Ctrl-b</code> or <strong>View ▸ Sidebar</strong>; the
+collapsed/expanded state is saved in <a href="/docs/preferences/">preferences</a>. It hides on
+terminals narrower than 60 columns.</p>
+<pre><code>┌ Series ─────────────────────────┐
+│ / sol                           │
+│ sort: year ▴   [f][p][d][y]     │
+│ ×binance ×2021 · clear all      │
+│ ▸ binance SOLUSDT 1h  2020–2024 │
+└─────────────────────────────────┘
+</code></pre>
+<h2 id="search">Search</h2>
+<p><code>/</code> focuses the sidebar and starts a fuzzy search: the letters you type must appear
+in order in the source, symbol and duration (<code>sl1h</code> matches <code>SOLUSDT 1h</code>).
+Separators don't matter (<code>btc-usdt</code>, <code>btc_usdt</code> and <code>btcusdt</code> all find <code>BTC/USDT</code>),
+and several words match in any order (<code>binance btc</code>). Enter or
+Esc ends typing; the list keeps the filter until you clear the text.</p>
+<h2 id="keys-while-the-sidebar-is-focused">Keys while the sidebar is focused</h2>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>j</code> / <code>k</code>, ↑ / ↓, PgUp / PgDn, Home / End</td>
+<td>move</td>
+</tr>
+<tr>
+<td>Enter, click a row</td>
+<td>show that series in the focused tile</td>
+</tr>
+<tr>
+<td><code>s</code></td>
+<td>sort by year (first bar) or by name</td>
+</tr>
+<tr>
+<td><code>o</code></td>
+<td>toggle ascending / descending (also works anywhere)</td>
+</tr>
+<tr>
+<td><code>f</code> <code>m</code> <code>p</code> <code>d</code> <code>y</code></td>
+<td>edit the source, symbol, price, period (duration) or year filter</td>
+</tr>
+<tr>
+<td><code>t</code></td>
+<td>set the time range (date and time picker)</td>
+</tr>
+<tr>
+<td><code>X</code></td>
+<td>clear all filters (also works anywhere)</td>
+</tr>
+<tr>
+<td><code>a</code></td>
+<td>add the selected series (with the current time range) to a <a href="/docs/projects/">project</a></td>
+</tr>
+<tr>
+<td>Esc, Tab, ←</td>
+<td>back to the tiles</td>
+</tr>
+</tbody>
+</table>
+<h2 id="filters">Filters</h2>
+<p>Active filters show as chips; click a chip's <code>×</code> to remove it, or <strong>clear all</strong>.</p>
+<ul>
+<li>
+<p><strong>Source</strong>, <strong>Symbol</strong>, <strong>Period</strong>, <strong>Year</strong>: checklists, Space toggles; several values
+combine with OR, different filters with AND.</p>
+</li>
+<li>
+<p><strong>Price</strong>: choose the metric (open, high, low, close, typical, median, OHLC
+average, VWAP) and an optional min and/or max. A series matches when its range of
+that metric overlaps <code>[min, max]</code>.</p>
+</li>
+<li>
+<p><strong>Time range</strong>: <code>T</code> anywhere (or <strong>Data ▸ Filters ▸ Time range…</strong>, or a click on the sidebar's <code>time</code> row) opens the date and time picker,
+first for <em>from</em>, then for <em>to</em> (<code>x</code> leaves that end open). It applies to every
+view and tile type: lists list only bars in the range, charts plot only that
+range, and the sidebar hides series with no bars in it. Chips <code>from …</code> / <code>to …</code>
+remove it.</p>
+</li>
+</ul>
+<p>The year filter and the time range <strong>scope the tiles</strong>: lists and charts only show
+bars inside them (a list tile's own <code>[</code> / <code>]</code> range narrows it further). <code>,</code> / <code>.</code> in a tile step through the series the sidebar shows.
+Sort and filters are saved in <a href="/docs/preferences/">preferences</a>.</p>
+<p>Also on the <strong>Data</strong> menu (Filter, Clear filters, Sort by year/name, Toggle order).</p>
+<p>The current search, filters and sort can be kept as a <a href="/docs/live-searches/">live search</a>
+(<code>B</code>) that always runs on the current data.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/sidebar.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

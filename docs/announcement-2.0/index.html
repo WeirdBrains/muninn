@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Muninn 2.0: decentralized data workflows · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a class="current" aria-current="page" href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="muninn-20-decentralized-data-workflows">Muninn 2.0: decentralized data workflows</h1>
+<p><img src="/screenshots/pipeline-live.png" alt="Three pipeline views as three live columns: price, volume and the tape" /></p>
+<p>Muninn (<code>mnnn</code>) is a local, encrypted workbench for market data, with a terminal UI and a
+CLI. 2.0 turns it into a network: your data moves through pipelines you can read and edit,
+and between nodes you own, your connections and your organizations, peer to peer, with
+no central server holding it. It was released as
+v2.0.0 through v2.20.0. The core from 1.x (ingest, encryption, backups, export, charts,
+tiling and themes) is in the <a href="https://github.com/WeirdBrains/muninn/blob/main/docs/historical/1.0/ANNOUNCEMENT.md">Muninn 1.0 announcement</a>.</p>
+<h2 id="data-that-flows-between-nodes-you-own">Data that flows between nodes you own</h2>
+<ul>
+<li><strong>Peer to peer</strong>: every node runs over TCP and QUIC with Noise encryption (libp2p), with local discovery, relays and hole punching. Key exchanges happen automatically when you connect, and nothing goes through a server you don't run.</li>
+<li><strong>Live collaboration</strong>: message peers (<code>mnnn msg send</code>), edit the same entry, journal, code space or record at once and see each other's cursors (<code>mnnn live share</code>), and run each other's served executables (<code>mnnn peers run</code>). Sessions run over gRPC bidirectional streams; where a stream can't be reached, such as a container that publishes no port, nodes fall back to polling over the peer connection, automatically or with <code>--transport poll</code>.</li>
+<li><strong>Peers</strong>: <code>mnnn peers</code> shows who you're connected to; <code>mnnn peers show ben</code> lists what a peer has for you: shared items, live sessions, executables and sites.</li>
+<li><strong>Share anything, anywhere</strong>: send any item to a project, journal, code space or connection, or onto the network, and review it with comments, suggestions, highlights and votes on the reviewer's own node.</li>
+<li><strong>Users, linked nodes and sync</strong>: one identity across your nodes, all your data on all of them, end to end encrypted.</li>
+<li><strong>Organizations</strong>: roles, members and hosted HTTPS sites (HTML, JSON and gRPC) with your own domains and Let's Encrypt certificates that renew themselves.</li>
+<li><strong>Relays</strong>: nodes behind NAT reach each other through relays, and any node can offer to be one.</li>
+<li><strong>Dark shards</strong>: your master key split among trusted peers, sealed so they cannot read it.</li>
+</ul>
+<p><img src="/screenshots/peers.png" alt="Peers: nodes seen nearby and through relays" /></p>
+<h2 id="the-pipeline-your-parsers-your-shapes">The pipeline: your parsers, your shapes</h2>
+<p>Muninn doesn't decide what incoming data looks like. Sources hand on what they have, and
+every shape after that is made by code you can open and change.</p>
+<ul>
+<li><strong>Raw in, code out</strong>: standard input arrives raw, one <code>text</code> column, nothing parsed. Parsing is a step: <code>parse-csv</code>, <code>parse-json</code>, <code>parse-ndjson</code> and <code>to-bars</code> ship as editable code spaces (<code>mnnn code parsers --install</code>), and <code>mnnn code create mine --from parse-csv</code> starts your own.</li>
+<li><strong>Pipes</strong>: <code>cat trades.csv | mnnn pipe - --format csv code:fast --to model:trades</code>. <code>--format csv|json|ndjson</code> just puts the matching parser in front as a visible step, and <code>--chunk N</code> keeps endless input like <code>tail -f</code> flowing.</li>
+<li><strong>Pipelines</strong>: saved graphs with fan-out and fan-in that end in model tables (<code>mnnn pipeline create|run</code>), designed node by node in the Pipeline Designer and watched live in tiles. Every hop is recorded with its rows, time and errors.</li>
+<li><strong>Pipelines travel too</strong>: export and import them with their code and models, or share them over the network, where they arrive as drafts that run only once approved.</li>
+</ul>
+<p><img src="/screenshots/pipeline-designer.png" alt="The Pipeline Designer" /></p>
+<h2 id="your-data-for-ai-assistants-on-your-terms">Your data for AI assistants, on your terms</h2>
+<ul>
+<li><strong>MCP server</strong>: <code>mnnn mcp serve</code> (stdio, or HTTP on 127.0.0.1:4743) exposes journals, projects, models and records, reports, live searches, code-space results and org executables to MCP clients. Each client is named, revocable and has a role (read by default; write, run or full), and writes and runs land in history.</li>
+<li><strong>Built-in HTTPS</strong>: <code>mnnn mcp serve --tls-domain mcp.example.com --tls-email you@example.com</code> gets a Let's Encrypt certificate and renews it while it runs; no proxy needed (an nginx and certbot setup is documented too).</li>
+<li><strong>MCP client</strong>: rule sets call external MCP servers' tools (<code>then mcp SERVER TOOL k=v</code>) and read them in conditions, each tool approved before its first call.</li>
+</ul>
+<h2 id="research-kept-together">Research, kept together</h2>
+<ul>
+<li><strong>Authors and action history</strong>: every import, export and change is saved with who did it; step back, forward and fork.</li>
+<li><strong>Live searches, projects and journals</strong>: saved questions that rerun on new data, grouped with their results and Markdown or LaTeX notes.</li>
+<li><strong>Reports</strong>: sections built from records, journals and projects, exported to HTML, PDF, Word, LaTeX, JSON or CSV.</li>
+</ul>
+<p><img src="/screenshots/journals.png" alt="Journals with their entries" /></p>
+<h2 id="rules-models-and-code">Rules, models and code</h2>
+<ul>
+<li><strong>Rule sets</strong>: when something happens, or on a schedule (<code>--every 6h</code>, <code>--cron</code>), run searches, exports, entries or notes.</li>
+<li><strong>Model Designer and templates</strong>: design record tables, migrate them with previews and roll back; export, import and share designs.</li>
+<li><strong>Code spaces</strong>: math, Polars, Rust or Python over your data, compiled to native plugins. Python is parsed and translated in Rust, no libpython needed.
+<img src="/screenshots/code-chart.png" alt="A code space's result as a live chart tile" /></li>
+</ul>
+<h2 id="organizations-and-their-sites">Organizations and their sites</h2>
+<p><img src="/screenshots/reviews.png" alt="Reviews: comments, suggestions, highlights and votes" /></p>
+<ul>
+<li><strong>Org site templates in the app</strong>: edit a site's HTML and CSS in the TUI (Orgs ▸ Templates) or in <code>$EDITOR</code>, manage its files, preview it live through the local site, and add build steps for React, Jaspr and other compiled templates. Build steps run in a scratch copy, and each node asks before running a new or changed command. A starting or stopping site tells the org's nodes, your linked nodes and connections where it is.</li>
+</ul>
+<p><img src="/screenshots/org-templates.png" alt="Org site templates: HTML and CSS, files, previews and build steps" /></p>
+<h2 id="notifications-and-broadcasts">Notifications and broadcasts</h2>
+<ul>
+<li><strong>Notifications</strong>: exchange requests, org applications, review comments and votes, sync conflicts, code waiting for approval and certificate warnings all notify you. A bell in the TUI header shows the unread count. <code>!</code> opens the list, and <code>Enter</code> takes you to the review, org, journal or project a notification is about. From the shell, use <code>mnnn notify list</code>. You can mute any kind.</li>
+<li><strong>Rule sets notify, and react to notifications</strong>: <code>then notify &quot;imported {inserted} bars&quot; level=warn</code>, or <code>--on notification --if &quot;level = error&quot;</code>.</li>
+<li><strong>Node broadcasts</strong>: <code>mnnn net broadcast deploy &quot;v2 is out&quot; --to connections</code> (or your linked nodes, or an org's nodes) sends a short message over the same trusted key exchanges as everything else. It arrives as a notification and as a trigger that rule sets can act on, and rule sets can send broadcasts too.</li>
+</ul>
+<p><img src="/screenshots/notifications.png" alt="Notifications: the header bell and the window" /></p>
+<ul>
+<li><strong>Clickable hints</strong>: every key shown in a hint is also a button you can click.</li>
+</ul>
+<h2 id="install">Install</h2>
+<p>Every package ships a prebuilt <code>mnnn</code> binary; no Rust is needed. Downloads and
+<code>SHA256SUMS</code> are on the <a href="https://github.com/WeirdBrains/muninn/releases/tag/v2.20.0">v2.20.0 release</a>
+(full steps in <a href="/docs/install/">install</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Download</th>
+<th>Install</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linux or macOS (tarball)</td>
+<td><code>muninn-2.20.0-&lt;target&gt;.tar.gz</code> for <code>x86_64</code>/<code>aarch64-unknown-linux-gnu</code> and <code>x86_64</code>/<code>aarch64-apple-darwin</code></td>
+<td><code>tar -xzf …</code> then <code>install -Dm755 muninn-2.20.0-&lt;target&gt;/mnnn ~/.local/bin/mnnn</code></td>
+</tr>
+<tr>
+<td>Debian / Ubuntu</td>
+<td><code>muninn_2.20.0-1_amd64.deb</code>, <code>muninn_2.20.0-1_arm64.deb</code></td>
+<td><code>sudo apt install ./muninn_2.20.0-1_amd64.deb</code></td>
+</tr>
+<tr>
+<td>Fedora</td>
+<td><code>muninn-2.20.0-1.x86_64.rpm</code>, <code>muninn-2.20.0-1.aarch64.rpm</code></td>
+<td><code>sudo dnf install ./muninn-2.20.0-1.x86_64.rpm</code></td>
+</tr>
+<tr>
+<td>Arch Linux</td>
+<td><code>muninn-bin-2.20.0-1-x86_64.pkg.tar.zst</code>, <code>…-aarch64.pkg.tar.zst</code></td>
+<td><code>sudo pacman -U muninn-bin-2.20.0-1-x86_64.pkg.tar.zst</code></td>
+</tr>
+<tr>
+<td>Homebrew</td>
+<td><code>muninn.rb</code> in <code>muninn-2.20.0-packaging.tar.gz</code></td>
+<td><code>tar -xzf muninn-2.20.0-packaging.tar.gz</code>, then <code>brew install ./packaging/homebrew/muninn.rb</code></td>
+</tr>
+<tr>
+<td>Windows (x64, arm64)</td>
+<td><code>muninn-2.20.0-x86_64-pc-windows-gnullvm.zip</code>, <code>…-aarch64-…zip</code></td>
+<td>unzip and put <code>mnnn.exe</code> on <code>PATH</code>, or <code>winget install --manifest packaging\winget\2.20.0</code> from the packaging tarball</td>
+</tr>
+</tbody>
+</table>
+<p>Then try it somewhere disposable:</p>
+<pre><code class="language-sh">export MUNINN_HOME=/tmp/muninn-demo
+mnnn keys init        # a password, then 24 words to keep offline
+mnnn                  # the TUI; ? opens the help
+</code></pre>
+<p>Your data stays in <code>~/.muninn</code> (or <code>MUNINN_HOME</code>); installing or uninstalling never
+touches it. Thanks for trying Muninn: tell us what you build with it on
+<a href="https://github.com/WeirdBrains/muninn">GitHub</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/announcement-2.0.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

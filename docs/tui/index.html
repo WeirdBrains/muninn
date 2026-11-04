@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Terminal UI · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a class="current" aria-current="page" href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="terminal-ui">Terminal UI</h1>
+<pre><code>mnnn tui
+</code></pre>
+<p>The TUI asks for the password first (or uses <code>MUNINN_PASSWORD</code>), then opens. It uses
+the same library calls as the CLI. Mouse clicks work on the menu bar, dropdowns, tiles, tabs and list headers
+(mouse capture is on while the TUI runs; hold Shift to select text in most terminals).</p>
+<h2 id="screen-layout">Screen layout</h2>
+<pre><code>┌ header: MUNINN banner · version · lock state · theme mode · home ┐
+├ menu bar: File  View  Data  Keys  Theme  Help ───────────────────┤
+│ content area                                                      │
+├ status line: theme · variant · last message ─────────────────────┘
+</code></pre>
+<ul>
+<li><strong>Header</strong>: MUNINN in block letters with the version and status (unlocked, theme
+mode and resolved variant, home folder, current author). On terminals with fewer than 30 rows (or
+fewer than 80 columns) it collapses to one line, <code>Muninn v0.x.y</code>. Force compact or
+large in <strong>File ▸ Preferences…</strong> (<code>[tui] header</code> in <a href="/docs/preferences/">preferences</a>).</li>
+<li><strong>Menu bar</strong>: categorized menus with submenus, mouse and keyboard (<a href="/docs/menus/">menus</a>).</li>
+<li><strong>Content area</strong>: tiles (see below).</li>
+<li><strong>Dialogs</strong> (export, keys, themes, preferences, help, info) open over the content
+area; Esc closes them.</li>
+</ul>
+<p>All keys: <a href="/docs/keybindings/">keybindings</a>.</p>
+<h2 id="content-area">Content area</h2>
+<p>Always a <a href="/docs/tiling/">tiling layout</a>: one list tile to start, split and rearranged
+with <code>Ctrl-w</code> commands or the <strong>View</strong> menu. Each tile shows a list or a chart of
+its own series.</p>
+<h2 id="performance">Performance</h2>
+<p>A tile's series is loaded into memory once, in the background (a tile shows
+<code>loading…</code> meanwhile; about 5 s for a million 5m bars). After that sorting, zooming,
+panning and filtering run in memory, typically 1–30 ms on a million bars. Memory is
+about 56 bytes per bar per loaded series.</p>
+<h2 id="import">Import</h2>
+<p><code>i</code> or <strong>File ▸ Import…</strong> opens a file browser with path completion, multi-select,
+preview and a background import with progress. See <a href="/docs/import/">import</a>.</p>
+<h2 id="sidebar">Sidebar</h2>
+<p>A collapsible series list at the right (<code>Ctrl-b</code>) with fuzzy search (<code>/</code>), sort and
+filters that also scope the tiles. See <a href="/docs/sidebar/">sidebar</a>.</p>
+<h2 id="history-bar">History bar</h2>
+<p>A collapsible pane at the left (<code>Y</code>) with the action tree: the head, the current
+line and every fork. <code>u</code> / <code>U</code> step back and forward, restoring filters and theme. See
+<a href="/docs/history/">history</a>; actions are attributed to the current <a href="/docs/authors/">author</a>
+(<code>A</code>).</p>
+<h2 id="projects-live-searches-and-journals">Projects, live searches and journals</h2>
+<p>The <strong>Projects</strong> menu (Alt+P) opens <a href="/docs/projects/">projects</a> (<code>P</code>),
+<a href="/docs/live-searches/">live searches</a> (<code>F</code>, save with <code>B</code>), <a href="/docs/journals/">journals</a>
+(<code>J</code>), <a href="/docs/reports/">reports</a> (<code>O</code>), <a href="/docs/rules/">rules</a> (<code>R</code>) and
+<a href="/docs/code-spaces/">code spaces</a> (<code>C</code>: an editor with build output, run and a result tile) and
+<a href="/docs/reviews/">reviews</a> (<code>V</code>, Projects ▸ Reviews). They open over the content area like other dialogs; opening a live search or a
+project's result changes the sidebar and tiles behind them.</p>
+<h2 id="dialogs">Dialogs</h2>
+<p>Every popup has a red <strong>[X]</strong> at the right of its title bar: click it to close (same as
+Esc). Clicks outside a popup are ignored while it is open.</p>
+<h2 id="loading">Loading</h2>
+<p>Series load in a background thread, so the UI keeps responding (menus, other tiles,
+help) while a large series is read. Until the bars arrive the tile shows what is
+happening:</p>
+<ul>
+<li>a progress bar, <code>▕████░░░░▏ 42%  12,345 / 29,000 bars</code>, once the bar count is known
+(it is counted first, then the bars are read 50,000 at a time);</li>
+<li>a spinner, <code>⠹ loading series…</code>, while the total is not known yet;</li>
+<li><code>could not load the series: …</code> if reading fails.</li>
+</ul>
+<p>The tile title shows <code>loading…</code> instead of the bar count meanwhile.</p>
+<h2 id="mouse">Mouse</h2>
+<p>Everything you can act on is clickable; there are no keyboard-only actions:</p>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Click</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>menu bar, dropdowns, submenus</td>
+<td>open / run the item</td>
+</tr>
+<tr>
+<td>tiles, tabs</td>
+<td>focus; list header sorts; list rows select a bar</td>
+</tr>
+<tr>
+<td>charts</td>
+<td>period arrows ◂ ▸, plot moves the cursor; wheel zooms</td>
+</tr>
+<tr>
+<td>sidebar</td>
+<td>search box, sort key and order, filters, chips (remove), series rows</td>
+</tr>
+<tr>
+<td>popup lists (Preferences, Chart layers, saved layouts, filters, themes)</td>
+<td>select and activate the row (themes: first click selects, second applies)</td>
+</tr>
+<tr>
+<td>forms (Export, Keys)</td>
+<td>a field starts editing it, a <code>[ button ]</code> runs it</td>
+</tr>
+<tr>
+<td>help</td>
+<td>links (follow), search box, results and history entries, the key bar along the bottom</td>
+</tr>
+<tr>
+<td>import picker</td>
+<td>files/folders (click highlights, second click opens or imports), Places, path / filter / source / symbol / duration inputs, Tab-completion candidates</td>
+</tr>
+<tr>
+<td>key buttons such as <code>[i import]</code>, <code>[OK]</code>, <code>[Cancel]</code>, <code>[Close]</code></td>
+<td>the same as pressing that key</td>
+</tr>
+<tr>
+<td><code>[X]</code></td>
+<td>close the popup</td>
+</tr>
+</tbody>
+</table>
+<p>Keys still work everywhere; the key buttons show which key does the same.</p>
+<ul>
+<li><strong>Export</strong> (File ▸ Export…): out, symbol, source, duration, from, to; <strong>Format</strong>
+cycles csv → parquet → json. See <a href="/docs/export/">export</a>.</li>
+<li><strong>Keys</strong> (File ▸ Backup ▸ Create, Keys ▸ Rotate / Re-issue shards): create a backup
+into a directory, rotate the service key (needs the 24 words and the new password),
+re-issue shards (hidden until <strong>Reveal/Hide</strong>, cleared when the dialog closes). See
+<a href="/docs/keys/">keys</a> and <a href="/docs/backup-recovery/">backup and recovery</a>.</li>
+<li><strong>Themes</strong> (Theme ▸ Select…/Edit current…/New from current…): selector with live
+dark/light preview and editor. See <a href="/docs/themes/">themes</a>.</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/tui.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

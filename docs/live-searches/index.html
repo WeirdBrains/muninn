@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Live searches · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a class="current" aria-current="page" href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="live-searches">Live searches</h1>
+<p>Any live search (records, series or journal entries) is also a <a href="/docs/pipes/">pipe</a> source: <code>mnnn pipe search:NAME code:SPACE</code>, or share it to a code space.</p>
+<p>A live search is a saved search. Muninn stores <strong>what you searched for</strong>, not what it
+found, so a live search always runs on the current data: import more bars or a new
+series and the live search shows them the next time you open it.</p>
+<p>A search has a <strong>target</strong>:</p>
+<ul>
+<li><strong>series</strong> (the default): the same search the <a href="/docs/sidebar/">sidebar</a> does — fuzzy
+text, source, symbol, period, year, time range and price filters, plus a sort.</li>
+<li><strong>journals</strong>: fuzzy text over the title and text of every <a href="/docs/journals/">journal</a>
+entry.</li>
+<li><strong>records</strong>: the records of a designed <a href="/docs/models/">model</a> (or of every model but
+bars): fuzzy text over their text fields plus <code>FIELD OP VALUE</code> conditions.</li>
+</ul>
+<p>Live searches live in the encrypted database. They can be added to
+<a href="/docs/projects/">projects</a>.</p>
+<h2 id="fork-and-optimize">Fork and optimize</h2>
+<ul>
+<li><strong>Fork</strong> makes a linked copy (it remembers which search it came from), optionally
+with changes. Use it to try a variation and keep the original.</li>
+<li><strong>Optimize</strong> (<code>edit</code>, or <code>w</code> in the TUI) changes a live search in place: rename it,
+or narrow or widen what it searches for.</li>
+</ul>
+<h2 id="command-line">Command line</h2>
+<pre><code>mnnn search list [--json]                       # with how many matches each has now
+mnnn search show SEARCH [--json]                # the definition
+mnnn search run SEARCH [--json]                 # run it on the current data (alias: results)
+mnnn search find [SPEC] [--save NAME] [--json]  # search once; --save keeps it
+mnnn search save NAME [SPEC]
+mnnn search fork SEARCH [--name NAME] [SPEC]    # a linked copy, changed by SPEC
+mnnn search edit SEARCH [--name NAME] [SPEC]    # optimize in place (alias: optimize)
+mnnn search remove SEARCH                       # asks first; -y skips (alias: rm)
+</code></pre>
+<p><code>SEARCH</code> is an id, a unique id prefix (the 8 characters <code>list</code> shows) or a name.
+<code>SPEC</code> is any of:</p>
+<table>
+<thead>
+<tr>
+<th>option</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--query TEXT</code></td>
+<td>fuzzy text, words in any order</td>
+</tr>
+<tr>
+<td><code>--series</code> / <code>--journals</code> / <code>--records</code></td>
+<td>the target (default: series)</td>
+</tr>
+<tr>
+<td><code>--model MODEL</code></td>
+<td>records of one model (<code>all</code>: every model but bars); implies <code>--records</code></td>
+</tr>
+<tr>
+<td><code>--where &quot;FIELD OP VALUE&quot;</code></td>
+<td>records meeting a condition, as in <a href="/docs/rules/">rules</a> (<code>= != ~ !~ &gt; &gt;= &lt; &lt;= ? !?</code>); repeatable; implies <code>--records</code></td>
+</tr>
+<tr>
+<td><code>--source NAME</code>, <code>--symbol SYM</code>, <code>--period 5m</code>, <code>--year 2024</code></td>
+<td>repeatable filters</td>
+</tr>
+<tr>
+<td><code>--from TIME</code>, <code>--to TIME</code></td>
+<td>time range (UTC date or date and time)</td>
+</tr>
+<tr>
+<td><code>--price METRIC --min X --max Y</code></td>
+<td>price filter (open, high, low, close, typical, median, ohlc, vwap)</td>
+</tr>
+<tr>
+<td><code>--sort year|name</code>, <code>--desc</code> / <code>--asc</code></td>
+<td>order of the series</td>
+</tr>
+<tr>
+<td><code>--from-view</code></td>
+<td>start from the filters and sort the TUI shows now</td>
+</tr>
+<tr>
+<td><code>--clear</code></td>
+<td>start with no filters (in <code>edit</code> and <code>fork</code>: drop the existing ones first)</td>
+</tr>
+</tbody>
+</table>
+<p>In <code>edit</code> and <code>fork</code> the options change the existing search; options you leave out
+keep their value. <code>run</code> and <code>find</code> print only the matches (one per line, or <code>--json</code>),
+so they can be piped.</p>
+<pre><code>mnnn search save &quot;eth 5m&quot; --symbol ETH/USDT --period 5m
+mnnn search run &quot;eth 5m&quot;
+mnnn search fork &quot;eth 5m&quot; --name &quot;eth 2024&quot; --year 2024
+mnnn search edit &quot;eth 2024&quot; --price close --min 1000
+mnnn search find --journals --query &quot;breakout&quot; --save breakouts
+mnnn search save big --model trades --where &quot;price &gt; 3000&quot;
+</code></pre>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p><strong>Projects ▸ Live searches…</strong> or <code>F</code> opens the list, with the current number of
+matches of each. <strong>Projects ▸ Save search as live search…</strong> or <code>B</code> saves what the
+sidebar shows now (its search text, filters, time range and sort).</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>j</code> / <code>k</code>, ↑ / ↓</td>
+<td>move</td>
+</tr>
+<tr>
+<td>Enter, click</td>
+<td>show it: the sidebar takes its search and filters (a journals search lists the matching entries)</td>
+</tr>
+<tr>
+<td><code>n</code> / <code>a</code></td>
+<td>save the current view as a new live search</td>
+</tr>
+<tr>
+<td><code>f</code></td>
+<td>fork the selected search</td>
+</tr>
+<tr>
+<td><code>w</code></td>
+<td>optimize: replace the selected search with the current view</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>rename</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>delete (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>add to a <a href="/docs/projects/">project</a></td>
+</tr>
+<tr>
+<td>Esc, <code>q</code>, [X]</td>
+<td>close</td>
+</tr>
+</tbody>
+</table>
+<p>Saving, forking, optimizing, renaming and removing are recorded in the
+<a href="/docs/history/">history</a> and attributed to the current <a href="/docs/authors/">author</a>.</p>
+<p>See also: <a href="/docs/projects/">projects</a>, <a href="/docs/sidebar/">sidebar</a>, <a href="/docs/journals/">journals</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/live-searches.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

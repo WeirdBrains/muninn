@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Model design templates · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a class="current" aria-current="page" href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="model-design-templates">Model design templates</h1>
+<p>A template is a <a href="/docs/models/">model</a>'s design in a file: its fields (types, constraints,
+descriptions), its refs, the <a href="/docs/rules/">rules</a> living in it and, if you like, its records as
+sample records. Import one to get the same model next to your own designs.</p>
+<h2 id="export">Export</h2>
+<pre><code>mnnn model export signals --out signals.json            # design and rules
+mnnn model export signals --out signals.json --records  # plus every record as a sample
+</code></pre>
+<p>The file is JSON with <code>&quot;format&quot;: &quot;muninn.model-template&quot;</code> and a <code>version</code> (now 1). A newer
+version than this Muninn reads is refused with a note to upgrade. In a template, refs name
+their model (<code>ref:venues</code>) instead of its id. The bars model exports its fields too, but
+not its bars (use <a href="/docs/export/">export</a> for those).</p>
+<h2 id="import">Import</h2>
+<pre><code>mnnn model import signals.json --dry-run          # only show the plan
+mnnn model import signals.json                    # a new model named as in the template
+mnnn model import signals.json --name signals2    # under another name
+mnnn model import signals.json --merge            # add its missing fields to `signals`
+mnnn model import signals.json --draft            # a draft: `mnnn model apply` applies it
+mnnn model import signals.json --no-records       # skip the sample records
+</code></pre>
+<p>Import first shows the migration plan, like <code>model plan</code>/<code>model apply</code>, then applies it.
+A plan that loses values (only possible with <code>--merge</code>) asks first; <code>-y</code> says yes.</p>
+<ul>
+<li><strong>Name clashes</strong>: when a model of that name exists, Muninn asks for a new name (offering
+<code>NAME_2</code>) or <code>merge</code>. Without a terminal, give <code>--name</code> or <code>--merge</code>.</li>
+<li><strong>Merge</strong> adds the template's fields the model lacks; a field the model already has keeps
+its type and values (the plan lists template fields of another type as kept).</li>
+<li><strong>Refs</strong> to other models need those models here (by name); import them first. A ref to
+the template's own model points at the new model.</li>
+<li>Every imported field gets a new id. <strong>Rules</strong> come in switched off (<code>mnnn rule enable</code>).
+<strong>Sample records</strong> lose their ref values (the records they pointed at are elsewhere).</li>
+<li>Every export and import is recorded in <a href="/docs/history/">history</a> (<code>model.export</code>, <code>model.import</code>).</li>
+</ul>
+<h2 id="built-in-templates">Built-in templates</h2>
+<pre><code>mnnn model templates                         # the templates Muninn ships
+mnnn model import builtin:bars --name candles
+</code></pre>
+<p><code>builtin:bars</code> is the design of the built-in bars model (source, symbol, base, quote,
+period, timestamp, open, high, low, close, volume, flags), for record tables shaped like
+price bars. The bars model itself is built from it: its records are the bars, kept in its
+table <code>m_bars</code>, which ingest, charts, code spaces, sync, archives and backups read and
+write (<a href="/docs/data-model/">data model</a>).</p>
+<h2 id="sharing">Sharing</h2>
+<p>Models are shared like anything else (<a href="/docs/share/">Share</a>, <code>mnnn share model signals net</code>,
+<code>mnnn net share</code>). A model fetched from a peer (<code>mnnn net fetch … --import</code>, or the
+Network window) arrives as a <strong>draft</strong>: nothing is created until you look at it
+(<code>mnnn model plan NAME</code>) and approve it with <code>mnnn model apply NAME</code>, as with code
+from peers. A taken name gets <code>_2</code>. Peer models carry no rules; refs to other models
+arrive as text fields.</p>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p>In the Models window (<strong>D</strong>): <strong>x</strong> exports the selected model to a file (the path is
+prefilled), <strong>i</strong> imports a file or <code>builtin:NAME</code>. A taken name asks for a new one or
+<code>merge</code>; the plan is shown above the list and <strong>y</strong> imports it.</p>
+<h2 id="failure-modes">Failure modes</h2>
+<ul>
+<li><code>not a Muninn model template</code>: the file has no <code>format</code> (it may be a project archive;
+use <code>mnnn project import</code>).</li>
+<li><code>refers to model X, which is not here</code>: import or create X first.</li>
+<li><code>model X already exists</code>: pass <code>--name</code> or <code>--merge</code>.</li>
+</ul>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/model-templates.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

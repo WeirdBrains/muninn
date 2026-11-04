@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Reviews · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a class="current" aria-current="page" href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="reviews">Reviews</h1>
+<p>A review asks peers to look at one thing of yours: an <a href="/docs/journals/">entry</a>, a
+<a href="/docs/journals/">journal</a> and its entries, a <a href="/docs/projects/">project</a>, a
+<a href="/docs/live-searches/">live search</a> or a <a href="/docs/models/">model</a> record. Reviewers can view it,
+comment, suggest changes, highlight text and vote. You accept or reject the suggestions
+and merge the accepted ones, which makes a new numbered revision of the thing.</p>
+<h2 id="asking-for-a-review">Asking for a review</h2>
+<pre><code>mnnn review request journal &quot;field notes&quot; --note &quot;before Friday&quot; --allow comment,suggest
+mnnn review request record trades/3f2a --label ben --peer /ip4/…/p2p/…
+mnnn review invite &quot;field notes&quot; --label cleo
+</code></pre>
+<p><code>request</code> takes a kind (<code>entry</code>, <code>journal</code>, <code>project</code>, <code>search</code> or <code>live-search</code>,
+<code>record</code>; plurals work too) and a name or id; a record is <code>MODEL/RECORD</code>. It makes the
+first link unless <code>--no-link</code>; <code>invite</code> makes more. With <code>--peer</code> the invitation is
+delivered to that node (the reviewer sees it in <code>mnnn net requests</code>), otherwise an
+invite link (<code>muninn://join/…</code>) is printed to pass on. The keys are exchanged on their
+own either way.</p>
+<ul>
+<li><strong>A link is a <a href="/docs/key-exchanges/">key exchange</a></strong> scoped to the review
+(<code>{&quot;kind&quot;:&quot;resource&quot;,&quot;as&quot;:&quot;review&quot;}</code>): good for one reviewer, for 7 days. A used link
+is refused to anyone else.</li>
+<li><strong>Permissions.</strong> <code>--allow</code> narrows what reviewers may do: <code>comment</code>, <code>suggest</code>,
+<code>highlight</code>, <code>vote</code>. <code>view</code> is always allowed; the default is everything.</li>
+<li>Reviewers reach the review through your node, so keep it running
+(<code>mnnn net start</code>, or <code>S</code> in the TUI's <a href="/docs/network/">network</a> window).</li>
+<li>Reports are not reviewable.</li>
+</ul>
+<h2 id="reviewing">Reviewing</h2>
+<pre><code>mnnn review join muninn://join/…        # the link, the review's title or the request id; `-` reads stdin
+mnnn review view &quot;field notes&quot;
+mnnn review comment &quot;field notes&quot; &quot;a fine start&quot;
+mnnn review suggest &quot;field notes&quot; --entry 3f2a --at &quot;the cat&quot; --to &quot;the comet&quot; --why &quot;it is a comet&quot;
+mnnn review highlight &quot;field notes&quot; --entry 3f2a --at &quot;hill&quot; --color yellow --note &quot;lovely&quot;
+mnnn review vote &quot;field notes&quot; approve        # approve, changes or reject
+mnnn review vote &quot;field notes&quot; up --on 9c1e   # up or down on an item
+mnnn review withdraw &quot;field notes&quot; 9c1e
+mnnn review sync &quot;field notes&quot;
+mnnn review leave &quot;field notes&quot;
+</code></pre>
+<p>Every command taking REVIEW works on your own reviews and on the ones you joined (those
+go through the author's node). Anchors: <code>--field</code> (default: an entry's <code>body</code>, a
+journal's <code>name</code>, a project's <code>description</code>, a search's <code>query</code>; records name a field),
+<code>--at TEXT</code> with <code>--nth N</code> for the Nth occurrence, and <code>--entry</code> for an entry of a
+journal review. A suggestion replaces the <code>--at</code> text, or the whole field, with <code>--to</code>
+(<code>--json</code> for a record's typed value). Replies use <code>comment --reply ITEM</code>.
+Each person has one vote on the review and one on each item; voting again changes it.</p>
+<h3 id="your-copy-offline">Your copy, offline</h3>
+<p>Joining copies what is reviewed to your node. <code>view</code> and <code>show</code> refresh the copy when the
+author's node answers and show the copy otherwise. Comments, suggestions, highlights and
+votes made while it is offline are kept and sent on the next <code>mnnn review sync</code> (a
+running node also does this every few minutes). Kept work the author's node refuses is
+dropped, with a warning. A record review also creates its model on your node, or adds
+the fields yours is missing. Fields are only ever added, never changed or removed, and
+each change is recorded in history as <code>review.model</code>. The copy itself can't be edited.
+New revisions refresh it.</p>
+<p>When the review is closed, you are dropped or you leave, the copy stays, archived and
+read-only. <code>mnnn review remove</code> forgets it, together with any work still waiting.</p>
+<h2 id="accepting-and-merging">Accepting and merging</h2>
+<pre><code>mnnn review show &quot;field notes&quot;
+mnnn review accept &quot;field notes&quot; 9c1e 4b2d     # or --all
+mnnn review reject &quot;field notes&quot; --all
+mnnn review merge &quot;field notes&quot;                # --force applies suggestions that no longer fit
+mnnn review revisions journal &quot;field notes&quot;
+</code></pre>
+<p>Only suggestions are accepted or rejected. A merge applies the accepted ones and gives
+each changed thing (the entry, journal, project, search or record) a new revision with
+its before and after values and the items in it. A suggestion whose quoted text is gone,
+or whose whole field changed since it was made, is a conflict: it stays accepted and is
+reported, unless <code>--force</code>.</p>
+<p><code>close</code> ends the review: the reviewers' exchanges are revoked and they are told.
+<code>reopen</code> opens it again; reviewers need new links. <code>drop REVIEW REVIEWER</code> takes one
+reviewer off. <code>remove</code> deletes a review and its thread (it asks first); revisions stay.
+For a review you joined, <code>remove</code> forgets it.</p>
+<h2 id="the-reviews-window-tui">The Reviews window (TUI)</h2>
+<p><code>V</code>, or <strong>Projects ▸ Reviews</strong> (Reviews…, Ask for a review…, Thread…, Reviewing
+(joined)…). Pages: <code>1</code> My reviews, <code>2</code> Thread, <code>3</code> Reviewing; Tab / ← → switch,
+<code>j</code> / <code>k</code> move, <code>g</code> refresh, Esc closes.</p>
+<table>
+<thead>
+<tr>
+<th>page</th>
+<th>keys</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>My reviews</td>
+<td><code>n</code> ask for a review (<code>journal NAME</code>, <code>record MODEL/RECORD</code>, …), Enter its thread, <code>i</code> a link (optionally delivered to a peer: its node address or name), <code>p</code> view, <code>H</code> revisions, <code>o</code> close / reopen, <code>d</code> delete (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td>Thread</td>
+<td><code>c</code> comment, <code>e</code> suggest, <code>h</code> highlight, <code>v</code> vote, <code>r</code> reply, <code>a</code> / <code>x</code> accept / reject the selected suggestion, <code>A</code> / <code>X</code> all, <code>m</code> merge, <code>F</code> merge anyway, <code>w</code> withdraw, <code>D</code> drop the last joined reviewer; <code>i</code>, <code>p</code>, <code>H</code> as above</td>
+</tr>
+<tr>
+<td>Reviewing</td>
+<td><code>j</code> join a link, Enter view and thread, <code>s</code> sync, <code>c</code> / <code>e</code> / <code>h</code> / <code>v</code> add items, <code>l</code> leave (<code>y</code> confirms)</td>
+</tr>
+</tbody>
+</table>
+<p>Item prompts take optional <code>field=F entry=E nth=N</code> first, then <code>@quoted text :: the rest</code> to anchor it: <code>entry=3f2a @the cat :: the comet</code> suggests a replacement. Without
+<code>@</code> the whole field is meant. A vote is <code>approve</code>, <code>changes</code> or <code>reject</code>, or
+<code>up ITEM</code> / <code>down ITEM</code>.</p>
+<h2 id="history-and-rules">History and rules</h2>
+<p>Every step is in the <a href="/docs/history/">history</a> under the current author: <code>review.request</code>,
+<code>review.invite</code>, <code>review.join</code>, <code>review.joined</code>, <code>review.comment</code>, <code>review.suggest</code>,
+<code>review.highlight</code>, <code>review.vote</code>, <code>review.withdraw</code>, <code>review.accept</code>, <code>review.reject</code>,
+<code>review.merge</code>, <code>review.close</code>, <code>review.closed</code>, <code>review.reopen</code>, <code>review.drop</code>,
+<code>review.leave</code>, <code>review.remove</code> and <code>review.serve</code>. A merge also records the edit itself
+(<code>entry.edit</code>, <code>journal.edit</code>, <code>project.edit</code>, <code>search.edit</code> or <code>record.update</code>) with the
+review's id. <a href="/docs/rules/">Rules</a> can react to all of them (<code>mnnn rule events</code>).</p>
+<h2 id="more-commands">More commands</h2>
+<pre><code>mnnn review list [--json]        # your reviews and the ones you joined
+mnnn review close REVIEW         # close it; reviewers' links and exchanges end, their copies stay read-only
+mnnn review reopen REVIEW        # open a closed review again; reviewers need new links
+</code></pre>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/reviews.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

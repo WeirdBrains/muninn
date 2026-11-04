@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Journals · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a class="current" aria-current="page" href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="journals">Journals</h1>
+<p>A journal is a list of entries: notes on what you see in the data, trade logs, ideas.
+A journal is <strong>standalone</strong> or belongs to a <a href="/docs/projects/">project</a> (a <em>project
+journal</em>); any journal can also be linked into other projects.</p>
+<ul>
+<li><strong>Entries</strong> have a title and a text in <strong>Markdown</strong> or <strong>LaTeX</strong>. A journal has a
+default format for new entries; each entry keeps its own.</li>
+<li><strong>Images</strong> are stored in the encrypted database and referenced from the text:
+<code>![name](attachment:ID)</code> in Markdown, <code>\includegraphics{attachment:ID}</code> in LaTeX.</li>
+<li><strong>Notes</strong> go on the journal, on an entry, or on selected words of an entry.</li>
+<li><strong>Highlights</strong> mark selected words of an entry (with a colour and an optional
+comment).</li>
+<li><strong>Fork</strong> a journal into a project: a copy of everything in it (entries, notes,
+highlights, images) that belongs to that project.</li>
+<li><strong>Copy</strong> selected entries into another journal or a new one; their notes,
+highlights and images come along.</li>
+</ul>
+<p>Everything is attributed to the current <a href="/docs/authors/">author</a> and recorded in the
+<a href="/docs/history/">history</a>.</p>
+<p>Selections are character ranges of the entry text, with the words they cover saved
+alongside. When an entry is edited, notes and highlights follow their words; when those
+words are gone they stay on the entry, marked <em>detached</em>.</p>
+<h2 id="command-line">Command line</h2>
+<pre><code>mnnn journal list [--project PROJECT] [--json]
+mnnn journal new NAME [--project PROJECT] [--format markdown|latex]     # alias: create
+mnnn journal show JOURNAL [--json]            # --json: the whole document
+mnnn journal edit JOURNAL [--name NAME] [--format markdown|latex]
+mnnn journal remove JOURNAL                   # asks first; -y skips
+mnnn journal fork JOURNAL [--project PROJECT] [--name NAME]
+
+mnnn journal write JOURNAL [--title TITLE] [--format F] (--text TEXT | --file PATH|-)
+mnnn journal entry ENTRY [--json]
+mnnn journal edit-entry ENTRY [--title T] [--format F] [--text TEXT | --file PATH|-]
+mnnn journal remove-entry ENTRY
+mnnn journal copy ENTRY... (--to JOURNAL | --new NAME [--project PROJECT])
+
+mnnn journal note BODY (--journal JOURNAL | --entry ENTRY [--on WORDS [--nth N] | --range A..B])
+mnnn journal highlight ENTRY (--on WORDS [--nth N] | --range A..B) [--color C] [--comment TEXT]
+mnnn journal edit-note ID BODY
+mnnn journal remove-note ID                   # notes and highlights (alias: unmark)
+
+mnnn journal attach ENTRY FILE [--name NAME]  # adds the reference to the entry text
+mnnn journal image ID [--out PATH]            # writes the image back out
+
+mnnn journal export JOURNAL [--entry ENTRY]... [--format pdf|html|docx|latex|json|text] [--out PATH]
+mnnn journal import FILE [--project PROJECT] [--name NAME]    # a JSON export
+mnnn journal print JOURNAL [--entry ENTRY]... [--printer NAME] [--out PATH] [--save-only]
+</code></pre>
+<p>Journals, entries, notes and images are named by id or unique id prefix; journals also
+by name. <code>--text</code> turns <code>\n</code> into a new line; <code>--file -</code> reads standard input.
+<code>--on WORDS</code> selects the first occurrence of the words (or the <code>--nth</code>); <code>--range</code>
+takes character offsets, counted from 0, end exclusive.</p>
+<pre><code>mnnn journal new &quot;Summer notes&quot; --project &quot;ETH summer&quot;
+mnnn journal write &quot;Summer notes&quot; --title &quot;June 3&quot; --text &quot;Breakout above 3800 on volume&quot;
+mnnn journal highlight 1a2b3c4d --on &quot;above 3800&quot; --comment &quot;resistance&quot;
+mnnn journal note &quot;check the 1h chart&quot; --entry 1a2b3c4d --on breakout
+mnnn journal attach 1a2b3c4d ~/charts/june3.png
+mnnn journal copy 1a2b3c4d 5e6f7a8b --new &quot;Best setups&quot;
+mnnn journal export &quot;Summer notes&quot; --out summer.pdf
+mnnn journal export &quot;Summer notes&quot; --entry 1a2b3c4d --format docx --out june3.docx
+mnnn journal print &quot;Summer notes&quot; --printer office
+</code></pre>
+<p>Exports keep notes (as footnotes), highlights and images; JSON exports can be imported
+again with everything. Printing makes a PDF and hands it to <code>lp</code>/<code>lpr</code>, or keeps it in
+<code>&lt;home&gt;/prints/</code> when there is no print command. See <a href="/docs/export-formats/">export formats</a>.</p>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p><strong>Projects ▸ Journals…</strong> or <code>J</code> lists the journals (with their project);
+<strong>Projects ▸ New journal…</strong> creates one.</p>
+<table>
+<thead>
+<tr>
+<th>key (list)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Enter</td>
+<td>open the journal</td>
+</tr>
+<tr>
+<td><code>n</code></td>
+<td>new journal</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>rename</td>
+</tr>
+<tr>
+<td><code>t</code></td>
+<td>switch the default format (Markdown ↔ LaTeX)</td>
+</tr>
+<tr>
+<td><code>N</code></td>
+<td>note on the journal</td>
+</tr>
+<tr>
+<td><code>f</code></td>
+<td>fork into a project (or standalone)</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>add to a project</td>
+</tr>
+<tr>
+<td><code>D</code></td>
+<td>delete the journal (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td>export the journal (choose a format, then a path)</td>
+</tr>
+<tr>
+<td><code>P</code></td>
+<td>print the journal</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>key (journal)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>j</code> / <code>k</code></td>
+<td>move</td>
+</tr>
+<tr>
+<td>Enter</td>
+<td>read the entry</td>
+</tr>
+<tr>
+<td><code>w</code> / <code>n</code></td>
+<td>write a new entry</td>
+</tr>
+<tr>
+<td><code>e</code></td>
+<td>edit the entry</td>
+</tr>
+<tr>
+<td>Space</td>
+<td>mark / unmark entries</td>
+</tr>
+<tr>
+<td><code>c</code></td>
+<td>copy the marked entries (or the selected one) to another journal or <strong>+ New journal…</strong> (a new journal joins this journal's project)</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>delete the entry (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td><code>N</code>, <code>f</code>, <code>p</code>, <code>r</code>, <code>t</code>, <code>D</code></td>
+<td>as in the list</td>
+</tr>
+<tr>
+<td><code>E</code> / <code>P</code></td>
+<td>export / print the marked entries (none marked: the whole journal)</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>back to the list</td>
+</tr>
+</tbody>
+</table>
+<p>Reading an entry shows its text, then its notes, highlights and images. A Markdown entry
+is rendered (headings, bold and italic, code, lists, quotes, tables, links with their
+URL, rules) in the theme's colours; <code>r</code> shows its source and back. Highlights, noted
+words and the word cursor are marked on the source, so moving the cursor (← →, <code>h</code> <code>l</code>,
+<code>w</code> <code>b</code>, Home, End), <code>v</code> and <code>m</code> switch to the source by themselves. LaTeX entries are
+always shown as their source. The cursor is a word:</p>
+<table>
+<thead>
+<tr>
+<th>key (entry)</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>← → / <code>h</code> <code>l</code></td>
+<td>previous / next word</td>
+</tr>
+<tr>
+<td><code>w</code> / <code>b</code>, Home / End</td>
+<td>five words forward / back, first / last word</td>
+</tr>
+<tr>
+<td><code>v</code></td>
+<td>start (or drop) a selection at the cursor; move to extend it</td>
+</tr>
+<tr>
+<td><code>m</code></td>
+<td>highlight the selection (or the word under the cursor)</td>
+</tr>
+<tr>
+<td><code>n</code></td>
+<td>note on the selection, or on the entry when nothing is selected</td>
+</tr>
+<tr>
+<td><code>N</code></td>
+<td>note on the journal</td>
+</tr>
+<tr>
+<td><code>j</code> / <code>k</code></td>
+<td>select a note or highlight</td>
+</tr>
+<tr>
+<td>Enter</td>
+<td>edit the selected note (or the highlight's comment)</td>
+</tr>
+<tr>
+<td><code>x</code></td>
+<td>delete the selected note or highlight (<code>y</code> confirms)</td>
+</tr>
+<tr>
+<td><code>i</code></td>
+<td>attach an image (type its path; <code>~/</code> works)</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>Markdown entries: rendered ↔ source</td>
+</tr>
+<tr>
+<td><code>e</code> / <code>d</code></td>
+<td>edit / delete the entry</td>
+</tr>
+<tr>
+<td><code>E</code> / <code>P</code></td>
+<td>export / print this entry</td>
+</tr>
+<tr>
+<td>PgUp / PgDn</td>
+<td>scroll</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>drop the selection, then back to the journal</td>
+</tr>
+</tbody>
+</table>
+<p>The entry editor has a title and a text field: Tab switches, Enter in the title moves to
+the text, <strong>Ctrl-S</strong> saves, <strong>Ctrl-T</strong> switches Markdown ↔ LaTeX, Esc cancels.</p>
+<p>A <a href="/docs/live-searches/">live search</a> on journals (<code>--journals</code>) lists the matching
+entries; Enter reads one.</p>
+<p>See also: <a href="/docs/projects/">projects</a>, <a href="/docs/reports/">reports</a>, <a href="/docs/export-formats/">export formats</a>,
+<a href="/docs/live-searches/">live searches</a>,
+<a href="/docs/authors/">authors</a>, <a href="/docs/history/">history</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/journals.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

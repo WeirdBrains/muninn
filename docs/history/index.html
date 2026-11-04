@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Action history · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a class="current" aria-current="page" href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="action-history">Action history</h1>
+<p>Muninn records what you do in the encrypted database: imports, exports, filter and
+time range changes, theme and theme mode changes, source and symbol changes, author
+changes, and work on live searches, projects, journals, reports, rules, models and code spaces. Each action has an id, a kind, a summary, when it ran, where it came from
+(<code>cli</code>, <code>tui</code>, or <code>rule</code> for what a <a href="/docs/rules/">rule</a> did) and the <a href="/docs/authors/">author</a> who was current.</p>
+<h2 id="a-tree-not-a-list">A tree, not a list</h2>
+<p>The <strong>head</strong> is the action you are at. A new action becomes a child of the head.
+Stepping back and then doing something different starts a <strong>fork</strong>: a new branch next
+to the old one. Nothing is ever deleted, so every branch can be revisited.</p>
+<pre><code>$ mnnn history tree
+│ #1 add author Ada
+│ #2 import BTCUSDT_5m.csv · 401 bars · completed · run #1
+│ #3 export 401 bars to out.csv (csv)
+○ #4 theme nord                  ← the branch you stepped back from
+○ #5 theme mode dark
+  ● #6 ⑂ from #3 theme dracula   ← head, on a fork
+</code></pre>
+<p>Stepping back, forward or to an action restores the <strong>view state</strong> saved with the
+actions: the sidebar filters (including the time range), the theme and the theme mode.
+Data actions (imports, exports, sources) are records only; stepping past them does not
+undo them.</p>
+<ul>
+<li><strong>Back</strong> moves to the parent of the head (<code>u</code>, <code>mnnn history back [N]</code>).</li>
+<li><strong>Forward</strong> moves to a child: the branch you stepped back from if there is one, else
+the newest branch (<code>U</code>, <code>mnnn history forward [N]</code>).</li>
+<li><strong>Go to</strong> jumps to any action on any branch (Enter in the history bar,
+<code>mnnn history goto ID</code>; <code>0</code> is the start, before the first action).</li>
+</ul>
+<h2 id="terminal-ui">Terminal UI</h2>
+<p>The history bar is a collapsible pane on the left. Toggle it with <code>Y</code>,
+<strong>View ▸ History ▸ Show/hide history bar</strong>, or its <code>«</code> button; whether it is open is
+saved in <a href="/docs/preferences/">preferences</a> (<code>tui.history_open</code>). It needs a terminal at
+least 94 columns wide.</p>
+<p>Each row shows <code>#id summary</code> and its age. <code>●</code> marks the head, <code>○</code> other actions,
+<code>⑂</code> the first action of a fork; forks are indented under the action they branch
+from, and actions off the current line are dimmed. The first row, <code>start</code>, is the
+state before any action.</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Y</code></td>
+<td>show the history bar and focus it; again: hide it</td>
+</tr>
+<tr>
+<td><code>u</code> / <code>U</code></td>
+<td>step back / forward (anywhere, also <strong>View ▸ History</strong>)</td>
+</tr>
+<tr>
+<td><code>j</code> / <code>k</code>, ↑ / ↓, PgUp / PgDn, <code>g</code> / <code>G</code></td>
+<td>move (history bar focused)</td>
+</tr>
+<tr>
+<td>Enter, click a selected row</td>
+<td>go to that action</td>
+</tr>
+<tr>
+<td>Esc, Tab, →</td>
+<td>back to the tiles</td>
+</tr>
+</tbody>
+</table>
+<p>Imports that run in the background appear when they finish.</p>
+<h2 id="command-line">Command line</h2>
+<pre><code>mnnn history list [-n N] [--all] [--json]   # the current line, newest first; --all: every branch
+mnnn history show [ID] [--json]             # one action (default: the head), with its forks
+mnnn history tree                           # every branch, forks indented
+mnnn history back [N]
+mnnn history forward [N]
+mnnn history goto ID                        # 0: before the first action
+</code></pre>
+<p><code>back</code>, <code>forward</code> and <code>goto</code> write the restored theme and filters to
+<code>preferences.toml</code>, so the next <code>mnnn tui</code> opens with them.</p>
+<p><code>mnnn theme set</code> and <code>mnnn theme mode</code> are recorded when the database opens without a
+prompt (<code>MUNINN_PASSWORD</code> set); otherwise they change the theme without a history
+entry, because they never ask for the password.</p>
+<h2 id="recorded-actions">Recorded actions</h2>
+<table>
+<thead>
+<tr>
+<th>kind</th>
+<th>from</th>
+<th>summary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>import</code></td>
+<td>CLI, TUI</td>
+<td>file(s), bars inserted, status, run number</td>
+</tr>
+<tr>
+<td><code>export</code></td>
+<td>CLI, TUI</td>
+<td>rows, destination, format (scope in the params)</td>
+</tr>
+<tr>
+<td><code>filter</code>, <code>filter.time</code>, <code>filter.clear</code></td>
+<td>TUI</td>
+<td>the new filters or time range</td>
+</tr>
+<tr>
+<td><code>theme</code>, <code>theme.mode</code></td>
+<td>TUI, CLI</td>
+<td>the new theme or mode</td>
+</tr>
+<tr>
+<td><code>source.add</code>, <code>source.rename</code>, <code>source.remove</code>, <code>symbol.add</code></td>
+<td>CLI</td>
+<td>what changed</td>
+</tr>
+<tr>
+<td><code>author.add</code>, <code>author.edit</code>, <code>author.remove</code>, <code>author.use</code></td>
+<td>CLI, TUI</td>
+<td>the author</td>
+</tr>
+<tr>
+<td><code>search.save</code>, <code>search.fork</code>, <code>search.edit</code>, <code>search.remove</code></td>
+<td>CLI, TUI</td>
+<td>the <a href="/docs/live-searches/">live search</a></td>
+</tr>
+<tr>
+<td><code>project.create</code>, <code>project.edit</code>, <code>project.remove</code>, <code>project.add</code>, <code>project.drop</code></td>
+<td>CLI, TUI</td>
+<td>the <a href="/docs/projects/">project</a> and item</td>
+</tr>
+<tr>
+<td><code>journal.create</code>, <code>journal.edit</code>, <code>journal.remove</code>, <code>journal.fork</code></td>
+<td>CLI, TUI</td>
+<td>the <a href="/docs/journals/">journal</a></td>
+</tr>
+<tr>
+<td><code>entry.add</code>, <code>entry.edit</code>, <code>entry.remove</code>, <code>entry.copy</code></td>
+<td>CLI, TUI</td>
+<td>the entry (copies: how many, to which journal)</td>
+</tr>
+<tr>
+<td><code>note.add</code>, <code>note.edit</code>, <code>note.remove</code>, <code>highlight.add</code>, <code>highlight.remove</code>, <code>image.add</code></td>
+<td>CLI, TUI</td>
+<td>the note, highlight or image</td>
+</tr>
+<tr>
+<td><code>report.create</code>, <code>report.edit</code>, <code>report.remove</code></td>
+<td>CLI, TUI</td>
+<td>the <a href="/docs/reports/">report</a></td>
+</tr>
+<tr>
+<td><code>report.section.add</code>, <code>report.section.edit</code>, <code>report.section.remove</code>, <code>report.section.move</code></td>
+<td>CLI, TUI</td>
+<td>the section, its kind and position</td>
+</tr>
+<tr>
+<td><code>journal.export</code>, <code>entry.export</code>, <code>report.export</code>, <code>project.export</code></td>
+<td>CLI, TUI</td>
+<td>what was exported, the format and file (<a href="/docs/export-formats/">export formats</a>)</td>
+</tr>
+<tr>
+<td><code>journal.print</code></td>
+<td>CLI, TUI</td>
+<td>the PDF and the print command (or none)</td>
+</tr>
+<tr>
+<td><code>journal.import</code>, <code>project.import</code></td>
+<td>CLI</td>
+<td>the file and what was restored</td>
+</tr>
+<tr>
+<td><code>rule.create</code>, <code>rule.edit</code>, <code>rule.remove</code>, <code>rule.enable</code>, <code>rule.disable</code></td>
+<td>CLI, TUI</td>
+<td>the <a href="/docs/rules/">rule</a></td>
+</tr>
+<tr>
+<td><code>model.create</code>, <code>model.edit</code>, <code>model.apply</code>, <code>model.rollback</code>, <code>model.remove</code></td>
+<td>CLI, TUI, rules</td>
+<td>the <a href="/docs/models/">model</a>, its version, plan steps and values lost</td>
+</tr>
+<tr>
+<td><code>record.create</code>, <code>record.update</code>, <code>record.delete</code></td>
+<td>CLI, TUI, rules</td>
+<td>the model and record, or the filter and how many</td>
+</tr>
+<tr>
+<td><code>code.create</code>, <code>code.edit</code>, <code>code.remove</code>, <code>code.approve</code></td>
+<td>CLI, TUI</td>
+<td>the <a href="/docs/code-spaces/">code space</a> and what changed (a removal keeps its source)</td>
+</tr>
+<tr>
+<td><code>code.build</code></td>
+<td>CLI, TUI, rules</td>
+<td>the code space and its build key (cached builds are not recorded)</td>
+</tr>
+<tr>
+<td><code>code.run</code></td>
+<td>CLI, TUI, rules</td>
+<td>the code space, its input, status, writes, duration and error; the model and record changes it made follow it</td>
+</tr>
+<tr>
+<td><code>net.node.start</code>, <code>net.node.stop</code>, <code>net.config</code></td>
+<td>CLI, TUI</td>
+<td>the <a href="/docs/network/">node</a>, its addresses or settings</td>
+</tr>
+<tr>
+<td><code>net.exchange.create</code>, <code>net.exchange.incoming</code>, <code>net.exchange.accept</code>, <code>net.exchange.complete</code>, <code>net.exchange.verify</code>, <code>net.exchange.revoke</code>, <code>net.exchange.restore</code></td>
+<td>CLI, TUI, node</td>
+<td>the <a href="/docs/key-exchanges/">key exchange</a> and peer (never keys)</td>
+</tr>
+<tr>
+<td><code>net.share</code>, <code>net.unshare</code>, <code>net.serve</code>, <code>net.fetch</code>, <code>net.import</code>, <code>net.search</code></td>
+<td>CLI, TUI, node</td>
+<td>what was shared, served to or fetched from which peer</td>
+</tr>
+<tr>
+<td><code>net.shard.entrust</code>, <code>net.shard.restore</code>, <code>net.shard.hold</code>, <code>net.shard.release</code>, <code>net.shard.drop</code></td>
+<td>CLI, TUI, node</td>
+<td>the <a href="/docs/dark-shards/">dark shard</a> set and exchanges (never shards)</td>
+</tr>
+<tr>
+<td><code>org.create</code>, <code>org.edit</code>, <code>org.remove</code></td>
+<td>CLI, TUI</td>
+<td>the <a href="/docs/organizations/">organization</a> and what changed</td>
+</tr>
+<tr>
+<td><code>org.role.create</code>, <code>org.role.edit</code>, <code>org.role.remove</code>, <code>org.defaults</code></td>
+<td>CLI, TUI, node</td>
+<td>the role, its rank and permissions, or the default roles</td>
+</tr>
+<tr>
+<td><code>org.member.apply</code>, <code>org.member.approve</code>, <code>org.member.reject</code>, <code>org.member.invite</code>, <code>org.member.join</code>, <code>org.member.role</code>, <code>org.member.kick</code>, <code>org.member.leave</code></td>
+<td>CLI, TUI, node</td>
+<td>the member, their role and who acted (never keys)</td>
+</tr>
+<tr>
+<td><code>org.apply</code>, <code>org.joined</code>, <code>org.leave</code>, <code>org.removed</code></td>
+<td>CLI, TUI, node</td>
+<td>an org on another node: applying, joining, leaving, being removed</td>
+</tr>
+<tr>
+<td><code>org.resource.add</code>, <code>org.resource.state</code>, <code>org.resource.remove</code>, <code>org.publish</code>, <code>org.unpublish</code>, <code>org.transfer</code></td>
+<td>CLI, TUI, node</td>
+<td>the resource, its state or where it is published</td>
+</tr>
+<tr>
+<td><code>org.project.add</code>, <code>org.project.remove</code>, <code>org.project.member</code>, <code>org.endpoint.add</code>, <code>org.endpoint.remove</code>, <code>org.template.save</code>, <code>org.template.asset</code></td>
+<td>CLI, TUI</td>
+<td>the org's projects, endpoints and templates</td>
+</tr>
+<tr>
+<td><code>org.call</code>, <code>org.serve</code>, <code>org.mirror</code></td>
+<td>CLI, node, web</td>
+<td>endpoint calls, what was served to whom, mirrors</td>
+</tr>
+<tr>
+<td><code>review.request</code>, <code>review.invite</code>, <code>review.close</code>, <code>review.reopen</code>, <code>review.drop</code>, <code>review.remove</code></td>
+<td>CLI, TUI</td>
+<td>the <a href="/docs/reviews/">review</a>, its thing and reviewers (never keys)</td>
+</tr>
+<tr>
+<td><code>review.join</code>, <code>review.joined</code>, <code>review.leave</code>, <code>review.closed</code>, <code>review.serve</code></td>
+<td>CLI, TUI, node</td>
+<td>a reviewer taking a link, joining, leaving, being closed out, what was served</td>
+</tr>
+<tr>
+<td><code>review.comment</code>, <code>review.suggest</code>, <code>review.highlight</code>, <code>review.vote</code>, <code>review.withdraw</code></td>
+<td>CLI, TUI, node</td>
+<td>the item, its anchor and who made it</td>
+</tr>
+<tr>
+<td><code>review.accept</code>, <code>review.reject</code>, <code>review.merge</code></td>
+<td>CLI, TUI</td>
+<td>the suggestions decided, the revisions made and conflicts; the edits follow with a <code>review</code> param</td>
+</tr>
+<tr>
+<td><code>org.host.start</code>, <code>org.host.stop</code>, <code>org.host.acme</code>, <code>org.host.cert</code></td>
+<td>CLI, TUI, host</td>
+<td>the <a href="/docs/org-hosting/">site</a>, its address and certificate (never keys)</td>
+</tr>
+<tr>
+<td><code>rule.run</code></td>
+<td>rules</td>
+<td>the rule, the action that triggered it, its status (<code>ok</code>, <code>failed</code>, <code>blocked</code>); what it did is recorded under it</td>
+</tr>
+</tbody>
+</table>
+<p>Stepping back over these actions moves the head only; it does not undo the change
+(stepping back restores view state: filters, time range and theme).</p>
+<p>See also: <a href="/docs/authors/">authors</a>, <a href="/docs/sidebar/">sidebar</a>, <a href="/docs/themes/">themes</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/history.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

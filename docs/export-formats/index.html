@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Export formats · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a class="current" aria-current="page" href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="export-formats">Export formats</h1>
+<p>Journals, entries, reports and projects are exported through one document layer, and
+bars can be exported as documents too (<a href="/docs/export/">export</a>).</p>
+<table>
+<thead>
+<tr>
+<th>format</th>
+<th>what you get</th>
+<th align="center">journals</th>
+<th align="center">reports</th>
+<th align="center">projects</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PDF</td>
+<td>for reading and printing (A4)</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>HTML</td>
+<td>one self-contained page, images inline</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>Word (.docx)</td>
+<td>for Word, LibreOffice, Google Docs</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>LaTeX (.tex)</td>
+<td>the source PDF and Docx are made from; images written beside it</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>JSON</td>
+<td>the data: importable journals and projects, a report's definition and tables</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>CSV</td>
+<td>the document's tables, with a leading <code>section</code> column</td>
+<td align="center"></td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>text</td>
+<td>plain text, as <code>report preview</code> shows it</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>archive (.mnnp)</td>
+<td>the whole project, see below</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✓</td>
+</tr>
+</tbody>
+</table>
+<pre><code>mnnn journal export JOURNAL [--entry ENTRY]... [--format F] [--out PATH]   # default pdf
+mnnn report export REPORT [--format F] [--out PATH]                        # default pdf
+mnnn project export PROJECT [--format archive|json|pdf|…] [--out PATH] [--rows N] [--no-data]
+</code></pre>
+<p>In the TUI, <code>E</code> opens the export window in <a href="/docs/journals/">journals</a> (the journal, the
+marked entries or the open entry), <a href="/docs/reports/">reports</a> and <a href="/docs/projects/">projects</a>:
+choose a format, then confirm or change the path (<code>&lt;current dir&gt;/&lt;name&gt;.&lt;ext&gt;</code>).
+Exports are recorded in the <a href="/docs/history/">history</a> (<code>journal.export</code>, <code>entry.export</code>,
+<code>report.export</code>, <code>project.export</code>). <code>I</code> in the projects list imports a project
+archive or JSON pack.</p>
+<h2 id="how-documents-are-made">How documents are made</h2>
+<p>Everything is generated inside <code>mnnn</code>; no TeX, LibreOffice, pandoc or other program is
+needed at run time, and packages stay prebuilt binaries.</p>
+<ol>
+<li>The exporter builds a document (headings, paragraphs, lists, tables, code, math,
+images, notes, highlights) from the store. Journal Markdown is parsed; journal
+LaTeX is read by the same reader as step 3.</li>
+<li><strong>LaTeX is the source.</strong> The document is written as LaTeX (<code>article</code>, <code>graphicx</code>,
+<code>longtable</code>, <code>amsmath</code>, <code>hyperref</code>, <code>xcolor</code> and <code>soul</code> for highlights; notes are
+numbered marks with a list at the end of their section). The <code>.tex</code> export is this
+file and compiles with a normal TeX installation.</li>
+<li><strong>PDF and Word are generated from that LaTeX</strong>: Muninn reads its own LaTeX back
+(plus the commands journal entries commonly use) and lays it out itself. The PDF
+writer uses bundled Liberation Serif and Mono fonts (SIL Open Font License, shipped
+as <code>LICENSE-FONTS</code>), subset into each file; Word documents are written as Office Open
+XML directly.</li>
+<li>HTML and text are written from the same document; JSON and CSV from the data.</li>
+</ol>
+<p>Why not a TeX engine? Embedding one (Tectonic) pulls in C/C++ libraries (harfbuzz,
+ICU, freetype, graphite) that are hard to build for every release target, and it
+downloads TeX packages on first use. Typst is pure Rust but is not LaTeX and adds a
+large dependency tree. The pure-Rust writers (<code>pdf-writer</code>, <code>ttf-parser</code>, <code>subsetter</code>,
+<code>png</code>, <code>flate2</code>) build on every CI target: Linux, macOS and Windows on x86_64 and
+aarch64, and the deb, rpm and Arch packages.</p>
+<p>Limits of the built-in layout:</p>
+<ul>
+<li>Math is shown as text with common commands turned into Unicode (<code>\alpha</code> → α,
+<code>x^2</code> → x²); there is no TeX math layout. Compile the <code>.tex</code> export for that.</li>
+<li>No kerning, ligatures or complex-script shaping; text outside the fonts' Latin,
+Greek and Cyrillic coverage shows as <code>?</code> in PDF (HTML, Word and text keep it).</li>
+<li>Notes are numbered and listed at the end of their section (endnotes), not at the
+foot of the page.</li>
+<li>PDF embeds PNG and JPEG images, Word PNG, JPEG, GIF and BMP; other images (WebP,
+SVG, …) are kept in HTML and LaTeX and shown as a named placeholder.</li>
+</ul>
+<h2 id="printing">Printing</h2>
+<pre><code>mnnn journal print JOURNAL [--entry ENTRY]... [--printer NAME] [--out PATH] [--save-only]
+</code></pre>
+<p>In the TUI, <code>P</code> prints the journal (or the marked entries) or the open entry. Muninn
+makes a PDF (by default in <code>&lt;home&gt;/prints/</code>), then hands it to <code>lp</code> (or <code>lpr</code>) when one
+is installed; otherwise, or with <code>--save-only</code>, it keeps the PDF and says where it is.
+A printer error is reported with the PDF's path. Recorded as <code>journal.print</code>.</p>
+<h2 id="project-archives-and-import">Project archives and import</h2>
+<pre><code>mnnn project export PROJECT [--out NAME.mnnp] [--no-data] [--rows N]
+mnnn project import FILE [--name NAME]
+mnnn journal export JOURNAL --format json --out FILE
+mnnn journal import FILE [--project PROJECT] [--name NAME]
+</code></pre>
+<p>A project archive (<code>.mnnp</code>, a zstd-compressed tar) holds <code>muninn-project.json</code> (the
+project, its live searches, results, journals with entries, notes and highlights,
+reports with their sections, its <a href="/docs/rules/">rules</a> and its journals' and live
+searches' rules, its <a href="/docs/models/">models</a> with their versions, records, their rules and the rules
+that migrated them, the <a href="/docs/code-spaces/">code spaces</a> of the project, its report sections and
+its rules (source and input only; they arrive not approved),
+and the authors involved), the images under
+<code>attachments/</code>, the bars the project refers to under <code>data/</code> as CSV (result ranges,
+what its live searches match and the series its report sections show; <code>--no-data</code>
+leaves them out), and <code>project.html</code> to read without Muninn. <code>--format json</code> writes
+the same project as one JSON file with images and bars inline.</p>
+<p>Import restores everything as new items with new ids, so it can sit next to the
+original: a project or journal of the same name is imported as &quot;NAME (imported)&quot;
+unless <code>--name</code> is given, and so are a project's journals and reports whose names are
+taken. Rules are imported switched off. Models keep their record ids; one whose name is
+taken is imported as <code>NAME_imported</code>, a local draft is kept, and only the fields added
+to bars travel (as optional fields, with their values). Bars are added like an ingest (existing bars are kept),
+authors are matched by id and added when missing, and references between the
+project's journals, live searches, reports and images are rewritten. An import is all
+or nothing. Recorded as <code>project.import</code> / <code>journal.import</code>.</p>
+<p>See also: <a href="/docs/reports/">reports</a>, <a href="/docs/projects/">projects</a>, <a href="/docs/journals/">journals</a>,
+<a href="/docs/export/">export</a>.</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/export-formats.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>

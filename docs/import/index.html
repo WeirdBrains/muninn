@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Import · Muninn docs</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-page">
+<header class="docs-top"><a class="brand" href="/">MUNINN</a><nav><a href="/docs/">Docs</a><a href="/#install">Install</a><a href="https://github.com/WeirdBrains/muninn/releases">Releases</a><a href="https://github.com/WeirdBrains/muninn">Source</a></nav></header>
+<div class="docs-layout">
+<nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a class="current" aria-current="page" href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li></ul></nav>
+<main class="doc">
+<h1 id="import">Import</h1>
+<p><strong>File ▸ Import…</strong> (or <code>i</code>) opens the import popup: a file browser, per-file guesses
+and a background import with a live progress bar. The same pipeline as
+<a href="/docs/ingest-csv/"><code>muninn ingest csv|json</code></a> runs underneath (<a href="/docs/ingest-json/">JSON</a>).</p>
+<pre><code>┌ Import ─────────────────────────────────────────────────────────────┐
+│ path /data/binance/                                                  │
+│ filter         hidden off   2 selected                               │
+│┌Places──────┐┌Files──────────────┐┌Preview─────────────────────────┐│
+││1 home      ││▸ ..               ││symbol BTC/USDT                 ││
+││2 raw/data  ││● BTCUSDT_5m.csv   ││period 5m                       ││
+││3 cwd       ││○ ETHUSDT_1h.csv   ││timestamp,open,high,...         ││
+│└────────────┘└───────────────────┘└────────────────────────────────┘│
+│ source   from file name, else local (s)                              │
+│ symbol   derive from name / data                                     │
+│ duration derive from name / data                                     │
+└──────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h2 id="browsing">Browsing</h2>
+<p>Only folders and data files (<code>csv tsv txt json ndjson jsonl</code>) are listed.</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>j</code> / <code>k</code>, ↑ / ↓, PgUp / PgDn, Home / End</td>
+<td>move</td>
+</tr>
+<tr>
+<td>Enter, <code>l</code>, →</td>
+<td>open a folder (Enter on a file imports it, or the selection)</td>
+</tr>
+<tr>
+<td>Backspace, <code>h</code>, ←</td>
+<td>parent folder</td>
+</tr>
+<tr>
+<td>Space</td>
+<td>select / unselect a file or folder (multi-select)</td>
+</tr>
+<tr>
+<td><code>a</code></td>
+<td>select every file in this folder (again: unselect)</td>
+</tr>
+<tr>
+<td><code>A</code></td>
+<td>import this whole folder, including subfolders</td>
+</tr>
+<tr>
+<td><code>.</code></td>
+<td>show / hide hidden files</td>
+</tr>
+<tr>
+<td><code>/</code></td>
+<td>filter the listing (substring)</td>
+</tr>
+<tr>
+<td>Tab, <code>g</code></td>
+<td>type a path (see <em>Path completion</em>); Enter goes there (or imports a file)</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>focus the Places column (see below)</td>
+</tr>
+<tr>
+<td><code>1</code>–<code>9</code></td>
+<td>jump to the numbered place</td>
+</tr>
+<tr>
+<td><code>b</code></td>
+<td>bookmark the current folder (again: remove the bookmark)</td>
+</tr>
+<tr>
+<td><code>s</code> <code>y</code> <code>d</code></td>
+<td>edit source, symbol, duration</td>
+</tr>
+<tr>
+<td><code>i</code></td>
+<td>import the selection, or the highlighted file or folder</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>close</td>
+</tr>
+</tbody>
+</table>
+<p>The preview shows the guessed symbol and duration (from the file name) and the first
+10 lines of the highlighted file parsed as bars with the same parser as the import
+(column mapping, timestamps, validation): <code>time SYMBOL o h l c v [zero-vol]</code>. Invalid
+lines are shown in red with the reason and the raw line. It reads at most 64 KiB, so
+it is instant on huge files. A large JSON array cannot be parsed from its start, so
+its preview shows raw lines; NDJSON previews parse.</p>
+<h2 id="path-completion">Path completion</h2>
+<p>In the path input, Tab works like zsh or Neovim:</p>
+<ol>
+<li><strong>Tab</strong> completes as far as the matching names agree (<code>/data/BT</code> → <code>/data/BTCUSDT_</code>).</li>
+<li>If several names still match, the next <strong>Tab</strong> shows them as a list under the input.</li>
+<li>Further <strong>Tab</strong> steps through the list, highlighting a candidate and filling it into
+the input; <strong>Shift-Tab</strong> steps backwards; both wrap around. Clicking a candidate
+picks it.</li>
+<li><strong>Enter</strong> or typing accepts the candidate (a second Enter goes there); <strong>Esc</strong> puts
+back what you had typed.</li>
+</ol>
+<p>Hidden names are offered only when hidden files are shown (<code>.</code>) or you type the dot.</p>
+<h2 id="resolution">Resolution</h2>
+<p><strong>Source</strong> records where the data originally came from (also when the files were
+copied or uploaded from elsewhere): press <code>s</code> (or click the source line) and type it to
+use it for every file in the run. Left empty, each file's source is the exchange in its
+name (the preview shows <code>source kraken (from name)</code>), else <code>local</code>. Symbol and duration are derived from each file name and,
+for the duration, from the data; type a value to override it for every file in the
+run. Recently used folders are saved in <a href="/docs/preferences/">preferences</a>
+(<code>tui.import_recent</code>).</p>
+<h2 id="progress-and-cancel">Progress and cancel</h2>
+<p>The import runs in a background thread on its own connection, so the TUI stays
+responsive. Progress is byte-based:</p>
+<ul>
+<li><strong>file</strong> gauge: the current file's estimated completion;</li>
+<li><strong>all</strong> gauge: bytes done / total bytes of every file in the run, with an ETA from
+the rate so far;</li>
+<li>bars stored / to store and elapsed time as a secondary line, plus a log of each
+file's result.</li>
+</ul>
+<p>Bytes are counted as the file is read (published every 64 KiB), so the bar moves from
+the first read. Reading is fast compared with storing, so each file's bytes are split
+into phases: reading 10 %, parsing and validating 5 %, storing 85 % (scaled by bars
+stored, reported every 4096 rows). The estimate is therefore linear in bytes across
+files and roughly linear in time within a file. The summary lists inserted, duplicate, rejected rows and gaps per
+series; identical files already imported are skipped. Rows failing validation are
+dropped (see the CLI <code>--rejects</code> option to keep a report).</p>
+<h2 id="cancelling">Cancelling</h2>
+<p>The progress popup has a <strong>[Cancel]</strong> button; <code>Esc</code>, <code>c</code> and the popup's <strong>[X]</strong> do the
+same. Cancelling always asks first (<strong>[Yes, cancel]</strong> / <strong>[No, continue]</strong>, or <code>y</code> /
+<code>n</code>). After yes the popup shows <em>Cancelling…</em>: the background import stops at its next
+read (every 64 KiB) or row batch (every 4096 rows), usually within a fraction of a
+second.</p>
+<p>What stays and what goes:</p>
+<ul>
+<li><strong>Files that finished</strong> before the cancel stay imported.</li>
+<li><strong>The file being imported</strong> is rolled back entirely: each file is imported in one
+all-or-nothing transaction, so none of its bars, its series totals or its import
+record remain. Importing it again later works normally (it is not skipped as
+&quot;already imported&quot;).</li>
+<li><strong>Files not started</strong> are not touched.</li>
+</ul>
+<p>The summary says how many files were kept, discarded and not started. The same
+all-or-nothing rule applies to the CLI: a file that fails part-way leaves nothing behind,
+and <strong>Ctrl-C</strong> in <code>mnnn ingest csv|json</code> cancels the same way (by <code>cli</code>).</p>
+<h3 id="import-runs-and-the-artifact-ledger">Import runs and the artifact ledger</h3>
+<p>Every import (TUI or CLI) is recorded as an <em>import run</em> with a status: <code>running</code>,
+<code>completed</code>, <code>failed</code> or <code>cancelled</code>. A cancel is noted when it happens: the time it
+was asked for, by whom (<code>tui</code> or <code>cli</code>), the file and the phase (<code>read</code>, <code>parse</code>,
+<code>store</code>).</p>
+<p>Each run keeps a ledger of what it created: new <strong>source</strong> rows, new <strong>series</strong>,
+<strong>bars</strong> (per series, with the count inserted), the <strong>ingest record</strong> used to skip
+identical files, and the <strong>recent</strong> folder entry. Artifacts of finished files are
+<code>kept</code>. Those of the cancelled or failed file are rolled back and listed as
+<code>rolled_back</code>. After the run, anything the run created that ended up empty (for
+example a new source whose only file was cancelled) is deleted and listed as
+<code>removed</code>; if nothing was imported, the Recent entry the run added is removed too.</p>
+<pre><code>mnnn ingest runs              # latest run
+mnnn ingest runs --show 12    # one run with its ledger
+</code></pre>
+<p>The TUI summary shows the run number.</p>
+<h2 id="places">Places</h2>
+<p>The left column of the browser, titled <strong>Places (p)</strong>, lists folders you can jump to.
+It has up to three sections:</p>
+<ul>
+<li><strong>Places</strong>: built-in shortcuts: Home, <code>~/Projects</code>, <code>raw/data</code> (the kommandosaldat
+raw data folder, or <code>$MUNINN_RAW_DATA</code>) and the folder Muninn was started from. Ones
+that don't exist on this machine are left out.</li>
+<li><strong>Bookmarks</strong>: folders you bookmarked with <code>b</code> (while browsing, <code>b</code> bookmarks the
+folder you are in; pressing it again removes the bookmark).</li>
+<li><strong>Recent</strong>: the last 10 folders you imported from (newest first).</li>
+</ul>
+<p>To use a place: click it, press its number <code>1</code>–<code>9</code>, or press <code>p</code> to move into the
+column, pick one with <code>j</code>/<code>k</code> and press Enter. In the column, <code>x</code> removes a bookmark or
+recent entry (built-ins stay). Bookmarks and recents are saved in
+<a href="/docs/preferences/">preferences</a> (<code>tui.import_bookmarks</code>, <code>tui.import_recent</code>). The
+popup opens in the most recent folder.</p>
+<h2 id="after-an-import">After an import</h2>
+<p>When the import finishes and no tile shows a series yet, the focused tile loads the
+first series that was imported (the status line says <code>loaded the import: …</code>). If any
+tile already shows data, the view is left as it is; pick the new series in the sidebar.</p>
+<h2 id="when-the-symbol-cant-be-guessed">When the symbol can't be guessed</h2>
+<p>If a file's name doesn't tell its symbol (for example <code>export_5m.csv</code>) and the symbol
+field is empty, a <strong>Symbol needed</strong> popup asks for it before the import starts, one
+file at a time. The popup shows the file name on its own line (<code>file</code>, wrapped if
+very long, never cut) and its folder below it (<code>in</code>, shortened from the left with <code>…</code>
+so the end of the path stays visible). When several files need a symbol, as in a
+folder import (<code>A</code>), the title counts them: <code>Symbol needed · file 3 of 12</code>.</p>
+<table>
+<thead>
+<tr>
+<th>key / button</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>type, Enter / <code>[Enter OK]</code></td>
+<td>use this symbol (BASE/QUOTE, e.g. <code>BTC/USDT</code>) for this file</td>
+</tr>
+<tr>
+<td>Ctrl-a / <code>[Ctrl-a OK for all]</code></td>
+<td>use it for this and every remaining file</td>
+</tr>
+<tr>
+<td>Tab / <code>[Tab skip file]</code></td>
+<td>leave this file out</td>
+</tr>
+<tr>
+<td>Esc / <code>[Esc cancel]</code> / <code>[X]</code></td>
+<td>cancel the import (nothing is imported)</td>
+</tr>
+</tbody>
+</table>
+<p>An invalid symbol shows an error and keeps the popup open. Filling the symbol field
+(<code>y</code>) beforehand skips the question.</p>
+<h2 id="mouse">Mouse</h2>
+<p>Click a file or folder to highlight it and click it again to open the folder or import
+the file. Click the path, filter or source/symbol/duration line to type there, a Places
+entry to go there, a completion candidate to pick it. The bottom row is a bar of key
+buttons (<code>[Enter open]</code>, <code>[Space select]</code>, <code>[A import folder]</code>, <code>[i import]</code>, ...) that
+act like the keys; <code>[Close]</code> ends the finished-import view.</p>
+<h2 id="importing-a-whole-folder">Importing a whole folder</h2>
+<p>A selected or highlighted folder is imported with everything below it: subfolders are
+searched for <code>.csv</code>, <code>.tsv</code>, <code>.txt</code>, <code>.json</code>, <code>.ndjson</code> and <code>.jsonl</code> files (hidden
+entries are skipped). <code>A</code> imports the current folder that way. Progress shows the
+current file (<code>file i/n</code>) and the whole run; each file is still all-or-nothing, so a
+cancel keeps finished files, rolls back the current one and the ledger records it.
+On the command line the same is <code>mnnn ingest path &lt;DIR&gt;</code> (see <a href="/docs/cli/">CLI</a>).</p>
+<p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/import.md">Edit this page on GitHub</a></p>
+</main>
+</div>
+</body>
+</html>
