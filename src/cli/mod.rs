@@ -91,8 +91,9 @@ impl Ctx {
     }
 }
 
-fn init_tracing(g: &GlobalArgs) {
-    let level = if g.quiet {
+/// The log level from `-q` / `-v`.
+fn log_level(g: &GlobalArgs) -> &'static str {
+    if g.quiet {
         "error"
     } else {
         match g.verbose {
@@ -101,15 +102,44 @@ fn init_tracing(g: &GlobalArgs) {
             2 => "debug",
             _ => "trace",
         }
+    }
+}
+
+fn log_filter(g: &GlobalArgs) -> tracing_subscriber::EnvFilter {
+    tracing_subscriber::EnvFilter::try_from_env("MUNINN_LOG").unwrap_or_else(|_| log_level(g).into())
+}
+
+fn init_tracing(g: &GlobalArgs) {
+    let _ = tracing_subscriber::fmt().with_env_filter(log_filter(g)).with_writer(std::io::stderr).try_init();
+}
+
+/// The TUI's log file, `<home>/logs/tui.log`.
+pub fn tui_log_path(home: &std::path::Path) -> std::path::PathBuf {
+    home.join("logs").join("tui.log")
+}
+
+/// While the TUI draws on the terminal, every log line goes to a file so
+/// nothing (libp2p included) writes over the screen.
+fn init_tui_tracing(g: &GlobalArgs, home: &std::path::Path) {
+    let path = tui_log_path(home);
+    let file = path
+        .parent()
+        .map(std::fs::create_dir_all)
+        .transpose()
+        .ok()
+        .and_then(|_| std::fs::OpenOptions::new().create(true).append(true).open(&path).ok());
+    let b = tracing_subscriber::fmt().with_env_filter(log_filter(g)).with_ansi(false);
+    let _ = match file {
+        Some(f) => b.with_writer(std::sync::Mutex::new(f)).try_init(),
+        None => b.with_writer(std::io::sink).try_init(),
     };
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_env("MUNINN_LOG").unwrap_or_else(|_| level.into()))
-        .with_writer(std::io::stderr)
-        .try_init();
 }
 
 pub fn run(cli: Cli) -> anyhow::Result<()> {
-    init_tracing(&cli.global);
+    let tui = matches!(cli.command, Command::Tui);
+    if !tui {
+        init_tracing(&cli.global);
+    }
     // Commands that never touch ~/.muninn.
     match &cli.command {
         Command::Help { topic, search } => return misc::help(topic.as_deref(), search.as_deref()),
@@ -118,6 +148,13 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
     }
     if let Some(t) = cli.global.transport.as_deref() {
         crate::collab::stream::set_override(crate::collab::stream::Mode::parse(t)?);
+    }
+    if tui {
+        let home = Paths::resolve(cli.global.home.clone(), None).map(|p| p.home);
+        match home {
+            Ok(h) => init_tui_tracing(&cli.global, &h),
+            Err(_) => init_tracing(&cli.global),
+        }
     }
     let ctx = Ctx::new(cli.global)?;
     ctx.prefs()?;

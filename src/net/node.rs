@@ -526,6 +526,11 @@ impl Loop {
 
     fn periodic(&mut self) {
         let k = &mut self.swarm.behaviour_mut().kad;
+        // With an empty routing table there is no one to bootstrap from; asking
+        // anyway only makes libp2p warn "No known peers" every tick.
+        if routing_empty(k) {
+            return;
+        }
         if k.bootstrap().is_ok() {
             k.get_providers(kad::RecordKey::new(&RELAY_KEY));
             if self.cfg.relay_server {
@@ -747,4 +752,9 @@ impl Loop {
             _ => {}
         }
     }
+}
+
+/// True when the Kademlia routing table holds no peers yet.
+fn routing_empty<S: kad::store::RecordStore + Send + 'static>(k: &mut kad::Behaviour<S>) -> bool {
+    k.kbuckets().all(|b| b.num_entries() == 0)
 }
