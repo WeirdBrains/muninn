@@ -39,14 +39,39 @@ pub fn master(ctx: &Ctx, m: &MasterInput) -> anyhow::Result<Key32> {
 
 pub(super) fn new_password(ctx: &Ctx, question: &str) -> anyhow::Result<SecretString> {
     if let Ok(p) = std::env::var("MUNINN_PASSWORD") {
+        if p.is_empty() {
+            return Err(Error::invalid("password", "MUNINN_PASSWORD must not be empty").into());
+        }
         return Ok(p.into());
     }
-    let a = ctx.io.password(question, "set MUNINN_PASSWORD or run interactively")?;
-    let b = ctx.io.password("Repeat password", "")?;
-    if a != b {
-        return Err(Error::invalid("password", "the two entries differ").into());
+    let hint = "set MUNINN_PASSWORD or run interactively";
+    let p = ask_new_password(|q| Ok(ctx.io.password(q, hint)?), |m| eprintln!("{m}"), question, 3)?;
+    Ok(p.into())
+}
+
+/// Ask for a new password twice, retrying (up to `tries` times) on an empty entry or a
+/// mismatch, so a slip on first run does not abort setup.
+pub(crate) fn ask_new_password(
+    mut read: impl FnMut(&str) -> anyhow::Result<String>,
+    mut say: impl FnMut(&str),
+    question: &str,
+    tries: u32,
+) -> anyhow::Result<String> {
+    for left in (0..tries).rev() {
+        let a = read(question)?;
+        let problem = if a.is_empty() {
+            "The password must not be empty."
+        } else if read("Repeat password")? != a {
+            "The two entries differ."
+        } else {
+            return Ok(a);
+        };
+        if left == 0 {
+            break;
+        }
+        say(&format!("{problem} Try again."));
     }
-    Ok(a.into())
+    Err(Error::invalid("password", "no matching, non-empty password entered").into())
 }
 
 pub fn run(ctx: &Ctx, cmd: KeysCommand) -> anyhow::Result<()> {
@@ -155,4 +180,35 @@ pub fn run(ctx: &Ctx, cmd: KeysCommand) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod new_password_tests {
+    use super::ask_new_password;
+
+    fn run(entries: &[&str], tries: u32) -> (anyhow::Result<String>, Vec<String>) {
+        let mut it = entries.iter().map(|s| s.to_string());
+        let mut said = Vec::new();
+        let r = ask_new_password(|_| it.next().ok_or_else(|| anyhow::anyhow!("eof")), |m| said.push(m.to_string()), "New", tries);
+        (r, said)
+    }
+
+    #[test]
+    fn retries_on_empty_and_mismatch_then_accepts() {
+        let (r, said) = run(&["", "a1", "b2", "pw", "pw"], 3);
+        assert_eq!(r.unwrap(), "pw");
+        assert_eq!(said, ["The password must not be empty. Try again.", "The two entries differ. Try again."]);
+    }
+
+    #[test]
+    fn gives_up_after_the_last_try() {
+        let (r, said) = run(&["", "", ""], 3);
+        assert!(r.unwrap_err().to_string().contains("no matching"));
+        assert_eq!(said.len(), 2);
+    }
+
+    #[test]
+    fn end_of_input_is_an_error_not_a_loop() {
+        assert!(run(&[], 3).0.is_err());
+    }
 }

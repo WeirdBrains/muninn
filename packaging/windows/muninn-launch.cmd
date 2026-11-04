@@ -10,15 +10,26 @@ if %errorlevel%==0 (
 )
 exit /b
 :run
+rem First run (no keys yet): set them up. Stop here, window open, if that fails, so the
+rem TUI never starts without keys; pause after success so the words can be written down.
 "%~dp0mnnn.exe" keys status >nul 2>nul
-if errorlevel 1 (
-  echo First run: Muninn sets up its keys. Write down the 24 words it prints and keep them offline.
-  echo.
-  "%~dp0mnnn.exe" keys init
-  if errorlevel 1 (
-    pause
-    exit /b 1
-  )
-)
+if not errorlevel 1 goto tui
+echo First run: Muninn sets up its keys and asks for a new password (typing is hidden).
+echo Afterwards it prints 24 recovery words: write them down and keep them offline.
+echo.
+"%~dp0mnnn.exe" keys init
+if errorlevel 1 goto initfailed
+echo.
+echo Write down the recovery words above now; they are not shown again.
+pause
+cls
+:tui
 "%~dp0mnnn.exe" tui
 if errorlevel 1 pause
+exit /b
+:initfailed
+echo.
+echo Muninn could not set up its keys (see the error above). Nothing was changed;
+echo open Muninn again to retry, or run "mnnn keys init" in a terminal.
+pause
+exit /b 1

@@ -106,6 +106,11 @@ pub fn init(paths: &Paths, password: &SecretString) -> Result<InitOutput> {
     if paths.envelope().exists() {
         return Err(Error::invalid("keys", format!("already initialized ({})", paths.envelope().display())));
     }
+    // Check the password before touching disk: a failed first run must leave nothing behind
+    // that a retry would trip over (a fresh encrypted database without an envelope).
+    if password.expose_secret().is_empty() {
+        return Err(Error::invalid("password", "must not be empty"));
+    }
     paths.ensure()?;
     let master = Key32::random()?;
     let dek = Key32::random()?;
@@ -121,16 +126,26 @@ pub fn init(paths: &Paths, password: &SecretString) -> Result<InitOutput> {
     }
     Store::open(&paths.db, Some(&dek.0))?;
 
-    write_service_file(paths, &db_id, 1, &svc, password)?;
-    let env = Envelope {
-        format: 1,
-        db_id: db_id.clone(),
-        created_at: now_ms(),
-        service_version: 1,
-        service_wrap: seal(&svc, &dek.0, DEK_AAD)?,
-        master_wrap: seal(&kek, &dek.0, DEK_AAD)?,
+    let finish = || -> Result<()> {
+        write_service_file(paths, &db_id, 1, &svc, password)?;
+        let env = Envelope {
+            format: 1,
+            db_id: db_id.clone(),
+            created_at: now_ms(),
+            service_version: 1,
+            service_wrap: seal(&svc, &dek.0, DEK_AAD)?,
+            master_wrap: seal(&kek, &dek.0, DEK_AAD)?,
+        };
+        env.save(paths)
     };
-    env.save(paths)?;
+    if let Err(e) = finish() {
+        // Undo a database this call created; its key is about to be lost.
+        if !migrated {
+            let _ = std::fs::remove_file(&paths.db);
+        }
+        let _ = std::fs::remove_file(service_file(paths, 1));
+        return Err(e);
+    }
     Ok(InitOutput { db_id, words: to_words(&master)?, shards: split_shards(&master)?, migrated_plain_db: migrated })
 }
 
@@ -287,6 +302,15 @@ mod tests {
         let p = Paths::resolve(Some(t.path().join("h")), None).unwrap();
         p.ensure().unwrap();
         (t, p)
+    }
+
+    #[test]
+    fn a_failed_first_init_leaves_nothing_behind_so_a_retry_works() {
+        let (_t, paths) = setup();
+        assert!(init(&paths, &SecretString::from("")).is_err());
+        assert!(!paths.db.exists() && !paths.envelope().exists(), "an empty password must not create a database");
+        init(&paths, &SecretString::from("pw1")).expect("the retry initializes");
+        assert!(unlock_with_password(&paths, &SecretString::from("pw1")).is_ok());
     }
 
     #[test]

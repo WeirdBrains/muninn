@@ -16,6 +16,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Homebrew tap: `brew install weirdbrains/tap/muninn` (or `--cask` for the app); winget id `WeirdBrains.Muninn`
 - Global `--log-file PATH` (`MUNINN_LOG_FILE`) sends logs to a file instead of stderr, for the TUI and every other command
 
+### Fixed
+- First run on Windows and macOS: an empty or mistyped password asks again instead of aborting, a failed `mnnn keys init` no longer leaves a database that blocks the next try, and the launchers pause so the recovery words can be written down
+
 ### Changed
 - The `.deb` requires glibc 2.39 (Ubuntu 24.04, Debian 13 or newer)
 - HTML exports and org sites drop unsafe link targets (`javascript:`, `data:` …) from Markdown

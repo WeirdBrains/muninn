@@ -28,6 +28,13 @@ fn the_windows_setup_installs_per_user_and_manages_path() {
     let launch = read("packaging/windows/muninn-launch.cmd");
     assert!(launch.contains("\r\n"), "muninn-launch.cmd must use CRLF line endings");
     assert!(launch.contains("wt.exe") && launch.contains("keys init") && launch.contains(" tui"));
+    // A failed first-run init stops with a message and a pause; it never falls through to the TUI.
+    let init = launch.find("keys init").unwrap();
+    let after = &launch[init..];
+    assert!(after.trim_start_matches(|c| c != '\n').trim_start().starts_with("if errorlevel 1 goto initfailed"), "check init right after it runs");
+    let failed = &launch[launch.find(":initfailed").expect("an :initfailed label")..];
+    assert!(failed.contains("pause") && failed.contains("exit /b 1") && !failed.contains(" tui"));
+    assert!(after[..after.find(":tui").unwrap()].contains("pause"), "pause after init so the words can be written down");
 }
 
 #[test]

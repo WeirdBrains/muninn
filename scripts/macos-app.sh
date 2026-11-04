@@ -32,8 +32,6 @@ cp -R "$src/man" "$src/README.md" "$src/CHANGELOG.md" "$src/LICENSE" "$app/Conte
 # icon: from assets/icons/muninn.png (scripts/icons.sh); also the dmg's volume icon
 scripts/icons.sh icns "$app/Contents/Resources/muninn.icns" >/dev/null
 cp "$app/Contents/Resources/muninn.icns" "$work/dmg/.VolumeIcon.icns"
-# the volume shows .VolumeIcon.icns when the root has the custom-icon flag (Xcode tools)
-command -v SetFile >/dev/null && SetFile -a C "$work/dmg"
 
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -79,9 +77,19 @@ if [[ ! -e "$state/cli-asked" ]]; then
   fi
 fi
 if ! "$mnnn" keys status >/dev/null 2>&1; then
-  echo "First run: Muninn sets up its keys. Write down the 24 words it prints and keep them offline."
+  echo "First run: Muninn sets up its keys and asks for a new password (typing is hidden)."
+  echo "Afterwards it prints 24 recovery words: write them down and keep them offline."
   echo
-  "$mnnn" keys init || { read -r -p "Press Enter to close. "; exit 1; }
+  if ! "$mnnn" keys init; then
+    echo
+    echo "Muninn could not set up its keys (see the error above). Nothing was changed;"
+    echo "open Muninn again to retry, or run 'mnnn keys init' in a terminal."
+    read -r -p "Press Enter to close. "
+    exit 1
+  fi
+  echo
+  read -r -p "Write down the recovery words above now; they are not shown again. Press Enter to continue. "
+  clear
 fi
 "$mnnn" tui || read -r -p "Press Enter to close. "
 SH
@@ -93,5 +101,12 @@ codesign --verify --deep --strict "$app"
 ln -s /Applications "$work/dmg/Applications"
 dmg="$dist/muninn-$ver-macos.dmg"
 rm -f "$dmg"
-hdiutil create -quiet -volname "Muninn $ver" -srcfolder "$work/dmg" -ov -format UDZO "$dmg"
+# The volume shows .VolumeIcon.icns only when its root has the custom-icon flag, which
+# -srcfolder drops: build read-write, set the flag on the mounted volume, then compress.
+rw="$work/rw.dmg"
+hdiutil create -quiet -volname "Muninn $ver" -srcfolder "$work/dmg" -ov -format UDRW "$rw"
+mnt=$(hdiutil attach -nobrowse -noautoopen "$rw" | awk -F'\t' '/\/Volumes\//{print $NF}')
+if command -v SetFile >/dev/null; then SetFile -a C "$mnt"; else xattr -wx com.apple.FinderInfo "0000000000000000040000000000000000000000000000000000000000000000" "$mnt"; fi
+hdiutil detach -quiet "$mnt"
+hdiutil convert -quiet "$rw" -format UDZO -o "$dmg"
 echo "$dmg"
