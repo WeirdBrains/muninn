@@ -174,20 +174,22 @@ const features = [
 const installs = [
   (
     'Release tarball (Linux, macOS)',
-    'tar -xzf muninn-2.18.0-x86_64-unknown-linux-gnu.tar.gz\ninstall -Dm755 muninn-2.18.0-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn',
+    'tar -xzf muninn-2.20.0-x86_64-unknown-linux-gnu.tar.gz\nmkdir -p ~/.local/bin\ninstall -m755 muninn-2.20.0-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn',
   ),
-  ('Debian / Ubuntu', 'sudo apt install ./muninn_2.18.0-1_amd64.deb'),
-  ('Fedora', 'sudo dnf install ./muninn-2.18.0-1.x86_64.rpm'),
-  ('Arch Linux', 'sudo pacman -U muninn-bin-2.18.0-1-x86_64.pkg.tar.zst'),
+  ('Debian / Ubuntu', 'sudo apt install ./muninn_2.20.0-1_amd64.deb'),
+  ('Fedora', 'sudo dnf install ./muninn-2.20.0-1.x86_64.rpm'),
+  ('Arch Linux', 'sudo pacman -U muninn-bin-2.20.0-1-x86_64.pkg.tar.zst'),
   (
     'Homebrew (macOS, Linux)',
-    'tar -xzf muninn-2.18.0-packaging.tar.gz\nbrew install ./packaging/homebrew/muninn.rb',
+    'tar -xzf muninn-2.20.0-packaging.tar.gz\nbrew tap-new --no-git local/muninn\ncp packaging/homebrew/muninn.rb "\$(brew --repository local/muninn)/Formula/"\nbrew install local/muninn/muninn',
   ),
   (
-    'Windows (winget)',
-    r'tar -xzf muninn-2.18.0-packaging.tar.gz'
+    'Windows (PowerShell)',
+    r'curl.exe -LO https://github.com/WeirdBrains/muninn/releases/download/v2.20.0/muninn-2.20.0-x86_64-pc-windows-gnullvm.zip'
         '\n'
-        r'winget install --manifest packaging\winget\2.18.0',
+        r'Expand-Archive muninn-2.20.0-x86_64-pc-windows-gnullvm.zip $env:LOCALAPPDATA\Programs -Force'
+        '\n'
+        r'# then add the folder to your user PATH and open a new terminal: see docs/install.md',
   ),
 ];
 

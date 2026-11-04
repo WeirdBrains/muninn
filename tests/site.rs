@@ -40,7 +40,7 @@ fn the_site_links_releases_docs_and_install_steps() {
         "dnf install",
         "pacman -U",
         "brew install",
-        "winget install",
+        "Expand-Archive",
     ] {
         assert!(app.contains(want), "site/lib/app.dart lacks {want}");
     }
