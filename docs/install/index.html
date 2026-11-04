@@ -81,9 +81,20 @@ click <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
 </ol>
 <p>Open a <strong>new</strong> terminal (old ones keep the old <code>PATH</code>) and run <code>mnnn --version</code>.
 Silent install, e.g. for scripts: <code>muninn-2.20.1-x86_64-windows-setup.exe /VERYSILENT /SUPPRESSMSGBOXES</code>.</p>
+<p><strong>Windows Firewall:</strong> the first time Muninn starts its network node, Windows Defender
+Firewall asks whether <code>mnnn.exe</code> may communicate on private and public networks. That is
+expected: the node listens for your other nodes and connections. <strong>Allow access</strong> (private
+networks are enough at home) for peer-to-peer sync, sharing and collaboration. <strong>Cancel</strong>
+keeps Muninn local-only: ingest, search, charts, journals, models, reports and exports all
+still work. The firewall only blocks incoming connections, so other nodes can't reach this
+one directly; connections it makes itself (for example through a relay) still go out.
+Change your answer later in <strong>Windows Security ▸ Firewall &amp; network protection ▸ Allow an
+app through firewall</strong>.</p>
 <p>Uninstall from <strong>Settings ▸ Apps ▸ Installed apps ▸ Muninn ▸ Uninstall</strong> (or Start Menu ▸
 Muninn ▸ Uninstall Muninn). That removes the program folder and its <code>PATH</code> entry; your
-data in <code>%USERPROFILE%\.muninn</code> stays.</p>
+data in <code>%USERPROFILE%\.muninn</code> stays. Windows keeps the firewall entry for <code>mnnn.exe</code>;
+remove it under <strong>Allow an app through firewall</strong> (Change settings, select <code>mnnn</code>, Remove)
+if you like.</p>
 <h3 id="windows-winget">Windows: winget</h3>
 <pre><code class="language-powershell">winget install WeirdBrains.Muninn
 </code></pre>
