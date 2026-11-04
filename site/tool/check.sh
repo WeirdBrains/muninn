@@ -7,7 +7,7 @@ html="$out/index.html"
 test -f "$html" || { echo "no $html: run jaspr build first" >&2; exit 1; }
 test -f "$out/styles.css" || { echo "no styles.css in $out" >&2; exit 1; }
 for want in '███╗   ███╗' 'https://github.com/WeirdBrains/muninn/releases' \
-  'https://github.com/WeirdBrains/muninn/tree/main/docs' 'docs/install.md' 'id="install"' 'styles.css' \
+  'href="/docs/"' 'href="/docs/install/"' 'id="install"' 'styles.css' \
   'class="hero-shot"' 'id="screenshots"' 'href="#screenshots"' 'loading="lazy"'; do
   grep -qF -- "$want" "$html" || { echo "index.html is missing: $want" >&2; exit 1; }
 done
@@ -19,6 +19,22 @@ for f in $srcs; do test -f "$out/$f" || { echo "missing image: $out/$f" >&2; exi
 if tr '\n' ' ' <"$html" | grep -oE '<img [^>]*>' | grep -v 'alt="[^"]' >/dev/null; then echo "an img has no alt text" >&2; exit 1; fi
 hero=$(tr '\n' ' ' <"$html" | grep -oE 'class="hero-shot">[[:space:]]*<img [^>]*src="[^"]+"' | grep -oE 'screenshots/[^"]+' | head -1 || true)
 [ -n "$hero" ] || { echo "no hero image under the header" >&2; exit 1; }
-pages=$(find "$out" -name '*.html' | wc -l)
-[ "$pages" -eq 1 ] || { echo "expected one page, found $pages" >&2; exit 1; }
-echo "site ok: $html ($(echo "$srcs" | wc -l) screenshots, hero $hero)"
+pages=$(find "$out" -maxdepth 1 -name '*.html' | wc -l)
+[ "$pages" -eq 1 ] || { echo "expected one front page, found $pages" >&2; exit 1; }
+# Every doc has a page (dart run tool/docs.dart), and every site link in them resolves.
+ndocs=0
+while IFS= read -r md; do
+  rel=${md#../docs/}; slug=${rel%.md}; [ "$rel" = README.md ] && slug=""
+  f="$out/docs/${slug:+$slug/}index.html"
+  test -f "$f" || { echo "no page for docs/$rel ($f): run dart run tool/docs.dart" >&2; exit 1; }
+  ndocs=$((ndocs + 1))
+done < <(find ../docs -name '*.md' -not -path '../docs/historical/*')
+while IFS= read -r l; do
+  page=${l%%:*}; h=${l#*:}; path=${h%%#*}; frag=${h#"$path"}; frag=${frag#\#}
+  f="$out$path"; case "$path" in */) f="${f}index.html" ;; esac
+  test -f "$f" || { echo "$page links $h, which is not in the build" >&2; exit 1; }
+  if [ -n "$frag" ] && [ "${f##*.}" = html ]; then
+    grep -qF "id=\"$frag\"" "$f" || { echo "$page links $h: no #$frag there" >&2; exit 1; }
+  fi
+done < <(grep -oE '(href|src)="/[^"]*"' -r "$out/docs" | sed -E 's/:(href|src)="/:/; s/"$//')
+echo "site ok: $html, $ndocs doc pages ($(echo "$srcs" | wc -l) screenshots, hero $hero)"

@@ -1,9 +1,15 @@
 # Website
 
-The Muninn website is one static page, built with [Jaspr](https://jaspr.site) (Dart) in
-`site/`. It uses the app's default theme (Tokyo Night: its colours, dark and light) and
+The Muninn website is a static front page, built with [Jaspr](https://jaspr.site) (Dart) in
+`site/`, plus these docs as pages under `/docs/`. It uses the app's default theme (Tokyo Night: its colours, dark and light) and
 the MUNINN header art, shows a hero screenshot under the header and a Screenshots section
 (one captioned shot per feature, lazy-loaded), and links the releases, the docs and the install steps.
+
+Every `docs/**/*.md` except `docs/historical` is published at `/docs/<slug>/` (`docs/README.md`
+is `/docs/`, `services/redis.md` is `/docs/services/redis/`), with a sidebar grouped like
+`docs/README.md` and an "Edit this page on GitHub" link. Links between docs point at those
+pages, screenshots at `/screenshots/`, and anything else in the repository at GitHub.
+The pages are generated from `docs/` on every build, so they never drift.
 
 | file | what |
 |------|------|
@@ -13,7 +19,8 @@ the MUNINN header art, shows a hero screenshot under the header and a Screenshot
 | `site/lib/banner.dart` | the header art (the same rows as `src/tui/header.rs`) |
 | `site/lib/main.server.dart` | the entry point: the document and its stylesheet |
 | `site/web/styles.css` | the theme colours as CSS variables, and the layout |
-| `site/tool/check.sh` | checks a build: one page, the banner, the links, the theme |
+| `site/tool/docs.dart` | publishes `docs/` as pages in `build/jaspr/docs/` (the `markdown` package, run after `jaspr build`) |
+| `site/tool/check.sh` | checks a build: the front page, the banner, the links, the theme, a page per doc and every link in them |
 
 ## Building
 
@@ -26,6 +33,7 @@ dart pub get
 dart pub global activate jaspr_cli 0.23.5
 jaspr serve          # http://localhost:8080, reloads on change
 jaspr build          # static output in site/build/jaspr
+dart run tool/docs.dart   # the docs pages, into build/jaspr/docs
 tool/check.sh
 ```
 
@@ -42,10 +50,10 @@ block. `HERO=name` picks the hero (default `pipeline-live`). It needs `chromium`
 ## Checks
 
 CI (`.github/workflows/ci.yml`, job `site`) installs Dart in the runner, checks the
-formatting, builds the site, analyzes it, runs `tool/check.sh` and keeps the built page
+formatting, builds the site and its docs pages, analyzes it, runs `tool/check.sh` and keeps the built page
 as the `site` artifact. `cargo test` (`tests/site.rs`) keeps the page honest without
 Dart: the header art matches the TUI's, the colours match `assets/themes/tokyo-night.toml`,
-every docs page it links exists, the hero and the Screenshots section and header link
+every docs page it links exists, every doc has a title and its links to other docs resolve, the hero and the Screenshots section and header link
 are there, and every screenshot the site or the README shows exists. `tool/check.sh` checks the
 same in the built page.
 
@@ -59,7 +67,7 @@ issues the Let's Encrypt certificate). The branch holds only the built page, a `
 file and `.nojekyll`. To redeploy by hand after a change:
 
 ```sh
-cd site && jaspr build && tool/check.sh && cd ..
+cd site && jaspr build && dart run tool/docs.dart && tool/check.sh && cd ..
 git worktree add /tmp/muninn-pages gh-pages
 rsync -a --delete --exclude .git --exclude CNAME --exclude .nojekyll site/build/jaspr/ /tmp/muninn-pages/
 git -C /tmp/muninn-pages add -A

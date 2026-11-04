@@ -6,10 +6,10 @@ import 'shots.dart';
 
 const repo = 'https://github.com/WeirdBrains/muninn';
 const releases = '$repo/releases';
-const docs = '$repo/tree/main/docs';
+const docs = '/docs/';
 const shotWidth = 1464;
 const shotHeight = 890;
-const installDoc = '$repo/blob/main/docs/install.md';
+const installDoc = '/docs/install/';
 
 /// The whole site: one page, no client-side code.
 class App extends StatelessComponent {
@@ -92,7 +92,7 @@ class App extends StatelessComponent {
           Component.text(
             '. Full steps, uninstalling and building from source: ',
           ),
-          a(href: installDoc, [Component.text('docs/install.md')]),
+          a(href: installDoc, [Component.text('the install guide')]),
           Component.text('.'),
         ]),
         for (final (label, cmd) in installs)
@@ -113,7 +113,9 @@ class App extends StatelessComponent {
         ul([
           for (final (name, file) in docPages)
             li([
-              a(href: '$repo/blob/main/docs/$file', [Component.text(name)]),
+              a(href: '/docs/${file.substring(0, file.length - 3)}/', [
+                Component.text(name),
+              ]),
             ]),
         ]),
         p(classes: 'muted', [
@@ -189,7 +191,7 @@ const installs = [
         '\n'
         r'Expand-Archive muninn-2.20.0-x86_64-pc-windows-gnullvm.zip $env:LOCALAPPDATA\Programs -Force'
         '\n'
-        r'# then add the folder to your user PATH and open a new terminal: see docs/install.md',
+        r'# then add the folder to your user PATH and open a new terminal: see muninn.weirdbrains.com/docs/install',
   ),
 ];
 

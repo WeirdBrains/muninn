@@ -33,8 +33,8 @@ fn the_site_links_releases_docs_and_install_steps() {
     let app = read("site/lib/app.dart");
     for want in [
         "/releases",
-        "/tree/main/docs",
-        "docs/install.md",
+        "const docs = '/docs/'",
+        "const installDoc = '/docs/install/'",
         "id: 'install'",
         "apt install",
         "dnf install",
@@ -47,6 +47,54 @@ fn the_site_links_releases_docs_and_install_steps() {
     for (_, file) in app.lines().filter_map(|l| l.trim().strip_prefix("('")).filter_map(|l| l.split_once("', '")) {
         if let Some(f) = file.strip_suffix("'),").filter(|f| f.ends_with(".md")) {
             assert!(Path::new(env!("CARGO_MANIFEST_DIR")).join("docs").join(f).exists(), "site links docs/{f}, which is missing");
+        }
+    }
+}
+
+#[test]
+fn every_doc_is_published_as_a_site_page_with_working_links() {
+    // site/tool/docs.dart publishes docs/**/*.md except docs/historical at /docs/<slug>/;
+    // links between docs must resolve to one of those pages (or leave docs/ on purpose).
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("docs");
+    let generator = read("site/tool/docs.dart");
+    assert!(generator.contains("startsWith('historical/')") && generator.contains("/docs/"), "the generator skips docs/historical and writes /docs/");
+    assert!(read("docs/website.md").contains("dart run tool/docs.dart"), "the deploy steps run the docs generator");
+    let mut docs = vec![];
+    fn walk(d: &Path, root: &Path, out: &mut Vec<String>) {
+        for e in std::fs::read_dir(d).unwrap().flatten() {
+            let p = e.path();
+            let rel = p.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
+            if p.is_dir() && rel != "historical" {
+                walk(&p, root, out);
+            } else if rel.ends_with(".md") {
+                out.push(rel);
+            }
+        }
+    }
+    walk(&root, &root, &mut docs);
+    assert!(docs.len() > 40 && docs.contains(&"install.md".to_string()) && docs.contains(&"services/redis.md".to_string()));
+    for d in &docs {
+        let text = std::fs::read_to_string(root.join(d)).unwrap();
+        assert!(text.lines().any(|l| l.starts_with("# ")), "{d} has no title (# heading) for its page");
+        let dir = Path::new(d).parent().unwrap();
+        let mut in_code = false;
+        for line in text.lines() {
+            if line.trim_start().starts_with("```") {
+                in_code = !in_code;
+            }
+            if in_code {
+                continue;
+            }
+            for (_, href) in muninn::help::inline_links(line) {
+                if href.contains("://") || href.starts_with('#') || href.starts_with("mailto:") {
+                    continue;
+                }
+                let path = href.split('#').next().unwrap();
+                if path.ends_with(".md") {
+                    let target = dir.join(path);
+                    assert!(root.join(&target).exists(), "{d} links {href}, which has no page");
+                }
+            }
         }
     }
 }

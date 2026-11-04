@@ -39,8 +39,9 @@ jobs:
           sdk: stable
       - run: dart pub get
       - run: dart pub global activate jaspr_cli 0.23.5
-      - run: dart format --output=none --set-exit-if-changed lib
+      - run: dart format --output=none --set-exit-if-changed lib tool
       - run: jaspr build
+      - run: dart run tool/docs.dart
       - run: dart analyze --fatal-infos
       - run: tool/check.sh
       - uses: actions/upload-artifact@v4
