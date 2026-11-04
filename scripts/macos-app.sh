@@ -3,7 +3,9 @@
 #   scripts/macos-app.sh
 # Environment: DIST (default dist) holds muninn-<ver>-{aarch64,x86_64}-apple-darwin.tar.gz
 # (scripts/dist.sh) and receives the .dmg. Needs only what macOS ships: lipo, sips,
-# iconutil, codesign (ad-hoc, no Developer ID) and hdiutil.
+# iconutil, codesign (ad-hoc, no Developer ID) and hdiutil. The icon comes from
+# assets/icons/muninn.svg; without rsvg-convert, set ICON_PNG to a 1024 px render of it
+# (`scripts/icons.sh png 1024 muninn-1024.png` on Linux), see assets/icons/README.md.
 #
 # The app opens Terminal running mnnn: the first time it offers to put the `mnnn` command
 # on PATH (/usr/local/bin, or ~/.local/bin when that is not writable) and sets up the keys

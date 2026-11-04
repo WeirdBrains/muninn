@@ -49,13 +49,14 @@ fn the_macos_app_is_universal_signed_and_versioned() {
 
 #[test]
 fn every_installer_icon_comes_from_the_one_source_image() {
-    let png = std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/icons/muninn.png")).unwrap();
-    assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n", "assets/icons/muninn.png must be a PNG");
-    let (w, h) = (u32::from_be_bytes(png[16..20].try_into().unwrap()), u32::from_be_bytes(png[20..24].try_into().unwrap()));
-    assert!(w == h && w >= 1024, "assets/icons/muninn.png must be square and >= 1024 px, is {w}x{h}");
+    let svg = read("assets/icons/muninn.svg");
+    assert!(svg.contains("<svg") && svg.contains("viewBox=\"0 0 512 512\""), "assets/icons/muninn.svg must be the square raven tile");
+    assert!(svg.contains("var(--muninn-bg, #1a1b26)"), "the tile keeps its Tokyo Night fallbacks");
     assert!(read("scripts/windows-setup.sh").contains("scripts/icons.sh ico"));
     assert!(read("scripts/macos-app.sh").contains("scripts/icons.sh icns"));
-    assert!(!Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/icons/muninn.ico").exists(), "muninn.ico is generated, not committed");
+    for gone in ["assets/icons/muninn.ico", "assets/icons/muninn.png"] {
+        assert!(!Path::new(env!("CARGO_MANIFEST_DIR")).join(gone).exists(), "{gone} is generated, not committed");
+    }
 }
 
 #[test]
