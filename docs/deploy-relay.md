@@ -50,8 +50,13 @@ The node's password goes in a root-only environment file that the unit reads:
 ```sh
 install -d -m 700 /etc/muninn
 install -m 600 /dev/null /etc/muninn/relay.env
-echo 'MUNINN_PASSWORD=<a long random password>' > /etc/muninn/relay.env
+echo "MUNINN_PASSWORD=$(openssl rand -hex 32)" > /etc/muninn/relay.env
+cat /etc/muninn/relay.env                 # copy the password somewhere safe
 ```
+
+This generates a random 64-character password. Save it in a password manager
+or other safe place as well: it unlocks the relay's keys, and without it (or the
+24 words from `keys init`) a restored `/var/lib/muninn` can't be opened.
 
 Then, as the service user (`sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) …`
 for each command):
