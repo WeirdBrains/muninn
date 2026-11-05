@@ -93,12 +93,37 @@ See [architecture](architecture.md) for the crate layout.
 - Mobile: TestFlight and Google Play testing tracks first, then the App Store and Play
   Store. Builds are also attached to GitHub releases (APKs, TestFlight links).
 
+## Icons
+
+The launcher icons come from the approved raven tile, `app/assets/logo/muninn-raven.svg`
+(the same file as the installers' `assets/icons/muninn.svg`, which stays the packaging
+source; a test checks they match). `app/assets/icon/` holds the renders:
+`muninn-1024.png` (the tile), `muninn-mark-1024.png` (the raven alone, Android's adaptive
+foreground on `#1a1b26`) and `muninn-256.png` (the Linux window icon, loaded from the
+bundle by `linux/runner/my_application.cc`). `flutter_launcher_icons` (config in
+`app/pubspec.yaml`) writes Android mipmaps and adaptive icon, the iOS and macOS
+AppIcon sets (iOS without alpha) and `windows/runner/resources/app_icon.ico`.
+After a logo change:
+
+```
+cd app
+rsvg-convert -w 1024 -h 1024 assets/logo/muninn-raven.svg -o assets/icon/muninn-1024.png
+rsvg-convert -w 1024 -h 1024 assets/logo/muninn-raven-mark.svg -o assets/icon/muninn-mark-1024.png
+rsvg-convert -w 256 -h 256 assets/logo/muninn-raven.svg -o assets/icon/muninn-256.png
+dart run flutter_launcher_icons
+git checkout ios/Runner.xcodeproj/project.pbxproj   # the tool rewrites a setting it shouldn't
+```
+
 ## Tests
 
 ```
 cd app && flutter analyze && flutter test
 cargo test -p muninn_ffi
 ```
+
+CI (`.github/workflows/ci.yml`, job `flutter`) runs `flutter analyze` and `flutter test` in
+`app/` on every push to main and every pull request, with Flutter 3.47.9; the tests use a
+fake API, so the job needs no Rust build.
 
 ## Failure modes
 
