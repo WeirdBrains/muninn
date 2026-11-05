@@ -49,8 +49,9 @@ jobs:
           name: site
           path: site/build/jaspr
 
-  # The Flutter app (app/): analyze and widget tests against the fake API, so no Rust build
-  # is needed here. The generated bindings in app/lib/src/rust/ are committed.
+  # The Flutter app (app/): analyze and widget tests (against a fake API). `flutter test`
+  # runs the Native Assets hook, which builds crates/muninn-ffi with the toolchain pinned in
+  # crates/muninn-ffi/rust-toolchain.toml (rustup is on the runner and installs it).
   flutter:
     runs-on: ubuntu-22.04
     defaults:
@@ -63,6 +64,9 @@ jobs:
           channel: stable
           flutter-version: 3.47.9
           cache: true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/muninn-ffi -> ../../app/.dart_tool/hooks_runner/shared/muninn/build
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
