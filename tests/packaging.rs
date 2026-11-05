@@ -131,3 +131,53 @@ fn release_sh_is_safe_in_a_shared_checkout() {
         assert!(read(s).contains("scripts/version.sh"), "{s} should read the version with scripts/version.sh");
     }
 }
+
+#[test]
+fn fill_sums_skips_missing_dmg_and_setup_exes_but_not_tarballs() {
+    let python = std::process::Command::new("python3").arg("--version").output();
+    if !python.is_ok_and(|o| o.status.success()) {
+        eprintln!("skipped: no python3");
+        return;
+    }
+    let ver = "9.9.9";
+    let dist = tempfile::tempdir().unwrap();
+    let sums = |names: &[&str]| {
+        let s: String = names.iter().enumerate().map(|(i, n)| format!("{:064x}  {n}\n", i + 1)).collect();
+        std::fs::write(dist.path().join("SHA256SUMS"), s).unwrap();
+    };
+    let run = || {
+        std::process::Command::new("python3")
+            .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/fill-sums.py"))
+            .args([ver, dist.path().to_str().unwrap()])
+            .output()
+            .unwrap()
+    };
+    let tarballs = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "aarch64-apple-darwin"]
+        .map(|t| format!("muninn-{ver}-{t}.tar.gz"));
+    let mut names: Vec<&str> = tarballs.iter().map(String::as_str).collect();
+    // only the tarballs: the cask and winget manifests are skipped with warnings
+    sums(&names);
+    let o = run();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(o.status.success(), "{err}");
+    assert!(err.contains("macos.dmg is not in SHA256SUMS; skipping the Homebrew cask"), "{err}");
+    assert!(err.contains("windows-setup.exe is not in SHA256SUMS; skipping the winget manifests"), "{err}");
+    let out = dist.path().join("packaging");
+    assert!(out.join("arch/PKGBUILD").exists() && out.join("homebrew/Formula/muninn.rb").exists());
+    assert!(!out.join("homebrew/Casks/muninn.rb").exists());
+    assert!(!out.join(format!("winget/manifests/w/WeirdBrains/Muninn/{ver}")).exists());
+    // everything there: every file, with the setup sums in the installer manifest
+    let extra =
+        [format!("muninn-{ver}-macos.dmg"), format!("muninn-{ver}-x86_64-windows-setup.exe"), format!("muninn-{ver}-aarch64-windows-setup.exe")];
+    names.extend(extra.iter().map(String::as_str));
+    sums(&names);
+    let o = run();
+    assert!(o.status.success() && !String::from_utf8_lossy(&o.stderr).contains("warning"), "{}", String::from_utf8_lossy(&o.stderr));
+    assert!(out.join("homebrew/Casks/muninn.rb").exists());
+    let inst = std::fs::read_to_string(out.join(format!("winget/manifests/w/WeirdBrains/Muninn/{ver}/WeirdBrains.Muninn.installer.yaml"))).unwrap();
+    assert!(inst.contains(&format!("{:064X}", 6)) && inst.contains(&format!("{:064X}", 7)), "{inst}");
+    // a missing tarball still fails, naming it
+    sums(&names[1..]);
+    let o = run();
+    assert!(!o.status.success() && String::from_utf8_lossy(&o.stderr).contains("x86_64-unknown-linux-gnu.tar.gz is not in"), "{o:?}");
+}

@@ -6,6 +6,9 @@ Usage: scripts/fill-sums.py [<version>] <dist-dir>
 Reads <dist-dir>/SHA256SUMS and writes into <dist-dir>/packaging/:
   arch/PKGBUILD (muninn-bin), homebrew/Formula/muninn.rb, homebrew/Casks/muninn.rb,
   winget/manifests/w/WeirdBrains/Muninn/<version>/*.yaml (ready for winget-pkgs)
+The Linux and macOS tarballs must be listed (else it fails, naming them). The macOS .dmg
+and the Windows setup.exe are built on other machines and may be missing: then the cask
+or the winget manifests are skipped with a warning.
 """
 import pathlib, re, subprocess, sys
 
@@ -22,7 +25,16 @@ for line in (dist / "SHA256SUMS").read_text().splitlines():
 out = dist / "packaging"
 
 def sha(target, ext="tar.gz"):
-    return sums[f"muninn-{ver}-{target}.{ext}"]
+    n = f"muninn-{ver}-{target}.{ext}"
+    if n not in sums:
+        sys.exit(f"fill-sums: {n} is not in {dist / 'SHA256SUMS'}")
+    return sums[n]
+
+def optional(name, skipping):
+    """The sum for an asset built elsewhere, or None with a warning."""
+    if name not in sums:
+        print(f"warning: {name} is not in SHA256SUMS; skipping {skipping}", file=sys.stderr)
+    return sums.get(name)
 
 def write(rel, text):
     p = out / rel
@@ -48,21 +60,24 @@ for i, l in enumerate(lines):
 write("homebrew/Formula/muninn.rb", "\n".join(lines) + "\n")
 
 # Homebrew cask: the universal Muninn.app dmg
-s = (root / "packaging/homebrew/Casks/muninn.rb").read_text()
-s = re.sub(r'version ".*?"', f'version "{ver}"', s, count=1)
-s = re.sub(r'sha256 ".*?"', f'sha256 "{sums[f"muninn-{ver}-macos.dmg"]}"', s, count=1)
-write("homebrew/Casks/muninn.rb", s)
+dmg = optional(f"muninn-{ver}-macos.dmg", "the Homebrew cask")
+if dmg:
+    s = (root / "packaging/homebrew/Casks/muninn.rb").read_text()
+    s = re.sub(r'version ".*?"', f'version "{ver}"', s, count=1)
+    s = re.sub(r'sha256 ".*?"', f'sha256 "{dmg}"', s, count=1)
+    write("homebrew/Casks/muninn.rb", s)
 
 # winget: newest template directory, retargeted to this version; Inno Setup installers
 wroot = "winget/manifests/w/WeirdBrains/Muninn"
 tdir = sorted((root / "packaging" / wroot).iterdir(),
               key=lambda p: [int(x) for x in p.name.split(".")])[-1]
-for f in sorted(tdir.glob("*.yaml")):
+setups = {a: optional(f"muninn-{ver}-{a}-windows-setup.exe", "the winget manifests") for a in ("x86_64", "aarch64")}
+for f in sorted(tdir.glob("*.yaml")) if all(setups.values()) else []:
     s = f.read_text().replace(tdir.name, ver)
     if "installer" in f.name:
         for arch in ("x86_64", "aarch64"):
             n = f"muninn-{ver}-{arch}-windows-setup.exe"
             s = re.sub(rf"({re.escape(n)}\n\s+InstallerSha256: )\"?[0-9a-fA-F]+\"?",
-                       rf'\g<1>"{sums[n].upper()}"', s)
+                       rf'\g<1>"{setups[arch].upper()}"', s)
         s = re.sub(r'ReleaseDate: .*', f'ReleaseDate: "{__import__("datetime").date.today()}"', s)
     write(f"{wroot}/{ver}/{f.name}", s)
