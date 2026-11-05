@@ -1,10 +1,17 @@
 # Build release binaries and packages for a pushed tag v*, then publish a GitHub Release.
+# Also runnable by hand for an existing tag: gh workflow run release.yml --ref main -f tag=vX.Y.Z
 # See docs/release.md.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and release, e.g. v2.21.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,6 +19,8 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   LLVM_MINGW: llvm-mingw-20261020-ucrt-ubuntu-22.04-x86_64
+  # The tag being released: the dispatch input, else the pushed tag.
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   unix:
@@ -27,6 +36,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -56,6 +67,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-gnullvm,aarch64-pc-windows-gnullvm
@@ -83,6 +96,8 @@ jobs:
     container: archlinux:base-devel
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/download-artifact@v5
         with:
           name: dist-${{ matrix.carch }}-unknown-linux-gnu
@@ -91,7 +106,7 @@ jobs:
         env:
           CARCH: ${{ matrix.carch }}
         run: |
-          ver="${GITHUB_REF_NAME#v}"
+          ver="${TAG#v}"
           useradd -m builder
           mkdir -p /tmp/pkg && cp dist/muninn-"$ver"-"$CARCH"-unknown-linux-gnu.tar.gz /tmp/pkg/
           sed "s/^pkgver=.*/pkgver=$ver/" packaging/arch/muninn-bin/PKGBUILD > /tmp/pkg/PKGBUILD
@@ -111,6 +126,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/download-artifact@v5
         with:
           pattern: dist-*
@@ -118,7 +135,7 @@ jobs:
           merge-multiple: true
       - name: Checksums, filled-in packaging, notes
         run: |
-          ver="${GITHUB_REF_NAME#v}"
+          ver="${TAG#v}"
           cd dist && sha256sum -- * > SHA256SUMS && cd ..
           python3 scripts/fill-sums.py "$ver" dist
           tar -czf "dist/muninn-$ver-packaging.tar.gz" -C dist packaging
@@ -131,12 +148,13 @@ jobs:
         run: |
           git fetch --force --tags origin
           top="$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
-          if [ "$top" = "$GITHUB_REF_NAME" ]; then echo "make_latest=true"; else echo "make_latest=false"; fi >> "$GITHUB_OUTPUT"
-          echo "highest tag: $top, this tag: $GITHUB_REF_NAME"
+          if [ "$top" = "$TAG" ]; then echo "make_latest=true"; else echo "make_latest=false"; fi >> "$GITHUB_OUTPUT"
+          echo "highest tag: $top, this tag: $TAG"
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           make_latest: ${{ steps.latest.outputs.make_latest }}
-          name: Muninn ${{ github.ref_name }}
+          name: Muninn ${{ inputs.tag || github.ref_name }}
           body_path: notes.md
           files: dist/*
           fail_on_unmatched_files: true
