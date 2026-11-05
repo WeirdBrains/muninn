@@ -6,6 +6,13 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Breaking: ingest stores raw data
+- `mnnn ingest` (csv, json, path, every service) and the TUI import now store what arrives as it is and make no bars. Bars come only from a pipe or pipeline you set up (`source:NAME > code:parse-csv > code:to-bars?symbol=… > model:bars`); see docs/ingest-csv.md
+- `--symbol`, `--duration`, `--map`, `--rejects`, `--delimiter`, `--quote`, `--escape`, `--no-header`, `--skip-rows` and `--records` on ingest still parse but are ignored with a warning; scripts that relied on them must add a pipeline step
+- The `import` history event's `inserted` now counts items stored, not bars; rules such as `inserted > 0` now fire when new data arrives
+- `mnnn sources remove` also deletes the source's stored data
+- Bars already in a database stay and work as before; no migration is needed
+
 ### Changed
 - Ingest stores data as it arrives and nothing more: `mnnn ingest csv|json|path`, the HTTP, Redis, SQLite and Postgres services and the TUI import keep each file, page or read byte for byte in its source (`source_data`), and never ask about symbols, bar lengths or columns or make bars. The only questions left are the password and, rarely, the source, which defaults to the folder's name (a service's host or file)
 - Bars come only from pipes and pipelines you set up: `source:NAME > code:parse-csv > code:to-bars?symbol=BTC/USDT&duration=5m > model:bars`
@@ -13,6 +20,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - The TUI import has only a source field, previews raw lines and leaves the view as it is
 - SQLite, Postgres and Redis reads are stored as NDJSON with their values' own types; each HTTP page is stored as its own item
 - The `import` history action and rules: `inserted`/`stored` count items stored, plus `bytes`
+- `fill-sums.py` (release CI) skips the Homebrew cask or winget manifests with a warning when the dmg or a setup.exe is missing; a missing tarball still fails
+- Docs: the unsigned Windows installer and SmartScreen ("More info", "Run anyway"), and winget seeming to hang at "Starting package install"
+- New tagline: "Local, encrypted workbench for market data with peer-to-peer data workflows"
 
 ### Added
 - `source:NAME` pipe and pipeline node: a source's stored items, one row each (`text name format locator received_at item source`)
@@ -21,6 +31,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - A `model:bars` save adds only bars not there yet ("N new bars, M already there"), so pipelines can run again
 - `mnnn sources data NAME` and `mnnn sources cat NAME ITEM`; `sources list` shows each source's items and bytes
 - Flutter app: the theme, time range and open dataset are saved in `preferences.toml` (shared with the TUI) and restored on launch; hovering or touching the chart shows the bar's values
+
+### Fixed
+- Windows uninstall removes exactly Muninn's folder from the user PATH (any case, trailing backslash or semicolon), keeping every other entry and the REG_EXPAND_SZ type; reinstalling never adds it twice
 
 ## [2.21.0] - 2026-11-04
 
