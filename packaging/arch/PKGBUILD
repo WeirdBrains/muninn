@@ -5,7 +5,7 @@
 # For the prebuilt binary from a published GitHub release, use muninn-bin/PKGBUILD.
 # Maintainer: Michael Christenson II <m3talsmith@gmail.com>
 pkgname=muninn
-pkgver=2.21.0
+pkgver=2.22.0
 pkgrel=1
 pkgdesc="Local, encrypted workbench for market data with peer-to-peer data workflows (mnnn)"
 arch=('x86_64' 'aarch64')

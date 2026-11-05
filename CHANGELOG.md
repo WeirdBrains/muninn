@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-11-05
+
+
 ### Breaking: ingest stores raw data
 - `mnnn ingest` (csv, json, path, every service) and the TUI import now store what arrives as it is and make no bars. Bars come only from a pipe or pipeline you set up (`source:NAME > code:parse-csv > code:to-bars?symbol=… > model:bars`); see docs/ingest-csv.md
 - `--symbol`, `--duration`, `--map`, `--rejects`, `--delimiter`, `--quote`, `--escape`, `--no-header`, `--skip-rows` and `--records` on ingest still parse but are ignored with a warning; scripts that relied on them must add a pipeline step
@@ -552,7 +555,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.21.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.22.0...HEAD
+[2.22.0]: https://github.com/WeirdBrains/muninn/compare/v2.21.0...v2.22.0
 [2.21.0]: https://github.com/WeirdBrains/muninn/compare/v2.20.1...v2.21.0
 [2.20.1]: https://github.com/WeirdBrains/muninn/compare/v2.20.0...v2.20.1
 [2.20.0]: https://github.com/WeirdBrains/muninn/compare/v2.19.0...v2.20.0
