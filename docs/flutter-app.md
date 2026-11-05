@@ -114,6 +114,23 @@ dart run flutter_launcher_icons
 git checkout ios/Runner.xcodeproj/project.pbxproj   # the tool rewrites a setting it shouldn't
 ```
 
+## Apple and Android builds (status)
+
+- **Swift Package Manager:** `rust_builder` (cargokit) only ships CocoaPods podspecs, so
+  Flutter warns that `muninn_ffi` does not support SPM and falls back to CocoaPods. A
+  hand-written `Package.swift` can't run cargo (SwiftPM plugins are sandboxed), so the
+  path to SPM is flutter_rust_bridge's Native Assets backend
+  (`flutter_rust_bridge_codegen integrate --integration-backend native-assets`, then
+  remove `rust_builder/`), which replaces cargokit on every platform and needs testing on
+  each.
+- **Disk:** a debug macOS build of `muninn_ffi` needs about 10 GB of Rust build output;
+  free at least 25 GB before building macOS, iOS and Android on one Mac.
+- **Flutter version:** the app needs Flutter 3.47.9 (Dart 3.13.7) or newer.
+- **Android SDK on Linux:** install the command-line tools, then
+  `sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"`,
+  `flutter config --android-sdk ~/Android/Sdk`, `flutter doctor --android-licenses`, and
+  `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android`.
+
 ## Tests
 
 ```
