@@ -10,26 +10,76 @@ import '../api.dart';
 import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 
-class BarChart extends StatelessWidget {
+/// Hovering (or touching / dragging on a phone) shows that bar's values in the header row.
+class BarChart extends StatefulWidget {
   const BarChart({super.key, required this.bars});
   final List<BarPoint> bars;
+  @override
+  State<BarChart> createState() => _BarChartState();
+}
+
+/// The one-line value readout for a bar (also used by tests).
+String barReadout(BarPoint b) {
+  String n(double v) => v.toStringAsPrecision(6);
+  return '${fmtUtc(b.ts)} UTC  O ${n(b.open)}  H ${n(b.high)}  L ${n(b.low)}  C ${n(b.close)}  V ${n(b.volume)}';
+}
+
+class _BarChartState extends State<BarChart> {
+  int? _hover;
+
+  void _at(double dx, double width) {
+    final bars = widget.bars;
+    if (bars.isEmpty || width <= 0) return;
+    final i = (dx / width * bars.length).floor().clamp(0, bars.length - 1);
+    if (i != _hover) setState(() => _hover = i);
+  }
+
+  void _clear() {
+    if (_hover != null) setState(() => _hover = null);
+  }
+
+  @override
+  void didUpdateWidget(BarChart old) {
+    super.didUpdateWidget(old);
+    if (old.bars != widget.bars) _hover = null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final m = context.muninn;
+    final bars = widget.bars;
     if (bars.isEmpty) return Center(child: Text('No bars in this time range', style: TextStyle(color: m.muted)));
     final hi = bars.map((b) => b.high).reduce(math.max);
     final lo = bars.map((b) => b.low).reduce(math.min);
     final label = TextStyle(color: m.muted, fontSize: 11);
+    final h = _hover == null || _hover! >= bars.length ? null : bars[_hover!];
     return Semantics(
       label: 'Price chart, ${bars.length} bars',
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Text(hi.toStringAsPrecision(6), style: label),
-          const Spacer(),
-          Text('${bars.length} bars', style: label),
-        ]),
-        Expanded(child: CustomPaint(painter: BarChartPainter(bars, m), size: Size.infinite)),
+        h == null
+            ? Row(children: [
+                Text(hi.toStringAsPrecision(6), style: label),
+                const Spacer(),
+                Text('${bars.length} bars', style: label),
+              ])
+            : Text(barReadout(h),
+                key: const ValueKey('bar-readout'),
+                style: label.copyWith(color: h.close >= h.open ? m.up : m.down),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (_, box) => MouseRegion(
+              onHover: (e) => _at(e.localPosition.dx, box.maxWidth),
+              onExit: (_) => _clear(),
+              child: GestureDetector(
+                onTapDown: (e) => _at(e.localPosition.dx, box.maxWidth),
+                onHorizontalDragUpdate: (e) => _at(e.localPosition.dx, box.maxWidth),
+                child: CustomPaint(painter: BarChartPainter(bars, m, hover: _hover), size: Size.infinite),
+              ),
+            ),
+          ),
+        ),
         Row(children: [
           Text(lo.toStringAsPrecision(6), style: label),
           const Spacer(),
@@ -45,9 +95,11 @@ class BarChart extends StatelessWidget {
 }
 
 class BarChartPainter extends CustomPainter {
-  BarChartPainter(this.bars, this.c);
+  BarChartPainter(this.bars, this.c, {this.hover});
   final List<BarPoint> bars;
   final MuninnColors c;
+  /// The bar under the pointer: a vertical guide is drawn through it.
+  final int? hover;
 
   /// Candles need at least this many pixels each.
   static const minCandle = 3.0;
@@ -104,10 +156,17 @@ class BarChartPainter extends CustomPainter {
         canvas.drawRect(Rect.fromLTWH(i * w, size.height - h, math.max(w - 1, 1), h), vp);
       }
     }
+    final hv = hover;
+    if (hv != null && hv >= 0 && hv < bars.length) {
+      final x = hv * w + w / 2;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()
+        ..color = c.muted
+        ..strokeWidth = 1);
+    }
   }
 
   @override
-  bool shouldRepaint(BarChartPainter old) => old.bars != bars || old.c != c;
+  bool shouldRepaint(BarChartPainter old) => old.bars != bars || old.c != c || old.hover != hover;
 }
 
 /// The list form of the same bars (View ▸ Change view).

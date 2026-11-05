@@ -255,11 +255,11 @@ Future<void> showLater(BuildContext context, String what, String cli) => showDia
       ),
     );
 
-/// Forget the key and the data shown.
+/// Forget the key and the data shown. The selected dataset key stays (it is saved in
+/// preferences and reopens after the next unlock); nothing is shown while locked.
 void lockStore(WidgetRef ref) {
   ref.read(apiProvider).lock();
   ref.read(unlockedProvider.notifier).state = false;
-  ref.read(selectedDatasetProvider.notifier).state = null;
   ref.read(selectedProjectProvider.notifier).state = null;
 }
 

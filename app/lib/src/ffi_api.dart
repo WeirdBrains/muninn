@@ -7,6 +7,7 @@ import 'api.dart';
 import 'rust/api/about.dart' as r_about;
 import 'rust/api/data.dart' as r_data;
 import 'rust/api/info.dart' as r_info;
+import 'rust/api/prefs.dart' as r_prefs;
 import 'rust/api/themes.dart' as r_themes;
 
 class FfiMuninnApi implements MuninnApi {
@@ -50,6 +51,22 @@ class FfiMuninnApi implements MuninnApi {
     final c = await r_themes.currentTheme(home: home);
     return (name: c.name, mode: c.mode);
   }
+
+  @override
+  Future<SavedState> savedState() async {
+    final s = await r_prefs.savedState(home: home);
+    return SavedState(theme: s.theme, mode: s.mode, range: TimeRange(from: s.from?.toInt(), to: s.to?.toInt()), dataset: s.dataset);
+  }
+
+  @override
+  Future<void> saveTheme(String name) => r_prefs.saveTheme(home: home, name: name);
+  @override
+  Future<void> saveThemeMode(String mode) => r_prefs.saveThemeMode(home: home, mode: mode);
+  @override
+  Future<void> saveTimeRange(TimeRange r) => r_prefs.saveTimeRange(
+      home: home, from: r.from == null ? null : PlatformInt64Util.from(r.from!), to: r.to == null ? null : PlatformInt64Util.from(r.to!));
+  @override
+  Future<void> saveDataset(String? key) => r_prefs.saveDataset(home: home, key: key);
 
   @override
   Future<DataDir> dataDir() async {

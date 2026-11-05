@@ -90,12 +90,28 @@ class Overview {
   final List<Dataset> datasets;
 }
 
+/// What the app restores on launch from preferences.toml (shared with the TUI).
+class SavedState {
+  const SavedState({this.theme = 'tokyo-night', this.mode = 'system', this.range = TimeRange.all, this.dataset});
+  final String theme, mode;
+  final TimeRange range;
+  final String? dataset;
+}
+
 abstract class MuninnApi {
   About about();
   Future<List<String>> listThemes();
   Future<MuninnTheme> loadTheme(String name, String variant);
   Future<({String name, String mode})> currentTheme();
   Future<DataDir> dataDir();
+  /// The saved theme, mode, time range and dataset (read-only; never creates the file).
+  Future<SavedState> savedState();
+  /// Like `mnnn theme set` / `mnnn theme mode`: written to preferences.toml.
+  Future<void> saveTheme(String name);
+  Future<void> saveThemeMode(String mode);
+  /// The TUI's saved time range (`[tui.sidebar.filters]`).
+  Future<void> saveTimeRange(TimeRange range);
+  Future<void> saveDataset(String? key);
   /// Unlock with the Muninn password; the key stays in Rust. Throws on a wrong password.
   Future<void> unlock(String password);
   void lock();

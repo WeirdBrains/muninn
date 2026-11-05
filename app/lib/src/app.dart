@@ -18,12 +18,30 @@ class _MuninnAppState extends ConsumerState<MuninnApp> with WidgetsBindingObserv
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _brightness();
+      final api = ref.read(apiProvider);
       try {
-        final c = await ref.read(apiProvider).currentTheme();
+        final s = await api.savedState();
+        if (!mounted) return;
         ref.read(themeSelectionProvider.notifier)
-          ..set(c.name)
-          ..setMode(c.mode);
+          ..set(s.theme)
+          ..setMode(s.mode);
+        ref.read(timeRangeProvider.notifier).state = s.range;
+        ref.read(selectedDatasetProvider.notifier).state = s.dataset;
       } catch (_) {/* defaults stay */}
+      if (!mounted) return;
+      // From here on every change is saved, whichever picker made it (desktop menus, phone sheet,
+      // Shift+T, Projects): preferences.toml is shared with the TUI.
+      void save(Future<void> Function() f) => f().catchError((_) {});
+      ref.listenManual(themeSelectionProvider, (a, b) {
+        if (a?.name != b.name) save(() => api.saveTheme(b.name));
+        if (a?.mode != b.mode) save(() => api.saveThemeMode(b.mode));
+      });
+      ref.listenManual(timeRangeProvider, (a, b) {
+        if (a != b) save(() => api.saveTimeRange(b));
+      });
+      ref.listenManual(selectedDatasetProvider, (a, b) {
+        if (a != b) save(() => api.saveDataset(b));
+      });
     });
   }
 

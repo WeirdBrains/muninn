@@ -23,8 +23,8 @@ class ThemeSelection {
       };
 }
 
-/// The theme in use. Starts from the TUI's preferences; switching here is for this session
-/// (the app never rewrites preferences.toml in this phase).
+/// The theme in use. Restored from preferences.toml on launch and saved there on change
+/// (see MuninnApp), the same `[theme]` the TUI and `mnnn theme` use.
 class ThemeSelectionNotifier extends Notifier<ThemeSelection> {
   @override
   ThemeSelection build() => const ThemeSelection('tokyo-night', 'system');

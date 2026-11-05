@@ -35,6 +35,19 @@ class FakeApi implements MuninnApi {
   @override
   Future<DataDir> dataDir() async => const DataDir(home: '/tmp/muninn-test', database: '/tmp/muninn-test/storage/muninn.database', databaseExists: true, keysInitialized: true);
 
+  SavedState saved = const SavedState(mode: 'dark');
+  final saves = <String>[];
+  @override
+  Future<SavedState> savedState() async => saved;
+  @override
+  Future<void> saveTheme(String name) async => saves.add('theme=$name');
+  @override
+  Future<void> saveThemeMode(String mode) async => saves.add('mode=$mode');
+  @override
+  Future<void> saveTimeRange(TimeRange r) async => saves.add('range=${r.from}..${r.to}');
+  @override
+  Future<void> saveDataset(String? key) async => saves.add('dataset=$key');
+
   bool unlocked = false;
   final queries = <TimeRange>[];
 

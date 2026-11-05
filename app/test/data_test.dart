@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,6 +56,17 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byType(BarChart), findsOneWidget);
     expect(find.text('50 bars'), findsOneWidget);
+    // hover readout: pointer over the chart shows that bar's values, leaving restores the header
+    final g = await t.createGesture(kind: PointerDeviceKind.mouse);
+    await g.addPointer(location: Offset.zero);
+    addTearDown(g.removePointer);
+    await g.moveTo(t.getTopLeft(find.byType(CustomPaint).last) + const Offset(2, 20));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('bar-readout')), findsOneWidget);
+    expect(find.textContaining('O '), findsOneWidget);
+    await g.moveTo(Offset.zero);
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('bar-readout')), findsNothing);
     await t.tap(find.text('List'));
     await t.pumpAndSettle();
     expect(find.byType(BarTable), findsOneWidget);
