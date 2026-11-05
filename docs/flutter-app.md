@@ -15,8 +15,14 @@ flutter run -d linux                          # desktop, uses MUNINN_HOME or ~/.
 MUNINN_HOME=/tmp/mnnn-demo flutter run -d linux   # a scratch data dir
 ```
 
-The first build compiles `crates/muninn-ffi` with cargo (cargokit, in
-`app/rust_builder/`). Users never need Rust: release builds ship the compiled library.
+The first build compiles `crates/muninn-ffi` with cargo through Dart **Native Assets**:
+`app/hook/build.dart` (flutter_rust_bridge_hooks) builds the crate for the target
+platform and Flutter bundles the library, on every platform, with no cargokit and no
+CocoaPods (iOS/macOS use Swift Package Manager). The Rust version and the targets come
+from `crates/muninn-ffi/rust-toolchain.toml` (pinned; rustup installs it on first use;
+it applies only inside that directory, so the workspace keeps its own toolchain). The
+build output lives in `app/.dart_tool/hooks_runner/` (delete it to reclaim space).
+Users never need Rust: release builds ship the compiled library.
 
 ## What it does
 
@@ -116,13 +122,8 @@ git checkout ios/Runner.xcodeproj/project.pbxproj   # the tool rewrites a settin
 
 ## Apple and Android builds (status)
 
-- **Swift Package Manager:** `rust_builder` (cargokit) only ships CocoaPods podspecs, so
-  Flutter warns that `muninn_ffi` does not support SPM and falls back to CocoaPods. A
-  hand-written `Package.swift` can't run cargo (SwiftPM plugins are sandboxed), so the
-  path to SPM is flutter_rust_bridge's Native Assets backend
-  (`flutter_rust_bridge_codegen integrate --integration-backend native-assets`, then
-  remove `rust_builder/`), which replaces cargokit on every platform and needs testing on
-  each.
+- **Swift Package Manager:** the Rust library is a native asset, so there is no plugin
+  needing a `Package.swift` or podspec; the old cargokit `rust_builder/` is gone.
 - **Disk:** a debug macOS build of `muninn_ffi` needs about 10 GB of Rust build output;
   free at least 25 GB before building macOS, iOS and Android on one Mac.
 - **Flutter version:** the app needs Flutter 3.47.9 (Dart 3.13.7) or newer.
@@ -140,11 +141,12 @@ cargo test -p muninn_ffi
 
 CI (`.github/workflows/ci.yml`, job `flutter`) runs `flutter analyze` and `flutter test` in
 `app/` on every push to main and every pull request, with Flutter 3.47.9; the tests use a
-fake API, so the job needs no Rust build.
+fake API; the Native Assets hook builds the Rust library first, so the job installs the pinned toolchain.
 
 ## Failure modes
 
 - *Wrong key or not a muninn database*: the password is wrong.
 - *No store yet*: run `mnnn keys init` first (in a scratch `MUNINN_HOME` to try it out).
-- Building needs cargo the first time; a missing toolchain stops `flutter run` with a
-  cargokit error.
+- Building needs rustup the first time; a missing toolchain or target stops
+  `flutter run` with "Building native assets failed" (details in
+  `app/.dart_tool/hooks_runner/muninn/*/stderr.txt`).
