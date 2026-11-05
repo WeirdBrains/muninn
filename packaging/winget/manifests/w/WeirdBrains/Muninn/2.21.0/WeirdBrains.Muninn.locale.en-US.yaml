@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
 PackageIdentifier: WeirdBrains.Muninn
-PackageVersion: 2.20.1
+PackageVersion: 2.21.0
 PackageLocale: en-US
 Publisher: WeirdBrains
 PublisherUrl: https://github.com/WeirdBrains
@@ -17,6 +17,6 @@ Tags:
   - market-data
   - sqlite
   - cli
-ReleaseNotesUrl: https://github.com/WeirdBrains/muninn/releases/tag/v2.20.1
+ReleaseNotesUrl: https://github.com/WeirdBrains/muninn/releases/tag/v2.21.0
 ManifestType: defaultLocale
 ManifestVersion: 1.9.0

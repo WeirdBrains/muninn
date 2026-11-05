@@ -6,6 +6,15 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.21.0] - 2026-11-04
+
+### Added
+- Flutter desktop and mobile app in `app/` (`flutter run -d linux`): the shared themes, the TUI's menus, a phone layout with bottom navigation, and a read-only Home of projects and datasets
+
+### Changed
+- Cargo workspace: the `muninn-core` library and `muninn_ffi` for the app; `mnnn` is unchanged
+- About Muninn comes from one place for the TUI, the app and the site
+
 ## [2.20.1] - 2026-11-04
 
 ### Added
@@ -514,7 +523,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.20.1...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.21.0...HEAD
+[2.21.0]: https://github.com/WeirdBrains/muninn/compare/v2.20.1...v2.21.0
 [2.20.1]: https://github.com/WeirdBrains/muninn/compare/v2.20.0...v2.20.1
 [2.20.0]: https://github.com/WeirdBrains/muninn/compare/v2.19.0...v2.20.0
 [2.19.0]: https://github.com/WeirdBrains/muninn/compare/v2.18.0...v2.19.0

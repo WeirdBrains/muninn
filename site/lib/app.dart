@@ -13,7 +13,7 @@ const installDoc = '/docs/install/';
 const homepage = 'https://muninn.weirdbrains.com';
 
 /// The released version (scripts/release.sh bumps it; tests/site.rs checks it).
-const version = '2.20.1';
+const version = '2.21.0';
 
 /// The whole site: one page, no client-side code.
 class App extends StatelessComponent {
@@ -194,19 +194,19 @@ const features = [
 const installs = [
   (
     'Windows (setup.exe)',
-    'Download muninn-2.20.1-x86_64-windows-setup.exe from the release and run it.\nSmartScreen: More info, then Run anyway. Firewall prompt: Allow for peer-to-peer.\nOr: winget install WeirdBrains.Muninn',
+    'Download muninn-2.21.0-x86_64-windows-setup.exe from the release and run it.\nSmartScreen: More info, then Run anyway. Firewall prompt: Allow for peer-to-peer.\nOr: winget install WeirdBrains.Muninn',
   ),
   (
     'macOS (dmg)',
-    'Download muninn-2.20.1-macos.dmg, drag Muninn to Applications,\nthen right-click Muninn and choose Open the first time.',
+    'Download muninn-2.21.0-macos.dmg, drag Muninn to Applications,\nthen right-click Muninn and choose Open the first time.',
   ),
   ('Homebrew (macOS, Linux)', 'brew install weirdbrains/tap/muninn'),
-  ('Debian / Ubuntu', 'sudo apt install ./muninn_2.20.1-1_amd64.deb'),
-  ('Fedora', 'sudo dnf install ./muninn-2.20.1-1.x86_64.rpm'),
-  ('Arch Linux', 'sudo pacman -U muninn-bin-2.20.1-1-x86_64.pkg.tar.zst'),
+  ('Debian / Ubuntu', 'sudo apt install ./muninn_2.21.0-1_amd64.deb'),
+  ('Fedora', 'sudo dnf install ./muninn-2.21.0-1.x86_64.rpm'),
+  ('Arch Linux', 'sudo pacman -U muninn-bin-2.21.0-1-x86_64.pkg.tar.zst'),
   (
     'Release tarball (Linux, macOS)',
-    'tar -xzf muninn-2.20.1-x86_64-unknown-linux-gnu.tar.gz\nmkdir -p ~/.local/bin\ninstall -m755 muninn-2.20.1-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn',
+    'tar -xzf muninn-2.21.0-x86_64-unknown-linux-gnu.tar.gz\nmkdir -p ~/.local/bin\ninstall -m755 muninn-2.21.0-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn',
   ),
 ];
 

@@ -2,7 +2,7 @@
 # github.com/WeirdBrains/homebrew-tap as Casks/muninn.rb:
 #   brew install --cask weirdbrains/tap/muninn   (scripts/fill-sums.py fills in the sum)
 cask "muninn" do
-  version "2.20.1"
+  version "2.21.0"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
 
   url "https://github.com/WeirdBrains/muninn/releases/download/v#{version}/muninn-#{version}-macos.dmg"
