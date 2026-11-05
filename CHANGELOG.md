@@ -20,6 +20,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - parse-csv options `delimiter`, `quote`, `header=false`, `skip_rows`; parse-json `records`; to-bars options `symbol`, `source`, `duration`, `map`, `rejects=fail`, `drop_zero_volume`, `check=false`, with rejected rows as a second `Rejected` table
 - A `model:bars` save adds only bars not there yet ("N new bars, M already there"), so pipelines can run again
 - `mnnn sources data NAME` and `mnnn sources cat NAME ITEM`; `sources list` shows each source's items and bytes
+- Flutter app: the theme, time range and open dataset are saved in `preferences.toml` (shared with the TUI) and restored on launch; hovering or touching the chart shows the bar's values
 
 ## [2.21.0] - 2026-11-04
 

@@ -27,7 +27,8 @@ The first build compiles `crates/muninn-ffi` with cargo (cargokit, in
   More), 48 px+ targets, safe areas, theme as a bottom sheet; nothing is hover-only.
 - **Themes:** every theme from `assets/themes/*.toml` plus your own in `<home>/themes/`,
   light, dark or system (Theme menu, or the palette button on phones). The app starts on
-  the theme in `preferences.toml`; switching in the app lasts for the session.
+  the theme in `preferences.toml` and saves your choice there (`[theme]`, the same as
+  `mnnn theme set` / `mnnn theme mode`), so the TUI and the app follow each other.
 - **Unlock:** Home, Data and Projects ask for the Muninn password once per session. The
   key stays in Rust memory (never in Dart, never on disk); **File ▸ Lock** forgets it.
   The store is opened **read-only** (no migrations, no writes).
@@ -43,7 +44,13 @@ The first build compiles `crates/muninn-ffi` with cargo (cargokit, in
   show it (`from …` / `to …`, × removes an end); click **Time range**, press `T`, or use
   **Data ▸ Filters ▸ Time range…** to open the picker: a date and a time (UTC) for
   *from* and *to*, either end left open. **Clear** (or **Data ▸ Filters ▸ Clear time
-  range**) shows everything. Datasets with no bars in the range are hidden.
+  range**) shows everything. Datasets with no bars in the range are hidden. The range is
+  saved as the TUI's sidebar filter (`[tui.sidebar.filters]` from/to), so it is shared.
+- **Saved state:** the theme, the time range and the dataset open in Data
+  (`[app] dataset`) are restored on launch. Locking keeps the dataset; it shows again
+  after the next unlock. Reading never creates `preferences.toml`; the first change does.
+- **Chart readout:** hover over the chart (or touch / drag on a phone) to show that bar's
+  time, open, high, low, close and volume above it; a guide line marks the bar.
 - **Projects:** pick a project to see the series saved in it (`mnnn project add`);
   opening one shows it in Data with the project's saved time range. Read-only for now.
 - **About** (Help ▸ About Muninn): the same text as the TUI's About box, from

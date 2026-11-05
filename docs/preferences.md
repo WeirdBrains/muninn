@@ -48,6 +48,7 @@ A `version` key records the file's format; older files are upgraded on load (2.9
 | `tui.sidebar_collapsed` | `false` | start with the sidebar hidden |
 | `tui.history_open` | `false` | show the [history](history.md) bar on the left |
 | `tui.sidebar` | | [sidebar](sidebar.md) sort (`sort`, `desc`) and `filters` (sources, durations, years, price metric/min/max) |
+| `app.dataset` | unset | the dataset open in the [Flutter app](flutter-app.md)'s Data view, `source:BASE/QUOTE:seconds`; written only when set. The app also saves `theme.*` and the time range in `tui.sidebar.filters` (`from`, `to`), shared with the TUI |
 | `tui.import_recent` | `[]` | recently imported folders ([import](import.md)) |
 | `tui.import_bookmarks` | `[]` | bookmarked import folders (Places) |
 | `net.label` | `""` | how the node introduces itself (empty: the current author) ([network](network.md)) |
