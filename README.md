@@ -1,7 +1,7 @@
 # Muninn (`mnnn`)
 
-Local, encrypted store for OHLCV market bars. Ingest from CSV, JSON, HTTP APIs,
-Redis, SQLite and Postgres; export to CSV, Parquet or JSON; browse it in a TUI.
+Local, encrypted workbench for market data with peer-to-peer data workflows. Ingest from CSV, JSON,
+HTTP APIs, Redis, SQLite and Postgres; export to CSV, Parquet or JSON; browse it in a TUI.
 
 Data lives in `~/.muninn` (override with `MUNINN_HOME` or `--home`), in a
 SQLCipher database protected by an envelope key scheme (see `docs/encryption.md`).

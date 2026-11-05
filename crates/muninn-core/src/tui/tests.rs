@@ -95,7 +95,7 @@ fn menu_opens_with_f10_alt_and_mouse() {
     let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuItem(0, 3)).unwrap();
     a.on_mouse(click(r.x + 2, r.y));
     assert_eq!(a.last_action, Some(Action::About));
-    assert!(screen_text(&mut a).contains("Local, encrypted store"));
+    assert!(screen_text(&mut a).contains("Local, encrypted workbench"));
 }
 
 #[test]

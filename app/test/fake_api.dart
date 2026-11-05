@@ -15,7 +15,7 @@ class FakeApi implements MuninnApi {
 
   @override
   About about() => const About(
-        name: 'Muninn', version: '2.21.0', tagline: 'Local, encrypted store for OHLCV market bars.',
+        name: 'Muninn', version: '2.21.0', tagline: 'Local, encrypted workbench for market data with peer-to-peer data workflows.',
         motto: "Odin's raven of memory: it remembers every bar.", publisher: 'WeirdBrains',
         homepage: 'https://muninn.weirdbrains.com', repository: 'https://github.com/WeirdBrains/muninn',
         license: 'BSD-3-Clause', copyright: '© 2026', credits: []);

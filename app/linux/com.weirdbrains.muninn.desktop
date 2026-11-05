@@ -2,7 +2,7 @@
 Type=Application
 Name=Muninn
 GenericName=Market data store
-Comment=Local, encrypted store for OHLCV market bars
+Comment=Local, encrypted workbench for market data with peer-to-peer data workflows
 Exec=muninn
 Icon=com.weirdbrains.muninn
 Categories=Office;Finance;
