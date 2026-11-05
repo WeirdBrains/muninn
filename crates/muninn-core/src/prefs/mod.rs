@@ -112,6 +112,9 @@ pub struct Preferences {
     /// The MCP server over HTTP (`mnnn mcp serve --http`, `[mcp]`); written only when set.
     #[serde(default, skip_serializing_if = "McpPrefs::is_default")]
     pub mcp: McpPrefs,
+    /// The Flutter app (see [`AppPrefs`]).
+    #[serde(default, skip_serializing_if = "AppPrefs::is_default")]
+    pub app: AppPrefs,
 }
 
 /// `mnnn mcp serve --http` settings; command-line flags override them.
@@ -143,7 +146,24 @@ impl Default for Preferences {
             net: NetPrefs::default(),
             hosting: HostingPrefs::default(),
             mcp: McpPrefs::default(),
+            app: AppPrefs::default(),
         }
+    }
+}
+
+/// The graphical app's own state (`[app]`); the theme and the time range are shared with the
+/// TUI through `[theme]` and `[tui.sidebar.filters]`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct AppPrefs {
+    /// The dataset open in the Data view, `source:BASE/QUOTE:duration_s`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dataset: Option<String>,
+}
+
+impl AppPrefs {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
     }
 }
 

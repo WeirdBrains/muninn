@@ -6,6 +6,7 @@
 import 'api/about.dart';
 import 'api/data.dart';
 import 'api/info.dart';
+import 'api/prefs.dart';
 import 'api/themes.dart';
 
 import 'dart:async';
@@ -72,7 +73,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -975379836;
+  int get rustContentHash => -43808503;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -124,6 +125,20 @@ abstract class RustLibApi extends BaseApi {
     PlatformInt64? to,
     required int maxPoints,
   });
+
+  Future<void> crateApiPrefsSaveDataset({String? home, String? key});
+
+  Future<void> crateApiPrefsSaveTheme({String? home, required String name});
+
+  Future<void> crateApiPrefsSaveThemeMode({String? home, required String mode});
+
+  Future<void> crateApiPrefsSaveTimeRange({
+    String? home,
+    PlatformInt64? from,
+    PlatformInt64? to,
+  });
+
+  Future<SavedState> crateApiPrefsSavedState({String? home});
 
   Future<void> crateApiDataUnlock({String? home, required String password});
 
@@ -490,6 +505,162 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<void> crateApiPrefsSaveDataset({String? home, String? key}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_opt_String(key, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 13,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPrefsSaveDatasetConstMeta,
+        argValues: [home, key],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrefsSaveDatasetConstMeta =>
+      const TaskConstMeta(debugName: "save_dataset", argNames: ["home", "key"]);
+
+  @override
+  Future<void> crateApiPrefsSaveTheme({String? home, required String name}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(name, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 14,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPrefsSaveThemeConstMeta,
+        argValues: [home, name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrefsSaveThemeConstMeta =>
+      const TaskConstMeta(debugName: "save_theme", argNames: ["home", "name"]);
+
+  @override
+  Future<void> crateApiPrefsSaveThemeMode({
+    String? home,
+    required String mode,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(mode, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 15,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPrefsSaveThemeModeConstMeta,
+        argValues: [home, mode],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrefsSaveThemeModeConstMeta => const TaskConstMeta(
+    debugName: "save_theme_mode",
+    argNames: ["home", "mode"],
+  );
+
+  @override
+  Future<void> crateApiPrefsSaveTimeRange({
+    String? home,
+    PlatformInt64? from,
+    PlatformInt64? to,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_opt_box_autoadd_i_64(from, serializer);
+          sse_encode_opt_box_autoadd_i_64(to, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPrefsSaveTimeRangeConstMeta,
+        argValues: [home, from, to],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrefsSaveTimeRangeConstMeta => const TaskConstMeta(
+    debugName: "save_time_range",
+    argNames: ["home", "from", "to"],
+  );
+
+  @override
+  Future<SavedState> crateApiPrefsSavedState({String? home}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_saved_state,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPrefsSavedStateConstMeta,
+        argValues: [home],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrefsSavedStateConstMeta =>
+      const TaskConstMeta(debugName: "saved_state", argNames: ["home"]);
+
+  @override
   Future<void> crateApiDataUnlock({String? home, required String password}) {
     return handler.executeNormal(
       NormalTask(
@@ -500,7 +671,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 18,
             port: port_,
           );
         },
@@ -524,7 +695,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -751,6 +922,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       name: dco_decode_String(arr[2]),
       description: dco_decode_String(arr[3]),
       updatedAt: dco_decode_i_64(arr[4]),
+    );
+  }
+
+  @protected
+  SavedState dco_decode_saved_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return SavedState(
+      theme: dco_decode_String(arr[0]),
+      mode: dco_decode_String(arr[1]),
+      from: dco_decode_opt_box_autoadd_i_64(arr[2]),
+      to: dco_decode_opt_box_autoadd_i_64(arr[3]),
+      dataset: dco_decode_opt_String(arr[4]),
     );
   }
 
@@ -1105,6 +1291,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SavedState sse_decode_saved_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_theme = sse_decode_String(deserializer);
+    var var_mode = sse_decode_String(deserializer);
+    var var_from = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_to = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_dataset = sse_decode_opt_String(deserializer);
+    return SavedState(
+      theme: var_theme,
+      mode: var_mode,
+      from: var_from,
+      to: var_to,
+      dataset: var_dataset,
+    );
+  }
+
+  @protected
   ThemeChoice sse_decode_theme_choice(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_name = sse_decode_String(deserializer);
@@ -1405,6 +1608,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.name, serializer);
     sse_encode_String(self.description, serializer);
     sse_encode_i_64(self.updatedAt, serializer);
+  }
+
+  @protected
+  void sse_encode_saved_state(SavedState self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.theme, serializer);
+    sse_encode_String(self.mode, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.from, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.to, serializer);
+    sse_encode_opt_String(self.dataset, serializer);
   }
 
   @protected

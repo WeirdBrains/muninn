@@ -6,6 +6,7 @@
 import 'api/about.dart';
 import 'api/data.dart';
 import 'api/info.dart';
+import 'api/prefs.dart';
 import 'api/themes.dart';
 
 import 'dart:async';
@@ -95,6 +96,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProjectSummary dco_decode_project_summary(dynamic raw);
+
+  @protected
+  SavedState dco_decode_saved_state(dynamic raw);
 
   @protected
   ThemeChoice dco_decode_theme_choice(dynamic raw);
@@ -193,6 +197,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProjectSummary sse_decode_project_summary(SseDeserializer deserializer);
+
+  @protected
+  SavedState sse_decode_saved_state(SseDeserializer deserializer);
 
   @protected
   ThemeChoice sse_decode_theme_choice(SseDeserializer deserializer);
@@ -322,6 +329,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     ProjectSummary self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_saved_state(SavedState self, SseSerializer serializer);
 
   @protected
   void sse_encode_theme_choice(ThemeChoice self, SseSerializer serializer);

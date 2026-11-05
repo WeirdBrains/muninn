@@ -3,6 +3,7 @@
 pub mod about;
 pub mod data;
 pub mod info;
+pub mod prefs;
 pub mod themes;
 
 #[flutter_rust_bridge::frb(init)]
