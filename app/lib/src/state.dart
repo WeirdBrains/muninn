@@ -49,13 +49,46 @@ final resolvedThemeProvider = FutureProvider<MuninnTheme>((ref) {
 
 final dataDirProvider = FutureProvider<DataDir>((ref) => ref.watch(apiProvider).dataDir());
 
-/// The password the user typed this session (memory only, never stored).
-final passwordProvider = StateProvider<String?>((ref) => null);
+/// True once the store is unlocked this session (the key lives in Rust memory only).
+final unlockedProvider = StateProvider<bool>((ref) => false);
 
 final overviewProvider = FutureProvider<Overview?>((ref) {
-  final pw = ref.watch(passwordProvider);
-  if (pw == null) return Future.value(null);
-  return ref.watch(apiProvider).overview(pw);
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).overview();
+});
+
+/// The global time range: like `T` in the TUI it scopes every view.
+final timeRangeProvider = StateProvider<TimeRange>((ref) => TimeRange.all);
+
+/// The dataset shown in the Data view (by [Dataset.key]).
+final selectedDatasetProvider = StateProvider<String?>((ref) => null);
+
+/// Data view: chart or list (View ▸ Change view, like `Ctrl-w t`).
+final dataAsChartProvider = StateProvider<bool>((ref) => true);
+
+final selectedDatasetValueProvider = Provider<Dataset?>((ref) {
+  final key = ref.watch(selectedDatasetProvider);
+  final o = ref.watch(overviewProvider).value;
+  if (key == null || o == null) return null;
+  for (final d in o.datasets) {
+    if (d.key == key) return d;
+  }
+  return null;
+});
+
+final barsProvider = FutureProvider<List<BarPoint>?>((ref) {
+  final d = ref.watch(selectedDatasetValueProvider);
+  final r = ref.watch(timeRangeProvider);
+  if (d == null) return Future.value(null);
+  return ref.watch(apiProvider).queryBars(d, r);
+});
+
+final selectedProjectProvider = StateProvider<Project?>((ref) => null);
+
+final projectSeriesProvider = FutureProvider<List<ProjectSeries>?>((ref) {
+  final p = ref.watch(selectedProjectProvider);
+  if (p == null || !ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).projectSeries(p.id);
 });
 
 /// The selected section (both the desktop menus and the mobile bottom bar drive it).

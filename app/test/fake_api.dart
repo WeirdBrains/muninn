@@ -35,12 +35,38 @@ class FakeApi implements MuninnApi {
   @override
   Future<DataDir> dataDir() async => const DataDir(home: '/tmp/muninn-test', database: '/tmp/muninn-test/storage/muninn.database', databaseExists: true, keysInitialized: true);
 
+  bool unlocked = false;
+  final queries = <TimeRange>[];
+
   @override
-  Future<Overview> overview(String password) async {
+  Future<void> unlock(String password) async {
     lastPassword = password;
-    return const Overview(
-      projects: [Project(shortId: 'abc123', name: 'Alpha', description: 'test project')],
-      datasets: [Dataset(source: 'coinbase', base: 'BTC', quote: 'USD', duration: '5m', count: 288, first: 1704067200000, last: 1704153300000)],
-    );
+    if (password != 'pw') throw 'wrong key or not a muninn database';
+    unlocked = true;
+  }
+
+  @override
+  void lock() => unlocked = false;
+
+  @override
+  Future<Overview> overview() async => const Overview(
+        projects: [Project(id: 'p1', shortId: 'abc123', name: 'Alpha', description: 'test project')],
+        datasets: [
+          Dataset(source: 'coinbase', base: 'BTC', quote: 'USD', duration: '5m', durationS: 300, count: 288, first: 1704067200000, last: 1704153300000),
+          Dataset(source: 'binance', base: 'ETH', quote: 'USDT', duration: '1h', durationS: 3600, count: 24, first: 1609459200000, last: 1609542000000),
+        ],
+      );
+
+  @override
+  Future<List<ProjectSeries>> projectSeries(String projectId) async =>
+      const [ProjectSeries(source: 'coinbase', base: 'BTC', quote: 'USD', durationS: 300, from: 1704067200000)];
+
+  @override
+  Future<List<BarPoint>> queryBars(Dataset d, TimeRange range, {int maxPoints = 600}) async {
+    queries.add(range);
+    return [
+      for (var i = 0; i < 50; i++)
+        BarPoint(ts: d.first + i * d.durationS * 1000, open: 100.0 + i, high: 102.0 + i, low: 99.0 + i, close: i.isEven ? 101.0 + i : 99.5 + i, volume: 10.0 + i),
+    ];
   }
 }

@@ -72,6 +72,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<ProjectSeries> dco_decode_list_project_series(dynamic raw);
+
+  @protected
   List<ProjectSummary> dco_decode_list_project_summary(dynamic raw);
 
   @protected
@@ -88,6 +91,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Overview dco_decode_overview(dynamic raw);
+
+  @protected
+  ProjectSeries dco_decode_project_series(dynamic raw);
 
   @protected
   ProjectSummary dco_decode_project_summary(dynamic raw);
@@ -158,6 +164,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<ProjectSeries> sse_decode_list_project_series(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ProjectSummary> sse_decode_list_project_summary(
     SseDeserializer deserializer,
   );
@@ -178,6 +189,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Overview sse_decode_overview(SseDeserializer deserializer);
+
+  @protected
+  ProjectSeries sse_decode_project_series(SseDeserializer deserializer);
 
   @protected
   ProjectSummary sse_decode_project_summary(SseDeserializer deserializer);
@@ -267,6 +281,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_project_series(
+    List<ProjectSeries> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_project_summary(
     List<ProjectSummary> self,
     SseSerializer serializer,
@@ -295,6 +315,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_overview(Overview self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_project_series(ProjectSeries self, SseSerializer serializer);
 
   @protected
   void sse_encode_project_summary(

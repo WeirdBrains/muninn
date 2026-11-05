@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
+import 'unlock.dart';
 
 class HomeView extends ConsumerWidget {
   const HomeView({super.key});
@@ -23,9 +24,9 @@ class HomeView extends ConsumerWidget {
       ),
       const SizedBox(height: 12),
       overview.when(
-        data: (o) => o == null ? const _Unlock() : _OverviewBody(o),
+        data: (o) => o == null ? const UnlockCard() : _OverviewBody(o),
         loading: () => const LinearProgressIndicator(),
-        error: (e, _) => Column(children: [Text('$e', style: TextStyle(color: context.muninn.error)), const _Unlock()]),
+        error: (e, _) => Column(children: [Text('$e', style: TextStyle(color: context.muninn.error)), const UnlockCard()]),
       ),
     ]);
   }
@@ -48,46 +49,6 @@ class _DataDirCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Unlock extends ConsumerStatefulWidget {
-  const _Unlock();
-  @override
-  ConsumerState<_Unlock> createState() => _UnlockState();
-}
-
-class _UnlockState extends ConsumerState<_Unlock> {
-  final _c = TextEditingController();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  void _go() {
-    if (_c.text.isNotEmpty) ref.read(passwordProvider.notifier).state = _c.text;
-  }
-
-  @override
-  Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Unlock to browse (read-only)', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _c,
-              obscureText: true,
-              autofillHints: const [AutofillHints.password],
-              decoration: const InputDecoration(labelText: 'Muninn password', border: OutlineInputBorder()),
-              onSubmitted: (_) => _go(),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(onPressed: _go, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)), child: const Text('Unlock')),
-          ]),
-        ),
-      );
 }
 
 class _OverviewBody extends StatelessWidget {

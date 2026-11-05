@@ -7,17 +7,27 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `open`, `overview_of`, `query_of`
+// These functions are ignored because they are not marked as `pub`: `open`, `overview_of`, `project_series_of`, `query_of`
 
-/// Projects and datasets, read-only.
-Future<Overview> overview({String? home, required String password}) =>
-    RustLib.instance.api.crateApiDataOverview(home: home, password: password);
+/// Unlock with the Muninn password. The key stays in Rust; Dart never sees it.
+Future<void> unlock({String? home, required String password}) =>
+    RustLib.instance.api.crateApiDataUnlock(home: home, password: password);
+
+/// Forget the key.
+void lock() => RustLib.instance.api.crateApiDataLock();
+
+bool isUnlocked() => RustLib.instance.api.crateApiDataIsUnlocked();
+
+/// Projects and datasets, read-only (after [`unlock`]).
+Future<Overview> overview() => RustLib.instance.api.crateApiDataOverview();
+
+/// The series results saved in a project (`mnnn project add … --series/--search`).
+Future<List<ProjectSeries>> projectSeries({required String projectId}) =>
+    RustLib.instance.api.crateApiDataProjectSeries(projectId: projectId);
 
 /// Bars of one series in `[from, to]` (ms, optional), downsampled in Rust to at most
 /// `max_points` buckets so charts stay fast on any device.
 Future<List<BarPoint>> queryBars({
-  String? home,
-  required String password,
   required String source,
   required String base,
   required String quote,
@@ -26,8 +36,6 @@ Future<List<BarPoint>> queryBars({
   PlatformInt64? to,
   required int maxPoints,
 }) => RustLib.instance.api.crateApiDataQueryBars(
-  home: home,
-  password: password,
   source: source,
   base: base,
   quote: quote,
@@ -141,6 +149,46 @@ class Overview {
           runtimeType == other.runtimeType &&
           projects == other.projects &&
           datasets == other.datasets;
+}
+
+/// A dataset a project points at, with the project's saved range (if any).
+class ProjectSeries {
+  final String source;
+  final String base;
+  final String quote;
+  final PlatformInt64 durationS;
+  final PlatformInt64? from;
+  final PlatformInt64? to;
+
+  const ProjectSeries({
+    required this.source,
+    required this.base,
+    required this.quote,
+    required this.durationS,
+    this.from,
+    this.to,
+  });
+
+  @override
+  int get hashCode =>
+      source.hashCode ^
+      base.hashCode ^
+      quote.hashCode ^
+      durationS.hashCode ^
+      from.hashCode ^
+      to.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProjectSeries &&
+          runtimeType == other.runtimeType &&
+          source == other.source &&
+          base == other.base &&
+          quote == other.quote &&
+          durationS == other.durationS &&
+          from == other.from &&
+          to == other.to;
 }
 
 class ProjectSummary {

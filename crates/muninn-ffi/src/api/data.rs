@@ -1,8 +1,11 @@
 //! Read-only views of the store: projects, datasets (series) and downsampled bars.
 //! The store is opened read-only (no migrations, no writes); unlocking needs the Muninn password.
 use super::info::paths;
+use muninn_core::crypto::Key32;
 use muninn_core::model::{Duration, Symbol};
 use muninn_core::store::{BarFilter, Store};
+use std::path::PathBuf;
+use std::sync::Mutex;
 
 pub struct ProjectSummary {
     pub id: String,
@@ -39,17 +42,62 @@ pub struct Overview {
     pub datasets: Vec<DatasetSummary>,
 }
 
-fn open(home: Option<String>, password: String) -> anyhow::Result<Store> {
+/// The unlocked data key, kept in Rust memory only (wiped on [`lock`] and on drop).
+static SESSION: Mutex<Option<(PathBuf, Key32)>> = Mutex::new(None);
+
+/// Unlock with the Muninn password. The key stays in Rust; Dart never sees it.
+pub fn unlock(home: Option<String>, password: String) -> anyhow::Result<()> {
     let p = paths(home)?;
     let pw = secrecy::SecretString::from(password);
     let dek = muninn_core::crypto::keyring::unlock_with_password(&p, &pw)?;
-    Ok(Store::open_readonly(&p.db, Some(&dek.0))?)
+    Store::open_readonly(&p.db, Some(&dek.0))?; // check the key against the database
+    *SESSION.lock().unwrap_or_else(|e| e.into_inner()) = Some((p.db, dek));
+    Ok(())
 }
 
-/// Projects and datasets, read-only.
-pub fn overview(home: Option<String>, password: String) -> anyhow::Result<Overview> {
-    let s = open(home, password)?;
-    overview_of(&s)
+/// Forget the key.
+#[flutter_rust_bridge::frb(sync)]
+pub fn lock() {
+    SESSION.lock().unwrap_or_else(|e| e.into_inner()).take();
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_unlocked() -> bool {
+    SESSION.lock().unwrap_or_else(|e| e.into_inner()).is_some()
+}
+
+fn open() -> anyhow::Result<Store> {
+    let g = SESSION.lock().unwrap_or_else(|e| e.into_inner());
+    let (db, key) = g.as_ref().ok_or_else(|| anyhow::anyhow!("locked: unlock with the Muninn password first"))?;
+    Ok(Store::open_readonly(db, Some(&key.0))?)
+}
+
+/// Projects and datasets, read-only (after [`unlock`]).
+pub fn overview() -> anyhow::Result<Overview> {
+    overview_of(&open()?)
+}
+
+/// A dataset a project points at, with the project's saved range (if any).
+pub struct ProjectSeries {
+    pub source: String,
+    pub base: String,
+    pub quote: String,
+    pub duration_s: i64,
+    pub from: Option<i64>,
+    pub to: Option<i64>,
+}
+
+/// The series results saved in a project (`mnnn project add … --series/--search`).
+pub fn project_series(project_id: String) -> anyhow::Result<Vec<ProjectSeries>> {
+    project_series_of(&open()?, &project_id)
+}
+
+pub(crate) fn project_series_of(s: &Store, project_id: &str) -> anyhow::Result<Vec<ProjectSeries>> {
+    Ok(s.project_items(project_id)?
+        .iter()
+        .filter_map(|i| i.series())
+        .map(|r| ProjectSeries { source: r.source, base: r.symbol.base, quote: r.symbol.quote, duration_s: r.duration.0, from: r.from, to: r.to })
+        .collect())
 }
 
 pub(crate) fn overview_of(s: &Store) -> anyhow::Result<Overview> {
@@ -79,8 +127,6 @@ pub(crate) fn overview_of(s: &Store) -> anyhow::Result<Overview> {
 /// `max_points` buckets so charts stay fast on any device.
 #[allow(clippy::too_many_arguments)]
 pub fn query_bars(
-    home: Option<String>,
-    password: String,
     source: String,
     base: String,
     quote: String,
@@ -89,7 +135,7 @@ pub fn query_bars(
     to: Option<i64>,
     max_points: u32,
 ) -> anyhow::Result<Vec<BarPoint>> {
-    let s = open(home, password)?;
+    let s = open()?;
     query_of(&s, source, base, quote, duration_s, from, to, max_points)
 }
 
@@ -143,9 +189,36 @@ mod tests {
     }
 
     #[test]
-    fn overview_needs_initialized_keys() {
+    fn locked_until_unlocked() {
         let home = tempfile::tempdir().unwrap();
-        assert!(overview(Some(home.path().display().to_string()), "pw".into()).is_err());
+        assert!(unlock(Some(home.path().display().to_string()), "pw".into()).is_err());
+        assert!(!is_unlocked() && overview().is_err());
         assert!(!home.path().join("storage").exists(), "a failed unlock must not create anything");
+    }
+
+    #[test]
+    fn bars_downsample_and_projects_list_their_series() {
+        use muninn_core::model::Bar;
+        use muninn_core::store::SeriesRef;
+        let mut s = Store::open_in_memory().unwrap();
+        let src = s.add_source("coinbase", "csv", None).unwrap();
+        let t0 = 1_704_067_200_000i64;
+        let bars: Vec<Bar> =
+            (0..1000).map(|i| Bar { ts: t0 + i * 300_000, open: 1.0, high: 2.0 + i as f64, low: 0.5, close: 1.5, volume: 1.0, flags: 0 }).collect();
+        s.upsert_bars(&src, &Symbol::new("BTC", "USD"), Duration(300), &bars).unwrap();
+        let all = query_of(&s, "coinbase".into(), "BTC".into(), "USD".into(), 300, None, None, 10_000).unwrap();
+        assert_eq!(all.len(), 1000);
+        let few = query_of(&s, "coinbase".into(), "BTC".into(), "USD".into(), 300, None, None, 100).unwrap();
+        assert!(few.len() <= 101 && few.len() >= 50, "{}", few.len());
+        assert_eq!(few.iter().map(|b| b.volume).sum::<f64>(), 1000.0, "buckets keep the volume");
+        let ranged = query_of(&s, "coinbase".into(), "BTC".into(), "USD".into(), 300, Some(t0), Some(t0 + 99 * 300_000), 10_000).unwrap();
+        assert_eq!(ranged.len(), 100);
+        let p = s.create_project("Alpha", "").unwrap();
+        let r = SeriesRef { source: "coinbase".into(), symbol: Symbol::new("BTC", "USD"), duration: Duration(300), from: Some(t0), to: None };
+        s.add_project_result(&p.id, &r).unwrap();
+        let ps = project_series_of(&s, &p.id).unwrap();
+        assert_eq!(ps.len(), 1);
+        assert_eq!((ps[0].base.as_str(), ps[0].from, ps[0].to), ("BTC", Some(t0), None));
+        assert_eq!(overview_of(&s).unwrap().datasets[0].count, 1000);
     }
 }
