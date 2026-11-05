@@ -1,5 +1,5 @@
 //! JSON / NDJSON reader: records (objects or positional arrays) -> an all-string Polars frame.
-use super::{IngestOptions, IngestReport, Input, Session, canonical, hash_bytes};
+use super::{IngestOptions, IngestReport};
 use crate::error::{Error, Result};
 use crate::interact::Interact;
 use crate::store::Store;
@@ -112,21 +112,7 @@ pub fn read_json_file(p: &Path, records: Option<&str>) -> Result<DataFrame> {
 
 pub fn ingest_json(store: &mut Store, io: Interact, opts: IngestOptions, path: &Path, records: Option<&str>) -> Result<Vec<IngestReport>> {
     let files = super::find_files(path, super::JSON_EXTS, !opts.no_recurse)?;
-    let kind = if path.is_dir() { "directory" } else { "file" };
-    let mut s = Session::new(store, io, opts, kind, &canonical(path));
-    let mut out = Vec::new();
-    let prog = s.opts.progress.clone();
-    for f in files {
-        let bytes = super::progress::read_counted(&f, prog.clone())?;
-        let frame = records_to_frame(&parse_records(&bytes, is_ndjson(&f), records)?)?;
-        out.push(s.ingest(Input {
-            locator: canonical(&f),
-            name_hint: f.file_name().map(|n| n.to_string_lossy().to_string()),
-            content_hash: hash_bytes(&bytes),
-            frame,
-        })?);
-    }
-    Ok(out)
+    super::ingest_files(store, io, opts, path, &files, |f, bytes| records_to_frame(&parse_records(&bytes, is_ndjson(f), records)?))
 }
 
 #[cfg(test)]

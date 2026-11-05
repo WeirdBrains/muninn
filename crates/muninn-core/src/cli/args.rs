@@ -210,6 +210,19 @@ pub struct CommonIngestArgs {
     pub no_recursive: bool,
 }
 
+/// Progress reporting for file ingests (on stderr; stdout is untouched).
+#[derive(Debug, Clone, Copy, Args, Default)]
+pub struct ProgressArgs {
+    /// Show per-file progress (bytes, rate, ETA) and a summary line per file on stderr.
+    /// On by default when stderr is a terminal; when it is not, prints a plain line
+    /// every few seconds.
+    #[arg(long, conflicts_with = "no_progress")]
+    pub progress: bool,
+    /// Never show progress, even on a terminal.
+    #[arg(long)]
+    pub no_progress: bool,
+}
+
 #[derive(Debug, Subcommand)]
 #[allow(clippy::large_enum_variant)]
 pub enum IngestCommand {
@@ -240,6 +253,8 @@ pub struct CsvIngestArgs {
     pub path: PathBuf,
     #[command(flatten)]
     pub common: CommonIngestArgs,
+    #[command(flatten)]
+    pub progress: ProgressArgs,
     #[arg(long, default_value_t = ',')]
     pub delimiter: char,
     #[arg(long, default_value_t = '"')]
@@ -260,6 +275,8 @@ pub struct JsonIngestArgs {
     pub path: PathBuf,
     #[command(flatten)]
     pub common: CommonIngestArgs,
+    #[command(flatten)]
+    pub progress: ProgressArgs,
     /// Where the array of bars lives (dotted path or JSON pointer).
     #[arg(long)]
     pub records: Option<String>,
@@ -276,6 +293,8 @@ pub struct PathIngestArgs {
     pub path: Option<PathBuf>,
     #[command(flatten)]
     pub common: CommonIngestArgs,
+    #[command(flatten)]
+    pub progress: ProgressArgs,
     /// CSV field delimiter.
     #[arg(long, default_value_t = ',')]
     pub delimiter: char,

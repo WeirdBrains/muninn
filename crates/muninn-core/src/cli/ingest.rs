@@ -1,6 +1,6 @@
 //! `mnnn ingest ...`
 use super::{CommonIngestArgs, Ctx, IngestCommand};
-use crate::cli::args::{DataFormat, Paginate, PasswordArgs, RedisType, ServiceCommand, ValueFormat};
+use crate::cli::args::{DataFormat, Paginate, PasswordArgs, ProgressArgs, RedisType, ServiceCommand, ValueFormat};
 use crate::ingest::service::{self as svc, Secret};
 use crate::ingest::{self, IngestOptions, IngestReport};
 use crate::store::Store;
@@ -17,6 +17,7 @@ pub fn options(ctx: &Ctx, c: &CommonIngestArgs) -> anyhow::Result<IngestOptions>
         run_id: None,
         progress: None,
         no_recurse: c.no_recursive,
+        track_files: true,
         default_source: None,
     })
 }
@@ -34,33 +35,35 @@ pub fn run(ctx: &Ctx, cmd: IngestCommand) -> anyhow::Result<()> {
     let mut store = ctx.open_store()?;
     let reports = match cmd {
         IngestCommand::Csv(a) => {
-            let opts = options(ctx, &a.common)?;
+            let opts = cancellable(options(ctx, &a.common)?);
             let csv =
                 ingest::csv::CsvOptions { delimiter: a.delimiter, quote: a.quote, escape: a.escape, header: !a.no_header, skip_rows: a.skip_rows };
-            let n = ingest::find_files(&a.path, ingest::CSV_EXTS, !opts.no_recurse).map(|v| v.len()).unwrap_or(0);
-            let opts = cancellable(opts);
-            ingest::tracked(&mut store, "cli", n, opts, |st, o| ingest::ingest_csv(st, ctx.io, o, &a.path, &csv)).map_err(cancelled)?
+            let files = ingest::find_files(&a.path, ingest::CSV_EXTS, !opts.no_recurse).unwrap_or_default();
+            let ticker = Ticker::start(ctx, a.progress, opts.progress.clone(), names(&a.path, &files), false);
+            let r = ingest::tracked(&mut store, "cli", files.len(), opts, |st, o| ingest::ingest_csv(st, ctx.io, o, &a.path, &csv));
+            ticker.stop();
+            r.map_err(cancelled)?
         }
         IngestCommand::Json(a) => {
             let opts = cancellable(options(ctx, &a.common)?);
-            let n = ingest::find_files(&a.path, ingest::JSON_EXTS, !opts.no_recurse).map(|v| v.len()).unwrap_or(0);
-            ingest::tracked(&mut store, "cli", n, opts, |st, o| ingest::json::ingest_json(st, ctx.io, o, &a.path, a.records.as_deref()))
-                .map_err(cancelled)?
+            let files = ingest::find_files(&a.path, ingest::JSON_EXTS, !opts.no_recurse).unwrap_or_default();
+            let ticker = Ticker::start(ctx, a.progress, opts.progress.clone(), names(&a.path, &files), false);
+            let r = ingest::tracked(&mut store, "cli", files.len(), opts, |st, o| {
+                ingest::json::ingest_json(st, ctx.io, o, &a.path, a.records.as_deref())
+            });
+            ticker.stop();
+            r.map_err(cancelled)?
         }
         IngestCommand::Path(a) => {
             let opts = cancellable(options(ctx, &a.common)?);
             let path = a.target.or(a.path).expect("clap requires a path");
-            let n = ingest::find_files(&path, ingest::DATA_EXTS, !opts.no_recurse).map(|v| v.len()).unwrap_or(0);
+            let files = ingest::find_files(&path, ingest::DATA_EXTS, !opts.no_recurse).unwrap_or_default();
             let csv = ingest::csv::CsvOptions { delimiter: a.delimiter, header: !a.no_header, ..Default::default() };
-            let ticker = Ticker::start(ctx, opts.progress.clone());
+            // `ingest path` always names each file as it starts (unless --quiet)
+            let ticker = Ticker::start(ctx, a.progress, opts.progress.clone(), names(&path, &files), true);
             let io = ctx.io;
-            let root = path.clone();
-            let r = ingest::tracked(&mut store, "cli", n, opts, |st, o| {
-                ingest::ingest_path(st, io, o, &path, &csv, a.records.as_deref(), |i, total, f| {
-                    let rel = f.strip_prefix(&root).unwrap_or(f).display().to_string();
-                    let rel = if rel.is_empty() { f.display().to_string() } else { rel };
-                    ticker.file(i, total, &rel);
-                })
+            let r = ingest::tracked(&mut store, "cli", files.len(), opts, |st, o| {
+                ingest::ingest_path(st, io, o, &path, &csv, a.records.as_deref(), |_, _, _| {})
             });
             ticker.stop();
             r.map_err(cancelled)?
@@ -98,44 +101,166 @@ pub fn run(ctx: &Ctx, cmd: IngestCommand) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Per-file and overall progress on stderr for `ingest path`: a `[i/n] file` line per
-/// file, plus a live `file % · overall %` line when stderr is a terminal.
+/// File names relative to the ingested path, for progress lines.
+fn names(root: &std::path::Path, files: &[std::path::PathBuf]) -> Vec<String> {
+    files
+        .iter()
+        .map(|f| {
+            let rel = f.strip_prefix(root).unwrap_or(f).display().to_string();
+            if rel.is_empty() { f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| f.display().to_string()) } else { rel }
+        })
+        .collect()
+}
+
+/// When progress is shown: `--progress` forces it, `--no-progress` and `--quiet` turn it
+/// off, otherwise it is on when stderr is a terminal. Returns (show, live) where `live`
+/// redraws one line in place (terminal) instead of printing periodic plain lines.
+pub fn progress_mode(a: ProgressArgs, quiet: bool, tty: bool) -> (bool, bool) {
+    if a.no_progress || (quiet && !a.progress) {
+        return (false, false);
+    }
+    (a.progress || tty, tty)
+}
+
+pub fn fmt_bytes(n: u64) -> String {
+    const U: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
+    let mut v = n as f64;
+    let mut i = 0;
+    while v >= 1024.0 && i < U.len() - 1 {
+        v /= 1024.0;
+        i += 1;
+    }
+    if i == 0 { format!("{n} B") } else { format!("{v:.1} {}", U[i]) }
+}
+
+pub fn fmt_secs(s: f64) -> String {
+    let s = s.max(0.0).round() as u64;
+    if s >= 3600 { format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60) } else { format!("{}:{:02}", s / 60, s % 60) }
+}
+
+fn fmt_count(n: u64) -> String {
+    let s = n.to_string();
+    let mut out = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// One progress line: `[1/3] BTC_5m.csv  42% · 180.3 MiB/429.0 MiB · 12.4 MiB/s · ETA 0:20`
+/// (plus ` · overall N%` for several files). `elapsed` is seconds since the run began.
+pub fn progress_line(e: &ingest::progress::Estimate, files: usize, name: &str, file_size: u64, elapsed: f64) -> String {
+    let rate = if elapsed > 0.0 { e.bytes_done as f64 / elapsed } else { 0.0 };
+    let eta = if rate > 0.0 { fmt_secs(e.bytes_total.saturating_sub(e.bytes_done) as f64 / rate) } else { "--:--".into() };
+    let done = (e.file * file_size as f64) as u64;
+    let mut l = format!(
+        "[{}/{files}] {name}  {:>3.0}% · {}/{} · {}/s · ETA {eta}",
+        e.file_index + 1,
+        e.file * 100.0,
+        fmt_bytes(done),
+        fmt_bytes(file_size),
+        fmt_bytes(rate as u64)
+    );
+    if files > 1 {
+        l.push_str(&format!(" · overall {:.0}%", e.overall * 100.0));
+    }
+    l
+}
+
+/// Per-file summary: `done BTC_5m.csv: 1,234,567 bars in 42.1s (29,321 bars/s)`.
+pub fn summary_line(name: &str, bars: u64, ms: i64) -> String {
+    let secs = ms.max(0) as f64 / 1000.0;
+    let rate = if secs > 0.0 { format!(" ({} bars/s)", fmt_count((bars as f64 / secs) as u64)) } else { String::new() };
+    format!("done {name}: {} bars in {secs:.1}s{rate}", fmt_count(bars))
+}
+
+/// Progress for file ingests on stderr. A background thread drains file events from the
+/// shared [`ingest::Progress`] (start lines, per-file summaries) and, while a file runs,
+/// redraws a live line on a terminal or prints a plain line every few seconds otherwise.
 struct Ticker {
-    quiet: bool,
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     handle: std::cell::RefCell<Option<std::thread::JoinHandle<()>>>,
-    tty: bool,
 }
 
 impl Ticker {
-    fn start(ctx: &Ctx, p: Option<std::sync::Arc<ingest::Progress>>) -> Self {
+    fn start(ctx: &Ctx, args: ProgressArgs, p: Option<std::sync::Arc<ingest::Progress>>, names: Vec<String>, name_files: bool) -> Self {
         use std::io::IsTerminal;
+        use std::sync::atomic::Ordering::Relaxed;
         let quiet = ctx.global.quiet;
-        let tty = !quiet && std::io::stderr().is_terminal();
+        let (show, live) = progress_mode(args, quiet, std::io::stderr().is_terminal());
+        let name_files = name_files && !quiet;
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let handle = match (tty, p) {
-            (true, Some(p)) => {
+        let handle = match p {
+            Some(p) if show || name_files => {
+                p.record_events.store(true, Relaxed);
                 let s = stop.clone();
                 Some(std::thread::spawn(move || {
-                    while !s.load(std::sync::atomic::Ordering::Relaxed) {
-                        let e = p.estimate();
-                        eprint!("\r  file {:>3.0}% · overall {:>3.0}%  ", e.file * 100.0, e.overall * 100.0);
+                    let started = std::time::Instant::now();
+                    let n = names.len();
+                    let name = |i: u64| names.get(i as usize).cloned().unwrap_or_default();
+                    let mut drawn = false;
+                    let mut last_plain = std::time::Instant::now();
+                    let mut running: Option<(u64, u64)> = None;
+                    let clear = |drawn: &mut bool| {
+                        if *drawn {
+                            eprint!("\r\x1b[2K");
+                            *drawn = false;
+                        }
+                    };
+                    let mut paused_for = std::time::Duration::ZERO;
+                    loop {
+                        let stopping = s.load(Relaxed);
+                        if p.paused.load(Relaxed) && !stopping {
+                            // a prompt is up: clear our line and keep quiet until it is answered
+                            clear(&mut drawn);
+                            p.pause_ack.store(true, Relaxed);
+                            std::thread::sleep(std::time::Duration::from_millis(50));
+                            paused_for += std::time::Duration::from_millis(50);
+                            last_plain = std::time::Instant::now();
+                            continue;
+                        }
+                        for ev in p.take_events() {
+                            clear(&mut drawn);
+                            match ev {
+                                ingest::progress::FileEvent::Begin { index, size } => {
+                                    running = Some((index, size));
+                                    last_plain = std::time::Instant::now();
+                                    if name_files || (show && !live) {
+                                        eprintln!("[{}/{n}] {} ({})", index + 1, name(index), fmt_bytes(size));
+                                    }
+                                }
+                                ingest::progress::FileEvent::End { index, bars, ms } => {
+                                    running = None;
+                                    if show {
+                                        eprintln!("{}", summary_line(&name(index), bars, ms));
+                                    }
+                                }
+                            }
+                        }
+                        if stopping {
+                            clear(&mut drawn);
+                            break;
+                        }
+                        if show && let Some((i, size)) = running {
+                            let line = progress_line(&p.estimate(), n, &name(i), size, started.elapsed().saturating_sub(paused_for).as_secs_f64());
+                            if live {
+                                eprint!("\r\x1b[2K{line}");
+                                drawn = true;
+                            } else if last_plain.elapsed() >= std::time::Duration::from_secs(5) {
+                                eprintln!("{line}");
+                                last_plain = std::time::Instant::now();
+                            }
+                        }
                         std::thread::sleep(std::time::Duration::from_millis(250));
                     }
-                    eprint!("\r{:40}\r", "");
                 }))
             }
             _ => None,
         };
-        Self { quiet, stop, handle: std::cell::RefCell::new(handle), tty }
-    }
-    fn file(&self, i: usize, n: usize, name: &str) {
-        if !self.quiet {
-            if self.tty {
-                eprint!("\r{:40}\r", "");
-            }
-            eprintln!("[{}/{n}] {name}", i + 1);
-        }
+        Self { stop, handle: std::cell::RefCell::new(handle) }
     }
     fn stop(&self) {
         self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -150,9 +275,9 @@ impl Ticker {
 fn cancellable(mut o: IngestOptions) -> IngestOptions {
     let p = std::sync::Arc::new(ingest::Progress::default());
     let h = p.clone();
-    if ctrlc::set_handler(move || h.request_cancel("cli")).is_ok() {
-        o.progress = Some(p);
-    }
+    // progress is reported even if the Ctrl-C handler could not be installed
+    let _ = ctrlc::set_handler(move || h.request_cancel("cli"));
+    o.progress = Some(p);
     o
 }
 
@@ -263,4 +388,30 @@ fn service(ctx: &Ctx, store: &mut Store, cmd: ServiceCommand) -> anyhow::Result<
             svc::run_inputs(store, ctx.io, options(ctx, &a.common.ingest)?, &loc, Some(src.host_label()), vec![input])?
         }
     })
+}
+
+#[cfg(test)]
+mod progress_tests {
+    use super::*;
+
+    #[test]
+    fn mode_follows_flags_and_tty() {
+        let a = |progress, no_progress| ProgressArgs { progress, no_progress };
+        assert_eq!(progress_mode(a(false, false), false, true), (true, true));
+        assert_eq!(progress_mode(a(false, false), false, false), (false, false));
+        assert_eq!(progress_mode(a(true, false), false, false), (true, false));
+        assert_eq!(progress_mode(a(false, true), false, true), (false, false));
+        assert_eq!(progress_mode(a(false, false), true, true), (false, false));
+        assert_eq!(progress_mode(a(true, false), true, false), (true, false));
+    }
+
+    #[test]
+    fn lines_read_well() {
+        let e = ingest::progress::Estimate { file_index: 0, file: 0.42, overall: 0.14, bytes_done: 180 << 20, bytes_total: 1290 << 20 };
+        let l = progress_line(&e, 3, "BTC_5m.csv", 429 << 20, 10.0);
+        assert_eq!(l, "[1/3] BTC_5m.csv   42% · 180.2 MiB/429.0 MiB · 18.0 MiB/s · ETA 1:02 · overall 14%");
+        assert_eq!(summary_line("BTC_5m.csv", 1_234_567, 42_100), "done BTC_5m.csv: 1,234,567 bars in 42.1s (29,324 bars/s)");
+        assert_eq!(fmt_secs(3725.0), "1:02:05");
+        assert_eq!(fmt_bytes(512), "512 B");
+    }
 }

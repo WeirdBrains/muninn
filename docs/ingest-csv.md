@@ -3,7 +3,7 @@
 ```
 mnnn ingest csv --path <FILE|DIR> [--source NAME] [--symbol PAIR] [--duration 5m]
                 [--delimiter ,] [--quote '"'] [--escape C] [--no-header] [--skip-rows 0]
-                [--map COL=FIELD]... [--rejects FILE] [--force]
+                [--map COL=FIELD]... [--rejects FILE] [--force] [--progress | --no-progress]
 ```
 
 Every row becomes a bar (see [data model](data-model.md)). A directory (searched recursively; `--no-recursive` for the top level only, hidden entries skipped) ingests every
@@ -34,7 +34,19 @@ The file name gives the symbol (`BTCUSDT` -> `BTC/USDT`) and the duration (`_5m`
    whose locator equals the path, else a prompt.
 4. **Symbol**: `--symbol` (`BTC/USDT`, `BTC-USD` or `BTCUSDT`), else parsed from the file
    name against the known symbol list (longest quote suffix wins, aliases like `XBT`
-   applied), else a prompt. A prompted answer is reused for the rest of the run.
+   applied), else a prompt. The symbol is the traded pair: the asset, a slash, then the
+   currency it is priced in, e.g. `BTC/USDT` or `BTC/USD`. The prompt says so and, when
+   the file name names an asset (`BTC_5m_combined.csv`), uses it in the example:
+
+   ```
+   Symbol for BTC_5m_combined_part1.csv: the traded pair as BASE/QUOTE, e.g. BTC/USDT or BTC/USD: BTC
+   warning: `BTC` is only one asset: add the currency it is priced in, e.g. BTC/USDT or BTC/USD
+   Symbol for BTC_5m_combined_part1.csv: the traded pair as BASE/QUOTE, e.g. BTC/USDT or BTC/USD: BTC/USDT
+   ```
+
+   A bad answer asks again (up to 5 times; an empty answer or end of input stops the
+   run). A prompted answer is reused for the rest of the run. To skip the prompt, pass
+   `--symbol BTC/USDT`; it applies to every file in the run.
 5. **Timestamp**: epoch seconds / ms / us / ns (detected by magnitude), RFC 3339 or
    `YYYY-MM-DD HH:MM:SS`. UTC unless an offset is present. Stored as epoch ms.
 6. **Duration**: `--duration`, else a file-name token (`5m`, `1h`, `15min`), else the
@@ -47,8 +59,26 @@ The file name gives the symbol (`BTCUSDT` -> `BTC/USDT`) and the duration (`_5m`
 8. **Upsert** in batched transactions on the bar id. Re-ingesting is a no-op; an
    identical file (same BLAKE3 content hash, source and series) is skipped outright
    unless `--force`.
-9. **Report**: rows, inserted, duplicate, rejected, zero-volume, gaps and missing bars,
+9. **Progress** (stderr only; stdout is untouched): see [Progress](#progress).
+10. **Report**: rows, inserted, duplicate, rejected, zero-volume, gaps and missing bars,
    coverage range.
+
+## Progress
+
+Large ingests show progress on stderr. On a terminal it is on by default and redraws one
+line per running file, then prints a summary line when the file is done:
+
+```
+[1/3] BTC_5m_combined_part1.csv   42% · 180.2 MiB/429.0 MiB · 18.0 MiB/s · ETA 1:02 · overall 14%
+done BTC_5m_combined_part1.csv: 1,234,567 bars in 42.1s (29,324 bars/s)
+```
+
+The percentage covers reading, parsing and storing (storing dominates), measured
+against the file size. `--progress` forces it on when stderr is not a terminal (logs,
+CI): then it prints a `[i/n] file (size)` line when each file starts, a plain progress
+line every 5 seconds and the summary line. `--no-progress` (or `-q`) turns it off.
+Progress pauses while a prompt is waiting. The same flags work on `ingest json` and
+`ingest path`.
 
 ## Flags and defaults
 

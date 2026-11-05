@@ -37,6 +37,30 @@ pub struct Progress {
     /// When a cancel was asked for (ms since epoch) and by whom (1 = TUI, 2 = CLI).
     pub cancel_at: AtomicI64,
     pub cancel_by: AtomicU8,
+    /// When the current file began (ms since epoch).
+    pub file_started: AtomicI64,
+    /// File begin/end events, recorded only while `record_events` is set (the CLI
+    /// progress printer drains them; the TUI polls the counters instead).
+    pub record_events: AtomicBool,
+    pub events: std::sync::Mutex<Vec<FileEvent>>,
+    /// A prompt is on screen: progress printers stop drawing (and ack) until resumed.
+    pub paused: AtomicBool,
+    pub pause_ack: AtomicBool,
+}
+
+/// A file started or finished (for line-based progress output).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileEvent {
+    Begin {
+        index: u64,
+        size: u64,
+    },
+    /// `bars` stored, `ms` taken.
+    End {
+        index: u64,
+        bars: u64,
+        ms: i64,
+    },
 }
 
 /// What the importer is doing.
@@ -114,11 +138,42 @@ impl Progress {
         self.file_bars_done.store(0, Relaxed);
         self.file_bars_total.store(0, Relaxed);
         self.file_size.store(size, Relaxed);
+        self.file_started.store(crate::store::now_ms(), Relaxed);
+        self.event(FileEvent::Begin { index, size });
+    }
+    fn event(&self, e: FileEvent) {
+        if self.record_events.load(Relaxed)
+            && let Ok(mut v) = self.events.lock()
+        {
+            v.push(e);
+        }
+    }
+    /// Stop progress output for a prompt; waits briefly for a printer to clear its line.
+    pub fn pause(&self) {
+        self.pause_ack.store(false, Relaxed);
+        self.paused.store(true, Relaxed);
+        if self.record_events.load(Relaxed) {
+            for _ in 0..100 {
+                if self.pause_ack.load(Relaxed) {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        }
+    }
+    pub fn resume(&self) {
+        self.paused.store(false, Relaxed);
+    }
+    /// Take the recorded file events.
+    pub fn take_events(&self) -> Vec<FileEvent> {
+        self.events.lock().map(|mut v| std::mem::take(&mut *v)).unwrap_or_default()
     }
     /// The current file is complete (or failed); its bytes count as done.
     pub fn end_file(&self) {
         self.bytes_before.fetch_add(self.file_size.swap(0, Relaxed), Relaxed);
         self.file_read.store(0, Relaxed);
+        let ms = crate::store::now_ms() - self.file_started.load(Relaxed);
+        self.event(FileEvent::End { index: self.file_index.load(Relaxed), bars: self.file_bars_done.load(Relaxed), ms });
     }
     pub fn add_read(&self, n: u64) {
         self.file_read.fetch_add(n, Relaxed);
@@ -303,6 +358,22 @@ mod tests {
         p.parsed(0); // nothing to store: file complete
         assert!((p.estimate().overall - 1.0).abs() < 1e-9);
         assert_eq!(p.get(), (100, 100));
+    }
+
+    #[test]
+    fn file_events_only_when_recording() {
+        let p = Progress::default();
+        p.begin_file(0, 10);
+        p.end_file();
+        assert!(p.take_events().is_empty());
+        p.record_events.store(true, Relaxed);
+        p.begin_file(1, 10);
+        p.stored(7);
+        p.end_file();
+        let e = p.take_events();
+        assert_eq!(e[0], FileEvent::Begin { index: 1, size: 10 });
+        assert!(matches!(e[1], FileEvent::End { index: 1, bars: 7, .. }));
+        assert!(p.take_events().is_empty());
     }
 
     #[test]

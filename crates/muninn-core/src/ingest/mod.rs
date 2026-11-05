@@ -31,6 +31,9 @@ pub struct IngestOptions {
     pub run_id: Option<i64>,
     /// Only the top level of a directory (default: recurse into subdirectories).
     pub no_recurse: bool,
+    /// `ingest_csv`/`ingest_json` mark file starts and ends in `progress` themselves
+    /// (the CLI). Off when the caller does that per file (the TUI import).
+    pub track_files: bool,
     /// Source used when none is given and the file name names no exchange (TUI: "local").
     pub default_source: Option<String>,
 }
@@ -204,6 +207,35 @@ pub fn duration_from_name(name: &str) -> Option<Duration> {
     stem.split(['_', '.', '-', ' ', ':', '/']).filter(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit())).find_map(|t| Duration::parse(t).ok())
 }
 
+/// How many bad symbol answers the prompt takes before giving up.
+pub const SYMBOL_TRIES: usize = 5;
+
+/// A known base asset named on its own in a file name (`BTC_5m_combined.csv` -> BTC).
+pub fn base_from_name(name: &str) -> Option<String> {
+    let stem = name_stem(name);
+    stem.split(['_', '.', '-', ' ', ':', '/'])
+        .map(|t| t.to_ascii_uppercase())
+        .find(|t| crate::model::KNOWN_BASES.contains(&t.as_str()) || crate::model::KNOWN_ALIASES.iter().any(|(a, _)| a == t))
+}
+
+/// An example pair for the symbol prompt, using `base` when known.
+pub fn example_pair(base: Option<&str>) -> String {
+    match base {
+        Some(b) => format!("{b}/USDT or {b}/USD"),
+        None => "BTC/USDT".to_string(),
+    }
+}
+
+/// What to say after a symbol answer that is not a pair.
+pub fn symbol_retry_hint(ans: &str) -> String {
+    let a = ans.trim().to_ascii_uppercase();
+    if !a.is_empty() && !a.contains(['/', '-', '_']) {
+        format!("`{}` is only one asset: add the currency it is priced in, e.g. {a}/USDT or {a}/USD", ans.trim())
+    } else {
+        format!("`{}` is not a symbol: type BASE/QUOTE, e.g. BTC/USDT", ans.trim())
+    }
+}
+
 /// An ingest session: answers to prompts are reused for the rest of a file/directory run.
 pub struct Session<'a> {
     pub store: &'a mut Store,
@@ -238,6 +270,34 @@ impl<'a> Session<'a> {
         }
     }
 
+    /// Prompt with progress output paused.
+    fn prompt(&self, what: &'static str, question: &str, hint: &str) -> Result<String> {
+        if !self.io.interactive {
+            return self.io.prompt(what, question, None, hint);
+        }
+        if let Some(p) = &self.opts.progress {
+            p.pause();
+        }
+        let r = self.io.prompt(what, question, None, hint);
+        if let Some(p) = &self.opts.progress {
+            p.resume();
+        }
+        r
+    }
+
+    /// Confirm with progress output paused.
+    fn confirm(&self, question: &str) -> Result<bool> {
+        let pause = self.io.interactive && !self.io.yes;
+        if let Some(p) = self.opts.progress.as_ref().filter(|_| pause) {
+            p.pause();
+        }
+        let r = self.io.confirm(question);
+        if let Some(p) = self.opts.progress.as_ref().filter(|_| pause) {
+            p.resume();
+        }
+        r
+    }
+
     fn resolve_source(&mut self) -> Result<Source> {
         if let Some(s) = &self.source {
             return Ok(s.clone());
@@ -249,7 +309,7 @@ impl<'a> Session<'a> {
         } else if let Some(name) = self.opts.default_source.clone().or_else(|| self.default_source.clone()) {
             self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
         } else {
-            let name = self.io.prompt("source", &format!("Source name for {}", self.source_locator), None, "pass --source <NAME>")?;
+            let name = self.prompt("source", &format!("Source name for {}", self.source_locator), "pass --source <NAME>")?;
             self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
         };
         self.source = Some(s.clone());
@@ -269,13 +329,24 @@ impl<'a> Session<'a> {
         if let Some(s) = &self.prompted_symbol {
             return Ok(s.clone());
         }
-        let ans = self.io.prompt(
-            "symbol",
-            &format!("Symbol (BASE/QUOTE) for {}", name_hint.unwrap_or("input")),
-            None,
-            "could not derive the symbol from the name; pass --symbol BASE/QUOTE",
-        )?;
-        let sym = self.store.canonical_symbol(&Symbol::parse(&ans)?)?;
+        let file = name_hint.unwrap_or("input");
+        let base = name_hint.and_then(base_from_name);
+        let question = format!("Symbol for {file}: the traded pair as BASE/QUOTE, e.g. {}", example_pair(base.as_deref()));
+        let hint = "could not derive the symbol from the name; pass --symbol BASE/QUOTE (e.g. --symbol BTC/USDT)";
+        let mut tries = 0;
+        let sym = loop {
+            let ans = self.prompt("symbol", &question, hint)?;
+            match Symbol::parse(&ans) {
+                Ok(s) => break self.store.canonical_symbol(&s)?,
+                Err(e) => {
+                    tries += 1;
+                    if tries >= SYMBOL_TRIES {
+                        return Err(e);
+                    }
+                    self.io.warn(symbol_retry_hint(&ans));
+                }
+            }
+        };
         self.store.add_symbol(&sym, &[])?;
         self.prompted_symbol = Some(sym.clone());
         Ok(sym)
@@ -297,7 +368,7 @@ impl<'a> Session<'a> {
         if let Some(d) = self.prompted_duration {
             return Ok(d);
         }
-        let ans = self.io.prompt("duration", "Bar duration (e.g. 5m)", None, "pass --duration (e.g. 5m)")?;
+        let ans = self.prompt("duration", "Bar duration (e.g. 5m)", "pass --duration (e.g. 5m)")?;
         let d = Duration::parse(&ans)?;
         self.prompted_duration = Some(d);
         Ok(d)
@@ -405,7 +476,7 @@ impl<'a> Session<'a> {
         if !v.rejects.is_empty() {
             self.write_rejects(&input.locator, &v.rejects)?;
             let sample: Vec<String> = v.rejects.iter().take(3).map(|r| format!("row {}: {}", r.row, r.reason)).collect();
-            if !self.io.confirm(&format!(
+            if !self.confirm(&format!(
                 "{} rows of {} failed validation ({}); drop them and continue?",
                 v.rejects.len(),
                 input.locator,
@@ -526,16 +597,43 @@ pub(crate) fn canonical(path: &Path) -> String {
 /// Ingest CSV file(s).
 pub fn ingest_csv(store: &mut Store, io: Interact, opts: IngestOptions, path: &Path, csv: &csv::CsvOptions) -> Result<Vec<IngestReport>> {
     let files = find_files(path, CSV_EXTS, !opts.no_recurse)?;
+    ingest_files(store, io, opts, path, &files, |_, bytes| csv::read_csv_bytes(bytes, csv))
+}
+
+/// Ingest `files` (found under `path`) one at a time, each all-or-nothing, reporting
+/// per-file and overall progress through `opts.progress`.
+pub(crate) fn ingest_files(
+    store: &mut Store,
+    io: Interact,
+    opts: IngestOptions,
+    path: &Path,
+    files: &[PathBuf],
+    mut parse: impl FnMut(&Path, Vec<u8>) -> Result<DataFrame>,
+) -> Result<Vec<IngestReport>> {
     let kind = if path.is_dir() { "directory" } else { "file" };
+    let prog = opts.progress.clone().filter(|_| opts.track_files);
+    let sizes: Vec<u64> = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).collect();
+    if let Some(p) = &prog {
+        p.bytes_total.store(sizes.iter().sum(), std::sync::atomic::Ordering::Relaxed);
+    }
     let mut s = Session::new(store, io, opts, kind, &canonical(path));
     let mut out = Vec::new();
-    let prog = s.opts.progress.clone();
-    for f in files {
-        let bytes = progress::read_counted(&f, prog.clone())?;
-        let content_hash = hash_bytes(&bytes);
-        let frame = csv::read_csv_bytes(bytes, csv)?;
-        let input = Input { locator: canonical(&f), name_hint: f.file_name().map(|n| n.to_string_lossy().to_string()), content_hash, frame };
-        out.push(s.ingest(input)?);
+    for (i, f) in files.iter().enumerate() {
+        // a cancel shows up as the next read failing (recorded in the read phase)
+        if let Some(p) = &prog {
+            p.begin_file(i as u64, sizes[i]);
+        }
+        let r = (|| {
+            let bytes = progress::read_counted(f, s.opts.progress.clone())?;
+            let content_hash = hash_bytes(&bytes);
+            let frame = parse(f, bytes)?;
+            let input = Input { locator: canonical(f), name_hint: f.file_name().map(|n| n.to_string_lossy().to_string()), content_hash, frame };
+            s.ingest(input)
+        })();
+        if let Some(p) = &prog {
+            p.end_file();
+        }
+        out.push(r?);
     }
     Ok(out)
 }
@@ -615,6 +713,21 @@ where
     };
     store.finish_import_run(run, status, kept, &note)?;
     r
+}
+
+#[cfg(test)]
+mod symbol_prompt_tests {
+    #[test]
+    fn base_and_hints() {
+        use super::*;
+        assert_eq!(base_from_name("BTC_5m_combined_part1.csv").as_deref(), Some("BTC"));
+        assert_eq!(base_from_name("eth-1h.csv").as_deref(), Some("ETH"));
+        assert_eq!(base_from_name("bars_5m.csv"), None);
+        assert_eq!(example_pair(Some("BTC")), "BTC/USDT or BTC/USD");
+        assert_eq!(example_pair(None), "BTC/USDT");
+        assert!(symbol_retry_hint("BTC").contains("BTC/USDT or BTC/USD"));
+        assert!(symbol_retry_hint("a/").contains("not a symbol"));
+    }
 }
 
 #[cfg(test)]
