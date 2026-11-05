@@ -4,13 +4,18 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'about_dialog.dart';
+import 'api.dart';
 import 'logo.dart';
 import 'state.dart';
 import 'theme/muninn_theme.dart';
+import 'time_range.dart';
+import 'views/data.dart';
 import 'views/home.dart';
+import 'views/projects.dart';
 import 'views/placeholder.dart';
 
 /// Widths below this use the phone layout.
@@ -24,7 +29,10 @@ class AppShell extends ConsumerWidget {
     final section = ref.watch(sectionProvider);
     return LayoutBuilder(builder: (context, c) {
       final phone = c.maxWidth < phoneBreakpoint;
-      final body = sectionView(section);
+      final body = _withShortcuts(context, ref, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const RangeBar(),
+        Expanded(child: sectionView(section)),
+      ]));
       if (phone) {
         return Scaffold(
           appBar: AppBar(
@@ -78,8 +86,8 @@ Section _phoneTabFor(Section s) => _phoneTabs.contains(s) ? s : Section.help;
 
 Widget sectionView(Section s) => switch (s) {
       Section.home => const HomeView(),
-      Section.data => const PlaceholderView(title: 'Data', cli: 'mnnn sources', icon: Icons.candlestick_chart_outlined),
-      Section.projects => const PlaceholderView(title: 'Projects', cli: 'mnnn project list', icon: Icons.folder_outlined),
+      Section.data => const DataView(),
+      Section.projects => const ProjectsView(),
       Section.net => const PlaceholderView(title: 'Net', cli: 'mnnn net status', icon: Icons.hub_outlined),
       Section.orgs => const PlaceholderView(title: 'Orgs', cli: 'mnnn org list', icon: Icons.apartment_outlined),
       Section.keys => const PlaceholderView(title: 'Keys', cli: 'mnnn keys status', icon: Icons.key_outlined),
@@ -153,15 +161,25 @@ class MuninnMenuBar extends ConsumerWidget {
     return MenuBar(children: [
       menu('File', [
         item('Home', () => go(Section.home)),
+        item('Lock', () => lockStore(ref)),
         item('Import…', () => later('Import', 'mnnn ingest path DIR')),
         item('Export…', () => later('Export', 'mnnn export')),
         item('Preferences…', () => later('Preferences', 'mnnn theme')),
       ]),
       menu('View', [
+        item('Change view (chart / list)', () => ref.read(dataAsChartProvider.notifier).state = !ref.read(dataAsChartProvider)),
         item('Refresh', () => ref.invalidate(overviewProvider)),
       ]),
       menu('Data', [
         item('Datasets', () => go(Section.data)),
+        SubmenuButton(menuChildren: [
+          MenuItemButton(
+            shortcut: const SingleActivator(LogicalKeyboardKey.keyT, shift: true),
+            onPressed: () => showTimeRangePicker(context, ref),
+            child: const Text('Time range…'),
+          ),
+          item('Clear time range', () => ref.read(timeRangeProvider.notifier).state = TimeRange.all),
+        ], child: const Text('Filters')),
         item('Sources…', () => later('Sources', 'mnnn sources')),
         item('Symbols…', () => later('Symbols', 'mnnn symbols')),
       ]),
@@ -235,4 +253,29 @@ Future<void> showLater(BuildContext context, String what, String cli) => showDia
         ]),
         content: Text('Not in the app yet. In the terminal: `$cli`, or the same menu in `mnnn tui`.'),
       ),
+    );
+
+/// Forget the key and the data shown.
+void lockStore(WidgetRef ref) {
+  ref.read(apiProvider).lock();
+  ref.read(unlockedProvider.notifier).state = false;
+  ref.read(selectedDatasetProvider.notifier).state = null;
+  ref.read(selectedProjectProvider.notifier).state = null;
+}
+
+/// `T` (Shift+t) opens the time range picker anywhere (as in the TUI), except while typing.
+Widget _withShortcuts(BuildContext context, WidgetRef ref, Widget child) => Focus(
+      autofocus: true,
+      onKeyEvent: (node, e) {
+        if (e is! KeyDownEvent || e.logicalKey != LogicalKeyboardKey.keyT || !HardwareKeyboard.instance.isShiftPressed) {
+          return KeyEventResult.ignored;
+        }
+        final f = FocusManager.instance.primaryFocus?.context;
+        if (f != null && (f.widget is EditableText || f.findAncestorWidgetOfExactType<EditableText>() != null)) {
+          return KeyEventResult.ignored;
+        }
+        showTimeRangePicker(context, ref);
+        return KeyEventResult.handled;
+      },
+      child: child,
     );
