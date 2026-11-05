@@ -2,7 +2,6 @@
 use super::{ident, sql_or_file};
 use crate::error::{Error, Result};
 use crate::ingest::{Input, hash_bytes};
-use polars::prelude::*;
 use rusqlite::types::ValueRef;
 use std::path::Path;
 
@@ -30,35 +29,34 @@ impl SqliteSource<'_> {
         let sql = self.sql()?;
         let mut st = conn.prepare(&sql)?;
         let names: Vec<String> = st.column_names().iter().map(|s| s.to_string()).collect();
-        let mut cols: Vec<Vec<Option<String>>> = vec![vec![]; names.len()];
+        let mut records = vec![];
         let mut rows = st.query([])?;
-        let mut hasher = blake3::Hasher::new();
         while let Some(r) = rows.next()? {
-            for (i, c) in cols.iter_mut().enumerate() {
+            // each row as an object, values as SQLite has them (blobs as hex)
+            let mut o = serde_json::Map::new();
+            for (i, n) in names.iter().enumerate() {
                 let v = match r.get_ref(i)? {
-                    ValueRef::Null => None,
-                    ValueRef::Integer(x) => Some(x.to_string()),
-                    ValueRef::Real(x) => Some(x.to_string()),
-                    ValueRef::Text(t) => Some(String::from_utf8_lossy(t).to_string()),
-                    ValueRef::Blob(b) => Some(hex::encode(b)),
+                    ValueRef::Null => serde_json::Value::Null,
+                    ValueRef::Integer(x) => x.into(),
+                    ValueRef::Real(x) => serde_json::Number::from_f64(x).map(serde_json::Value::Number).unwrap_or(serde_json::Value::Null),
+                    ValueRef::Text(t) => String::from_utf8_lossy(t).into_owned().into(),
+                    ValueRef::Blob(b) => hex::encode(b).into(),
                 };
-                if let Some(s) = &v {
-                    hasher.update(s.as_bytes());
-                }
-                hasher.update(b"\x1f");
-                c.push(v);
+                o.insert(n.clone(), v);
             }
+            records.push(serde_json::Value::Object(o));
         }
-        let columns: Vec<Column> = names.iter().zip(cols).map(|(n, c)| Column::new(n.as_str().into(), c)).collect();
-        let frame = DataFrame::new_infer_height(columns)?;
+        let bytes = super::ndjson(&records)?;
         let canon = std::fs::canonicalize(self.path).unwrap_or_else(|_| self.path.to_path_buf());
         Ok(Input {
             locator: format!("sqlite://{}#{}", canon.display(), self.table.unwrap_or("query")),
-            name_hint: Some(
-                self.table.map(str::to_string).unwrap_or_else(|| self.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()),
-            ),
-            content_hash: hash_bytes(format!("{}|{}|{}", canon.display(), sql, hasher.finalize().to_hex()).as_bytes()),
-            frame,
+            name: self
+                .table
+                .map(str::to_string)
+                .unwrap_or_else(|| self.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()),
+            format: "ndjson".into(),
+            content_hash: hash_bytes(format!("{}|{}|{}", canon.display(), sql, hash_bytes(&bytes)).as_bytes()),
+            bytes,
         })
     }
 }

@@ -99,7 +99,7 @@ How live collaboration reaches peers: `stream` (gRPC streams, the default) or `p
 Print help
 .TP
 <\fISOURCE\fR>
-Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a bare model query), or `\-` for standard input (raw text: add a parser step, or \-\-format)
+Where the data comes from: source:NAME (what `mnnn ingest` stored there, as it arrived: a `text` column, one row per file or page), search:NAME, journal:NAME, code:SPACE, model:QUERY (or a bare model query), or `\-` for standard input (raw text: add a parser step, or \-\-format). Code steps take options: `code:to\-bars?symbol=BTC/USDT&duration=5m`
 .TP
 [\fISTEPS\fR]
 Steps in order: code:SPACE (or a space name), search:NAME (keeps the rows it matches), or a save that passes the data on unchanged, like `tee`: journal:NAME (a new entry with the data), model:NAME (new records), project:NAME[/J], org:ORG[/J] or net[:EXCHANGE|all][/J] (a journal entry kept in the project, given to the org, shared on the network). Save at any step

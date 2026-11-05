@@ -8,8 +8,7 @@ fn err(o: &std::process::Output) -> String {
 }
 
 fn ingest(e: &Env, file: &str) {
-    let f = fixture(file);
-    e.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
+    e.bars(file, "binance");
 }
 
 fn png(path: &Path) {

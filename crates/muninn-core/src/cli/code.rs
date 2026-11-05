@@ -368,7 +368,7 @@ pub(crate) fn run_pipe(
     rows: usize,
 ) -> anyhow::Result<()> {
     use code::pipe::{Source, Step};
-    let mut names: Vec<String> = steps.iter().filter_map(|s| if let Step::Code(n) = s { Some(n.clone()) } else { None }).collect();
+    let mut names: Vec<String> = steps.iter().filter_map(|s| if let Step::Code(n) = s { Some(code::split_options(n).0) } else { None }).collect();
     // a code source runs too, and so does whatever it reads by default
     let mut from = if let Source::Code(n) = src { Some(n.clone()) } else { None };
     while let Some(n) = from.take() {

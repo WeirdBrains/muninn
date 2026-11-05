@@ -1,7 +1,7 @@
 //! Redis source: streams, lists, sorted sets, hashes and strings.
 use crate::error::{Error, Result};
 use crate::ingest::frame::is_timestamp_alias;
-use crate::ingest::json::{parse_records, records_to_frame};
+use crate::ingest::json::parse_records;
 use crate::ingest::{Input, hash_bytes};
 use redis::Value as RV;
 use serde_json::{Map, Value};
@@ -102,9 +102,10 @@ impl RedisSource {
             let hash = hash_bytes(serde_json::to_string(&records)?.as_bytes());
             out.push(Input {
                 locator: format!("{}#{key}", self.display_url()),
-                name_hint: Some(key.clone()),
+                name: key.clone(),
+                format: "ndjson".into(),
                 content_hash: hash,
-                frame: records_to_frame(&records)?,
+                bytes: super::ndjson(&records)?,
             });
         }
         if out.is_empty() {
@@ -399,6 +400,6 @@ mod tests {
         s.key = Some("muninn:test:BTCUSDT_5m".into());
         s.value_format = ValueFormat::Fields;
         let inputs = s.read().unwrap();
-        assert_eq!(inputs[0].frame.height(), 5);
+        assert_eq!(inputs[0].bytes.split(|b| *b == b'\n').filter(|l| !l.is_empty()).count(), 5);
     }
 }

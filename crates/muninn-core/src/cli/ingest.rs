@@ -6,20 +6,40 @@ use crate::ingest::{self, IngestOptions, IngestReport};
 use crate::store::Store;
 
 pub fn options(ctx: &Ctx, c: &CommonIngestArgs) -> anyhow::Result<IngestOptions> {
+    moved(
+        ctx,
+        &[
+            (c.symbol.is_some(), "--symbol", "to-bars", "symbol=BTC/USDT"),
+            (c.duration.is_some(), "--duration", "to-bars", "duration=5m"),
+            (!c.map.is_empty(), "--map", "to-bars", "map=ts:timestamp"),
+            (c.rejects.is_some(), "--rejects", "to-bars", "rejects=keep"),
+        ],
+    );
     Ok(IngestOptions {
         source: c.source.clone(),
-        symbol: c.symbol.clone(),
-        duration: c.duration.clone(),
-        map: c.map.clone(),
-        rejects: c.rejects.clone(),
         force: c.force,
-        drop_zero_volume: ctx.prefs()?.ingest.drop_zero_volume,
         run_id: None,
         progress: None,
         no_recurse: c.no_recursive,
         track_files: true,
         default_source: None,
     })
+}
+
+/// Old shaping flags still parse, warn on one line each and change nothing: ingest stores
+/// data as it arrives; reading it is the parse-csv/to-bars code spaces' job.
+pub fn moved(ctx: &Ctx, flags: &[(bool, &str, &str, &str)]) {
+    for (given, flag, space, eg) in flags {
+        if *given {
+            ctx.io.warn(moved_note(flag, space, eg));
+        }
+    }
+}
+
+pub fn moved_note(flag: &str, space: &str, eg: &str) -> String {
+    format!(
+        "{flag} is ignored: ingest stores data as it arrives; it is now an option of the {space} code space (code:{space}?{eg}), see docs/pipes.md"
+    )
 }
 
 pub fn report(ctx: &Ctx, reports: &[IngestReport]) {
@@ -35,36 +55,48 @@ pub fn run(ctx: &Ctx, cmd: IngestCommand) -> anyhow::Result<()> {
     let mut store = ctx.open_store()?;
     let reports = match cmd {
         IngestCommand::Csv(a) => {
+            moved(
+                ctx,
+                &[
+                    (a.delimiter != ',', "--delimiter", "parse-csv", "delimiter=;"),
+                    (a.quote != '"', "--quote", "parse-csv", "quote='"),
+                    (a.escape.is_some(), "--escape", "parse-csv", "quote=\""),
+                    (a.no_header, "--no-header", "parse-csv", "header=false"),
+                    (a.skip_rows > 0, "--skip-rows", "parse-csv", "skip_rows=1"),
+                ],
+            );
             let opts = cancellable(options(ctx, &a.common)?);
-            let csv =
-                ingest::csv::CsvOptions { delimiter: a.delimiter, quote: a.quote, escape: a.escape, header: !a.no_header, skip_rows: a.skip_rows };
             let files = ingest::find_files(&a.path, ingest::CSV_EXTS, !opts.no_recurse).unwrap_or_default();
             let ticker = Ticker::start(ctx, a.progress, opts.progress.clone(), names(&a.path, &files), false);
-            let r = ingest::tracked(&mut store, "cli", files.len(), opts, |st, o| ingest::ingest_csv(st, ctx.io, o, &a.path, &csv));
+            let r = ingest::tracked(&mut store, "cli", files.len(), opts, |st, o| ingest::ingest_csv(st, ctx.io, o, &a.path));
             ticker.stop();
             r.map_err(cancelled)?
         }
         IngestCommand::Json(a) => {
+            moved(ctx, &[(a.records.is_some(), "--records", "parse-json", "records=data.items")]);
             let opts = cancellable(options(ctx, &a.common)?);
             let files = ingest::find_files(&a.path, ingest::JSON_EXTS, !opts.no_recurse).unwrap_or_default();
             let ticker = Ticker::start(ctx, a.progress, opts.progress.clone(), names(&a.path, &files), false);
-            let r = ingest::tracked(&mut store, "cli", files.len(), opts, |st, o| {
-                ingest::json::ingest_json(st, ctx.io, o, &a.path, a.records.as_deref())
-            });
+            let r = ingest::tracked(&mut store, "cli", files.len(), opts, |st, o| ingest::json::ingest_json(st, ctx.io, o, &a.path));
             ticker.stop();
             r.map_err(cancelled)?
         }
         IngestCommand::Path(a) => {
+            moved(
+                ctx,
+                &[
+                    (a.delimiter != ',', "--delimiter", "parse-csv", "delimiter=;"),
+                    (a.no_header, "--no-header", "parse-csv", "header=false"),
+                    (a.records.is_some(), "--records", "parse-json", "records=data.items"),
+                ],
+            );
             let opts = cancellable(options(ctx, &a.common)?);
             let path = a.target.or(a.path).expect("clap requires a path");
             let files = ingest::find_files(&path, ingest::DATA_EXTS, !opts.no_recurse).unwrap_or_default();
-            let csv = ingest::csv::CsvOptions { delimiter: a.delimiter, header: !a.no_header, ..Default::default() };
             // `ingest path` always names each file as it starts (unless --quiet)
             let ticker = Ticker::start(ctx, a.progress, opts.progress.clone(), names(&path, &files), true);
             let io = ctx.io;
-            let r = ingest::tracked(&mut store, "cli", files.len(), opts, |st, o| {
-                ingest::ingest_path(st, io, o, &path, &csv, a.records.as_deref(), |_, _, _| {})
-            });
+            let r = ingest::tracked(&mut store, "cli", files.len(), opts, |st, o| ingest::ingest_path(st, io, o, &path, |_, _, _| {}));
             ticker.stop();
             r.map_err(cancelled)?
         }
@@ -138,18 +170,6 @@ pub fn fmt_secs(s: f64) -> String {
     if s >= 3600 { format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60) } else { format!("{}:{:02}", s / 60, s % 60) }
 }
 
-fn fmt_count(n: u64) -> String {
-    let s = n.to_string();
-    let mut out = String::new();
-    for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c);
-    }
-    out
-}
-
 /// One progress line: `[1/3] BTC_5m.csv  42% · 180.3 MiB/429.0 MiB · 12.4 MiB/s · ETA 0:20`
 /// (plus ` · overall N%` for several files). `elapsed` is seconds since the run began.
 pub fn progress_line(e: &ingest::progress::Estimate, files: usize, name: &str, file_size: u64, elapsed: f64) -> String {
@@ -170,11 +190,11 @@ pub fn progress_line(e: &ingest::progress::Estimate, files: usize, name: &str, f
     l
 }
 
-/// Per-file summary: `done BTC_5m.csv: 1,234,567 bars in 42.1s (29,321 bars/s)`.
-pub fn summary_line(name: &str, bars: u64, ms: i64) -> String {
+/// Per-file summary: `done BTC_5m.csv: 429.0 MiB stored in 42.1s (10.2 MiB/s)`.
+pub fn summary_line(name: &str, bytes: u64, ms: i64) -> String {
     let secs = ms.max(0) as f64 / 1000.0;
-    let rate = if secs > 0.0 { format!(" ({} bars/s)", fmt_count((bars as f64 / secs) as u64)) } else { String::new() };
-    format!("done {name}: {} bars in {secs:.1}s{rate}", fmt_count(bars))
+    let rate = if secs > 0.0 { format!(" ({}/s)", fmt_bytes((bytes as f64 / secs) as u64)) } else { String::new() };
+    format!("done {name}: {} stored in {secs:.1}s{rate}", fmt_bytes(bytes))
 }
 
 /// Progress for file ingests on stderr. A background thread drains file events from the
@@ -232,10 +252,11 @@ impl Ticker {
                                         eprintln!("[{}/{n}] {} ({})", index + 1, name(index), fmt_bytes(size));
                                     }
                                 }
-                                ingest::progress::FileEvent::End { index, bars, ms } => {
+                                ingest::progress::FileEvent::End { index, ms, .. } => {
+                                    let size = running.filter(|(i, _)| *i == index).map(|(_, s)| s).unwrap_or(0);
                                     running = None;
                                     if show {
-                                        eprintln!("{}", summary_line(&name(index), bars, ms));
+                                        eprintln!("{}", summary_line(&name(index), size, ms));
                                     }
                                 }
                             }
@@ -325,9 +346,9 @@ fn service(ctx: &Ctx, store: &mut Store, cmd: ServiceCommand) -> anyhow::Result<
             };
             req.validate()?;
             let host = url::Url::parse(&a.url).ok().and_then(|u| u.host_str().map(str::to_string));
-            let input = req.fetch()?;
-            let loc = input.locator.clone();
-            svc::run_inputs(store, ctx.io, options(ctx, &a.common.ingest)?, &loc, host, vec![input])?
+            let inputs = req.fetch()?;
+            let loc = svc::http::redact(&url::Url::parse(&a.url)?);
+            svc::run_inputs(store, ctx.io, options(ctx, &a.common.ingest)?, &loc, host, inputs)?
         }
         ServiceCommand::Redis(a) => {
             let src = svc::redis::RedisSource {
@@ -410,7 +431,8 @@ mod progress_tests {
         let e = ingest::progress::Estimate { file_index: 0, file: 0.42, overall: 0.14, bytes_done: 180 << 20, bytes_total: 1290 << 20 };
         let l = progress_line(&e, 3, "BTC_5m.csv", 429 << 20, 10.0);
         assert_eq!(l, "[1/3] BTC_5m.csv   42% · 180.2 MiB/429.0 MiB · 18.0 MiB/s · ETA 1:02 · overall 14%");
-        assert_eq!(summary_line("BTC_5m.csv", 1_234_567, 42_100), "done BTC_5m.csv: 1,234,567 bars in 42.1s (29,324 bars/s)");
+        assert_eq!(summary_line("BTC_5m.csv", 429 << 20, 42_100), "done BTC_5m.csv: 429.0 MiB stored in 42.1s (10.2 MiB/s)");
+        assert!(moved_note("--symbol", "to-bars", "symbol=BTC/USDT").contains("code:to-bars?symbol=BTC/USDT"));
         assert_eq!(fmt_secs(3725.0), "1:02:05");
         assert_eq!(fmt_bytes(512), "512 B");
     }

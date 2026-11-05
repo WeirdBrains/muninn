@@ -16,9 +16,11 @@ mnnn pipeline export flow --out flow.json
 mnnn pipeline import flow.json --dry-run      # the plan; then without --dry-run
 ```
 
-Nodes are `ID=KIND`: `search:NAME`, `journal:NAME`, `source:QUERY` or `-` (stdin, raw
+Nodes are `ID=KIND`: `source:NAME` (what [ingest](ingest-csv.md) stored there, as it
+arrived), `search:NAME`, `journal:NAME`, `source:QUERY` or `-` (stdin, raw
 text: follow it with a parser node such as `code:parse-csv`, see [pipes](pipes.md#parsers)) as
 sources; `code:SPACE`; `view:table|chart[:col,col]`; `filter:SEARCH`; `model:NAME`.
+Code nodes take options: `b=code:to-bars?symbol=BTC/USDT&duration=5m`.
 Saves along the way: `raw=code:fast+journal:Raw`. Edges are `FROM>TO[:NAME]` and chain
 (`a>b>c`); a code space with several inputs reads `host.input()` (the first) or
 `host.input_named("NAME")` and `host.inputs()` (the names); a math space writes
@@ -134,3 +136,18 @@ drafts to approve, as models do.
 4. Designer window, monitor tile, code space tile with a result chart, views as tiles (done).
 5. Pipelines over Share and `net share`/`net fetch` (peer pipelines as drafts) (done).
 6. Saves to projects, orgs and the network.
+
+## Bars from ingested files
+
+Ingest never makes bars; a pipeline you set up does:
+
+```
+mnnn ingest csv --path ~/raw/binance/BTCUSDT_5m.csv          # stored as is, source "binance"
+mnnn code parsers --install
+mnnn pipeline create btc --node src=source:binance --node p=code:parse-csv \
+  --node 'b=code:to-bars?symbol=BTC/USDT&duration=5m' --node m=model:bars --edge 'src>p>b>m'
+mnnn pipeline run btc -y
+```
+
+Run it again after more files arrive: the `model:bars` leaf adds only bars that are not
+there yet.

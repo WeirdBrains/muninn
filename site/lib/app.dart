@@ -163,7 +163,7 @@ const features = [
   ),
   (
     'Ingest anything',
-    'CSV, JSON, HTTP APIs, Redis, SQLite, Postgres and standard input, as structured data.',
+    'CSV, JSON, HTTP APIs, Redis, SQLite, Postgres and standard input, stored as they arrive; your pipelines decide what the data is.',
   ),
   (
     'Live searches, journals, reports',

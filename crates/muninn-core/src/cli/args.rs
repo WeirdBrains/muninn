@@ -54,7 +54,7 @@ pub struct GlobalArgs {
 #[derive(Debug, Subcommand)]
 #[allow(clippy::large_enum_variant)]
 pub enum Command {
-    /// Ingest bars from files or services.
+    /// Store data from files or services as it arrives (pipelines decide what it is).
     #[command(subcommand)]
     Ingest(IngestCommand),
     /// Export bars.
@@ -183,26 +183,28 @@ pub enum Command {
     },
 }
 
-/// Values shared by every ingest kind.
+/// Values shared by every ingest kind. Ingest stores data as it arrives; what it is
+/// (rows, bars, symbols) is for pipelines and code spaces to decide.
 #[derive(Debug, Clone, Args, Default)]
 pub struct CommonIngestArgs {
-    /// Where the data came from, e.g. coinbase (created if unknown). Default: an exchange
-    /// named in the file name (binance_…, coinbase_…), else a prompt.
+    /// The source to store into (created if unknown). Default: the source already
+    /// holding this path, else the folder's name (a service: its host); asked only when
+    /// there is none.
     #[arg(long)]
     pub source: Option<String>,
-    /// Symbol, e.g. BTC/USDT, BTC-USD or BTCUSDT.
+    /// Ignored (warns): now the to-bars option `symbol` (`code:to-bars?symbol=BTC/USDT`).
     #[arg(long)]
     pub symbol: Option<String>,
-    /// Bar duration, e.g. 5m, 1h, 1d.
+    /// Ignored (warns): now the to-bars option `duration` (`code:to-bars?duration=5m`).
     #[arg(long)]
     pub duration: Option<String>,
-    /// Column mapping `<col>=<field>` (fields: timestamp, open, high, low, close, volume). Repeatable.
+    /// Ignored (warns): now the to-bars option `map` (`code:to-bars?map=ts:timestamp`).
     #[arg(long = "map", value_name = "COL=FIELD")]
     pub map: Vec<String>,
-    /// Write rejected rows (with reasons) to this CSV.
+    /// Ignored (warns): to-bars passes rejected rows to its output (`rejects=fail` stops instead).
     #[arg(long, value_name = "FILE")]
     pub rejects: Option<PathBuf>,
-    /// Re-process even if this exact input was already ingested.
+    /// Store again even if these exact bytes are already in the source.
     #[arg(long)]
     pub force: bool,
     /// For a directory --path: only its top level (default: search subdirectories too).
@@ -226,13 +228,14 @@ pub struct ProgressArgs {
 #[derive(Debug, Subcommand)]
 #[allow(clippy::large_enum_variant)]
 pub enum IngestCommand {
-    /// Ingest CSV file(s).
+    /// Store CSV file(s) in a source as they are (read them with a pipeline:
+    /// `source:NAME > code:parse-csv > …`).
     Csv(CsvIngestArgs),
-    /// Ingest JSON / NDJSON file(s).
+    /// Store JSON / NDJSON file(s) in a source as they are.
     Json(JsonIngestArgs),
-    /// Ingest a whole path: every CSV and JSON file in a directory tree (or one file).
+    /// Store a whole path: every CSV and JSON file in a directory tree (or one file), as they are.
     Path(PathIngestArgs),
-    /// Ingest from a service.
+    /// Store what a service returns (HTTP pages, Redis, SQLite, Postgres rows as NDJSON), as it is.
     #[command(subcommand)]
     Service(ServiceCommand),
     /// Show import runs (status, cancels) and their artifact ledger.
@@ -255,15 +258,19 @@ pub struct CsvIngestArgs {
     pub common: CommonIngestArgs,
     #[command(flatten)]
     pub progress: ProgressArgs,
+    /// Ignored (warns): now the parse-csv option `delimiter`.
     #[arg(long, default_value_t = ',')]
     pub delimiter: char,
+    /// Ignored (warns): now the parse-csv option `quote`.
     #[arg(long, default_value_t = '"')]
     pub quote: char,
+    /// Ignored (warns): parse-csv doubles its `quote` character.
     #[arg(long)]
     pub escape: Option<char>,
-    /// The file has no header row.
+    /// Ignored (warns): now the parse-csv option `header=false`.
     #[arg(long)]
     pub no_header: bool,
+    /// Ignored (warns): now the parse-csv option `skip_rows`.
     #[arg(long, default_value_t = 0)]
     pub skip_rows: usize,
 }
@@ -277,7 +284,7 @@ pub struct JsonIngestArgs {
     pub common: CommonIngestArgs,
     #[command(flatten)]
     pub progress: ProgressArgs,
-    /// Where the array of bars lives (dotted path or JSON pointer).
+    /// Ignored (warns): now the parse-json option `records`.
     #[arg(long)]
     pub records: Option<String>,
 }
@@ -295,13 +302,13 @@ pub struct PathIngestArgs {
     pub common: CommonIngestArgs,
     #[command(flatten)]
     pub progress: ProgressArgs,
-    /// CSV field delimiter.
+    /// Ignored (warns): now the parse-csv option `delimiter`.
     #[arg(long, default_value_t = ',')]
     pub delimiter: char,
-    /// CSV files have no header row.
+    /// Ignored (warns): now the parse-csv option `header=false`.
     #[arg(long)]
     pub no_header: bool,
-    /// JSON: where the array of bars lives (dotted path or JSON pointer).
+    /// Ignored (warns): now the parse-json option `records`.
     #[arg(long)]
     pub records: Option<String>,
 }
@@ -614,6 +621,19 @@ pub enum SourcesCommand {
     },
     Remove {
         name: String,
+    },
+    /// What a source holds as it arrived (`mnnn ingest` stores files, pages and query
+    /// results byte for byte): one line per item, oldest first.
+    Data {
+        name: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Write one stored item's bytes to standard output, exactly as they arrived.
+    Cat {
+        name: String,
+        /// The item's id (or its start, as `sources data` shows it).
+        item: String,
     },
 }
 
@@ -1933,10 +1953,10 @@ const TUI_NOTES: &str = "\
 Everything you can act on is clickable: menus, tiles, sidebar, popup rows, form fields, \
 import picker entries and the key buttons ([X] closes any popup).
 
-Import (i): pick a file or a whole folder (A imports the folder, recursing). If a symbol \
-cannot be guessed from a file name, a popup asks for it, showing the file name on its own \
-line, its folder below and (file i of n) during folder imports. After an import, if no tile shows \
-data yet, the focused tile loads the first imported series.
+Import (i): pick a file or a whole folder (A imports the folder, recursing). Files are \
+stored as they are in a source (the folder's name unless you type one); nothing is asked \
+about symbols. To chart them, run a pipeline from source:NAME through code:parse-csv and \
+code:to-bars into model:bars.
 
 Help (? or F1): follow links with Tab and Enter or a click, Backspace goes back, / searches \
 from any topic; a clickable key bar at the bottom lists the shortcuts.
@@ -3960,8 +3980,11 @@ pub enum PipelineCommand {
   cat trades.csv | mnnn pipe - --format csv code:fast --to model:trades
   tail -f feed.ndjson | mnnn pipe - --format ndjson code:fast --chunk 100 --to journal:Feed")]
 pub struct PipeArgs {
-    /// Where the data comes from: search:NAME, journal:NAME, code:SPACE, model:QUERY (or a
-    /// bare model query), or `-` for standard input (raw text: add a parser step, or --format).
+    /// Where the data comes from: source:NAME (what `mnnn ingest` stored there, as it
+    /// arrived: a `text` column, one row per file or page), search:NAME, journal:NAME,
+    /// code:SPACE, model:QUERY (or a bare model query), or `-` for standard input (raw
+    /// text: add a parser step, or --format). Code steps take options:
+    /// `code:to-bars?symbol=BTC/USDT&duration=5m`.
     pub source: String,
     /// Steps in order: code:SPACE (or a space name), search:NAME (keeps the rows it
     /// matches), or a save that passes the data on unchanged, like `tee`: journal:NAME (a

@@ -31,6 +31,9 @@ impl Env {
             .env("PATH", std::env::var("PATH").unwrap_or_default())
             .env("MUNINN_HOME", self.home())
             .env("MUNINN_PASSWORD", "correct horse battery staple")
+            // code spaces (the built-in parsers) build into one shared, cached target
+            .env("HOME", std::env::var("HOME").unwrap_or_default())
+            .env("MUNINN_CODE_TARGET", Path::new(env!("CARGO_TARGET_TMPDIR")).join("code-target"))
             .arg("--non-interactive");
         c
     }
@@ -47,5 +50,20 @@ impl Env {
             String::from_utf8_lossy(&o.stderr)
         );
         String::from_utf8_lossy(&o.stdout).to_string()
+    }
+    /// Bars from a fixture CSV the way a user makes them: `mnnn ingest` stores the file as
+    /// it is (in a source of its own, `<source>-<file>`), then a pipe through the built-in
+    /// parsers writes them to the bars model under `source`. The symbol comes from the
+    /// fixture's name (ETHUSDT_5m.csv: ETH/USDT, 5m).
+    pub fn bars(&self, file: &str, source: &str) {
+        let f = fixture(file);
+        let stem = file.trim_end_matches(".csv");
+        let raw = format!("{source}-{stem}");
+        self.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", &raw]);
+        let (pair, dur) = stem.rsplit_once('_').unwrap_or((stem, "5m"));
+        let sym = format!("{}/USDT", pair.trim_end_matches("USDT"));
+        let to_bars = format!("code:to-bars?symbol={sym}&duration={dur}&source={source}");
+        self.ok(&["-y", "code", "parsers", "--install"]);
+        self.ok(&["-y", "pipe", &format!("source:{raw}"), "code:parse-csv", &to_bars, "--to", "model:bars", "--rows", "1"]);
     }
 }

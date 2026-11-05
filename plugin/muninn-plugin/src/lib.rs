@@ -125,6 +125,23 @@ impl Host {
         Frame::from_json(&self.call("input_named", &Json::obj().with("name", name))?)
     }
 
+    /// The step's options, as text: `code:to-bars?symbol=BTC/USDT&duration=5m` gives
+    /// `[("symbol", "BTC/USDT"), ("duration", "5m")]`. Empty when none were given (or the
+    /// host is older than options).
+    pub fn options(&self) -> Vec<(String, String)> {
+        let o = self.call("options", &Json::Null).unwrap_or(Json::Null);
+        o.as_object()
+            .unwrap_or(&[])
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())))
+            .collect()
+    }
+
+    /// One option by name (see [`Host::options`]).
+    pub fn option(&self, name: &str) -> Option<String> {
+        self.options().into_iter().find(|(k, _)| k == name).map(|(_, v)| v)
+    }
+
     /// The code space's input request itself (what [`Host::input`] loads).
     pub fn input_request(&self) -> Result<Json> {
         self.call("input_request", &Json::Null)

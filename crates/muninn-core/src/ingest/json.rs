@@ -110,9 +110,10 @@ pub fn read_json_file(p: &Path, records: Option<&str>) -> Result<DataFrame> {
     records_to_frame(&parse_records(&b, is_ndjson(p), records)?)
 }
 
-pub fn ingest_json(store: &mut Store, io: Interact, opts: IngestOptions, path: &Path, records: Option<&str>) -> Result<Vec<IngestReport>> {
+/// Ingest JSON / NDJSON file(s): stored as they are (`records` is now a parse-json option).
+pub fn ingest_json(store: &mut Store, io: Interact, opts: IngestOptions, path: &Path) -> Result<Vec<IngestReport>> {
     let files = super::find_files(path, super::JSON_EXTS, !opts.no_recurse)?;
-    super::ingest_files(store, io, opts, path, &files, |f, bytes| records_to_frame(&parse_records(&bytes, is_ndjson(f), records)?))
+    super::ingest_files(store, io, opts, path, &files)
 }
 
 #[cfg(test)]

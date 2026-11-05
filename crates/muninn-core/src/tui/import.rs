@@ -1,4 +1,6 @@
-//! Import popup: file browser, per-file guesses, background ingest with live progress.
+//! Import popup: file browser, a raw preview, background ingest with live progress. Files
+//! are stored as they are in their source; nothing about what they hold is asked or
+//! guessed (pipelines and code spaces read them later).
 use super::{App, block};
 use crate::ingest::{self, IngestOptions, Progress};
 use crate::theme::Theme;
@@ -181,85 +183,17 @@ pub fn head(path: &Path, n: usize) -> Vec<String> {
 /// Lines shown by the preview.
 pub const PREVIEW_LINES: usize = 10;
 
-/// One preview line: parsed bar text, or the raw line with why it is invalid.
+/// One preview line: the file's text as it is.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PreviewRow {
     pub text: String,
     pub ok: bool,
 }
 
-fn fmt_px(v: f64) -> String {
-    super::tiles::fmt_num(v)
-}
-
-/// Parse the first [`PREVIEW_LINES`] data lines of a file with the ingest parser
-/// (column mapping, timestamp parsing, validation). Reads at most 64 KiB.
-pub fn preview_bars(path: &Path) -> Vec<PreviewRow> {
-    use crate::ingest::frame::{Columns, derive_duration};
-    let json = super::forms::is_json(path);
-    let ndjson = crate::ingest::json::is_ndjson(path);
-    let header = usize::from(!json);
-    let lines = head(path, PREVIEW_LINES + header);
-    let data_lines: Vec<String> = lines.iter().skip(header).cloned().collect();
-    let raw = |why: &str| {
-        let mut v = vec![PreviewRow { text: why.to_string(), ok: false }];
-        v.extend(data_lines.iter().map(|l| PreviewRow { text: l.clone(), ok: false }));
-        v
-    };
-    let mut text = lines.join("\n");
-    text.push('\n');
-    let df = if json && !ndjson {
-        // A JSON array only parses whole; small files fit in the head read.
-        let whole = path.metadata().map(|m| m.len() <= 64 * 1024).unwrap_or(false);
-        if !whole {
-            return raw("JSON array: too large to parse a head preview (ndjson previews parse)");
-        }
-        std::fs::read(path).map_err(crate::Error::from).and_then(|b| crate::ingest::json::read_json_bytes(&b, false))
-    } else if json {
-        crate::ingest::json::read_json_bytes(text.as_bytes(), true)
-    } else {
-        crate::ingest::csv::read_csv_bytes(text.into_bytes(), &Default::default())
-    };
-    let df = match df {
-        Ok(d) => d.head(Some(PREVIEW_LINES)),
-        Err(e) => return raw(&format!("✗ cannot parse: {e}")),
-    };
-    let cols = match Columns::from_frame(&df, &Default::default()) {
-        Ok(c) => c,
-        Err(e) => return raw(&format!("✗ {e}")),
-    };
-    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-    let sym = crate::ingest::symbol_from_name_static(&name).map(|s| s.display()).unwrap_or_else(|| "?/?".into());
-    let dur = crate::ingest::duration_from_name(&name)
-        .or_else(|| derive_duration(&cols.valid_ts()).map(|d| d.duration))
-        // unknown duration: skip the alignment check
-        .unwrap_or(crate::model::Duration(400 * 86_400));
-    let v = cols.validate(dur, false);
-    let mut rejects: std::collections::HashMap<usize, String> = v.rejects.into_iter().map(|r| (r.row, r.reason)).collect();
-    let mut bars = v.bars.into_iter();
-    let mut out = vec![];
-    for i in 0..cols.len() {
-        let row = i + 1;
-        let line = data_lines.get(i).cloned().unwrap_or_default();
-        if let Some(why) = rejects.remove(&row) {
-            out.push(PreviewRow { text: format!("✗ {why}: {line}"), ok: false });
-        } else if let Some(b) = bars.next() {
-            let flags = if b.flags & crate::model::FLAG_ZERO_VOLUME != 0 { " zero-vol" } else { "" };
-            out.push(PreviewRow {
-                text: format!(
-                    "{} {sym} o {} h {} l {} c {} v {}{flags}",
-                    crate::ingest::time::fmt_ts(b.ts),
-                    fmt_px(b.open),
-                    fmt_px(b.high),
-                    fmt_px(b.low),
-                    fmt_px(b.close),
-                    fmt_px(b.volume)
-                ),
-                ok: true,
-            });
-        }
-    }
-    out
+/// The first [`PREVIEW_LINES`] lines of a file, as they are (nothing parsed: what the
+/// data is is for code spaces to say). Reads at most 64 KiB.
+pub fn preview_data(path: &Path) -> Vec<PreviewRow> {
+    head(path, PREVIEW_LINES).into_iter().map(|text| PreviewRow { text, ok: true }).collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -275,8 +209,8 @@ pub enum Pane {
 pub enum Msg {
     File(usize),
     Report(String, Vec<String>),
-    /// Series written by a finished file (for auto-loading).
-    Series(Vec<super::layout::SeriesKey>),
+    /// The source a finished file was stored in.
+    Source(String),
     Failed(String, String),
     /// Cancelled while importing this file; it was rolled back.
     Cancelled(String),
@@ -299,8 +233,8 @@ pub struct Running {
     pub run_id: Option<i64>,
     /// The folder was added to Recent by this run (undone if nothing is kept).
     pub recent_added: bool,
-    /// Series of the files that were kept, in import order.
-    pub imported: Vec<super::layout::SeriesKey>,
+    /// Sources the kept files went into, in import order.
+    pub sources: Vec<String>,
 }
 
 pub enum Phase {
@@ -321,18 +255,16 @@ pub struct ImportState {
     pub path: String,
     pub completer: Completer,
     pub pane: Pane,
-    /// source, symbol, duration (empty = derive).
-    pub fields: [String; 3],
+    /// The source to store into (empty: the folder's name).
+    pub fields: [String; 1],
     pub phase: Phase,
     pub preview: Option<(PathBuf, Vec<PreviewRow>)>,
     pub message: Option<String>,
     /// Highlighted entry in the Places column.
     pub place_sel: usize,
-    /// The symbol popup, while one is open.
-    pub ask: Option<SymbolAsk>,
 }
 
-pub const FIELDS: [&str; 3] = ["source", "symbol", "duration"];
+pub const FIELDS: [&str; 1] = ["source"];
 
 impl Default for ImportState {
     fn default() -> Self {
@@ -358,14 +290,13 @@ impl ImportState {
             preview: None,
             message: None,
             place_sel: 0,
-            ask: None,
         };
         s.reload();
         s
     }
 
     pub fn typing(&self) -> bool {
-        self.ask.is_some() || matches!(self.phase, Phase::Browse) && !matches!(self.pane, Pane::Files | Pane::Places)
+        matches!(self.phase, Phase::Browse) && !matches!(self.pane, Pane::Files | Pane::Places)
     }
 
     pub fn running(&self) -> bool {
@@ -419,15 +350,6 @@ impl ImportState {
         } else {
             self.chosen.extend(files);
         }
-    }
-
-    /// Guessed symbol and duration for a file name, shown before importing.
-    pub fn guess(p: &Path) -> (String, String) {
-        let n = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-        (
-            ingest::symbol_from_name_static(&n).map(|s| s.display()).unwrap_or_else(|| "?".into()),
-            ingest::duration_from_name(&n).map(|d| d.to_string()).unwrap_or_else(|| "from data".into()),
-        )
     }
 }
 
@@ -565,191 +487,17 @@ pub fn start(app: &mut App, targets: Vec<PathBuf>) {
         app.import.message = Some(format!("no data files (.csv .tsv .txt .json .ndjson .jsonl) in {}", targets[0].display()));
         return;
     }
-    // Ask for the symbol of every file whose name doesn't give one (unless the symbol
-    // field is set): a popup per file, then the import starts.
-    if app.import.fields[1].trim().is_empty() {
-        let ask: Vec<PathBuf> = files
-            .iter()
-            .filter(|f| {
-                let n = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                ingest::symbol_from_name(&app.store, &n).ok().flatten().is_none()
-            })
-            .cloned()
-            .collect();
-        if !ask.is_empty() {
-            app.import.ask = Some(SymbolAsk { files, asked: ask.len(), ask, answers: Default::default(), input: String::new(), error: None });
-            return;
-        }
-    }
-    launch(app, files, Default::default());
+    launch(app, files);
 }
 
-/// "Which symbol is this file?" asked before an import for names that don't tell.
-pub struct SymbolAsk {
-    /// Every file of the import.
-    pub files: Vec<PathBuf>,
-    /// Files still to ask about (the first is shown).
-    pub ask: Vec<PathBuf>,
-    /// How many files needed a symbol when the popup opened (for "file i of n").
-    pub asked: usize,
-    pub answers: std::collections::HashMap<PathBuf, String>,
-    pub input: String,
-    pub error: Option<String>,
-}
-
-/// Symbol popup answers: OK (this file), OK for all remaining, skip the file, cancel.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AskAction {
-    Ok,
-    All,
-    Skip,
-    Cancel,
-}
-
-pub fn ask_action(app: &mut App, a: AskAction) {
-    let Some(mut q) = app.import.ask.take() else { return };
-    if a == AskAction::Cancel {
-        app.import.message = Some("import cancelled: no symbol given".into());
-        return;
-    }
-    if a == AskAction::Skip {
-        let f = q.ask.remove(0);
-        q.files.retain(|x| *x != f);
-    } else {
-        let sym = match crate::model::Symbol::parse(&q.input) {
-            Ok(s) => s.display(),
-            Err(_) => {
-                q.error = Some(format!("`{}` is not a symbol: type BASE/QUOTE, e.g. BTC/USDT", q.input.trim()));
-                app.import.ask = Some(q);
-                return;
-            }
-        };
-        let take = if a == AskAction::All { q.ask.len() } else { 1 };
-        for f in q.ask.drain(..take) {
-            q.answers.insert(f, sym.clone());
-        }
-        q.input.clear();
-        q.error = None;
-    }
-    if !q.ask.is_empty() {
-        app.import.ask = Some(q);
-    } else if q.files.is_empty() {
-        app.import.message = Some("nothing to import: every file was skipped".into());
-    } else {
-        launch(app, q.files, q.answers);
-    }
-}
-
-fn ask_key(app: &mut App, k: KeyEvent) {
-    let Some(q) = app.import.ask.as_mut() else { return };
-    match k.code {
-        KeyCode::Enter => ask_action(app, AskAction::Ok),
-        KeyCode::Esc => ask_action(app, AskAction::Cancel),
-        KeyCode::Tab => ask_action(app, AskAction::Skip),
-        KeyCode::Char('a') if k.modifiers.contains(ratatui::crossterm::event::KeyModifiers::CONTROL) => ask_action(app, AskAction::All),
-        KeyCode::Backspace => {
-            q.input.pop();
-        }
-        KeyCode::Char(c) => q.input.push(c),
-        _ => {}
-    }
-}
-
-/// `s` cut to at most `w` columns from the left, with a leading `…` when shortened.
-pub fn ellipsize_left(s: &str, w: usize) -> String {
-    let n = s.chars().count();
-    if n <= w {
-        return s.to_string();
-    }
-    if w == 0 {
-        return String::new();
-    }
-    let tail: String = s.chars().skip(n - (w - 1)).collect();
-    format!("…{tail}")
-}
-
-/// Split a file name into rows of at most `w` columns (never cut, only wrapped).
-fn wrap_name(s: &str, w: usize) -> Vec<String> {
-    let c: Vec<char> = s.chars().collect();
-    c.chunks(w.max(1)).map(|ch| ch.iter().collect()).collect()
-}
-
-fn draw_ask(q: &SymbolAsk, f: &mut Frame, area: Rect, t: &Theme, hits: &mut Vec<(Rect, super::Hit)>) {
-    let path = q.ask.first().cloned().unwrap_or_default();
-    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string());
-    let dir = path.parent().map(|d| d.display().to_string()).unwrap_or_default();
-    let w = 76.min(area.width);
-    let inner_w = w.saturating_sub(2) as usize;
-    let name_rows = wrap_name(&name, inner_w.saturating_sub(6));
-    let r = super::centered(area, w, (9 + name_rows.len() as u16).min(area.height));
-    f.render_widget(ratatui::widgets::Clear, r);
-    let pos = q.asked.saturating_sub(q.ask.len()) + 1;
-    let title = if q.asked > 1 { format!("Symbol needed · file {pos} of {}", q.asked) } else { "Symbol needed".to_string() };
-    let b = block(&title, true, t);
-    let inner = b.inner(r);
-    f.render_widget(b, r);
-    let more = q.ask.len().saturating_sub(1);
-    let mut lines = vec![Line::styled("The symbol can't be guessed from the file name:", Style::new().fg(t.muted))];
-    for (i, row) in name_rows.into_iter().enumerate() {
-        let label = if i == 0 { "file  " } else { "      " };
-        lines.push(Line::from(vec![
-            Span::styled(label, Style::new().fg(t.accent)),
-            Span::styled(row, Style::new().fg(t.fg).add_modifier(Modifier::BOLD)),
-        ]));
-    }
-    lines.push(Line::from(vec![
-        Span::styled("in    ", Style::new().fg(t.accent)),
-        Span::styled(ellipsize_left(&dir, inner_w.saturating_sub(6)), Style::new().fg(t.muted)),
-    ]));
-    lines.push(Line::raw(""));
-    lines.push(Line::from(vec![
-        Span::styled("symbol ", Style::new().fg(t.accent)),
-        Span::styled(format!("{}▏", q.input), Style::new().fg(t.fg)),
-        Span::styled("  e.g. BTC/USDT", Style::new().fg(t.muted)),
-    ]));
-    lines.push(match &q.error {
-        Some(e) => Line::styled(e.clone(), Style::new().fg(t.error)),
-        None if more > 0 => Line::styled(format!("{more} more file(s) after this one"), Style::new().fg(t.muted)),
-        None => Line::raw(""),
-    });
-    f.render_widget(Paragraph::new(lines), inner);
-    let bar = Rect { y: inner.bottom().saturating_sub(1), height: 1, ..inner };
-    let mut keys = vec![("Enter OK", KeyCode::Enter)];
-    if more > 0 {
-        keys.push(("Ctrl-a OK for all", KeyCode::F(30)));
-    }
-    keys.extend([("Tab skip file", KeyCode::Tab), ("Esc cancel", KeyCode::Esc)]);
-    let start = hits.len();
-    super::widgets::key_bar(f, bar, &keys, t, hits);
-    // map the key buttons to the popup's actions
-    for (_, h) in hits[start..].iter_mut() {
-        *h = super::Hit::ImportAsk(match h {
-            super::Hit::Press(KeyCode::Enter) => 0,
-            super::Hit::Press(KeyCode::F(30)) => 1,
-            super::Hit::Press(KeyCode::Tab) => 2,
-            _ => 3,
-        });
-    }
-    let x = super::widgets::close_button(f, r, t);
-    hits.push((x, super::Hit::ImportAsk(3)));
-}
-
-/// Start the background import of `files`; `symbols` gives a symbol for some files.
-fn launch(app: &mut App, files: Vec<PathBuf>, symbols: std::collections::HashMap<PathBuf, String>) {
+/// Start the background import of `files`: each stored as it is.
+fn launch(app: &mut App, files: Vec<PathBuf>) {
     let progress = Arc::new(Progress::default());
     let sizes: Vec<u64> = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).collect();
     progress.bytes_total.store(sizes.iter().sum(), Ordering::Relaxed);
     let f = &app.import.fields;
     let opt = |s: &String| (!s.trim().is_empty()).then(|| s.trim().to_string());
-    let opts = IngestOptions {
-        source: opt(&f[0]),
-        default_source: Some("local".into()),
-        symbol: opt(&f[1]),
-        duration: opt(&f[2]),
-        drop_zero_volume: app.prefs.ingest.drop_zero_volume,
-        progress: Some(progress.clone()),
-        ..Default::default()
-    };
+    let opts = IngestOptions { source: opt(&f[0]), default_source: Some("local".into()), progress: Some(progress.clone()), ..Default::default() };
     let (tx, rx) = mpsc::channel();
     let db = app.paths.db.clone();
     let key = app.dek.0;
@@ -777,15 +525,7 @@ fn launch(app: &mut App, files: Vec<PathBuf>, symbols: std::collections::HashMap
                 p.begin_file(i as u64, sizes[i]);
             }
             let io = crate::interact::Interact::batch(true);
-            let mut o = opts.clone();
-            if let Some(sym) = symbols.get(f) {
-                o.symbol = Some(sym.clone());
-            }
-            let r = if super::forms::is_json(f) {
-                ingest::json::ingest_json(&mut store, io, o, f, None)
-            } else {
-                ingest::ingest_csv(&mut store, io, o, f, &Default::default())
-            };
+            let r = ingest::ingest_files(&mut store, io, opts.clone(), f, std::slice::from_ref(f));
             if let Some(p) = &opts.progress {
                 p.end_file();
             }
@@ -793,11 +533,9 @@ fn launch(app: &mut App, files: Vec<PathBuf>, symbols: std::collections::HashMap
             let _ = match r {
                 Ok(reps) => {
                     kept += 1;
-                    let keys = reps
-                        .iter()
-                        .map(|r| super::layout::SeriesKey { source: r.source.clone(), symbol: r.symbol.clone(), duration: r.duration.clone() })
-                        .collect();
-                    let _ = tx.send(Msg::Series(keys));
+                    if let Some(r) = reps.first() {
+                        let _ = tx.send(Msg::Source(r.source.clone()));
+                    }
                     tx.send(Msg::Report(name, reps.iter().map(line_of).collect()))
                 }
                 Err(_) if opts.progress.as_ref().is_some_and(|p| p.cancelled()) => tx.send(Msg::Cancelled(name)),
@@ -849,19 +587,16 @@ fn launch(app: &mut App, files: Vec<PathBuf>, symbols: std::collections::HashMap
         kept: 0,
         run_id: None,
         recent_added,
-        imported: vec![],
+        sources: vec![],
     });
 }
 
 fn line_of(r: &ingest::IngestReport) -> String {
     if r.skipped {
-        return format!("{} {} {}: skipped (already imported)", r.source, r.symbol, r.duration);
+        return format!("{}: skipped (already stored)", r.source);
     }
-    let w = if r.warnings.is_empty() { String::new() } else { format!(" · {}", r.warnings.join("; ")) };
-    format!(
-        "{} {} {}: {} rows, {} new, {} dup, {} rejected, {} gaps{w}",
-        r.source, r.symbol, r.duration, r.rows, r.inserted, r.duplicate, r.rejected, r.gaps
-    )
+    let fmt = if r.format.is_empty() { String::new() } else { format!(" · {}", r.format) };
+    format!("{}: {:.1} MB stored as is{fmt}", r.source, r.bytes as f64 / 1e6)
 }
 
 /// Drain messages from the background import. Returns true when it finished.
@@ -879,15 +614,17 @@ pub fn poll(app: &mut App) -> bool {
             Msg::Failed(n, e) => run.log.push(format!("✗ {n}: {e} (rolled back)")),
             Msg::Cancelled(n) => run.log.push(format!("✗ {n}: cancelled, rolled back (nothing of it stored)")),
             Msg::Run(id) => run.run_id = Some(id),
-            Msg::Series(k) => run.imported.extend(k),
+            Msg::Source(k) => {
+                if !run.sources.contains(&k) {
+                    run.sources.push(k)
+                }
+            }
             Msg::Done => done = true,
         }
     }
     if done {
         let cancelled = run.progress.cancelled();
-        let (d, _) = run.progress.get();
         let mb = run.progress.bytes_before.load(Ordering::Relaxed) as f64 / 1e6;
-        let d = if cancelled { d.min(run.progress.done.load(Ordering::Relaxed)) } else { d };
         let secs = run.started.elapsed().as_secs_f64();
         let mut lines = std::mem::take(&mut run.log);
         lines.push(String::new());
@@ -907,9 +644,13 @@ pub fn poll(app: &mut App) -> bool {
                 run.files.len() - started
             ));
         }
-        lines.push(format!("{} file(s), {mb:.1} MB, {d} bars stored in {secs:.1} s{}", run.files.len(), if cancelled { " · cancelled" } else { "" }));
+        lines.push(format!("{} file(s), {mb:.1} MB stored as is in {secs:.1} s{}", run.files.len(), if cancelled { " · cancelled" } else { "" }));
+        if let Some(src) = run.sources.first() {
+            lines.push(format!(
+                "To read it, run a pipeline from source:{src}, e.g. source:{src} → code:parse-csv → code:to-bars?symbol=BTC/USDT → model:bars"
+            ));
+        }
         let run_id = run.run_id;
-        let first = run.imported.first().cloned();
         app.import.phase = Phase::Done { lines, cancelled };
         if let Some(d) = undo_recent {
             // Nothing was imported: the Recent entry this run added goes too.
@@ -922,13 +663,6 @@ pub fn poll(app: &mut App) -> bool {
             }
         }
         app.dispatch(super::action::Action::Refresh);
-        // Nothing on screen yet: show what was just imported.
-        if let Some(k) = first
-            && app.layout.tiles().iter().all(|t| t.series.is_none())
-        {
-            app.set_series(k.clone());
-            app.set_status(format!("loaded the import: {}", k.label()));
-        }
     }
     done
 }
@@ -956,7 +690,6 @@ pub fn confirm_cancel(app: &mut App, yes: bool) {
 
 /// Close the popup ([X] or Esc); during an import this asks to cancel instead.
 pub fn close(app: &mut App) {
-    app.import.ask = None;
     match app.import.phase {
         Phase::Running(_) => request_cancel(app),
         Phase::Done { .. } => {
@@ -980,7 +713,6 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             st.path = p;
             st.pane = Pane::Path;
         }
-        Hit::ImportAsk(n) => ask_action(app, [AskAction::Ok, AskAction::All, AskAction::Skip, AskAction::Cancel][n.min(3) as usize]),
         Hit::ImportEntry(i) => {
             let st = &mut app.import;
             if st.pane == Pane::Files && st.sel == i {
@@ -998,7 +730,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             st.pane = match n {
                 0 => Pane::Path,
                 1 => Pane::Filter,
-                n => Pane::Field((n as usize - 2).min(2)),
+                _ => Pane::Field(0),
             };
         }
         Hit::ImportPlace(i) => {
@@ -1010,9 +742,6 @@ pub fn on_click(app: &mut App, h: super::Hit) {
 }
 
 pub fn on_key(app: &mut App, k: KeyEvent) {
-    if app.import.ask.is_some() {
-        return ask_key(app, k);
-    }
     match &app.import.phase {
         Phase::Running(r) => {
             if r.confirm {
@@ -1095,8 +824,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         },
         Pane::Field(i) => match k.code {
             KeyCode::Enter | KeyCode::Esc => st.pane = Pane::Files,
-            KeyCode::Tab | KeyCode::Down => st.pane = Pane::Field((i + 1) % 3),
-            KeyCode::Up | KeyCode::BackTab => st.pane = Pane::Field((i + 2) % 3),
+            KeyCode::Tab | KeyCode::Down | KeyCode::Up | KeyCode::BackTab => st.pane = Pane::Files,
             KeyCode::Backspace => {
                 st.fields[i].pop();
             }
@@ -1175,8 +903,6 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                     st.completer.reset();
                 }
                 KeyCode::Char('s') => st.pane = Pane::Field(0),
-                KeyCode::Char('y') => st.pane = Pane::Field(1),
-                KeyCode::Char('d') => st.pane = Pane::Field(2),
                 KeyCode::Char('i') => {
                     let t = st.targets();
                     start(app, t);
@@ -1193,12 +919,6 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
 pub fn draw(app: &mut App, f: &mut Frame, r: Rect) {
     let mut hits = std::mem::take(&mut app.modal_hits);
     draw_body(app, f, r, &mut hits);
-    if let Some(q) = &app.import.ask {
-        // the symbol popup takes every click while it is open
-        hits.clear();
-        let t = app.theme.clone();
-        draw_ask(q, f, r, &t, &mut hits);
-    }
     app.modal_hits = hits;
 }
 
@@ -1353,20 +1073,14 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
     let mut pv = vec![];
     if let Some(p) = cur {
         if st.preview.as_ref().is_none_or(|(q, _)| *q != p) {
-            st.preview = Some((p.clone(), preview_bars(&p)));
+            st.preview = Some((p.clone(), preview_data(&p)));
         }
-        let (sym, dur) = ImportState::guess(&p);
         let src = match st.fields[0].trim() {
-            "" => p
-                .file_name()
-                .and_then(|n| crate::ingest::source_from_name(&n.to_string_lossy()))
-                .map(|s| format!("{s} (from name)"))
-                .unwrap_or_else(|| "local (default)".into()),
+            "" => crate::ingest::source_name_for(&p).map(|s| format!("{s} (the folder)")).unwrap_or_else(|| "local (default)".into()),
             s => s.to_string(),
         };
         pv.push(Line::from(vec![Span::styled("source ", Style::new().fg(t.muted)), Span::styled(src, Style::new().fg(t.fg))]));
-        pv.push(Line::from(vec![Span::styled("symbol ", Style::new().fg(t.muted)), Span::styled(sym, Style::new().fg(t.fg))]));
-        pv.push(Line::from(vec![Span::styled("period ", Style::new().fg(t.muted)), Span::styled(dur, Style::new().fg(t.fg))]));
+        pv.push(Line::styled("stored as is; pipelines read it", Style::new().fg(t.muted)));
         if let Ok(m) = p.metadata() {
             pv.push(Line::styled(format!("size   {:.1} MB", m.len() as f64 / 1e6), Style::new().fg(t.muted)));
         }
@@ -1383,7 +1097,7 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
     for (i, name) in FIELDS.iter().enumerate() {
         let v = &st.fields[i];
         let shown = if v.is_empty() && st.pane != Pane::Field(i) {
-            Span::styled(if i == 0 { "from file name, else local (s)" } else { "derive from name / data" }, Style::new().fg(t.muted))
+            Span::styled(if i == 0 { "the folder's name (s)" } else { "" }, Style::new().fg(t.muted))
         } else {
             Span::styled(format!("{v}{}", caret(Pane::Field(i))), Style::new().fg(t.fg))
         };
@@ -1393,7 +1107,7 @@ fn draw_body(app: &mut App, f: &mut Frame, r: Rect, app_hits: &mut Vec<(Rect, su
         fl.push(Line::styled(format!(" {m}"), Style::new().fg(t.warning)));
     }
     f.render_widget(Paragraph::new(fl), fields_r);
-    for i in 0..3u16 {
+    for i in 0..FIELDS.len() as u16 {
         if fields_r.y + i < fields_r.bottom() {
             app_hits.push((Rect { y: fields_r.y + i, height: 1, ..fields_r }, super::Hit::ImportInput(2 + i as u8)));
         }
@@ -1492,10 +1206,9 @@ fn draw_running(run: &Running, msg: Option<&str>, f: &mut Frame, r: Rect, t: &Th
         gauge(e.overall, format!("all {:.0}% · {} / {}{left}", e.overall * 100.0, fmt_bytes(e.bytes_done), fmt_bytes(e.bytes_total))),
         all_g,
     );
-    let (d, tot) = run.progress.get();
     f.render_widget(
         Paragraph::new(vec![
-            Line::styled(format!(" {d} / {tot} bars stored · {}", fmt_secs(elapsed)), Style::new().fg(t.muted)),
+            Line::styled(format!(" {} stored as is · {}", fmt_bytes(e.bytes_done), fmt_secs(elapsed)), Style::new().fg(t.muted)),
             Line::styled(msg.unwrap_or("").to_string(), Style::new().fg(t.warning)),
         ]),
         stats,
@@ -1551,30 +1264,23 @@ mod tests {
     }
 
     #[test]
-    fn preview_parses_head_and_marks_invalid_lines() {
+    fn preview_shows_the_raw_lines_without_judging_them() {
         let d = tempfile::tempdir().unwrap();
-        let f = d.path().join("BTCUSDT_5m.csv");
+        let f = d.path().join("anything.csv");
         let mut csv = String::from("timestamp,open,high,low,close,volume\n");
-        csv += "2020-01-01 00:00:00,10,12,9,11,5\n";
-        csv += "2020-01-01 00:05:00,10,9,9,11,5\n"; // high below close
+        csv += "2020-01-01 00:05:00,10,9,9,11,5\n"; // high below close: still just a line
         csv += "garbage,1,2,0.5,1,1\n";
-        csv += "2020-01-01 00:10:00,11,11,11,11,0\n";
         for i in 0..50_000 {
             csv += &format!("2020-02-01 00:{:02}:00,1,1,1,1,1\n", i % 60);
         }
         std::fs::write(&f, csv).unwrap();
         let t = std::time::Instant::now();
-        let v = preview_bars(&f);
+        let v = preview_data(&f);
         assert!(t.elapsed().as_millis() < 200);
         assert_eq!(v.len(), PREVIEW_LINES);
-        assert!(v[0].ok && v[0].text.contains("2020-01-01 00:00:00 BTC/USDT o 10"), "{:?}", v[0]);
-        assert!(!v[1].ok && v[1].text.contains("high below") && v[1].text.contains("00:05:00,10,9"), "{:?}", v[1]);
-        assert!(!v[2].ok && v[2].text.contains("timestamp"), "{:?}", v[2]);
-        assert!(v[3].ok && v[3].text.ends_with("zero-vol"), "{:?}", v[3]);
-        let n = d.path().join("x.ndjson");
-        std::fs::write(&n, "{\"t\":1577836800000,\"o\":1,\"h\":2,\"l\":0.5,\"c\":1.5,\"v\":3}\n").unwrap();
-        let v = preview_bars(&n);
-        assert!(v.len() == 1, "{v:?}");
+        assert!(v.iter().all(|r| r.ok));
+        assert_eq!(v[0].text, "timestamp,open,high,low,close,volume");
+        assert_eq!(v[2].text, "garbage,1,2,0.5,1,1");
     }
 
     #[test]
@@ -1647,7 +1353,7 @@ mod tests {
     }
 
     #[test]
-    fn selection_targets_and_guesses() {
+    fn selection_targets() {
         let t = tree();
         let mut s = ImportState::at(t.path().to_path_buf());
         assert!(s.targets().is_empty()); // ".." highlighted
@@ -1657,6 +1363,5 @@ mod tests {
         assert_eq!(s.chosen.len(), 2);
         s.toggle_all();
         assert!(s.chosen.is_empty());
-        assert_eq!(ImportState::guess(Path::new("BTCUSDT_5m.csv")), ("BTC/USDT".into(), "5m".into()));
     }
 }

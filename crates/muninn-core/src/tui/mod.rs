@@ -79,8 +79,6 @@ pub enum Hit {
     ImportConfirm(bool),
     ImportPlace(usize),
     ImportCandidate(usize),
-    /// Symbol popup buttons: 0 OK, 1 OK for all, 2 skip file, 3 cancel / [X].
-    ImportAsk(u8),
     /// A file/folder row in the import picker (index into the listing).
     ImportEntry(usize),
     /// Import inputs: 0 path, 1 filter, 2.. the source/symbol/duration fields.
@@ -950,7 +948,6 @@ impl App {
                 | Hit::ImportPlace(_)
                 | Hit::ImportCandidate(_)
                 | Hit::ImportEntry(_)
-                | Hit::ImportAsk(_)
                 | Hit::ImportInput(_)
                 | Hit::Row(_)
                 | Hit::HelpLink(_)

@@ -14,7 +14,8 @@ fn init_rotate_recover_via_cli() {
     assert!(e.run(&["keys", "init"]).status.code() != Some(0));
 
     let f = fixture("ETHUSDT_5m.csv");
-    e.ok(&["ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
+    let _ = f;
+    e.bars("ETHUSDT_5m.csv", "binance");
 
     // wrong password fails cleanly
     let o = e.cmd().env("MUNINN_PASSWORD", "nope").args(["sources", "list"]).output().unwrap();

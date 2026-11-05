@@ -294,6 +294,89 @@ pub fn create(s: &Store, m: &Model, core: &Map<String, Value>) -> Result<String>
     Ok(id)
 }
 
+/// Rows arriving at a pipeline's bars leaf (`model:bars`), e.g. from `to-bars`: each row
+/// gives `source`, `symbol` (or `base` and `quote`), `period`, `timestamp` (epoch ms or a
+/// time), `open`, `high`, `low`, `close` and optionally `volume` and `flags`. Stored by
+/// bar id, so running the pipeline again adds only bars not there yet. Returns (new,
+/// already there). A row missing a value is an error naming the row.
+pub fn upsert_frame(s: &Store, cols: &Map<String, Value>, rows: usize) -> Result<(u64, u64)> {
+    let keys = ["source", "symbol", "base", "quote", "period", "timestamp", "open", "high", "low", "close", "volume", "flags"];
+    for need in ["source", "period", "timestamp", "open", "high", "low", "close"] {
+        if !cols.contains_key(need) {
+            return Err(Error::invalid("bars", format!("rows for bars need a `{need}` column (to-bars makes them: `code:to-bars?symbol=BTC/USDT`)")));
+        }
+    }
+    if !cols.contains_key("symbol") && !(cols.contains_key("base") && cols.contains_key("quote")) {
+        return Err(Error::invalid("bars", "rows for bars need a `symbol` column (or `base` and `quote`): give to-bars `symbol=BASE/QUOTE`"));
+    }
+    let mut series: std::collections::BTreeSet<(String, String, String, i64)> = Default::default();
+    let (mut new, mut dup) = (0u64, 0u64);
+    let mut st = s.conn.prepare_cached(
+        "INSERT OR IGNORE INTO m_bars(id, _base, _quote, _timestamp, _open, _high, _low, _close, _volume, _source_id, _duration_s, _flags) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+    )?;
+    let mut sources: std::collections::HashMap<String, (String, String)> = Default::default();
+    for i in 0..rows {
+        let mut core = Map::new();
+        for k in keys {
+            if let Some(v) = cols.get(k).and_then(|c| c.get(i)).filter(|v| !v.is_null()) {
+                core.insert(k.to_string(), v.clone());
+            }
+        }
+        let mut row =
+            Row { source_id: String::new(), source: String::new(), sym: Symbol::new("", ""), dur: Duration(60), ts: 0, ohlcv: [0.0; 5], flags: 0 };
+        // the source once per name (apply would look it up for every row)
+        let src_name = core.remove("source").map(|v| match v {
+            Value::String(t) => t,
+            o => o.to_string(),
+        });
+        apply(s, &mut row, &core).map_err(|e| Error::invalid("bars", format!("row {}: {e}", i + 1)))?;
+        let Some(src_name) = src_name else { return Err(Error::invalid("bars", format!("row {}: no source", i + 1))) };
+        let (sid, sname) = match sources.get(&src_name) {
+            Some(x) => x.clone(),
+            None => {
+                let src = match s.source_by_name(&src_name)? {
+                    Some(x) => x,
+                    None => s.add_source(&src_name, "code", None)?,
+                };
+                let x = (src.id, src.name);
+                sources.insert(src_name.clone(), x.clone());
+                x
+            }
+        };
+        row.source_id = sid;
+        row.source = sname;
+        if row.sym.base.is_empty() || row.sym.quote.is_empty() {
+            return Err(Error::invalid("bars", format!("row {}: no symbol", i + 1)));
+        }
+        let key = (row.source_id.clone(), row.sym.base.clone(), row.sym.quote.clone(), row.dur.0);
+        if series.insert(key) {
+            known_symbol(s, &row.sym)?;
+        }
+        let o = row.ohlcv;
+        let id = row.id();
+        let n = st.execute(params![
+            hex::decode(&id).unwrap_or_default(),
+            row.sym.base,
+            row.sym.quote,
+            row.ts,
+            o[0],
+            o[1],
+            o[2],
+            o[3],
+            o[4],
+            row.source_id,
+            row.dur.0,
+            row.flags
+        ])?;
+        if n > 0 { new += 1 } else { dup += 1 }
+    }
+    drop(st);
+    for (sid, base, quote, dur) in &series {
+        restat(s, sid, &Symbol { base: base.clone(), quote: quote.clone() }, Duration(*dur))?;
+    }
+    Ok((new, dup))
+}
+
 /// Update one bar: built-in fields here, stored fields through the store. Returns the id and
 /// the built-in values before (null when none changed).
 pub fn update_record(s: &Store, m: &Model, id: &str, values: &Map<String, Value>) -> Result<(String, Value)> {
@@ -359,4 +442,31 @@ pub fn delete(s: &Store, ids: &[String]) -> Result<usize> {
         restat(s, &src, &Symbol { base, quote }, Duration(d))?;
     }
     Ok(n)
+}
+
+/// Bars straight from an OHLCV CSV into `m_bars`, the way `source:… > code:parse-csv >
+/// code:to-bars?symbol=…&duration=… > model:bars` would store them, without compiling
+/// the parser code spaces. For tests and fixtures only: `mnnn ingest` never makes bars.
+#[doc(hidden)]
+pub fn load_csv_bars(s: &mut Store, path: &std::path::Path, source: &str, symbol: &str, duration: &str) -> Result<(u64, u64)> {
+    let df = crate::ingest::csv::read_csv(path, &Default::default())?;
+    let names = crate::ingest::frame::map_columns(&df, &Default::default())?;
+    let ts = crate::ingest::frame::timestamps(&df, &names[0])?;
+    let vals: Vec<Vec<Option<f64>>> = names[1..].iter().map(|c| crate::ingest::frame::floats(&df, c)).collect::<Result<_>>()?;
+    let period = Duration::parse(duration)?.0;
+    let keep: Vec<usize> = (0..ts.len()).filter(|&i| ts[i].is_some() && vals[..4].iter().all(|v| v[i].is_some())).collect();
+    let mut cols = Map::new();
+    let n = keep.len();
+    cols.insert("source".into(), Value::Array(vec![json!(source); n]));
+    cols.insert("symbol".into(), Value::Array(vec![json!(symbol); n]));
+    cols.insert("period".into(), Value::Array(vec![json!(period); n]));
+    cols.insert("timestamp".into(), keep.iter().map(|&i| json!(ts[i])).collect());
+    for (k, v) in ["open", "high", "low", "close", "volume"].iter().zip(&vals) {
+        cols.insert(k.to_string(), keep.iter().map(|&i| json!(v[i].unwrap_or(0.0))).collect());
+    }
+    cols.insert("flags".into(), keep.iter().map(|&i| json!(i32::from(vals[4][i].unwrap_or(0.0) == 0.0))).collect());
+    let tx = s.conn.unchecked_transaction()?;
+    let r = upsert_frame(s, &cols, n)?;
+    tx.commit()?;
+    Ok(r)
 }

@@ -17,9 +17,16 @@ fn json_file_ingest_with_records_path() {
     let f = e.dir.path().join("ETHUSDT_5m.json");
     let bars: Vec<String> = (0..20).map(bar_json).collect();
     std::fs::write(&f, format!(r#"{{"data":{{"bars":[{}]}}}}"#, bars.join(","))).unwrap();
-    let out = e.ok(&["-y", "ingest", "json", "--path", f.to_str().unwrap(), "--records", "data.bars", "--source", "test"]);
-    assert!(out.contains("test ETH/USDT 5m"), "{out}");
-    assert!(out.contains("20"), "{out}");
+    let out = e.ok(&["ingest", "json", "--path", f.to_str().unwrap(), "--source", "test"]);
+    assert!(out.contains("(json) in source test"), "{out}");
+    let id = e.ok(&["sources", "data", "test"]).split('\t').next().unwrap().to_string();
+    assert_eq!(e.run(&["sources", "cat", "test", &id]).stdout, std::fs::read(&f).unwrap());
+    // the records path is now a parse-json option, and to-bars makes the bars
+    e.ok(&["-y", "code", "parsers", "--install"]);
+    let o =
+        e.run(&["-y", "pipe", "source:test", "code:parse-json?records=data.bars", "code:to-bars?symbol=ETH/USDT&duration=5m", "--to", "model:bars"]);
+    let all = format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr));
+    assert!(o.status.success() && all.contains("20 new bars"), "{all}");
 }
 
 #[test]
@@ -33,11 +40,14 @@ fn sqlite_table_and_query() {
     }
     drop(c);
     let p = db.to_str().unwrap();
-    let out = e.ok(&["-y", "ingest", "service", "sqlite", "--path", p, "--table", "BTCUSDT_1h"]);
-    assert!(out.contains("exchange BTC/USDT 1h"), "{out}");
-    assert!(out.contains("48"), "{out}");
-    // a query over the same rows: all duplicates
-    let out = e.ok(&[
+    let out = e.ok(&["ingest", "service", "sqlite", "--path", p, "--table", "BTCUSDT_1h"]);
+    assert!(out.contains("(ndjson) in source exchange"), "rows as NDJSON, source named for the file: {out}");
+    let id = e.ok(&["sources", "data", "exchange"]).split('\t').next().unwrap().to_string();
+    let rows = String::from_utf8(e.run(&["sources", "cat", "exchange", &id]).stdout).unwrap();
+    assert_eq!(rows.lines().count(), 48);
+    assert!(rows.lines().next().unwrap().contains(&format!("\"ts\":{T0}")), "{rows}");
+    // a query (and a moved flag, which only warns)
+    let o = e.run(&[
         "-y",
         "ingest",
         "service",
@@ -48,9 +58,9 @@ fn sqlite_table_and_query() {
         "SELECT * FROM BTCUSDT_1h WHERE ts < 1503000000000",
         "--symbol",
         "BTC/USDT",
-        "--force",
     ]);
-    assert!(out.contains("duplicate"), "{out}");
+    assert!(o.status.success() && String::from_utf8_lossy(&o.stderr).contains("--symbol is ignored"), "{o:?}");
+    assert_eq!(e.ok(&["sources", "data", "exchange"]).lines().count(), 2);
     // missing file is a clear error
     let o = e.run(&["-y", "ingest", "service", "sqlite", "--path", "/nonexistent.db", "--table", "x"]);
     assert!(!o.status.success());
@@ -93,24 +103,11 @@ fn http_cursor_paging_sends_user_agent() {
     });
     let e = Env::new();
     let url = format!("http://127.0.0.1:{port}/api/klines");
-    let out = e.ok(&[
-        "-y",
-        "ingest",
-        "service",
-        "http",
-        "--url",
-        &url,
-        "--records",
-        "result",
-        "--paginate",
-        "cursor",
-        "--symbol",
-        "SOL/USDT",
-        "--duration",
-        "5m",
-    ]);
-    assert!(out.contains("127.0.0.1 SOL/USDT 5m"), "{out}");
-    assert!(out.contains("20"), "{out}");
+    let out = e.ok(&["-y", "ingest", "service", "http", "--url", &url, "--records", "result", "--paginate", "cursor"]);
+    // one item per page, each body as it arrived
+    assert!(out.contains("#page=1") && out.contains("#page=2") && out.contains("in source 127.0.0.1"), "{out}");
+    let items = e.ok(&["sources", "data", "127.0.0.1"]);
+    assert_eq!(items.lines().count(), 2, "{items}");
     let seen = seen.lock().unwrap();
     assert_eq!(seen.len(), 2);
     assert!(seen.iter().all(|(_, ua)| ua.starts_with("muninn/")), "{seen:?}");

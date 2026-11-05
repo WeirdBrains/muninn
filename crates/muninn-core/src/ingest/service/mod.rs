@@ -39,6 +39,16 @@ impl Secret {
     }
 }
 
+/// Records as NDJSON bytes, one object a line, as a service gave them.
+pub fn ndjson(records: &[serde_json::Value]) -> Result<Vec<u8>> {
+    let mut out = vec![];
+    for r in records {
+        serde_json::to_writer(&mut out, r)?;
+        out.push(b'\n');
+    }
+    Ok(out)
+}
+
 /// Read `SQL` or `@FILE`.
 pub fn sql_or_file(s: &str) -> Result<String> {
     match s.strip_prefix('@') {
@@ -63,6 +73,9 @@ pub fn run_inputs(
 ) -> Result<Vec<IngestReport>> {
     let mut s = Session::new(store, io, opts, "service", locator);
     s.default_source = default_source;
+    if let Some(p) = s.opts.progress.clone() {
+        p.bytes_total.store(inputs.iter().map(|i| i.bytes.len() as u64).sum(), std::sync::atomic::Ordering::Relaxed);
+    }
     let mut out = vec![];
     for i in inputs {
         out.push(s.ingest(i)?);

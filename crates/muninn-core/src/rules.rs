@@ -75,7 +75,9 @@ pub const EVENTS: &[Event] = &[
             "files_done: files read",
             "files_total: files given",
             "files: the files",
-            "inserted: bars added",
+            "inserted: items newly stored (files, pages, query results; same as stored)",
+            "stored: items newly stored as they arrived",
+            "bytes: bytes stored",
         ],
     },
     Event {

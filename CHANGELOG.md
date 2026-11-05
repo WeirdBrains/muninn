@@ -6,6 +6,21 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Changed
+- Ingest stores data as it arrives and nothing more: `mnnn ingest csv|json|path`, the HTTP, Redis, SQLite and Postgres services and the TUI import keep each file, page or read byte for byte in its source (`source_data`), and never ask about symbols, bar lengths or columns or make bars. The only questions left are the password and, rarely, the source, which defaults to the folder's name (a service's host or file)
+- Bars come only from pipes and pipelines you set up: `source:NAME > code:parse-csv > code:to-bars?symbol=BTC/USDT&duration=5m > model:bars`
+- `--symbol`, `--duration`, `--map`, `--rejects`, `--delimiter`, `--quote`, `--escape`, `--no-header`, `--skip-rows` and `ingest json --records` are ignored with a one-line warning naming the code space option that replaces them
+- The TUI import has only a source field, previews raw lines and leaves the view as it is
+- SQLite, Postgres and Redis reads are stored as NDJSON with their values' own types; each HTTP page is stored as its own item
+- The `import` history action and rules: `inserted`/`stored` count items stored, plus `bytes`
+
+### Added
+- `source:NAME` pipe and pipeline node: a source's stored items, one row each (`text name format locator received_at item source`)
+- Code step options: `code:SPACE?key=value&…`, read with `host.options()` / `host.option(name)` in the SDK
+- parse-csv options `delimiter`, `quote`, `header=false`, `skip_rows`; parse-json `records`; to-bars options `symbol`, `source`, `duration`, `map`, `rejects=fail`, `drop_zero_volume`, `check=false`, with rejected rows as a second `Rejected` table
+- A `model:bars` save adds only bars not there yet ("N new bars, M already there"), so pipelines can run again
+- `mnnn sources data NAME` and `mnnn sources cat NAME ITEM`; `sources list` shows each source's items and bytes
+
 ## [2.21.0] - 2026-11-04
 
 ### Added

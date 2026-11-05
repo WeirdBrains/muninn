@@ -44,7 +44,7 @@ fn a_2_14_database_keeps_every_bar() {
     e.ok(&["-y", "export", "--format", "csv", "--out", csv.to_str().unwrap()]);
     assert_eq!(std::fs::read_to_string(&csv).unwrap(), std::fs::read_to_string(fixture("bars-2.14/bars.csv")).unwrap());
     // and it keeps working: a new import and a stored value on an upgraded bar
-    e.ok(&["-y", "ingest", "csv", "--path", fixture("ETHUSDT_5m.csv").to_str().unwrap(), "--source", "bitstamp"]);
+    e.bars("ETHUSDT_5m.csv", "bitstamp");
     let id = want[0]["id"].as_str().unwrap();
     e.ok(&["model", "record", "update", "bars", "--id", id, "note=after"]);
     let one = got(&["model", "record", "show", "bars", id, "--json"]);

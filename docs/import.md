@@ -1,21 +1,21 @@
 # Import
 
-**File ▸ Import…** (or `i`) opens the import popup: a file browser, per-file guesses
-and a background import with a live progress bar. The same pipeline as
-[`muninn ingest csv|json`](ingest-csv.md) runs underneath ([JSON](ingest-json.md)).
+**File ▸ Import…** (or `i`) opens the import popup: a file browser and a background
+import with a live progress bar. Like [`mnnn ingest csv|json`](ingest-csv.md), it stores
+each file as it is, byte for byte, in a source; it asks nothing about symbols or bar
+lengths and makes no bars. Turn stored files into bars (or anything else) with a
+[pipe or pipeline](pipes.md) from `source:NAME`.
 
 ```
 ┌ Import ─────────────────────────────────────────────────────────────┐
 │ path /data/binance/                                                  │
 │ filter         hidden off   2 selected                               │
 │┌Places──────┐┌Files──────────────┐┌Preview─────────────────────────┐│
-││1 home      ││▸ ..               ││symbol BTC/USDT                 ││
-││2 raw/data  ││● BTCUSDT_5m.csv   ││period 5m                       ││
+││1 home      ││▸ ..               ││source binance (the folder)     ││
+││2 raw/data  ││● BTCUSDT_5m.csv   ││stored as is; pipelines read it ││
 ││3 cwd       ││○ ETHUSDT_1h.csv   ││timestamp,open,high,...         ││
 │└────────────┘└───────────────────┘└────────────────────────────────┘│
-│ source   from file name, else local (s)                              │
-│ symbol   derive from name / data                                     │
-│ duration derive from name / data                                     │
+│ source   the folder's name (s)                                       │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -37,16 +37,12 @@ Only folders and data files (`csv tsv txt json ndjson jsonl`) are listed.
 | `p` | focus the Places column (see below) |
 | `1`–`9` | jump to the numbered place |
 | `b` | bookmark the current folder (again: remove the bookmark) |
-| `s` `y` `d` | edit source, symbol, duration |
+| `s` | edit the source |
 | `i` | import the selection, or the highlighted file or folder |
 | Esc | close |
 
-The preview shows the guessed symbol and duration (from the file name) and the first
-10 lines of the highlighted file parsed as bars with the same parser as the import
-(column mapping, timestamps, validation): `time SYMBOL o h l c v [zero-vol]`. Invalid
-lines are shown in red with the reason and the raw line. It reads at most 64 KiB, so
-it is instant on huge files. A large JSON array cannot be parsed from its start, so
-its preview shows raw lines; NDJSON previews parse.
+The preview shows the source the file will be stored in and its first 10 lines as they
+are, unparsed. It reads at most 64 KiB, so it is instant on huge files.
 
 ## Path completion
 
@@ -64,12 +60,10 @@ Hidden names are offered only when hidden files are shown (`.`) or you type the 
 
 ## Resolution
 
-**Source** records where the data originally came from (also when the files were
-copied or uploaded from elsewhere): press `s` (or click the source line) and type it to
-use it for every file in the run. Left empty, each file's source is the exchange in its
-name (the preview shows `source kraken (from name)`), else `local`. Symbol and duration are derived from each file name and,
-for the duration, from the data; type a value to override it for every file in the
-run. Recently used folders are saved in [preferences](preferences.md)
+**Source** is where the files are kept: press `s` (or click the source line) and type
+it to use it for every file in the run. Left empty, each file goes to the source named
+for its folder (the preview shows `source kraken (the folder)`), else `local`. Nothing
+else is asked. Recently used folders are saved in [preferences](preferences.md)
 (`tui.import_recent`).
 
 ## Progress and cancel
@@ -80,31 +74,24 @@ responsive. Progress is byte-based:
 - **file** gauge: the current file's estimated completion;
 - **all** gauge: bytes done / total bytes of every file in the run, with an ETA from
   the rate so far;
-- bars stored / to store and elapsed time as a secondary line, plus a log of each
-  file's result.
+- bytes stored and elapsed time as a secondary line, plus a log of each file's result.
 
 Bytes are counted as the file is read (published every 64 KiB), so the bar moves from
-the first read. Reading is fast compared with storing, so each file's bytes are split
-into phases: reading 10 %, parsing and validating 5 %, storing 85 % (scaled by bars
-stored, reported every 4096 rows). The estimate is therefore linear in bytes across
-files and roughly linear in time within a file. The summary lists inserted, duplicate, rejected rows and gaps per
-series; identical files already imported are skipped. Rows failing validation are
-dropped (see the CLI `--rejects` option to keep a report).
+the first read. The summary lists each file's size and source and how to read it with a
+pipeline; files whose bytes are already in the source are skipped.
 
 ## Cancelling
 
 The progress popup has a **[Cancel]** button; `Esc`, `c` and the popup's **[X]** do the
 same. Cancelling always asks first (**[Yes, cancel]** / **[No, continue]**, or `y` /
 `n`). After yes the popup shows *Cancelling…*: the background import stops at its next
-read (every 64 KiB) or row batch (every 4096 rows), usually within a fraction of a
-second.
+read (every 64 KiB), usually within a fraction of a second.
 
 What stays and what goes:
 
 - **Files that finished** before the cancel stay imported.
 - **The file being imported** is rolled back entirely: each file is imported in one
-  all-or-nothing transaction, so none of its bars, its series totals or its import
-  record remain. Importing it again later works normally (it is not skipped as
+  all-or-nothing transaction, so nothing of it remains. Importing it again later works normally (it is not skipped as
   "already imported").
 - **Files not started** are not touched.
 
@@ -119,9 +106,8 @@ Every import (TUI or CLI) is recorded as an *import run* with a status: `running
 was asked for, by whom (`tui` or `cli`), the file and the phase (`read`, `parse`,
 `store`).
 
-Each run keeps a ledger of what it created: new **source** rows, new **series**,
-**bars** (per series, with the count inserted), the **ingest record** used to skip
-identical files, and the **recent** folder entry. Artifacts of finished files are
+Each run keeps a ledger of what it created: new **source** rows, the stored items
+(**source_data**), and the **recent** folder entry. Artifacts of finished files are
 `kept`. Those of the cancelled or failed file are rolled back and listed as
 `rolled_back`. After the run, anything the run created that ended up empty (for
 example a new source whose only file was cancelled) is deleted and listed as
@@ -154,33 +140,14 @@ popup opens in the most recent folder.
 
 ## After an import
 
-When the import finishes and no tile shows a series yet, the focused tile loads the
-first series that was imported (the status line says `loaded the import: …`). If any
-tile already shows data, the view is left as it is; pick the new series in the sidebar.
-
-## When the symbol can't be guessed
-
-If a file's name doesn't tell its symbol (for example `export_5m.csv`) and the symbol
-field is empty, a **Symbol needed** popup asks for it before the import starts, one
-file at a time. The popup shows the file name on its own line (`file`, wrapped if
-very long, never cut) and its folder below it (`in`, shortened from the left with `…`
-so the end of the path stays visible). When several files need a symbol, as in a
-folder import (`A`), the title counts them: `Symbol needed · file 3 of 12`.
-
-| key / button | action |
-|---|---|
-| type, Enter / `[Enter OK]` | use this symbol (BASE/QUOTE, e.g. `BTC/USDT`) for this file |
-| Ctrl-a / `[Ctrl-a OK for all]` | use it for this and every remaining file |
-| Tab / `[Tab skip file]` | leave this file out |
-| Esc / `[Esc cancel]` / `[X]` | cancel the import (nothing is imported) |
-
-An invalid symbol shows an error and keeps the popup open. Filling the symbol field
-(`y`) beforehand skips the question.
+The view is left as it is: stored files are not series. The summary shows how to read
+them, e.g. `source:binance → code:parse-csv → code:to-bars?symbol=BTC/USDT → model:bars`;
+once a pipeline has made bars, they appear in the sidebar like any series.
 
 ## Mouse
 
 Click a file or folder to highlight it and click it again to open the folder or import
-the file. Click the path, filter or source/symbol/duration line to type there, a Places
+the file. Click the path, filter or source line to type there, a Places
 entry to go there, a completion candidate to pick it. The bottom row is a bar of key
 buttons (`[Enter open]`, `[Space select]`, `[A import folder]`, `[i import]`, ...) that
 act like the keys; `[Close]` ends the finished-import view.

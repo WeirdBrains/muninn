@@ -29,6 +29,7 @@ pub const METHODS: &[&str] = &[
     "input_request",
     "inputs",
     "input_named",
+    "options",
     "models",
     "load",
     "update",
@@ -55,11 +56,13 @@ pub struct Run<'a> {
     pub input: Option<Value>,
     /// Every input by name, when several upstreams feed it (a pipeline's fan-in).
     pub named: Vec<(String, Value)>,
+    /// The step's options (`code:to-bars?symbol=BTC/USDT`).
+    pub options: Map<String, Value>,
 }
 
 impl<'a> Run<'a> {
     pub fn new(store: &'a Store, space: &'a CodeSpace) -> Self {
-        Run { store, space, logs: vec![], result: None, notes: vec![], error: None, writes: 0, input: None, named: vec![] }
+        Run { store, space, logs: vec![], result: None, notes: vec![], error: None, writes: 0, input: None, named: vec![], options: Map::new() }
     }
 
     /// The table to hand to `muninn_plugin_run` (valid while `self` is).
@@ -89,6 +92,7 @@ impl<'a> Run<'a> {
             "methods" => Ok(json!(METHODS)),
             "input_request" => Ok(serde_json::to_value(&self.space.input)?),
             "inputs" => Ok(json!(self.named.iter().map(|(n, _)| n).collect::<Vec<_>>())),
+            "options" => Ok(Value::Object(self.options.clone())),
             "input_named" => {
                 let n = str_of(&req, "name")?;
                 self.named.iter().find(|(k, _)| *k == n).map(|(_, f)| f.clone()).ok_or_else(|| {

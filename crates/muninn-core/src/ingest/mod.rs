@@ -1,4 +1,8 @@
-//! Ingestion pipeline: read -> source -> symbol -> timestamp -> duration -> validate -> upsert -> report.
+//! Ingestion: data goes into its source **as it arrives**. A file, an HTTP page or a
+//! query result is stored byte for byte in `source_data`; nothing is parsed, no columns,
+//! symbols, bar lengths or rows are assumed. What the data is, and what to make of it
+//! (rows, bars, anything), is decided later by pipelines and their code spaces
+//! (`source:NAME | code:parse-csv | code:to-bars | model:bars`). See `docs/ingest-csv.md`.
 pub mod csv;
 pub mod frame;
 pub mod json;
@@ -8,24 +12,18 @@ pub mod time;
 
 use crate::error::{Error, Result};
 use crate::interact::Interact;
-use crate::model::{Duration, Source, Symbol};
-use crate::store::{Store, UpsertCounts, now_ms};
-use frame::{Columns, Reject, derive_duration, gaps, parse_map};
-use polars::prelude::DataFrame;
-use std::io::Write;
+use crate::model::Source;
+use crate::store::Store;
 use std::path::{Path, PathBuf};
 
-/// User-supplied ingest options (flags or TUI fields).
+/// Ingest options (flags or TUI fields). Only where data goes and how it is tracked:
+/// nothing about what the data is.
 #[derive(Debug, Clone, Default)]
 pub struct IngestOptions {
     pub source: Option<String>,
-    pub symbol: Option<String>,
-    pub duration: Option<String>,
-    pub map: Vec<String>,
-    pub rejects: Option<PathBuf>,
+    /// Store again even if these exact bytes are already in the source.
     pub force: bool,
-    pub drop_zero_volume: bool,
-    /// Live progress and cancellation (TUI import); checked per stored chunk.
+    /// Live progress and cancellation; checked between reads.
     pub progress: Option<std::sync::Arc<Progress>>,
     /// Import run whose artifact ledger this ingest writes to.
     pub run_id: Option<i64>,
@@ -34,37 +32,31 @@ pub struct IngestOptions {
     /// `ingest_csv`/`ingest_json` mark file starts and ends in `progress` themselves
     /// (the CLI). Off when the caller does that per file (the TUI import).
     pub track_files: bool,
-    /// Source used when none is given and the file name names no exchange (TUI: "local").
+    /// Source used when none is given and the locator is not a known source's.
     pub default_source: Option<String>,
 }
 
 pub use progress::{CountingReader, Estimate, Progress};
 
-/// One unit of input (a file, a response, a query result).
+/// One unit of input (a file, a response, a query result), as it arrived.
 pub struct Input {
     pub locator: String,
-    /// File name (or key) used for symbol/duration derivation.
-    pub name_hint: Option<String>,
+    /// A short name: the file name, the URL's last segment, the key.
+    pub name: String,
+    /// What it looks like (`csv`, `json`, `ndjson`, `text`, …): a hint, never enforced.
+    pub format: String,
     pub content_hash: String,
-    pub frame: DataFrame,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct IngestReport {
     pub locator: String,
     pub source: String,
-    pub symbol: String,
-    pub duration: String,
-    pub rows: u64,
-    pub inserted: u64,
-    pub duplicate: u64,
-    pub rejected: u64,
-    pub zero_volume: u64,
-    pub dropped_zero_volume: u64,
-    pub gaps: u64,
-    pub missing_bars: u64,
-    pub first: Option<i64>,
-    pub last: Option<i64>,
+    pub format: String,
+    pub bytes: u64,
+    /// The stored item's id (the existing one when skipped).
+    pub id: String,
     pub skipped: bool,
     pub warnings: Vec<String>,
     pub elapsed_ms: u128,
@@ -72,32 +64,12 @@ pub struct IngestReport {
 
 impl IngestReport {
     pub fn summary(&self) -> String {
+        let id = &self.id[..8.min(self.id.len())];
         if self.skipped {
-            return format!(
-                "{}: skipped (identical input already ingested as {} {} {}; use --force)",
-                self.locator, self.source, self.symbol, self.duration
-            );
+            return format!("{}: skipped (already in source {} as {id}; use --force to store it again)", self.locator, self.source);
         }
-        let range = match (self.first, self.last) {
-            (Some(a), Some(b)) => format!("{} .. {}", time::fmt_ts(a), time::fmt_ts(b)),
-            _ => "-".into(),
-        };
-        format!(
-            "{loc}\n  series     {src} {sym} {dur}\n  rows       {rows}\n  inserted   {ins}\n  duplicate  {dup}\n  rejected   {rej}\n  zero-vol   {zv} (dropped {dz})\n  gaps       {g} ({m} missing bars)\n  coverage   {range} UTC\n  time       {t} ms",
-            loc = self.locator,
-            src = self.source,
-            sym = self.symbol,
-            dur = self.duration,
-            rows = self.rows,
-            ins = self.inserted,
-            dup = self.duplicate,
-            rej = self.rejected,
-            zv = self.zero_volume,
-            dz = self.dropped_zero_volume,
-            g = self.gaps,
-            m = self.missing_bars,
-            t = self.elapsed_ms,
-        )
+        let fmt = if self.format.is_empty() { String::new() } else { format!(" ({})", self.format) };
+        format!("{}\n  stored     {} bytes{fmt} in source {} as {id}\n  time       {} ms", self.locator, self.bytes, self.source, self.elapsed_ms)
     }
 }
 
@@ -113,130 +85,26 @@ pub fn hash_bytes(b: &[u8]) -> String {
     blake3::hash(b).to_hex().to_string()
 }
 
-/// The last path segment without a known data-file extension (`a/b/BTCUSDT_5m.csv` -> `BTCUSDT_5m`).
-fn name_stem(name: &str) -> String {
-    let last = name.rsplit(['/', '\\']).next().unwrap_or(name);
-    let lower = last.to_ascii_lowercase();
-    for ext in [".csv", ".tsv", ".txt", ".json", ".ndjson", ".jsonl", ".db", ".sqlite", ".sqlite3", ".gz"] {
-        if lower.ends_with(ext) {
-            return last[..last.len() - ext.len()].to_string();
-        }
-    }
-    last.to_string()
-}
-
-/// Derive a symbol from a file name against the known symbol list.
-pub fn symbol_from_name(store: &Store, name: &str) -> Result<Option<Symbol>> {
-    let stem = name_stem(name);
-    let quotes = store.known_quotes()?;
-    let qrefs: Vec<&str> = quotes.iter().map(String::as_str).collect();
-    let tokens: Vec<&str> = stem.split(['_', '.', ' ', ':', '/']).collect();
-    // Try separator-joined pairs first (BTC-USD), then concatenated (BTCUSDT), across tokens and adjacent token pairs.
-    let mut candidates: Vec<String> = tokens.iter().map(|t| t.to_string()).collect();
-    for w in tokens.windows(2) {
-        candidates.push(format!("{}/{}", w[0], w[1]));
-    }
-    // `coinbase-BTC-USD`, `Kraken-ETHUSDT`: also try the dash-separated parts and pairs
-    for t in tokens.iter().filter(|t| t.contains('-')) {
-        let parts: Vec<&str> = t.split('-').collect();
-        candidates.extend(parts.iter().map(|p| p.to_string()));
-        candidates.extend(parts.windows(2).map(|w| format!("{}/{}", w[0], w[1])));
-    }
-    for c in candidates {
-        if let Some(sym) = Symbol::parse_with(&c, &qrefs) {
-            let sym = store.canonical_symbol(&sym)?;
-            if store.is_known_asset(&sym.base)? && store.is_known_asset(&sym.quote)? {
-                return Ok(Some(sym));
-            }
-        }
-    }
-    Ok(None)
-}
-
-/// Derive a symbol from a file name using only the built-in symbol list (no store; for previews).
-pub fn symbol_from_name_static(name: &str) -> Option<Symbol> {
-    let stem = Path::new(name).file_stem()?.to_string_lossy().to_string();
-    let tokens: Vec<&str> = stem.split(['_', '.', ' ']).collect();
-    // also the dash parts and pairs (`Kraken-ETHUSDT`, `coinbase-BTC-USD`), like symbol_from_name
-    let mut candidates: Vec<String> = tokens.iter().map(|t| t.to_string()).collect();
-    for t in tokens.iter().filter(|t| t.contains('-')) {
-        let parts: Vec<&str> = t.split('-').collect();
-        candidates.extend(parts.iter().map(|p| p.to_string()));
-        candidates.extend(parts.windows(2).map(|w| format!("{}/{}", w[0], w[1])));
-    }
-    candidates.iter().find_map(|t| Symbol::parse_with(t, crate::model::KNOWN_QUOTES).filter(|s| crate::model::KNOWN_BASES.contains(&s.base.as_str())))
-}
-
-/// Exchanges recognised in file names (lower case; aliases map to the canonical name).
-pub const EXCHANGES: &[(&str, &str)] = &[
-    ("binance", "binance"),
-    ("binanceus", "binanceus"),
-    ("coinbase", "coinbase"),
-    ("gdax", "coinbase"),
-    ("kraken", "kraken"),
-    ("bitstamp", "bitstamp"),
-    ("bitfinex", "bitfinex"),
-    ("bybit", "bybit"),
-    ("okx", "okx"),
-    ("okex", "okx"),
-    ("kucoin", "kucoin"),
-    ("gemini", "gemini"),
-    ("huobi", "htx"),
-    ("htx", "htx"),
-    ("gateio", "gateio"),
-    ("bitmex", "bitmex"),
-    ("deribit", "deribit"),
-    ("poloniex", "poloniex"),
-    ("bittrex", "bittrex"),
-    ("bitget", "bitget"),
-    ("mexc", "mexc"),
-    ("cryptocom", "cryptocom"),
-    ("upbit", "upbit"),
-    ("bithumb", "bithumb"),
-];
-
-/// The exchange named by a file name token, e.g. `coinbase_BTC-USD_5m.csv` -> coinbase.
-pub fn source_from_name(name: &str) -> Option<String> {
-    let stem = name_stem(name).to_lowercase();
-    stem.split(['_', '.', '-', ' ', ':', '/']).find_map(|t| EXCHANGES.iter().find(|(k, _)| *k == t).map(|(_, v)| v.to_string()))
-}
-
-/// Derive a duration from a file name token such as `5m`, `1h`, `15min`.
-pub fn duration_from_name(name: &str) -> Option<Duration> {
-    let stem = name_stem(name);
-    stem.split(['_', '.', '-', ' ', ':', '/']).filter(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit())).find_map(|t| Duration::parse(t).ok())
-}
-
-/// How many bad symbol answers the prompt takes before giving up.
-pub const SYMBOL_TRIES: usize = 5;
-
-/// A known base asset named on its own in a file name (`BTC_5m_combined.csv` -> BTC).
-pub fn base_from_name(name: &str) -> Option<String> {
-    let stem = name_stem(name);
-    stem.split(['_', '.', '-', ' ', ':', '/'])
-        .map(|t| t.to_ascii_uppercase())
-        .find(|t| crate::model::KNOWN_BASES.contains(&t.as_str()) || crate::model::KNOWN_ALIASES.iter().any(|(a, _)| a == t))
-}
-
-/// An example pair for the symbol prompt, using `base` when known.
-pub fn example_pair(base: Option<&str>) -> String {
-    match base {
-        Some(b) => format!("{b}/USDT or {b}/USD"),
-        None => "BTC/USDT".to_string(),
+/// The format hint of a file name, by its extension (`csv`, `tsv`, `json`, `ndjson`,
+/// `text`); empty when it says nothing.
+pub fn format_of(name: &str) -> String {
+    let ext = Path::new(name).extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+    match ext.as_str() {
+        "csv" | "tsv" | "json" | "ndjson" => ext,
+        "jsonl" => "ndjson".into(),
+        "txt" => "text".into(),
+        _ => String::new(),
     }
 }
 
-/// What to say after a symbol answer that is not a pair.
-pub fn symbol_retry_hint(ans: &str) -> String {
-    let a = ans.trim().to_ascii_uppercase();
-    if !a.is_empty() && !a.contains(['/', '-', '_']) {
-        format!("`{}` is only one asset: add the currency it is priced in, e.g. {a}/USDT or {a}/USD", ans.trim())
-    } else {
-        format!("`{}` is not a symbol: type BASE/QUOTE, e.g. BTC/USDT", ans.trim())
-    }
+/// The default source name for a path: the folder's name (a file's folder for a file).
+pub fn source_name_for(path: &Path) -> Option<String> {
+    let abs = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let dir = if abs.is_dir() { abs.as_path() } else { abs.parent()? };
+    dir.file_name().map(|n| n.to_string_lossy().trim().to_string()).filter(|n| !n.is_empty() && !n.contains('|'))
 }
 
-/// An ingest session: answers to prompts are reused for the rest of a file/directory run.
+/// An ingest session: one source for a file/directory run (or a service read).
 pub struct Session<'a> {
     pub store: &'a mut Store,
     pub io: Interact,
@@ -244,30 +112,38 @@ pub struct Session<'a> {
     source_kind: String,
     source_locator: String,
     source: Option<Source>,
-    prompted_symbol: Option<Symbol>,
-    prompted_duration: Option<Duration>,
-    rejects_started: bool,
-    /// Source name used when none is given and the locator is unknown (services).
+    /// Source name used when none is given and the locator is unknown (services, the
+    /// folder name for files).
     pub default_source: Option<String>,
-    /// Artifacts of the input being ingested (written when it commits or rolls back).
-    pending: Vec<crate::store::Artifact>,
 }
 
 impl<'a> Session<'a> {
     pub fn new(store: &'a mut Store, io: Interact, opts: IngestOptions, source_kind: &str, source_locator: &str) -> Self {
-        Self {
-            store,
-            io,
-            opts,
-            source_kind: source_kind.to_string(),
-            source_locator: source_locator.to_string(),
-            source: None,
-            prompted_symbol: None,
-            prompted_duration: None,
-            rejects_started: false,
-            default_source: None,
-            pending: vec![],
+        Self { store, io, opts, source_kind: source_kind.to_string(), source_locator: source_locator.to_string(), source: None, default_source: None }
+    }
+
+    /// `--source`, else the source already holding this locator, else the default (the
+    /// folder name, the service host); a prompt only when there is none of these.
+    fn resolve_source(&mut self) -> Result<(Source, bool)> {
+        if let Some(s) = &self.source {
+            return Ok((s.clone(), false));
         }
+        let name = if let Some(n) = self.opts.source.clone() {
+            Some(n)
+        } else if let Some(s) = self.store.source_by_locator(&self.source_locator)? {
+            self.source = Some(s.clone());
+            return Ok((s, false));
+        } else {
+            self.default_source.clone().or_else(|| self.opts.default_source.clone())
+        };
+        let name = match name {
+            Some(n) => n,
+            None => self.prompt("source", &format!("Source name for {}", self.source_locator), "pass --source <NAME>")?,
+        };
+        let created = self.store.source_by_name(&name)?.is_none();
+        let s = self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?;
+        self.source = Some(s.clone());
+        Ok((s, created))
     }
 
     /// Prompt with progress output paused.
@@ -285,253 +161,86 @@ impl<'a> Session<'a> {
         r
     }
 
-    /// Confirm with progress output paused.
-    fn confirm(&self, question: &str) -> Result<bool> {
-        let pause = self.io.interactive && !self.io.yes;
-        if let Some(p) = self.opts.progress.as_ref().filter(|_| pause) {
-            p.pause();
-        }
-        let r = self.io.confirm(question);
-        if let Some(p) = self.opts.progress.as_ref().filter(|_| pause) {
-            p.resume();
-        }
-        r
-    }
-
-    fn resolve_source(&mut self) -> Result<Source> {
-        if let Some(s) = &self.source {
-            return Ok(s.clone());
-        }
-        let s = if let Some(name) = self.opts.source.clone() {
-            self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
-        } else if let Some(s) = self.store.source_by_locator(&self.source_locator)? {
-            s
-        } else if let Some(name) = self.opts.default_source.clone().or_else(|| self.default_source.clone()) {
-            self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
-        } else {
-            let name = self.prompt("source", &format!("Source name for {}", self.source_locator), "pass --source <NAME>")?;
-            self.store.get_or_create_source(&name, &self.source_kind, Some(&self.source_locator))?
-        };
-        self.source = Some(s.clone());
-        Ok(s)
-    }
-
-    fn resolve_symbol(&mut self, name_hint: Option<&str>) -> Result<Symbol> {
-        if let Some(s) = &self.opts.symbol {
-            let sym = Symbol::parse(s)?;
-            return self.store.canonical_symbol(&sym);
-        }
-        if let Some(n) = name_hint
-            && let Some(sym) = symbol_from_name(self.store, n)?
-        {
-            return Ok(sym);
-        }
-        if let Some(s) = &self.prompted_symbol {
-            return Ok(s.clone());
-        }
-        let file = name_hint.unwrap_or("input");
-        let base = name_hint.and_then(base_from_name);
-        let question = format!("Symbol for {file}: the traded pair as BASE/QUOTE, e.g. {}", example_pair(base.as_deref()));
-        let hint = "could not derive the symbol from the name; pass --symbol BASE/QUOTE (e.g. --symbol BTC/USDT)";
-        let mut tries = 0;
-        let sym = loop {
-            let ans = self.prompt("symbol", &question, hint)?;
-            match Symbol::parse(&ans) {
-                Ok(s) => break self.store.canonical_symbol(&s)?,
-                Err(e) => {
-                    tries += 1;
-                    if tries >= SYMBOL_TRIES {
-                        return Err(e);
-                    }
-                    self.io.warn(symbol_retry_hint(&ans));
+    /// Store one input as it is, all or nothing.
+    pub fn ingest(&mut self, input: Input) -> Result<IngestReport> {
+        let started = std::time::Instant::now();
+        self.store.begin_atomic()?;
+        let file = input.locator.clone();
+        let r = (|| {
+            let (source, created) = self.resolve_source()?;
+            let mut rep = IngestReport {
+                locator: input.locator.clone(),
+                source: source.name.clone(),
+                format: input.format.clone(),
+                bytes: input.bytes.len() as u64,
+                ..Default::default()
+            };
+            if let Some(p) = &self.opts.progress {
+                p.set_phase(progress::Phase::Store);
+                p.parsed(1);
+                if p.cancelled() {
+                    return Err(Error::Aborted);
                 }
             }
-        };
-        self.store.add_symbol(&sym, &[])?;
-        self.prompted_symbol = Some(sym.clone());
-        Ok(sym)
-    }
-
-    fn resolve_duration(&mut self, name_hint: Option<&str>, ts: &[i64], warnings: &mut Vec<String>) -> Result<Duration> {
-        if let Some(d) = &self.opts.duration {
-            return Duration::parse(d);
-        }
-        if let Some(d) = name_hint.and_then(duration_from_name) {
-            return Ok(d);
-        }
-        if let Some(d) = derive_duration(ts) {
-            if d.share < 0.9 {
-                warnings.push(format!("derived duration {} covers only {:.1}% of timestamp differences", d.duration, d.share * 100.0));
+            let mut notes = vec![];
+            if created {
+                notes.push(("source", source.id.clone()));
             }
-            return Ok(d.duration);
-        }
-        if let Some(d) = self.prompted_duration {
-            return Ok(d);
-        }
-        let ans = self.prompt("duration", "Bar duration (e.g. 5m)", "pass --duration (e.g. 5m)")?;
-        let d = Duration::parse(&ans)?;
-        self.prompted_duration = Some(d);
-        Ok(d)
-    }
-
-    fn write_rejects(&mut self, locator: &str, rejects: &[Reject]) -> Result<()> {
-        let Some(p) = self.opts.rejects.clone() else { return Ok(()) };
-        let mut f = if self.rejects_started {
-            std::fs::OpenOptions::new().append(true).open(&p)?
-        } else {
-            let mut f = std::fs::File::create(&p)?;
-            writeln!(f, "input,row,timestamp,reason")?;
-            self.rejects_started = true;
-            f
-        };
-        for r in rejects {
-            writeln!(f, "\"{}\",{},{},{}", locator.replace('"', "\"\""), r.row, r.timestamp.map(time::fmt_ts).unwrap_or_default(), r.reason)?;
-        }
-        Ok(())
-    }
-
-    /// Normalize, validate and store one input.
-    /// Normalize, validate and store one input, all or nothing: on any error or cancel
-    /// nothing of this input stays (bars, series stats, ingest run).
-    pub fn ingest(&mut self, input: Input) -> Result<IngestReport> {
-        self.store.begin_atomic()?;
-        self.pending.clear();
-        let file = input.locator.clone();
-        match self.ingest_inner(input) {
-            Ok(r) => {
+            match self.store.find_source_data(&source.id, &input.content_hash)? {
+                Some(d) if !self.opts.force => {
+                    rep.skipped = true;
+                    rep.id = d.id;
+                }
+                _ => {
+                    rep.id = self.store.add_source_data(
+                        &source.id,
+                        &crate::store::NewSourceData {
+                            locator: &input.locator,
+                            name: &input.name,
+                            format: &input.format,
+                            content_hash: &input.content_hash,
+                            data: &input.bytes,
+                            run_id: self.opts.run_id,
+                        },
+                    )?;
+                    notes.push(("source_data", rep.id.clone()));
+                }
+            }
+            if let Some(p) = &self.opts.progress {
+                p.stored(1);
+            }
+            rep.elapsed_ms = started.elapsed().as_millis();
+            Ok((rep, notes))
+        })();
+        match r {
+            Ok((rep, notes)) => {
                 if let Some(run) = self.opts.run_id {
-                    for a in std::mem::take(&mut self.pending) {
-                        self.store.add_artifact(run, &a)?;
+                    for (kind, reference) in notes {
+                        self.store
+                            .add_artifact(run, &crate::store::Artifact { kind: kind.into(), reference, file: file.clone(), state: "kept".into() })?;
                     }
                 }
                 self.store.commit_atomic()?;
-                Ok(r)
+                Ok(rep)
             }
             Err(e) => {
                 let _ = self.store.rollback_atomic();
                 // A source created inside the rolled-back unit no longer exists.
                 self.source = None;
-                if let Some(run) = self.opts.run_id {
-                    for mut a in std::mem::take(&mut self.pending) {
-                        a.state = "rolled_back".into();
-                        let _ = self.store.add_artifact(run, &a);
-                    }
-                    if let Some(p) = self.opts.progress.as_ref().filter(|p| p.cancelled()) {
-                        let _ = self.store.record_cancel(
-                            run,
-                            p.cancel_at.load(std::sync::atomic::Ordering::Relaxed),
-                            p.cancel_by_name(),
-                            &file,
-                            p.phase().name(),
-                        );
-                    }
+                if let Some(run) = self.opts.run_id
+                    && let Some(p) = self.opts.progress.as_ref().filter(|p| p.cancelled())
+                {
+                    let _ = self.store.record_cancel(
+                        run,
+                        p.cancel_at.load(std::sync::atomic::Ordering::Relaxed),
+                        p.cancel_by_name(),
+                        &file,
+                        p.phase().name(),
+                    );
                 }
                 Err(e)
             }
         }
-    }
-
-    fn note(&mut self, kind: &str, reference: String, file: &str) {
-        self.pending.push(crate::store::Artifact { kind: kind.into(), reference, file: file.into(), state: "kept".into() });
-    }
-
-    fn ingest_inner(&mut self, input: Input) -> Result<IngestReport> {
-        let started = std::time::Instant::now();
-        let started_ms = now_ms();
-        let mut rep = IngestReport { locator: input.locator.clone(), ..Default::default() };
-        let overrides = parse_map(&self.opts.map)?;
-        let cols = Columns::from_frame(&input.frame, &overrides)?;
-        rep.rows = cols.len() as u64;
-        // An exchange named in the file name wins over remembered/default sources (not over --source).
-        let guessed = if self.opts.source.is_none() { input.name_hint.as_deref().and_then(source_from_name) } else { None };
-        let had_source = self.source.is_some() && guessed.is_none();
-        let known = match guessed.as_ref().or(self.opts.source.as_ref()) {
-            Some(n) => self.store.source_by_name(n)?.is_some(),
-            None => true,
-        };
-        let source = match &guessed {
-            Some(n) => self.store.get_or_create_source(n, &self.source_kind, Some(&input.locator))?,
-            None => self.resolve_source()?,
-        };
-        if !had_source && !known {
-            self.note("source", source.id.clone(), &input.locator);
-        }
-        let symbol = self.resolve_symbol(input.name_hint.as_deref())?;
-        let valid_ts = cols.valid_ts();
-        let duration = self.resolve_duration(input.name_hint.as_deref(), &valid_ts, &mut rep.warnings)?;
-        rep.source = source.name.clone();
-        rep.symbol = symbol.display();
-        rep.duration = duration.to_string();
-
-        if !self.opts.force && self.store.find_run(&input.content_hash, &source, &symbol, duration)?.is_some() {
-            rep.skipped = true;
-            rep.elapsed_ms = started.elapsed().as_millis();
-            return Ok(rep);
-        }
-
-        let v = cols.validate(duration, self.opts.drop_zero_volume);
-        rep.rejected = v.rejects.len() as u64;
-        rep.zero_volume = v.zero_volume;
-        rep.dropped_zero_volume = v.dropped_zero_volume;
-        if !v.rejects.is_empty() {
-            self.write_rejects(&input.locator, &v.rejects)?;
-            let sample: Vec<String> = v.rejects.iter().take(3).map(|r| format!("row {}: {}", r.row, r.reason)).collect();
-            if !self.confirm(&format!(
-                "{} rows of {} failed validation ({}); drop them and continue?",
-                v.rejects.len(),
-                input.locator,
-                sample.join("; ")
-            ))? {
-                return Err(Error::Aborted);
-            }
-        }
-        let ts: Vec<i64> = v.bars.iter().map(|b| b.ts).collect();
-        let (g, m) = gaps(&ts, duration);
-        rep.gaps = g;
-        rep.missing_bars = m;
-        rep.first = ts.iter().min().copied();
-        rep.last = ts.iter().max().copied();
-
-        let series_ref = format!("{}|{}|{}", source.name, symbol.display(), duration);
-        if !self.store.has_series(&source.id, &symbol.base, &symbol.quote, duration.0)? {
-            self.note("series", series_ref.clone(), &input.locator);
-        }
-        let mut counts = UpsertCounts::default();
-        let prog = self.opts.progress.clone();
-        if let Some(p) = &prog {
-            p.set_phase(progress::Phase::Store);
-        }
-        if let Some(p) = &prog {
-            p.parsed(v.bars.len() as u64);
-        }
-        for chunk in v.bars.chunks(50_000) {
-            if prog.as_ref().is_some_and(|p| p.cancelled()) {
-                return Err(Error::Aborted);
-            }
-            // Progress inside the chunk's transaction (every 4096 rows), the rest at the end.
-            let mut reported = 0u64;
-            let c = match &prog {
-                Some(p) => self.store.upsert_bars_with(&source, &symbol, duration, chunk, &mut |n| {
-                    reported += n;
-                    p.stored(n);
-                    !p.cancelled()
-                })?,
-                None => self.store.upsert_bars(&source, &symbol, duration, chunk)?,
-            };
-            if let Some(p) = &prog {
-                p.stored(chunk.len() as u64 - reported);
-            }
-            counts.inserted += c.inserted;
-            counts.duplicate += c.duplicate;
-        }
-        rep.inserted = counts.inserted;
-        rep.duplicate = counts.duplicate;
-        self.store.record_run(&source, &input.locator, &input.content_hash, &symbol, duration, started_ms, counts, rep.rejected)?;
-        let rid = self.store.last_rowid();
-        self.note("bars", format!("{series_ref}: {} inserted", counts.inserted), &input.locator);
-        self.note("ingest_record", rid.to_string(), &input.locator);
-        rep.elapsed_ms = started.elapsed().as_millis();
-        Ok(rep)
     }
 }
 
@@ -594,22 +303,15 @@ pub(crate) fn canonical(path: &Path) -> String {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()).display().to_string()
 }
 
-/// Ingest CSV file(s).
-pub fn ingest_csv(store: &mut Store, io: Interact, opts: IngestOptions, path: &Path, csv: &csv::CsvOptions) -> Result<Vec<IngestReport>> {
+/// Ingest CSV file(s): stored as they are.
+pub fn ingest_csv(store: &mut Store, io: Interact, opts: IngestOptions, path: &Path) -> Result<Vec<IngestReport>> {
     let files = find_files(path, CSV_EXTS, !opts.no_recurse)?;
-    ingest_files(store, io, opts, path, &files, |_, bytes| csv::read_csv_bytes(bytes, csv))
+    ingest_files(store, io, opts, path, &files)
 }
 
-/// Ingest `files` (found under `path`) one at a time, each all-or-nothing, reporting
-/// per-file and overall progress through `opts.progress`.
-pub(crate) fn ingest_files(
-    store: &mut Store,
-    io: Interact,
-    opts: IngestOptions,
-    path: &Path,
-    files: &[PathBuf],
-    mut parse: impl FnMut(&Path, Vec<u8>) -> Result<DataFrame>,
-) -> Result<Vec<IngestReport>> {
+/// Ingest `files` (found under `path`) one at a time, each stored as is and all or
+/// nothing, reporting per-file and overall progress through `opts.progress`.
+pub fn ingest_files(store: &mut Store, io: Interact, opts: IngestOptions, path: &Path, files: &[PathBuf]) -> Result<Vec<IngestReport>> {
     let kind = if path.is_dir() { "directory" } else { "file" };
     let prog = opts.progress.clone().filter(|_| opts.track_files);
     let sizes: Vec<u64> = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).collect();
@@ -617,6 +319,7 @@ pub(crate) fn ingest_files(
         p.bytes_total.store(sizes.iter().sum(), std::sync::atomic::Ordering::Relaxed);
     }
     let mut s = Session::new(store, io, opts, kind, &canonical(path));
+    s.default_source = source_name_for(path);
     let mut out = Vec::new();
     for (i, f) in files.iter().enumerate() {
         // a cancel shows up as the next read failing (recorded in the read phase)
@@ -624,10 +327,20 @@ pub(crate) fn ingest_files(
             p.begin_file(i as u64, sizes[i]);
         }
         let r = (|| {
-            let bytes = progress::read_counted(f, s.opts.progress.clone())?;
-            let content_hash = hash_bytes(&bytes);
-            let frame = parse(f, bytes)?;
-            let input = Input { locator: canonical(f), name_hint: f.file_name().map(|n| n.to_string_lossy().to_string()), content_hash, frame };
+            let bytes = match progress::read_counted(f, s.opts.progress.clone()) {
+                Ok(b) => b,
+                Err(e) => {
+                    let Some(p) = s.opts.progress.as_ref().filter(|p| p.cancelled()) else { return Err(e.into()) };
+                    // cancelled while reading: nothing of this file was stored
+                    if let Some(run) = s.opts.run_id {
+                        let at = p.cancel_at.load(std::sync::atomic::Ordering::Relaxed);
+                        let _ = s.store.record_cancel(run, at, p.cancel_by_name(), &canonical(f), "read");
+                    }
+                    return Err(Error::Aborted);
+                }
+            };
+            let name = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            let input = Input { locator: canonical(f), format: format_of(&name), name, content_hash: hash_bytes(&bytes), bytes };
             s.ingest(input)
         })();
         if let Some(p) = &prog {
@@ -638,50 +351,23 @@ pub(crate) fn ingest_files(
     Ok(out)
 }
 
-/// Ingest every supported file under `path` (CSV and JSON, chosen by extension), one
-/// file at a time: each file is all-or-nothing, and progress is reported per file
-/// (`on_file(index, total, file)`) and overall through `opts.progress`.
+/// Ingest every data file under `path` (CSV- and JSON-like by extension), each stored
+/// as is; `on_file(index, total, file)` is called as each starts.
 pub fn ingest_path(
     store: &mut Store,
     io: Interact,
     opts: IngestOptions,
     path: &Path,
-    csv: &csv::CsvOptions,
-    records: Option<&str>,
     mut on_file: impl FnMut(usize, usize, &Path),
 ) -> Result<Vec<IngestReport>> {
     let files = find_files(path, DATA_EXTS, !opts.no_recurse)?;
-    let kind = if path.is_dir() { "directory" } else { "file" };
-    let prog = opts.progress.clone();
-    let sizes: Vec<u64> = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).collect();
-    if let Some(p) = &prog {
-        p.bytes_total.store(sizes.iter().sum(), std::sync::atomic::Ordering::Relaxed);
-    }
-    let mut s = Session::new(store, io, opts, kind, &canonical(path));
-    let mut out = Vec::new();
+    let mut opts = opts;
+    opts.track_files = true;
+    let n = files.len();
     for (i, f) in files.iter().enumerate() {
-        if prog.as_ref().is_some_and(|p| p.cancelled()) {
-            return Err(Error::Aborted);
-        }
-        on_file(i, files.len(), f);
-        if let Some(p) = &prog {
-            p.begin_file(i as u64, sizes[i]);
-        }
-        let bytes = progress::read_counted(f, prog.clone())?;
-        let content_hash = hash_bytes(&bytes);
-        let frame = if is_json_path(f) {
-            json::records_to_frame(&json::parse_records(&bytes, json::is_ndjson(f), records)?)?
-        } else {
-            csv::read_csv_bytes(bytes, csv)?
-        };
-        let input = Input { locator: canonical(f), name_hint: f.file_name().map(|n| n.to_string_lossy().to_string()), content_hash, frame };
-        let r = s.ingest(input);
-        if let Some(p) = &prog {
-            p.end_file();
-        }
-        out.push(r?);
+        on_file(i, n, f);
     }
-    Ok(out)
+    ingest_files(store, io, opts, path, &files)
 }
 
 /// Run `f` as one tracked import run: an `import_runs` row (origin `tui`/`cli`), the
@@ -705,7 +391,7 @@ where
         }
     }
     let removed = store.cleanup_run(run).unwrap_or(0);
-    let kept = store.import_artifacts(run).map(|a| a.iter().filter(|a| a.kind == "ingest_record" && a.state == "kept").count()).unwrap_or(0);
+    let kept = store.import_artifacts(run).map(|a| a.iter().filter(|a| a.kind == "source_data" && a.state == "kept").count()).unwrap_or(0);
     let (status, note) = match &r {
         Ok(_) => ("completed", String::new()),
         Err(Error::Aborted) => ("cancelled", format!("current file rolled back; {removed} empty leftover(s) removed")),
@@ -716,29 +402,72 @@ where
 }
 
 #[cfg(test)]
-mod symbol_prompt_tests {
-    #[test]
-    fn base_and_hints() {
-        use super::*;
-        assert_eq!(base_from_name("BTC_5m_combined_part1.csv").as_deref(), Some("BTC"));
-        assert_eq!(base_from_name("eth-1h.csv").as_deref(), Some("ETH"));
-        assert_eq!(base_from_name("bars_5m.csv"), None);
-        assert_eq!(example_pair(Some("BTC")), "BTC/USDT or BTC/USD");
-        assert_eq!(example_pair(None), "BTC/USDT");
-        assert!(symbol_retry_hint("BTC").contains("BTC/USDT or BTC/USD"));
-        assert!(symbol_retry_hint("a/").contains("not a symbol"));
-    }
-}
+mod tests {
+    use super::*;
 
-#[cfg(test)]
-mod source_name_tests {
+    fn store() -> Store {
+        Store::open_in_memory().unwrap()
+    }
+
     #[test]
-    fn exchange_tokens_in_names() {
-        use super::source_from_name as s;
-        assert_eq!(s("binance_BTCUSDT_5m.csv").as_deref(), Some("binance"));
-        assert_eq!(s("Coinbase-BTC-USD_5m.csv").as_deref(), Some("coinbase"));
-        assert_eq!(s("gdax_btc.csv").as_deref(), Some("coinbase"));
-        assert_eq!(s("BTCUSDT_5m.csv"), None);
-        assert_eq!(s("okxish_5m.csv"), None, "whole tokens only");
+    fn files_are_stored_byte_for_byte_without_prompts() {
+        let d = tempfile::tempdir().unwrap();
+        let dir = d.path().join("math");
+        std::fs::create_dir(&dir).unwrap();
+        // nothing here looks like bars, and the names say nothing about symbols
+        std::fs::write(dir.join("BTC_5m_combined_part1.csv"), "a;b\n1;x\n").unwrap();
+        std::fs::write(dir.join("notes.json"), "{\"not\": [\"an\", \"array of bars\"]}").unwrap();
+        let mut s = store();
+        // a batch session errors on any prompt: none may be asked
+        let r = ingest_path(&mut s, Interact::batch(false), IngestOptions::default(), &dir, |_, _, _| {}).unwrap();
+        assert_eq!(r.len(), 2);
+        assert!(r.iter().all(|r| r.source == "math" && !r.skipped), "{r:?}");
+        let src = s.source_by_name("math").unwrap().unwrap();
+        let items = s.source_data(&src.id).unwrap();
+        assert_eq!(items.iter().map(|i| i.format.as_str()).collect::<Vec<_>>(), ["csv", "json"]);
+        assert_eq!(s.source_data_bytes(&items[0].id).unwrap(), b"a;b\n1;x\n");
+        // no bars, series or symbols were made
+        let n = |sql: &str| s.conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap();
+        assert_eq!((n("SELECT COUNT(*) FROM m_bars"), n("SELECT COUNT(*) FROM series_stats"), n("SELECT COUNT(*) FROM ingest_runs")), (0, 0, 0));
+        // the same bytes again are skipped, unless --force
+        let again = ingest_csv(&mut s, Interact::batch(false), IngestOptions::default(), &dir).unwrap();
+        assert!(again[0].skipped && again[0].summary().contains("skipped"));
+        let o = IngestOptions { force: true, ..Default::default() };
+        assert!(!ingest_csv(&mut s, Interact::batch(false), o, &dir).unwrap()[0].skipped);
+        assert_eq!(s.source_data(&src.id).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn source_defaults_to_the_folder_and_only_a_rootless_path_would_ask() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("prices");
+        std::fs::create_dir(&f).unwrap();
+        std::fs::write(f.join("x.csv"), "1\n").unwrap();
+        assert_eq!(source_name_for(&f.join("x.csv")).as_deref(), Some("prices"));
+        assert_eq!(source_name_for(&f).as_deref(), Some("prices"));
+        assert_eq!(source_name_for(Path::new("/")), None);
+        let mut s = store();
+        let o = IngestOptions { source: Some("given".into()), ..Default::default() };
+        assert_eq!(ingest_csv(&mut s, Interact::batch(false), o, &f).unwrap()[0].source, "given");
+        // a service with no default and no --source asks for the source name, and nothing else
+        let mut sess = Session::new(&mut s, Interact::batch(false), IngestOptions::default(), "service", "redis://h/k");
+        let e = sess
+            .ingest(Input {
+                locator: "redis://h/k".into(),
+                name: "k".into(),
+                format: "ndjson".into(),
+                content_hash: "x".into(),
+                bytes: b"{}".to_vec(),
+            })
+            .unwrap_err();
+        assert!(e.to_string().contains("--source"), "{e}");
+    }
+
+    #[test]
+    fn formats_are_hints_from_names() {
+        assert_eq!(format_of("a.CSV"), "csv");
+        assert_eq!(format_of("a.jsonl"), "ndjson");
+        assert_eq!(format_of("a.txt"), "text");
+        assert_eq!(format_of("a.bin"), "");
     }
 }

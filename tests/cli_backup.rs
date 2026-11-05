@@ -6,7 +6,8 @@ use common::*;
 fn backup_restore_round_trip() {
     let e = Env::new();
     let f = fixture("ETHUSDT_5m.csv");
-    e.ok(&["ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
+    let _ = f;
+    e.bars("ETHUSDT_5m.csv", "binance");
     let home = e.home();
     std::fs::create_dir_all(home.join("themes/mine/assets")).unwrap();
     std::fs::write(home.join("themes/mine/interface.toml"), "# custom").unwrap();

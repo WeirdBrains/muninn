@@ -100,24 +100,26 @@ impl Store {
             params![run, status, now_ms(), files_done as i64, note],
         )?;
         if let Some(r) = self.import_run(run)? {
-            let bars: i64 = self.conn.query_row(
-                "SELECT COALESCE(SUM(i.inserted), 0) FROM import_artifacts a JOIN ingest_runs i ON i.id = CAST(a.reference AS INTEGER)
-                 WHERE a.run_id = ?1 AND a.kind = 'ingest_record' AND a.state = 'kept'",
+            // what arrived: items stored as they are (ingest makes no bars)
+            let (items, bytes): (i64, i64) = self.conn.query_row(
+                "SELECT COUNT(*), COALESCE(SUM(d.size), 0) FROM import_artifacts a JOIN source_data d ON d.id = a.reference
+                 WHERE a.run_id = ?1 AND a.kind = 'source_data' AND a.state = 'kept'",
                 [run],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )?;
             let files: Vec<String> = {
                 let mut st =
-                    self.conn.prepare("SELECT DISTINCT file FROM import_artifacts WHERE run_id = ?1 AND kind = 'ingest_record' ORDER BY rowid")?;
+                    self.conn.prepare("SELECT DISTINCT file FROM import_artifacts WHERE run_id = ?1 AND kind = 'source_data' ORDER BY rowid")?;
                 st.query_map([run], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?
             };
             let what = match files.as_slice() {
                 [one] => std::path::Path::new(one).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| one.clone()),
                 _ => format!("{}/{} file(s)", r.files_done, r.files_total),
             };
-            let a = super::NewAction::new("import", &r.origin, format!("import {what} · {bars} bars · {} · run #{run}", r.status)).params(
+            let a = super::NewAction::new("import", &r.origin, format!("import {what} · {items} item(s) stored · {} · run #{run}", r.status)).params(
                 serde_json::json!({
-                    "run": run, "status": r.status, "files_done": r.files_done, "files_total": r.files_total, "files": files, "inserted": bars,
+                    "run": run, "status": r.status, "files_done": r.files_done, "files_total": r.files_total, "files": files,
+                    "inserted": items, "stored": items, "bytes": bytes,
                 }),
             );
             self.note_action(&a);
@@ -175,7 +177,7 @@ impl Store {
         };
         for (id, file) in created {
             let used: i64 = self.conn.query_row(
-                "SELECT (SELECT COUNT(*) FROM series_stats WHERE source_id = ?1) + EXISTS(SELECT 1 FROM m_bars WHERE _source_id = ?1)",
+                "SELECT (SELECT COUNT(*) FROM series_stats WHERE source_id = ?1) + EXISTS(SELECT 1 FROM m_bars WHERE _source_id = ?1) + EXISTS(SELECT 1 FROM source_data WHERE source_id = ?1)",
                 [&id],
                 |r| r.get(0),
             )?;

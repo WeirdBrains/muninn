@@ -44,11 +44,24 @@ mnnn sources rename binance binance-spot
 mnnn sources remove binance-spot      # asks for confirmation, -y to skip
 ```
 
+## Source data
+
+`source_data(id, source_id, locator, name, format, content_hash, size, data, received_at,
+run_id)`: what `mnnn ingest` stored, byte for byte, one row per file, HTTP
+page or service read. `format` is only a hint (`csv`, `json`, `ndjson`). Nothing reads
+it but pipelines (`source:NAME`); removing a source removes its data.
+
+```
+mnnn sources data binance             # items: id, received, format, size, name, locator
+mnnn sources cat binance 3f2a1c9e     # one item's bytes, unchanged
+```
+
 ## Symbols and aliases
 
 The known symbol list seeds common base assets (BTC, ETH, SOL, ...) and quote
 currencies (USDT, USDC, USD, EUR, ...), plus aliases such as `XBT -> BTC`. It is
-used to derive a symbol from a file name (see [CSV ingest](ingest-csv.md)).
+used to read symbols written as `BTCUSDT` or `XBT-USD` (for example by the to-bars code
+space); ingest itself never derives or asks for one ([CSV ingest](ingest-csv.md)).
 
 ```
 mnnn symbols list

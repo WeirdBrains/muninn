@@ -187,7 +187,7 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         super::generate(d.path()).unwrap();
         let tui = std::fs::read_to_string(d.path().join("mnnn-tui.1")).unwrap();
-        assert!(tui.contains(".SH NOTES") && tui.contains("loads the first imported series") && tui.contains("progress bar"), "{tui}");
+        assert!(tui.contains(".SH NOTES") && tui.contains("stored as they are") && tui.contains("progress bar"), "{tui}");
         let help = std::fs::read_to_string(d.path().join("mnnn-help.1")).unwrap();
         assert!(help.contains("searches from any topic") && help.contains("key bar"), "{help}");
     }

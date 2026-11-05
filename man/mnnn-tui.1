@@ -83,7 +83,7 @@ Print help (see a summary with \*(Aq\-h\*(Aq)
 .PP
 Everything you can act on is clickable: menus, tiles, sidebar, popup rows, form fields, import picker entries and the key buttons ([X] closes any popup).
 .PP
-Import (i): pick a file or a whole folder (A imports the folder, recursing). If a symbol cannot be guessed from a file name, a popup asks for it, showing the file name on its own line, its folder below and (file i of n) during folder imports. After an import, if no tile shows data yet, the focused tile loads the first imported series.
+Import (i): pick a file or a whole folder (A imports the folder, recursing). Files are stored as they are in a source (the folder's name unless you type one); nothing is asked about symbols. To chart them, run a pipeline from source:NAME through code:parse\-csv and code:to\-bars into model:bars.
 .PP
 Help (? or F1): follow links with Tab and Enter or a click, Backspace goes back, / searches from any topic; a clickable key bar at the bottom lists the shortcuts.
 .PP

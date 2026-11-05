@@ -28,6 +28,11 @@ pub enum Source {
     Code(String),
     /// Data given as is: a frame (`{model, fields, ids, columns, groups}`).
     Frame(Value),
+    /// A source's stored data (`source:NAME`), as it arrived: one row per stored item
+    /// (`text` holds its bytes as text; also `name`, `format`, `locator`, `received_at`,
+    /// `item`). Code spaces such as `parse-csv` shape it. (A name that is no source but a
+    /// model reads that model, as `source:MODEL` did before.)
+    Data(String),
     /// Standard input (`-`): passed on raw, as text in one `text` column; a parser code
     /// space step (`parse-csv`, `parse-json`, `parse-ndjson`, or your own) shapes it.
     Stdin,
@@ -49,6 +54,8 @@ impl Source {
             "search" => Source::Search(need("search")?),
             "journal" => Source::Journal(need("journal")?),
             "code" => Source::Code(need("code")?),
+            "source" if !rest.is_empty() && !rest.contains([':', ' ']) => Source::Data(rest.to_string()),
+            "source" => Source::parse(rest)?,
             "model" => Source::of(super::parse_input(rest)?),
             _ => Source::of(super::parse_input(s)?),
         })
@@ -78,6 +85,7 @@ impl Source {
             Source::Search(n) => format!("search:{n}"),
             Source::Journal(n) => format!("journal:{n}"),
             Source::Code(n) => format!("code:{n}"),
+            Source::Data(n) => format!("source:{n}"),
             Source::Frame(f) => format!("data:{}", f.get("model").and_then(Value::as_str).unwrap_or("shared")),
             Source::Stdin => "-".into(),
         }
@@ -96,6 +104,11 @@ pub fn frame(store: &Store, env: &CodeEnv, origin: &str, src: &Source, log: &mut
         Source::Frame(f) => f.clone(),
         Source::Stdin => return Err(Error::invalid("pipe", "standard input is read by `mnnn pipe -`")),
         Source::Model(i) => host::load(store, &serde_json::to_value(i)?)?,
+        Source::Data(n) => match store.source_by_name(n)? {
+            Some(src) => data_frame(store, &src)?,
+            None if store.find_model(n).is_ok() => host::load(store, &serde_json::to_value(super::parse_input(n)?)?)?,
+            None => return Err(Error::invalid("source", format!("no source `{n}` (`mnnn sources list`; data gets into one with `mnnn ingest`)"))),
+        },
         Source::Search(n) => {
             let ls = store.find_live_search(n)?;
             search_frame(store, &ls.spec, &format!("search:{}", ls.name))?
@@ -120,6 +133,30 @@ pub fn frame(store: &Store, env: &CodeEnv, origin: &str, src: &Source, log: &mut
             res?
         }
     }))
+}
+
+/// A source's stored items as a frame, one row each, the bytes as text (`text`).
+pub fn data_frame(store: &Store, src: &crate::model::Source) -> Result<Value> {
+    let items = store.source_data(&src.id)?;
+    let mut text = vec![];
+    for i in &items {
+        text.push(Value::String(String::from_utf8_lossy(&store.source_data_bytes(&i.id)?).into_owned()));
+    }
+    let col = |f: &dyn Fn(&crate::store::SourceData) -> Value| items.iter().map(f).collect::<Vec<_>>();
+    Ok(col_frame(
+        &format!("source:{}", src.name),
+        vec![
+            ("text", "text", text),
+            ("name", "text", col(&|i| json!(i.name))),
+            ("format", "text", col(&|i| json!(i.format))),
+            ("locator", "text", col(&|i| json!(i.locator))),
+            ("received_at", "time", col(&|i| json!(i.received_at))),
+            ("item", "text", col(&|i| json!(i.id))),
+            ("source", "text", col(&|_| json!(src.name))),
+        ],
+        items.iter().map(|i| i.id.clone()).collect(),
+        vec![],
+    ))
 }
 
 fn col_frame(name: &str, cols: Vec<(&str, &str, Vec<Value>)>, ids: Vec<String>, groups: Vec<Value>) -> Value {
@@ -504,14 +541,16 @@ fn run_hops(
                 let made = deliver(store, origin, k, f, last.as_ref(), &out.hops.join(" | "))?;
                 out.saved.push(format!("{} → {made}", k.text()));
             }
-            Step::Code(n) => {
-                let c = store.find_code_space(n)?;
+            Step::Code(spec) => {
+                let (n, options) = super::split_options(spec);
+                let c = store.find_code_space(&n)?;
                 if seen.contains(&c.id) {
                     return Err(Error::invalid("pipe", format!("code space {} is in this pipe twice: a cycle", c.name)));
                 }
                 seen.push(c.id.clone());
                 let from = out.hops[out.hops.len() - 2].clone();
-                let info = super::run_on(store, env, origin, &c, cur.take(), &from, log)?;
+                let input = cur.take();
+                let info = super::with_options(options, || super::run_on(store, env, origin, &c, input, &from, log))?;
                 cur = Some(output(&c, &info)?);
                 if let Some(f) = &cur {
                     note_frame(store, origin, &format!("code:{}", c.name), f);
@@ -713,6 +752,16 @@ fn deliver(store: &Store, origin: &str, sink: &Sink, f: &Value, last: Option<&(C
             let to = x.clone().unwrap_or_else(|| "every exchange".into());
             Ok(format!("journal {} shared with {to}{} · entry {e}", jr.name, if fresh { "" } else { " (already)" }))
         }
+        Sink::Model(n) if store.find_model(n).is_ok_and(|m| m.is_bars()) => {
+            let cols = f.get("columns").and_then(Value::as_object).cloned().unwrap_or_default();
+            let rows = f.get("ids").and_then(Value::as_array).map(Vec::len).unwrap_or(0);
+            let (new, dup) = store.code_atomic(|| super::bars::upsert_frame(store, &cols, rows))?;
+            store.note_action(
+                &NewAction::new("record.create", origin, format!("pipe {new} new bars into bars ({dup} already there)"))
+                    .params(json!({ "model": "bars", "count": new, "duplicate": dup, "pipe": hops })),
+            );
+            Ok(format!("{new} new bars, {dup} already there"))
+        }
         Sink::Model(n) => {
             let m = store.find_model(n)?;
             let fields = crate::store::records::field_names(&m);
@@ -772,5 +821,43 @@ mod tests {
         assert_eq!(Source::of(Source::parse("code:x").unwrap().input()), Source::Code("x".into()));
         assert!(Step::parse("tee:x").is_err() && Sink::parse("bogus:x").is_err());
         assert_eq!(Step::parse("journal:Out").unwrap(), Step::Save(Sink::Journal("Out".into())));
+    }
+
+    #[test]
+    fn a_source_node_reads_stored_data_as_it_arrived_and_bars_rows_upsert() {
+        let s = Store::open_in_memory().unwrap();
+        let src = s.add_source("raw", "file", None).unwrap();
+        let bytes = b"ts,o,h,l,c\n1,2,3,1,2\n";
+        let nd = crate::store::NewSourceData { locator: "/x/a.csv", name: "a.csv", format: "csv", content_hash: "h", data: bytes, run_id: None };
+        s.add_source_data(&src.id, &nd).unwrap();
+        let node = Source::parse("source:raw").unwrap();
+        assert_eq!(node, Source::Data("raw".into()));
+        assert_eq!(node.text(), "source:raw");
+        let dir = tempfile::tempdir().unwrap();
+        let f = frame(&s, &CodeEnv::new(dir.path()), "t", &node, &mut |_| {}).unwrap().unwrap();
+        assert_eq!(f["columns"]["text"], json!([String::from_utf8_lossy(bytes)]));
+        assert_eq!(f["columns"]["name"], json!(["a.csv"]));
+        assert_eq!(f["columns"]["format"], json!(["csv"]));
+        let e = frame(&s, &CodeEnv::new(dir.path()), "t", &Source::parse("source:nope").unwrap(), &mut |_| {}).unwrap_err();
+        assert!(e.to_string().contains("mnnn sources list"), "{e}");
+        // options ride on the code spec
+        let (name, o) = super::super::split_options("to-bars?symbol=BTC%2FUSDT&duration=5m&check");
+        assert_eq!(name, "to-bars");
+        assert_eq!((o["symbol"].clone(), o["duration"].clone(), o["check"].clone()), (json!("BTC/USDT"), json!("5m"), json!("true")));
+        assert!(super::super::split_options("parse-csv").1.is_empty());
+        // rows shaped like to-bars output become bars; a rerun adds none
+        let mut cols = serde_json::Map::new();
+        cols.insert("source".into(), json!(["raw", "raw"]));
+        cols.insert("symbol".into(), json!(["BTC/USDT", "BTC/USDT"]));
+        cols.insert("period".into(), json!([300, 300]));
+        cols.insert("timestamp".into(), json!([0, 300_000]));
+        for k in ["open", "high", "low", "close", "volume"] {
+            cols.insert(k.into(), json!([1.0, 1.0]));
+        }
+        assert_eq!(super::super::bars::upsert_frame(&s, &cols, 2).unwrap(), (2, 0));
+        assert_eq!(super::super::bars::upsert_frame(&s, &cols, 2).unwrap(), (0, 2));
+        assert_eq!(s.count_bars().unwrap(), 2);
+        cols.remove("symbol");
+        assert!(super::super::bars::upsert_frame(&s, &cols, 2).unwrap_err().to_string().contains("symbol"));
     }
 }

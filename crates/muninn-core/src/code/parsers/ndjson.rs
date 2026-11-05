@@ -1,13 +1,15 @@
 // parse-ndjson: raw text with one JSON object a line (NDJSON, JSON lines) into rows.
+// Each `text` cell is read on its own (one stored item each with `source:NAME`).
 // A built-in parser: copy it (`mnnn code create my-ndjson --from parse-ndjson`) and change it.
 use muninn_plugin::prelude::*;
 
 pub fn run(host: &Host) -> Result<View> {
     let input = host.input()?;
-    let text: String = input.text("text")?.join("\n");
     let mut objs = vec![];
-    for (i, l) in text.lines().enumerate().filter(|(_, l)| !l.trim().is_empty()) {
-        objs.push(Json::parse(l.trim()).map_err(|e| Error::new(format!("line {}: {e}", i + 1)))?);
+    for text in input.text("text")? {
+        for (i, l) in text.lines().enumerate().filter(|(_, l)| !l.trim().is_empty()) {
+            objs.push(Json::parse(l.trim()).map_err(|e| Error::new(format!("line {}: {e}", i + 1)))?);
+        }
     }
     let mut names: Vec<String> = vec![];
     for o in &objs {

@@ -189,25 +189,33 @@ to never prompt.
 
 ## Ingest
 
+Ingest stores data as it arrives, byte for byte, in a source. It never asks what the
+data is and never makes bars; pipelines you set up decide that.
+
 ```sh
 RAW=~/Projects/kommandosaldat/raw/data
-# source, symbol and bar size come from flags or the file name (BTCUSDT_5m.csv -> BTC/USDT 5m)
 mnnn ingest csv --path $RAW/BTCUSDT_5m.csv --source binance
-mnnn ingest csv --path $RAW --source binance          # every CSV in a directory
-mnnn ingest csv --path $RAW/ETHUSD_5m.csv --source kraken --rejects /tmp/rejects.csv
-
-mnnn ingest json --path bars.json --records data.bars --source myfeed
+mnnn ingest path $RAW                                 # every file; source "data" (the folder)
+mnnn ingest json --path bars.json --source myfeed
 
 mnnn ingest service http --url https://api.example.com/klines \
-    --param symbol=BTCUSDT --param interval=5m --records result \
-    --paginate time --from 2024-01-01 --symbol BTC/USDT --duration 5m
+    --param symbol=BTCUSDT --param interval=5m --records result --paginate time --from 2024-01-01
 mnnn ingest service sqlite --path exchange.db --table BTCUSDT_1h
 mnnn ingest service redis --uri redis://localhost --pattern 'bars:*' --value-format fields
 mnnn ingest service postgres --host db --username me --password-env PGPASS \
-    --database market --table btc_5m --symbol BTC/USDT
+    --database market --table btc_5m
+
+mnnn sources data binance                             # what a source holds
 ```
 
-Re-ingesting an unchanged file is skipped; `--force` re-reads it (duplicates are ignored).
+Re-ingesting unchanged bytes is skipped; `--force` stores them again.
+
+Bars come from a pipe or pipeline through the built-in parser code spaces:
+
+```sh
+mnnn code parsers --install
+mnnn pipe source:binance code:parse-csv 'code:to-bars?symbol=BTC/USDT&duration=5m' --to model:bars -y
+```
 
 ## Query and export
 

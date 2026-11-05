@@ -185,14 +185,12 @@ impl HttpRequest {
         }
     }
 
-    /// Fetch all pages into one Input.
-    pub fn fetch(&self) -> Result<Input> {
+    /// Fetch every page; each page's body is one Input, stored as it arrived.
+    pub fn fetch(&self) -> Result<Vec<Input>> {
         self.validate()?;
         let client = self.client()?;
         let base_params = parse_params(&self.params)?;
-        let mut json_records: Vec<Value> = vec![];
-        let mut csv_frame: Option<DataFrame> = None;
-        let mut all_bytes: Vec<u8> = vec![];
+        let mut pages: Vec<(Vec<u8>, Format)> = vec![];
         let mut cursor: Option<String> = None;
         let mut start = self.from.as_deref().map(|s| parse_ts(s).ok_or_else(|| Error::invalid("--from", s.to_string()))).transpose()?;
         let to = self.to.as_deref().map(|s| parse_ts(s).ok_or_else(|| Error::invalid("--to", s.to_string()))).transpose()?;
@@ -219,8 +217,8 @@ impl HttpRequest {
                 std::thread::sleep(iv);
             }
             let (ct, bytes) = self.send(&client, &url)?;
-            all_bytes.extend_from_slice(&bytes);
             let fmt = self.format_for(ct.as_deref());
+            pages.push((bytes.clone(), fmt));
             let (n, page_frame) = match fmt {
                 Format::Csv => {
                     let df = CsvReadOptions::default()
@@ -229,19 +227,12 @@ impl HttpRequest {
                         .into_reader_with_file_handle(std::io::Cursor::new(bytes.clone()))
                         .finish()?;
                     let n = df.height();
-                    match &mut csv_frame {
-                        Some(acc) => {
-                            acc.vstack_mut(&df)?;
-                        }
-                        None => csv_frame = Some(df.clone()),
-                    }
                     (n, Some(df))
                 }
                 Format::Json | Format::Ndjson => {
                     let recs = parse_records(&bytes, fmt == Format::Ndjson, self.records.as_deref())?;
                     let n = recs.len();
                     let df = if n > 0 { Some(records_to_frame(&recs)?) } else { None };
-                    json_records.extend(recs);
                     if self.paging == Paging::Cursor {
                         let doc: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
                         cursor = select(&doc, Some(&self.cursor_path)).ok().and_then(|v| match v {
@@ -271,21 +262,31 @@ impl HttpRequest {
                 }
             }
         }
-        let mut frame = match csv_frame {
-            Some(f) => f,
-            None => records_to_frame(&json_records)?,
-        };
-        if let Some(t) = to {
-            // Trim bars past --to when paging by time.
-            if self.paging == Paging::Time {
-                let cols = Columns::from_frame(&frame, &Default::default())?;
-                let mask: BooleanChunked = cols.ts.iter().map(|v| Some(v.is_none_or(|x| x <= t))).collect();
-                frame = frame.filter(&mask)?;
-            }
-        }
+        // the bytes past --to stay as they came: trimming is a code space's job
+        let _ = to;
         let u = first_url.unwrap_or(build_url(&self.url, &[])?);
-        let name_hint = u.path_segments().and_then(|mut s| s.next_back().map(str::to_string)).filter(|s| !s.is_empty());
-        Ok(Input { locator: redact(&u), name_hint, content_hash: hash_bytes(&[u.as_str().as_bytes(), &all_bytes].concat()), frame })
+        let name =
+            u.path_segments().and_then(|mut s| s.next_back().map(str::to_string)).filter(|s| !s.is_empty()).unwrap_or_else(|| "response".into());
+        let n = pages.len();
+        Ok(pages
+            .into_iter()
+            .enumerate()
+            .map(|(i, (bytes, fmt))| {
+                let locator = if n > 1 { format!("{}#page={}", redact(&u), i + 1) } else { redact(&u) };
+                Input {
+                    content_hash: hash_bytes(&[locator.as_bytes(), &bytes].concat()),
+                    locator,
+                    name: name.clone(),
+                    format: match fmt {
+                        Format::Csv => "csv",
+                        Format::Json => "json",
+                        Format::Ndjson => "ndjson",
+                    }
+                    .into(),
+                    bytes,
+                }
+            })
+            .collect())
     }
 }
 

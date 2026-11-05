@@ -447,7 +447,7 @@ fn monitor_enter(app: &mut App, p: String, sel: usize) {
             }
         }
         Some(crate::code::pipeline::NodeKind::Code { space }) => {
-            open(app, FrameTile::new(format!("code:{space}")));
+            open(app, FrameTile::new(format!("code:{}", crate::code::split_options(&space).0)));
         }
         Some(k) => app.set_status(format!(
             "{}: {} · {} rows in, {} out{}",

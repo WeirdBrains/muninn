@@ -524,6 +524,30 @@ pub fn run_named(
 thread_local! {
     /// The named inputs of the run starting now (see [`run_named`]).
     static NAMED: std::cell::RefCell<Vec<(String, serde_json::Value)>> = const { std::cell::RefCell::new(vec![]) };
+    /// The options of the run starting now (see [`with_options`]).
+    static OPTIONS: std::cell::RefCell<serde_json::Map<String, serde_json::Value>> = std::cell::RefCell::new(serde_json::Map::new());
+}
+
+/// A code step with options: `to-bars?symbol=BTC/USDT&duration=5m` -> (`to-bars`,
+/// `{symbol: "BTC/USDT", duration: "5m"}`). Values are text; `%XX` escapes are decoded.
+/// A code space reads them with `host.option(NAME)`.
+pub fn split_options(spec: &str) -> (String, serde_json::Map<String, serde_json::Value>) {
+    let mut m = serde_json::Map::new();
+    let Some((name, q)) = spec.split_once('?') else { return (spec.trim().to_string(), m) };
+    for kv in q.split('&').filter(|s| !s.trim().is_empty()) {
+        let (k, v) = kv.split_once('=').unwrap_or((kv, "true"));
+        let dec = |s: &str| url::form_urlencoded::parse(format!("x={s}").as_bytes()).next().map(|(_, v)| v.to_string()).unwrap_or_default();
+        m.insert(k.trim().to_string(), serde_json::Value::String(dec(v.trim())));
+    }
+    (name.trim().to_string(), m)
+}
+
+/// Run `f` with `options` handed to the code space it runs (`host.option`).
+pub fn with_options<T>(options: serde_json::Map<String, serde_json::Value>, f: impl FnOnce() -> T) -> T {
+    OPTIONS.with(|o| *o.borrow_mut() = options);
+    let r = f();
+    OPTIONS.with(|o| o.borrow_mut().clear());
+    r
 }
 
 /// Run a code space over `input` (a frame; `None`: its default model query, if any).
@@ -562,6 +586,7 @@ pub fn run_on(
     let mut r = host::Run::new(store, space);
     r.input = input;
     r.named = NAMED.with(|n| std::mem::take(&mut *n.borrow_mut()));
+    r.options = OPTIONS.with(|o| std::mem::take(&mut *o.borrow_mut()));
     let table = r.table();
     // SAFETY: an approved plugin with a checked ABI; `table` and `r` outlive the call.
     let code = unsafe { (plugin.run)(&table) };

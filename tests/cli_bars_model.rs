@@ -9,7 +9,7 @@ fn json(e: &Env, args: &[&str]) -> Value {
 }
 
 fn ingest(e: &Env, file: &str, source: &str) {
-    e.ok(&["-y", "ingest", "csv", "--path", fixture(file).to_str().unwrap(), "--source", source]);
+    e.bars(file, source);
 }
 
 /// The bars with their ids, after a stored value on the first one.

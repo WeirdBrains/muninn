@@ -122,7 +122,10 @@ fn standard_input_is_a_pipe_source_in_one_go_or_in_chunks() {
     }
     assert!(e.ok(&["code", "parsers"]).contains("not installed (--install)"));
     e.ok(&["code", "parsers", "--install"]);
-    let o = feed(&["-y", "pipe", "-", "code:to-bars", "--json", "--format", "csv"], "time,open,high,low,close,vol\n1700000000000,1,2,0.5,1.5,10\n");
+    let o = feed(
+        &["-y", "pipe", "-", "code:to-bars?symbol=BTC/USDT&duration=1m", "--json", "--format", "csv"],
+        "time,open,high,low,close,vol\n1699999980000,1,2,0.5,1.5,10\n",
+    );
     assert!(o.status.success(), "{}", err(&o));
     let j: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
     assert_eq!(nums(&j["output"]["columns"]["close"]), vec![1.5], "{j}");

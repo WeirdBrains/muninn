@@ -118,7 +118,8 @@ fn a_math_code_space_builds_runs_and_runs_from_a_rule() {
             .unwrap()
     };
     let f = fixture("BTCUSDT_5m.csv");
-    e.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
+    let _ = f;
+    e.bars("BTCUSDT_5m.csv", "binance");
     e.ok(&[
         "code",
         "create",

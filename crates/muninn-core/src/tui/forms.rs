@@ -1,7 +1,7 @@
 //! Export and Keys & Backup dialogs, plus file preview helpers.
 use super::{App, block, widgets::Input};
 use crate::export::{self, Format};
-use crate::ingest::{self, frame::Columns, time::fmt_ts};
+use crate::ingest;
 use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -135,31 +135,13 @@ pub fn is_json(p: &std::path::Path) -> bool {
     p.extension().is_some_and(|e| matches!(e.to_string_lossy().to_ascii_lowercase().as_str(), "json" | "ndjson" | "jsonl"))
 }
 
+/// The first `n` lines of the first data file at `path`, as they are.
 pub fn preview(path: &std::path::Path, n: usize) -> crate::Result<Vec<String>> {
+    use std::io::BufRead;
     let file = ingest::expand_path(path, &["csv", "tsv", "txt", "json", "ndjson", "jsonl"])?.remove(0);
-    let df = if is_json(&file) { ingest::json::read_json_file(&file, None)? } else { ingest::csv::read_csv(&file, &Default::default())? };
-    let cols = Columns::from_frame(&df.head(Some(n)), &Default::default())?;
-    let mut out = vec![format!("{} ({} columns)", file.display(), df.width())];
-    for i in 0..cols.len() {
-        let f = |v: Option<f64>| v.map(|x| format!("{x:.4}")).unwrap_or_else(|| "?".into());
-        out.push(format!(
-            "{:<20} o {} h {} l {} c {} v {}",
-            cols.ts[i].map(fmt_ts).unwrap_or_else(|| "?".into()),
-            f(cols.open[i]),
-            f(cols.high[i]),
-            f(cols.low[i]),
-            f(cols.close[i]),
-            f(cols.volume[i])
-        ));
-    }
-    if let Some(n) = file.file_name() {
-        let n = n.to_string_lossy();
-        out.push(format!(
-            "derived: symbol {} · duration {}",
-            ingest::symbol_from_name_static(&n).map(|s| s.display()).unwrap_or_else(|| "?".into()),
-            ingest::duration_from_name(&n).map(|d| d.to_string()).unwrap_or_else(|| "from data".into())
-        ));
-    }
+    let mut out = vec![format!("{} (stored as is)", file.display())];
+    let r = std::io::BufReader::new(std::fs::File::open(&file)?);
+    out.extend(r.lines().take(n).map_while(std::result::Result::ok));
     Ok(out)
 }
 

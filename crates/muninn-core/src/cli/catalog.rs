@@ -9,7 +9,8 @@ pub fn sources(ctx: &Ctx, cmd: SourcesCommand) -> anyhow::Result<()> {
     match cmd {
         SourcesCommand::List => {
             for s in store.sources()? {
-                println!("{}\t{}\t{}\t{}", s.name, s.kind, s.locator.unwrap_or_default(), s.id);
+                let (n, b) = store.source_data_totals(&s.id)?;
+                println!("{}\t{}\t{}\t{}\t{n} item(s), {b} bytes", s.name, s.kind, s.locator.unwrap_or_default(), s.id);
             }
         }
         SourcesCommand::Add { name, kind, locator } => {
@@ -35,6 +36,40 @@ pub fn sources(ctx: &Ctx, cmd: SourcesCommand) -> anyhow::Result<()> {
                 &NewAction::new("source.remove", "cli", format!("remove source {name} ({n} bars)")).params(json!({ "source": name, "bars": n })),
             );
             ctx.io.info(format!("removed {name} ({n} bars)"));
+        }
+        SourcesCommand::Data { name, json } => {
+            let src = store.source_by_name(&name)?.ok_or_else(|| anyhow::anyhow!("no source `{name}`"))?;
+            let items = store.source_data(&src.id)?;
+            if json {
+                let v: Vec<_> = items
+                    .iter()
+                    .map(|i| json!({ "id": i.id, "name": i.name, "format": i.format, "locator": i.locator, "size": i.size, "content_hash": i.content_hash, "received_at": i.received_at }))
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&v)?);
+            } else {
+                for i in items {
+                    println!(
+                        "{}\t{}\t{}\t{} bytes\t{}\t{}",
+                        &i.id[..8],
+                        crate::ingest::time::fmt_ts(i.received_at),
+                        i.format,
+                        i.size,
+                        i.name,
+                        i.locator
+                    );
+                }
+            }
+        }
+        SourcesCommand::Cat { name, item } => {
+            use std::io::Write;
+            let src = store.source_by_name(&name)?.ok_or_else(|| anyhow::anyhow!("no source `{name}`"))?;
+            let found: Vec<_> = store.source_data(&src.id)?.into_iter().filter(|i| i.id.starts_with(item.trim())).collect();
+            let i = match found.as_slice() {
+                [one] => one,
+                [] => anyhow::bail!("no item `{item}` in {name} (`mnnn sources data {name}`)"),
+                _ => anyhow::bail!("`{item}` matches {} items; give more of the id", found.len()),
+            };
+            std::io::stdout().write_all(&store.source_data_bytes(&i.id)?)?;
         }
     }
     Ok(())

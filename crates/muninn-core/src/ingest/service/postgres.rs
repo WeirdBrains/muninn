@@ -1,7 +1,6 @@
 //! Postgres source: server-side cursor, rows fetched as JSON.
 use super::{ident, sql_or_file};
 use crate::error::{Error, Result};
-use crate::ingest::json::records_to_frame;
 use crate::ingest::{Input, hash_bytes};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -115,9 +114,10 @@ impl PgSource {
                 self.database.as_deref().unwrap_or("postgres"),
                 self.table.as_deref().unwrap_or("query")
             ),
-            name_hint: self.table.clone(),
+            name: self.table.clone().unwrap_or_else(|| "query".into()),
+            format: "ndjson".into(),
             content_hash: hash_bytes(format!("{sql}|{}", hasher.finalize().to_hex()).as_bytes()),
-            frame: records_to_frame(&records)?,
+            bytes: super::ndjson(&records)?,
         })
     }
 }
@@ -163,6 +163,6 @@ mod tests {
             timeout: 10,
             ..Default::default()
         };
-        assert_eq!(p.read().unwrap().frame.height(), 10);
+        assert_eq!(p.read().unwrap().bytes.split(|b| *b == b'\n').filter(|l| !l.is_empty()).count(), 10);
     }
 }

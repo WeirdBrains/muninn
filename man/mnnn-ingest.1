@@ -4,7 +4,7 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-ingest \- Ingest bars from files or services
+mnnn\-ingest \- Store data from files or services as it arrives (pipelines decide what it is)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ mnnn\-ingest \- Ingest bars from files or services
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-Ingest bars from files or services
+Store data from files or services as it arrives (pipelines decide what it is)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -84,16 +84,16 @@ Print help
 .SH SUBCOMMANDS
 .TP
 mnnn\-ingest\-csv(1)
-Ingest CSV file(s)
+Store CSV file(s) in a source as they are (read them with a pipeline: `source:NAME > code:parse\-csv > …`)
 .TP
 mnnn\-ingest\-json(1)
-Ingest JSON / NDJSON file(s)
+Store JSON / NDJSON file(s) in a source as they are
 .TP
 mnnn\-ingest\-path(1)
-Ingest a whole path: every CSV and JSON file in a directory tree (or one file)
+Store a whole path: every CSV and JSON file in a directory tree (or one file), as they are
 .TP
 mnnn\-ingest\-service(1)
-Ingest from a service
+Store what a service returns (HTTP pages, Redis, SQLite, Postgres rows as NDJSON), as it is
 .TP
 mnnn\-ingest\-runs(1)
 Show import runs (status, cancels) and their artifact ledger

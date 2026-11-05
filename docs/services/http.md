@@ -6,7 +6,7 @@ mnnn ingest service http --url URL [-X METHOD] [--body STRING|@FILE] [--param K=
      [--paginate none|cursor|time] [--cursor-path next] [--cursor-param cursor]
      [--start-param startTime] [--from T] [--to T] [--max-pages 1000]
      [--rate-limit REQ_PER_S] [--retries 3] [--insecure] [--timeout 30]
-     [--source NAME] [--symbol PAIR] [--duration 5m] [--map COL=FIELD]...
+     [--source NAME] [--force]
 ```
 
 | flag | default | notes |
@@ -17,7 +17,7 @@ mnnn ingest service http --url URL [-X METHOD] [--body STRING|@FILE] [--param K=
 | `--param K=V` | | repeatable, URL-encoded and appended to the query string |
 | `-H "K: V"` | | repeatable; overrides the default headers |
 | `--format` | from `Content-Type` | json, csv or ndjson |
-| `--records` | root | where the array of bars lives (see [JSON ingest](../ingest-json.md)) |
+| `--records` | root | where the rows are in each page, for `--paginate time` (the last timestamp) and cursors; the page itself is stored whole |
 | `--paginate` | `none` | `cursor`: read `--cursor-path` from each response and send it as `--cursor-param`; `time`: advance `--start-param` past the last bar until `--to` or an empty page |
 | `--rate-limit` | | requests per second |
 | `--retries` | 3 | exponential backoff on 429 and 5xx |
@@ -31,8 +31,15 @@ Accept: application/json, text/csv;q=0.9
 ```
 
 The source defaults to the URL's host when `--source` is not given and nothing is
-known for the URL; the symbol and duration must come from flags (or prompts) unless
-the URL path carries them (e.g. `.../BTCUSDT_5m.json`).
+known for the URL. Nothing is asked about symbols or durations.
+
+## What is stored
+
+Ingest stores what the service returns as it is, in a source, and makes no bars:
+each page's body, unchanged (one item per page, its locator ending in `#page=N` when there are several). `mnnn sources data NAME` lists the items. Make bars (or anything else) with a pipe:
+`mnnn pipe source:NAME code:parse-json?records=result 'code:to-bars?symbol=BTC/USDT&duration=5m' --to model:bars`
+([pipes](../pipes.md)). `--symbol`, `--duration` and `--map` are still accepted but only
+warn: they are options of the to-bars code space now.
 
 ## Example
 
@@ -40,7 +47,10 @@ the URL path carries them (e.g. `.../BTCUSDT_5m.json`).
 mnnn ingest service http --url https://data-api.binance.vision/api/v3/klines \
   --param symbol=BTCUSDT --param interval=5m --param limit=1000 \
   --paginate time --start-param startTime --from 2024-01-01 --to 2024-01-02 \
-  --source binance --symbol BTC/USDT --duration 5m
+  --source binance
+mnnn pipe source:binance code:parse-json \
+  'code:to-bars?symbol=BTC/USDT&duration=5m&map=column_1:timestamp,column_2:open,column_3:high,column_4:low,column_5:close,column_6:volume' \
+  --to model:bars -y
 ```
 
 ## Failure modes

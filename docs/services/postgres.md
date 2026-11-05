@@ -4,7 +4,7 @@
 mnnn ingest service postgres (--url URL | --username USER --host HOST [--port 5432]
      [--database postgres] [--secure]) [--password P | --password-env VAR | --password-stdin]
      [--ca-cert FILE] [--schema public] (--table NAME | --query SQL|@FILE) [--batch 10000]
-     [--timeout 30] [--source NAME] [--symbol PAIR] [--duration 5m] [--map COL=FIELD]...
+     [--timeout 30] [--source NAME] [--force]
 ```
 
 | flag | default | notes |
@@ -21,15 +21,22 @@ mnnn ingest service postgres (--url URL | --username USER --host HOST [--port 54
 | `--table` / `--query` | one required | |
 | `--batch` | 10000 | rows per fetch from a server-side cursor |
 
-Each row is fetched as JSON (`row_to_json`), so any column types work. With `--table`
-the table name is used to derive the symbol and duration. The source defaults to the
-database host when `--source` is not given.
+Each row is fetched as JSON (`row_to_json`), so any column types work. The source
+defaults to the database host when `--source` is not given.
+
+## What is stored
+
+Ingest stores what the service returns as it is, in a source, and makes no bars:
+the rows of the table or query, as NDJSON (one object a row), one item per read. `mnnn sources data NAME` lists the items. Make bars (or anything else) with a pipe:
+`mnnn pipe source:NAME code:parse-ndjson 'code:to-bars?symbol=BTC/USDT&duration=5m' --to model:bars`
+([pipes](../pipes.md)). `--symbol`, `--duration` and `--map` are still accepted but only
+warn: they are options of the to-bars code space now.
 
 ## Example
 
 ```
 mnnn ingest service postgres --username quant --host db.local --database market \
-  --password-env PGPASSWORD --table btcusdt_5m --source binance --symbol BTC/USDT
+  --password-env PGPASSWORD --table btcusdt_5m --source binance
 ```
 
 ## Failure modes

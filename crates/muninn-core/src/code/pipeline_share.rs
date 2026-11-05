@@ -170,9 +170,12 @@ pub fn import(store: &Store, e: &Export, plan: &ImportPlan) -> Result<Pipeline> 
         if from != to {
             for n in &mut g.nodes {
                 if let NodeKind::Code { space } = &mut n.kind
-                    && space == from
+                    && super::super::split_options(space).0 == *from
                 {
-                    *space = to.clone();
+                    *space = match space.split_once('?') {
+                        Some((_, q)) => format!("{to}?{q}"),
+                        None => to.clone(),
+                    };
                 }
             }
         }

@@ -24,9 +24,8 @@ pub fn app() -> (tempfile::TempDir, App) {
     let dek = crate::crypto::Key32::random().unwrap();
     let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
     let root = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
-    for f in ["ETHUSDT_5m.csv", "BTCUSDT_5m.csv"] {
-        let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
-        crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &root.join(f), &Default::default()).unwrap();
+    for (f, sym) in [("ETHUSDT_5m.csv", "ETH/USDT"), ("BTCUSDT_5m.csv", "BTC/USDT")] {
+        crate::code::bars::load_csv_bars(&mut store, &root.join(f), "binance", sym, "5m").unwrap();
     }
     let prefs = Preferences::load_or_create(&paths).unwrap();
     let mut a = App::new(paths, store, dek, prefs, Some(ThemeMode::Dark)).unwrap();
@@ -465,16 +464,9 @@ fn snapshots() {
             let dek = crate::crypto::Key32::random().unwrap();
             let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
             for f in ["binance_BTCUSDT_5m.csv", "binance_ETHUSDT_5m.csv"] {
-                let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
                 let started = std::time::Instant::now();
-                crate::ingest::ingest_csv(
-                    &mut store,
-                    crate::interact::Interact::batch(true),
-                    opts,
-                    &std::path::Path::new(&raw).join(f),
-                    &Default::default(),
-                )
-                .unwrap();
+                let sym = if f.contains("BTC") { "BTC/USDT" } else { "ETH/USDT" };
+                crate::code::bars::load_csv_bars(&mut store, &std::path::Path::new(&raw).join(f), "binance", sym, "5m").unwrap();
                 println!("ingested {f} in {:?}", started.elapsed());
             }
             let prefs = Preferences::load_or_create(&paths).unwrap();
@@ -604,7 +596,8 @@ fn import_popup_browses_and_imports_in_background() {
     assert_eq!(a.import.chosen.len(), 2);
     a.on_key(key(KeyCode::End));
     let s = screen_text(&mut a);
-    assert!(s.contains("SOL/USDT") && s.contains("Preview") && s.contains("● SOLUSDT_5m.csv"), "{s}");
+    assert!(s.contains("timestamp_utc,open") && s.contains("Preview") && s.contains("● SOLUSDT_5m.csv"), "{s}");
+    assert!(!s.contains("SOL/USDT") && !s.contains("Symbol"), "no symbol guessing: {s}");
     a.on_key(key(KeyCode::Char('s')));
     for c in "kraken".chars() {
         a.on_key(key(KeyCode::Char(c)));
@@ -619,7 +612,11 @@ fn import_popup_browses_and_imports_in_background() {
     }
     let s = screen_text(&mut a);
     assert!(s.contains("Import finished") && s.contains("2 file(s)"), "{s}");
-    assert!(a.series.iter().any(|x| x.source == "kraken" && x.symbol.to_string() == "SOL/USDT"));
+    let mut names = stored(&a, "kraken");
+    names.sort();
+    assert_eq!(names, ["ADAUSDT_5m.csv", "SOLUSDT_5m.csv"]);
+    assert!(s.contains("source:kraken"), "pipeline hint: {s}");
+    assert!(a.series.iter().all(|x| x.source != "kraken"), "no bars from an import");
     assert_eq!(a.prefs.tui.import_recent[0], std::fs::canonicalize(d.path()).unwrap().display().to_string());
     a.on_key(key(KeyCode::Enter));
     assert!(a.modal.is_none());
@@ -630,13 +627,13 @@ fn ingest_progress_counts_and_cancel_aborts() {
     let (_t, mut a) = app();
     let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures/ETHUSDT_5m.csv");
     let p = std::sync::Arc::new(crate::ingest::Progress::default());
-    let opts = crate::ingest::IngestOptions { source: Some("p".into()), progress: Some(p.clone()), ..Default::default() };
-    crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts.clone(), &fx, &Default::default()).unwrap();
-    let (d, t) = p.get();
-    assert!(d > 0 && d == t);
+    let opts = crate::ingest::IngestOptions { source: Some("p".into()), progress: Some(p.clone()), track_files: true, ..Default::default() };
+    crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts.clone(), &fx).unwrap();
+    let e = p.estimate();
+    assert!(e.bytes_done > 0 && e.bytes_done == e.bytes_total, "{e:?}");
     p.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
     let o2 = crate::ingest::IngestOptions { force: true, ..opts };
-    assert!(crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), o2, &fx, &Default::default()).is_err());
+    assert!(crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), o2, &fx).is_err());
 }
 
 /// Full-scale timings on the real raw data (read-only). Needs MUNINN_RAW_DATA.
@@ -665,10 +662,10 @@ fn fullscale() {
     let mut store = Store::open(&paths.db, Some(&dek.0)).unwrap();
     if store.series().unwrap().len() < 2 {
         for f in ["binance_BTCUSDT_5m.csv", "binance_ETHUSDT_5m.csv"] {
-            let opts = crate::ingest::IngestOptions { source: Some("binance".into()), ..Default::default() };
             let t = Instant::now();
-            let r = crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &raw.join(f), &Default::default()).unwrap();
-            println!("ingest {f}: {} rows in {:?}", r[0].rows, t.elapsed());
+            let sym = if f.contains("BTC") { "BTC/USDT" } else { "ETH/USDT" };
+            let (n, _) = crate::code::bars::load_csv_bars(&mut store, &raw.join(f), "binance", sym, "5m").unwrap();
+            println!("bars {f}: {n} in {:?}", t.elapsed());
         }
     }
     let prefs = Preferences::load_or_create(&paths).unwrap();
@@ -812,8 +809,7 @@ fn ingest_timing() {
         let progress = std::env::var_os("MUNINN_TIMING_PROGRESS").map(|_| std::sync::Arc::new(crate::ingest::Progress::default()));
         let opts = crate::ingest::IngestOptions { source: Some("binance".into()), progress, ..Default::default() };
         let s = std::time::Instant::now();
-        crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &std::path::Path::new(&raw).join(f), &Default::default())
-            .unwrap();
+        crate::ingest::ingest_csv(&mut store, crate::interact::Interact::batch(true), opts, &std::path::Path::new(&raw).join(f)).unwrap();
         println!("TIMING {f}: {:?}", s.elapsed());
     }
 }
@@ -830,35 +826,25 @@ fn big_csv(path: &std::path::Path, n: usize) {
 }
 
 #[test]
-fn cancel_mid_file_rolls_back_the_whole_file() {
+fn a_cancelled_file_stores_nothing_and_stores_whole_afterwards() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
     let f = d.path().join("SOLUSDT_5m.csv");
     big_csv(&f, 300_000);
-    let before = a.store.count_bars().unwrap();
-    let series_before = a.store.series().unwrap();
+    let bars = a.store.count_bars().unwrap();
     let p = std::sync::Arc::new(crate::ingest::Progress::default());
-    let watcher = {
-        let p = p.clone();
-        std::thread::spawn(move || {
-            while p.file_bars_done.load(std::sync::atomic::Ordering::Relaxed) < 20_000 {
-                std::thread::yield_now();
-            }
-            p.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
-        })
-    };
-    let opts = crate::ingest::IngestOptions { source: Some("c".into()), progress: Some(p.clone()), ..Default::default() };
-    let r = crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts, &f, &Default::default());
-    watcher.join().unwrap();
+    p.request_cancel("cli");
+    let opts = crate::ingest::IngestOptions { source: Some("c".into()), progress: Some(p), ..Default::default() };
+    let r = crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts, &f);
     assert!(matches!(r, Err(crate::Error::Aborted)), "{r:?}");
-    assert!(p.file_bars_done.load(std::sync::atomic::Ordering::Relaxed) >= 20_000);
-    assert_eq!(a.store.count_bars().unwrap(), before, "partial file must be rolled back");
-    assert_eq!(a.store.series().unwrap(), series_before, "series_stats unchanged");
-    // not recorded as ingested: the same file imports fully afterwards
+    assert!(a.store.source_by_name("c").unwrap().is_none(), "nothing of it stored");
+    // not recorded: the same file stores fully afterwards, byte for byte; never bars
     let opts = crate::ingest::IngestOptions { source: Some("c".into()), ..Default::default() };
-    let r = crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts, &f, &Default::default()).unwrap();
-    assert!(!r[0].skipped && r[0].inserted == 300_000);
-    assert_eq!(a.store.count_bars().unwrap(), before + 300_000);
+    let r = crate::ingest::ingest_csv(&mut a.store, crate::interact::Interact::batch(true), opts, &f).unwrap();
+    assert!(!r[0].skipped && r[0].bytes == std::fs::metadata(&f).unwrap().len());
+    let id = r[0].id.clone();
+    assert_eq!(a.store.source_data_bytes(&id).unwrap(), std::fs::read(&f).unwrap());
+    assert_eq!(a.store.count_bars().unwrap(), bars, "ingest never makes bars");
 }
 
 #[test]
@@ -867,7 +853,7 @@ fn tui_cancel_keeps_finished_files_and_discards_current() {
     let d = tempfile::tempdir().unwrap();
     let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
-    big_csv(&d.path().join("SOLUSDT_5m.csv"), 400_000);
+    big_csv(&d.path().join("SOLUSDT_5m.csv"), 3_000_000);
     a.on_key(key(KeyCode::Char('i')));
     a.import.cd(d.path().to_path_buf());
     a.on_key(key(KeyCode::Char('a')));
@@ -880,7 +866,6 @@ fn tui_cancel_keeps_finished_files_and_discards_current() {
         screen_text(&mut a);
         if let import::Phase::Running(r) = &a.import.phase
             && r.progress.file_index.load(std::sync::atomic::Ordering::Relaxed) == 1
-            && r.progress.file_bars_done.load(std::sync::atomic::Ordering::Relaxed) > 0
         {
             break;
         }
@@ -902,8 +887,9 @@ fn tui_cancel_keeps_finished_files_and_discards_current() {
     }
     let s = screen_text(&mut a);
     assert!(s.contains("Import cancelled") && s.contains("kept 1 complete file(s), discarded 1"), "{s}");
-    let src: Vec<String> = a.series.iter().filter(|x| x.source == "cx").map(|x| x.symbol.to_string()).collect();
-    assert_eq!(src, ["ADA/USDT"], "only the finished file stays");
+    let cx = a.store.source_by_name("cx").unwrap().unwrap();
+    let names: Vec<String> = a.store.source_data(&cx.id).unwrap().into_iter().map(|x| x.name).collect();
+    assert_eq!(names, ["ADAUSDT_5m.csv"], "only the finished file stays");
     a.on_key(key(KeyCode::Esc));
     assert!(a.modal.is_none());
 }
@@ -1001,46 +987,11 @@ fn places_are_visible_clickable_and_bookmarkable() {
     assert!(import::places(&a).iter().any(|p| p.label == "Home") || dirs::home_dir().is_none());
 }
 
-/// Cancel half-way through the real BTCUSDT_5m.csv: nothing stays, cancel is quick.
-#[test]
-#[ignore]
-fn cancel_fullsize() {
-    use std::sync::atomic::Ordering::Relaxed;
-    let Ok(raw) = std::env::var("MUNINN_RAW_DATA") else { return };
-    let (_t, mut a) = app();
-    let before = a.store.count_bars().unwrap();
-    let p = std::sync::Arc::new(crate::ingest::Progress::default());
-    let w = {
-        let p = p.clone();
-        std::thread::spawn(move || {
-            while p.file_bars_done.load(Relaxed) < 480_000 {
-                std::thread::sleep(std::time::Duration::from_millis(5));
-            }
-            p.cancel.store(true, Relaxed);
-            std::time::Instant::now()
-        })
-    };
-    let opts = crate::ingest::IngestOptions { source: Some("big".into()), progress: Some(p.clone()), ..Default::default() };
-    let r = crate::ingest::ingest_csv(
-        &mut a.store,
-        crate::interact::Interact::batch(true),
-        opts,
-        &std::path::Path::new(&raw).join("binance_BTCUSDT_5m.csv"),
-        &Default::default(),
-    );
-    let asked = w.join().unwrap();
-    println!("CANCEL stopped {:?} after the request, at {} bars stored", asked.elapsed(), p.file_bars_done.load(Relaxed));
-    assert!(matches!(r, Err(crate::Error::Aborted)));
-    assert_eq!(a.store.count_bars().unwrap(), before);
-    assert!(a.store.series().unwrap().iter().all(|s| s.source != "big"));
-}
-
 #[test]
 fn cancel_with_new_source_leaves_no_artifacts_and_is_recorded() {
-    use std::sync::atomic::Ordering::Relaxed;
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    big_csv(&d.path().join("SOLUSDT_5m.csv"), 300_000);
+    big_csv(&d.path().join("SOLUSDT_5m.csv"), 3_000_000);
     let recent_before = a.prefs.tui.import_recent.clone();
     a.on_key(key(KeyCode::Char('i')));
     a.import.cd(d.path().to_path_buf());
@@ -1048,15 +999,15 @@ fn cancel_with_new_source_leaves_no_artifacts_and_is_recorded() {
     a.on_key(key(KeyCode::Char('a')));
     a.on_key(key(KeyCode::Char('i')));
     let t0 = std::time::Instant::now();
+    // wait until the file is being read
     loop {
-        screen_text(&mut a);
         if let import::Phase::Running(r) = &a.import.phase
-            && r.progress.file_bars_done.load(Relaxed) > 0
+            && r.progress.file_read.load(std::sync::atomic::Ordering::Relaxed) > 0
         {
             break;
         }
-        assert!(t0.elapsed().as_secs() < 60);
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        assert!(t0.elapsed().as_secs() < 60 && a.import.running());
+        std::thread::yield_now();
     }
     a.on_key(key(KeyCode::Char('c')));
     a.on_key(key(KeyCode::Char('y')));
@@ -1065,31 +1016,27 @@ fn cancel_with_new_source_leaves_no_artifacts_and_is_recorded() {
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
     assert!(a.store.source_by_name("fresh").unwrap().is_none(), "no empty source left");
-    assert!(a.series.iter().all(|s| s.source != "fresh"));
     assert_eq!(a.prefs.tui.import_recent, recent_before, "recent entry undone");
     let run = a.store.last_import_run().unwrap().unwrap();
     assert_eq!(
         (run.origin.as_str(), run.status.as_str(), run.cancel_by.as_deref(), run.cancel_phase.as_deref()),
-        ("tui", "cancelled", Some("tui"), Some("store"))
+        ("tui", "cancelled", Some("tui"), run.cancel_phase.as_deref())
     );
     assert!(run.cancel_requested_at.is_some() && run.cancel_file.as_deref().unwrap().ends_with("SOLUSDT_5m.csv"));
     let arts = a.store.import_artifacts(run.id).unwrap();
-    assert!(arts.iter().any(|x| x.kind == "source" && x.state == "rolled_back"), "{arts:?}");
-    assert!(arts.iter().any(|x| x.kind == "series" && x.state == "rolled_back"), "{arts:?}");
     assert!(arts.iter().any(|x| x.kind == "recent" && x.state == "removed"), "{arts:?}");
     assert!(arts.iter().all(|x| x.state != "kept"));
     // re-import works and is recorded as completed with kept artifacts
     let opts = crate::ingest::IngestOptions { source: Some("fresh".into()), ..Default::default() };
     let f = d.path().join("SOLUSDT_5m.csv");
-    let r = crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| {
-        crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f, &Default::default())
-    })
-    .unwrap();
-    assert_eq!(r[0].inserted, 300_000);
+    let r =
+        crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f))
+            .unwrap();
+    assert_eq!(r[0].bytes, std::fs::metadata(&f).unwrap().len());
     let run = a.store.last_import_run().unwrap().unwrap();
     assert_eq!((run.status.as_str(), run.files_done), ("completed", 1));
     let kinds: Vec<String> = a.store.import_artifacts(run.id).unwrap().into_iter().filter(|x| x.state == "kept").map(|x| x.kind).collect();
-    assert_eq!(kinds, ["source", "series", "bars", "ingest_record"]);
+    assert_eq!(kinds, ["source", "source_data"]);
 }
 
 #[test]
@@ -1101,9 +1048,8 @@ fn cli_style_cancel_is_recorded_by_cli() {
     let p = std::sync::Arc::new(crate::ingest::Progress::default());
     p.request_cancel("cli");
     let opts = crate::ingest::IngestOptions { source: Some("clicx".into()), progress: Some(p), ..Default::default() };
-    let r = crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| {
-        crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f, &Default::default())
-    });
+    let r =
+        crate::ingest::tracked(&mut a.store, "cli", 1, opts, |st, o| crate::ingest::ingest_csv(st, crate::interact::Interact::batch(true), o, &f));
     assert!(r.is_err());
     let run = a.store.last_import_run().unwrap().unwrap();
     assert_eq!((run.status.as_str(), run.cancel_by.as_deref(), run.cancel_phase.as_deref()), ("cancelled", Some("cli"), Some("read")));
@@ -1139,6 +1085,12 @@ fn path_tab_list_cycles_and_click_picks() {
     assert!(a.import.dir.ends_with("alpha"));
 }
 
+/// Names of the items stored in source `src`, oldest first (empty when there is none).
+fn stored(a: &App, src: &str) -> Vec<String> {
+    let Some(s) = a.store.source_by_name(src).unwrap() else { return vec![] };
+    a.store.source_data(&s.id).unwrap().into_iter().map(|x| x.name).collect()
+}
+
 fn wait_import(a: &mut App) -> String {
     let t0 = std::time::Instant::now();
     while a.import.running() && t0.elapsed().as_secs() < 60 {
@@ -1164,8 +1116,11 @@ fn import_folder_recursively_from_tui() {
     a.on_key(key(KeyCode::Char('i')));
     let s = wait_import(&mut a);
     assert!(s.contains("Import finished") && s.contains("2 file(s)"), "{s}");
-    assert!(a.series.iter().any(|x| x.symbol.to_string() == "ADA/USDT"));
-    assert!(!a.series.iter().any(|x| x.symbol.to_string() == "DOT/USDT"));
+    // each file goes to the source named for its folder
+    assert_eq!(stored(&a, "sub"), ["SOLUSDT_5m.csv"]);
+    assert_eq!(stored(&a, "deeper"), ["ADAUSDT_5m.csv"]);
+    let top = d.path().file_name().unwrap().to_string_lossy().into_owned();
+    assert!(stored(&a, &top).is_empty());
     a.on_key(key(KeyCode::Enter));
     // A imports the whole current folder tree
     a.on_key(key(KeyCode::Char('i')));
@@ -1173,7 +1128,8 @@ fn import_folder_recursively_from_tui() {
     a.on_key(key(KeyCode::Char('A')));
     let s = wait_import(&mut a);
     assert!(s.contains("3 file(s)"), "{s}");
-    assert!(a.series.iter().any(|x| x.symbol.to_string() == "DOT/USDT"));
+    assert_eq!(stored(&a, &top), ["DOTUSDT_5m.csv"]);
+    assert_eq!(stored(&a, "sub").len(), 1, "the same bytes are not stored twice");
     // Space selects a folder too
     a.on_key(key(KeyCode::Enter));
     a.on_key(key(KeyCode::Char('i')));
@@ -1209,8 +1165,8 @@ fn import_picker_entries_inputs_and_keys_are_clickable() {
     click_on(&mut a, |h| *h == Hit::ImportEntry(sub));
     assert!(a.import.dir.ends_with("sub"));
     // inputs focus on click
-    click_on(&mut a, |h| *h == Hit::ImportInput(3));
-    assert_eq!(a.import.pane, crate::tui::import::Pane::Field(1));
+    click_on(&mut a, |h| *h == Hit::ImportInput(2));
+    assert_eq!(a.import.pane, crate::tui::import::Pane::Field(0));
     click_on(&mut a, |h| *h == Hit::ImportInput(0));
     assert_eq!(a.import.pane, crate::tui::import::Pane::Path);
     // back to the list with a click, then the key buttons
@@ -1222,7 +1178,7 @@ fn import_picker_entries_inputs_and_keys_are_clickable() {
         screen_text(&mut a);
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
-    assert!(a.series.iter().any(|x| x.symbol.to_string() == "SOL/USDT"));
+    assert_eq!(stored(&a, "sub"), ["SOLUSDT_5m.csv"]);
     click_on(&mut a, |h| *h == Hit::Press(KeyCode::Enter)); // [Close]
     assert!(a.modal.is_none());
 }
@@ -1263,83 +1219,45 @@ fn popup_rows_forms_and_list_rows_are_clickable() {
 }
 
 #[test]
-fn import_asks_for_a_symbol_it_cannot_guess() {
+fn import_never_asks_about_symbols_and_stores_files_as_they_are() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
     let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("unnamed.csv"), d.path().join("mystery_5m.csv")).unwrap();
-    std::fs::copy(fx.join("unnamed.csv"), d.path().join("other_5m.csv")).unwrap();
-    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("SOLUSDT_5m.csv")).unwrap();
+    std::fs::write(d.path().join("notes.json"), "{\"anything\": [1, 2, 3]}").unwrap();
+    let bars = a.store.count_bars().unwrap();
     a.on_key(key(KeyCode::Char('i')));
     a.import.cd(d.path().to_path_buf());
+    a.import.fields[0] = "inbox".into();
     a.on_key(key(KeyCode::Char('A')));
-    assert!(!a.import.running());
-    let s = screen_text(&mut a);
-    assert!(s.contains("Symbol needed") && s.contains("mystery_5m.csv") && s.contains("1 more file"), "{s}");
-    assert_eq!(a.import.ask.as_ref().unwrap().ask.len(), 2); // SOLUSDT is guessed
-    // a bad answer stays in the popup with an error
-    for c in "zzz".chars() {
-        a.on_key(key(KeyCode::Char(c)));
-    }
-    a.on_key(key(KeyCode::Enter));
-    assert!(screen_text(&mut a).contains("is not a symbol"));
-    // [X] cancels without importing
-    click_on(&mut a, |h| *h == Hit::ImportAsk(3));
-    assert!(a.import.ask.is_none() && !a.import.running());
-    // again: answer the first, skip the second (clicked)
-    a.on_key(key(KeyCode::Char('A')));
-    for c in "xmr/usdt".chars() {
-        a.on_key(key(KeyCode::Char(c)));
-    }
-    a.on_key(key(KeyCode::Enter));
-    assert!(screen_text(&mut a).contains("other_5m.csv"));
-    click_on(&mut a, |h| *h == Hit::ImportAsk(2));
+    assert!(a.import.running(), "starts without a question");
     let s = wait_import(&mut a);
-    assert!(s.contains("2 file(s)"), "{s}");
-    assert!(a.series.iter().any(|x| x.symbol.to_string() == "XMR/USDT"));
-    assert!(a.series.iter().any(|x| x.symbol.to_string() == "SOL/USDT"));
-    // the symbol field skips the question
-    a.on_key(key(KeyCode::Enter));
-    a.on_key(key(KeyCode::Char('i')));
-    a.import.cd(d.path().to_path_buf());
-    a.import.fields[1] = "LTC/USDT".into();
-    a.import.sel = a.import.entries.iter().position(|e| e.name == "other_5m.csv").unwrap();
-    a.on_key(key(KeyCode::Char('i')));
-    assert!(a.import.ask.is_none() && a.import.running());
-    wait_import(&mut a);
-    assert!(a.series.iter().any(|x| x.symbol.to_string() == "LTC/USDT"));
+    assert!(s.contains("2 file(s)") && !s.contains("Symbol"), "{s}");
+    let src = a.store.source_by_name("inbox").unwrap().unwrap();
+    for item in a.store.source_data(&src.id).unwrap() {
+        let want = std::fs::read(d.path().join(&item.name)).unwrap();
+        assert_eq!(a.store.source_data_bytes(&item.id).unwrap(), want, "{} stored byte for byte", item.name);
+    }
+    assert_eq!(a.store.count_bars().unwrap(), bars, "bars come only from pipelines");
 }
 
 #[test]
-fn finished_import_loads_into_an_empty_view_only() {
+fn finished_import_leaves_the_view_alone() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
     let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("SOLUSDT_5m.csv")).unwrap();
-    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
     let ids: Vec<u32> = a.layout.tiles().iter().map(|t| t.id).collect();
     for id in ids {
         a.layout.set_focus(id);
         a.layout.focused_mut().series = None;
     }
-    // nothing loaded: the import shows up
     a.on_key(key(KeyCode::Char('i')));
     a.import.cd(d.path().to_path_buf());
     a.import.sel = a.import.entries.iter().position(|e| e.name == "SOLUSDT_5m.csv").unwrap();
     a.on_key(key(KeyCode::Char('i')));
     wait_import(&mut a);
-    assert_eq!(a.layout.focused().series.as_ref().map(|k| k.symbol.as_str()), Some("SOL/USDT"));
-    assert!(a.status.contains("loaded the import"), "{}", a.status);
-    let s = screen_text(&mut a);
-    assert!(!s.contains("pick a series"), "{s}");
-    // something loaded: a later import leaves the view alone
-    a.on_key(key(KeyCode::Enter));
-    a.on_key(key(KeyCode::Char('i')));
-    a.import.cd(d.path().to_path_buf());
-    a.import.sel = a.import.entries.iter().position(|e| e.name == "ADAUSDT_5m.csv").unwrap();
-    a.on_key(key(KeyCode::Char('i')));
-    wait_import(&mut a);
-    assert_eq!(a.layout.focused().series.as_ref().map(|k| k.symbol.as_str()), Some("SOL/USDT"));
+    assert!(a.layout.focused().series.is_none(), "raw data is not a series");
 }
 
 fn help(a: &mut App) -> &mut crate::help::HelpView {
@@ -1440,46 +1358,6 @@ fn loading_widget_draws_a_bar_when_the_total_is_known() {
 
 fn a_theme() -> crate::theme::Theme {
     crate::theme::builtin("tokyo-night").unwrap().resolved(crate::theme::Variant::Dark)
-}
-
-#[test]
-fn symbol_popup_keeps_the_file_name_visible_with_long_paths() {
-    let (_t, mut a) = app();
-    let d = tempfile::tempdir().unwrap();
-    let deep = d.path().join("a_very_long_directory_name_for_market_data/exchange_exports/2026/october/raw");
-    std::fs::create_dir_all(&deep).unwrap();
-    let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
-    for n in ["mystery_5m.csv", "second_mystery_file_with_a_long_name_5m.csv", "third_5m.csv"] {
-        std::fs::copy(fx.join("unnamed.csv"), deep.join(n)).unwrap();
-    }
-    a.on_key(key(KeyCode::Char('i')));
-    a.import.cd(d.path().to_path_buf());
-    a.on_key(key(KeyCode::Char('A')));
-    let first = a.import.ask.as_ref().unwrap().ask[0].file_name().unwrap().to_string_lossy().into_owned();
-    for w in [60u16, 80, 140] {
-        let s = render(&mut a, w, 30);
-        assert!(s.contains(&first), "file name cut at width {w}: {s}");
-        assert!(s.contains("file 1 of 3"), "{s}");
-        assert!(s.contains("…") || w == 140, "long dir not shortened at width {w}: {s}");
-        assert!(s.contains("/raw"), "end of the directory missing at width {w}: {s}");
-        assert!(a.modal_hits.iter().any(|(_, h)| *h == Hit::ImportAsk(3)), "[X] missing");
-    }
-    // the long name wraps instead of being cut, and the counter advances
-    a.on_key(key(KeyCode::Tab));
-    a.on_key(key(KeyCode::Tab));
-    let s = render(&mut a, 60, 30);
-    assert!(s.contains("file 3 of 3") || s.contains("file 2 of 3"), "{s}");
-    let name = a.import.ask.as_ref().unwrap().ask[0].file_name().unwrap().to_string_lossy().into_owned();
-    let flat: String = s.split('\n').map(|l| l.replace('│', "")).collect::<Vec<_>>().join("").replace(' ', "");
-    assert!(flat.contains(&name.replace(' ', "")), "{name} not shown whole: {s}");
-}
-
-#[test]
-fn ellipsize_left_keeps_the_end() {
-    use super::import::ellipsize_left;
-    assert_eq!(ellipsize_left("/a/b/c", 10), "/a/b/c");
-    assert_eq!(ellipsize_left("/home/me/data/raw", 8), "…ata/raw");
-    assert_eq!(ellipsize_left("abc", 0), "");
 }
 
 fn picker(a: &mut App) -> &mut crate::tui::picker::DatePicker {
@@ -1624,56 +1502,39 @@ fn tile_focus_next_previous_and_direct_jump() {
 }
 
 #[test]
-fn import_source_defaults_to_the_exchange_in_the_name_then_local() {
+fn import_source_defaults_to_the_folder_and_a_typed_one_wins() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
     let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
-    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("kraken_SOLUSDT_5m.csv")).unwrap();
-    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
+    std::fs::create_dir(d.path().join("kraken")).unwrap();
+    std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("kraken/binance_SOLUSDT_5m.csv")).unwrap();
     a.on_key(key(KeyCode::Char('i')));
-    a.import.cd(d.path().to_path_buf());
-    a.import.sel = a.import.entries.iter().position(|e| e.name == "kraken_SOLUSDT_5m.csv").unwrap();
+    a.import.cd(d.path().join("kraken"));
+    a.import.sel = a.import.entries.iter().position(|e| e.name == "binance_SOLUSDT_5m.csv").unwrap();
     let s = screen_text(&mut a);
-    assert!(s.contains("source kraken (from name)"), "{s}");
-    assert!(s.contains("from file name, else local"), "{s}");
+    assert!(s.contains("kraken (the folder)"), "{s}");
     a.on_key(key(KeyCode::Char('A')));
     wait_import(&mut a);
-    let src = |a: &App, sym: &str| a.series.iter().find(|x| x.symbol.to_string() == sym).map(|x| x.source.clone());
-    assert_eq!(src(&a, "SOL/USDT").as_deref(), Some("kraken"));
-    assert_eq!(src(&a, "ADA/USDT").as_deref(), Some("local"));
-    // a typed source wins (s focuses the field)
+    assert_eq!(stored(&a, "kraken"), ["binance_SOLUSDT_5m.csv"], "the folder, not a name in the file");
+    assert!(stored(&a, "binance").is_empty());
+    // a typed source wins
     a.on_key(key(KeyCode::Enter));
     a.on_key(key(KeyCode::Char('i')));
-    a.import.cd(d.path().to_path_buf());
+    a.import.cd(d.path().join("kraken"));
     a.import.fields[0] = "coinbase".into();
-    a.import.sel = a.import.entries.iter().position(|e| e.name == "kraken_SOLUSDT_5m.csv").unwrap();
+    a.import.sel = a.import.entries.iter().position(|e| e.name == "binance_SOLUSDT_5m.csv").unwrap();
     assert!(screen_text(&mut a).contains("source coinbase"));
     a.on_key(key(KeyCode::Char('i')));
     wait_import(&mut a);
-    assert!(a.series.iter().any(|x| x.source == "coinbase" && x.symbol.to_string() == "SOL/USDT"));
+    assert_eq!(stored(&a, "coinbase"), ["binance_SOLUSDT_5m.csv"]);
 }
 
 #[test]
-fn symbols_are_guessed_searched_and_filtered_with_exchange_prefixed_names() {
-    // names with the exchange in front (raw/data since v1.15.0)
-    for (n, want) in [
-        ("coinbase_BTC-USD_5m.csv", "BTC/USD"),
-        ("binance_BTCUSDT_5m.csv", "BTC/USDT"),
-        ("bitstamp_BTCUSD_5m_part1.csv", "BTC/USD"),
-        ("Kraken-ETHUSDT_1h.csv", "ETH/USDT"),
-    ] {
-        assert_eq!(crate::ingest::symbol_from_name_static(n).map(|s| s.display()).as_deref(), Some(want), "{n}");
-    }
+fn symbols_are_searched_and_filtered_by_name() {
     let (_t, mut a) = app();
-    let d = tempfile::tempdir().unwrap();
     let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
-    std::fs::copy(fx.join("BTCUSDT_5m.csv"), d.path().join("coinbase_BTC-USD_5m.csv")).unwrap();
-    a.on_key(key(KeyCode::Char('i')));
-    a.import.cd(d.path().to_path_buf());
-    a.on_key(key(KeyCode::Char('A')));
-    assert!(a.import.ask.is_none(), "symbol guessed, no popup");
-    wait_import(&mut a);
-    a.on_key(key(KeyCode::Enter));
+    crate::code::bars::load_csv_bars(&mut a.store, &fx.join("BTCUSDT_5m.csv"), "coinbase", "BTC/USD", "5m").unwrap();
+    a.dispatch(Action::Refresh);
     assert!(a.series.iter().any(|x| x.source == "coinbase" && x.symbol.display() == "BTC/USD"));
     // search ignores separators and word order
     let n = |a: &App, q: &str| crate::tui::sidebar::rows(&a.series, q, &a.prefs.tui.sidebar, &|_| None).len();

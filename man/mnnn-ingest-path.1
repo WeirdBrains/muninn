@@ -4,7 +4,7 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH NAME
-mnnn\-ingest\-path \- Ingest a whole path: every CSV and JSON file in a directory tree (or one file)
+mnnn\-ingest\-path \- Store a whole path: every CSV and JSON file in a directory tree (or one file), as they are
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ mnnn\-ingest\-path \- Ingest a whole path: every CSV and JSON file in a director
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
-Ingest a whole path: every CSV and JSON file in a directory tree (or one file)
+Store a whole path: every CSV and JSON file in a directory tree (or one file), as they are
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
@@ -33,7 +33,7 @@ May also be specified with the \fBMUNINN_DB\fR environment variable.
 .RE
 .TP
 \fB\-\-source\fR \fI<SOURCE>\fR
-Where the data came from, e.g. coinbase (created if unknown). Default: an exchange named in the file name (binance_…, coinbase_…), else a prompt
+The source to store into (created if unknown). Default: the source already holding this path, else the folder\*(Aqs name (a service: its host); asked only when there is none
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
@@ -42,10 +42,10 @@ May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable
 .RE
 .TP
 \fB\-\-symbol\fR \fI<SYMBOL>\fR
-Symbol, e.g. BTC/USDT, BTC\-USD or BTCUSDT
+Ignored (warns): now the to\-bars option `symbol` (`code:to\-bars?symbol=BTC/USDT`)
 .TP
 \fB\-\-duration\fR \fI<DURATION>\fR
-Bar duration, e.g. 5m, 1h, 1d
+Ignored (warns): now the to\-bars option `duration` (`code:to\-bars?duration=5m`)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
@@ -57,7 +57,7 @@ May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable.
 .RE
 .TP
 \fB\-\-map\fR \fI<COL=FIELD>\fR
-Column mapping `<col>=<field>` (fields: timestamp, open, high, low, close, volume). Repeatable
+Ignored (warns): now the to\-bars option `map` (`code:to\-bars?map=ts:timestamp`)
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -66,10 +66,10 @@ May also be specified with the \fBMUNINN_QUIET\fR environment variable.
 .RE
 .TP
 \fB\-\-rejects\fR \fI<FILE>\fR
-Write rejected rows (with reasons) to this CSV
+Ignored (warns): to\-bars passes rejected rows to its output (`rejects=fail` stops instead)
 .TP
 \fB\-\-force\fR
-Re\-process even if this exact input was already ingested
+Store again even if these exact bytes are already in the source
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -108,13 +108,13 @@ How live collaboration reaches peers: `stream` (gRPC streams, the default) or `p
 Never show progress, even on a terminal
 .TP
 \fB\-\-delimiter\fR \fI<DELIMITER>\fR [default: ,]
-CSV field delimiter
+Ignored (warns): now the parse\-csv option `delimiter`
 .TP
 \fB\-\-no\-header\fR
-CSV files have no header row
+Ignored (warns): now the parse\-csv option `header=false`
 .TP
 \fB\-\-records\fR \fI<RECORDS>\fR
-JSON: where the array of bars lives (dotted path or JSON pointer)
+Ignored (warns): now the parse\-json option `records`
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

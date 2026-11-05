@@ -80,7 +80,8 @@ fn models_are_designed_migrated_and_rolled_back() {
     // the bars model is designed like any other: rename and drop its fields from imports
     e.ok(&["model", "edit", "bars", "--rename", "close:mid", "--drop", "volume", "--add", "flag:text", "--apply"]);
     let f = fixture("BTCUSDT_5m.csv");
-    e.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
+    let _ = f;
+    e.bars("BTCUSDT_5m.csv", "binance");
     let rs = json(&e, &["model", "record", "list", "bars", "--json", "--where", "mid > 0", "--limit", "3"]);
     assert_eq!(rs.as_array().unwrap().len(), 3);
     assert!(rs[0].get("mid").is_some() && rs[0].get("close").is_none() && rs[0].get("volume").is_none(), "{rs}");

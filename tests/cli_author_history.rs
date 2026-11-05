@@ -41,17 +41,22 @@ fn author_crud_and_current() {
 fn imports_exports_and_view_changes_are_recorded_and_forks_kept() {
     let e = Env::new();
     e.ok(&["author", "add", "--name", "Ada"]);
-    let f = fixture("BTCUSDT_5m.csv");
-    e.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", "binance"]);
+    // the import stores the file; the pipe that makes bars records its own steps
+    e.bars("BTCUSDT_5m.csv", "binance");
     let out = e.dir.path().join("out.csv");
     e.ok(&["export", "--format", "csv", "--out", out.to_str().unwrap()]);
     e.ok(&["theme", "set", "nord"]);
     e.ok(&["theme", "mode", "dark"]);
     let list = e.ok(&["history", "list"]);
     let kinds: Vec<&str> = list.lines().map(|l| l.split('\t').nth(2).unwrap()).collect();
-    assert_eq!(kinds, ["theme.mode", "theme", "export", "import", "author.add"], "{list}");
+    assert_eq!(kinds[..4], ["theme.mode", "theme", "export", "pipe.run"], "{list}");
+    assert_eq!(kinds[kinds.len() - 2..], ["import", "author.add"], "{list}");
+    assert!(kinds.contains(&"record.create"), "{list}");
+    // ids before the export are the import and the pipe: count from the export (old #3)
+    let export: usize = list.lines().nth(2).unwrap().split('\t').next().unwrap().trim_start_matches(['*', ' ', '#']).parse().unwrap();
+    let id = |old: usize| (export + old - 3).to_string();
     assert!(list.lines().next().unwrap().starts_with('*'), "{list}");
-    assert!(list.contains("401 bars") && list.contains("export 401 bars"), "{list}");
+    assert!(list.contains("401 new bars") && list.contains("export 401 bars"), "{list}");
     assert!(list.lines().all(|l| l.contains("\tAda\t") || l.contains("author.add")), "{list}");
 
     // Back two steps restores the theme from before `theme set`.
@@ -61,15 +66,15 @@ fn imports_exports_and_view_changes_are_recorded_and_forks_kept() {
     // Doing something else forks; both branches are kept.
     e.ok(&["theme", "set", "dracula"]);
     let tree = e.ok(&["history", "tree"]);
-    assert!(tree.contains("⑂ from #3"), "{tree}");
+    assert!(tree.contains(&format!("⑂ from #{}", id(3))), "{tree}");
     assert!(tree.contains("theme nord") && tree.contains("theme dracula"), "{tree}");
-    assert_eq!(e.ok(&["history", "list", "--all", "--json"]).matches("\"kind\"").count(), 6);
+    assert_eq!(e.ok(&["history", "list", "--all", "--json"]).matches("\"kind\"").count(), export + 3);
     // Goto the old branch's tip brings back nord + dark.
-    e.ok(&["history", "goto", "5"]);
+    e.ok(&["history", "goto", &id(5)]);
     let prefs = std::fs::read_to_string(e.home().join("preferences.toml")).unwrap();
     assert!(prefs.contains("nord") && prefs.contains("dark"), "{prefs}");
-    let show = e.ok(&["history", "show", "3"]);
-    assert!(show.contains("next:    #4, #6  (forks)"), "{show}");
+    let show = e.ok(&["history", "show", &id(3)]);
+    assert!(show.contains(&format!("next:    #{}, #{}  (forks)", id(4), id(6))), "{show}");
     let o = e.run(&["history", "forward"]);
     assert!(!o.status.success(), "already at the newest action");
     e.ok(&["history", "goto", "0"]);
