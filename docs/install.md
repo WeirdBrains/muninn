@@ -29,8 +29,9 @@ translated in process, so no Python install is needed. See
 1. Download `muninn-2.21.0-x86_64-windows-setup.exe` (on an ARM PC,
    `muninn-2.21.0-aarch64-windows-setup.exe`) from the
    [v2.21.0 release](https://github.com/WeirdBrains/muninn/releases/tag/v2.21.0).
-2. Run it. It is not code-signed, so Windows SmartScreen says "Windows protected your PC":
-   click **More info**, then **Run anyway**.
+2. Run it. The installer is not code-signed yet, so Windows SmartScreen may warn
+   "Windows protected your PC" (it does for unsigned downloads it hasn't seen often):
+   click **More info**, then **Run anyway**. Nothing else is different about it.
 3. Click through the wizard. It installs for your user only (no admin prompt) into
    `%LOCALAPPDATA%\Programs\Muninn`, adds that folder to your user `PATH`, and adds a
    **Muninn** Start Menu entry that opens the TUI (setting up keys the first time).
@@ -63,6 +64,11 @@ winget install WeirdBrains.Muninn
 This runs the same `setup.exe` silently. Muninn's entry was submitted to the public winget
 catalogue with v2.21.0; until Microsoft merges it, winget reports "No package found", so
 use `setup.exe` meanwhile. Uninstall: `winget uninstall WeirdBrains.Muninn`.
+
+Because the installer is unsigned, SmartScreen may check it before it runs, and winget can
+seem to hang at **Starting package install…** while it does (or while a SmartScreen prompt
+waits behind other windows). Give it a minute and look for the prompt (**More info**,
+**Run anyway**); if it stays stuck, cancel and run the downloaded `setup.exe` directly.
 
 ### macOS: dmg
 
