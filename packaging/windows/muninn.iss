@@ -62,48 +62,133 @@ Source: "muninn-launch.cmd"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{group}\Muninn"; Filename: "{app}\muninn-launch.cmd"; WorkingDir: "{%USERPROFILE}"; IconFilename: "{app}\muninn.ico"; Flags: runminimized; Comment: "Muninn terminal UI"
 Name: "{group}\Uninstall Muninn"; Filename: "{uninstallexe}"
 
-[Registry]
-Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath(ExpandConstant('{app}'))
-
 [Run]
 Filename: "{app}\muninn-launch.cmd"; Description: "Open Muninn"; Flags: postinstall nowait skipifsilent runminimized
 
 [Code]
-function NeedsAddPath(Dir: string): Boolean;
+// The user PATH (HKCU\Environment\Path, REG_EXPAND_SZ) gets the install folder once on
+// install and loses exactly that entry on uninstall. Entries are compared without case,
+// surrounding spaces, a trailing backslash or unexpanded %VARS%; every other entry, its
+// spelling and its order are kept, and empty entries left by stray semicolons are dropped.
+function Norm(Entry: string): string;
+begin
+  Result := Uppercase(Trim(Entry));
+  StringChangeEx(Result, '/', '\', True);
+  while (Length(Result) > 3) and (Result[Length(Result)] = '\') do
+    Delete(Result, Length(Result), 1);
+end;
+
+function ExpandEnv(S: string): string;
+var
+  A, B: Integer;
+  Name, Rest: string;
+begin
+  Result := '';
+  Rest := S;
+  A := Pos('%', Rest);
+  while A > 0 do
+  begin
+    Result := Result + Copy(Rest, 1, A - 1);
+    Rest := Copy(Rest, A + 1, Length(Rest));
+    B := Pos('%', Rest);
+    if B = 0 then
+    begin
+      Result := Result + '%';
+      break;
+    end;
+    Name := Copy(Rest, 1, B - 1);
+    if GetEnv(Name) <> '' then
+      Result := Result + GetEnv(Name)
+    else
+      Result := Result + '%' + Name + '%';
+    Rest := Copy(Rest, B + 1, Length(Rest));
+    A := Pos('%', Rest);
+  end;
+  Result := Result + Rest;
+end;
+
+function Same(Entry, Dir: string): Boolean;
+begin
+  Result := Norm(ExpandEnv(Entry)) = Norm(Dir);
+end;
+
+// The PATH without Dir (Found: whether it was there), rebuilt from its other entries.
+function Without(Path, Dir: string; var Found: Boolean): string;
+var
+  P: Integer;
+  Entry, Rest: string;
+begin
+  Result := '';
+  Found := False;
+  Rest := Path + ';';
+  P := Pos(';', Rest);
+  while P > 0 do
+  begin
+    Entry := Copy(Rest, 1, P - 1);
+    Rest := Copy(Rest, P + 1, Length(Rest));
+    if Trim(Entry) <> '' then
+    begin
+      if Same(Entry, Dir) then
+        Found := True
+      else if Result = '' then
+        Result := Entry
+      else
+        Result := Result + ';' + Entry;
+    end;
+    P := Pos(';', Rest);
+  end;
+end;
+
+function UserPath(var Path: string): Boolean;
+begin
+  Result := RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path);
+  if not Result then
+    Path := '';
+end;
+
+procedure AddPath(Dir: string);
 var
   Path: string;
+  Found: Boolean;
 begin
-  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path) then
-    Path := '';
-  Result := Pos(';' + Uppercase(Dir) + ';', ';' + Uppercase(Path) + ';') = 0;
+  UserPath(Path);
+  Without(Path, Dir, Found);
+  if Found then
+    exit; // already there: leave the value exactly as it is
+  while (Length(Path) > 0) and (Path[Length(Path)] = ';') do
+    Delete(Path, Length(Path), 1);
+  if Path = '' then
+    Path := Dir
+  else
+    Path := Path + ';' + Dir;
+  RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path);
 end;
 
 procedure RemovePath(Dir: string);
 var
-  Path, Upper, Needle: string;
-  P: Integer;
+  Path, Kept: string;
+  Found: Boolean;
 begin
-  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path) then
+  if not UserPath(Path) then
     exit;
-  Path := ';' + Path + ';';
-  Needle := ';' + Uppercase(Dir) + ';';
-  Upper := Uppercase(Path);
-  P := Pos(Needle, Upper);
-  while P > 0 do
-  begin
-    Delete(Path, P, Length(Needle) - 1);
-    Upper := Uppercase(Path);
-    P := Pos(Needle, Upper);
-  end;
-  while (Length(Path) > 0) and (Path[1] = ';') do
-    Delete(Path, 1, 1);
-  while (Length(Path) > 0) and (Path[Length(Path)] = ';') do
-    Delete(Path, Length(Path), 1);
-  RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path);
+  Kept := Without(Path, Dir, Found);
+  if not Found then
+    exit;
+  if Kept = '' then
+    RegDeleteValue(HKEY_CURRENT_USER, 'Environment', 'Path')
+  else
+    RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Kept);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    AddPath(ExpandConstant('{app}'));
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
-  if CurUninstallStep = usPostUninstall then
+  // usUninstall: the install folder is still known and its files are about to go
+  if CurUninstallStep = usUninstall then
     RemovePath(ExpandConstant('{app}'));
 end;
