@@ -2,8 +2,9 @@
 
 Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
-phones it switches to a phone layout. Status: early (2.21): theme switcher, header with
-the raven, the TUI menu bar, and a read-only Home view of projects and datasets.
+phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
+the TUI menu bar, a read-only Home, the Data view with charts and the time range, and
+read-only Projects.
 
 ## Run it
 
@@ -27,9 +28,24 @@ The first build compiles `crates/muninn-ffi` with cargo (cargokit, in
 - **Themes:** every theme from `assets/themes/*.toml` plus your own in `<home>/themes/`,
   light, dark or system (Theme menu, or the palette button on phones). The app starts on
   the theme in `preferences.toml`; switching in the app lasts for the session.
-- **Home:** where the data lives; enter the Muninn password to list projects and
-  datasets. The store is opened **read-only** (no migrations, no writes) and the password
-  is kept in memory only.
+- **Unlock:** Home, Data and Projects ask for the Muninn password once per session. The
+  key stays in Rust memory (never in Dart, never on disk); **File ▸ Lock** forgets it.
+  The store is opened **read-only** (no migrations, no writes).
+- **Home:** where the data lives, and the projects and datasets in it.
+- **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range;
+  pick one to see it as a chart (candles when they fit, else a close line, volume
+  underneath) or a list of bars, newest first. Switch with the Chart / List buttons or
+  **View ▸ Change view** (`Ctrl-w t` in the TUI). Rust downsamples to at most 600
+  buckets (open = first, close = last, high/low = extremes, volume = sum), so long
+  ranges stay fast. Desktop shows the list and the chart side by side; on a phone the
+  chart opens on its own page.
+- **Time range:** as in the TUI it applies to every view. The chips above every section
+  show it (`from …` / `to …`, × removes an end); click **Time range**, press `T`, or use
+  **Data ▸ Filters ▸ Time range…** to open the picker: a date and a time (UTC) for
+  *from* and *to*, either end left open. **Clear** (or **Data ▸ Filters ▸ Clear time
+  range**) shows everything. Datasets with no bars in the range are hidden.
+- **Projects:** pick a project to see the series saved in it (`mnnn project add`);
+  opening one shows it in Data with the project's saved time range. Read-only for now.
 - **About** (Help ▸ About Muninn): the same text as the TUI's About box, from
   `muninn_core::about`.
 

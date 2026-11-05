@@ -50,7 +50,7 @@ Active filters show as chips; click a chip's `×` to remove it, or **clear all**
   first for *from*, then for *to* (`x` leaves that end open). It applies to every
   view and tile type: lists list only bars in the range, charts plot only that
   range, and the sidebar hides series with no bars in it. Chips `from …` / `to …`
-  remove it.
+  remove it. The [Flutter app](flutter-app.md) has the same range above every view.
 
 The year filter and the time range **scope the tiles**: lists and charts only show
 bars inside them (a list tile's own `[` / `]` range narrows it further). `,` / `.` in a tile step through the series the sidebar shows.
