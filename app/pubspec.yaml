@@ -36,9 +36,10 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  muninn_ffi:
-    path: rust_builder
   flutter_rust_bridge: 2.13.0
+  # Builds crates/muninn-ffi and bundles it as a native asset (hook/build.dart); works
+  # with Swift Package Manager on iOS/macOS. Replaces the old cargokit rust_builder.
+  flutter_rust_bridge_hooks: 2.13.0
   flutter_riverpod: ^3.4.3
   flutter_svg: ^2.3.2
 
