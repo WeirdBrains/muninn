@@ -7,7 +7,7 @@ cask "muninn" do
 
   url "https://github.com/WeirdBrains/muninn/releases/download/v#{version}/muninn-#{version}-macos.dmg"
   name "Muninn"
-  desc "Local, encrypted store for OHLCV market bars"
+  desc "Local, encrypted workbench for market data with peer-to-peer data workflows"
   homepage "https://muninn.weirdbrains.com"
 
   app "Muninn.app"

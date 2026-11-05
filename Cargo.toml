@@ -3,7 +3,7 @@ name = "muninn"
 version.workspace = true
 edition = "2024"
 rust-version = "1.99"
-description = "The data ingestor for the Kommandosaldat project. It ingests data from various sources and normalizes it into a common format."
+description = "Local, encrypted workbench for market data with peer-to-peer data workflows (mnnn): ingest, pipelines and encrypted peer-to-peer sharing, in a TUI and CLI."
 authors = ["Michael Christenson II <m3talsmith@gmail.com>"]
 license = "BSD-3-Clause"
 repository = "https://github.com/WeirdBrains/muninn"
@@ -119,9 +119,11 @@ maintainer = "Michael Christenson II <m3talsmith@gmail.com>"
 copyright = "2026, Michael Christenson II <m3talsmith@gmail.com>"
 license-file = ["LICENSE", "0"]
 extended-description = """\
-Muninn (mnnn) ingests OHLCV market bars from CSV, JSON, HTTP APIs, Redis, SQLite and \
-Postgres, normalizes them and stores them in an encrypted SQLite (SQLCipher) database. \
-Export to CSV, Parquet or JSON; browse in a terminal UI."""
+Muninn (mnnn) is a local, encrypted workbench for market data, with a terminal UI and a \
+CLI. Ingest from CSV, JSON, HTTP APIs, Redis, SQLite and Postgres into an encrypted \
+SQLite (SQLCipher) database; run pipelines you can read and edit; and share data peer to \
+peer between your own nodes, connections and organizations, with no central server. \
+Export to CSV, Parquet or JSON."""
 section = "utils"
 priority = "optional"
 depends = "libc6 (>= 2.39), libgcc-s1"
@@ -136,7 +138,7 @@ assets = [
 
 # Fedora/RHEL package: `cargo build --release && cargo generate-rpm` (packaging/fedora)
 [package.metadata.generate-rpm]
-summary = "Local, encrypted store for OHLCV market bars (mnnn)"
+summary = "Local, encrypted workbench for market data with peer-to-peer data workflows (mnnn)"
 license = "BSD-3-Clause"
 release = "1"
 assets = [
