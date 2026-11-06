@@ -8,6 +8,7 @@ import 'api/data.dart';
 import 'api/info.dart';
 import 'api/io.dart';
 import 'api/net.dart';
+import 'api/orgs.dart';
 import 'api/prefs.dart';
 import 'api/projects.dart';
 import 'api/themes.dart';
@@ -76,7 +77,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1636503241;
+  int get rustContentHash => 802137952;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -148,6 +149,8 @@ abstract class RustLibApi extends BaseApi {
   void crateApiDataLock();
 
   Future<NetOverview> crateApiNetNetOverview({String? home});
+
+  Future<OrgOverview> crateApiOrgsOrgOverview();
 
   Future<Overview> crateApiDataOverview();
 
@@ -685,7 +688,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "net_overview", argNames: ["home"]);
 
   @override
-  Future<Overview> crateApiDataOverview() {
+  Future<OrgOverview> crateApiOrgsOrgOverview() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -694,6 +697,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             generalizedFrbRustBinding,
             serializer,
             funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_org_overview,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgOverviewConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgOverviewConstMeta =>
+      const TaskConstMeta(debugName: "org_overview", argNames: []);
+
+  @override
+  Future<Overview> crateApiDataOverview() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 18,
             port: port_,
           );
         },
@@ -723,7 +753,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 19,
             port: port_,
           );
         },
@@ -765,7 +795,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 20,
             port: port_,
           );
         },
@@ -803,7 +833,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 21,
             port: port_,
           );
         },
@@ -833,7 +863,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 22,
             port: port_,
           );
         },
@@ -865,7 +895,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 23,
             port: port_,
           );
         },
@@ -894,7 +924,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 24,
             port: port_,
           );
         },
@@ -926,7 +956,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 25,
             port: port_,
           );
         },
@@ -962,7 +992,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 26,
             port: port_,
           );
         },
@@ -992,7 +1022,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1021,7 +1051,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1055,7 +1085,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1082,7 +1112,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1304,6 +1334,48 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<OrgEndpointInfo> dco_decode_list_org_endpoint_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_org_endpoint_info).toList();
+  }
+
+  @protected
+  List<OrgInfo> dco_decode_list_org_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_org_info).toList();
+  }
+
+  @protected
+  List<OrgJoined> dco_decode_list_org_joined(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_org_joined).toList();
+  }
+
+  @protected
+  List<OrgMemberInfo> dco_decode_list_org_member_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_org_member_info).toList();
+  }
+
+  @protected
+  List<OrgMirror> dco_decode_list_org_mirror(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_org_mirror).toList();
+  }
+
+  @protected
+  List<OrgResourceInfo> dco_decode_list_org_resource_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_org_resource_info).toList();
+  }
+
+  @protected
+  List<OrgRoleInfo> dco_decode_list_org_role_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_org_role_info).toList();
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
@@ -1408,6 +1480,133 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ThemeData? dco_decode_opt_box_autoadd_theme_data(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_theme_data(raw);
+  }
+
+  @protected
+  OrgEndpointInfo dco_decode_org_endpoint_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return OrgEndpointInfo(
+      name: dco_decode_String(arr[0]),
+      kind: dco_decode_String(arr[1]),
+      perm: dco_decode_String(arr[2]),
+      anyone: dco_decode_bool(arr[3]),
+    );
+  }
+
+  @protected
+  OrgInfo dco_decode_org_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 20)
+      throw Exception('unexpected arr length: expect 20 but see ${arr.length}');
+    return OrgInfo(
+      id: dco_decode_String(arr[0]),
+      shortId: dco_decode_String(arr[1]),
+      name: dco_decode_String(arr[2]),
+      slug: dco_decode_String(arr[3]),
+      description: dco_decode_String(arr[4]),
+      visibility: dco_decode_String(arr[5]),
+      access: dco_decode_String(arr[6]),
+      hosted: dco_decode_bool(arr[7]),
+      memberAuth: dco_decode_bool(arr[8]),
+      gated: dco_decode_bool(arr[9]),
+      members: dco_decode_i_64(arr[10]),
+      applyRole: dco_decode_String(arr[11]),
+      inviteRole: dco_decode_String(arr[12]),
+      template: dco_decode_String(arr[13]),
+      roles: dco_decode_list_org_role_info(arr[14]),
+      memberList: dco_decode_list_org_member_info(arr[15]),
+      resources: dco_decode_list_org_resource_info(arr[16]),
+      projects: dco_decode_list_String(arr[17]),
+      endpoints: dco_decode_list_org_endpoint_info(arr[18]),
+      templates: dco_decode_list_String(arr[19]),
+    );
+  }
+
+  @protected
+  OrgJoined dco_decode_org_joined(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return OrgJoined(
+      name: dco_decode_String(arr[0]),
+      slug: dco_decode_String(arr[1]),
+      status: dco_decode_String(arr[2]),
+      role: dco_decode_String(arr[3]),
+      node: dco_decode_String(arr[4]),
+      perms: dco_decode_list_String(arr[5]),
+    );
+  }
+
+  @protected
+  OrgMemberInfo dco_decode_org_member_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return OrgMemberInfo(
+      shortId: dco_decode_String(arr[0]),
+      title: dco_decode_String(arr[1]),
+      role: dco_decode_String(arr[2]),
+      status: dco_decode_String(arr[3]),
+      note: dco_decode_String(arr[4]),
+    );
+  }
+
+  @protected
+  OrgMirror dco_decode_org_mirror(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return OrgMirror(
+      slug: dco_decode_String(arr[0]),
+      fetchedAt: dco_decode_i_64(arr[1]),
+    );
+  }
+
+  @protected
+  OrgOverview dco_decode_org_overview(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return OrgOverview(
+      mine: dco_decode_list_org_info(arr[0]),
+      joined: dco_decode_list_org_joined(arr[1]),
+      mirrors: dco_decode_list_org_mirror(arr[2]),
+    );
+  }
+
+  @protected
+  OrgResourceInfo dco_decode_org_resource_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return OrgResourceInfo(
+      kind: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      state: dco_decode_String(arr[2]),
+      published: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
+  OrgRoleInfo dco_decode_org_role_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return OrgRoleInfo(
+      name: dco_decode_String(arr[0]),
+      rank: dco_decode_i_64(arr[1]),
+      perms: dco_decode_list_String(arr[2]),
+    );
   }
 
   @protected
@@ -1789,6 +1988,98 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<OrgEndpointInfo> sse_decode_list_org_endpoint_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <OrgEndpointInfo>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_org_endpoint_info(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<OrgInfo> sse_decode_list_org_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <OrgInfo>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_org_info(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<OrgJoined> sse_decode_list_org_joined(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <OrgJoined>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_org_joined(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<OrgMemberInfo> sse_decode_list_org_member_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <OrgMemberInfo>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_org_member_info(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<OrgMirror> sse_decode_list_org_mirror(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <OrgMirror>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_org_mirror(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<OrgResourceInfo> sse_decode_list_org_resource_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <OrgResourceInfo>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_org_resource_info(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<OrgRoleInfo> sse_decode_list_org_role_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <OrgRoleInfo>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_org_role_info(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
@@ -1949,6 +2240,149 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     } else {
       return null;
     }
+  }
+
+  @protected
+  OrgEndpointInfo sse_decode_org_endpoint_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_kind = sse_decode_String(deserializer);
+    var var_perm = sse_decode_String(deserializer);
+    var var_anyone = sse_decode_bool(deserializer);
+    return OrgEndpointInfo(
+      name: var_name,
+      kind: var_kind,
+      perm: var_perm,
+      anyone: var_anyone,
+    );
+  }
+
+  @protected
+  OrgInfo sse_decode_org_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_shortId = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_slug = sse_decode_String(deserializer);
+    var var_description = sse_decode_String(deserializer);
+    var var_visibility = sse_decode_String(deserializer);
+    var var_access = sse_decode_String(deserializer);
+    var var_hosted = sse_decode_bool(deserializer);
+    var var_memberAuth = sse_decode_bool(deserializer);
+    var var_gated = sse_decode_bool(deserializer);
+    var var_members = sse_decode_i_64(deserializer);
+    var var_applyRole = sse_decode_String(deserializer);
+    var var_inviteRole = sse_decode_String(deserializer);
+    var var_template = sse_decode_String(deserializer);
+    var var_roles = sse_decode_list_org_role_info(deserializer);
+    var var_memberList = sse_decode_list_org_member_info(deserializer);
+    var var_resources = sse_decode_list_org_resource_info(deserializer);
+    var var_projects = sse_decode_list_String(deserializer);
+    var var_endpoints = sse_decode_list_org_endpoint_info(deserializer);
+    var var_templates = sse_decode_list_String(deserializer);
+    return OrgInfo(
+      id: var_id,
+      shortId: var_shortId,
+      name: var_name,
+      slug: var_slug,
+      description: var_description,
+      visibility: var_visibility,
+      access: var_access,
+      hosted: var_hosted,
+      memberAuth: var_memberAuth,
+      gated: var_gated,
+      members: var_members,
+      applyRole: var_applyRole,
+      inviteRole: var_inviteRole,
+      template: var_template,
+      roles: var_roles,
+      memberList: var_memberList,
+      resources: var_resources,
+      projects: var_projects,
+      endpoints: var_endpoints,
+      templates: var_templates,
+    );
+  }
+
+  @protected
+  OrgJoined sse_decode_org_joined(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_slug = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_role = sse_decode_String(deserializer);
+    var var_node = sse_decode_String(deserializer);
+    var var_perms = sse_decode_list_String(deserializer);
+    return OrgJoined(
+      name: var_name,
+      slug: var_slug,
+      status: var_status,
+      role: var_role,
+      node: var_node,
+      perms: var_perms,
+    );
+  }
+
+  @protected
+  OrgMemberInfo sse_decode_org_member_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_shortId = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_role = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_note = sse_decode_String(deserializer);
+    return OrgMemberInfo(
+      shortId: var_shortId,
+      title: var_title,
+      role: var_role,
+      status: var_status,
+      note: var_note,
+    );
+  }
+
+  @protected
+  OrgMirror sse_decode_org_mirror(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_slug = sse_decode_String(deserializer);
+    var var_fetchedAt = sse_decode_i_64(deserializer);
+    return OrgMirror(slug: var_slug, fetchedAt: var_fetchedAt);
+  }
+
+  @protected
+  OrgOverview sse_decode_org_overview(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_mine = sse_decode_list_org_info(deserializer);
+    var var_joined = sse_decode_list_org_joined(deserializer);
+    var var_mirrors = sse_decode_list_org_mirror(deserializer);
+    return OrgOverview(
+      mine: var_mine,
+      joined: var_joined,
+      mirrors: var_mirrors,
+    );
+  }
+
+  @protected
+  OrgResourceInfo sse_decode_org_resource_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_state = sse_decode_String(deserializer);
+    var var_published = sse_decode_String(deserializer);
+    return OrgResourceInfo(
+      kind: var_kind,
+      name: var_name,
+      state: var_state,
+      published: var_published,
+    );
+  }
+
+  @protected
+  OrgRoleInfo sse_decode_org_role_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_rank = sse_decode_i_64(deserializer);
+    var var_perms = sse_decode_list_String(deserializer);
+    return OrgRoleInfo(name: var_name, rank: var_rank, perms: var_perms);
   }
 
   @protected
@@ -2282,6 +2716,87 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_org_endpoint_info(
+    List<OrgEndpointInfo> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_org_endpoint_info(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_org_info(List<OrgInfo> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_org_info(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_org_joined(
+    List<OrgJoined> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_org_joined(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_org_member_info(
+    List<OrgMemberInfo> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_org_member_info(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_org_mirror(
+    List<OrgMirror> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_org_mirror(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_org_resource_info(
+    List<OrgResourceInfo> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_org_resource_info(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_org_role_info(
+    List<OrgRoleInfo> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_org_role_info(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -2414,6 +2929,102 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     if (self != null) {
       sse_encode_box_autoadd_theme_data(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_org_endpoint_info(
+    OrgEndpointInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.kind, serializer);
+    sse_encode_String(self.perm, serializer);
+    sse_encode_bool(self.anyone, serializer);
+  }
+
+  @protected
+  void sse_encode_org_info(OrgInfo self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.shortId, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.slug, serializer);
+    sse_encode_String(self.description, serializer);
+    sse_encode_String(self.visibility, serializer);
+    sse_encode_String(self.access, serializer);
+    sse_encode_bool(self.hosted, serializer);
+    sse_encode_bool(self.memberAuth, serializer);
+    sse_encode_bool(self.gated, serializer);
+    sse_encode_i_64(self.members, serializer);
+    sse_encode_String(self.applyRole, serializer);
+    sse_encode_String(self.inviteRole, serializer);
+    sse_encode_String(self.template, serializer);
+    sse_encode_list_org_role_info(self.roles, serializer);
+    sse_encode_list_org_member_info(self.memberList, serializer);
+    sse_encode_list_org_resource_info(self.resources, serializer);
+    sse_encode_list_String(self.projects, serializer);
+    sse_encode_list_org_endpoint_info(self.endpoints, serializer);
+    sse_encode_list_String(self.templates, serializer);
+  }
+
+  @protected
+  void sse_encode_org_joined(OrgJoined self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.slug, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_String(self.role, serializer);
+    sse_encode_String(self.node, serializer);
+    sse_encode_list_String(self.perms, serializer);
+  }
+
+  @protected
+  void sse_encode_org_member_info(
+    OrgMemberInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.shortId, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.role, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_String(self.note, serializer);
+  }
+
+  @protected
+  void sse_encode_org_mirror(OrgMirror self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.slug, serializer);
+    sse_encode_i_64(self.fetchedAt, serializer);
+  }
+
+  @protected
+  void sse_encode_org_overview(OrgOverview self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_org_info(self.mine, serializer);
+    sse_encode_list_org_joined(self.joined, serializer);
+    sse_encode_list_org_mirror(self.mirrors, serializer);
+  }
+
+  @protected
+  void sse_encode_org_resource_info(
+    OrgResourceInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.kind, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.state, serializer);
+    sse_encode_String(self.published, serializer);
+  }
+
+  @protected
+  void sse_encode_org_role_info(OrgRoleInfo self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_i_64(self.rank, serializer);
+    sse_encode_list_String(self.perms, serializer);
   }
 
   @protected
