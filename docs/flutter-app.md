@@ -31,7 +31,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
-  Live searches… / Journals… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Rules… / Reviews… / Notifications… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
+  Live searches… / Journals… / New journal… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Rules… / Reviews… / Notifications… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
   Rekey, Export, Recover and Re-issue shards, and Data ▸ Sources… / Symbols…. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
@@ -105,8 +105,16 @@ Users never need Rust: release builds ship the compiled library.
   Dart only passes the path, and archive bytes stay in Rust. **Journals** list,
   create (optionally in a project), rename, change format, fork and delete journals,
   and write, edit or remove entries plus journal-level notes (`mnnn journal`).
-  Word-span highlights, images, copying entries and document export stay in the
-  TUI. **Searches** save a live search (query and target: series, journals or
+  **Highlights** mark selected words of an entry (optional comment; TUI `m` /
+  `mnnn journal highlight`). **Notes on words** attach a note to an entry or a
+  span (`mnnn journal note --entry`). **Images** attach from a file path (Rust
+  reads the bytes) and save an attached image to a path (`mnnn journal attach` /
+  `image`); Dart never sees the bytes. **Copy** adds selected entries (with their
+  notes, highlights and images) to another journal or a new one (`mnnn journal
+  copy`). **Export** writes PDF, Word, HTML, LaTeX, text or JSON to a path
+  (`mnnn journal export`); **Import journal** reads a JSON export (`mnnn journal
+  import`); **Print** saves a PDF and can send it to `lp`/`lpr` (`mnnn journal
+  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query and target: series, journals or
   records), rename, fork or delete it (`mnnn search save|edit|fork|remove`).
   Refining a search with the full sidebar filters, overwriting one or applying it
   to Data stays in the TUI. **Reports** create (optionally attached to a project),
@@ -312,7 +320,7 @@ comes in a later phase (see [sync](sync.md)).
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars, ingest and bar export, sources and symbols, code spaces, live pipes and pipelines, rules, reviews and notifications, net status, peers, settings, connections, exchanges, search, broadcast and dark shards, org list and writes (including templates, domains, certificates/ACME, browse, fetch/give/mirror, endpoints, org projects, code serve and sign-in), keys status and writes, help topics), exposed with
+  projects and datasets, downsampled bars, ingest and bar export, sources and symbols, code spaces, live pipes and pipelines, rules, reviews and notifications, net status, peers, settings, connections, exchanges, search, broadcast and dark shards, org list and writes (including templates, domains, certificates/ACME, browse, fetch/give/mirror, endpoints, org projects, code serve and sign-in), journal extras (highlights, images, copy, export/import and print), keys status and writes, help topics), exposed with
   flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.

@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
+import 'journal_extras.dart';
 
 void _ok(BuildContext context, String msg, {Color? color}) {
   ScaffoldMessenger.of(context)
@@ -122,11 +123,23 @@ class JournalsPane extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
-              key: const ValueKey('journals-new'),
-              onPressed: () => showNewJournalDialog(context, ref),
-              icon: const Icon(Icons.add),
-              label: const Text('New journal'),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  key: const ValueKey('journals-new'),
+                  onPressed: () => showNewJournalDialog(context, ref),
+                  icon: const Icon(Icons.add),
+                  label: const Text('New journal'),
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey('journals-import'),
+                  onPressed: () => showJournalImportDialog(context, ref),
+                  icon: const Icon(Icons.file_open_outlined),
+                  label: const Text('Import journal'),
+                ),
+              ],
             ),
           ),
         ),
@@ -310,6 +323,18 @@ class _JournalDetail extends ConsumerWidget {
                 icon: const Icon(Icons.sticky_note_2_outlined),
                 label: const Text('Add note'),
               ),
+              OutlinedButton.icon(
+                key: const ValueKey('journal-export'),
+                onPressed: () => showJournalExportDialog(context, ref, journal),
+                icon: const Icon(Icons.ios_share),
+                label: const Text('Export'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('journal-print'),
+                onPressed: () => showJournalPrintDialog(context, ref, journal),
+                icon: const Icon(Icons.print_outlined),
+                label: const Text('Print'),
+              ),
             ],
           ),
         ),
@@ -361,7 +386,7 @@ class _JournalDetail extends ConsumerWidget {
                 }
                 return Column(
                   children: [
-                    for (final e in entries)
+                    for (final e in entries) ...[
                       ListTile(
                         minTileHeight: 48,
                         contentPadding: const EdgeInsets.only(
@@ -416,6 +441,8 @@ class _JournalDetail extends ConsumerWidget {
                           ],
                         ),
                       ),
+                      JournalEntryExtras(e),
+                    ],
                   ],
                 );
               },

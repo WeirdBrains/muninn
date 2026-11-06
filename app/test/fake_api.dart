@@ -131,6 +131,8 @@ class FakeApi implements MuninnApi {
   final removedSeries = <int>[];
   final itemsByProject = <String, List<ProjectItemInfo>>{};
   List<JournalInfo> journalList = [];
+  List<JournalAnnotationInfo> annotationList = [];
+  List<JournalImageInfo> imageList = [];
   List<JournalEntryInfo> entryList = [];
   List<JournalNoteInfo> noteList = [];
   List<SearchInfo> searchList = [];
@@ -488,6 +490,209 @@ class FakeApi implements MuninnApi {
     );
     noteList = [...noteList, n];
     return n;
+  }
+
+  @override
+  Future<List<JournalAnnotationInfo>> entryAnnotations(String entry) async => [
+    for (final a in annotationList)
+      if (a.entryId == entry) a,
+  ];
+
+  @override
+  Future<JournalAnnotationInfo> addEntryNote(
+    String entry,
+    String body, {
+    String? words,
+    int? nth,
+    int? start,
+    int? end,
+  }) async {
+    extraCalls.add('entry-note:$entry:${words ?? ''}');
+    final e = entryList.firstWhere((x) => x.id == entry);
+    final n = JournalAnnotationInfo(
+      id: 'a${annotationList.length + 1}',
+      shortId: 'a${annotationList.length + 1}',
+      journalId: e.journalId,
+      entryId: entry,
+      kind: 'note',
+      start: start,
+      end: end,
+      quote: words,
+      body: body,
+    );
+    annotationList = [...annotationList, n];
+    return n;
+  }
+
+  @override
+  Future<JournalAnnotationInfo> addEntryHighlight(
+    String entry, {
+    String? words,
+    int? nth,
+    int? start,
+    int? end,
+    String? color,
+    String? comment,
+  }) async {
+    extraCalls.add('highlight:$entry:${words ?? ''}');
+    final e = entryList.firstWhere((x) => x.id == entry);
+    final h = JournalAnnotationInfo(
+      id: 'a${annotationList.length + 1}',
+      shortId: 'a${annotationList.length + 1}',
+      journalId: e.journalId,
+      entryId: entry,
+      kind: 'highlight',
+      start: start,
+      end: end,
+      quote: words,
+      body: comment ?? '',
+      color: color ?? 'yellow',
+    );
+    annotationList = [...annotationList, h];
+    return h;
+  }
+
+  @override
+  Future<JournalAnnotationInfo> updateJournalAnnotation(
+    String id,
+    String body,
+  ) async {
+    extraCalls.add('ann-edit:$id');
+    annotationList = [
+      for (final a in annotationList)
+        if (a.id == id)
+          JournalAnnotationInfo(
+            id: a.id,
+            shortId: a.shortId,
+            journalId: a.journalId,
+            entryId: a.entryId,
+            kind: a.kind,
+            start: a.start,
+            end: a.end,
+            quote: a.quote,
+            body: body,
+            color: a.color,
+            detached: a.detached,
+          )
+        else
+          a,
+    ];
+    return annotationList.firstWhere((a) => a.id == id);
+  }
+
+  @override
+  Future<String> removeJournalAnnotation(String id) async {
+    extraCalls.add('ann-remove:$id');
+    final a = annotationList.firstWhere((x) => x.id == id);
+    annotationList = [
+      for (final x in annotationList)
+        if (x.id != id) x,
+    ];
+    return 'removed ${a.kind}';
+  }
+
+  @override
+  Future<List<JournalImageInfo>> entryImages(String entry) async => [
+    for (final i in imageList)
+      if (i.entryId == entry) i,
+  ];
+
+  @override
+  Future<JournalImageInfo> attachJournalImage(
+    String entry,
+    String path, {
+    String? name,
+  }) async {
+    extraCalls.add('attach:$entry:$path');
+    final n = name ?? path.split('/').last;
+    final img = JournalImageInfo(
+      id: 'img${imageList.length + 1}',
+      shortId: 'img${imageList.length + 1}',
+      entryId: entry,
+      name: n,
+      mime: 'image/png',
+      size: 21,
+    );
+    imageList = [...imageList, img];
+    return img;
+  }
+
+  @override
+  Future<String> saveJournalImage(String id, String out) async {
+    extraCalls.add('save-image:$id:$out');
+    final img = imageList.firstWhere((x) => x.id == id);
+    return 'wrote ${img.name} (${img.size} bytes) to $out';
+  }
+
+  @override
+  Future<List<JournalEntryInfo>> copyJournalEntries(
+    List<String> entries, {
+    String? to,
+    String? newName,
+    String? project,
+  }) async {
+    extraCalls.add('copy:${entries.join(',')}:${to ?? ''}:${newName ?? ''}');
+    String dest = to ?? '';
+    if (newName != null && newName.isNotEmpty) {
+      final j = await createJournal(newName, project: project);
+      dest = j.id;
+    }
+    final copied = <JournalEntryInfo>[];
+    for (final id in entries) {
+      final e = entryList.firstWhere((x) => x.id == id);
+      final n = JournalEntryInfo(
+        id: 'e${entryList.length + copied.length + 1}',
+        shortId: 'e${entryList.length + copied.length + 1}',
+        journalId: dest,
+        title: e.title,
+        heading: e.heading,
+        body: e.body,
+        format: e.format,
+      );
+      copied.add(n);
+    }
+    entryList = [...entryList, ...copied];
+    return copied;
+  }
+
+  @override
+  Future<JournalExportInfo> exportJournal(
+    String journal, {
+    String format = 'pdf',
+    required String out,
+    List<String> entries = const [],
+  }) async {
+    extraCalls.add('journal-export:$journal:$format:$out');
+    return JournalExportInfo(
+      path: out,
+      message: 'exported journal $journal to $out ($format)',
+    );
+  }
+
+  @override
+  Future<JournalInfo> importJournal(
+    String path, {
+    String? project,
+    String? name,
+  }) async {
+    extraCalls.add('journal-import:$path');
+    return createJournal(name ?? 'Imported', project: project);
+  }
+
+  @override
+  Future<JournalExportInfo> printJournal(
+    String journal, {
+    List<String> entries = const [],
+    String? printer,
+    String? out,
+    bool saveOnly = true,
+  }) async {
+    extraCalls.add('journal-print:$journal:${out ?? ''}');
+    final path = out ?? '/tmp/$journal.pdf';
+    return JournalExportInfo(
+      path: path,
+      message: 'saved the PDF at $path (not sent to a printer)',
+    );
   }
 
   @override

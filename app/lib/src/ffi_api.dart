@@ -517,6 +517,136 @@ class FfiMuninnApi implements MuninnApi {
   }
 
   @override
+  Future<List<JournalAnnotationInfo>> entryAnnotations(String entry) async => [
+    for (final a in await r_journals.entryAnnotations(entry: entry)) _ann(a),
+  ];
+
+  @override
+  Future<JournalAnnotationInfo> addEntryNote(
+    String entry,
+    String body, {
+    String? words,
+    int? nth,
+    int? start,
+    int? end,
+  }) async => _ann(
+    await r_journals.addEntryNote(
+      entry: entry,
+      body: body,
+      words: words,
+      nth: nth == null ? null : PlatformInt64Util.from(nth),
+      start: start == null ? null : PlatformInt64Util.from(start),
+      end: end == null ? null : PlatformInt64Util.from(end),
+    ),
+  );
+
+  @override
+  Future<JournalAnnotationInfo> addEntryHighlight(
+    String entry, {
+    String? words,
+    int? nth,
+    int? start,
+    int? end,
+    String? color,
+    String? comment,
+  }) async => _ann(
+    await r_journals.addEntryHighlight(
+      entry: entry,
+      words: words,
+      nth: nth == null ? null : PlatformInt64Util.from(nth),
+      start: start == null ? null : PlatformInt64Util.from(start),
+      end: end == null ? null : PlatformInt64Util.from(end),
+      color: color,
+      comment: comment,
+    ),
+  );
+
+  @override
+  Future<JournalAnnotationInfo> updateJournalAnnotation(
+    String id,
+    String body,
+  ) async => _ann(await r_journals.updateJournalAnnotation(id: id, body: body));
+
+  @override
+  Future<String> removeJournalAnnotation(String id) =>
+      r_journals.removeJournalAnnotation(id: id);
+
+  @override
+  Future<List<JournalImageInfo>> entryImages(String entry) async => [
+    for (final i in await r_journals.entryImages(entry: entry)) _image(i),
+  ];
+
+  @override
+  Future<JournalImageInfo> attachJournalImage(
+    String entry,
+    String path, {
+    String? name,
+  }) async => _image(
+    await r_journals.attachJournalImage(entry: entry, path: path, name: name),
+  );
+
+  @override
+  Future<String> saveJournalImage(String id, String out) =>
+      r_journals.saveJournalImage(id: id, out: out);
+
+  @override
+  Future<List<JournalEntryInfo>> copyJournalEntries(
+    List<String> entries, {
+    String? to,
+    String? newName,
+    String? project,
+  }) async => [
+    for (final e in await r_journals.copyJournalEntries(
+      entries: entries,
+      to: to,
+      newName: newName,
+      project: project,
+    ))
+      _entry(e),
+  ];
+
+  @override
+  Future<JournalExportInfo> exportJournal(
+    String journal, {
+    String format = 'pdf',
+    required String out,
+    List<String> entries = const [],
+  }) async => _jexport(
+    await r_journals.exportJournal(
+      journal: journal,
+      format: format,
+      out: out,
+      entries: entries,
+    ),
+  );
+
+  @override
+  Future<JournalInfo> importJournal(
+    String path, {
+    String? project,
+    String? name,
+  }) async => _journal(
+    await r_journals.importJournal(path: path, project: project, name: name),
+  );
+
+  @override
+  Future<JournalExportInfo> printJournal(
+    String journal, {
+    List<String> entries = const [],
+    String? printer,
+    String? out,
+    bool saveOnly = true,
+  }) async => _jexport(
+    await r_journals.printJournal(
+      journal: journal,
+      entries: entries,
+      printer: printer,
+      out: out,
+      saveOnly: saveOnly,
+    ),
+  );
+
+  @override
   Future<List<SearchInfo>> searches() async => [
     for (final s in await r_searches.searches()) _search(s),
   ];
@@ -2370,6 +2500,33 @@ OrgHostStatus _orgHost(r_orgs.OrgHostStatus s) => OrgHostStatus(
   httpAddr: s.httpAddr,
   autostart: s.autostart,
 );
+
+JournalAnnotationInfo _ann(r_journals.JournalAnnotationInfo a) =>
+    JournalAnnotationInfo(
+      id: a.id,
+      shortId: a.shortId,
+      journalId: a.journalId,
+      entryId: a.entryId,
+      kind: a.kind,
+      start: a.start?.toInt(),
+      end: a.end?.toInt(),
+      quote: a.quote,
+      body: a.body,
+      color: a.color,
+      detached: a.detached,
+    );
+
+JournalImageInfo _image(r_journals.JournalImageInfo i) => JournalImageInfo(
+  id: i.id,
+  shortId: i.shortId,
+  entryId: i.entryId,
+  name: i.name,
+  mime: i.mime,
+  size: i.size.toInt(),
+);
+
+JournalExportInfo _jexport(r_journals.JournalExportInfo e) =>
+    JournalExportInfo(path: e.path, files: e.files.toInt(), message: e.message);
 
 JournalInfo _journal(r_journals.JournalInfo j) => JournalInfo(
   id: j.id,

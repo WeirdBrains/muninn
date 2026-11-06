@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_entry_of`, `add_journal_note_of`, `create_journal_of`, `entries_of`, `entry_info`, `fmt`, `fork_journal_of`, `journal_info`, `journal_notes_of`, `journals_of`, `note`, `parse_fmt`, `remove_entry_of`, `remove_journal_of`, `update_entry_of`, `update_journal_of`
+// These functions are ignored because they are not marked as `pub`: `add_entry_note_of`, `add_entry_of`, `add_highlight_of`, `add_journal_note_of`, `annotation_info`, `attach_image_of`, `copy_entries_of`, `create_journal_of`, `entries_of`, `entry_annotations_of`, `entry_images_of`, `entry_info`, `export_journal_of`, `fmt`, `fork_journal_of`, `image_info`, `import_journal_of`, `journal_info`, `journal_notes_of`, `journals_of`, `kind_label`, `note`, `parse_fmt`, `print_journal_of`, `remove_annotation_of`, `remove_entry_of`, `remove_journal_of`, `resolve_span`, `save_image_of`, `update_annotation_of`, `update_entry_of`, `update_journal_of`
 
 /// `mnnn journal list`.
 Future<List<JournalInfo>> journals() =>
@@ -88,6 +88,128 @@ Future<JournalNoteInfo> addJournalNote({
   body: body,
 );
 
+/// Notes and highlights on an entry (`mnnn journal entry` / TUI entry view).
+Future<List<JournalAnnotationInfo>> entryAnnotations({required String entry}) =>
+    RustLib.instance.api.crateApiJournalsEntryAnnotations(entry: entry);
+
+/// Note on an entry, or on selected words (`mnnn journal note --entry`).
+Future<JournalAnnotationInfo> addEntryNote({
+  required String entry,
+  required String body,
+  String? words,
+  PlatformInt64? nth,
+  PlatformInt64? start,
+  PlatformInt64? end,
+}) => RustLib.instance.api.crateApiJournalsAddEntryNote(
+  entry: entry,
+  body: body,
+  words: words,
+  nth: nth,
+  start: start,
+  end: end,
+);
+
+/// Highlight selected words of an entry (`mnnn journal highlight` / TUI `m`).
+Future<JournalAnnotationInfo> addEntryHighlight({
+  required String entry,
+  String? words,
+  PlatformInt64? nth,
+  PlatformInt64? start,
+  PlatformInt64? end,
+  String? color,
+  String? comment,
+}) => RustLib.instance.api.crateApiJournalsAddEntryHighlight(
+  entry: entry,
+  words: words,
+  nth: nth,
+  start: start,
+  end: end,
+  color: color,
+  comment: comment,
+);
+
+Future<JournalAnnotationInfo> updateJournalAnnotation({
+  required String id,
+  required String body,
+}) => RustLib.instance.api.crateApiJournalsUpdateJournalAnnotation(
+  id: id,
+  body: body,
+);
+
+Future<String> removeJournalAnnotation({required String id}) =>
+    RustLib.instance.api.crateApiJournalsRemoveJournalAnnotation(id: id);
+
+/// Image metadata for an entry. Bytes stay in the store.
+Future<List<JournalImageInfo>> entryImages({required String entry}) =>
+    RustLib.instance.api.crateApiJournalsEntryImages(entry: entry);
+
+/// Attach an image from a file path. Rust reads the bytes; Dart never sends them.
+Future<JournalImageInfo> attachJournalImage({
+  required String entry,
+  required String path,
+  String? name,
+}) => RustLib.instance.api.crateApiJournalsAttachJournalImage(
+  entry: entry,
+  path: path,
+  name: name,
+);
+
+/// Write an attached image to a file (`mnnn journal image`). Bytes never return to Dart.
+Future<String> saveJournalImage({required String id, required String out}) =>
+    RustLib.instance.api.crateApiJournalsSaveJournalImage(id: id, out: out);
+
+/// Copy entries (with notes, highlights and images) to another journal (`mnnn journal copy`).
+Future<List<EntryInfo>> copyJournalEntries({
+  required List<String> entries,
+  String? to,
+  String? newName,
+  String? project,
+}) => RustLib.instance.api.crateApiJournalsCopyJournalEntries(
+  entries: entries,
+  to: to,
+  newName: newName,
+  project: project,
+);
+
+/// Export a journal as PDF, Word, HTML, LaTeX, text or JSON (`mnnn journal export`). File bytes stay in Rust.
+Future<JournalExportInfo> exportJournal({
+  required String journal,
+  required String format,
+  required String out,
+  required List<String> entries,
+}) => RustLib.instance.api.crateApiJournalsExportJournal(
+  journal: journal,
+  format: format,
+  out: out,
+  entries: entries,
+);
+
+/// Import a journal exported as JSON (`mnnn journal import`). Dart only passes the path.
+Future<JournalInfo> importJournal({
+  required String path,
+  String? project,
+  String? name,
+}) => RustLib.instance.api.crateApiJournalsImportJournal(
+  path: path,
+  project: project,
+  name: name,
+);
+
+/// Print a journal as PDF (`mnnn journal print` / TUI `P`). Default is save-only; `out` is a path, never ~/.muninn unless the caller chose it.
+Future<JournalExportInfo> printJournal({
+  required String journal,
+  required List<String> entries,
+  String? printer,
+  String? out,
+  required bool saveOnly,
+}) => RustLib.instance.api.crateApiJournalsPrintJournal(
+  journal: journal,
+  entries: entries,
+  printer: printer,
+  out: out,
+  saveOnly: saveOnly,
+);
+
 class EntryInfo {
   final String id;
   final String shortId;
@@ -133,6 +255,129 @@ class EntryInfo {
           body == other.body &&
           format == other.format &&
           position == other.position;
+}
+
+class JournalAnnotationInfo {
+  final String id;
+  final String shortId;
+  final String journalId;
+  final String? entryId;
+  final String kind;
+  final PlatformInt64? start;
+  final PlatformInt64? end;
+  final String? quote;
+  final String body;
+  final String? color;
+  final bool detached;
+
+  const JournalAnnotationInfo({
+    required this.id,
+    required this.shortId,
+    required this.journalId,
+    this.entryId,
+    required this.kind,
+    this.start,
+    this.end,
+    this.quote,
+    required this.body,
+    this.color,
+    required this.detached,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      shortId.hashCode ^
+      journalId.hashCode ^
+      entryId.hashCode ^
+      kind.hashCode ^
+      start.hashCode ^
+      end.hashCode ^
+      quote.hashCode ^
+      body.hashCode ^
+      color.hashCode ^
+      detached.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is JournalAnnotationInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          shortId == other.shortId &&
+          journalId == other.journalId &&
+          entryId == other.entryId &&
+          kind == other.kind &&
+          start == other.start &&
+          end == other.end &&
+          quote == other.quote &&
+          body == other.body &&
+          color == other.color &&
+          detached == other.detached;
+}
+
+class JournalExportInfo {
+  final String path;
+  final PlatformInt64 files;
+  final String message;
+
+  const JournalExportInfo({
+    required this.path,
+    required this.files,
+    required this.message,
+  });
+
+  @override
+  int get hashCode => path.hashCode ^ files.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is JournalExportInfo &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          files == other.files &&
+          message == other.message;
+}
+
+/// Attachment metadata only. Image bytes stay in the store.
+class JournalImageInfo {
+  final String id;
+  final String shortId;
+  final String entryId;
+  final String name;
+  final String mime;
+  final PlatformInt64 size;
+
+  const JournalImageInfo({
+    required this.id,
+    required this.shortId,
+    required this.entryId,
+    required this.name,
+    required this.mime,
+    required this.size,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      shortId.hashCode ^
+      entryId.hashCode ^
+      name.hashCode ^
+      mime.hashCode ^
+      size.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is JournalImageInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          shortId == other.shortId &&
+          entryId == other.entryId &&
+          name == other.name &&
+          mime == other.mime &&
+          size == other.size;
 }
 
 class JournalInfo {

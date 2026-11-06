@@ -120,6 +120,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IngestProgressSnap dco_decode_ingest_progress_snap(dynamic raw);
 
   @protected
+  JournalAnnotationInfo dco_decode_journal_annotation_info(dynamic raw);
+
+  @protected
+  JournalExportInfo dco_decode_journal_export_info(dynamic raw);
+
+  @protected
+  JournalImageInfo dco_decode_journal_image_info(dynamic raw);
+
+  @protected
   JournalInfo dco_decode_journal_info(dynamic raw);
 
   @protected
@@ -154,6 +163,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<IngestFileReport> dco_decode_list_ingest_file_report(dynamic raw);
+
+  @protected
+  List<JournalAnnotationInfo> dco_decode_list_journal_annotation_info(
+    dynamic raw,
+  );
+
+  @protected
+  List<JournalImageInfo> dco_decode_list_journal_image_info(dynamic raw);
 
   @protected
   List<JournalInfo> dco_decode_list_journal_info(dynamic raw);
@@ -634,6 +651,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  JournalAnnotationInfo sse_decode_journal_annotation_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  JournalExportInfo sse_decode_journal_export_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  JournalImageInfo sse_decode_journal_image_info(SseDeserializer deserializer);
+
+  @protected
   JournalInfo sse_decode_journal_info(SseDeserializer deserializer);
 
   @protected
@@ -676,6 +706,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<IngestFileReport> sse_decode_list_ingest_file_report(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<JournalAnnotationInfo> sse_decode_list_journal_annotation_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<JournalImageInfo> sse_decode_list_journal_image_info(
     SseDeserializer deserializer,
   );
 
@@ -1260,6 +1300,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_journal_annotation_info(
+    JournalAnnotationInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_journal_export_info(
+    JournalExportInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_journal_image_info(
+    JournalImageInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_journal_info(JournalInfo self, SseSerializer serializer);
 
   @protected
@@ -1316,6 +1374,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_ingest_file_report(
     List<IngestFileReport> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_journal_annotation_info(
+    List<JournalAnnotationInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_journal_image_info(
+    List<JournalImageInfo> self,
     SseSerializer serializer,
   );
 

@@ -216,6 +216,49 @@ class JournalNoteInfo {
   final String id, shortId, body;
 }
 
+class JournalAnnotationInfo {
+  const JournalAnnotationInfo({
+    required this.id,
+    required this.shortId,
+    required this.journalId,
+    this.entryId,
+    required this.kind,
+    this.start,
+    this.end,
+    this.quote,
+    this.body = '',
+    this.color,
+    this.detached = false,
+  });
+  final String id, shortId, journalId, kind, body;
+  final String? entryId, quote, color;
+  final int? start, end;
+  final bool detached;
+}
+
+class JournalImageInfo {
+  const JournalImageInfo({
+    required this.id,
+    required this.shortId,
+    required this.entryId,
+    required this.name,
+    this.mime = '',
+    this.size = 0,
+  });
+  final String id, shortId, entryId, name, mime;
+  final int size;
+}
+
+class JournalExportInfo {
+  const JournalExportInfo({
+    required this.path,
+    this.files = 1,
+    this.message = '',
+  });
+  final String path, message;
+  final int files;
+}
+
 class SearchInfo {
   const SearchInfo({
     required this.id,
@@ -1378,6 +1421,58 @@ abstract class MuninnApi {
   Future<String> removeJournalEntry(String entry);
   Future<List<JournalNoteInfo>> journalNotes(String journal);
   Future<JournalNoteInfo> addJournalNote(String journal, String body);
+
+  Future<List<JournalAnnotationInfo>> entryAnnotations(String entry);
+  Future<JournalAnnotationInfo> addEntryNote(
+    String entry,
+    String body, {
+    String? words,
+    int? nth,
+    int? start,
+    int? end,
+  });
+  Future<JournalAnnotationInfo> addEntryHighlight(
+    String entry, {
+    String? words,
+    int? nth,
+    int? start,
+    int? end,
+    String? color,
+    String? comment,
+  });
+  Future<JournalAnnotationInfo> updateJournalAnnotation(String id, String body);
+  Future<String> removeJournalAnnotation(String id);
+  Future<List<JournalImageInfo>> entryImages(String entry);
+  Future<JournalImageInfo> attachJournalImage(
+    String entry,
+    String path, {
+    String? name,
+  });
+  Future<String> saveJournalImage(String id, String out);
+  Future<List<JournalEntryInfo>> copyJournalEntries(
+    List<String> entries, {
+    String? to,
+    String? newName,
+    String? project,
+  });
+  Future<JournalExportInfo> exportJournal(
+    String journal, {
+    String format = 'pdf',
+    required String out,
+    List<String> entries = const [],
+  });
+  Future<JournalInfo> importJournal(
+    String path, {
+    String? project,
+    String? name,
+  });
+  Future<JournalExportInfo> printJournal(
+    String journal, {
+    List<String> entries = const [],
+    String? printer,
+    String? out,
+    bool saveOnly = true,
+  });
 
   Future<List<SearchInfo>> searches();
   Future<SearchInfo> saveSearch(
