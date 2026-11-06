@@ -80,11 +80,7 @@ fn parse_price(metric: &str) -> anyhow::Result<PriceMetric> {
 }
 
 fn parse_sort(s: &str) -> SortBy {
-    if s.trim().eq_ignore_ascii_case("name") {
-        SortBy::Name
-    } else {
-        SortBy::Year
-    }
+    if s.trim().eq_ignore_ascii_case("name") { SortBy::Name } else { SortBy::Year }
 }
 
 fn nonempty_parts(items: &[String]) -> Vec<String> {
@@ -327,6 +323,67 @@ pub fn remove_search(id: String) -> anyhow::Result<String> {
     remove_search_of(&open_write()?, &id)
 }
 
+pub struct FoundEntry {
+    pub journal_id: String,
+    pub journal_name: String,
+    pub entry_id: String,
+    pub heading: String,
+    pub title: String,
+    pub created_at: i64,
+}
+
+pub struct FoundRecord {
+    pub model_id: String,
+    pub model_name: String,
+    pub record_id: String,
+    pub brief: String,
+    pub created_at: i64,
+}
+
+fn found_spec(query: &str, target: SearchTarget, from: Option<i64>, to: Option<i64>) -> SearchSpec {
+    let mut spec = SearchSpec { target, query: query.to_string(), ..Default::default() };
+    spec.filters.from = from;
+    spec.filters.to = to;
+    spec
+}
+
+pub(crate) fn search_found_entries_of(store: &Store, query: &str, from: Option<i64>, to: Option<i64>) -> anyhow::Result<Vec<FoundEntry>> {
+    Ok(muninn_core::live::entry_matches(store, &found_spec(query, SearchTarget::Journals, from, to))?
+        .into_iter()
+        .map(|(j, e)| FoundEntry {
+            journal_id: j.id,
+            journal_name: j.name,
+            heading: e.heading(),
+            title: e.title,
+            created_at: e.created_at,
+            entry_id: e.id,
+        })
+        .collect())
+}
+
+/// Journal entries matching a live search (TUI apply → found-views).
+pub fn search_found_entries(query: String, from: Option<i64>, to: Option<i64>) -> anyhow::Result<Vec<FoundEntry>> {
+    search_found_entries_of(&super::data::open()?, &query, from, to)
+}
+
+pub(crate) fn search_found_records_of(store: &Store, query: &str, from: Option<i64>, to: Option<i64>) -> anyhow::Result<Vec<FoundRecord>> {
+    Ok(muninn_core::live::record_matches(store, &found_spec(query, SearchTarget::Records, from, to))?
+        .into_iter()
+        .map(|(m, r)| FoundRecord {
+            model_id: m.id,
+            model_name: m.name,
+            brief: muninn_core::live::record_brief(&r),
+            created_at: r.created_at,
+            record_id: r.id,
+        })
+        .collect())
+}
+
+/// Records matching a live search (TUI apply → found-views).
+pub fn search_found_records(query: String, from: Option<i64>, to: Option<i64>) -> anyhow::Result<Vec<FoundRecord>> {
+    search_found_records_of(&super::data::open()?, &query, from, to)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,48 +478,85 @@ mod tests {
     }
 
     #[test]
+    fn found_views_match_journal_entries_and_records() {
+        let s = Store::open_in_memory().unwrap();
+        let j = crate::api::journals::create_journal_of(&s, "Desk", None, "markdown").unwrap();
+        crate::api::journals::add_entry_of(&s, &j.id, "BTC note", "watched bitcoin break out", None).unwrap();
+        crate::api::journals::add_entry_of(&s, &j.id, "ETH note", "ether stayed quiet", None).unwrap();
+        let hits = search_found_entries_of(&s, "bitcoin", None, None).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].journal_name, "Desk");
+        assert!(hits[0].heading.contains("BTC"));
+        assert!(search_found_entries_of(&s, "quiet", None, None).unwrap().iter().any(|e| e.title.contains("ETH")));
+
+        let (m, _) = s
+            .create_model(
+                "signals",
+                "",
+                muninn_core::store::Design {
+                    fields: vec![muninn_core::store::Field::new("memo", muninn_core::store::FieldType::Text)],
+                    ..Default::default()
+                },
+                true,
+            )
+            .unwrap();
+        let mut values = serde_json::Map::new();
+        values.insert("memo".into(), serde_json::json!("alpha signal"));
+        s.create_record(&m, &values).unwrap();
+        let recs = search_found_records_of(&s, "alpha", None, None).unwrap();
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].model_name, "signals");
+        assert!(recs[0].brief.contains("alpha"), "{}", recs[0].brief);
+        assert!(search_found_records_of(&s, "no-such", None, None).unwrap().is_empty());
+    }
+
+    #[test]
     fn writes_need_unlock() {
         crate::api::data::lock();
         assert!(save_search("X".into(), "q".into(), "series".into()).is_err());
-        assert!(save_search_spec(
-            "X".into(),
-            "q".into(),
-            "series".into(),
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            false,
-            None,
-            vec![],
-        )
-        .is_err());
-        assert!(edit_search(
-            "x".into(),
-            None,
-            "q".into(),
-            "series".into(),
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            false,
-            None,
-            vec![],
-        )
-        .is_err());
+        assert!(
+            save_search_spec(
+                "X".into(),
+                "q".into(),
+                "series".into(),
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+                vec![],
+            )
+            .is_err()
+        );
+        assert!(
+            edit_search(
+                "x".into(),
+                None,
+                "q".into(),
+                "series".into(),
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+                vec![],
+            )
+            .is_err()
+        );
         assert!(searches().is_err());
     }
 }
