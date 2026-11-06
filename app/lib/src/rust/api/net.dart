@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `check_relay_addr`, `edit_prefs`, `hosted_node`, `invite_info`, `invite_of`, `invites_of`, `link_of`, `net_overview_of`, `parse_kind`, `peers_of`, `prefs_of`, `reap_hosted`, `relays_of`, `request_info`, `share_of`, `shared_of`, `status_of`, `stop_of`, `unshare_of`
+// These functions are ignored because they are not marked as `pub`: `check_relay_addr`, `config_of`, `connections_of`, `edit_prefs`, `exchange_info`, `exchanges_of`, `hosted_node`, `invite_info`, `invite_of`, `invites_of`, `link_of`, `master_from_key_file`, `net_overview_of`, `parse_kind`, `peers_of`, `prefs_of`, `reap_hosted`, `relays_of`, `request_info`, `shards_of`, `share_of`, `shared_of`, `status_of`, `stop_of`, `unshare_of`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `HostedDriver`
 
 /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
@@ -105,6 +105,478 @@ Future<String> netUnshare({
   item: item,
   with_: with_,
 );
+
+/// Read network settings from preferences.toml (does not create the file).
+Future<NetConfig> netConfig({String? home}) =>
+    RustLib.instance.api.crateApiNetNetConfig(home: home);
+
+/// Save network settings (`mnnn net config`). Relays are left to the Relays page.
+Future<String> netConfigSet({String? home, required NetConfig cfg}) =>
+    RustLib.instance.api.crateApiNetNetConfigSet(home: home, cfg: cfg);
+
+/// `mnnn connection list` / TUI Net ▸ Connections…. No user keys leave Rust.
+Future<NetConnections> netConnections({String? home}) =>
+    RustLib.instance.api.crateApiNetNetConnections(home: home);
+
+/// `mnnn connection trust` / TUI `t`.
+Future<String> netConnectionTrust({
+  String? home,
+  required String user,
+  required bool trusted,
+}) => RustLib.instance.api.crateApiNetNetConnectionTrust(
+  home: home,
+  user: user,
+  trusted: trusted,
+);
+
+/// `mnnn connection remove` / TUI `d`.
+Future<String> netConnectionRemove({String? home, required String user}) =>
+    RustLib.instance.api.crateApiNetNetConnectionRemove(home: home, user: user);
+
+/// `mnnn net exchange list` / TUI Net ▸ Nodes…. Tokens stay in Rust; short codes are meant to be read aloud.
+Future<List<NetExchangeInfo>> netExchanges({String? home}) =>
+    RustLib.instance.api.crateApiNetNetExchanges(home: home);
+
+/// `mnnn net exchange label`.
+Future<String> netExchangeLabel({
+  String? home,
+  required String exchange,
+  required String label,
+}) => RustLib.instance.api.crateApiNetNetExchangeLabel(
+  home: home,
+  exchange: exchange,
+  label: label,
+);
+
+/// `mnnn net exchange verify`.
+Future<String> netExchangeVerify({
+  String? home,
+  required String exchange,
+  required String code,
+}) => RustLib.instance.api.crateApiNetNetExchangeVerify(
+  home: home,
+  exchange: exchange,
+  code: code,
+);
+
+/// `mnnn net exchange revoke` / TUI disconnect on a node.
+Future<String> netExchangeRevoke({String? home, required String exchange}) =>
+    RustLib.instance.api.crateApiNetNetExchangeRevoke(
+      home: home,
+      exchange: exchange,
+    );
+
+/// `mnnn net list` / TUI Nodes ▸ L. Needs a running or ephemeral node.
+Future<List<NetRemoteItem>> netRemoteList({
+  String? home,
+  required String exchange,
+}) => RustLib.instance.api.crateApiNetNetRemoteList(
+  home: home,
+  exchange: exchange,
+);
+
+/// `mnnn net fetch` / TUI Enter on a remote item. Bytes stay in Rust (import or write [path]).
+Future<String> netFetch({
+  String? home,
+  required String exchange,
+  required String item,
+  String? format,
+  String? path,
+  required bool import_,
+}) => RustLib.instance.api.crateApiNetNetFetch(
+  home: home,
+  exchange: exchange,
+  item: item,
+  format: format,
+  path: path,
+  import_: import_,
+);
+
+/// `mnnn net shard list` / TUI Dark shards. Sealed blobs stay in Rust.
+Future<NetShards> netShards({String? home}) =>
+    RustLib.instance.api.crateApiNetNetShards(home: home);
+
+/// `mnnn net shard entrust` / TUI Entrust…. Master comes from a key file; shard password is not stored.
+Future<String> netShardEntrust({
+  String? home,
+  required List<String> to,
+  required int threshold,
+  required String keyFile,
+  String? filePassword,
+  required String shardPassword,
+}) => RustLib.instance.api.crateApiNetNetShardEntrust(
+  home: home,
+  to: to,
+  threshold: threshold,
+  keyFile: keyFile,
+  filePassword: filePassword,
+  shardPassword: shardPassword,
+);
+
+/// TUI “Check restore”: gather shards and verify they rebuild this database's key. The key never leaves Rust.
+Future<String> netShardCheck({String? home, required String shardPassword}) =>
+    RustLib.instance.api.crateApiNetNetShardCheck(
+      home: home,
+      shardPassword: shardPassword,
+    );
+
+/// `mnnn net shard drop` / TUI `d` on a held shard.
+Future<String> netShardDrop({String? home, required String id}) =>
+    RustLib.instance.api.crateApiNetNetShardDrop(home: home, id: id);
+
+/// `mnnn net search` / TUI Network search… (runs a saved live search here and on peers).
+Future<List<NetSearchOrigin>> netSearch({
+  String? home,
+  required String saved,
+  required List<String> only,
+  required bool remoteOnly,
+  required int limit,
+}) => RustLib.instance.api.crateApiNetNetSearch(
+  home: home,
+  saved: saved,
+  only: only,
+  remoteOnly: remoteOnly,
+  limit: limit,
+);
+
+/// `mnnn net broadcast`.
+Future<String> netBroadcast({
+  String? home,
+  required String topic,
+  required String text,
+  required String to,
+}) => RustLib.instance.api.crateApiNetNetBroadcast(
+  home: home,
+  topic: topic,
+  text: text,
+  to: to,
+);
+
+/// `mnnn net config` / TUI Net ▸ Settings… (plus CLI extras the TUI page does not list).
+class NetConfig {
+  final String label;
+  final int port;
+  final List<String> listen;
+  final bool mdns;
+  final bool relayServer;
+  final bool autostart;
+  final bool hostAutostart;
+  final String accept;
+  final List<String> bootstrap;
+  final List<String> externalAddresses;
+  final String collabTransport;
+  final String collabBind;
+  final int collabPort;
+  final List<String> collabAdvertise;
+
+  const NetConfig({
+    required this.label,
+    required this.port,
+    required this.listen,
+    required this.mdns,
+    required this.relayServer,
+    required this.autostart,
+    required this.hostAutostart,
+    required this.accept,
+    required this.bootstrap,
+    required this.externalAddresses,
+    required this.collabTransport,
+    required this.collabBind,
+    required this.collabPort,
+    required this.collabAdvertise,
+  });
+
+  @override
+  int get hashCode =>
+      label.hashCode ^
+      port.hashCode ^
+      listen.hashCode ^
+      mdns.hashCode ^
+      relayServer.hashCode ^
+      autostart.hashCode ^
+      hostAutostart.hashCode ^
+      accept.hashCode ^
+      bootstrap.hashCode ^
+      externalAddresses.hashCode ^
+      collabTransport.hashCode ^
+      collabBind.hashCode ^
+      collabPort.hashCode ^
+      collabAdvertise.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetConfig &&
+          runtimeType == other.runtimeType &&
+          label == other.label &&
+          port == other.port &&
+          listen == other.listen &&
+          mdns == other.mdns &&
+          relayServer == other.relayServer &&
+          autostart == other.autostart &&
+          hostAutostart == other.hostAutostart &&
+          accept == other.accept &&
+          bootstrap == other.bootstrap &&
+          externalAddresses == other.externalAddresses &&
+          collabTransport == other.collabTransport &&
+          collabBind == other.collabBind &&
+          collabPort == other.collabPort &&
+          collabAdvertise == other.collabAdvertise;
+}
+
+class NetConnNode {
+  final String shortId;
+  final String label;
+  final bool active;
+  final String state;
+
+  const NetConnNode({
+    required this.shortId,
+    required this.label,
+    required this.active,
+    required this.state,
+  });
+
+  @override
+  int get hashCode =>
+      shortId.hashCode ^ label.hashCode ^ active.hashCode ^ state.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetConnNode &&
+          runtimeType == other.runtimeType &&
+          shortId == other.shortId &&
+          label == other.label &&
+          active == other.active &&
+          state == other.state;
+}
+
+class NetConnectionInfo {
+  final String userId;
+  final String shortId;
+  final String name;
+  final bool trusted;
+  final PlatformInt64 nodes;
+  final PlatformInt64 since;
+  final List<NetConnNode> nodeList;
+
+  const NetConnectionInfo({
+    required this.userId,
+    required this.shortId,
+    required this.name,
+    required this.trusted,
+    required this.nodes,
+    required this.since,
+    required this.nodeList,
+  });
+
+  @override
+  int get hashCode =>
+      userId.hashCode ^
+      shortId.hashCode ^
+      name.hashCode ^
+      trusted.hashCode ^
+      nodes.hashCode ^
+      since.hashCode ^
+      nodeList.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetConnectionInfo &&
+          runtimeType == other.runtimeType &&
+          userId == other.userId &&
+          shortId == other.shortId &&
+          name == other.name &&
+          trusted == other.trusted &&
+          nodes == other.nodes &&
+          since == other.since &&
+          nodeList == other.nodeList;
+}
+
+class NetConnections {
+  final NetMeInfo? me;
+  final List<NetConnectionInfo> connections;
+
+  const NetConnections({this.me, required this.connections});
+
+  @override
+  int get hashCode => me.hashCode ^ connections.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetConnections &&
+          runtimeType == other.runtimeType &&
+          me == other.me &&
+          connections == other.connections;
+}
+
+class NetEntrustedInfo {
+  final String setId;
+  final int index;
+  final int threshold;
+  final int total;
+  final String exchange;
+  final String status;
+
+  const NetEntrustedInfo({
+    required this.setId,
+    required this.index,
+    required this.threshold,
+    required this.total,
+    required this.exchange,
+    required this.status,
+  });
+
+  @override
+  int get hashCode =>
+      setId.hashCode ^
+      index.hashCode ^
+      threshold.hashCode ^
+      total.hashCode ^
+      exchange.hashCode ^
+      status.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetEntrustedInfo &&
+          runtimeType == other.runtimeType &&
+          setId == other.setId &&
+          index == other.index &&
+          threshold == other.threshold &&
+          total == other.total &&
+          exchange == other.exchange &&
+          status == other.status;
+}
+
+class NetExchangeInfo {
+  final String id;
+  final String shortId;
+  final String title;
+  final String label;
+  final String status;
+  final String role;
+  final String peerId;
+  final String peerLabel;
+  final String? shortCode;
+  final String? fingerprint;
+  final PlatformInt64? expiresAt;
+  final PlatformInt64? verifiedAt;
+  final PlatformInt64? revokedAt;
+  final PlatformInt64 createdAt;
+  final bool active;
+  final bool incoming;
+
+  const NetExchangeInfo({
+    required this.id,
+    required this.shortId,
+    required this.title,
+    required this.label,
+    required this.status,
+    required this.role,
+    required this.peerId,
+    required this.peerLabel,
+    this.shortCode,
+    this.fingerprint,
+    this.expiresAt,
+    this.verifiedAt,
+    this.revokedAt,
+    required this.createdAt,
+    required this.active,
+    required this.incoming,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      shortId.hashCode ^
+      title.hashCode ^
+      label.hashCode ^
+      status.hashCode ^
+      role.hashCode ^
+      peerId.hashCode ^
+      peerLabel.hashCode ^
+      shortCode.hashCode ^
+      fingerprint.hashCode ^
+      expiresAt.hashCode ^
+      verifiedAt.hashCode ^
+      revokedAt.hashCode ^
+      createdAt.hashCode ^
+      active.hashCode ^
+      incoming.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetExchangeInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          shortId == other.shortId &&
+          title == other.title &&
+          label == other.label &&
+          status == other.status &&
+          role == other.role &&
+          peerId == other.peerId &&
+          peerLabel == other.peerLabel &&
+          shortCode == other.shortCode &&
+          fingerprint == other.fingerprint &&
+          expiresAt == other.expiresAt &&
+          verifiedAt == other.verifiedAt &&
+          revokedAt == other.revokedAt &&
+          createdAt == other.createdAt &&
+          active == other.active &&
+          incoming == other.incoming;
+}
+
+class NetHeldInfo {
+  final String id;
+  final String shortId;
+  final String setId;
+  final int index;
+  final int threshold;
+  final int total;
+  final String owner;
+  final String exchange;
+
+  const NetHeldInfo({
+    required this.id,
+    required this.shortId,
+    required this.setId,
+    required this.index,
+    required this.threshold,
+    required this.total,
+    required this.owner,
+    required this.exchange,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      shortId.hashCode ^
+      setId.hashCode ^
+      index.hashCode ^
+      threshold.hashCode ^
+      total.hashCode ^
+      owner.hashCode ^
+      exchange.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetHeldInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          shortId == other.shortId &&
+          setId == other.setId &&
+          index == other.index &&
+          threshold == other.threshold &&
+          total == other.total &&
+          owner == other.owner &&
+          exchange == other.exchange;
+}
 
 /// An invite this node made (`mnnn net invite`). The link holds no secret.
 class NetInviteInfo {
@@ -204,6 +676,34 @@ class NetLinkResult {
           warning == other.warning;
 }
 
+class NetMeInfo {
+  final String userId;
+  final String shortId;
+  final String name;
+  final PlatformInt64 nodes;
+
+  const NetMeInfo({
+    required this.userId,
+    required this.shortId,
+    required this.name,
+    required this.nodes,
+  });
+
+  @override
+  int get hashCode =>
+      userId.hashCode ^ shortId.hashCode ^ name.hashCode ^ nodes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetMeInfo &&
+          runtimeType == other.runtimeType &&
+          userId == other.userId &&
+          shortId == other.shortId &&
+          name == other.name &&
+          nodes == other.nodes;
+}
+
 class NetOverview {
   final NetStatus status;
   final List<NetPeerInfo> peers;
@@ -294,6 +794,34 @@ class NetRelayInfo {
           serving == other.serving;
 }
 
+class NetRemoteItem {
+  final String id;
+  final String kind;
+  final String name;
+  final String about;
+
+  const NetRemoteItem({
+    required this.id,
+    required this.kind,
+    required this.name,
+    required this.about,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^ kind.hashCode ^ name.hashCode ^ about.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetRemoteItem &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          kind == other.kind &&
+          name == other.name &&
+          about == other.about;
+}
+
 /// A request waiting for this node (`mnnn net requests`).
 class NetRequestInfo {
   final String id;
@@ -332,6 +860,63 @@ class NetRequestInfo {
           purpose == other.purpose &&
           peerId == other.peerId &&
           createdAt == other.createdAt;
+}
+
+class NetSearchOrigin {
+  final String origin;
+  final String? peer;
+  final String? exchange;
+  final String? error;
+  final bool truncated;
+  final List<String> lines;
+
+  const NetSearchOrigin({
+    required this.origin,
+    this.peer,
+    this.exchange,
+    this.error,
+    required this.truncated,
+    required this.lines,
+  });
+
+  @override
+  int get hashCode =>
+      origin.hashCode ^
+      peer.hashCode ^
+      exchange.hashCode ^
+      error.hashCode ^
+      truncated.hashCode ^
+      lines.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetSearchOrigin &&
+          runtimeType == other.runtimeType &&
+          origin == other.origin &&
+          peer == other.peer &&
+          exchange == other.exchange &&
+          error == other.error &&
+          truncated == other.truncated &&
+          lines == other.lines;
+}
+
+class NetShards {
+  final List<NetEntrustedInfo> entrusted;
+  final List<NetHeldInfo> held;
+
+  const NetShards({required this.entrusted, required this.held});
+
+  @override
+  int get hashCode => entrusted.hashCode ^ held.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetShards &&
+          runtimeType == other.runtimeType &&
+          entrusted == other.entrusted &&
+          held == other.held;
 }
 
 /// One item this node shares (`mnnn net shared`).

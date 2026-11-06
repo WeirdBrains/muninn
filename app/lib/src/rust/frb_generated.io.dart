@@ -62,6 +62,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IngestProgressSnap dco_decode_box_autoadd_ingest_progress_snap(dynamic raw);
 
   @protected
+  NetConfig dco_decode_box_autoadd_net_config(dynamic raw);
+
+  @protected
+  NetMeInfo dco_decode_box_autoadd_net_me_info(dynamic raw);
+
+  @protected
   RevealHandle dco_decode_box_autoadd_reveal_handle(dynamic raw);
 
   @protected
@@ -137,13 +143,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<JournalNoteInfo> dco_decode_list_journal_note_info(dynamic raw);
 
   @protected
+  List<NetConnNode> dco_decode_list_net_conn_node(dynamic raw);
+
+  @protected
+  List<NetConnectionInfo> dco_decode_list_net_connection_info(dynamic raw);
+
+  @protected
+  List<NetEntrustedInfo> dco_decode_list_net_entrusted_info(dynamic raw);
+
+  @protected
+  List<NetExchangeInfo> dco_decode_list_net_exchange_info(dynamic raw);
+
+  @protected
+  List<NetHeldInfo> dco_decode_list_net_held_info(dynamic raw);
+
+  @protected
   List<NetInviteInfo> dco_decode_list_net_invite_info(dynamic raw);
 
   @protected
   List<NetPeerInfo> dco_decode_list_net_peer_info(dynamic raw);
 
   @protected
+  List<NetRemoteItem> dco_decode_list_net_remote_item(dynamic raw);
+
+  @protected
   List<NetRequestInfo> dco_decode_list_net_request_info(dynamic raw);
+
+  @protected
+  List<NetSearchOrigin> dco_decode_list_net_search_origin(dynamic raw);
 
   @protected
   List<NetShareInfo> dco_decode_list_net_share_info(dynamic raw);
@@ -206,6 +233,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ThemeRole> dco_decode_list_theme_role(dynamic raw);
 
   @protected
+  NetConfig dco_decode_net_config(dynamic raw);
+
+  @protected
+  NetConnNode dco_decode_net_conn_node(dynamic raw);
+
+  @protected
+  NetConnectionInfo dco_decode_net_connection_info(dynamic raw);
+
+  @protected
+  NetConnections dco_decode_net_connections(dynamic raw);
+
+  @protected
+  NetEntrustedInfo dco_decode_net_entrusted_info(dynamic raw);
+
+  @protected
+  NetExchangeInfo dco_decode_net_exchange_info(dynamic raw);
+
+  @protected
+  NetHeldInfo dco_decode_net_held_info(dynamic raw);
+
+  @protected
   NetInviteInfo dco_decode_net_invite_info(dynamic raw);
 
   @protected
@@ -213,6 +261,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   NetLinkResult dco_decode_net_link_result(dynamic raw);
+
+  @protected
+  NetMeInfo dco_decode_net_me_info(dynamic raw);
 
   @protected
   NetOverview dco_decode_net_overview(dynamic raw);
@@ -224,7 +275,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NetRelayInfo dco_decode_net_relay_info(dynamic raw);
 
   @protected
+  NetRemoteItem dco_decode_net_remote_item(dynamic raw);
+
+  @protected
   NetRequestInfo dco_decode_net_request_info(dynamic raw);
+
+  @protected
+  NetSearchOrigin dco_decode_net_search_origin(dynamic raw);
+
+  @protected
+  NetShards dco_decode_net_shards(dynamic raw);
 
   @protected
   NetShareInfo dco_decode_net_share_info(dynamic raw);
@@ -245,6 +305,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IngestProgressSnap? dco_decode_opt_box_autoadd_ingest_progress_snap(
     dynamic raw,
   );
+
+  @protected
+  NetMeInfo? dco_decode_opt_box_autoadd_net_me_info(dynamic raw);
 
   @protected
   RevealHandle? dco_decode_opt_box_autoadd_reveal_handle(dynamic raw);
@@ -331,6 +394,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ThemeRole dco_decode_theme_role(dynamic raw);
 
   @protected
+  int dco_decode_u_16(dynamic raw);
+
+  @protected
   int dco_decode_u_32(dynamic raw);
 
   @protected
@@ -367,6 +433,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IngestProgressSnap sse_decode_box_autoadd_ingest_progress_snap(
     SseDeserializer deserializer,
   );
+
+  @protected
+  NetConfig sse_decode_box_autoadd_net_config(SseDeserializer deserializer);
+
+  @protected
+  NetMeInfo sse_decode_box_autoadd_net_me_info(SseDeserializer deserializer);
 
   @protected
   RevealHandle sse_decode_box_autoadd_reveal_handle(
@@ -456,6 +528,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<NetConnNode> sse_decode_list_net_conn_node(SseDeserializer deserializer);
+
+  @protected
+  List<NetConnectionInfo> sse_decode_list_net_connection_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<NetEntrustedInfo> sse_decode_list_net_entrusted_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<NetExchangeInfo> sse_decode_list_net_exchange_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<NetHeldInfo> sse_decode_list_net_held_info(SseDeserializer deserializer);
+
+  @protected
   List<NetInviteInfo> sse_decode_list_net_invite_info(
     SseDeserializer deserializer,
   );
@@ -464,7 +557,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<NetPeerInfo> sse_decode_list_net_peer_info(SseDeserializer deserializer);
 
   @protected
+  List<NetRemoteItem> sse_decode_list_net_remote_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<NetRequestInfo> sse_decode_list_net_request_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<NetSearchOrigin> sse_decode_list_net_search_origin(
     SseDeserializer deserializer,
   );
 
@@ -547,6 +650,29 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ThemeRole> sse_decode_list_theme_role(SseDeserializer deserializer);
 
   @protected
+  NetConfig sse_decode_net_config(SseDeserializer deserializer);
+
+  @protected
+  NetConnNode sse_decode_net_conn_node(SseDeserializer deserializer);
+
+  @protected
+  NetConnectionInfo sse_decode_net_connection_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  NetConnections sse_decode_net_connections(SseDeserializer deserializer);
+
+  @protected
+  NetEntrustedInfo sse_decode_net_entrusted_info(SseDeserializer deserializer);
+
+  @protected
+  NetExchangeInfo sse_decode_net_exchange_info(SseDeserializer deserializer);
+
+  @protected
+  NetHeldInfo sse_decode_net_held_info(SseDeserializer deserializer);
+
+  @protected
   NetInviteInfo sse_decode_net_invite_info(SseDeserializer deserializer);
 
   @protected
@@ -554,6 +680,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   NetLinkResult sse_decode_net_link_result(SseDeserializer deserializer);
+
+  @protected
+  NetMeInfo sse_decode_net_me_info(SseDeserializer deserializer);
 
   @protected
   NetOverview sse_decode_net_overview(SseDeserializer deserializer);
@@ -565,7 +694,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NetRelayInfo sse_decode_net_relay_info(SseDeserializer deserializer);
 
   @protected
+  NetRemoteItem sse_decode_net_remote_item(SseDeserializer deserializer);
+
+  @protected
   NetRequestInfo sse_decode_net_request_info(SseDeserializer deserializer);
+
+  @protected
+  NetSearchOrigin sse_decode_net_search_origin(SseDeserializer deserializer);
+
+  @protected
+  NetShards sse_decode_net_shards(SseDeserializer deserializer);
 
   @protected
   NetShareInfo sse_decode_net_share_info(SseDeserializer deserializer);
@@ -584,6 +722,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   IngestProgressSnap? sse_decode_opt_box_autoadd_ingest_progress_snap(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  NetMeInfo? sse_decode_opt_box_autoadd_net_me_info(
     SseDeserializer deserializer,
   );
 
@@ -676,6 +819,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ThemeRole sse_decode_theme_role(SseDeserializer deserializer);
 
   @protected
+  int sse_decode_u_16(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
@@ -720,6 +866,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_ingest_progress_snap(
     IngestProgressSnap self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_net_config(
+    NetConfig self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_net_me_info(
+    NetMeInfo self,
     SseSerializer serializer,
   );
 
@@ -838,6 +996,36 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_net_conn_node(
+    List<NetConnNode> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_net_connection_info(
+    List<NetConnectionInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_net_entrusted_info(
+    List<NetEntrustedInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_net_exchange_info(
+    List<NetExchangeInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_net_held_info(
+    List<NetHeldInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_net_invite_info(
     List<NetInviteInfo> self,
     SseSerializer serializer,
@@ -850,8 +1038,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_net_remote_item(
+    List<NetRemoteItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_net_request_info(
     List<NetRequestInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_net_search_origin(
+    List<NetSearchOrigin> self,
     SseSerializer serializer,
   );
 
@@ -973,6 +1173,39 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_net_config(NetConfig self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_net_conn_node(NetConnNode self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_net_connection_info(
+    NetConnectionInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_net_connections(
+    NetConnections self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_net_entrusted_info(
+    NetEntrustedInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_net_exchange_info(
+    NetExchangeInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_net_held_info(NetHeldInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_net_invite_info(NetInviteInfo self, SseSerializer serializer);
 
   @protected
@@ -980,6 +1213,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_net_link_result(NetLinkResult self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_net_me_info(NetMeInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_net_overview(NetOverview self, SseSerializer serializer);
@@ -991,10 +1227,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_net_relay_info(NetRelayInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_net_remote_item(NetRemoteItem self, SseSerializer serializer);
+
+  @protected
   void sse_encode_net_request_info(
     NetRequestInfo self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_net_search_origin(
+    NetSearchOrigin self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_net_shards(NetShards self, SseSerializer serializer);
 
   @protected
   void sse_encode_net_share_info(NetShareInfo self, SseSerializer serializer);
@@ -1017,6 +1265,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_ingest_progress_snap(
     IngestProgressSnap? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_net_me_info(
+    NetMeInfo? self,
     SseSerializer serializer,
   );
 
@@ -1127,6 +1381,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_theme_role(ThemeRole self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_16(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

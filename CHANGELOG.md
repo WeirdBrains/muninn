@@ -22,6 +22,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: Project extras — journals, live searches, reports and import/export archives (`mnnn journal` / `search` / `report` / `project import|export|add`); archive bytes stay in Rust
 - Flutter app: Data chart layers for high/low envelope, moving averages (sma/ema), wick, gap and zero-volume markers (`e m w g z`, `M`/`N`), matching the TUI
 - Flutter app: Data ▸ Sources… and Data ▸ Symbols… (`mnnn sources` / `mnnn symbols`) — list, add, rename and remove sources, inspect and save stored items, list pairs and aliases, and add a symbol; chart keys `[` `]` `{` `}` `@` set the visible window among loaded bars
+- Flutter app: Net leftovers — settings (`mnnn net config`), connections (trust/remove), key exchanges (verify/label/revoke, list and fetch what a peer shares), network search, broadcast and dark shards; exchange tokens, shard blobs and the master key stay in Rust
 
 ## [2.22.0] - 2026-11-05
 

@@ -4,7 +4,7 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
-Projects (create, rename, describe, delete, attach and detach series, journals, live searches, reports, import/export archives), Net status, peers, start/stop, connect, invites, relays and sharing, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
+Projects (create, rename, describe, delete, attach and detach series, journals, live searches, reports, import/export archives), Net status, peers, start/stop, connect, invites, relays, sharing, settings, connections, key exchanges, search, broadcast and dark shards, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
 (CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
@@ -31,7 +31,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
-  Live searches… / Journals… / Reports… / Import archive… and Net ▸ Status / Start / Stop / Invite or connect / Peers / Relays / Shared, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
+  Live searches… / Journals… / Reports… / Import archive… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
   Rekey, Export, Recover and Re-issue shards, and Data ▸ Sources… / Symbols…. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
@@ -121,11 +121,24 @@ Users never need Rust: release builds ship the compiled library.
   (create a public link that holds no secret, list yours, accept or decline requests,
   withdraw an invite), disconnect and forget, relay add/remove/serve (saved in
   `preferences.toml`, picked up the next time the node starts, like the CLI), and
-  share / unshare (model, search, journal, project, report, code or pipeline). The
-  node identity and exchange keys stay in Rust. On a phone the node uses the same
-  platform-secure app sandbox the store already uses. Network settings, manual key
-  exchanges, listing or fetching what a peer shares, network search, broadcast and
-  dark shards stay in the TUI or CLI.
+  share / unshare (model, search, journal, project, report, code or pipeline),
+  network settings (`mnnn net config` / TUI Settings: label, port, listen, mDNS,
+  relay-for-others, autostart, host autostart, who to accept, bootstrap, plus the
+  CLI extras for external addresses and collab transport — relays stay on the Relays
+  page), connections (`mnnn connection` / TUI Connections: list, trust, remove; no
+  user keys leave Rust), key exchanges (`mnnn net exchange` / TUI Nodes: list,
+  verify, label, revoke, list what a peer shares and fetch it — import or write a
+  path; bytes stay in Rust), network search (run a saved live search here and on
+  peers), broadcast (`mnnn net broadcast`), and dark shards (list entrusted and held,
+  entrust from a key file, check that gathered shards restore this database's key,
+  drop a held shard). The node identity, exchange offer/answer tokens, shard blobs
+  and the master key stay in Rust. Short codes and fingerprints are meant to be read
+  aloud, as in the TUI. On a phone the node uses the same platform-secure app sandbox
+  the store already uses. Exporting or restoring a password-sealed exchange
+  (`mnnn net exchange export|restore`), creating or accepting a raw exchange token
+  (the hidden CLI; the TUI and app use invite links instead), and restoring a key
+  from shards or a backup when this database cannot open (`mnnn net shard` /
+  `mnnn keys recover`) stay in the CLI.
 - **Orgs:** list and detail like `mnnn org list` / `mnnn org show` (and the TUI's
   Organizations and Joined pages), plus the write flows those surfaces already have:
   create (`mnnn org create` / New organization), edit (name, slug, description,
@@ -257,7 +270,7 @@ comes in a later phase (see [sync](sync.md)).
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars, ingest and bar export, sources and symbols, net status and peers, org list and writes, keys status and writes, help topics), exposed with
+  projects and datasets, downsampled bars, ingest and bar export, sources and symbols, net status, peers, settings, connections, exchanges, search, broadcast and dark shards, org list and writes, keys status and writes, help topics), exposed with
   flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.

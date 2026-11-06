@@ -1,11 +1,15 @@
-/// Net write dialogs (`mnnn net connect|invite|relay|share`). The node identity
-/// and exchange keys stay in Rust; invite links hold no secret.
+/// Net write dialogs (`mnnn net connect|invite|relay|share` plus settings leftovers:
+/// exchange verify/label, remote fetch, broadcast and dark-shard entrust/check).
+/// The node identity, exchange tokens and shard blobs stay in Rust; invite links
+/// hold no secret.
 library;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
 
@@ -488,4 +492,509 @@ class _ShareDialogState extends State<_ShareDialog> {
       ],
     );
   }
+}
+
+Future<void> showNetExchangeLabelDialog(
+  BuildContext context,
+  WidgetRef ref,
+  NetExchangeInfo x,
+) async {
+  final label = await showDialog<String>(
+    context: context,
+    builder: (ctx) => const _LabelDialog(
+      title: 'Label exchange',
+      hint: 'Label',
+      keyName: 'net-exchange-label',
+    ),
+  );
+  if (label == null || !context.mounted) {
+    return;
+  }
+  await _after(
+    context,
+    ref,
+    ref.read(apiProvider).netExchangeLabel(x.id, label.trim()),
+  );
+}
+
+Future<void> showNetExchangeVerifyDialog(
+  BuildContext context,
+  WidgetRef ref,
+  NetExchangeInfo x,
+) async {
+  final code = await showDialog<String>(
+    context: context,
+    builder: (ctx) => const _LabelDialog(
+      title: 'Verify exchange',
+      hint: 'Short code (read aloud)',
+      keyName: 'net-exchange-verify',
+    ),
+  );
+  if (code == null || code.trim().isEmpty || !context.mounted) {
+    return;
+  }
+  await _after(
+    context,
+    ref,
+    ref.read(apiProvider).netExchangeVerify(x.id, code.trim()),
+  );
+}
+
+Future<void> showNetRemoteListDialog(
+  BuildContext context,
+  WidgetRef ref,
+  NetExchangeInfo x,
+) async {
+  try {
+    final items = await ref.read(apiProvider).netRemoteList(x.id);
+    if (!context.mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => _RemoteListDialog(exchange: x, items: items),
+    );
+  } catch (e) {
+    if (context.mounted) {
+      _snack(context, '$e', error: true);
+    }
+  }
+}
+
+class _RemoteListDialog extends ConsumerWidget {
+  const _RemoteListDialog({required this.exchange, required this.items});
+  final NetExchangeInfo exchange;
+  final List<NetRemoteItem> items;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final m = context.muninn;
+    return AlertDialog(
+      backgroundColor: m.bg,
+      title: Text(
+        'Shared by ${exchange.title.isEmpty ? exchange.shortId : exchange.title}',
+        style: TextStyle(color: m.header),
+      ),
+      content: SizedBox(
+        width: 460,
+        height: 360,
+        child: items.isEmpty
+            ? Text(
+                'This peer is not sharing anything with you.',
+                style: TextStyle(color: m.muted),
+              )
+            : ListView(
+                children: [
+                  for (final it in items)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${it.kind} ${it.name}'),
+                      subtitle: it.about.isEmpty
+                          ? null
+                          : Text(it.about, style: TextStyle(color: m.muted)),
+                      trailing: Wrap(
+                        children: [
+                          TextButton(
+                            onPressed: () async {
+                              try {
+                                final msg = await ref
+                                    .read(apiProvider)
+                                    .netFetch(exchange.id, it.id, import: true);
+                                refreshNet(ref);
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                  _snack(context, msg);
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  _snack(context, '$e', error: true);
+                                }
+                              }
+                            },
+                            child: const Text('Import'),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              final path = await FilePicker.platform.saveFile(
+                                fileName: it.name,
+                              );
+                              if (path == null || !context.mounted) {
+                                return;
+                              }
+                              try {
+                                final msg = await ref
+                                    .read(apiProvider)
+                                    .netFetch(exchange.id, it.id, path: path);
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                  _snack(context, msg);
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  _snack(context, '$e', error: true);
+                                }
+                              }
+                            },
+                            child: const Text('Save…'),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> showNetBroadcastDialog(BuildContext context, WidgetRef ref) async {
+  ref.read(sectionProvider.notifier).state = Section.net;
+  if (!ref.read(unlockedProvider)) {
+    return;
+  }
+  final result = await showDialog<(String, String, String)>(
+    context: context,
+    builder: (ctx) => const _BroadcastDialog(),
+  );
+  if (result == null || !context.mounted) {
+    return;
+  }
+  final (topic, text, to) = result;
+  await _after(
+    context,
+    ref,
+    ref.read(apiProvider).netBroadcast(topic, text, to: to),
+  );
+}
+
+class _BroadcastDialog extends StatefulWidget {
+  const _BroadcastDialog();
+  @override
+  State<_BroadcastDialog> createState() => _BroadcastDialogState();
+}
+
+class _BroadcastDialogState extends State<_BroadcastDialog> {
+  final _topic = TextEditingController();
+  final _text = TextEditingController();
+  String _to = 'nodes';
+
+  @override
+  void dispose() {
+    _topic.dispose();
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    return AlertDialog(
+      backgroundColor: m.bg,
+      title: Text('Broadcast', style: TextStyle(color: m.header)),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Send a short topic and text to linked nodes, your connections, everyone, or an org. Arrives as a net.broadcast action.',
+              style: TextStyle(color: m.muted),
+            ),
+            TextField(
+              key: const ValueKey('net-broadcast-topic'),
+              controller: _topic,
+              decoration: const InputDecoration(labelText: 'Topic'),
+            ),
+            TextField(
+              key: const ValueKey('net-broadcast-text'),
+              controller: _text,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Message'),
+            ),
+            DropdownButtonFormField<String>(
+              key: const ValueKey('net-broadcast-to'),
+              initialValue: _to,
+              items: const [
+                DropdownMenuItem(value: 'nodes', child: Text('nodes')),
+                DropdownMenuItem(
+                  value: 'connections',
+                  child: Text('connections'),
+                ),
+                DropdownMenuItem(value: 'all', child: Text('all')),
+              ],
+              onChanged: (v) => setState(() => _to = v ?? 'nodes'),
+              decoration: const InputDecoration(labelText: 'To'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('net-broadcast-confirm'),
+          onPressed: () => Navigator.pop(context, (
+            _topic.text.trim(),
+            _text.text.trim(),
+            _to,
+          )),
+          child: const Text('Send'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> showNetShardEntrustDialog(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  if (!ref.read(unlockedProvider)) {
+    return;
+  }
+  final result = await showDialog<_EntrustDraft>(
+    context: context,
+    builder: (ctx) => const _EntrustDialog(),
+  );
+  if (result == null || !context.mounted) {
+    return;
+  }
+  await _after(
+    context,
+    ref,
+    ref
+        .read(apiProvider)
+        .netShardEntrust(
+          to: result.to,
+          keyFile: result.keyFile,
+          shardPassword: result.shardPassword,
+          filePassword: result.filePassword,
+          threshold: result.threshold,
+        ),
+  );
+}
+
+class _EntrustDraft {
+  const _EntrustDraft({
+    required this.to,
+    required this.keyFile,
+    required this.shardPassword,
+    this.filePassword,
+    this.threshold = 0,
+  });
+  final List<String> to;
+  final String keyFile, shardPassword;
+  final String? filePassword;
+  final int threshold;
+}
+
+class _EntrustDialog extends ConsumerStatefulWidget {
+  const _EntrustDialog();
+  @override
+  ConsumerState<_EntrustDialog> createState() => _EntrustDialogState();
+}
+
+class _EntrustDialogState extends ConsumerState<_EntrustDialog> {
+  String? _keyFile;
+  final _filePass = TextEditingController();
+  final _shardPass = TextEditingController();
+  final _repeat = TextEditingController();
+  final _threshold = TextEditingController(text: '0');
+  final _picked = <String>{};
+
+  @override
+  void dispose() {
+    _filePass.dispose();
+    _shardPass.dispose();
+    _repeat.dispose();
+    _threshold.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pick() async {
+    final r = await FilePicker.platform.pickFiles();
+    final path = r?.files.single.path;
+    if (path != null) {
+      setState(() => _keyFile = path);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    final xs =
+        ref.watch(netExchangesProvider).value ??
+        const <NetExchangeInfo>[];
+    final active = [
+      for (final x in xs)
+        if (x.active) x,
+    ];
+    return AlertDialog(
+      backgroundColor: m.bg,
+      title: Text('Entrust dark shards', style: TextStyle(color: m.header)),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Split this database’s key across at least two connected nodes. The key is read from a file (the same files Keys ▸ Export writes); it never appears in the app. You will need the shard password again to restore.',
+                style: TextStyle(color: m.muted),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                key: const ValueKey('net-entrust-pick'),
+                onPressed: _pick,
+                child: Text(_keyFile == null ? 'Choose key file…' : _keyFile!),
+              ),
+              TextField(
+                controller: _filePass,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Key file password (if encrypted)',
+                ),
+              ),
+              TextField(
+                key: const ValueKey('net-entrust-password'),
+                controller: _shardPass,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Shard password'),
+              ),
+              TextField(
+                controller: _repeat,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Repeat shard password',
+                ),
+              ),
+              TextField(
+                controller: _threshold,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Threshold (0 = half, at least 2)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Holders (pick at least two)',
+                style: TextStyle(color: m.muted),
+              ),
+              if (active.isEmpty)
+                Text(
+                  'Connect to at least two nodes first.',
+                  style: TextStyle(color: m.muted),
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final x in active)
+                      FilterChip(
+                        label: Text(x.title.isEmpty ? x.shortId : x.title),
+                        selected: _picked.contains(x.id),
+                        onSelected: (on) => setState(() {
+                          if (on) {
+                            _picked.add(x.id);
+                          } else {
+                            _picked.remove(x.id);
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('net-entrust-confirm'),
+          onPressed: () {
+            if (_keyFile == null) {
+              _snack(context, 'Choose the key file to split', error: true);
+              return;
+            }
+            if (_shardPass.text.isEmpty || _shardPass.text != _repeat.text) {
+              _snack(context, 'Type the shard password twice', error: true);
+              return;
+            }
+            if (_picked.length < 2) {
+              _snack(context, 'Pick at least two connected nodes', error: true);
+              return;
+            }
+            Navigator.pop(
+              context,
+              _EntrustDraft(
+                to: _picked.toList(),
+                keyFile: _keyFile!,
+                shardPassword: _shardPass.text,
+                filePassword: _filePass.text.trim().isEmpty
+                    ? null
+                    : _filePass.text,
+                threshold: int.tryParse(_threshold.text.trim()) ?? 0,
+              ),
+            );
+          },
+          child: const Text('Entrust'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> showNetShardCheckDialog(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  if (!ref.read(unlockedProvider)) {
+    return;
+  }
+  final pw = await showDialog<String>(
+    context: context,
+    builder: (ctx) {
+      final ctl = TextEditingController();
+      final m = ctx.muninn;
+      return AlertDialog(
+        backgroundColor: m.bg,
+        title: Text('Check restore', style: TextStyle(color: m.header)),
+        content: TextField(
+          key: const ValueKey('net-shard-check-password'),
+          controller: ctl,
+          obscureText: true,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Shard password'),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey('net-shard-check-confirm'),
+            onPressed: () => Navigator.pop(ctx, ctl.text),
+            child: const Text('Check'),
+          ),
+        ],
+      );
+    },
+  );
+  if (pw == null || pw.isEmpty || !context.mounted) {
+    return;
+  }
+  await _after(context, ref, ref.read(apiProvider).netShardCheck(pw));
 }

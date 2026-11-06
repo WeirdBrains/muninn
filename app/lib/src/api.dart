@@ -107,7 +107,6 @@ class BarPoint {
   final double open, high, low, close, volume;
 }
 
-
 /// An ingest source (`mnnn sources list` / TUI Data ▸ Sources…).
 class SourceInfo {
   const SourceInfo({
@@ -398,6 +397,161 @@ class NetShareInfo {
   final String id, shortId, kind, name, withWhom;
 }
 
+/// `mnnn net config` / TUI Net ▸ Settings… (relays stay on the Relays page).
+class NetConfig {
+  const NetConfig({
+    this.label = '',
+    this.port = 4741,
+    this.listen = const [],
+    this.mdns = true,
+    this.relayServer = false,
+    this.autostart = true,
+    this.hostAutostart = false,
+    this.accept = 'known',
+    this.bootstrap = const [],
+    this.externalAddresses = const [],
+    this.collabTransport = 'stream',
+    this.collabBind = '0.0.0.0',
+    this.collabPort = 4742,
+    this.collabAdvertise = const [],
+  });
+  final String label, accept, collabTransport, collabBind;
+  final int port, collabPort;
+  final List<String> listen, bootstrap, externalAddresses, collabAdvertise;
+  final bool mdns, relayServer, autostart, hostAutostart;
+}
+
+class NetMeInfo {
+  const NetMeInfo({
+    required this.userId,
+    required this.shortId,
+    required this.name,
+    this.nodes = 0,
+  });
+  final String userId, shortId, name;
+  final int nodes;
+}
+
+class NetConnNode {
+  const NetConnNode({
+    required this.shortId,
+    this.label = '',
+    this.active = false,
+    this.state = '',
+  });
+  final String shortId, label, state;
+  final bool active;
+}
+
+class NetConnectionInfo {
+  const NetConnectionInfo({
+    required this.userId,
+    required this.shortId,
+    required this.name,
+    this.trusted = false,
+    this.nodes = 0,
+    this.since = 0,
+    this.nodeList = const [],
+  });
+  final String userId, shortId, name;
+  final bool trusted;
+  final int nodes, since;
+  final List<NetConnNode> nodeList;
+}
+
+class NetConnections {
+  const NetConnections({this.me, this.connections = const []});
+  final NetMeInfo? me;
+  final List<NetConnectionInfo> connections;
+}
+
+/// A key exchange (`mnnn net exchange list` / TUI Nodes…). Tokens stay in Rust;
+/// [shortCode] and [fingerprint] are meant to be read aloud.
+class NetExchangeInfo {
+  const NetExchangeInfo({
+    required this.id,
+    required this.shortId,
+    this.title = '',
+    this.label = '',
+    this.status = '',
+    this.role = '',
+    this.peerId = '',
+    this.peerLabel = '',
+    this.shortCode,
+    this.fingerprint,
+    this.expiresAt,
+    this.verifiedAt,
+    this.revokedAt,
+    this.createdAt = 0,
+    this.active = false,
+    this.incoming = false,
+  });
+  final String id, shortId, title, label, status, role, peerId, peerLabel;
+  final String? shortCode, fingerprint;
+  final int? expiresAt, verifiedAt, revokedAt;
+  final int createdAt;
+  final bool active, incoming;
+}
+
+class NetRemoteItem {
+  const NetRemoteItem({
+    required this.id,
+    required this.kind,
+    required this.name,
+    this.about = '',
+  });
+  final String id, kind, name, about;
+}
+
+class NetEntrustedInfo {
+  const NetEntrustedInfo({
+    required this.setId,
+    required this.index,
+    required this.threshold,
+    required this.total,
+    this.exchange = '',
+    this.status = '',
+  });
+  final String setId, exchange, status;
+  final int index, threshold, total;
+}
+
+class NetHeldInfo {
+  const NetHeldInfo({
+    required this.id,
+    required this.shortId,
+    required this.setId,
+    required this.index,
+    required this.threshold,
+    required this.total,
+    this.owner = '',
+    this.exchange = '',
+  });
+  final String id, shortId, setId, owner, exchange;
+  final int index, threshold, total;
+}
+
+class NetShards {
+  const NetShards({this.entrusted = const [], this.held = const []});
+  final List<NetEntrustedInfo> entrusted;
+  final List<NetHeldInfo> held;
+}
+
+class NetSearchOrigin {
+  const NetSearchOrigin({
+    required this.origin,
+    this.peer,
+    this.exchange,
+    this.error,
+    this.truncated = false,
+    this.lines = const [],
+  });
+  final String origin;
+  final String? peer, exchange, error;
+  final bool truncated;
+  final List<String> lines;
+}
+
 class Overview {
   const Overview({required this.projects, required this.datasets});
   final List<Project> projects;
@@ -675,12 +829,15 @@ abstract class MuninnApi {
     int maxPoints = 600,
   });
 
-
   /// `mnnn sources list`. The store is opened read-only.
   Future<List<SourceInfo>> listSources();
 
   /// `mnnn sources add`. [kind] defaults to `file` when empty.
-  Future<SourceInfo> addSource(String name, {String kind = 'file', String? locator});
+  Future<SourceInfo> addSource(
+    String name, {
+    String kind = 'file',
+    String? locator,
+  });
 
   /// `mnnn sources rename`. Returns how many bar ids were recomputed.
   Future<int> renameSource(String from, String to);
@@ -701,7 +858,10 @@ abstract class MuninnApi {
   Future<List<AliasInfo>> listAliases();
 
   /// `mnnn symbols add`. [aliases] apply to the base asset.
-  Future<SymbolInfo> addSymbol(String symbol, {List<String> aliases = const []});
+  Future<SymbolInfo> addSymbol(
+    String symbol, {
+    List<String> aliases = const [],
+  });
 
   /// Store each data file at [path] (file or folder) byte for byte. Opens the store for writes.
   Future<IngestResult> ingestPath(String path, {String? source});
@@ -864,6 +1024,54 @@ abstract class MuninnApi {
     String item, {
     List<String> withPeers = const [],
   });
+
+  /// `mnnn net config` / TUI Settings. Does not create preferences.toml on read.
+  Future<NetConfig> netConfig();
+  Future<String> netConfigSet(NetConfig cfg);
+
+  /// `mnnn connection list` / TUI Connections…. No user keys leave Rust.
+  Future<NetConnections> netConnections();
+  Future<String> netConnectionTrust(String user, bool trusted);
+  Future<String> netConnectionRemove(String user);
+
+  /// `mnnn net exchange list` / TUI Nodes…. Tokens stay in Rust.
+  Future<List<NetExchangeInfo>> netExchanges();
+  Future<String> netExchangeLabel(String exchange, String label);
+  Future<String> netExchangeVerify(String exchange, String code);
+  Future<String> netExchangeRevoke(String exchange);
+  Future<List<NetRemoteItem>> netRemoteList(String exchange);
+
+  /// Fetch a peer's shared item. Bytes stay in Rust ([import] or write [path]).
+  Future<String> netFetch(
+    String exchange,
+    String item, {
+    String? format,
+    String? path,
+    bool import = false,
+  });
+
+  /// `mnnn net shard list` / TUI Dark shards. Sealed blobs stay in Rust.
+  Future<NetShards> netShards();
+  Future<String> netShardEntrust({
+    required List<String> to,
+    required String keyFile,
+    required String shardPassword,
+    String? filePassword,
+    int threshold = 0,
+  });
+  Future<String> netShardCheck(String shardPassword);
+  Future<String> netShardDrop(String id);
+
+  /// `mnnn net search` / TUI Network search… (a saved live search here and on peers).
+  Future<List<NetSearchOrigin>> netSearch(
+    String saved, {
+    List<String> only = const [],
+    bool remoteOnly = false,
+    int limit = 200,
+  });
+
+  /// `mnnn net broadcast`. [to] is `nodes`, `connections`, `all` or `org:SLUG`.
+  Future<String> netBroadcast(String topic, String text, {String to = 'nodes'});
 
   /// `mnnn org list` and the fields `mnnn org show` prints for orgs this node owns.
   Future<OrgOverview> orgOverview();

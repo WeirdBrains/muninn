@@ -468,8 +468,19 @@ final netOverviewProvider = FutureProvider<NetOverview?>((ref) {
   return ref.watch(apiProvider).netOverview();
 });
 
-/// Net window pages (TUI Node / Peers / Relays / Invites / Shared).
-enum NetPane { node, peers, relays, invites, shared }
+/// Net window pages (TUI Node / Peers / Relays / Invites / Shared plus leftovers).
+enum NetPane {
+  node,
+  peers,
+  relays,
+  invites,
+  shared,
+  settings,
+  connections,
+  exchanges,
+  search,
+  shards,
+}
 
 final netPaneProvider = StateProvider<NetPane>((ref) => NetPane.node);
 
@@ -488,11 +499,35 @@ final netSharedProvider = FutureProvider<List<NetShareInfo>?>((ref) {
   return ref.watch(apiProvider).netShared();
 });
 
+final netConfigProvider = FutureProvider<NetConfig?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).netConfig();
+});
+
+final netConnectionsProvider = FutureProvider<NetConnections?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).netConnections();
+});
+
+final netExchangesProvider = FutureProvider<List<NetExchangeInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).netExchanges();
+});
+
+final netShardsProvider = FutureProvider<NetShards?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).netShards();
+});
+
 void refreshNet(WidgetRef ref) {
   ref.invalidate(netOverviewProvider);
   ref.invalidate(netInvitesProvider);
   ref.invalidate(netRelaysProvider);
   ref.invalidate(netSharedProvider);
+  ref.invalidate(netConfigProvider);
+  ref.invalidate(netConnectionsProvider);
+  ref.invalidate(netExchangesProvider);
+  ref.invalidate(netShardsProvider);
 }
 
 final orgOverviewProvider = FutureProvider<OrgOverview?>((ref) {

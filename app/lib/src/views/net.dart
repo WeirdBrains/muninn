@@ -1,5 +1,7 @@
-/// Net: `mnnn net status|peers` plus start/stop, connect, invites, relays and
-/// sharing. The node identity stays in Rust; invite links hold no secret.
+/// Net: `mnnn net status|peers` plus start/stop, connect, invites, relays,
+/// sharing, settings, connections, exchanges, search, broadcast and dark shards.
+/// The node identity, exchange tokens and shard blobs stay in Rust; invite links
+/// hold no secret. Short codes are meant to be read aloud.
 library;
 
 import 'package:flutter/material.dart';
@@ -52,6 +54,11 @@ class NetView extends ConsumerWidget {
               NetPane.relays => _RelaysPane(),
               NetPane.invites => _InvitesPane(),
               NetPane.shared => _SharedPane(),
+              NetPane.settings => _SettingsPane(),
+              NetPane.connections => _ConnectionsPane(),
+              NetPane.exchanges => _ExchangesPane(),
+              NetPane.search => _SearchPane(),
+              NetPane.shards => _ShardsPane(),
             },
           ),
         ],
@@ -65,6 +72,11 @@ class NetView extends ConsumerWidget {
     NetPane.relays => 'Relays',
     NetPane.invites => 'Invites',
     NetPane.shared => 'Shared',
+    NetPane.settings => 'Settings',
+    NetPane.connections => 'Connections',
+    NetPane.exchanges => 'Nodes',
+    NetPane.search => 'Search',
+    NetPane.shards => 'Shards',
   };
 }
 
@@ -717,6 +729,721 @@ class _SharedPane extends ConsumerWidget {
                           }
                         },
                         icon: const Icon(Icons.link_off),
+                      ),
+                    ),
+              ],
+            );
+          },
+        );
+  }
+}
+
+class _SettingsPane extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final m = context.muninn;
+    return ref
+        .watch(netConfigProvider)
+        .when(
+          loading: () => const LinearProgressIndicator(),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('$e', style: TextStyle(color: m.error)),
+          ),
+          data: (cfg) {
+            if (cfg == null) {
+              return const SizedBox.shrink();
+            }
+            return _SettingsForm(config: cfg);
+          },
+        );
+  }
+}
+
+class _SettingsForm extends ConsumerStatefulWidget {
+  const _SettingsForm({required this.config});
+  final NetConfig config;
+  @override
+  ConsumerState<_SettingsForm> createState() => _SettingsFormState();
+}
+
+class _SettingsFormState extends ConsumerState<_SettingsForm> {
+  late final TextEditingController _label;
+  late final TextEditingController _port;
+  late final TextEditingController _listen;
+  late final TextEditingController _bootstrap;
+  late final TextEditingController _external;
+  late final TextEditingController _collabBind;
+  late final TextEditingController _collabPort;
+  late final TextEditingController _collabAdvertise;
+  late bool _mdns;
+  late bool _relayServer;
+  late bool _autostart;
+  late bool _hostAutostart;
+  late String _accept;
+  late String _collabTransport;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.config;
+    _label = TextEditingController(text: c.label);
+    _port = TextEditingController(text: '${c.port}');
+    _listen = TextEditingController(text: c.listen.join('\n'));
+    _bootstrap = TextEditingController(text: c.bootstrap.join('\n'));
+    _external = TextEditingController(text: c.externalAddresses.join('\n'));
+    _collabBind = TextEditingController(text: c.collabBind);
+    _collabPort = TextEditingController(text: '${c.collabPort}');
+    _collabAdvertise = TextEditingController(
+      text: c.collabAdvertise.join('\n'),
+    );
+    _mdns = c.mdns;
+    _relayServer = c.relayServer;
+    _autostart = c.autostart;
+    _hostAutostart = c.hostAutostart;
+    _accept = c.accept;
+    _collabTransport = c.collabTransport;
+  }
+
+  @override
+  void dispose() {
+    _label.dispose();
+    _port.dispose();
+    _listen.dispose();
+    _bootstrap.dispose();
+    _external.dispose();
+    _collabBind.dispose();
+    _collabPort.dispose();
+    _collabAdvertise.dispose();
+    super.dispose();
+  }
+
+  List<String> _lines(String s) => [
+    for (final part in s.split(RegExp(r'[\n,]')))
+      if (part.trim().isNotEmpty) part.trim(),
+  ];
+
+  Future<void> _save() async {
+    final m = context.muninn;
+    try {
+      final msg = await ref
+          .read(apiProvider)
+          .netConfigSet(
+            NetConfig(
+              label: _label.text.trim(),
+              port: int.tryParse(_port.text.trim()) ?? 4741,
+              listen: _lines(_listen.text),
+              mdns: _mdns,
+              relayServer: _relayServer,
+              autostart: _autostart,
+              hostAutostart: _hostAutostart,
+              accept: _accept,
+              bootstrap: _lines(_bootstrap.text),
+              externalAddresses: _lines(_external.text),
+              collabTransport: _collabTransport,
+              collabBind: _collabBind.text.trim(),
+              collabPort: int.tryParse(_collabPort.text.trim()) ?? 4742,
+              collabAdvertise: _lines(_collabAdvertise.text),
+            ),
+          );
+      refreshNet(ref);
+      if (mounted) {
+        _ok(context, msg);
+      }
+    } catch (e) {
+      if (mounted) {
+        _ok(context, '$e', color: m.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Network settings (preferences.toml, shared with the TUI). Relays stay on the Relays page. Changes apply the next time the node starts.',
+                  style: TextStyle(color: m.muted),
+                ),
+                TextField(
+                  key: const ValueKey('net-config-label'),
+                  controller: _label,
+                  decoration: const InputDecoration(labelText: 'Label'),
+                ),
+                TextField(
+                  key: const ValueKey('net-config-port'),
+                  controller: _port,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Port'),
+                ),
+                TextField(
+                  controller: _listen,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Listen addresses',
+                    hintText: 'one per line, empty for the default',
+                  ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Find peers on the local network (mDNS)'),
+                  value: _mdns,
+                  onChanged: (v) => setState(() => _mdns = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Relay for others'),
+                  value: _relayServer,
+                  onChanged: (v) => setState(() => _relayServer = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Start the node when the app opens'),
+                  value: _autostart,
+                  onChanged: (v) => setState(() => _autostart = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Start hosted org sites with the node'),
+                  value: _hostAutostart,
+                  onChanged: (v) => setState(() => _hostAutostart = v),
+                ),
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('net-config-accept'),
+                  initialValue: _accept,
+                  items: const [
+                    DropdownMenuItem(value: 'known', child: Text('known')),
+                    DropdownMenuItem(value: 'anyone', child: Text('anyone')),
+                  ],
+                  onChanged: (v) => setState(() => _accept = v ?? 'known'),
+                  decoration: const InputDecoration(
+                    labelText: 'Accept connections from',
+                  ),
+                ),
+                TextField(
+                  controller: _bootstrap,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Bootstrap nodes',
+                    hintText: 'one multiaddr per line',
+                  ),
+                ),
+                TextField(
+                  controller: _external,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'External addresses',
+                    hintText: 'host, host:port or a multiaddr, one per line',
+                  ),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: _collabTransport,
+                  items: const [
+                    DropdownMenuItem(value: 'stream', child: Text('stream')),
+                    DropdownMenuItem(value: 'poll', child: Text('poll')),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _collabTransport = v ?? 'stream'),
+                  decoration: const InputDecoration(
+                    labelText: 'Collab transport',
+                  ),
+                ),
+                TextField(
+                  controller: _collabBind,
+                  decoration: const InputDecoration(labelText: 'Collab bind'),
+                ),
+                TextField(
+                  controller: _collabPort,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Collab port'),
+                ),
+                TextField(
+                  controller: _collabAdvertise,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Collab advertise',
+                    hintText: 'host:port, one per line',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton(
+              key: const ValueKey('net-settings-save'),
+              onPressed: _save,
+              child: const Text('Save settings'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ConnectionsPane extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final m = context.muninn;
+    return ref
+        .watch(netConnectionsProvider)
+        .when(
+          loading: () => const LinearProgressIndicator(),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('$e', style: TextStyle(color: m.error)),
+          ),
+          data: (all) {
+            if (all == null) {
+              return const SizedBox.shrink();
+            }
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                if (all.me != null) ...[
+                  Text(
+                    'You',
+                    style: TextStyle(
+                      color: m.header,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(all.me!.name),
+                    subtitle: Text(
+                      '${all.me!.shortId} · ${all.me!.nodes} node(s)',
+                      style: TextStyle(color: m.muted),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Text(
+                  'Connections',
+                  style: TextStyle(
+                    color: m.header,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                if (all.connections.isEmpty)
+                  Text(
+                    'No connections yet. Someone you exchange keys with becomes a connection.',
+                    style: TextStyle(color: m.muted),
+                  )
+                else
+                  for (final c in all.connections)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(c.name),
+                      subtitle: Text(
+                        [
+                          c.shortId,
+                          c.trusted ? 'trusted' : 'untrusted',
+                          '${c.nodes} node(s)',
+                          for (final n in c.nodeList)
+                            n.label.isEmpty ? n.shortId : n.label,
+                        ].join(' · '),
+                        style: TextStyle(color: m.muted),
+                      ),
+                      trailing: Wrap(
+                        children: [
+                          TextButton(
+                            key: ValueKey('net-trust-${c.shortId}'),
+                            onPressed: () async {
+                              try {
+                                final msg = await ref
+                                    .read(apiProvider)
+                                    .netConnectionTrust(c.userId, !c.trusted);
+                                refreshNet(ref);
+                                if (context.mounted) {
+                                  _ok(context, msg);
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  _ok(context, '$e', color: m.error);
+                                }
+                              }
+                            },
+                            child: Text(c.trusted ? 'Untrust' : 'Trust'),
+                          ),
+                          IconButton(
+                            tooltip: 'Remove',
+                            onPressed: () async {
+                              if (!await confirmNet(
+                                context,
+                                'Remove connection',
+                                'Remove the connection with ${c.name}?',
+                              )) {
+                                return;
+                              }
+                              try {
+                                final msg = await ref
+                                    .read(apiProvider)
+                                    .netConnectionRemove(c.userId);
+                                refreshNet(ref);
+                                if (context.mounted) {
+                                  _ok(context, msg);
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  _ok(context, '$e', color: m.error);
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.delete_outline),
+                          ),
+                        ],
+                      ),
+                    ),
+              ],
+            );
+          },
+        );
+  }
+}
+
+class _ExchangesPane extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final m = context.muninn;
+    return ref
+        .watch(netExchangesProvider)
+        .when(
+          loading: () => const LinearProgressIndicator(),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('$e', style: TextStyle(color: m.error)),
+          ),
+          data: (items) {
+            final all = items ?? const <NetExchangeInfo>[];
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                Text(
+                  'Key exchanges (Nodes). Invite tokens stay in Rust. Short codes are meant to be read aloud. Export or restore a sealed exchange with the CLI (`mnnn net exchange export|restore`).',
+                  style: TextStyle(color: m.muted),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: () => showNetInviteOrConnectDialog(context, ref),
+                    icon: const Icon(Icons.link),
+                    label: const Text('Invite or connect…'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (all.isEmpty)
+                  Text(
+                    'No key exchanges yet.',
+                    style: TextStyle(color: m.muted),
+                  )
+                else
+                  for (final x in all)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(x.title.isEmpty ? x.shortId : x.title),
+                      subtitle: Text(
+                        [
+                          x.status,
+                          if (x.label.isNotEmpty) x.label,
+                          if (x.peerId.isNotEmpty) x.peerId,
+                          if (x.shortCode != null) 'code ${x.shortCode}',
+                          if (x.fingerprint != null) x.fingerprint!,
+                        ].join(' · '),
+                        style: TextStyle(color: m.muted),
+                      ),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (v) async {
+                          switch (v) {
+                            case 'label':
+                              await showNetExchangeLabelDialog(context, ref, x);
+                            case 'verify':
+                              await showNetExchangeVerifyDialog(
+                                context,
+                                ref,
+                                x,
+                              );
+                            case 'list':
+                              await showNetRemoteListDialog(context, ref, x);
+                            case 'revoke':
+                              if (!await confirmNet(
+                                context,
+                                'Disconnect',
+                                'Disconnect from ${x.title.isEmpty ? x.shortId : x.title}? Keys are erased on both sides.',
+                              )) {
+                                return;
+                              }
+                              try {
+                                final msg = await ref
+                                    .read(apiProvider)
+                                    .netExchangeRevoke(x.id);
+                                refreshNet(ref);
+                                if (context.mounted) {
+                                  _ok(context, msg);
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  _ok(context, '$e', color: m.error);
+                                }
+                              }
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: 'label', child: Text('Label…')),
+                          PopupMenuItem(
+                            value: 'verify',
+                            child: Text('Verify…'),
+                          ),
+                          PopupMenuItem(
+                            value: 'list',
+                            child: Text('List shares…'),
+                          ),
+                          PopupMenuItem(
+                            value: 'revoke',
+                            child: Text('Disconnect'),
+                          ),
+                        ],
+                      ),
+                    ),
+              ],
+            );
+          },
+        );
+  }
+}
+
+class _SearchPane extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_SearchPane> createState() => _SearchPaneState();
+}
+
+class _SearchPaneState extends ConsumerState<_SearchPane> {
+  String? _saved;
+  bool _remoteOnly = false;
+  List<NetSearchOrigin>? _hits;
+  bool _busy = false;
+
+  Future<void> _run() async {
+    final name = _saved;
+    if (name == null || name.isEmpty) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final hits = await ref
+          .read(apiProvider)
+          .netSearch(name, remoteOnly: _remoteOnly);
+      if (mounted) {
+        setState(() {
+          _hits = hits;
+          _busy = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        _ok(context, '$e', color: context.muninn.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    final searches = ref.watch(searchesProvider).value ?? const <SearchInfo>[];
+    if (_saved == null && searches.isNotEmpty) {
+      _saved = searches.first.name;
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        Text(
+          'Run a saved live search here and on peers (each peer searches only what it shares with you).',
+          style: TextStyle(color: m.muted),
+        ),
+        const SizedBox(height: 12),
+        if (searches.isEmpty)
+          Text(
+            'Save a live search in Projects first.',
+            style: TextStyle(color: m.muted),
+          )
+        else
+          DropdownButtonFormField<String>(
+            key: const ValueKey('net-search-saved'),
+            initialValue: _saved,
+            items: [
+              for (final s in searches)
+                DropdownMenuItem(value: s.name, child: Text(s.name)),
+            ],
+            onChanged: (v) => setState(() => _saved = v),
+            decoration: const InputDecoration(labelText: 'Live search'),
+          ),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Peers only (skip the local search)'),
+          value: _remoteOnly,
+          onChanged: (v) => setState(() => _remoteOnly = v ?? false),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton(
+            key: const ValueKey('net-search-run'),
+            onPressed: searches.isEmpty || _busy ? null : _run,
+            child: Text(_busy ? 'Searching…' : 'Run search'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (_hits != null)
+          for (final o in _hits!) ...[
+            Text(
+              o.origin,
+              style: TextStyle(color: m.header, fontWeight: FontWeight.w800),
+            ),
+            if (o.error != null)
+              Text(o.error!, style: TextStyle(color: m.error)),
+            if (o.lines.isEmpty && o.error == null)
+              Text('No matches.', style: TextStyle(color: m.muted)),
+            for (final line in o.lines)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(line),
+              ),
+            if (o.truncated)
+              Text('truncated', style: TextStyle(color: m.muted)),
+            const SizedBox(height: 12),
+          ],
+      ],
+    );
+  }
+}
+
+class _ShardsPane extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final m = context.muninn;
+    return ref
+        .watch(netShardsProvider)
+        .when(
+          loading: () => const LinearProgressIndicator(),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('$e', style: TextStyle(color: m.error)),
+          ),
+          data: (all) {
+            if (all == null) {
+              return const SizedBox.shrink();
+            }
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                Text(
+                  'Dark shards split your master key across trusted nodes. The key file and shard password stay in Rust; sealed blobs never leave it. Restoring a key when this database cannot open stays in the CLI.',
+                  style: TextStyle(color: m.muted),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      key: const ValueKey('net-shard-entrust'),
+                      onPressed: () => showNetShardEntrustDialog(context, ref),
+                      icon: const Icon(Icons.safety_check),
+                      label: const Text('Entrust…'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('net-shard-check'),
+                      onPressed: () => showNetShardCheckDialog(context, ref),
+                      child: const Text('Check restore'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Entrusted',
+                  style: TextStyle(
+                    color: m.header,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                if (all.entrusted.isEmpty)
+                  Text(
+                    'No dark shards entrusted.',
+                    style: TextStyle(color: m.muted),
+                  )
+                else
+                  for (final e in all.entrusted)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        '${e.exchange.isEmpty ? e.setId : e.exchange} · shard ${e.index}/${e.total}',
+                      ),
+                      subtitle: Text(
+                        'any ${e.threshold} of ${e.total} · ${e.status}',
+                        style: TextStyle(color: m.muted),
+                      ),
+                    ),
+                const SizedBox(height: 16),
+                Text(
+                  'Held',
+                  style: TextStyle(
+                    color: m.header,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                if (all.held.isEmpty)
+                  Text('No dark shards held.', style: TextStyle(color: m.muted))
+                else
+                  for (final h in all.held)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${h.owner} · shard ${h.index}/${h.total}'),
+                      subtitle: Text(
+                        'any ${h.threshold} of ${h.total} · ${h.shortId}',
+                        style: TextStyle(color: m.muted),
+                      ),
+                      trailing: IconButton(
+                        tooltip: 'Drop',
+                        onPressed: () async {
+                          if (!await confirmNet(
+                            context,
+                            'Drop shard',
+                            'Drop the shard you hold for ${h.owner}?',
+                          )) {
+                            return;
+                          }
+                          try {
+                            final msg = await ref
+                                .read(apiProvider)
+                                .netShardDrop(h.id);
+                            refreshNet(ref);
+                            if (context.mounted) {
+                              _ok(context, msg);
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              _ok(context, '$e', color: m.error);
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.delete_outline),
                       ),
                     ),
               ],

@@ -161,4 +161,113 @@ void main() {
     expect(api.netCalls.any((c) => c.startsWith('relay-add:')), isTrue);
     expect(find.textContaining('/ip4/1.2.3.4/tcp/4741/p2p/'), findsWidgets);
   });
+
+  testWidgets('Settings menu opens the form, not a placeholder', (t) async {
+    final (api, c) = await pump(t);
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Settings…'));
+    await t.pumpAndSettle();
+    expect(c.read(netPaneProvider), NetPane.settings);
+    expect(find.textContaining('Coming to the app'), findsNothing);
+    expect(find.textContaining('Not in the app yet'), findsNothing);
+    expect(find.byKey(const ValueKey('net-settings-save')), findsOneWidget);
+    await t.enterText(find.byKey(const ValueKey('net-config-label')), 'desk');
+    await t.ensureVisible(find.byKey(const ValueKey('net-settings-save')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('net-settings-save')));
+    await t.pumpAndSettle();
+    expect(api.netCalls, contains('config-set:desk'));
+    expect(find.textContaining('saved network settings'), findsOneWidget);
+  });
+
+  testWidgets('Connections menu trusts a user', (t) async {
+    final (api, c) = await pump(t);
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Connections…'));
+    await t.pumpAndSettle();
+    expect(c.read(netPaneProvider), NetPane.connections);
+    expect(find.textContaining('Coming to the app'), findsNothing);
+    expect(find.text('bob'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('net-trust-bobuser')));
+    await t.pumpAndSettle();
+    expect(api.netCalls, contains('trust:u2:true'));
+    expect(find.text('Untrust'), findsOneWidget);
+  });
+
+  testWidgets('Nodes menu lists no exchanges yet', (t) async {
+    final (_, c) = await pump(t);
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Nodes…'));
+    await t.pumpAndSettle();
+    expect(c.read(netPaneProvider), NetPane.exchanges);
+    expect(find.textContaining('Coming to the app'), findsNothing);
+    expect(find.text('No key exchanges yet.'), findsOneWidget);
+  });
+
+  testWidgets('Dark shards menu shows empty entrusted and held lists', (
+    t,
+  ) async {
+    final (_, c) = await pump(t);
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Dark shards…'));
+    await t.pumpAndSettle();
+    expect(c.read(netPaneProvider), NetPane.shards);
+    expect(find.textContaining('Coming to the app'), findsNothing);
+    expect(find.text('No dark shards entrusted.'), findsOneWidget);
+    expect(find.text('No dark shards held.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('net-shard-entrust')), findsOneWidget);
+  });
+
+  testWidgets('Network search runs a saved live search', (t) async {
+    final (api, c) = await pump(t);
+    api.searchList = [
+      const SearchInfo(
+        id: 's1',
+        shortId: 's1short',
+        name: 'wide',
+        query: 'BTC',
+      ),
+    ];
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Network search…'));
+    await t.pumpAndSettle();
+    expect(c.read(netPaneProvider), NetPane.search);
+    expect(find.textContaining('Coming to the app'), findsNothing);
+    await t.tap(find.byKey(const ValueKey('net-search-run')));
+    await t.pumpAndSettle();
+    expect(api.netCalls, contains('search:wide:all'));
+    expect(find.text('BTC/USD 5m match'), findsOneWidget);
+  });
+
+  testWidgets('Broadcast dialog sends a topic and text', (t) async {
+    final (api, _) = await pump(t);
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Broadcast…'));
+    await t.pumpAndSettle();
+    expect(find.textContaining('Coming to the app'), findsNothing);
+    await t.enterText(
+      find.byKey(const ValueKey('net-broadcast-topic')),
+      'hello',
+    );
+    await t.enterText(
+      find.byKey(const ValueKey('net-broadcast-text')),
+      'world',
+    );
+    await t.tap(find.byKey(const ValueKey('net-broadcast-confirm')));
+    await t.pumpAndSettle();
+    expect(api.netCalls, contains('broadcast:nodes:hello:world'));
+    expect(find.textContaining('sent to 0 node(s)'), findsOneWidget);
+  });
 }

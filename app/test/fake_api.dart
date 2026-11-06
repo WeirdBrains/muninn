@@ -747,7 +747,8 @@ class FakeApi implements MuninnApi {
   final catalogCalls = <String>[];
 
   @override
-  Future<List<SourceInfo>> listSources() async => List<SourceInfo>.from(sources);
+  Future<List<SourceInfo>> listSources() async =>
+      List<SourceInfo>.from(sources);
 
   @override
   Future<SourceInfo> addSource(
@@ -832,7 +833,8 @@ class FakeApi implements MuninnApi {
   }
 
   @override
-  Future<List<SymbolInfo>> listSymbols() async => List<SymbolInfo>.from(symbols);
+  Future<List<SymbolInfo>> listSymbols() async =>
+      List<SymbolInfo>.from(symbols);
 
   @override
   Future<List<AliasInfo>> listAliases() async => List<AliasInfo>.from(aliases);
@@ -1176,6 +1178,209 @@ class FakeApi implements MuninnApi {
         if (!(s.kind == kind && s.name == item)) s,
     ];
     return 'stopped sharing $kind $item';
+  }
+
+  NetConfig netCfg = const NetConfig();
+  NetConnections connections = const NetConnections(
+    me: NetMeInfo(userId: 'me', shortId: 'meuser', name: 'alice', nodes: 1),
+    connections: [
+      NetConnectionInfo(
+        userId: 'u2',
+        shortId: 'bobuser',
+        name: 'bob',
+        trusted: false,
+        nodes: 1,
+        nodeList: [
+          NetConnNode(
+            shortId: 'KooWbob',
+            label: 'bob-desk',
+            active: true,
+            state: 'linked',
+          ),
+        ],
+      ),
+    ],
+  );
+  List<NetExchangeInfo> exchanges = const [];
+  List<NetRemoteItem> remoteItems = const [];
+  NetShards shards = const NetShards();
+  List<NetSearchOrigin> searchHits = const [
+    NetSearchOrigin(origin: 'local', lines: ['BTC/USD 5m match']),
+  ];
+
+  @override
+  Future<NetConfig> netConfig() async => netCfg;
+
+  @override
+  Future<String> netConfigSet(NetConfig cfg) async {
+    netCalls.add('config-set:${cfg.label}');
+    netCfg = cfg;
+    return 'saved network settings';
+  }
+
+  @override
+  Future<NetConnections> netConnections() async => connections;
+
+  @override
+  Future<String> netConnectionTrust(String user, bool trusted) async {
+    netCalls.add('trust:$user:$trusted');
+    connections = NetConnections(
+      me: connections.me,
+      connections: [
+        for (final c in connections.connections)
+          if (c.userId == user || c.shortId == user || c.name == user)
+            NetConnectionInfo(
+              userId: c.userId,
+              shortId: c.shortId,
+              name: c.name,
+              trusted: trusted,
+              nodes: c.nodes,
+              since: c.since,
+              nodeList: c.nodeList,
+            )
+          else
+            c,
+      ],
+    );
+    return trusted ? '$user is now trusted' : '$user is now untrusted';
+  }
+
+  @override
+  Future<String> netConnectionRemove(String user) async {
+    netCalls.add('remove:$user');
+    connections = NetConnections(
+      me: connections.me,
+      connections: [
+        for (final c in connections.connections)
+          if (c.userId != user && c.shortId != user && c.name != user) c,
+      ],
+    );
+    return 'connection with $user removed';
+  }
+
+  @override
+  Future<List<NetExchangeInfo>> netExchanges() async => List.of(exchanges);
+
+  @override
+  Future<String> netExchangeLabel(String exchange, String label) async {
+    netCalls.add('exchange-label:$exchange:$label');
+    exchanges = [
+      for (final x in exchanges)
+        if (x.id == exchange || x.shortId == exchange)
+          NetExchangeInfo(
+            id: x.id,
+            shortId: x.shortId,
+            title: x.title,
+            label: label,
+            status: x.status,
+            role: x.role,
+            peerId: x.peerId,
+            peerLabel: x.peerLabel,
+            shortCode: x.shortCode,
+            fingerprint: x.fingerprint,
+            expiresAt: x.expiresAt,
+            verifiedAt: x.verifiedAt,
+            revokedAt: x.revokedAt,
+            createdAt: x.createdAt,
+            active: x.active,
+            incoming: x.incoming,
+          )
+        else
+          x,
+    ];
+    return 'exchange $exchange is now $label';
+  }
+
+  @override
+  Future<String> netExchangeVerify(String exchange, String code) async {
+    netCalls.add('exchange-verify:$exchange:$code');
+    return 'key exchange with $exchange verified';
+  }
+
+  @override
+  Future<String> netExchangeRevoke(String exchange) async {
+    netCalls.add('exchange-revoke:$exchange');
+    exchanges = [
+      for (final x in exchanges)
+        if (x.id != exchange && x.shortId != exchange) x,
+    ];
+    return 'disconnected from $exchange';
+  }
+
+  @override
+  Future<List<NetRemoteItem>> netRemoteList(String exchange) async {
+    netCalls.add('remote-list:$exchange');
+    return List.of(remoteItems);
+  }
+
+  @override
+  Future<String> netFetch(
+    String exchange,
+    String item, {
+    String? format,
+    String? path,
+    bool import = false,
+  }) async {
+    netCalls.add('fetch:$exchange:$item:${import ? "import" : path ?? ""}');
+    if (import) {
+      return 'imported 1';
+    }
+    return 'wrote ${path ?? "file"}';
+  }
+
+  @override
+  Future<NetShards> netShards() async => shards;
+
+  @override
+  Future<String> netShardEntrust({
+    required List<String> to,
+    required String keyFile,
+    required String shardPassword,
+    String? filePassword,
+    int threshold = 0,
+  }) async {
+    netCalls.add('shard-entrust:${to.join(",")}:$keyFile:$threshold');
+    return 'entrusted: any ${threshold == 0 ? 2 : threshold} of ${to.length} shards restore your key';
+  }
+
+  @override
+  Future<String> netShardCheck(String shardPassword) async {
+    netCalls.add('shard-check');
+    return "your shards restore this database's key";
+  }
+
+  @override
+  Future<String> netShardDrop(String id) async {
+    netCalls.add('shard-drop:$id');
+    shards = NetShards(
+      entrusted: shards.entrusted,
+      held: [
+        for (final h in shards.held)
+          if (h.id != id && h.shortId != id) h,
+      ],
+    );
+    return 'dropped';
+  }
+
+  @override
+  Future<List<NetSearchOrigin>> netSearch(
+    String saved, {
+    List<String> only = const [],
+    bool remoteOnly = false,
+    int limit = 200,
+  }) async {
+    netCalls.add('search:$saved:${remoteOnly ? "remote" : "all"}');
+    return List.of(searchHits);
+  }
+
+  @override
+  Future<String> netBroadcast(
+    String topic,
+    String text, {
+    String to = 'nodes',
+  }) async {
+    netCalls.add('broadcast:$to:$topic:$text');
+    return 'sent to 0 node(s)';
   }
 
   OrgOverview orgs = const OrgOverview(

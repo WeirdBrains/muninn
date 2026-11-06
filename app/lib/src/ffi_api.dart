@@ -234,7 +234,11 @@ class FfiMuninnApi implements MuninnApi {
 
   @override
   Future<int> exportSourceData(String name, String item, String path) async =>
-      (await r_data.exportSourceData(name: name, item: item, path: path)).toInt();
+      (await r_data.exportSourceData(
+        name: name,
+        item: item,
+        path: path,
+      )).toInt();
 
   @override
   Future<List<SymbolInfo>> listSymbols() async => [
@@ -794,6 +798,234 @@ class FfiMuninnApi implements MuninnApi {
     String item, {
     List<String> withPeers = const [],
   }) => r_net.netUnshare(home: home, kind: kind, item: item, with_: withPeers);
+
+  NetConfig _netConfig(r_net.NetConfig c) => NetConfig(
+    label: c.label,
+    port: c.port,
+    listen: c.listen,
+    mdns: c.mdns,
+    relayServer: c.relayServer,
+    autostart: c.autostart,
+    hostAutostart: c.hostAutostart,
+    accept: c.accept,
+    bootstrap: c.bootstrap,
+    externalAddresses: c.externalAddresses,
+    collabTransport: c.collabTransport,
+    collabBind: c.collabBind,
+    collabPort: c.collabPort,
+    collabAdvertise: c.collabAdvertise,
+  );
+
+  @override
+  Future<NetConfig> netConfig() async =>
+      _netConfig(await r_net.netConfig(home: home));
+
+  @override
+  Future<String> netConfigSet(NetConfig cfg) => r_net.netConfigSet(
+    home: home,
+    cfg: r_net.NetConfig(
+      label: cfg.label,
+      port: cfg.port,
+      listen: cfg.listen,
+      mdns: cfg.mdns,
+      relayServer: cfg.relayServer,
+      autostart: cfg.autostart,
+      hostAutostart: cfg.hostAutostart,
+      accept: cfg.accept,
+      bootstrap: cfg.bootstrap,
+      externalAddresses: cfg.externalAddresses,
+      collabTransport: cfg.collabTransport,
+      collabBind: cfg.collabBind,
+      collabPort: cfg.collabPort,
+      collabAdvertise: cfg.collabAdvertise,
+    ),
+  );
+
+  NetConnNode _netConnNode(r_net.NetConnNode n) => NetConnNode(
+    shortId: n.shortId,
+    label: n.label,
+    active: n.active,
+    state: n.state,
+  );
+
+  NetConnectionInfo _netConnection(r_net.NetConnectionInfo c) =>
+      NetConnectionInfo(
+        userId: c.userId,
+        shortId: c.shortId,
+        name: c.name,
+        trusted: c.trusted,
+        nodes: c.nodes.toInt(),
+        since: c.since.toInt(),
+        nodeList: [for (final n in c.nodeList) _netConnNode(n)],
+      );
+
+  @override
+  Future<NetConnections> netConnections() async {
+    final o = await r_net.netConnections(home: home);
+    return NetConnections(
+      me: o.me == null
+          ? null
+          : NetMeInfo(
+              userId: o.me!.userId,
+              shortId: o.me!.shortId,
+              name: o.me!.name,
+              nodes: o.me!.nodes.toInt(),
+            ),
+      connections: [for (final c in o.connections) _netConnection(c)],
+    );
+  }
+
+  @override
+  Future<String> netConnectionTrust(String user, bool trusted) =>
+      r_net.netConnectionTrust(home: home, user: user, trusted: trusted);
+
+  @override
+  Future<String> netConnectionRemove(String user) =>
+      r_net.netConnectionRemove(home: home, user: user);
+
+  NetExchangeInfo _netExchange(r_net.NetExchangeInfo x) => NetExchangeInfo(
+    id: x.id,
+    shortId: x.shortId,
+    title: x.title,
+    label: x.label,
+    status: x.status,
+    role: x.role,
+    peerId: x.peerId,
+    peerLabel: x.peerLabel,
+    shortCode: x.shortCode,
+    fingerprint: x.fingerprint,
+    expiresAt: x.expiresAt?.toInt(),
+    verifiedAt: x.verifiedAt?.toInt(),
+    revokedAt: x.revokedAt?.toInt(),
+    createdAt: x.createdAt.toInt(),
+    active: x.active,
+    incoming: x.incoming,
+  );
+
+  @override
+  Future<List<NetExchangeInfo>> netExchanges() async => [
+    for (final x in await r_net.netExchanges(home: home)) _netExchange(x),
+  ];
+
+  @override
+  Future<String> netExchangeLabel(String exchange, String label) =>
+      r_net.netExchangeLabel(home: home, exchange: exchange, label: label);
+
+  @override
+  Future<String> netExchangeVerify(String exchange, String code) =>
+      r_net.netExchangeVerify(home: home, exchange: exchange, code: code);
+
+  @override
+  Future<String> netExchangeRevoke(String exchange) =>
+      r_net.netExchangeRevoke(home: home, exchange: exchange);
+
+  @override
+  Future<List<NetRemoteItem>> netRemoteList(String exchange) async => [
+    for (final i in await r_net.netRemoteList(home: home, exchange: exchange))
+      NetRemoteItem(id: i.id, kind: i.kind, name: i.name, about: i.about),
+  ];
+
+  @override
+  Future<String> netFetch(
+    String exchange,
+    String item, {
+    String? format,
+    String? path,
+    bool import = false,
+  }) => r_net.netFetch(
+    home: home,
+    exchange: exchange,
+    item: item,
+    format: format,
+    path: path,
+    import_: import,
+  );
+
+  @override
+  Future<NetShards> netShards() async {
+    final s = await r_net.netShards(home: home);
+    return NetShards(
+      entrusted: [
+        for (final e in s.entrusted)
+          NetEntrustedInfo(
+            setId: e.setId,
+            index: e.index,
+            threshold: e.threshold,
+            total: e.total,
+            exchange: e.exchange,
+            status: e.status,
+          ),
+      ],
+      held: [
+        for (final h in s.held)
+          NetHeldInfo(
+            id: h.id,
+            shortId: h.shortId,
+            setId: h.setId,
+            index: h.index,
+            threshold: h.threshold,
+            total: h.total,
+            owner: h.owner,
+            exchange: h.exchange,
+          ),
+      ],
+    );
+  }
+
+  @override
+  Future<String> netShardEntrust({
+    required List<String> to,
+    required String keyFile,
+    required String shardPassword,
+    String? filePassword,
+    int threshold = 0,
+  }) => r_net.netShardEntrust(
+    home: home,
+    to: to,
+    threshold: threshold,
+    keyFile: keyFile,
+    filePassword: filePassword,
+    shardPassword: shardPassword,
+  );
+
+  @override
+  Future<String> netShardCheck(String shardPassword) =>
+      r_net.netShardCheck(home: home, shardPassword: shardPassword);
+
+  @override
+  Future<String> netShardDrop(String id) =>
+      r_net.netShardDrop(home: home, id: id);
+
+  @override
+  Future<List<NetSearchOrigin>> netSearch(
+    String saved, {
+    List<String> only = const [],
+    bool remoteOnly = false,
+    int limit = 200,
+  }) async => [
+    for (final o in await r_net.netSearch(
+      home: home,
+      saved: saved,
+      only: only,
+      remoteOnly: remoteOnly,
+      limit: limit,
+    ))
+      NetSearchOrigin(
+        origin: o.origin,
+        peer: o.peer,
+        exchange: o.exchange,
+        error: o.error,
+        truncated: o.truncated,
+        lines: o.lines,
+      ),
+  ];
+
+  @override
+  Future<String> netBroadcast(
+    String topic,
+    String text, {
+    String to = 'nodes',
+  }) => r_net.netBroadcast(home: home, topic: topic, text: text, to: to);
 
   @override
   Future<OrgOverview> orgOverview() async =>
