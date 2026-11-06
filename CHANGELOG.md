@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+- Flutter app: File ▸ Import… and Export… (CSV, Parquet, JSON), opening the store for writes after unlock
+
 ## [2.22.0] - 2026-11-05
 
 

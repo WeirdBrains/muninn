@@ -42,6 +42,7 @@ dependencies:
   flutter_rust_bridge_hooks: 2.13.0
   flutter_riverpod: ^3.4.3
   flutter_svg: ^2.3.2
+  file_picker: ^10.3.3
 
 dev_dependencies:
   flutter_test:

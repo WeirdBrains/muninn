@@ -7,6 +7,7 @@ import 'api.dart';
 import 'rust/api/about.dart' as r_about;
 import 'rust/api/data.dart' as r_data;
 import 'rust/api/info.dart' as r_info;
+import 'rust/api/io.dart' as r_io;
 import 'rust/api/prefs.dart' as r_prefs;
 import 'rust/api/themes.dart' as r_themes;
 
@@ -127,4 +128,63 @@ class FfiMuninnApi implements MuninnApi {
         ))
           BarPoint(ts: b.ts.toInt(), open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume),
       ];
+
+  @override
+  Future<IngestResult> ingestPath(String path, {String? source}) async {
+    final o = await r_io.ingestPath(path: path, source: source);
+    return IngestResult(
+      files: [
+        for (final f in o.files)
+          IngestFileReport(
+            locator: f.locator,
+            source: f.source,
+            format: f.format,
+            bytes: f.bytes.toInt(),
+            id: f.id,
+            skipped: f.skipped,
+            elapsedMs: f.elapsedMs.toInt(),
+          ),
+      ],
+      cancelled: o.cancelled,
+    );
+  }
+
+  @override
+  void cancelIngest() => r_io.cancelIngest();
+
+  @override
+  IngestProgress? ingestProgress() {
+    final p = r_io.ingestProgress();
+    if (p == null) return null;
+    return IngestProgress(
+      fileIndex: p.fileIndex.toInt(),
+      file: p.file,
+      overall: p.overall,
+      bytesDone: p.bytesDone.toInt(),
+      bytesTotal: p.bytesTotal.toInt(),
+      cancelled: p.cancelled,
+    );
+  }
+
+  @override
+  Future<ExportResult> exportBars({
+    required String path,
+    required String format,
+    String? source,
+    String? symbol,
+    String? duration,
+    String? from,
+    String? to,
+  }) async {
+    final o = await r_io.exportBars(
+      path: path,
+      format: format,
+      source: source,
+      symbol: symbol,
+      duration: duration,
+      from: from,
+      to: to,
+    );
+    return ExportResult(path: o.path, format: o.format, rows: o.rows.toInt());
+  }
 }

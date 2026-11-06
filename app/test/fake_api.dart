@@ -82,4 +82,43 @@ class FakeApi implements MuninnApi {
         BarPoint(ts: d.first + i * d.durationS * 1000, open: 100.0 + i, high: 102.0 + i, low: 99.0 + i, close: i.isEven ? 101.0 + i : 99.5 + i, volume: 10.0 + i),
     ];
   }
+
+  final ingests = <({String path, String? source})>[];
+  final exports = <({String path, String format, String? source, String? symbol, String? duration, String? from, String? to})>[];
+  IngestResult nextIngest = const IngestResult(files: [
+    IngestFileReport(locator: '/tmp/a.csv', source: 'math', format: 'csv', bytes: 8, id: 'abc', skipped: false, elapsedMs: 12),
+  ]);
+  ExportResult nextExport = const ExportResult(path: '/tmp/out.csv', format: 'csv', rows: 3);
+  bool ingestCancelled = false;
+  IngestProgress? progress;
+  Object? ingestError;
+  Object? exportError;
+
+  @override
+  Future<IngestResult> ingestPath(String path, {String? source}) async {
+    ingests.add((path: path, source: source));
+    if (ingestError != null) throw ingestError!;
+    return nextIngest;
+  }
+
+  @override
+  void cancelIngest() => ingestCancelled = true;
+
+  @override
+  IngestProgress? ingestProgress() => progress;
+
+  @override
+  Future<ExportResult> exportBars({
+    required String path,
+    required String format,
+    String? source,
+    String? symbol,
+    String? duration,
+    String? from,
+    String? to,
+  }) async {
+    exports.add((path: path, format: format, source: source, symbol: symbol, duration: duration, from: from, to: to));
+    if (exportError != null) throw exportError!;
+    return nextExport;
+  }
 }

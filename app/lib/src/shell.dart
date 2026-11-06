@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'about_dialog.dart';
 import 'api.dart';
+import 'io_dialogs.dart';
 import 'logo.dart';
 import 'state.dart';
 import 'theme/muninn_theme.dart';
@@ -39,6 +40,20 @@ class AppShell extends ConsumerWidget {
             toolbarHeight: 64,
             title: const FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: _Brand(compact: true)),
             actions: [
+              PopupMenuButton<String>(
+                tooltip: 'File',
+                icon: const Icon(Icons.folder_outlined, size: 28),
+                onSelected: (v) {
+                  if (v == 'import') showImportDialog(context, ref);
+                  if (v == 'export') showExportDialog(context, ref);
+                  if (v == 'lock') lockStore(ref);
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'import', child: Text('Import…')),
+                  PopupMenuItem(value: 'export', child: Text('Export…')),
+                  PopupMenuItem(value: 'lock', child: Text('Lock')),
+                ],
+              ),
               IconButton(
                 tooltip: 'Theme',
                 iconSize: 28,
@@ -162,8 +177,8 @@ class MuninnMenuBar extends ConsumerWidget {
       menu('File', [
         item('Home', () => go(Section.home)),
         item('Lock', () => lockStore(ref)),
-        item('Import…', () => later('Import', 'mnnn ingest path DIR')),
-        item('Export…', () => later('Export', 'mnnn export')),
+        item('Import…', () => showImportDialog(context, ref)),
+        item('Export…', () => showExportDialog(context, ref)),
         item('Preferences…', () => later('Preferences', 'mnnn theme')),
       ]),
       menu('View', [

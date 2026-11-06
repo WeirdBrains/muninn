@@ -98,6 +98,50 @@ class SavedState {
   final String? dataset;
 }
 
+
+/// One file stored by Import (as it arrived; no bars are made).
+class IngestFileReport {
+  const IngestFileReport({
+    required this.locator,
+    required this.source,
+    required this.format,
+    required this.bytes,
+    required this.id,
+    required this.skipped,
+    required this.elapsedMs,
+  });
+  final String locator, source, format, id;
+  final int bytes, elapsedMs;
+  final bool skipped;
+}
+
+class IngestResult {
+  const IngestResult({required this.files, this.cancelled = false});
+  final List<IngestFileReport> files;
+  final bool cancelled;
+}
+
+/// Live import progress, polled while [MuninnApi.ingestPath] runs.
+class IngestProgress {
+  const IngestProgress({
+    required this.fileIndex,
+    required this.file,
+    required this.overall,
+    required this.bytesDone,
+    required this.bytesTotal,
+    this.cancelled = false,
+  });
+  final int fileIndex, bytesDone, bytesTotal;
+  final double file, overall;
+  final bool cancelled;
+}
+
+class ExportResult {
+  const ExportResult({required this.path, required this.format, required this.rows});
+  final String path, format;
+  final int rows;
+}
+
 abstract class MuninnApi {
   About about();
   Future<List<String>> listThemes();
@@ -115,9 +159,25 @@ abstract class MuninnApi {
   /// Unlock with the Muninn password; the key stays in Rust. Throws on a wrong password.
   Future<void> unlock(String password);
   void lock();
-  /// Read-only: the store is opened without migrations or writes.
+  /// Dashboard reads: the store is opened without migrations or writes.
   Future<Overview> overview();
   Future<List<ProjectSeries>> projectSeries(String projectId);
   /// Bars of one dataset in [range], downsampled in Rust to at most [maxPoints].
   Future<List<BarPoint>> queryBars(Dataset d, TimeRange range, {int maxPoints = 600});
+  /// Store each data file at [path] (file or folder) byte for byte. Opens the store for writes.
+  Future<IngestResult> ingestPath(String path, {String? source});
+  /// Ask a running import to stop (finished files stay; the current file is rolled back).
+  void cancelIngest();
+  /// Snapshot of a running import, or null.
+  IngestProgress? ingestProgress();
+  /// Write matching bars to [path] as `csv`, `parquet` or `json`. Opens the store for writes.
+  Future<ExportResult> exportBars({
+    required String path,
+    required String format,
+    String? source,
+    String? symbol,
+    String? duration,
+    String? from,
+    String? to,
+  });
 }

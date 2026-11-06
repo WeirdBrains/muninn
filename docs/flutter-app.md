@@ -3,8 +3,8 @@
 Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
-the TUI menu bar, a read-only Home, the Data view with charts and the time range, and
-read-only Projects.
+the TUI menu bar, a read-only Home, the Data view with charts and the time range,
+read-only Projects, and File ▸ Import… / Export… (CSV, Parquet, JSON).
 
 ## Run it
 
@@ -29,6 +29,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Header:** the raven (themed) and the big MUNINN wordmark, as on the website.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
+  File ▸ Import… and Export… are wired; Net, Orgs, Keys and Preferences still point at the CLI.
 - **Phone layout** (narrower than 720 px): bottom navigation (Home, Data, Projects, Net,
   More), 48 px+ targets, safe areas, theme as a bottom sheet; nothing is hover-only.
 - **Themes:** every theme from `assets/themes/*.toml` plus your own in `<home>/themes/`,
@@ -37,7 +38,8 @@ Users never need Rust: release builds ship the compiled library.
   `mnnn theme set` / `mnnn theme mode`), so the TUI and the app follow each other.
 - **Unlock:** Home, Data and Projects ask for the Muninn password once per session. The
   key stays in Rust memory (never in Dart, never on disk); **File ▸ Lock** forgets it.
-  The store is opened **read-only** (no migrations, no writes).
+  Dashboard reads open the store **read-only** (no migrations). **File ▸ Import…** and
+  **Export…** open it for writes after the same unlock.
 - **Home:** where the data lives, and the projects and datasets in it.
 - **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range;
   pick one to see it as a chart (candles when they fit, else a close line, volume
@@ -59,6 +61,14 @@ Users never need Rust: release builds ship the compiled library.
   time, open, high, low, close and volume above it; a guide line marks the bar.
 - **Projects:** pick a project to see the series saved in it (`mnnn project add`);
   opening one shows it in Data with the project's saved time range. Read-only for now.
+- **Import** (File ▸ Import…): pick a file or folder (CSV, TSV, TXT, JSON, NDJSON, JSONL)
+  and store each file as it is in a source, like `mnnn ingest path`. An optional source
+  name overrides the folder's name (else `local`). Progress is byte-based; Cancel keeps
+  finished files and rolls back the file in progress. Stored files are not series —
+  turn them into bars with a [pipe or pipeline](pipes.md).
+- **Export** (File ▸ Export…): write stored bars as CSV, Parquet or JSON, like
+  `mnnn export`. The selected dataset and the time range pre-fill the filters; leave
+  them empty to export everything. No matching bars writes an empty file (CSV header or `[]`).
 - **About** (Help ▸ About Muninn): the same text as the TUI's About box, from
   `muninn_core::about`.
 
@@ -72,7 +82,8 @@ network and sync (see [sync](sync.md)); that comes in a later phase.
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars), exposed with flutter_rust_bridge 2.
+  projects and datasets, downsampled bars, ingest and bar export), exposed with
+  flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.
 - State is Riverpod. Themes are resolved to hex roles in Rust and mapped to Flutter's
