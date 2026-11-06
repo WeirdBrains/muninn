@@ -194,6 +194,67 @@ void main() {
     expect(c.read(selectedJournalProvider)?.id, 'j1');
   });
 
+  testWidgets('applying a records search opens the model and record', (t) async {
+    final (api, c) = await pump(t);
+    api.searchList = [
+      const SearchInfo(
+        id: 's2',
+        shortId: 's2',
+        name: 'Signals',
+        target: 'records',
+        query: 'alpha',
+      ),
+    ];
+    api.foundRecords = const [
+      FoundRecordInfo(
+        modelId: 'm1',
+        modelName: 'signals',
+        recordId: 'r1',
+        brief: 'alpha signal',
+      ),
+    ];
+    api.modelList = const [
+      ModelInfo(
+        id: 'm1',
+        shortId: 'm1',
+        name: 'signals',
+        fields: ['memo'],
+        recordCount: 1,
+      ),
+    ];
+    api.recordList = const [
+      RecordInfo(
+        id: 'r1',
+        shortId: 'r1',
+        modelId: 'm1',
+        fields: [RecordField(name: 'memo', value: 'alpha signal')],
+      ),
+    ];
+    c.read(sectionProvider.notifier).state = Section.projects;
+    c.read(projectPaneProvider.notifier).state = ProjectPane.searches;
+    await t.pumpAndSettle();
+    await unlock(t);
+    expect(find.text('Signals'), findsOneWidget);
+
+    await t.tap(find.byKey(const ValueKey('search-menu-s2')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Apply'));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('found-records:alpha'));
+    expect(find.byKey(const ValueKey('found-records-dialog')), findsOneWidget);
+
+    await t.tap(find.byKey(const ValueKey('found-record-r1')));
+    await t.pumpAndSettle();
+    expect(c.read(sectionProvider), Section.projects);
+    expect(c.read(projectPaneProvider), ProjectPane.models);
+    expect(c.read(viewingModelIdProvider), 'm1');
+    expect(c.read(viewingRecordIdProvider), 'r1');
+    expect(find.byKey(const ValueKey('model-m1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('record-detail-r1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('record-field-memo')), findsOneWidget);
+    expect(find.text('alpha signal'), findsWidgets);
+  });
+
   test('linked list selection centres the paired chart', () {
     final ws = Workspace.single(datasetKey: 'a', asChart: false)
         .split(SplitDir.horizontal, const Size(800, 600), asChart: true)

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state.dart';
+import '../workspace.dart';
 import '../theme/muninn_theme.dart';
 
 class UnlockCard extends ConsumerStatefulWidget {
@@ -34,6 +35,7 @@ class _UnlockCardState extends ConsumerState<UnlockCard> {
       await ref.read(apiProvider).unlock(_c.text);
       _c.clear();
       ref.read(unlockedProvider.notifier).state = true;
+      await restoreLiveLayout(ref);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {

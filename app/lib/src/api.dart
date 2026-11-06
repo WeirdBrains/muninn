@@ -365,6 +365,56 @@ class FoundRecordInfo {
   final int createdAt;
 }
 
+class ModelInfo {
+  const ModelInfo({
+    required this.id,
+    required this.shortId,
+    required this.name,
+    this.description = '',
+    this.builtin = false,
+    this.version = 0,
+    this.isBars = false,
+    this.fields = const [],
+    this.recordCount = 0,
+  });
+  final String id, shortId, name, description;
+  final bool builtin, isBars;
+  final int version, recordCount;
+  final List<String> fields;
+}
+
+class RecordField {
+  const RecordField({required this.name, this.value = ''});
+  final String name, value;
+}
+
+class RecordInfo {
+  const RecordInfo({
+    required this.id,
+    required this.shortId,
+    required this.modelId,
+    this.version = 0,
+    this.createdAt = 0,
+    this.updatedAt = 0,
+    this.fields = const [],
+  });
+  final String id, shortId, modelId;
+  final int version, createdAt, updatedAt;
+  final List<RecordField> fields;
+}
+
+class PipeFrameInfo {
+  const PipeFrameInfo({
+    required this.key,
+    this.columns = const [],
+    this.cells = const [],
+    this.rowCount = 0,
+  });
+  final String key;
+  final List<String> columns, cells;
+  final int rowCount;
+}
+
 class ReportExportInfo {
   const ReportExportInfo({
     required this.path,
@@ -1511,6 +1561,10 @@ abstract class MuninnApi {
   Future<String> namedLayout(String name);
   Future<String> removeNamedLayout(String name);
 
+  /// Live workspace tree (`[tui.layout]`), shared with the TUI.
+  Future<String?> liveLayout();
+  Future<String> saveLiveLayout(String json);
+
   /// History bar visibility (`[tui.history_open]`, TUI `Y`).
   Future<bool> historyOpen();
   Future<void> setHistoryOpen(bool open);
@@ -1751,6 +1805,12 @@ abstract class MuninnApi {
     int? to,
   });
 
+  /// Models and records (`mnnn model` / TUI Data ▸ Model designer…).
+  Future<List<ModelInfo>> models();
+  Future<ModelInfo> model(String key);
+  Future<List<RecordInfo>> modelRecords(String model, {String? text, int? limit});
+  Future<RecordInfo> modelRecord(String model, String id);
+
   /// Action history (`View ▸ History`, TUI `Y` / `u` / `U`).
   Future<List<HistoryRowInfo>> historyTree();
   Future<HistoryMoveInfo> historyBack();
@@ -1841,6 +1901,8 @@ abstract class MuninnApi {
   Future<List<String>> codeCheck(String space);
   Future<CodeRunResult> codeBuild(String space);
   Future<CodeRunResult> codeRun(String space);
+  /// Latest `pipe.frame` for a data tile (`code:SPACE` or `view:PIPELINE/NODE`).
+  Future<PipeFrameInfo?> latestPipeFrame(String key);
   Future<List<CodeParserInfo>> codeParsers();
   Future<String> codeParsersInstall({String? name});
 

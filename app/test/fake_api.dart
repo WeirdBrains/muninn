@@ -97,6 +97,10 @@ class FakeApi implements MuninnApi {
   List<AuthorInfo> authorList = const [];
   List<FoundEntryInfo> foundEntries = const [];
   List<FoundRecordInfo> foundRecords = const [];
+  List<ModelInfo> modelList = const [];
+  List<RecordInfo> recordList = const [];
+  final Map<String, PipeFrameInfo> pipeFrames = {};
+  String? liveLayoutJson;
 
   @override
   Future<List<String>> savedLayouts() async =>
@@ -122,6 +126,19 @@ class FakeApi implements MuninnApi {
     extraCalls.add('layout-remove:$name');
     if (namedLayouts.remove(name) == null) throw 'no saved layout `$name`';
     return 'removed layout $name';
+  }
+
+  @override
+  Future<String?> liveLayout() async {
+    extraCalls.add('layout-live');
+    return liveLayoutJson;
+  }
+
+  @override
+  Future<String> saveLiveLayout(String json) async {
+    extraCalls.add('layout-save-live');
+    liveLayoutJson = json;
+    return 'saved layout';
   }
 
   @override
@@ -956,6 +973,42 @@ class FakeApi implements MuninnApi {
   }
 
   @override
+  Future<List<ModelInfo>> models() async => List.of(modelList);
+
+  @override
+  Future<ModelInfo> model(String key) async => modelList.firstWhere(
+    (m) => m.id == key || m.name == key || m.shortId == key,
+  );
+
+  @override
+  Future<List<RecordInfo>> modelRecords(
+    String model, {
+    String? text,
+    int? limit,
+  }) async {
+    extraCalls.add('model-records:$model');
+    final q = (text ?? '').toLowerCase();
+    var rows = [
+      for (final r in recordList)
+        if (r.modelId == model) r,
+    ];
+    if (q.isNotEmpty) {
+      rows = [
+        for (final r in rows)
+          if (r.fields.any((f) => f.value.toLowerCase().contains(q))) r,
+      ];
+    }
+    if (limit != null && rows.length > limit) rows = rows.sublist(0, limit);
+    return rows;
+  }
+
+  @override
+  Future<RecordInfo> modelRecord(String model, String id) async {
+    extraCalls.add('model-record:$model:$id');
+    return recordList.firstWhere((r) => r.modelId == model && r.id == id);
+  }
+
+  @override
   Future<List<HistoryRowInfo>> historyTree() async => List.of(historyList);
 
   HistoryMoveInfo _historyMove() =>
@@ -1397,7 +1450,22 @@ class FakeApi implements MuninnApi {
         else
           c,
     ];
+    final name = codeList
+        .firstWhere((c) => c.id == space || c.name == space)
+        .name;
+    pipeFrames['code:$name'] = PipeFrameInfo(
+      key: 'code:$name',
+      columns: const ['value'],
+      cells: const ['101'],
+      rowCount: 1,
+    );
     return const CodeRunResult(status: 'ok', lines: ['mean close 101'], ms: 4);
+  }
+
+  @override
+  Future<PipeFrameInfo?> latestPipeFrame(String key) async {
+    extraCalls.add('pipe-frame:$key');
+    return pipeFrames[key];
   }
 
   @override

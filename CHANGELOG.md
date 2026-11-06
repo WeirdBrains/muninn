@@ -35,6 +35,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: tiling extras — named layouts (`[tui.layouts]`, shared with the TUI), the history bar (`Y` / `u` / `U`), File ▸ Authors… (`A`), per-tile chart layers and viewport, linked list↔chart pan, and found-views when applying a journals or records search
 - Flutter app: pipeline monitor as a Data workspace tile (`monitor:PIPELINE`, shared with the TUI)
 - Flutter app: journal word-cursor highlighting and image thumbnails (downscaled PNG preview; original bytes stay in Rust)
+- Flutter app: model/record viewer so a found-records hit opens that model and record (schema edits stay in the TUI/CLI)
+- Flutter app: code-result workspace tiles (`code:SPACE`, TUI `T`); pipeline-view keys (`view:PIPELINE/NODE`) render the same way when present in a layout
+- Flutter app: live workspace tree written to `[tui.layout]` after unlock (shared with the TUI)
 
 ## [2.22.0] - 2026-11-05
 

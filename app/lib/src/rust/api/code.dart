@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `apply_pipe_format`, `approve_if_needed`, `approve_pipe_spaces`, `chunk_frames`, `code_spaces_of`, `edge_spec`, `graph_lines`, `hash16`, `live_pipes_of`, `node_spec`, `nonempty`, `parse_lang`, `pipe_result`, `pipe_run_of`, `pipeline_end_in_model_of`, `pipeline_info`, `pipeline_monitor_of`, `pipeline_run_of`, `pipeline_run_once`, `pipeline_tee_of`, `pipelines_of`, `run_result`, `scope_label`, `source_from`, `space_info`, `stdin_body`, `strs`
+// These functions are ignored because they are not marked as `pub`: `apply_pipe_format`, `approve_if_needed`, `approve_pipe_spaces`, `chunk_frames`, `code_spaces_of`, `edge_spec`, `frame_cell`, `graph_lines`, `hash16`, `latest_pipe_frame_of`, `live_pipes_of`, `node_spec`, `nonempty`, `parse_lang`, `pipe_result`, `pipe_run_of`, `pipeline_end_in_model_of`, `pipeline_info`, `pipeline_monitor_of`, `pipeline_run_of`, `pipeline_run_once`, `pipeline_tee_of`, `pipelines_of`, `run_result`, `scope_label`, `source_from`, `space_info`, `stdin_body`, `strs`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`
 
 /// `mnnn code list` / TUI Code spaces….
@@ -186,6 +186,10 @@ Future<PipelineInfo> pipelineEndInModel({
 /// TUI monitor tile: each node's status, rows and what landed in the latest run.
 Future<PipelineMonitor> pipelineMonitor({required String pipeline}) =>
     RustLib.instance.api.crateApiCodePipelineMonitor(pipeline: pipeline);
+
+/// Latest `pipe.frame` for a data tile key (`code:SPACE` or `view:PIPELINE/NODE`).
+Future<PipeFrameInfo?> latestPipeFrame({required String key}) =>
+    RustLib.instance.api.crateApiCodeLatestPipeFrame(key: key);
 
 /// `mnnn pipeline export`. Bytes stay in Rust; Dart passes the path.
 Future<String> pipelineExport({
@@ -446,6 +450,34 @@ class LivePipeInfo {
           hops == other.hops &&
           saved == other.saved &&
           updated == other.updated;
+}
+
+class PipeFrameInfo {
+  final String key;
+  final List<String> columns;
+  final List<String> cells;
+  final int rowCount;
+
+  const PipeFrameInfo({
+    required this.key,
+    required this.columns,
+    required this.cells,
+    required this.rowCount,
+  });
+
+  @override
+  int get hashCode =>
+      key.hashCode ^ columns.hashCode ^ cells.hashCode ^ rowCount.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PipeFrameInfo &&
+          runtimeType == other.runtimeType &&
+          key == other.key &&
+          columns == other.columns &&
+          cells == other.cells &&
+          rowCount == other.rowCount;
 }
 
 class PipeRunResult {

@@ -12,6 +12,7 @@ import 'rust/api/help.dart' as r_help;
 import 'rust/api/info.dart' as r_info;
 import 'rust/api/keys.dart' as r_keys;
 import 'rust/api/mcp.dart' as r_mcp;
+import 'rust/api/models.dart' as r_models;
 import 'rust/api/io.dart' as r_io;
 import 'rust/api/journals.dart' as r_journals;
 import 'rust/api/authors.dart' as r_authors;
@@ -115,6 +116,13 @@ class FfiMuninnApi implements MuninnApi {
   @override
   Future<String> removeNamedLayout(String name) =>
       r_layouts.removeNamedLayout(home: home, name: name);
+
+  @override
+  Future<String?> liveLayout() => r_layouts.liveLayout(home: home);
+
+  @override
+  Future<String> saveLiveLayout(String json) =>
+      r_layouts.saveLiveLayout(home: home, json: json);
 
   @override
   Future<bool> historyOpen() => r_layouts.historyOpen(home: home);
@@ -803,7 +811,34 @@ class FfiMuninnApi implements MuninnApi {
       _foundRecord(e),
   ];
 
+    @override
+  Future<List<ModelInfo>> models() async => [
+    for (final m in await r_models.models()) _model(m),
+  ];
+
   @override
+  Future<ModelInfo> model(String key) async =>
+      _model(await r_models.model(key: key));
+
+  @override
+  Future<List<RecordInfo>> modelRecords(
+    String model, {
+    String? text,
+    int? limit,
+  }) async => [
+    for (final r in await r_models.modelRecords(
+      model: model,
+      text: text,
+      limit: limit,
+    ))
+      _record(r),
+  ];
+
+  @override
+  Future<RecordInfo> modelRecord(String model, String id) async =>
+      _record(await r_models.modelRecord(model: model, id: id));
+
+@override
   Future<List<HistoryRowInfo>> historyTree() async => [
     for (final r in await r_history.historyTree()) _historyRow(r),
   ];
@@ -1064,6 +1099,18 @@ class FfiMuninnApi implements MuninnApi {
   @override
   Future<CodeRunResult> codeRun(String space) async =>
       _codeRun(await r_code.codeRun(space: space));
+
+  @override
+  Future<PipeFrameInfo?> latestPipeFrame(String key) async {
+    final f = await r_code.latestPipeFrame(key: key);
+    if (f == null) return null;
+    return PipeFrameInfo(
+      key: f.key,
+      columns: f.columns,
+      cells: f.cells,
+      rowCount: f.rowCount,
+    );
+  }
 
   @override
   Future<List<CodeParserInfo>> codeParsers() async => [
@@ -3027,6 +3074,28 @@ FoundRecordInfo _foundRecord(r_searches.FoundRecord e) => FoundRecordInfo(
   recordId: e.recordId,
   brief: e.brief,
   createdAt: e.createdAt.toInt(),
+);
+
+ModelInfo _model(r_models.ModelInfo m) => ModelInfo(
+  id: m.id,
+  shortId: m.shortId,
+  name: m.name,
+  description: m.description,
+  builtin: m.builtin,
+  version: m.version.toInt(),
+  isBars: m.isBars,
+  fields: m.fields,
+  recordCount: m.recordCount,
+);
+
+RecordInfo _record(r_models.RecordInfo r) => RecordInfo(
+  id: r.id,
+  shortId: r.shortId,
+  modelId: r.modelId,
+  version: r.version.toInt(),
+  createdAt: r.createdAt.toInt(),
+  updatedAt: r.updatedAt.toInt(),
+  fields: [for (final f in r.fields) RecordField(name: f.name, value: f.value)],
 );
 
 HistoryRowInfo _historyRow(r_history.HistoryRow r) => HistoryRowInfo(

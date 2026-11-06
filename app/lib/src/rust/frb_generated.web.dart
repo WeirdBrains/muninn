@@ -19,6 +19,7 @@ import 'api/journals.dart';
 import 'api/keys.dart';
 import 'api/layouts.dart';
 import 'api/mcp.dart';
+import 'api/models.dart';
 import 'api/net.dart';
 import 'api/notify.dart';
 import 'api/orgs.dart';
@@ -83,6 +84,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   NetMeInfo dco_decode_box_autoadd_net_me_info(dynamic raw);
+
+  @protected
+  PipeFrameInfo dco_decode_box_autoadd_pipe_frame_info(dynamic raw);
 
   @protected
   RevealHandle dco_decode_box_autoadd_reveal_handle(dynamic raw);
@@ -237,6 +241,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<McpToolInfo> dco_decode_list_mcp_tool_info(dynamic raw);
 
   @protected
+  List<ModelInfo> dco_decode_list_model_info(dynamic raw);
+
+  @protected
   List<NetConnNode> dco_decode_list_net_conn_node(dynamic raw);
 
   @protected
@@ -341,6 +348,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ProjectSummary> dco_decode_list_project_summary(dynamic raw);
 
   @protected
+  List<RecordField> dco_decode_list_record_field(dynamic raw);
+
+  @protected
+  List<RecordInfo> dco_decode_list_record_info(dynamic raw);
+
+  @protected
   List<ReportInfo> dco_decode_list_report_info(dynamic raw);
 
   @protected
@@ -399,6 +412,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   McpToolInfo dco_decode_mcp_tool_info(dynamic raw);
+
+  @protected
+  ModelInfo dco_decode_model_info(dynamic raw);
 
   @protected
   NetConfig dco_decode_net_config(dynamic raw);
@@ -490,6 +506,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NetMeInfo? dco_decode_opt_box_autoadd_net_me_info(dynamic raw);
 
   @protected
+  PipeFrameInfo? dco_decode_opt_box_autoadd_pipe_frame_info(dynamic raw);
+
+  @protected
   RevealHandle? dco_decode_opt_box_autoadd_reveal_handle(dynamic raw);
 
   @protected
@@ -562,6 +581,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PeerMessageInfo dco_decode_peer_message_info(dynamic raw);
 
   @protected
+  PipeFrameInfo dco_decode_pipe_frame_info(dynamic raw);
+
+  @protected
   PipeRunResult dco_decode_pipe_run_result(dynamic raw);
 
   @protected
@@ -584,6 +606,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProjectSummary dco_decode_project_summary(dynamic raw);
+
+  @protected
+  RecordField dco_decode_record_field(dynamic raw);
+
+  @protected
+  RecordInfo dco_decode_record_info(dynamic raw);
 
   @protected
   ReportExportInfo dco_decode_report_export_info(dynamic raw);
@@ -697,6 +725,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   NetMeInfo sse_decode_box_autoadd_net_me_info(SseDeserializer deserializer);
+
+  @protected
+  PipeFrameInfo sse_decode_box_autoadd_pipe_frame_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RevealHandle sse_decode_box_autoadd_reveal_handle(
@@ -881,6 +914,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<McpToolInfo> sse_decode_list_mcp_tool_info(SseDeserializer deserializer);
 
   @protected
+  List<ModelInfo> sse_decode_list_model_info(SseDeserializer deserializer);
+
+  @protected
   List<NetConnNode> sse_decode_list_net_conn_node(SseDeserializer deserializer);
 
   @protected
@@ -1031,6 +1067,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<RecordField> sse_decode_list_record_field(SseDeserializer deserializer);
+
+  @protected
+  List<RecordInfo> sse_decode_list_record_info(SseDeserializer deserializer);
+
+  @protected
   List<ReportInfo> sse_decode_list_report_info(SseDeserializer deserializer);
 
   @protected
@@ -1101,6 +1143,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   McpToolInfo sse_decode_mcp_tool_info(SseDeserializer deserializer);
+
+  @protected
+  ModelInfo sse_decode_model_info(SseDeserializer deserializer);
 
   @protected
   NetConfig sse_decode_net_config(SseDeserializer deserializer);
@@ -1200,6 +1245,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PipeFrameInfo? sse_decode_opt_box_autoadd_pipe_frame_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RevealHandle? sse_decode_opt_box_autoadd_reveal_handle(
     SseDeserializer deserializer,
   );
@@ -1278,6 +1328,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PeerMessageInfo sse_decode_peer_message_info(SseDeserializer deserializer);
 
   @protected
+  PipeFrameInfo sse_decode_pipe_frame_info(SseDeserializer deserializer);
+
+  @protected
   PipeRunResult sse_decode_pipe_run_result(SseDeserializer deserializer);
 
   @protected
@@ -1304,6 +1357,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProjectSummary sse_decode_project_summary(SseDeserializer deserializer);
+
+  @protected
+  RecordField sse_decode_record_field(SseDeserializer deserializer);
+
+  @protected
+  RecordInfo sse_decode_record_info(SseDeserializer deserializer);
 
   @protected
   ReportExportInfo sse_decode_report_export_info(SseDeserializer deserializer);
@@ -1431,6 +1490,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_net_me_info(
     NetMeInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_pipe_frame_info(
+    PipeFrameInfo self,
     SseSerializer serializer,
   );
 
@@ -1678,6 +1743,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_model_info(
+    List<ModelInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_net_conn_node(
     List<NetConnNode> self,
     SseSerializer serializer,
@@ -1879,6 +1950,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_record_field(
+    List<RecordField> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_record_info(
+    List<RecordInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_report_info(
     List<ReportInfo> self,
     SseSerializer serializer,
@@ -1979,6 +2062,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_mcp_tool_info(McpToolInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_model_info(ModelInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_net_config(NetConfig self, SseSerializer serializer);
@@ -2104,6 +2190,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_pipe_frame_info(
+    PipeFrameInfo? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_reveal_handle(
     RevealHandle? self,
     SseSerializer serializer,
@@ -2209,6 +2301,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_pipe_frame_info(PipeFrameInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_pipe_run_result(PipeRunResult self, SseSerializer serializer);
 
   @protected
@@ -2246,6 +2341,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     ProjectSummary self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_record_field(RecordField self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_record_info(RecordInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_report_export_info(

@@ -210,6 +210,11 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
       ref.read(sectionProvider.notifier).state = Section.projects;
       return KeyEventResult.handled;
     }
+    if (ch == 'D' || (key == LogicalKeyboardKey.keyD && shift)) {
+      ref.read(projectPaneProvider.notifier).state = ProjectPane.models;
+      ref.read(sectionProvider.notifier).state = Section.projects;
+      return KeyEventResult.handled;
+    }
     if (ch == 'K' || (key == LogicalKeyboardKey.keyK && shift)) {
       ref.read(sectionProvider.notifier).state = Section.net;
       return KeyEventResult.handled;

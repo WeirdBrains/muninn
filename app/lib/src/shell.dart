@@ -501,6 +501,10 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           ),
           item('Sources…', () => showSourcesDialog(context, ref)),
           item('Symbols…', () => showSymbolsDialog(context, ref)),
+          item('Models…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.models;
+            go(Section.projects);
+          }, const SingleActivator(LogicalKeyboardKey.keyD, shift: true)),
         ]),
         menu('Projects', [
           item('Projects…', () {
@@ -523,6 +527,10 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           item('New journal…', () => showNewJournalDialog(context, ref)),
           item('Reports…', () {
             ref.read(projectPaneProvider.notifier).state = ProjectPane.reports;
+            go(Section.projects);
+          }),
+          item('Models…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.models;
             go(Section.projects);
           }),
           item('New report…', () => showNewReportDialog(context, ref)),
@@ -779,4 +787,7 @@ void lockStore(WidgetRef ref) {
   ref.read(apiProvider).lock();
   ref.read(unlockedProvider.notifier).state = false;
   ref.read(selectedProjectProvider.notifier).state = null;
+  ref.read(liveLayoutReadyProvider.notifier).state = false;
+  ref.read(viewingModelIdProvider.notifier).state = null;
+  ref.read(viewingRecordIdProvider.notifier).state = null;
 }

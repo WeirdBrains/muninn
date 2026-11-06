@@ -1,9 +1,10 @@
 /// Desktop tiling workspace, matching the TUI's i3-style binary tree
 /// (`docs/tiling.md`): split, close, focus, resize, zoom, link, containers,
-/// presets. The live tree is session-only (`[tui.layout]` is not written on
-/// start); named layouts save to `[tui.layouts]` and are shared with the TUI.
+/// presets. The live tree is written to `[tui.layout]` after unlock (shared with
+/// the TUI); named layouts save to `[tui.layouts]`.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -50,17 +51,33 @@ class WsTile {
   final ChartLayers layers;
   final ChartViewport viewport;
   final int? listCursorTs;
-  /// `monitor:PIPELINE`, shared with the TUI's `FrameTile.key`.
+  /// `monitor:PIPELINE`, `code:SPACE` or `view:PIPELINE/NODE` (TUI `FrameTile.key`).
   final String? frameKey;
+
+  bool get isFrame => frameKey != null && frameKey!.isNotEmpty;
 
   bool get isMonitor =>
       frameKey != null && frameKey!.startsWith('monitor:') && frameKey!.length > 8;
 
+  bool get isCodeResult =>
+      frameKey != null && frameKey!.startsWith('code:') && frameKey!.length > 5;
+
+  bool get isPipelineView =>
+      frameKey != null && frameKey!.startsWith('view:') && frameKey!.length > 5;
+
   String? get monitorPipeline =>
       isMonitor ? frameKey!.substring('monitor:'.length) : null;
 
+  String? get codeSpace =>
+      isCodeResult ? frameKey!.substring('code:'.length) : null;
+
+  String? get pipelineView =>
+      isPipelineView ? frameKey!.substring('view:'.length) : null;
+
   String get label {
     if (isMonitor) return 'monitor · $monitorPipeline';
+    if (isCodeResult) return 'result · $codeSpace';
+    if (isPipelineView) return 'view · $pipelineView';
     final view = asChart ? 'chart' : 'list';
     return '$view ${datasetKey ?? ''}'.trim();
   }
@@ -195,9 +212,8 @@ class Workspace {
   Workspace updateTile(int id, WsTile Function(WsTile) f) =>
       _copy(root: root.mapTiles((t) => t.id == id ? f(t) : t));
 
-  /// Open or focus a pipeline monitor tile (`monitor:PIPELINE`), like the TUI's `m`.
-  Workspace openMonitor(String pipeline, Size area) {
-    final key = 'monitor:$pipeline';
+  /// Open or focus a data frame tile (`monitor:`, `code:` or `view:`), like the TUI.
+  Workspace openFrame(String key, Size area) {
     for (final t in tiles) {
       if (t.frameKey == key) return focusTile(t.id);
     }
@@ -214,6 +230,14 @@ class Workspace {
       (t) => t.copyWith(frameKey: key, clearDataset: true, datasetKey: null),
     );
   }
+
+  /// Open or focus a pipeline monitor tile (`monitor:PIPELINE`), like the TUI's `m`.
+  Workspace openMonitor(String pipeline, Size area) =>
+      openFrame('monitor:$pipeline', area);
+
+  /// Open or focus a code-space result tile (`code:SPACE`), like the TUI's `T`.
+  Workspace openCodeResult(String space, Size area) =>
+      openFrame('code:$space', area);
 
   String encode() => jsonEncode(toJson());
 
@@ -871,6 +895,9 @@ WsNode _nodeFromJson(dynamic v) {
 
 final workspaceProvider = StateProvider<Workspace>((ref) => Workspace.single());
 
+/// True after the first attempt to restore `[tui.layout]` this unlock session.
+final liveLayoutReadyProvider = StateProvider<bool>((ref) => false);
+
 final workspaceAreaProvider = StateProvider<Size>(
   (ref) => const Size(800, 600),
 );
@@ -903,6 +930,7 @@ void syncWorkspaceSelection(WidgetRef ref) {
 void applyWorkspace(WidgetRef ref, WsOp op, {BuildContext? context}) {
   ref.read(workspaceProvider.notifier).state = op.workspace;
   syncWorkspaceSelection(ref);
+  _persistLiveLayout(ref, op.workspace);
   final msg = op.error ?? op.status;
   if (msg != null && context != null && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -912,4 +940,26 @@ void applyWorkspace(WidgetRef ref, WsOp op, {BuildContext? context}) {
 void setWorkspace(WidgetRef ref, Workspace ws) {
   ref.read(workspaceProvider.notifier).state = ws;
   syncWorkspaceSelection(ref);
+  _persistLiveLayout(ref, ws);
+}
+
+void _persistLiveLayout(WidgetRef ref, Workspace ws) {
+  if (!ref.read(unlockedProvider) || !ref.read(liveLayoutReadyProvider)) {
+    return;
+  }
+  unawaited(ref.read(apiProvider).saveLiveLayout(ws.encode()));
+}
+
+/// Restore `[tui.layout]` after unlock, then allow later changes to save it.
+Future<void> restoreLiveLayout(WidgetRef ref) async {
+  if (ref.read(liveLayoutReadyProvider)) return;
+  try {
+    final json = await ref.read(apiProvider).liveLayout();
+    if (json != null && json.isNotEmpty) {
+      final ws = Workspace.decode(json);
+      ref.read(workspaceProvider.notifier).state = ws;
+      syncWorkspaceSelection(ref);
+    }
+  } catch (_) {}
+  ref.read(liveLayoutReadyProvider.notifier).state = true;
 }

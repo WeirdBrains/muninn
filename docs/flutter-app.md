@@ -57,7 +57,7 @@ Users never need Rust: release builds ship the compiled library.
   focus / resize / zoom / link / tabbed and stacked containers, and the 2-up,
   3-column, Main + stack and 2×2 presets). A session starts with one chart tile
   (the app's existing Data default; the TUI starts with a list tile) and the layout
-  stays in memory — it does not write `[tui.layout]`. Pick a dataset to see it as a
+  is written to `[tui.layout]` after unlock (shared with the TUI). Pick a dataset to see it as a
   chart (candles when they fit, else a close line, volume
   underneath) or a list of bars, newest first. **Data ▸ Sources…** lists ingest
   sources (`mnnn sources list`) with kind, locator and stored-item totals; you can
@@ -123,14 +123,14 @@ Users never need Rust: release builds ship the compiled library.
   copy`). **Export** writes PDF, Word, HTML, LaTeX, text or JSON to a path
   (`mnnn journal export`); **Import journal** reads a JSON export (`mnnn journal
   import`); **Print** saves a PDF and can send it to `lp`/`lpr` (`mnnn journal
-  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (`mnnn search save|edit`, TUI `w`), apply a series search to Data (TUI Enter), and rename, fork or delete it (`mnnn search fork|remove`). Shift+F opens Live searches, matching the TUI's `F`. Applying a journals or records search opens a found-views list (TUI Enter on those targets); a series search still applies to Data. Found records show the model and a brief, but tapping one does not open a model or record pane — the app has no model viewer yet. **Reports** create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI `v` / `mnnn report preview`) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI `E` / `mnnn report export`). File bytes stay in Rust. **Code spaces** list, create
+  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (`mnnn search save|edit`, TUI `w`), apply a series search to Data (TUI Enter), and rename, fork or delete it (`mnnn search fork|remove`). Shift+F opens Live searches, matching the TUI's `F`. Applying a journals or records search opens a found-views list (TUI Enter on those targets); a series search still applies to Data. Tapping a found record opens the Models pane on that model and record (TUI Data ▸ Model designer… / `D`). Schema edits, migrations and rules stay in the TUI and CLI. **Reports** create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI `v` / `mnnn report preview`) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI `E` / `mnnn report export`). File bytes stay in Rust. **Code spaces** list, create
   (from a language template, another space or a built-in parser), edit source and
   input, approve, check, build, run and remove (`mnnn code` / TUI Code, `C`).
   Built-in parsers can be listed and installed (`mnnn code parsers --install`).
   **Give to org…** (the TUI Code window `g`) assigns a space to an organization
   you own (`mnnn org resource add`); members pull it with Sync code. Piping a
-  prior step into a space (`>`), result tiles and writing the plugin SDK stay
-  in the TUI or CLI. **Pipes** show live
+  prior step into a space (`>`) and writing the plugin SDK stay
+  in the TUI or CLI. **Result tile…** (TUI `T`) opens a Data workspace tile (`code:SPACE`) with the space’s latest run as a table. **Pipes** show live
   and recent runs from history (the TUI Pipes window) and run a pipe
   (`mnnn pipe SOURCE STEP… [--to TARGET]`). Source `-` is standard input: paste
   the text or choose a file (Rust reads the bytes), with the CLI's `--format`
@@ -241,8 +241,7 @@ Users never need Rust: release builds ship the compiled library.
   (`[theme]`, `[tui.sidebar.filters]` from/to, `[app] dataset`) and shared with the TUI.
   Changing them here uses the same save path as the Theme menu, the time range picker
   and Data. Header size stays in `mnnn tui`. Named layouts write `[tui.layouts]`
-  (shared with the TUI); the live tile tree is still session-only and does not
-  write `[tui.layout]` on start. The history bar (`Y` / `u` / `U`) stores
+  (shared with the TUI); the live tile tree is written to `[tui.layout]` after unlock, like the TUI. The history bar (`Y` / `u` / `U`) stores
   `[tui.history_open]` the same way the TUI does.
 - **Help** (Help ▸ Topics… / Search help… / Keybindings, or `?` / F1): the same
   embedded `docs/` topics as `mnnn help` and the TUI. `?` and F1 open the topic
@@ -342,9 +341,9 @@ When the Data chart is showing:
 - **Tiling** follows the TUI's i3-style binary tree on a wide window (width ≥ 720).
   `Ctrl-w` is a prefix (the same as the TUI): it is not registered as `Ctrl+V` /
   `Ctrl+S` / `Ctrl+Q`, so paste, save and quit stay with the platform. Minimum tile
-  size is 200×96 pixels (a stand-in for the TUI's 20×6 cells). Chart, list and pipeline-monitor (`monitor:PIPELINE`) tiles
-  — the app has no terminal tiles or code-result tiles.
-  The live layout is session-only (not written to `[tui.layout]`). A fresh session is one
+  size is 200×96 pixels (a stand-in for the TUI's 20×6 cells). Chart, list, pipeline-monitor (`monitor:PIPELINE`) and data-frame tiles (`code:SPACE` from Code ▸ Result tile… / TUI `T`, and `view:PIPELINE/NODE` when a saved layout includes them).
+  The TUI has no embedded PTY/terminal tile type — it is itself a terminal UI — so the app does not invent a terminal emulator.
+  The live layout is written to `[tui.layout]` after unlock (shared with the TUI). A fresh session without a saved layout is one
   chart tile so existing Data behaviour stays; the TUI starts with a list tile.
   Chart layers and the visible window are stored on each tile (like the TUI). Linking records
   a pairing and shows ⛓id in the title; selecting a row in a linked list centres the paired

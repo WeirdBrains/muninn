@@ -32,6 +32,7 @@ void main() {
     await unlock(t);
     await t.tap(find.text('Projects'));
     await t.pumpAndSettle();
+    await t.ensureVisible(find.text('Rules…'));
     await t.tap(find.text('Rules…'));
     await t.pumpAndSettle();
     expect(c.read(projectPaneProvider), ProjectPane.rules);

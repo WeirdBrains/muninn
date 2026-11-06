@@ -14,6 +14,7 @@ import '../time_range.dart';
 import '../workspace.dart';
 import '../tiling_extras.dart';
 import 'chart.dart';
+import 'frame_tile.dart';
 import 'project_compute.dart';
 import 'unlock.dart';
 
@@ -339,6 +340,9 @@ class SeriesPanel extends ConsumerWidget {
     final tile = tileId == null ? null : ws.tile(tileId!);
     if (tile != null && tile.isMonitor) {
       return PipelineMonitorPane(pipeline: tile.monitorPipeline!);
+    }
+    if (tile != null && tile.isFrame) {
+      return FrameResultPane(frameKey: tile.frameKey!);
     }
     final key = tile?.datasetKey ?? ref.watch(selectedDatasetProvider);
     final bool asChart = tile?.asChart ?? ref.watch(dataAsChartProvider);

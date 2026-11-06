@@ -46,6 +46,16 @@ void main() {
     expect(api.extraCalls, contains('code-create:mean:math'));
     expect(find.text('mean'), findsOneWidget);
     expect(find.textContaining('not approved'), findsOneWidget);
+
+    await t.tap(find.byType(PopupMenuButton<String>));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Result tile…'));
+    await t.pumpAndSettle();
+    expect(c.read(sectionProvider), Section.data);
+    expect(
+      c.read(workspaceProvider).tiles.any((t) => t.frameKey == 'code:mean'),
+      isTrue,
+    );
   });
 
   testWidgets('Pipes menu lists none then runs a pipe', (t) async {

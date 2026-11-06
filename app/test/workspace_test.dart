@@ -191,10 +191,33 @@ void main() {
     expect(loaded.focused.datasetKey, isNull);
   });
 
+  test('named-layout JSON round-trips a code-result frame', () {
+    final ws = Workspace.single().openCodeResult('mean', area);
+    expect(ws.focused.frameKey, 'code:mean');
+    expect(ws.focused.isCodeResult, isTrue);
+    expect(ws.focused.codeSpace, 'mean');
+    expect(ws.encode(), contains('code:mean'));
+    final loaded = Workspace.decode(ws.encode());
+    expect(loaded.focused.frameKey, 'code:mean');
+    expect(loaded.focused.isCodeResult, isTrue);
+    expect(loaded.focused.datasetKey, isNull);
+  });
+
+  testWidgets('unlock restores the live [tui.layout]', (t) async {
+    final (api, c) = await pump(t, const Size(1280, 800));
+    api.liveLayoutJson = Workspace.single().openCodeResult('mean', area).encode();
+    c.read(sectionProvider.notifier).state = Section.data;
+    await t.pumpAndSettle();
+    await unlock(t);
+    expect(api.extraCalls, contains('layout-live'));
+    expect(c.read(workspaceProvider).focused.frameKey, 'code:mean');
+    expect(find.byKey(const ValueKey('frame-result-code:mean')), findsOneWidget);
+  });
+
   testWidgets(
     'Ctrl-w v splits; Tab and Alt-2 move focus; Ctrl-b hides the sidebar',
     (t) async {
-      final (_, c) = await pump(t, const Size(1280, 800));
+      final (api, c) = await pump(t, const Size(1280, 800));
       c.read(sectionProvider.notifier).state = Section.data;
       await t.pumpAndSettle();
       await unlock(t);
@@ -205,6 +228,7 @@ void main() {
       await ctrlWThen(t, LogicalKeyboardKey.keyV);
       expect(c.read(workspaceProvider).tiles, hasLength(2));
       expect(c.read(workspaceProvider).focus, 2);
+      expect(api.extraCalls, contains('layout-save-live'));
       expect(find.byKey(const ValueKey('data-tile-1')), findsOneWidget);
       expect(find.byKey(const ValueKey('data-tile-2')), findsOneWidget);
 

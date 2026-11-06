@@ -42,3 +42,11 @@ Future<bool> historyOpen({String? home}) =>
 /// Show or hide the history bar, shared with the TUI.
 Future<void> setHistoryOpen({String? home, required bool open}) =>
     RustLib.instance.api.crateApiLayoutsSetHistoryOpen(home: home, open: open);
+
+/// The live workspace tree (`[tui.layout]`), shared with the TUI. Missing when never saved.
+Future<String?> liveLayout({String? home}) =>
+    RustLib.instance.api.crateApiLayoutsLiveLayout(home: home);
+
+/// Write the live workspace tree to `[tui.layout]`, like the TUI after every layout change.
+Future<String> saveLiveLayout({String? home, required String json}) =>
+    RustLib.instance.api.crateApiLayoutsSaveLiveLayout(home: home, json: json);

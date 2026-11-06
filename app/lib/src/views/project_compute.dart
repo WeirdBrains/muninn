@@ -11,6 +11,7 @@ import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
 import '../workspace.dart';
+import 'frame_tile.dart';
 
 void _ok(BuildContext context, String msg, {Color? color}) {
   ScaffoldMessenger.of(context)
@@ -176,6 +177,10 @@ class CodeSpacesPane extends ConsumerWidget {
                           PopupMenuItem(value: 'open', child: Text('Open…')),
                           PopupMenuItem(value: 'run', child: Text('Run')),
                           PopupMenuItem(
+                            value: 'result',
+                            child: Text('Result tile…'),
+                          ),
+                          PopupMenuItem(
                             value: 'approve',
                             child: Text('Approve'),
                           ),
@@ -211,6 +216,8 @@ Future<void> _codeAction(
           builder: (ctx) => _CodeSpaceDialog(existing: c),
         );
         if (ok == true) refreshProjectExtras(ref);
+      case 'result':
+        openCodeResultTile(ref, c);
       case 'run':
         if (!c.approved &&
             !await _confirm(

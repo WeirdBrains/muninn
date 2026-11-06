@@ -755,6 +755,17 @@ Future<void> showFoundRecordsDialog(
                       minTileHeight: 56,
                       title: Text(r.brief.isNotEmpty ? r.brief : r.recordId),
                       subtitle: Text(r.modelName),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        ref.read(sectionProvider.notifier).state =
+                            Section.projects;
+                        ref.read(projectPaneProvider.notifier).state =
+                            ProjectPane.models;
+                        ref.read(viewingModelIdProvider.notifier).state =
+                            r.modelId;
+                        ref.read(viewingRecordIdProvider.notifier).state =
+                            r.recordId;
+                      },
                     ),
                 ],
               ),

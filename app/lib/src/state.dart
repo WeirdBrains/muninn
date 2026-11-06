@@ -444,12 +444,13 @@ final projectSeriesProvider = FutureProvider<List<ProjectSeries>?>((ref) {
   return ref.watch(apiProvider).projectSeries(p.id);
 });
 
-/// Projects window pages (TUI Projects / Journals / Searches / Reports / Code / Pipes / Pipelines / Rules / Reviews / Notifications).
+/// Projects window pages (TUI Projects / Journals / Searches / Reports / Code / Pipes / Pipelines / Rules / Reviews / Notifications / Models).
 enum ProjectPane {
   projects,
   journals,
   searches,
   reports,
+  models,
   code,
   pipes,
   pipelines,
@@ -490,6 +491,29 @@ final journalNotesProvider = FutureProvider<List<JournalNoteInfo>?>((ref) {
 final searchesProvider = FutureProvider<List<SearchInfo>?>((ref) {
   if (!ref.watch(unlockedProvider)) return Future.value(null);
   return ref.watch(apiProvider).searches();
+});
+
+final modelsProvider = FutureProvider<List<ModelInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).models();
+});
+
+final viewingModelIdProvider = StateProvider<String?>((ref) => null);
+final viewingRecordIdProvider = StateProvider<String?>((ref) => null);
+
+final modelRecordsProvider = FutureProvider<List<RecordInfo>?>((ref) {
+  final id = ref.watch(viewingModelIdProvider);
+  if (id == null || !ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).modelRecords(id);
+});
+
+final recordDetailProvider = FutureProvider<RecordInfo?>((ref) {
+  final model = ref.watch(viewingModelIdProvider);
+  final id = ref.watch(viewingRecordIdProvider);
+  if (model == null || id == null || !ref.watch(unlockedProvider)) {
+    return Future.value(null);
+  }
+  return ref.watch(apiProvider).modelRecord(model, id);
 });
 
 final reportsProvider = FutureProvider<List<ReportInfo>?>((ref) {
@@ -551,6 +575,9 @@ void refreshProjectExtras(WidgetRef ref) {
   ref.invalidate(journalEntriesProvider);
   ref.invalidate(journalNotesProvider);
   ref.invalidate(searchesProvider);
+  ref.invalidate(modelsProvider);
+  ref.invalidate(modelRecordsProvider);
+  ref.invalidate(recordDetailProvider);
   ref.invalidate(reportsProvider);
   ref.invalidate(reportSectionsProvider);
   ref.invalidate(codeSpacesProvider);

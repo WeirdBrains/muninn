@@ -14,6 +14,7 @@ import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 import 'project_compute.dart';
 import 'project_collab.dart';
+import 'models.dart';
 import 'project_extras.dart';
 import 'unlock.dart';
 
@@ -62,6 +63,7 @@ class ProjectsView extends ConsumerWidget {
               ProjectPane.journals => const JournalsPane(),
               ProjectPane.searches => const SearchesPane(),
               ProjectPane.reports => const ReportsPane(),
+              ProjectPane.models => const ModelsPane(),
               ProjectPane.code => const CodeSpacesPane(),
               ProjectPane.pipes => const PipesPane(),
               ProjectPane.pipelines => const PipelinesPane(),
@@ -80,6 +82,7 @@ class ProjectsView extends ConsumerWidget {
     ProjectPane.journals => 'Journals',
     ProjectPane.searches => 'Searches',
     ProjectPane.reports => 'Reports',
+    ProjectPane.models => 'Models',
     ProjectPane.code => 'Code',
     ProjectPane.pipes => 'Pipes',
     ProjectPane.pipelines => 'Pipelines',
