@@ -7,11 +7,202 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `net_overview_of`, `peers_of`, `status_of`
+// These functions are ignored because they are not marked as `pub`: `check_relay_addr`, `edit_prefs`, `hosted_node`, `invite_info`, `invite_of`, `invites_of`, `link_of`, `net_overview_of`, `parse_kind`, `peers_of`, `prefs_of`, `reap_hosted`, `relays_of`, `request_info`, `share_of`, `shared_of`, `status_of`, `stop_of`, `unshare_of`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `HostedDriver`
 
 /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
 Future<NetOverview> netOverview({String? home}) =>
     RustLib.instance.api.crateApiNetNetOverview(home: home);
+
+/// `mnnn net start`: run the node in this process until `net_stop` (or `mnnn net stop`).
+/// The node identity stays in Rust. Does not start the org site (that stays an Orgs action).
+Future<String> netStart({String? home}) =>
+    RustLib.instance.api.crateApiNetNetStart(home: home);
+
+/// `mnnn net stop`: stop the node this app started, or ask another process to stop.
+Future<String> netStop({String? home}) =>
+    RustLib.instance.api.crateApiNetNetStop(home: home);
+
+/// `mnnn net connect` (or an invite link). `hello` only says hello and remembers the peer.
+Future<NetLinkResult> netConnect({
+  String? home,
+  required String target,
+  String? label,
+  required bool hello,
+}) => RustLib.instance.api.crateApiNetNetConnect(
+  home: home,
+  target: target,
+  label: label,
+  hello: hello,
+);
+
+/// `mnnn net invite`: a public link the other node can paste. It holds no secret.
+Future<String> netInvite({String? home, String? label}) =>
+    RustLib.instance.api.crateApiNetNetInvite(home: home, label: label);
+
+/// Open invites this node made, and requests waiting for it.
+Future<NetInvites> netInvites({String? home}) =>
+    RustLib.instance.api.crateApiNetNetInvites(home: home);
+
+/// `mnnn net accept` (a request id or an invite link).
+Future<NetLinkResult> netAccept({String? home, required String request}) =>
+    RustLib.instance.api.crateApiNetNetAccept(home: home, request: request);
+
+/// `mnnn net decline`.
+Future<String> netDecline({String? home, required String request}) =>
+    RustLib.instance.api.crateApiNetNetDecline(home: home, request: request);
+
+/// Withdraw an invite this node made (or end a connection): `mnnn net disconnect` / TUI revoke.
+Future<String> netDisconnect({String? home, required String peer}) =>
+    RustLib.instance.api.crateApiNetNetDisconnect(home: home, peer: peer);
+
+/// `mnnn net forget`: drop a known peer (exchanges stay).
+Future<String> netForget({String? home, required String peer}) =>
+    RustLib.instance.api.crateApiNetNetForget(home: home, peer: peer);
+
+/// Configured relays, seen relay peers, and whether this node will serve.
+Future<NetRelayInfo> netRelays({String? home}) =>
+    RustLib.instance.api.crateApiNetNetRelays(home: home);
+
+/// `mnnn net relay add`. Saved in preferences.toml (picked up the next time the node starts).
+Future<String> netRelayAdd({String? home, required String addr}) =>
+    RustLib.instance.api.crateApiNetNetRelayAdd(home: home, addr: addr);
+
+/// `mnnn net relay remove`.
+Future<String> netRelayRemove({String? home, required String relay}) =>
+    RustLib.instance.api.crateApiNetNetRelayRemove(home: home, relay: relay);
+
+/// `mnnn net relay serve on|off`.
+Future<String> netRelayServe({String? home, required bool on_}) =>
+    RustLib.instance.api.crateApiNetNetRelayServe(home: home, on_: on_);
+
+/// `mnnn net shared`.
+Future<List<NetShareInfo>> netShared({String? home}) =>
+    RustLib.instance.api.crateApiNetNetShared(home: home);
+
+/// `mnnn net share KIND ITEM [--with EXCHANGE…]`.
+Future<String> netShare({
+  String? home,
+  required String kind,
+  required String item,
+  required List<String> with_,
+}) => RustLib.instance.api.crateApiNetNetShare(
+  home: home,
+  kind: kind,
+  item: item,
+  with_: with_,
+);
+
+/// `mnnn net unshare KIND ITEM [--with EXCHANGE…]`.
+Future<String> netUnshare({
+  String? home,
+  required String kind,
+  required String item,
+  required List<String> with_,
+}) => RustLib.instance.api.crateApiNetNetUnshare(
+  home: home,
+  kind: kind,
+  item: item,
+  with_: with_,
+);
+
+/// An invite this node made (`mnnn net invite`). The link holds no secret.
+class NetInviteInfo {
+  final String id;
+  final String shortId;
+  final String title;
+  final String purpose;
+  final PlatformInt64? expiresAt;
+  final PlatformInt64 createdAt;
+  final String link;
+
+  const NetInviteInfo({
+    required this.id,
+    required this.shortId,
+    required this.title,
+    required this.purpose,
+    this.expiresAt,
+    required this.createdAt,
+    required this.link,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      shortId.hashCode ^
+      title.hashCode ^
+      purpose.hashCode ^
+      expiresAt.hashCode ^
+      createdAt.hashCode ^
+      link.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetInviteInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          shortId == other.shortId &&
+          title == other.title &&
+          purpose == other.purpose &&
+          expiresAt == other.expiresAt &&
+          createdAt == other.createdAt &&
+          link == other.link;
+}
+
+class NetInvites {
+  final List<NetInviteInfo> invites;
+  final List<NetRequestInfo> requests;
+
+  const NetInvites({required this.invites, required this.requests});
+
+  @override
+  int get hashCode => invites.hashCode ^ requests.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetInvites &&
+          runtimeType == other.runtimeType &&
+          invites == other.invites &&
+          requests == other.requests;
+}
+
+/// Result of connect / accept / hello (no keys).
+class NetLinkResult {
+  final String status;
+  final String peer;
+  final String? peerId;
+  final String detail;
+  final String? warning;
+
+  const NetLinkResult({
+    required this.status,
+    required this.peer,
+    this.peerId,
+    required this.detail,
+    this.warning,
+  });
+
+  @override
+  int get hashCode =>
+      status.hashCode ^
+      peer.hashCode ^
+      peerId.hashCode ^
+      detail.hashCode ^
+      warning.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetLinkResult &&
+          runtimeType == other.runtimeType &&
+          status == other.status &&
+          peer == other.peer &&
+          peerId == other.peerId &&
+          detail == other.detail &&
+          warning == other.warning;
+}
 
 class NetOverview {
   final NetStatus status;
@@ -77,6 +268,106 @@ class NetPeerInfo {
           link == other.link &&
           source == other.source &&
           lastSeen == other.lastSeen;
+}
+
+class NetRelayInfo {
+  final List<String> configured;
+  final List<NetPeerInfo> seen;
+  final bool serving;
+
+  const NetRelayInfo({
+    required this.configured,
+    required this.seen,
+    required this.serving,
+  });
+
+  @override
+  int get hashCode => configured.hashCode ^ seen.hashCode ^ serving.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetRelayInfo &&
+          runtimeType == other.runtimeType &&
+          configured == other.configured &&
+          seen == other.seen &&
+          serving == other.serving;
+}
+
+/// A request waiting for this node (`mnnn net requests`).
+class NetRequestInfo {
+  final String id;
+  final String shortId;
+  final String title;
+  final String purpose;
+  final String? peerId;
+  final PlatformInt64 createdAt;
+
+  const NetRequestInfo({
+    required this.id,
+    required this.shortId,
+    required this.title,
+    required this.purpose,
+    this.peerId,
+    required this.createdAt,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      shortId.hashCode ^
+      title.hashCode ^
+      purpose.hashCode ^
+      peerId.hashCode ^
+      createdAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetRequestInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          shortId == other.shortId &&
+          title == other.title &&
+          purpose == other.purpose &&
+          peerId == other.peerId &&
+          createdAt == other.createdAt;
+}
+
+/// One item this node shares (`mnnn net shared`).
+class NetShareInfo {
+  final String id;
+  final String shortId;
+  final String kind;
+  final String name;
+  final String with_;
+
+  const NetShareInfo({
+    required this.id,
+    required this.shortId,
+    required this.kind,
+    required this.name,
+    required this.with_,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      shortId.hashCode ^
+      kind.hashCode ^
+      name.hashCode ^
+      with_.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetShareInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          shortId == other.shortId &&
+          kind == other.kind &&
+          name == other.name &&
+          with_ == other.with_;
 }
 
 /// What `mnnn net status` shows: the node and counts, no secrets.

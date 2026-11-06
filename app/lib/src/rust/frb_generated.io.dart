@@ -107,7 +107,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<IngestFileReport> dco_decode_list_ingest_file_report(dynamic raw);
 
   @protected
+  List<NetInviteInfo> dco_decode_list_net_invite_info(dynamic raw);
+
+  @protected
   List<NetPeerInfo> dco_decode_list_net_peer_info(dynamic raw);
+
+  @protected
+  List<NetRequestInfo> dco_decode_list_net_request_info(dynamic raw);
+
+  @protected
+  List<NetShareInfo> dco_decode_list_net_share_info(dynamic raw);
 
   @protected
   List<OrgEndpointInfo> dco_decode_list_org_endpoint_info(dynamic raw);
@@ -146,10 +155,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ThemeRole> dco_decode_list_theme_role(dynamic raw);
 
   @protected
+  NetInviteInfo dco_decode_net_invite_info(dynamic raw);
+
+  @protected
+  NetInvites dco_decode_net_invites(dynamic raw);
+
+  @protected
+  NetLinkResult dco_decode_net_link_result(dynamic raw);
+
+  @protected
   NetOverview dco_decode_net_overview(dynamic raw);
 
   @protected
   NetPeerInfo dco_decode_net_peer_info(dynamic raw);
+
+  @protected
+  NetRelayInfo dco_decode_net_relay_info(dynamic raw);
+
+  @protected
+  NetRequestInfo dco_decode_net_request_info(dynamic raw);
+
+  @protected
+  NetShareInfo dco_decode_net_share_info(dynamic raw);
 
   @protected
   NetStatus dco_decode_net_status(dynamic raw);
@@ -319,7 +346,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<NetInviteInfo> sse_decode_list_net_invite_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<NetPeerInfo> sse_decode_list_net_peer_info(SseDeserializer deserializer);
+
+  @protected
+  List<NetRequestInfo> sse_decode_list_net_request_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<NetShareInfo> sse_decode_list_net_share_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<OrgEndpointInfo> sse_decode_list_org_endpoint_info(
@@ -370,10 +412,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ThemeRole> sse_decode_list_theme_role(SseDeserializer deserializer);
 
   @protected
+  NetInviteInfo sse_decode_net_invite_info(SseDeserializer deserializer);
+
+  @protected
+  NetInvites sse_decode_net_invites(SseDeserializer deserializer);
+
+  @protected
+  NetLinkResult sse_decode_net_link_result(SseDeserializer deserializer);
+
+  @protected
   NetOverview sse_decode_net_overview(SseDeserializer deserializer);
 
   @protected
   NetPeerInfo sse_decode_net_peer_info(SseDeserializer deserializer);
+
+  @protected
+  NetRelayInfo sse_decode_net_relay_info(SseDeserializer deserializer);
+
+  @protected
+  NetRequestInfo sse_decode_net_request_info(SseDeserializer deserializer);
+
+  @protected
+  NetShareInfo sse_decode_net_share_info(SseDeserializer deserializer);
 
   @protected
   NetStatus sse_decode_net_status(SseDeserializer deserializer);
@@ -571,8 +631,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_net_invite_info(
+    List<NetInviteInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_net_peer_info(
     List<NetPeerInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_net_request_info(
+    List<NetRequestInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_net_share_info(
+    List<NetShareInfo> self,
     SseSerializer serializer,
   );
 
@@ -646,10 +724,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_net_invite_info(NetInviteInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_net_invites(NetInvites self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_net_link_result(NetLinkResult self, SseSerializer serializer);
+
+  @protected
   void sse_encode_net_overview(NetOverview self, SseSerializer serializer);
 
   @protected
   void sse_encode_net_peer_info(NetPeerInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_net_relay_info(NetRelayInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_net_request_info(
+    NetRequestInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_net_share_info(NetShareInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_net_status(NetStatus self, SseSerializer serializer);
