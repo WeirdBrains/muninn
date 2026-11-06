@@ -15,6 +15,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: read-only Keys status (`mnnn keys status`); master key, words, shards and wrapped keys stay in Rust
 - Flutter app: pinch-to-zoom and pan on the Data chart (inside the selected time range), with TUI-style layer toggles
 - Flutter app: TUI keybinding parity for Help, navigation, Data/Projects/Net/Orgs, chart layers and zoom (same keys; platform exceptions in docs/flutter-app.md)
+- Flutter app: in-app Help from the same embedded docs as `mnnn help` and the TUI (`?` / F1, search, keybindings)
+- Flutter app: Keys init, rotate, rekey, export, recover and re-issue shards; recovery words and shards are shown from a Rust-held one-time session
 
 ## [2.22.0] - 2026-11-05
 

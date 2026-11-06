@@ -32,7 +32,9 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project…
-  and Net ▸ Status… / Peers…, Orgs ▸ Organizations… and Keys ▸ Status…. Help still points at the CLI.
+  and Net ▸ Status… / Peers…, Orgs ▸ Organizations… and Keys ▸ Status… plus Initialize, Rotate,
+  Rekey, Export, Recover and Re-issue shards. Help ▸ Topics / Search / Keybindings open the
+  same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
   (see [Keybindings](#keybindings) below).
 - **Phone layout** (narrower than 720 px): bottom navigation (Home, Data, Projects, Net,
@@ -95,13 +97,18 @@ Users never need Rust: release builds ship the compiled library.
   endpoints and template names), orgs this node has joined (status, role, node), and
   mirrors (slug and when they were fetched, not the snapshot). Create, edit, join, leave
   and hosting stay in the TUI or CLI.
-- **Keys:** read-only status, like `mnnn keys status`. It reads the same data dir as the
-  store (on a phone, the platform-secure app sandbox; on desktop, the TUI home) and shows
-  whether keys are initialized, the database id, the database path, the current service-key
-  version, and each on-disk service key as active or retired. The master key, recovery
-  words, shards, passphrases, wrapped keys and raw key bytes stay in Rust and are never
-  sent to Dart. Initialize, rotate, rekey, export, recover and re-issue shards stay in
-  the TUI or CLI.
+- **Keys:** status like `mnnn keys status`, plus the write flows the CLI provides
+  (Initialize, Rotate, Rekey, Export, Recover from words or shards, Re-issue shards).
+  It uses the same data dir as the store (on a phone, the platform-secure app sandbox;
+  on desktop, the TUI home). Status shows whether keys are initialized, the database id,
+  the database path, the current service-key version, and each on-disk service key as
+  active or retired. The master key, recovery words, shards, passphrases, wrapped keys
+  and raw key bytes stay in Rust. After init, recover `--print-words`, or re-issue
+  shards, a one-time sheet fetches **one line at a time** from a Rust-held session and
+  dismisses (wipes) that session when you close it. Rekey locks the app session first
+  (the TUI refuses to rekey while open). Export writes age-encrypted files to a directory
+  you pick and returns only those paths. Typed recovery words in a rotate/recover form
+  are the same pattern as the TUI Keys form (obscured fields, not stored).
 - **Import** (File ▸ Import…): pick a file or folder (CSV, TSV, TXT, JSON, NDJSON, JSONL)
   and store each file as it is in a source, like `mnnn ingest path`. An optional source
   name overrides the folder's name (else `local`). Progress is byte-based; Cancel keeps
@@ -115,6 +122,12 @@ Users never need Rust: release builds ship the compiled library.
   (`[theme]`, `[tui.sidebar.filters]` from/to, `[app] dataset`) and shared with the TUI.
   Changing them here uses the same save path as the Theme menu, the time range picker
   and Data. TUI-only layout (header size, sidebar, history bar) stays in `mnnn tui`.
+- **Help** (Help ▸ Topics… / Search help… / Keybindings, or `?` / F1): the same
+  embedded `docs/` topics as `mnnn help` and the TUI. `?` and F1 open the topic
+  for the current section (Data chart → [charts](charts.md), Keys → [keys](keys.md),
+  Home → [this page](flutter-app.md), and so on). Search matches titles and bodies;
+  internal links follow other topics; Help ▸ Keybindings opens [keybindings](keybindings.md).
+  The Flutter-specific shortcut notes on this page are part of that same help tree.
 - **About** (Help ▸ About Muninn): the same text as the TUI's About box, from
   `muninn_core::about`.
 
@@ -132,7 +145,7 @@ when a hardware keyboard is attached.
 | `T` | time range picker |
 | `X` | clear the time range (the TUI's "clear all" filters; the app's filter is the time range) |
 | F5 | refresh |
-| `?`, F1 | Help (the placeholder that points at `mnnn help`) |
+| `?`, F1 | Help for the current section (the embedded docs) |
 | `i` | File ▸ Import… |
 | `P` | Projects |
 | `K` | Net status |
@@ -195,7 +208,7 @@ comes in a later phase (see [sync](sync.md)).
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars, ingest and bar export, net status and peers, org list, keys status), exposed with
+  projects and datasets, downsampled bars, ingest and bar export, net status and peers, org list, keys status and writes, help topics), exposed with
   flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.
@@ -270,7 +283,7 @@ fake API; the Native Assets hook builds the Rust library first, so the job insta
 ## Failure modes
 
 - *Wrong key or not a muninn database*: the password is wrong.
-- *No store yet*: run `mnnn keys init` first (in a scratch `MUNINN_HOME` to try it out).
+- *No store yet*: **Keys ▸ Initialize…** (or `mnnn keys init` in a scratch `MUNINN_HOME`).
 - Building needs rustup the first time; a missing toolchain or target stops
   `flutter run` with "Building native assets failed" (details in
   `app/.dart_tool/hooks_runner/muninn/*/stderr.txt`).

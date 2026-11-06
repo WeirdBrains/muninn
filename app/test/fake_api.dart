@@ -238,4 +238,128 @@ class FakeApi implements MuninnApi {
 
   @override
   Future<KeysStatus> keysStatus() async => keys;
+
+  static const helpPages = <HelpTopic>[
+    HelpTopic(id: 'README', title: 'Muninn', body: '# Muninn\n\nLocal encrypted workbench. See [keybindings](keybindings.md) and the [Flutter app](flutter-app.md).\n'),
+    HelpTopic(id: 'help', title: 'In-app help', body: '# In-app help\n\nOpen with `?` or F1. Search titles and bodies.\n'),
+    HelpTopic(id: 'keybindings', title: 'Keybindings', body: '# Keybindings\n\nEvery key runs the same named action as its menu item.\n\n| key | action |\n|-----|--------|\n| F5 | refresh |\n| `?`, F1 | help |\n| `T` | time range |\n'),
+    HelpTopic(id: 'keys', title: 'Keys', body: '# Keys\n\nInitialize, rotate, rekey, export, recover and shards.\n'),
+    HelpTopic(id: 'flutter-app', title: 'Flutter app (desktop and mobile)', body: '# Flutter app (desktop and mobile)\n\n## Keybindings\n\nThe app uses the same keys as the TUI for every action it already has.\n\n| key | action |\n|-----|--------|\n| `T` | time range picker |\n| F5 | refresh |\n'),
+    HelpTopic(id: 'charts', title: 'Charts', body: '# Charts\n\nPinch to zoom. Layers: candles, volume, grid.\n'),
+    HelpTopic(id: 'projects', title: 'Projects', body: '# Projects\n\nCreate, rename and attach series.\n'),
+    HelpTopic(id: 'network', title: 'Network', body: '# Network\n\nNode status and peers.\n'),
+    HelpTopic(id: 'organizations', title: 'Organizations', body: '# Organizations\n\nList and detail.\n'),
+    HelpTopic(id: 'sidebar', title: 'Sidebar', body: '# Sidebar\n\nThe dataset list, like Data in the app.\n'),
+  ];
+
+  @override
+  Future<List<HelpTopicInfo>> helpTopics() async => [for (final t in helpPages) HelpTopicInfo(id: t.id, title: t.title)];
+
+  @override
+  Future<HelpTopic> helpTopic(String id) async {
+    final want = id.trim().isEmpty || id == 'index' ? 'README' : id;
+    return helpPages.firstWhere((t) => t.id == want, orElse: () => throw 'unknown help topic `$id`');
+  }
+
+  @override
+  Future<List<HelpTopicInfo>> helpSearch(String query) async {
+    final q = query.trim().toLowerCase();
+    final all = [for (final t in helpPages) HelpTopicInfo(id: t.id, title: t.title)];
+    if (q.isEmpty) return all;
+    return [
+      for (final t in helpPages)
+        if (t.title.toLowerCase().contains(q) || t.id.toLowerCase().contains(q) || t.body.toLowerCase().contains(q)) HelpTopicInfo(id: t.id, title: t.title),
+    ];
+  }
+
+  @override
+  Future<String?> helpResolveHref(String from, String href) async {
+    if (href.contains('://') || href.startsWith('mailto:')) return null;
+    final path = href.split('#').first;
+    if (path.isEmpty) return from;
+    return path.replaceAll('.md', '').split('/').last;
+  }
+
+  RevealHandle? reveal;
+  String initPassword = '';
+  final rotated = <int>[];
+  final recovered = <String>[];
+  final exported = <String>[];
+  int nextReveal = 1;
+  static const fakeWords = [
+    'alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel',
+    'india', 'juliet', 'kilo', 'lima', 'mike', 'november', 'oscar', 'papa',
+    'quebec', 'romeo', 'sierra', 'tango', 'uniform', 'victor', 'whiskey', 'xray',
+  ];
+  static const fakeShards = ['muninn-shard-v1:aaa:3:1:aa:bbbbbbbb', 'muninn-shard-v1:aaa:3:2:bb:cccccccc', 'muninn-shard-v1:aaa:3:3:cc:dddddddd', 'muninn-shard-v1:aaa:3:4:dd:eeeeeeee', 'muninn-shard-v1:aaa:3:5:ee:ffffffff'];
+
+  RevealHandle _newReveal({String dbId = '', int words = 0, int shards = 0, bool migrated = false}) {
+    reveal = RevealHandle(id: nextReveal++, dbId: dbId, wordCount: words, shardCount: shards, migratedPlainDb: migrated);
+    return reveal!;
+  }
+
+  @override
+  Future<RevealHandle> keysInit(String password) async {
+    if (password.isEmpty) throw 'the password must not be empty';
+    if (keys.initialized) throw 'already initialized';
+    initPassword = password;
+    keys = KeysStatus(initialized: true, dbId: 'db-new', database: keys.database, serviceVersion: 1, services: [const ServiceKeyInfo(version: 1)]);
+    return _newReveal(dbId: 'db-new', words: 24, shards: 5);
+  }
+
+  @override
+  Future<String> keysRevealWord(int id, int index) async {
+    if (reveal == null || reveal!.id != id) throw 'reveal session expired or dismissed';
+    if (index < 1 || index > fakeWords.length) throw 'no word $index';
+    return fakeWords[index - 1];
+  }
+
+  @override
+  Future<String> keysRevealShard(int id, int index) async {
+    if (reveal == null || reveal!.id != id) throw 'reveal session expired or dismissed';
+    if (index < 1 || index > fakeShards.length) throw 'no shard $index';
+    return fakeShards[index - 1];
+  }
+
+  @override
+  Future<void> keysRevealDismiss(int id) async {
+    if (reveal?.id == id) reveal = null;
+  }
+
+  @override
+  Future<int> keysRotate({required String password, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async {
+    if (password.isEmpty) throw 'the password must not be empty';
+    keys = KeysStatus(initialized: true, dbId: keys.dbId, database: keys.database, serviceVersion: keys.serviceVersion + 1, services: [
+      ...keys.services.map((s) => ServiceKeyInfo(version: s.version, retired: true)),
+      ServiceKeyInfo(version: keys.serviceVersion + 1),
+    ]);
+    rotated.add(keys.serviceVersion);
+    return keys.serviceVersion;
+  }
+
+  @override
+  Future<void> keysRekey({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async {}
+
+  @override
+  Future<List<String>> keysExport({required String out, required String exportPassword, List<String> only = const [], bool confirmCombined = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async {
+    if (exportPassword.isEmpty) throw 'export password must not be empty';
+    final items = only.isEmpty ? ['master', 'words', 'service', 'shards'] : only;
+    if ((items.contains('master') || items.contains('words')) && items.contains('shards') && !confirmCombined) {
+      throw 'writing the master key/words and shards to one directory defeats the vault/shard split; confirm to continue';
+    }
+    exported.addAll(items.map((i) => '$out/$i'));
+    return [for (final i in items) '$out/$i'];
+  }
+
+  @override
+  Future<RevealHandle?> keysRecover({required String newPassword, bool printWords = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async {
+    if (newPassword.isEmpty) throw 'the password must not be empty';
+    recovered.add(newPassword);
+    if (!printWords) return null;
+    return _newReveal(words: 24);
+  }
+
+  @override
+  Future<RevealHandle> keysReissueShards({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async =>
+      _newReveal(shards: 5);
 }

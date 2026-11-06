@@ -18,12 +18,13 @@ import 'theme/muninn_theme.dart';
 import 'time_range.dart';
 import 'views/chart.dart';
 import 'views/data.dart';
+import 'views/help.dart';
 import 'views/home.dart';
 import 'views/net.dart';
 import 'views/orgs.dart';
 import 'views/keys.dart';
+import 'views/keys_dialogs.dart';
 import 'views/projects.dart';
-import 'views/placeholder.dart';
 
 /// Widths below this use the phone layout.
 const phoneBreakpoint = 720.0;
@@ -114,7 +115,7 @@ Widget sectionView(Section s) => switch (s) {
       Section.net => const NetView(),
       Section.orgs => const OrgsView(),
       Section.keys => const KeysView(),
-      Section.help => const PlaceholderView(title: 'Help', cli: 'mnnn help', icon: Icons.help_outline),
+      Section.help => const HelpView(),
     };
 
 /// The website's bombastic header: the raven and a huge gradient wordmark.
@@ -235,7 +236,19 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
         item('Peers…', () => go(Section.net), const SingleActivator(LogicalKeyboardKey.keyW, shift: true)),
       ]),
       menu('Orgs', [item('Organizations…', () => go(Section.orgs), const SingleActivator(LogicalKeyboardKey.keyG, shift: true))]),
-      menu('Keys', [item('Status…', () => go(Section.keys))]),
+      menu('Keys', [
+        item('Status…', () => go(Section.keys)),
+        item('Initialize…', () => showKeysInitDialog(context, ref)),
+        item('Lock', () => lockStore(ref)),
+        item('Rotate service key', () => showKeysRotateDialog(context, ref)),
+        item('Rekey database', () => showKeysRekeyDialog(context, ref)),
+        item('Export…', () => showKeysExportDialog(context, ref)),
+        SubmenuButton(menuChildren: [
+          item('From words', () => showKeysRecoverWordsDialog(context, ref)),
+          item('From shards', () => showKeysRecoverShardsDialog(context, ref)),
+        ], child: const Text('Recover')),
+        item('Re-issue shards', () => showKeysReissueShardsDialog(context, ref)),
+      ]),
       menu('Theme', [
         for (final n in names)
           MenuItemButton(
@@ -252,7 +265,9 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           ),
       ]),
       menu('Help', [
-        item('Topics…', () => go(Section.help), const SingleActivator(LogicalKeyboardKey.f1)),
+        item('Topics…', () => openHelp(ref), const SingleActivator(LogicalKeyboardKey.f1)),
+        item('Search help…', () => openHelp(ref, search: true)),
+        item('Keybindings', () => openHelp(ref, topic: 'keybindings')),
         item('About Muninn', () => showMuninnAbout(context, ref)),
       ]),
     ]);

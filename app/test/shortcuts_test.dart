@@ -43,7 +43,8 @@ void main() {
     await t.sendKeyEvent(LogicalKeyboardKey.f1);
     await t.pumpAndSettle();
     expect(c.read(sectionProvider), Section.help);
-    expect(find.textContaining('mnnn help'), findsOneWidget);
+    expect(find.byKey(const ValueKey('help-title')), findsOneWidget);
+    expect(find.textContaining('Flutter app'), findsWidgets);
 
     await shiftLetter(t, LogicalKeyboardKey.keyP);
     expect(c.read(sectionProvider), Section.projects);

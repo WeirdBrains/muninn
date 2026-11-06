@@ -13,6 +13,7 @@ import 'io_dialogs.dart';
 import 'state.dart';
 import 'time_range.dart';
 import 'views/chart.dart';
+import 'views/help.dart';
 import 'views/projects.dart';
 
 /// F10 asks the desktop menu bar to open (File, the first menu).
@@ -120,7 +121,7 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
           ch == '?' ||
           key == LogicalKeyboardKey.question ||
           (key == LogicalKeyboardKey.slash && shift)) {
-        ref.read(sectionProvider.notifier).state = Section.help;
+        openHelp(ref);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.f10) {

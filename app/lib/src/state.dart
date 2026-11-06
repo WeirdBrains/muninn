@@ -215,6 +215,11 @@ final keysStatusProvider = FutureProvider<KeysStatus>((ref) {
   return ref.watch(apiProvider).keysStatus();
 });
 
+/// Help topic id (`mnnn help <id>` / TUI Help). `?` and F1 set this from the current section.
+final helpTopicIdProvider = StateProvider<String>((ref) => 'flutter-app');
+final helpSearchQueryProvider = StateProvider<String>((ref) => '');
+final helpSearchOpenProvider = StateProvider<bool>((ref) => false);
+
 /// The selected section (both the desktop menus and the mobile bottom bar drive it).
 enum Section { home, data, projects, net, orgs, keys, help }
 

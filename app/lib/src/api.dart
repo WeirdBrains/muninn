@@ -384,4 +384,44 @@ abstract class MuninnApi {
   Future<OrgOverview> orgOverview();
   /// `mnnn keys status`: database id, path and service-key versions. No key material.
   Future<KeysStatus> keysStatus();
+
+  /// Embedded docs (`mnnn help` / the TUI help viewer).
+  Future<List<HelpTopicInfo>> helpTopics();
+  Future<HelpTopic> helpTopic(String id);
+  Future<List<HelpTopicInfo>> helpSearch(String query);
+  Future<String?> helpResolveHref(String from, String href);
+
+  /// `mnnn keys init`. Secrets stay in Rust; [RevealHandle] is a session id and counts.
+  Future<RevealHandle> keysInit(String password);
+  Future<String> keysRevealWord(int id, int index);
+  Future<String> keysRevealShard(int id, int index);
+  Future<void> keysRevealDismiss(int id);
+  Future<int> keysRotate({required String password, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
+  Future<void> keysRekey({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
+  Future<List<String>> keysExport({required String out, required String exportPassword, List<String> only = const [], bool confirmCombined = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
+  Future<RevealHandle?> keysRecover({required String newPassword, bool printWords = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
+  Future<RevealHandle> keysReissueShards({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
+}
+
+class HelpTopicInfo {
+  const HelpTopicInfo({required this.id, required this.title});
+  final String id;
+  final String title;
+}
+
+class HelpTopic {
+  const HelpTopic({required this.id, required this.title, required this.body});
+  final String id;
+  final String title;
+  final String body;
+}
+
+/// A one-time Rust-held reveal of recovery words and/or shards. No secrets in this handle.
+class RevealHandle {
+  const RevealHandle({required this.id, this.dbId = '', this.wordCount = 0, this.shardCount = 0, this.migratedPlainDb = false});
+  final int id;
+  final String dbId;
+  final int wordCount;
+  final int shardCount;
+  final bool migratedPlainDb;
 }

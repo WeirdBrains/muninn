@@ -6,6 +6,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'api.dart';
 import 'rust/api/about.dart' as r_about;
 import 'rust/api/data.dart' as r_data;
+import 'rust/api/help.dart' as r_help;
 import 'rust/api/info.dart' as r_info;
 import 'rust/api/keys.dart' as r_keys;
 import 'rust/api/io.dart' as r_io;
@@ -314,4 +315,67 @@ class FfiMuninnApi implements MuninnApi {
       services: [for (final x in s.services) ServiceKeyInfo(version: x.version.toInt(), retired: x.retired)],
     );
   }
+
+  @override
+  Future<List<HelpTopicInfo>> helpTopics() async =>
+      [for (final t in await r_help.helpTopics()) HelpTopicInfo(id: t.id, title: t.title)];
+
+  @override
+  Future<HelpTopic> helpTopic(String id) async {
+    final t = await r_help.helpTopic(id: id);
+    return HelpTopic(id: t.id, title: t.title, body: t.body);
+  }
+
+  @override
+  Future<List<HelpTopicInfo>> helpSearch(String query) async =>
+      [for (final t in await r_help.helpSearch(query: query)) HelpTopicInfo(id: t.id, title: t.title)];
+
+  @override
+  Future<String?> helpResolveHref(String from, String href) => r_help.helpResolveHref(from: from, href: href);
+
+  RevealHandle _reveal(dynamic h) => RevealHandle(
+        id: h.id.toInt(),
+        dbId: h.dbId,
+        wordCount: h.wordCount.toInt(),
+        shardCount: h.shardCount.toInt(),
+        migratedPlainDb: h.migratedPlainDb,
+      );
+
+  @override
+  Future<RevealHandle> keysInit(String password) async => _reveal(await r_keys.keysInit(home: home, password: password));
+
+  @override
+  Future<String> keysRevealWord(int id, int index) =>
+      r_keys.keysRevealWord(id: PlatformInt64Util.from(id), index: PlatformInt64Util.from(index));
+
+  @override
+  Future<String> keysRevealShard(int id, int index) =>
+      r_keys.keysRevealShard(id: PlatformInt64Util.from(id), index: PlatformInt64Util.from(index));
+
+  @override
+  Future<void> keysRevealDismiss(int id) => r_keys.keysRevealDismiss(id: PlatformInt64Util.from(id));
+
+  @override
+  Future<int> keysRotate({required String password, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async {
+    final v = await r_keys.keysRotate(home: home, password: password, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword);
+    return v.toInt();
+  }
+
+  @override
+  Future<void> keysRekey({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) =>
+      r_keys.keysRekey(home: home, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword);
+
+  @override
+  Future<List<String>> keysExport({required String out, required String exportPassword, List<String> only = const [], bool confirmCombined = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) =>
+      r_keys.keysExport(home: home, out: out, exportPassword: exportPassword, only: only, confirmCombined: confirmCombined, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword);
+
+  @override
+  Future<RevealHandle?> keysRecover({required String newPassword, bool printWords = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async {
+    final h = await r_keys.keysRecover(home: home, newPassword: newPassword, printWords: printWords, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword);
+    return h == null ? null : _reveal(h);
+  }
+
+  @override
+  Future<RevealHandle> keysReissueShards({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async =>
+      _reveal(await r_keys.keysReissueShards(home: home, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword));
 }

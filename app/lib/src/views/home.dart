@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api.dart';
 import '../state.dart';
+import 'keys_dialogs.dart';
 import '../theme/muninn_theme.dart';
 import 'unlock.dart';
 
@@ -32,20 +33,31 @@ class HomeView extends ConsumerWidget {
   }
 }
 
-class _DataDirCard extends StatelessWidget {
+class _DataDirCard extends ConsumerWidget {
   const _DataDirCard(this.d);
   final DataDir d;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final m = context.muninn;
+    final ready = d.keysInitialized;
     return Card(
       child: ListTile(
         leading: Icon(Icons.storage, color: m.accent),
         title: Text(d.home),
         subtitle: Text(d.databaseExists
-            ? (d.keysInitialized ? 'Encrypted store found (shared with mnnn)' : 'Store found, keys not initialized: run `mnnn keys init`')
-            : 'No store yet: run `mnnn keys init`, then import with `mnnn ingest path DIR`'),
+            ? (ready ? 'Encrypted store found (shared with mnnn)' : 'Store found, keys not initialized')
+            : 'No store yet: initialize keys, then import with File ▸ Import… or `mnnn ingest path DIR`'),
+        trailing: ready
+            ? null
+            : TextButton(
+                key: const ValueKey('home-keys-init'),
+                onPressed: () {
+                  ref.read(sectionProvider.notifier).state = Section.keys;
+                  showKeysInitDialog(context, ref);
+                },
+                child: const Text('Initialize…'),
+              ),
       ),
     );
   }
