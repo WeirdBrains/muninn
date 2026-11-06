@@ -40,4 +40,43 @@ void main() {
     await t.pumpAndSettle();
     expect(api.saves, ['theme=nord', 'mode=light', 'range=1..2', 'dataset=binance:ETH/USDT:3600']);
   });
+
+  testWidgets('File Preferences opens a dialog, not a placeholder', (t) async {
+    await pumpWith(t, FakeApi());
+    await t.tap(find.text('File'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Preferences…'));
+    await t.pumpAndSettle();
+    expect(find.textContaining('Not in the app yet'), findsNothing);
+    expect(find.textContaining('Saved in preferences.toml'), findsOneWidget);
+    expect(find.byKey(const ValueKey('prefs-theme-nord')), findsOneWidget);
+  });
+
+  testWidgets('Preferences dialog writes theme, mode, range and dataset', (t) async {
+    final api = FakeApi();
+    final c = await pumpWith(t, api);
+    await t.tap(find.text('File'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Preferences…'));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('prefs-theme-nord')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Light'));
+    await t.pumpAndSettle();
+    expect(c.read(themeSelectionProvider).name, 'nord');
+    expect(c.read(themeSelectionProvider).mode, 'light');
+    expect(api.saves, containsAll(['theme=nord', 'mode=light']));
+
+    c.read(timeRangeProvider.notifier).state = const TimeRange(from: 1, to: 2);
+    c.read(selectedDatasetProvider.notifier).state = 'coinbase:BTC/USD:300';
+    await t.pumpAndSettle();
+    api.saves.clear();
+    await t.tap(find.byKey(const ValueKey('prefs-range-clear')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('prefs-dataset-clear')));
+    await t.pumpAndSettle();
+    expect(c.read(timeRangeProvider), TimeRange.all);
+    expect(c.read(selectedDatasetProvider), isNull);
+    expect(api.saves, containsAll(['range=null..null', 'dataset=null']));
+  });
 }

@@ -77,6 +77,9 @@ A `version` key records the file's format; older files are upgraded on load (2.9
 | `tui.layouts.<name>` | none | named layouts |
 
 `mnnn theme set <name>`, `mnnn theme mode <mode>` and **File ▸ Preferences…** in the TUI edit the file for you.
+The Flutter app's **File ▸ Preferences…** edits `theme.name`, `theme.mode`, the time range
+in `tui.sidebar.filters`, and `app.dataset` (the same values the Theme menu, time-range
+picker and Data view save).
 Preferences are part of every backup ([backup and recovery](backup-recovery.md)).
 
 Failure modes: invalid TOML makes every command fail with a `toml:` error naming

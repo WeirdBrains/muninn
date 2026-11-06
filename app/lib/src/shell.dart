@@ -11,6 +11,7 @@ import 'about_dialog.dart';
 import 'api.dart';
 import 'io_dialogs.dart';
 import 'logo.dart';
+import 'prefs_dialog.dart';
 import 'state.dart';
 import 'theme/muninn_theme.dart';
 import 'time_range.dart';
@@ -46,11 +47,13 @@ class AppShell extends ConsumerWidget {
                 onSelected: (v) {
                   if (v == 'import') showImportDialog(context, ref);
                   if (v == 'export') showExportDialog(context, ref);
+                  if (v == 'prefs') showPreferencesDialog(context, ref);
                   if (v == 'lock') lockStore(ref);
                 },
                 itemBuilder: (_) => const [
                   PopupMenuItem(value: 'import', child: Text('Import…')),
                   PopupMenuItem(value: 'export', child: Text('Export…')),
+                  PopupMenuItem(value: 'prefs', child: Text('Preferences…')),
                   PopupMenuItem(value: 'lock', child: Text('Lock')),
                 ],
               ),
@@ -179,7 +182,7 @@ class MuninnMenuBar extends ConsumerWidget {
         item('Lock', () => lockStore(ref)),
         item('Import…', () => showImportDialog(context, ref)),
         item('Export…', () => showExportDialog(context, ref)),
-        item('Preferences…', () => later('Preferences', 'mnnn theme')),
+        item('Preferences…', () => showPreferencesDialog(context, ref)),
       ]),
       menu('View', [
         item('Change view (chart / list)', () => ref.read(dataAsChartProvider.notifier).state = !ref.read(dataAsChartProvider)),

@@ -4,7 +4,7 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
-read-only Projects, and File ▸ Import… / Export… (CSV, Parquet, JSON).
+read-only Projects, File ▸ Import… / Export… (CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
 
@@ -29,7 +29,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Header:** the raven (themed) and the big MUNINN wordmark, as on the website.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
-  File ▸ Import… and Export… are wired; Net, Orgs, Keys and Preferences still point at the CLI.
+  File ▸ Import…, Export… and Preferences… are wired; Net, Orgs and Keys still point at the CLI.
 - **Phone layout** (narrower than 720 px): bottom navigation (Home, Data, Projects, Net,
   More), 48 px+ targets, safe areas, theme as a bottom sheet; nothing is hover-only.
 - **Themes:** every theme from `assets/themes/*.toml` plus your own in `<home>/themes/`,
@@ -69,6 +69,11 @@ Users never need Rust: release builds ship the compiled library.
 - **Export** (File ▸ Export…): write stored bars as CSV, Parquet or JSON, like
   `mnnn export`. The selected dataset and the time range pre-fill the filters; leave
   them empty to export everything. No matching bars writes an empty file (CSV header or `[]`).
+- **Preferences** (File ▸ Preferences…): the theme, light/dark/system mode, time range
+  and the dataset open in Data — the same values already saved in `preferences.toml`
+  (`[theme]`, `[tui.sidebar.filters]` from/to, `[app] dataset`) and shared with the TUI.
+  Changing them here uses the same save path as the Theme menu, the time range picker
+  and Data. TUI-only layout (header size, sidebar, history bar) stays in `mnnn tui`.
 - **About** (Help ▸ About Muninn): the same text as the TUI's About box, from
   `muninn_core::about`.
 

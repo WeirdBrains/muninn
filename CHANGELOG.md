@@ -8,6 +8,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Added
 - Flutter app: File ▸ Import… and Export… (CSV, Parquet, JSON), opening the store for writes after unlock
+- Flutter app: File ▸ Preferences… edits the saved theme, mode, time range and dataset in preferences.toml (shared with the TUI)
 
 ## [2.22.0] - 2026-11-05
 
