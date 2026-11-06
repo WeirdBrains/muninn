@@ -7,11 +7,217 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `mine_of`, `org_overview_of`, `role_named`
+// These functions are ignored because they are not marked as `pub`: `announcement`, `create_of`, `create_role_of`, `edit_of`, `edit_prefs`, `edit_role_of`, `invitation`, `joined_of`, `member_reject_of`, `member_role_of`, `mine_of`, `org_overview_of`, `ours_running`, `prefs_of`, `reap_site`, `remove_of`, `remove_role_of`, `resource_add_of`, `resource_archive_of`, `resource_publish_of`, `resource_release_of`, `role_info`, `role_named`, `site_status`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `HostedSite`
 
 /// `mnnn org list` plus the fields `mnnn org show` prints for orgs this node owns.
 Future<OrgOverview> orgOverview() =>
     RustLib.instance.api.crateApiOrgsOrgOverview();
+
+/// `mnnn org create` / TUI New organization.
+Future<OrgInfo> orgCreate({
+  required String name,
+  String? slug,
+  required String description,
+  required bool public,
+  required bool open,
+}) => RustLib.instance.api.crateApiOrgsOrgCreate(
+  name: name,
+  slug: slug,
+  description: description,
+  public: public,
+  open: open,
+);
+
+/// `mnnn org edit` / TUI rename, visibility, access, hosted, member sign-in, gated, defaults.
+Future<OrgInfo> orgEdit({
+  required String org,
+  String? name,
+  String? slug,
+  String? description,
+  String? visibility,
+  String? access,
+  bool? hosted,
+  bool? memberAuth,
+  bool? gated,
+  String? template,
+  String? applyRole,
+  String? inviteRole,
+}) => RustLib.instance.api.crateApiOrgsOrgEdit(
+  org: org,
+  name: name,
+  slug: slug,
+  description: description,
+  visibility: visibility,
+  access: access,
+  hosted: hosted,
+  memberAuth: memberAuth,
+  gated: gated,
+  template: template,
+  applyRole: applyRole,
+  inviteRole: inviteRole,
+);
+
+/// `mnnn org remove` / TUI delete (owner only). Resources stay on this node.
+Future<String> orgRemove({required String org}) =>
+    RustLib.instance.api.crateApiOrgsOrgRemove(org: org);
+
+/// `mnnn org role add` / TUI new role (`name [rank] perms…`).
+Future<OrgRoleInfo> orgRoleCreate({
+  required String org,
+  required String name,
+  required PlatformInt64 rank,
+  required List<String> perms,
+}) => RustLib.instance.api.crateApiOrgsOrgRoleCreate(
+  org: org,
+  name: name,
+  rank: rank,
+  perms: perms,
+);
+
+/// `mnnn org role edit` / TUI role permissions.
+Future<OrgRoleInfo> orgRoleEdit({
+  required String org,
+  required String role,
+  String? name,
+  PlatformInt64? rank,
+  List<String>? perms,
+}) => RustLib.instance.api.crateApiOrgsOrgRoleEdit(
+  org: org,
+  role: role,
+  name: name,
+  rank: rank,
+  perms: perms,
+);
+
+Future<String> orgRoleRemove({required String org, required String role}) =>
+    RustLib.instance.api.crateApiOrgsOrgRoleRemove(org: org, role: role);
+
+Future<String> orgMemberRole({
+  required String org,
+  required String member,
+  required String role,
+}) => RustLib.instance.api.crateApiOrgsOrgMemberRole(
+  org: org,
+  member: member,
+  role: role,
+);
+
+Future<String> orgMemberReject({required String org, required String member}) =>
+    RustLib.instance.api.crateApiOrgsOrgMemberReject(org: org, member: member);
+
+/// TUI "Give the org: kind name" / `mnnn org resource add`.
+Future<String> orgResourceAdd({
+  required String org,
+  required String kind,
+  required String name,
+}) => RustLib.instance.api.crateApiOrgsOrgResourceAdd(
+  org: org,
+  kind: kind,
+  name: name,
+);
+
+/// TUI cycle publish (no → members → public → no).
+Future<String> orgResourcePublish({
+  required String org,
+  required String resource,
+}) => RustLib.instance.api.crateApiOrgsOrgResourcePublish(
+  org: org,
+  resource: resource,
+);
+
+/// TUI archive / restore toggle.
+Future<String> orgResourceArchive({
+  required String org,
+  required String resource,
+}) => RustLib.instance.api.crateApiOrgsOrgResourceArchive(
+  org: org,
+  resource: resource,
+);
+
+Future<String> orgResourceRelease({
+  required String org,
+  required String resource,
+}) => RustLib.instance.api.crateApiOrgsOrgResourceRelease(
+  org: org,
+  resource: resource,
+);
+
+/// `mnnn org join` / TUI join with an invitation token or link.
+Future<String> orgJoin({String? home, required String token}) =>
+    RustLib.instance.api.crateApiOrgsOrgJoin(home: home, token: token);
+
+/// `mnnn org apply` / TUI apply to an org on another node.
+Future<String> orgApply({
+  String? home,
+  required String target,
+  required String org,
+  required String note,
+}) => RustLib.instance.api.crateApiOrgsOrgApply(
+  home: home,
+  target: target,
+  org: org,
+  note: note,
+);
+
+/// `mnnn org sync`.
+Future<String> orgSync({String? home, required String org}) =>
+    RustLib.instance.api.crateApiOrgsOrgSync(home: home, org: org);
+
+/// `mnnn org leave` / TUI leave.
+Future<String> orgLeave({String? home, required String org}) =>
+    RustLib.instance.api.crateApiOrgsOrgLeave(home: home, org: org);
+
+/// `mnnn org member invite` / TUI invite (empty `to`: a token they join with).
+Future<String> orgMemberInvite({
+  String? home,
+  required String org,
+  String? to,
+}) => RustLib.instance.api.crateApiOrgsOrgMemberInvite(
+  home: home,
+  org: org,
+  to: to,
+);
+
+/// `mnnn org member approve` / TUI approve an application.
+Future<String> orgMemberApprove({
+  String? home,
+  required String org,
+  required String member,
+}) => RustLib.instance.api.crateApiOrgsOrgMemberApprove(
+  home: home,
+  org: org,
+  member: member,
+);
+
+/// `mnnn org member kick` / TUI kick (`leftovers`: keep, archive or publish).
+Future<String> orgMemberKick({
+  String? home,
+  required String org,
+  required String member,
+  required String leftovers,
+}) => RustLib.instance.api.crateApiOrgsOrgMemberKick(
+  home: home,
+  org: org,
+  member: member,
+  leftovers: leftovers,
+);
+
+/// `mnnn org host status`.
+Future<OrgHostStatus> orgHostStatus({String? home}) =>
+    RustLib.instance.api.crateApiOrgsOrgHostStatus(home: home);
+
+/// `mnnn org host start` / TUI Start site: serve hosted orgs in this process.
+Future<OrgHostStatus> orgHostStart({String? home}) =>
+    RustLib.instance.api.crateApiOrgsOrgHostStart(home: home);
+
+/// `mnnn org host stop` / TUI Stop site.
+Future<String> orgHostStop({String? home}) =>
+    RustLib.instance.api.crateApiOrgsOrgHostStop(home: home);
+
+/// `mnnn org host autostart` (the site comes up with `net start` when on).
+Future<String> orgHostAutostart({String? home, required bool on_}) =>
+    RustLib.instance.api.crateApiOrgsOrgHostAutostart(home: home, on_: on_);
 
 class OrgEndpointInfo {
   final String name;
@@ -39,6 +245,64 @@ class OrgEndpointInfo {
           kind == other.kind &&
           perm == other.perm &&
           anyone == other.anyone;
+}
+
+/// What `mnnn org host status` shows (no certificate private key).
+class OrgHostStatus {
+  final bool running;
+
+  /// This process started the site (TUI in-process host).
+  final bool ours;
+  final String url;
+  final String addr;
+  final PlatformInt64? pid;
+  final List<String> orgs;
+  final List<String> mirrors;
+  final String certSource;
+  final String? httpAddr;
+  final bool autostart;
+
+  const OrgHostStatus({
+    required this.running,
+    required this.ours,
+    required this.url,
+    required this.addr,
+    this.pid,
+    required this.orgs,
+    required this.mirrors,
+    required this.certSource,
+    this.httpAddr,
+    required this.autostart,
+  });
+
+  @override
+  int get hashCode =>
+      running.hashCode ^
+      ours.hashCode ^
+      url.hashCode ^
+      addr.hashCode ^
+      pid.hashCode ^
+      orgs.hashCode ^
+      mirrors.hashCode ^
+      certSource.hashCode ^
+      httpAddr.hashCode ^
+      autostart.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgHostStatus &&
+          runtimeType == other.runtimeType &&
+          running == other.running &&
+          ours == other.ours &&
+          url == other.url &&
+          addr == other.addr &&
+          pid == other.pid &&
+          orgs == other.orgs &&
+          mirrors == other.mirrors &&
+          certSource == other.certSource &&
+          httpAddr == other.httpAddr &&
+          autostart == other.autostart;
 }
 
 /// One organization this node owns, with the fields `mnnn org show` prints.

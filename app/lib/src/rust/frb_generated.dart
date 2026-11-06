@@ -79,7 +79,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 385895130;
+  int get rustContentHash => -558421708;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -287,7 +287,127 @@ abstract class RustLibApi extends BaseApi {
     required List<String> with_,
   });
 
+  Future<String> crateApiOrgsOrgApply({
+    String? home,
+    required String target,
+    required String org,
+    required String note,
+  });
+
+  Future<OrgInfo> crateApiOrgsOrgCreate({
+    required String name,
+    String? slug,
+    required String description,
+    required bool public,
+    required bool open,
+  });
+
+  Future<OrgInfo> crateApiOrgsOrgEdit({
+    required String org,
+    String? name,
+    String? slug,
+    String? description,
+    String? visibility,
+    String? access,
+    bool? hosted,
+    bool? memberAuth,
+    bool? gated,
+    String? template,
+    String? applyRole,
+    String? inviteRole,
+  });
+
+  Future<String> crateApiOrgsOrgHostAutostart({
+    String? home,
+    required bool on_,
+  });
+
+  Future<OrgHostStatus> crateApiOrgsOrgHostStart({String? home});
+
+  Future<OrgHostStatus> crateApiOrgsOrgHostStatus({String? home});
+
+  Future<String> crateApiOrgsOrgHostStop({String? home});
+
+  Future<String> crateApiOrgsOrgJoin({String? home, required String token});
+
+  Future<String> crateApiOrgsOrgLeave({String? home, required String org});
+
+  Future<String> crateApiOrgsOrgMemberApprove({
+    String? home,
+    required String org,
+    required String member,
+  });
+
+  Future<String> crateApiOrgsOrgMemberInvite({
+    String? home,
+    required String org,
+    String? to,
+  });
+
+  Future<String> crateApiOrgsOrgMemberKick({
+    String? home,
+    required String org,
+    required String member,
+    required String leftovers,
+  });
+
+  Future<String> crateApiOrgsOrgMemberReject({
+    required String org,
+    required String member,
+  });
+
+  Future<String> crateApiOrgsOrgMemberRole({
+    required String org,
+    required String member,
+    required String role,
+  });
+
   Future<OrgOverview> crateApiOrgsOrgOverview();
+
+  Future<String> crateApiOrgsOrgRemove({required String org});
+
+  Future<String> crateApiOrgsOrgResourceAdd({
+    required String org,
+    required String kind,
+    required String name,
+  });
+
+  Future<String> crateApiOrgsOrgResourceArchive({
+    required String org,
+    required String resource,
+  });
+
+  Future<String> crateApiOrgsOrgResourcePublish({
+    required String org,
+    required String resource,
+  });
+
+  Future<String> crateApiOrgsOrgResourceRelease({
+    required String org,
+    required String resource,
+  });
+
+  Future<OrgRoleInfo> crateApiOrgsOrgRoleCreate({
+    required String org,
+    required String name,
+    required PlatformInt64 rank,
+    required List<String> perms,
+  });
+
+  Future<OrgRoleInfo> crateApiOrgsOrgRoleEdit({
+    required String org,
+    required String role,
+    String? name,
+    PlatformInt64? rank,
+    List<String>? perms,
+  });
+
+  Future<String> crateApiOrgsOrgRoleRemove({
+    required String org,
+    required String role,
+  });
+
+  Future<String> crateApiOrgsOrgSync({String? home, required String org});
 
   Future<Overview> crateApiDataOverview();
 
@@ -1907,6 +2027,524 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<String> crateApiOrgsOrgApply({
+    String? home,
+    required String target,
+    required String org,
+    required String note,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(target, serializer);
+          sse_encode_String(org, serializer);
+          sse_encode_String(note, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 47,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgApplyConstMeta,
+        argValues: [home, target, org, note],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgApplyConstMeta => const TaskConstMeta(
+    debugName: "org_apply",
+    argNames: ["home", "target", "org", "note"],
+  );
+
+  @override
+  Future<OrgInfo> crateApiOrgsOrgCreate({
+    required String name,
+    String? slug,
+    required String description,
+    required bool public,
+    required bool open,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(name, serializer);
+          sse_encode_opt_String(slug, serializer);
+          sse_encode_String(description, serializer);
+          sse_encode_bool(public, serializer);
+          sse_encode_bool(open, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 48,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_org_info,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgCreateConstMeta,
+        argValues: [name, slug, description, public, open],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgCreateConstMeta => const TaskConstMeta(
+    debugName: "org_create",
+    argNames: ["name", "slug", "description", "public", "open"],
+  );
+
+  @override
+  Future<OrgInfo> crateApiOrgsOrgEdit({
+    required String org,
+    String? name,
+    String? slug,
+    String? description,
+    String? visibility,
+    String? access,
+    bool? hosted,
+    bool? memberAuth,
+    bool? gated,
+    String? template,
+    String? applyRole,
+    String? inviteRole,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_opt_String(name, serializer);
+          sse_encode_opt_String(slug, serializer);
+          sse_encode_opt_String(description, serializer);
+          sse_encode_opt_String(visibility, serializer);
+          sse_encode_opt_String(access, serializer);
+          sse_encode_opt_box_autoadd_bool(hosted, serializer);
+          sse_encode_opt_box_autoadd_bool(memberAuth, serializer);
+          sse_encode_opt_box_autoadd_bool(gated, serializer);
+          sse_encode_opt_String(template, serializer);
+          sse_encode_opt_String(applyRole, serializer);
+          sse_encode_opt_String(inviteRole, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 49,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_org_info,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgEditConstMeta,
+        argValues: [
+          org,
+          name,
+          slug,
+          description,
+          visibility,
+          access,
+          hosted,
+          memberAuth,
+          gated,
+          template,
+          applyRole,
+          inviteRole,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgEditConstMeta => const TaskConstMeta(
+    debugName: "org_edit",
+    argNames: [
+      "org",
+      "name",
+      "slug",
+      "description",
+      "visibility",
+      "access",
+      "hosted",
+      "memberAuth",
+      "gated",
+      "template",
+      "applyRole",
+      "inviteRole",
+    ],
+  );
+
+  @override
+  Future<String> crateApiOrgsOrgHostAutostart({
+    String? home,
+    required bool on_,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_bool(on_, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 50,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgHostAutostartConstMeta,
+        argValues: [home, on_],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgHostAutostartConstMeta =>
+      const TaskConstMeta(
+        debugName: "org_host_autostart",
+        argNames: ["home", "on_"],
+      );
+
+  @override
+  Future<OrgHostStatus> crateApiOrgsOrgHostStart({String? home}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 51,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_org_host_status,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgHostStartConstMeta,
+        argValues: [home],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgHostStartConstMeta =>
+      const TaskConstMeta(debugName: "org_host_start", argNames: ["home"]);
+
+  @override
+  Future<OrgHostStatus> crateApiOrgsOrgHostStatus({String? home}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 52,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_org_host_status,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgHostStatusConstMeta,
+        argValues: [home],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgHostStatusConstMeta =>
+      const TaskConstMeta(debugName: "org_host_status", argNames: ["home"]);
+
+  @override
+  Future<String> crateApiOrgsOrgHostStop({String? home}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 53,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgHostStopConstMeta,
+        argValues: [home],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgHostStopConstMeta =>
+      const TaskConstMeta(debugName: "org_host_stop", argNames: ["home"]);
+
+  @override
+  Future<String> crateApiOrgsOrgJoin({String? home, required String token}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(token, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 54,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgJoinConstMeta,
+        argValues: [home, token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgJoinConstMeta =>
+      const TaskConstMeta(debugName: "org_join", argNames: ["home", "token"]);
+
+  @override
+  Future<String> crateApiOrgsOrgLeave({String? home, required String org}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(org, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 55,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgLeaveConstMeta,
+        argValues: [home, org],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgLeaveConstMeta =>
+      const TaskConstMeta(debugName: "org_leave", argNames: ["home", "org"]);
+
+  @override
+  Future<String> crateApiOrgsOrgMemberApprove({
+    String? home,
+    required String org,
+    required String member,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(org, serializer);
+          sse_encode_String(member, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 56,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgMemberApproveConstMeta,
+        argValues: [home, org, member],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgMemberApproveConstMeta =>
+      const TaskConstMeta(
+        debugName: "org_member_approve",
+        argNames: ["home", "org", "member"],
+      );
+
+  @override
+  Future<String> crateApiOrgsOrgMemberInvite({
+    String? home,
+    required String org,
+    String? to,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(org, serializer);
+          sse_encode_opt_String(to, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 57,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgMemberInviteConstMeta,
+        argValues: [home, org, to],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgMemberInviteConstMeta =>
+      const TaskConstMeta(
+        debugName: "org_member_invite",
+        argNames: ["home", "org", "to"],
+      );
+
+  @override
+  Future<String> crateApiOrgsOrgMemberKick({
+    String? home,
+    required String org,
+    required String member,
+    required String leftovers,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(org, serializer);
+          sse_encode_String(member, serializer);
+          sse_encode_String(leftovers, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 58,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgMemberKickConstMeta,
+        argValues: [home, org, member, leftovers],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgMemberKickConstMeta => const TaskConstMeta(
+    debugName: "org_member_kick",
+    argNames: ["home", "org", "member", "leftovers"],
+  );
+
+  @override
+  Future<String> crateApiOrgsOrgMemberReject({
+    required String org,
+    required String member,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_String(member, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 59,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgMemberRejectConstMeta,
+        argValues: [org, member],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgMemberRejectConstMeta =>
+      const TaskConstMeta(
+        debugName: "org_member_reject",
+        argNames: ["org", "member"],
+      );
+
+  @override
+  Future<String> crateApiOrgsOrgMemberRole({
+    required String org,
+    required String member,
+    required String role,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_String(member, serializer);
+          sse_encode_String(role, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 60,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgMemberRoleConstMeta,
+        argValues: [org, member, role],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgMemberRoleConstMeta => const TaskConstMeta(
+    debugName: "org_member_role",
+    argNames: ["org", "member", "role"],
+  );
+
+  @override
   Future<OrgOverview> crateApiOrgsOrgOverview() {
     return handler.executeNormal(
       NormalTask(
@@ -1915,7 +2553,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 47,
+            funcId: 61,
             port: port_,
           );
         },
@@ -1934,6 +2572,316 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "org_overview", argNames: []);
 
   @override
+  Future<String> crateApiOrgsOrgRemove({required String org}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 62,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgRemoveConstMeta,
+        argValues: [org],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgRemoveConstMeta =>
+      const TaskConstMeta(debugName: "org_remove", argNames: ["org"]);
+
+  @override
+  Future<String> crateApiOrgsOrgResourceAdd({
+    required String org,
+    required String kind,
+    required String name,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_String(kind, serializer);
+          sse_encode_String(name, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 63,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgResourceAddConstMeta,
+        argValues: [org, kind, name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgResourceAddConstMeta => const TaskConstMeta(
+    debugName: "org_resource_add",
+    argNames: ["org", "kind", "name"],
+  );
+
+  @override
+  Future<String> crateApiOrgsOrgResourceArchive({
+    required String org,
+    required String resource,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_String(resource, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 64,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgResourceArchiveConstMeta,
+        argValues: [org, resource],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgResourceArchiveConstMeta =>
+      const TaskConstMeta(
+        debugName: "org_resource_archive",
+        argNames: ["org", "resource"],
+      );
+
+  @override
+  Future<String> crateApiOrgsOrgResourcePublish({
+    required String org,
+    required String resource,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_String(resource, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 65,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgResourcePublishConstMeta,
+        argValues: [org, resource],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgResourcePublishConstMeta =>
+      const TaskConstMeta(
+        debugName: "org_resource_publish",
+        argNames: ["org", "resource"],
+      );
+
+  @override
+  Future<String> crateApiOrgsOrgResourceRelease({
+    required String org,
+    required String resource,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_String(resource, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 66,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgResourceReleaseConstMeta,
+        argValues: [org, resource],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgResourceReleaseConstMeta =>
+      const TaskConstMeta(
+        debugName: "org_resource_release",
+        argNames: ["org", "resource"],
+      );
+
+  @override
+  Future<OrgRoleInfo> crateApiOrgsOrgRoleCreate({
+    required String org,
+    required String name,
+    required PlatformInt64 rank,
+    required List<String> perms,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_i_64(rank, serializer);
+          sse_encode_list_String(perms, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 67,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_org_role_info,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgRoleCreateConstMeta,
+        argValues: [org, name, rank, perms],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgRoleCreateConstMeta => const TaskConstMeta(
+    debugName: "org_role_create",
+    argNames: ["org", "name", "rank", "perms"],
+  );
+
+  @override
+  Future<OrgRoleInfo> crateApiOrgsOrgRoleEdit({
+    required String org,
+    required String role,
+    String? name,
+    PlatformInt64? rank,
+    List<String>? perms,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_String(role, serializer);
+          sse_encode_opt_String(name, serializer);
+          sse_encode_opt_box_autoadd_i_64(rank, serializer);
+          sse_encode_opt_list_String(perms, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 68,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_org_role_info,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgRoleEditConstMeta,
+        argValues: [org, role, name, rank, perms],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgRoleEditConstMeta => const TaskConstMeta(
+    debugName: "org_role_edit",
+    argNames: ["org", "role", "name", "rank", "perms"],
+  );
+
+  @override
+  Future<String> crateApiOrgsOrgRoleRemove({
+    required String org,
+    required String role,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(org, serializer);
+          sse_encode_String(role, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 69,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgRoleRemoveConstMeta,
+        argValues: [org, role],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgRoleRemoveConstMeta => const TaskConstMeta(
+    debugName: "org_role_remove",
+    argNames: ["org", "role"],
+  );
+
+  @override
+  Future<String> crateApiOrgsOrgSync({String? home, required String org}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(org, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 70,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiOrgsOrgSyncConstMeta,
+        argValues: [home, org],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiOrgsOrgSyncConstMeta =>
+      const TaskConstMeta(debugName: "org_sync", argNames: ["home", "org"]);
+
+  @override
   Future<Overview> crateApiDataOverview() {
     return handler.executeNormal(
       NormalTask(
@@ -1942,7 +2890,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 48,
+            funcId: 71,
             port: port_,
           );
         },
@@ -1972,7 +2920,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 49,
+            funcId: 72,
             port: port_,
           );
         },
@@ -2014,7 +2962,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 50,
+            funcId: 73,
             port: port_,
           );
         },
@@ -2052,7 +3000,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 51,
+            funcId: 74,
             port: port_,
           );
         },
@@ -2082,7 +3030,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 52,
+            funcId: 75,
             port: port_,
           );
         },
@@ -2114,7 +3062,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 53,
+            funcId: 76,
             port: port_,
           );
         },
@@ -2143,7 +3091,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 54,
+            funcId: 77,
             port: port_,
           );
         },
@@ -2175,7 +3123,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 55,
+            funcId: 78,
             port: port_,
           );
         },
@@ -2211,7 +3159,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 56,
+            funcId: 79,
             port: port_,
           );
         },
@@ -2241,7 +3189,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 57,
+            funcId: 80,
             port: port_,
           );
         },
@@ -2270,7 +3218,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 58,
+            funcId: 81,
             port: port_,
           );
         },
@@ -2304,7 +3252,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 59,
+            funcId: 82,
             port: port_,
           );
         },
@@ -2331,7 +3279,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 60)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 83)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -2397,6 +3345,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   bool dco_decode_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
+  }
+
+  @protected
+  bool dco_decode_box_autoadd_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as bool;
   }
@@ -2844,6 +3798,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool? dco_decode_opt_box_autoadd_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_bool(raw);
+  }
+
+  @protected
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_i_64(raw);
@@ -2872,6 +3832,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<String>? dco_decode_opt_list_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_list_String(raw);
+  }
+
+  @protected
   OrgEndpointInfo dco_decode_org_endpoint_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -2882,6 +3848,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       kind: dco_decode_String(arr[1]),
       perm: dco_decode_String(arr[2]),
       anyone: dco_decode_bool(arr[3]),
+    );
+  }
+
+  @protected
+  OrgHostStatus dco_decode_org_host_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return OrgHostStatus(
+      running: dco_decode_bool(arr[0]),
+      ours: dco_decode_bool(arr[1]),
+      url: dco_decode_String(arr[2]),
+      addr: dco_decode_String(arr[3]),
+      pid: dco_decode_opt_box_autoadd_i_64(arr[4]),
+      orgs: dco_decode_list_String(arr[5]),
+      mirrors: dco_decode_list_String(arr[6]),
+      certSource: dco_decode_String(arr[7]),
+      httpAddr: dco_decode_opt_String(arr[8]),
+      autostart: dco_decode_bool(arr[9]),
     );
   }
 
@@ -3204,6 +4190,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   bool sse_decode_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
+  bool sse_decode_box_autoadd_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_bool(deserializer));
   }
 
   @protected
@@ -3829,6 +4821,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_bool(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -3879,6 +4882,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<String>? sse_decode_opt_list_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_list_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   OrgEndpointInfo sse_decode_org_endpoint_info(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_name = sse_decode_String(deserializer);
@@ -3890,6 +4904,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       kind: var_kind,
       perm: var_perm,
       anyone: var_anyone,
+    );
+  }
+
+  @protected
+  OrgHostStatus sse_decode_org_host_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_running = sse_decode_bool(deserializer);
+    var var_ours = sse_decode_bool(deserializer);
+    var var_url = sse_decode_String(deserializer);
+    var var_addr = sse_decode_String(deserializer);
+    var var_pid = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_orgs = sse_decode_list_String(deserializer);
+    var var_mirrors = sse_decode_list_String(deserializer);
+    var var_certSource = sse_decode_String(deserializer);
+    var var_httpAddr = sse_decode_opt_String(deserializer);
+    var var_autostart = sse_decode_bool(deserializer);
+    return OrgHostStatus(
+      running: var_running,
+      ours: var_ours,
+      url: var_url,
+      addr: var_addr,
+      pid: var_pid,
+      orgs: var_orgs,
+      mirrors: var_mirrors,
+      certSource: var_certSource,
+      httpAddr: var_httpAddr,
+      autostart: var_autostart,
     );
   }
 
@@ -4208,6 +5249,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self ? 1 : 0);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self, serializer);
   }
 
   @protected
@@ -4718,6 +5765,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_bool(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_i_64(
     PlatformInt64? self,
     SseSerializer serializer,
@@ -4770,6 +5827,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_list_String(
+    List<String>? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_list_String(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_org_endpoint_info(
     OrgEndpointInfo self,
     SseSerializer serializer,
@@ -4779,6 +5849,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.kind, serializer);
     sse_encode_String(self.perm, serializer);
     sse_encode_bool(self.anyone, serializer);
+  }
+
+  @protected
+  void sse_encode_org_host_status(
+    OrgHostStatus self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.running, serializer);
+    sse_encode_bool(self.ours, serializer);
+    sse_encode_String(self.url, serializer);
+    sse_encode_String(self.addr, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.pid, serializer);
+    sse_encode_list_String(self.orgs, serializer);
+    sse_encode_list_String(self.mirrors, serializer);
+    sse_encode_String(self.certSource, serializer);
+    sse_encode_opt_String(self.httpAddr, serializer);
+    sse_encode_bool(self.autostart, serializer);
   }
 
   @protected

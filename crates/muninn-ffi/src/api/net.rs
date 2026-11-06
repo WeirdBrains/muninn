@@ -162,7 +162,7 @@ fn reap_hosted() {
     }
 }
 
-fn hosted_node() -> Option<Arc<Node>> {
+pub(crate) fn hosted_node() -> Option<Arc<Node>> {
     reap_hosted();
     HOSTED.lock().ok()?.as_ref().filter(|d| d.node.running()).map(|d| d.node.clone())
 }
@@ -377,7 +377,7 @@ pub fn net_start(home: Option<String>) -> anyhow::Result<String> {
             return Ok("the node is already running".into());
         }
     }
-    let p = paths(home)?;
+    let p = paths(home.clone())?;
     let store = open_write()?;
     let service = open_write()?;
     let listener = open_write()?;
@@ -391,7 +391,7 @@ pub fn net_start(home: Option<String>) -> anyhow::Result<String> {
         .settle_with(spare, prefs.net.relays.clone());
     let node = hosted.node.clone();
     let peer = node.peer_id().to_string();
-    let msg = format!("node {label} running as {peer}");
+    let mut msg = format!("node {label} running as {peer}");
     let stop = Arc::new(AtomicBool::new(false));
     let stop2 = stop.clone();
     let thread = thread::spawn(move || {
@@ -401,6 +401,18 @@ pub fn net_start(home: Option<String>) -> anyhow::Result<String> {
         hosted.stop(&tick_store, ORIGIN);
     });
     *HOSTED.lock().unwrap_or_else(|e| e.into_inner()) = Some(HostedDriver { node, stop, thread: Some(thread) });
+    // Same as the TUI / `mnnn net start`: the site comes up with the node when hosting.autostart is on.
+    if prefs.hosting.autostart {
+        match super::orgs::org_host_start(home) {
+            Ok(st) if st.running && !st.url.is_empty() => {
+                msg = format!("{msg}; site at {}", st.url);
+            }
+            Ok(_) => {}
+            Err(e) => {
+                msg = format!("{msg}; site: {e}");
+            }
+        }
+    }
     Ok(msg)
 }
 
