@@ -1,5 +1,6 @@
-/// Projects: create, rename, describe, delete, and attach or detach series
-/// (`mnnn project create|edit|remove|add|drop`). Opening a series shows it in
+/// Projects: create, rename, describe, delete, attach or detach series, plus
+/// journals, live searches, reports and archive import/export (`mnnn project`,
+/// `mnnn journal`, `mnnn search`, `mnnn report`). Opening a series shows it in
 /// Data with the project's saved time range. Writes reuse the unlocked session
 /// (`open_write`); the key stays in Rust.
 library;
@@ -11,6 +12,7 @@ import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
 import '../time_range.dart';
+import 'project_extras.dart';
 import 'unlock.dart';
 
 Future<void> showNewProjectDialog(BuildContext context, WidgetRef ref) async {
@@ -30,99 +32,166 @@ class ProjectsView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final pane = ref.watch(projectPaneProvider);
+    return Unlocked(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final p in ProjectPane.values)
+                  FilterChip(
+                    key: ValueKey('projects-pane-${p.name}'),
+                    label: Text(_paneTitle(p)),
+                    selected: pane == p,
+                    onSelected: (_) =>
+                        ref.read(projectPaneProvider.notifier).state = p,
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: switch (pane) {
+              ProjectPane.projects => const _ProjectsList(),
+              ProjectPane.journals => const JournalsPane(),
+              ProjectPane.searches => const SearchesPane(),
+              ProjectPane.reports => const ReportsPane(),
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _paneTitle(ProjectPane p) => switch (p) {
+    ProjectPane.projects => 'Projects',
+    ProjectPane.journals => 'Journals',
+    ProjectPane.searches => 'Searches',
+    ProjectPane.reports => 'Reports',
+  };
+}
+
+class _ProjectsList extends ConsumerWidget {
+  const _ProjectsList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final m = context.muninn;
     final sel = ref.watch(selectedProjectProvider);
-    return Unlocked(
-      child: ref
-          .watch(overviewProvider)
-          .when(
-            loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text('$e', style: TextStyle(color: m.error)),
-            data: (o) {
-              final ps = o?.projects ?? const <Project>[];
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: FilledButton.icon(
+    return ref
+        .watch(overviewProvider)
+        .when(
+          loading: () => const LinearProgressIndicator(),
+          error: (e, _) => Text('$e', style: TextStyle(color: m.error)),
+          data: (o) {
+            final ps = o?.projects ?? const <Project>[];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.icon(
                         key: const ValueKey('projects-new'),
                         onPressed: () => showNewProjectDialog(context, ref),
                         icon: const Icon(Icons.add),
                         label: const Text('New project'),
                       ),
+                      OutlinedButton.icon(
+                        key: const ValueKey('projects-import'),
+                        onPressed: () => showImportProjectDialog(context, ref),
+                        icon: const Icon(Icons.file_upload_outlined),
+                        label: const Text('Import archive'),
+                      ),
+                    ],
+                  ),
+                ),
+                if (ps.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'No projects yet',
+                      style: TextStyle(color: m.muted),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(8),
+                      children: [
+                        for (final p in ps) ...[
+                          ListTile(
+                            minTileHeight: 56,
+                            leading: Icon(Icons.folder, color: m.accent),
+                            title: Text(p.name),
+                            subtitle: p.description.isEmpty
+                                ? null
+                                : Text(p.description),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  sel?.id == p.id
+                                      ? Icons.expand_less
+                                      : Icons.expand_more,
+                                ),
+                                PopupMenuButton<String>(
+                                  key: ValueKey('project-menu-${p.id}'),
+                                  tooltip: 'Project actions',
+                                  onSelected: (v) =>
+                                      _onProjectAction(context, ref, p, v),
+                                  itemBuilder: (ctx) => const [
+                                    PopupMenuItem(
+                                      value: 'rename',
+                                      child: Text('Rename…'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'describe',
+                                      child: Text('Edit description…'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('Delete…'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'export',
+                                      child: Text('Export…'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'journal',
+                                      child: Text('New journal…'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'add-item',
+                                      child: Text('Add item…'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            onTap: () =>
+                                ref
+                                    .read(selectedProjectProvider.notifier)
+                                    .state = sel?.id == p.id
+                                ? null
+                                : p,
+                          ),
+                          if (sel?.id == p.id) _ProjectSeriesList(p, o!),
+                        ],
+                      ],
                     ),
                   ),
-                  if (ps.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'No projects yet',
-                        style: TextStyle(color: m.muted),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.all(8),
-                        children: [
-                          for (final p in ps) ...[
-                            ListTile(
-                              minTileHeight: 56,
-                              leading: Icon(Icons.folder, color: m.accent),
-                              title: Text(p.name),
-                              subtitle: p.description.isEmpty
-                                  ? null
-                                  : Text(p.description),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    sel?.id == p.id
-                                        ? Icons.expand_less
-                                        : Icons.expand_more,
-                                  ),
-                                  PopupMenuButton<String>(
-                                    key: ValueKey('project-menu-${p.id}'),
-                                    tooltip: 'Project actions',
-                                    onSelected: (v) =>
-                                        _onProjectAction(context, ref, p, v),
-                                    itemBuilder: (ctx) => const [
-                                      PopupMenuItem(
-                                        value: 'rename',
-                                        child: Text('Rename…'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'describe',
-                                        child: Text('Edit description…'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text('Delete…'),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              onTap: () =>
-                                  ref
-                                      .read(selectedProjectProvider.notifier)
-                                      .state = sel?.id == p.id
-                                  ? null
-                                  : p,
-                            ),
-                            if (sel?.id == p.id) _ProjectSeriesList(p, o!),
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-    );
+              ],
+            );
+          },
+        );
   }
 }
 
@@ -166,6 +235,13 @@ Future<void> _onProjectAction(
       }
       ref.invalidate(overviewProvider);
       ref.invalidate(projectSeriesProvider);
+      ref.invalidate(projectItemsProvider);
+    case 'export':
+      await showExportProjectDialog(context, ref, p);
+    case 'journal':
+      await showNewJournalDialog(context, ref, project: p);
+    case 'add-item':
+      await showAddProjectItemDialog(context, ref, p);
   }
 }
 
@@ -411,18 +487,41 @@ class _ProjectSeriesList extends ConsumerWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(72, 0, 16, 8),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const ValueKey('project-add-series'),
-              onPressed: () => _addCurrent(context, ref),
-              icon: const Icon(Icons.add_chart),
-              label: Text(
-                d == null
-                    ? 'Add current dataset'
-                    : 'Add ${d.symbol} · ${d.duration}',
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                key: const ValueKey('project-add-series'),
+                onPressed: () => _addCurrent(context, ref),
+                icon: const Icon(Icons.add_chart),
+                label: Text(
+                  d == null
+                      ? 'Add current dataset'
+                      : 'Add ${d.symbol} · ${d.duration}',
+                ),
               ),
-            ),
+              OutlinedButton.icon(
+                key: const ValueKey('project-new-journal'),
+                onPressed: () =>
+                    showNewJournalDialog(context, ref, project: project),
+                icon: const Icon(Icons.menu_book),
+                label: const Text('New journal'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('project-add-item'),
+                onPressed: () =>
+                    showAddProjectItemDialog(context, ref, project),
+                icon: const Icon(Icons.playlist_add),
+                label: const Text('Add item'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('project-export'),
+                onPressed: () => showExportProjectDialog(context, ref, project),
+                icon: const Icon(Icons.file_download_outlined),
+                label: const Text('Export'),
+              ),
+            ],
           ),
         ),
         ref
@@ -481,8 +580,81 @@ class _ProjectSeriesList extends ConsumerWidget {
                 );
               },
             ),
+        ref
+            .watch(projectItemsProvider)
+            .when(
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.fromLTRB(72, 0, 16, 12),
+                child: Text('$e', style: TextStyle(color: m.error)),
+              ),
+              data: (items) {
+                final extra = [
+                  for (final i in items ?? const <ProjectItemInfo>[])
+                    if (!i.isResult) i,
+                ];
+                if (extra.isEmpty) return const SizedBox.shrink();
+                return Column(
+                  children: [
+                    for (final i in extra)
+                      ListTile(
+                        minTileHeight: 48,
+                        contentPadding: const EdgeInsets.only(
+                          left: 72,
+                          right: 8,
+                        ),
+                        leading: Icon(_kindIcon(i.kind), color: m.accent),
+                        title: Text(i.name),
+                        subtitle: Text(
+                          i.detail.isEmpty ? i.kind : '${i.kind} · ${i.detail}',
+                        ),
+                        trailing: IconButton(
+                          key: ValueKey('project-remove-item-${i.itemId}'),
+                          tooltip: 'Remove from project',
+                          icon: Icon(
+                            Icons.remove_circle_outline,
+                            color: m.muted,
+                          ),
+                          onPressed: () => _removeItem(context, ref, i.itemId),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
       ],
     );
+  }
+
+  IconData _kindIcon(String kind) => switch (kind) {
+    'journal' => Icons.menu_book,
+    'live_search' || 'search' => Icons.search,
+    'report' => Icons.description,
+    'rule' => Icons.rule,
+    'model' => Icons.schema,
+    'code' => Icons.code,
+    _ => Icons.folder_open,
+  };
+
+  Future<void> _removeItem(
+    BuildContext context,
+    WidgetRef ref,
+    int itemId,
+  ) async {
+    final m = context.muninn;
+    try {
+      await ref.read(apiProvider).removeProjectSeries(itemId);
+      ref.invalidate(projectSeriesProvider);
+      ref.invalidate(projectItemsProvider);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$e', style: TextStyle(color: m.fg)),
+          backgroundColor: m.error,
+        ),
+      );
+    }
   }
 
   Future<void> _addCurrent(BuildContext context, WidgetRef ref) async {
@@ -517,6 +689,7 @@ class _ProjectSeriesList extends ConsumerWidget {
           .read(apiProvider)
           .addProjectSeries(project.id, d, ref.read(timeRangeProvider));
       ref.invalidate(projectSeriesProvider);
+      ref.invalidate(projectItemsProvider);
       ref.invalidate(overviewProvider);
       if (!context.mounted) return;
       if (!added) {
@@ -550,6 +723,7 @@ class _ProjectSeriesList extends ConsumerWidget {
     try {
       await ref.read(apiProvider).removeProjectSeries(s.itemId);
       ref.invalidate(projectSeriesProvider);
+      ref.invalidate(projectItemsProvider);
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

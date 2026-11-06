@@ -10,10 +10,13 @@ import 'rust/api/help.dart' as r_help;
 import 'rust/api/info.dart' as r_info;
 import 'rust/api/keys.dart' as r_keys;
 import 'rust/api/io.dart' as r_io;
+import 'rust/api/journals.dart' as r_journals;
 import 'rust/api/net.dart' as r_net;
 import 'rust/api/orgs.dart' as r_orgs;
 import 'rust/api/prefs.dart' as r_prefs;
 import 'rust/api/projects.dart' as r_projects;
+import 'rust/api/reports.dart' as r_reports;
+import 'rust/api/searches.dart' as r_searches;
 import 'rust/api/themes.dart' as r_themes;
 
 class FfiMuninnApi implements MuninnApi {
@@ -285,6 +288,259 @@ class FfiMuninnApi implements MuninnApi {
   @override
   Future<void> removeProjectSeries(int itemId) =>
       r_projects.removeProjectSeries(itemId: PlatformInt64Util.from(itemId));
+
+  @override
+  Future<List<ProjectItemInfo>> projectItems(String projectId) async => [
+    for (final i in await r_projects.projectItems(projectId: projectId))
+      ProjectItemInfo(
+        itemId: i.itemId.toInt(),
+        kind: i.kind,
+        name: i.name,
+        detail: i.detail,
+        refId: i.refId,
+        source: i.source,
+        base: i.base,
+        quote: i.quote,
+        durationS: i.durationS?.toInt(),
+        from: i.from?.toInt(),
+        to: i.to?.toInt(),
+      ),
+  ];
+
+  @override
+  Future<String> addProjectItem(String project, String kind, String key) =>
+      r_projects.addProjectItem(project: project, kind: kind, key: key);
+
+  @override
+  Future<String> projectImport(String path, {String? name}) =>
+      r_projects.projectImport(path: path, name: name);
+
+  @override
+  Future<String> projectExport(
+    String id,
+    String path, {
+    String format = 'archive',
+    bool noData = false,
+  }) => r_projects.projectExport(
+    id: id,
+    path: path,
+    format: format,
+    noData: noData,
+  );
+
+  @override
+  Future<List<JournalInfo>> journals() async => [
+    for (final j in await r_journals.journals())
+      JournalInfo(
+        id: j.id,
+        shortId: j.shortId,
+        name: j.name,
+        projectId: j.projectId,
+        projectName: j.projectName,
+        format: j.format,
+        entries: j.entries.toInt(),
+        forkedFrom: j.forkedFrom,
+      ),
+  ];
+
+  @override
+  Future<JournalInfo> createJournal(
+    String name, {
+    String? project,
+    String format = 'markdown',
+  }) async => _journal(
+    await r_journals.createJournal(
+      name: name,
+      project: project,
+      format: format,
+    ),
+  );
+
+  @override
+  Future<JournalInfo> updateJournal(
+    String id, {
+    String? name,
+    String? format,
+  }) async => _journal(
+    await r_journals.updateJournal(id: id, name: name, format: format),
+  );
+
+  @override
+  Future<String> removeJournal(String id) => r_journals.removeJournal(id: id);
+
+  @override
+  Future<JournalInfo> forkJournal(
+    String id, {
+    String? project,
+    String? name,
+  }) async => _journal(
+    await r_journals.forkJournal(id: id, project: project, name: name),
+  );
+
+  @override
+  Future<List<JournalEntryInfo>> journalEntries(String journal) async => [
+    for (final e in await r_journals.journalEntries(journal: journal))
+      _entry(e),
+  ];
+
+  @override
+  Future<JournalEntryInfo> addJournalEntry(
+    String journal, {
+    String title = '',
+    String body = '',
+    String? format,
+  }) async => _entry(
+    await r_journals.addJournalEntry(
+      journal: journal,
+      title: title,
+      body: body,
+      format: format,
+    ),
+  );
+
+  @override
+  Future<JournalEntryInfo> updateJournalEntry(
+    String entry, {
+    String? title,
+    String? body,
+    String? format,
+  }) async => _entry(
+    await r_journals.updateJournalEntry(
+      entry: entry,
+      title: title,
+      body: body,
+      format: format,
+    ),
+  );
+
+  @override
+  Future<String> removeJournalEntry(String entry) =>
+      r_journals.removeJournalEntry(entry: entry);
+
+  @override
+  Future<List<JournalNoteInfo>> journalNotes(String journal) async => [
+    for (final n in await r_journals.journalNotes(journal: journal))
+      JournalNoteInfo(id: n.id, shortId: n.shortId, body: n.body),
+  ];
+
+  @override
+  Future<JournalNoteInfo> addJournalNote(String journal, String body) async {
+    final n = await r_journals.addJournalNote(journal: journal, body: body);
+    return JournalNoteInfo(id: n.id, shortId: n.shortId, body: n.body);
+  }
+
+  @override
+  Future<List<SearchInfo>> searches() async => [
+    for (final s in await r_searches.searches()) _search(s),
+  ];
+
+  @override
+  Future<SearchInfo> saveSearch(
+    String name, {
+    String query = '',
+    String target = 'series',
+  }) async => _search(
+    await r_searches.saveSearch(name: name, query: query, target: target),
+  );
+
+  @override
+  Future<SearchInfo> renameSearch(String id, String name) async =>
+      _search(await r_searches.renameSearch(id: id, name: name));
+
+  @override
+  Future<SearchInfo> forkSearch(String id, {String? name}) async =>
+      _search(await r_searches.forkSearch(id: id, name: name));
+
+  @override
+  Future<String> removeSearch(String id) => r_searches.removeSearch(id: id);
+
+  @override
+  Future<List<ReportInfo>> reports() async => [
+    for (final r in await r_reports.reports()) _report(r),
+  ];
+
+  @override
+  Future<ReportInfo> createReport(
+    String name, {
+    String description = '',
+    String? project,
+  }) async => _report(
+    await r_reports.createReport(
+      name: name,
+      description: description,
+      project: project,
+    ),
+  );
+
+  @override
+  Future<ReportInfo> updateReport(
+    String id, {
+    String? name,
+    String? description,
+  }) async => _report(
+    await r_reports.updateReport(id: id, name: name, description: description),
+  );
+
+  @override
+  Future<String> removeReport(String id) => r_reports.removeReport(id: id);
+
+  @override
+  Future<List<ReportSectionInfo>> reportSections(String report) async => [
+    for (final s in await r_reports.reportSections(report: report)) _section(s),
+  ];
+
+  @override
+  Future<ReportSectionInfo> addReportSection(
+    String report, {
+    String kind = 'text',
+    String title = '',
+    String body = '',
+    String format = 'markdown',
+    String? target,
+  }) async => _section(
+    await r_reports.addReportSection(
+      report: report,
+      kind: kind,
+      title: title,
+      body: body,
+      format: format,
+      target: target,
+    ),
+  );
+
+  @override
+  Future<ReportSectionInfo> updateReportSection(
+    String report,
+    String section, {
+    String? title,
+    String? body,
+    String? format,
+  }) async => _section(
+    await r_reports.updateReportSection(
+      report: report,
+      section: section,
+      title: title,
+      body: body,
+      format: format,
+    ),
+  );
+
+  @override
+  Future<String> removeReportSection(String report, String section) =>
+      r_reports.removeReportSection(report: report, section: section);
+
+  @override
+  Future<ReportSectionInfo> moveReportSection(
+    String report,
+    String section,
+    int to,
+  ) async => _section(
+    await r_reports.moveReportSection(
+      report: report,
+      section: section,
+      to: PlatformInt64Util.from(to),
+    ),
+  );
 
   @override
   Future<NetOverview> netOverview() async {
@@ -875,4 +1131,57 @@ OrgHostStatus _orgHost(r_orgs.OrgHostStatus s) => OrgHostStatus(
   certSource: s.certSource,
   httpAddr: s.httpAddr,
   autostart: s.autostart,
+);
+
+JournalInfo _journal(r_journals.JournalInfo j) => JournalInfo(
+  id: j.id,
+  shortId: j.shortId,
+  name: j.name,
+  projectId: j.projectId,
+  projectName: j.projectName,
+  format: j.format,
+  entries: j.entries.toInt(),
+  forkedFrom: j.forkedFrom,
+);
+
+JournalEntryInfo _entry(r_journals.EntryInfo e) => JournalEntryInfo(
+  id: e.id,
+  shortId: e.shortId,
+  journalId: e.journalId,
+  title: e.title,
+  heading: e.heading,
+  body: e.body,
+  format: e.format,
+  position: e.position.toInt(),
+);
+
+SearchInfo _search(r_searches.SearchInfo s) => SearchInfo(
+  id: s.id,
+  shortId: s.shortId,
+  name: s.name,
+  target: s.target,
+  query: s.query,
+  describe: s.describe,
+  matches: s.matches.toInt(),
+  forkedFrom: s.forkedFrom,
+);
+
+ReportInfo _report(r_reports.ReportInfo r) => ReportInfo(
+  id: r.id,
+  shortId: r.shortId,
+  name: r.name,
+  description: r.description,
+  sections: r.sections.toInt(),
+);
+
+ReportSectionInfo _section(r_reports.SectionInfo s) => ReportSectionInfo(
+  id: s.id,
+  shortId: s.shortId,
+  reportId: s.reportId,
+  position: s.position.toInt(),
+  kind: s.kind,
+  title: s.title,
+  heading: s.heading,
+  body: s.body,
+  format: s.format,
 );

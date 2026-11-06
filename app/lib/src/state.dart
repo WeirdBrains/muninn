@@ -236,6 +236,68 @@ final projectSeriesProvider = FutureProvider<List<ProjectSeries>?>((ref) {
   return ref.watch(apiProvider).projectSeries(p.id);
 });
 
+/// Projects window pages (TUI Projects / Journals / Searches / Reports).
+enum ProjectPane { projects, journals, searches, reports }
+
+final projectPaneProvider = StateProvider<ProjectPane>(
+  (ref) => ProjectPane.projects,
+);
+
+final projectItemsProvider = FutureProvider<List<ProjectItemInfo>?>((ref) {
+  final p = ref.watch(selectedProjectProvider);
+  if (p == null || !ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).projectItems(p.id);
+});
+
+final journalsProvider = FutureProvider<List<JournalInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).journals();
+});
+
+final selectedJournalProvider = StateProvider<JournalInfo?>((ref) => null);
+
+final journalEntriesProvider = FutureProvider<List<JournalEntryInfo>?>((ref) {
+  final j = ref.watch(selectedJournalProvider);
+  if (j == null || !ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).journalEntries(j.id);
+});
+
+final journalNotesProvider = FutureProvider<List<JournalNoteInfo>?>((ref) {
+  final j = ref.watch(selectedJournalProvider);
+  if (j == null || !ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).journalNotes(j.id);
+});
+
+final searchesProvider = FutureProvider<List<SearchInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).searches();
+});
+
+final reportsProvider = FutureProvider<List<ReportInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).reports();
+});
+
+final selectedReportProvider = StateProvider<ReportInfo?>((ref) => null);
+
+final reportSectionsProvider = FutureProvider<List<ReportSectionInfo>?>((ref) {
+  final r = ref.watch(selectedReportProvider);
+  if (r == null || !ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).reportSections(r.id);
+});
+
+void refreshProjectExtras(WidgetRef ref) {
+  ref.invalidate(overviewProvider);
+  ref.invalidate(projectSeriesProvider);
+  ref.invalidate(projectItemsProvider);
+  ref.invalidate(journalsProvider);
+  ref.invalidate(journalEntriesProvider);
+  ref.invalidate(journalNotesProvider);
+  ref.invalidate(searchesProvider);
+  ref.invalidate(reportsProvider);
+  ref.invalidate(reportSectionsProvider);
+}
+
 final netOverviewProvider = FutureProvider<NetOverview?>((ref) {
   if (!ref.watch(unlockedProvider)) return Future.value(null);
   return ref.watch(apiProvider).netOverview();

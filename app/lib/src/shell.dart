@@ -26,6 +26,7 @@ import 'views/orgs_dialogs.dart';
 import 'views/keys.dart';
 import 'views/keys_dialogs.dart';
 import 'views/net_dialogs.dart';
+import 'views/project_extras.dart';
 import 'views/projects.dart';
 
 /// Widths below this use the phone layout.
@@ -230,8 +231,15 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
         item('Symbols…', () => later('Symbols', 'mnnn symbols')),
       ]),
       menu('Projects', [
-        item('Projects…', () => go(Section.projects), const SingleActivator(LogicalKeyboardKey.keyP, shift: true)),
+        item('Projects…', () { ref.read(projectPaneProvider.notifier).state = ProjectPane.projects; go(Section.projects); }, const SingleActivator(LogicalKeyboardKey.keyP, shift: true)),
         item('New project…', () => showNewProjectDialog(context, ref)),
+        item('Live searches…', () { ref.read(projectPaneProvider.notifier).state = ProjectPane.searches; go(Section.projects); }),
+        item('Save search as live search…', () => showSaveSearchDialog(context, ref)),
+        item('Journals…', () { ref.read(projectPaneProvider.notifier).state = ProjectPane.journals; go(Section.projects); }),
+        item('New journal…', () => showNewJournalDialog(context, ref)),
+        item('Reports…', () { ref.read(projectPaneProvider.notifier).state = ProjectPane.reports; go(Section.projects); }),
+        item('New report…', () => showNewReportDialog(context, ref)),
+        item('Import archive…', () => showImportProjectDialog(context, ref)),
       ]),
       menu('Net', [
         item('Status…', () { ref.read(netPaneProvider.notifier).state = NetPane.node; go(Section.net); }, const SingleActivator(LogicalKeyboardKey.keyK, shift: true)),

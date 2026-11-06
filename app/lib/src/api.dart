@@ -107,6 +107,112 @@ class BarPoint {
   final double open, high, low, close, volume;
 }
 
+/// Any item saved in a project (`mnnn project show`).
+class ProjectItemInfo {
+  const ProjectItemInfo({
+    required this.itemId,
+    required this.kind,
+    required this.name,
+    this.detail = '',
+    this.refId = '',
+    this.source,
+    this.base,
+    this.quote,
+    this.durationS,
+    this.from,
+    this.to,
+  });
+  final int itemId;
+  final String kind, name, detail, refId;
+  final String? source, base, quote;
+  final int? durationS, from, to;
+  bool get isResult => kind == 'result';
+}
+
+class JournalInfo {
+  const JournalInfo({
+    required this.id,
+    required this.shortId,
+    required this.name,
+    this.projectId,
+    this.projectName = '',
+    this.format = 'markdown',
+    this.entries = 0,
+    this.forkedFrom,
+  });
+  final String id, shortId, name, format, projectName;
+  final String? projectId, forkedFrom;
+  final int entries;
+}
+
+class JournalEntryInfo {
+  const JournalEntryInfo({
+    required this.id,
+    required this.shortId,
+    required this.journalId,
+    this.title = '',
+    this.heading = '',
+    this.body = '',
+    this.format = 'markdown',
+    this.position = 0,
+  });
+  final String id, shortId, journalId, title, heading, body, format;
+  final int position;
+}
+
+class JournalNoteInfo {
+  const JournalNoteInfo({
+    required this.id,
+    required this.shortId,
+    required this.body,
+  });
+  final String id, shortId, body;
+}
+
+class SearchInfo {
+  const SearchInfo({
+    required this.id,
+    required this.shortId,
+    required this.name,
+    this.target = 'series',
+    this.query = '',
+    this.describe = '',
+    this.matches = 0,
+    this.forkedFrom,
+  });
+  final String id, shortId, name, target, query, describe;
+  final int matches;
+  final String? forkedFrom;
+}
+
+class ReportInfo {
+  const ReportInfo({
+    required this.id,
+    required this.shortId,
+    required this.name,
+    this.description = '',
+    this.sections = 0,
+  });
+  final String id, shortId, name, description;
+  final int sections;
+}
+
+class ReportSectionInfo {
+  const ReportSectionInfo({
+    required this.id,
+    required this.shortId,
+    required this.reportId,
+    this.position = 0,
+    this.kind = 'text',
+    this.title = '',
+    this.heading = '',
+    this.body = '',
+    this.format = 'markdown',
+  });
+  final String id, shortId, reportId, kind, title, heading, body, format;
+  final int position;
+}
+
 /// A series saved in a project, with the project's range.
 class ProjectSeries {
   const ProjectSeries({
@@ -555,6 +661,94 @@ abstract class MuninnApi {
 
   /// Take a series result out of a project (`mnnn project drop`). The series stays.
   Future<void> removeProjectSeries(int itemId);
+
+  /// Every item in a project (`mnnn project show`).
+  Future<List<ProjectItemInfo>> projectItems(String projectId);
+
+  /// `mnnn project add --journal|--search|--report|--rule|--model|--code`.
+  Future<String> addProjectItem(String project, String kind, String key);
+
+  /// `mnnn project import` a `.mnnp` archive or JSON pack.
+  Future<String> projectImport(String path, {String? name});
+
+  /// `mnnn project export` as archive (`.mnnp`) or JSON. `noData` leaves bars out.
+  Future<String> projectExport(
+    String id,
+    String path, {
+    String format = 'archive',
+    bool noData = false,
+  });
+
+  Future<List<JournalInfo>> journals();
+  Future<JournalInfo> createJournal(
+    String name, {
+    String? project,
+    String format = 'markdown',
+  });
+  Future<JournalInfo> updateJournal(String id, {String? name, String? format});
+  Future<String> removeJournal(String id);
+  Future<JournalInfo> forkJournal(String id, {String? project, String? name});
+  Future<List<JournalEntryInfo>> journalEntries(String journal);
+  Future<JournalEntryInfo> addJournalEntry(
+    String journal, {
+    String title = '',
+    String body = '',
+    String? format,
+  });
+  Future<JournalEntryInfo> updateJournalEntry(
+    String entry, {
+    String? title,
+    String? body,
+    String? format,
+  });
+  Future<String> removeJournalEntry(String entry);
+  Future<List<JournalNoteInfo>> journalNotes(String journal);
+  Future<JournalNoteInfo> addJournalNote(String journal, String body);
+
+  Future<List<SearchInfo>> searches();
+  Future<SearchInfo> saveSearch(
+    String name, {
+    String query = '',
+    String target = 'series',
+  });
+  Future<SearchInfo> renameSearch(String id, String name);
+  Future<SearchInfo> forkSearch(String id, {String? name});
+  Future<String> removeSearch(String id);
+
+  Future<List<ReportInfo>> reports();
+  Future<ReportInfo> createReport(
+    String name, {
+    String description = '',
+    String? project,
+  });
+  Future<ReportInfo> updateReport(
+    String id, {
+    String? name,
+    String? description,
+  });
+  Future<String> removeReport(String id);
+  Future<List<ReportSectionInfo>> reportSections(String report);
+  Future<ReportSectionInfo> addReportSection(
+    String report, {
+    String kind = 'text',
+    String title = '',
+    String body = '',
+    String format = 'markdown',
+    String? target,
+  });
+  Future<ReportSectionInfo> updateReportSection(
+    String report,
+    String section, {
+    String? title,
+    String? body,
+    String? format,
+  });
+  Future<String> removeReportSection(String report, String section);
+  Future<ReportSectionInfo> moveReportSection(
+    String report,
+    String section,
+    int to,
+  );
 
   /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
   Future<NetOverview> netOverview();

@@ -19,6 +19,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: Keys init, rotate, rekey, export, recover and re-issue shards; recovery words and shards are shown from a Rust-held one-time session
 - Flutter app: Net start/stop, connect, invites, relays and sharing (`mnnn net`); the node identity stays in Rust
 - Flutter app: Orgs create, edit, remove, join, apply, leave, members, roles, resources and hosting (`mnnn org`); host certificates stay in Rust
+- Flutter app: Project extras — journals, live searches, reports and import/export archives (`mnnn journal` / `search` / `report` / `project import|export|add`); archive bytes stay in Rust
 
 ## [2.22.0] - 2026-11-05
 

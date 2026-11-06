@@ -4,7 +4,7 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
-Projects (create, rename, describe, delete, attach and detach series), Net status, peers, start/stop, connect, invites, relays and sharing, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
+Projects (create, rename, describe, delete, attach and detach series, journals, live searches, reports, import/export archives), Net status, peers, start/stop, connect, invites, relays and sharing, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
 (CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
@@ -30,8 +30,8 @@ Users never need Rust: release builds ship the compiled library.
 - **Header:** the raven (themed) and the big MUNINN wordmark, as on the website.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
-  File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project…
-  and Net ▸ Status / Start / Stop / Invite or connect / Peers / Relays / Shared, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site and Keys ▸ Status… plus Initialize, Rotate,
+  File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
+  Live searches… / Journals… / Reports… / Import archive… and Net ▸ Status / Start / Stop / Invite or connect / Peers / Relays / Shared, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site and Keys ▸ Status… plus Initialize, Rotate,
   Rekey, Export, Recover and Re-issue shards. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
@@ -47,7 +47,8 @@ Users never need Rust: release builds ship the compiled library.
   Dashboard reads open the store **read-only** (no migrations). Net and Orgs overviews are read-only; Net writes and Orgs writes (create, edit, join, members, roles, resources, hosting) open the store for writes after the same unlock.
   Keys status does not unlock the store (same as `mnnn keys status`).
   **File ▸ Import…**, **Export…** and project writes (create, rename, describe, delete,
-  attach or detach a series) open it for writes after the same unlock.
+  attach or detach a series, journals, live searches, reports, import/export archives)
+  open it for writes after the same unlock.
 - **Home:** where the data lives, and the projects and datasets in it.
 - **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range;
   pick one to see it as a chart (candles when they fit, else a close line, volume
@@ -76,14 +77,30 @@ Users never need Rust: release builds ship the compiled library.
   and the price (`y`) / time (`t`) axes. Defaults match the TUI (candles, volume, grid,
   crosshair and both axes on). Moving averages, wick and gap markers and the high/low
   envelope stay in the TUI (`e`, `m`, `w`, `g`, `z` are unbound here).
-- **Projects:** pick a project to see the series saved in it. **New project** (or
-  Projects ▸ New project…) creates one (`mnnn project create`); the project menu
-  renames, edits the description or deletes it (`mnnn project edit` / `remove` — journals
-  stay as standalone journals). **Add current dataset** attaches the dataset open in
-  Data, with the current time range (`a` in the TUI / `mnnn project add`); remove takes
-  a series out of the project without deleting it (`mnnn project drop`). Opening a
-  series shows it in Data with the project's saved time range. Journals, searches,
-  reports and import/export archives stay out of the app (use the TUI or CLI).
+- **Projects:** pages for Projects, Journals, Searches and Reports, like the TUI
+  Projects window. Pick a project to see the series and other items saved in it.
+  **New project** (or Projects ▸ New project…) creates one (`mnnn project create`);
+  the project menu renames, edits the description or deletes it (`mnnn project edit` /
+  `remove` — journals stay as standalone journals), exports an archive (`.mnnp` or
+  JSON; `mnnn project export`), starts a journal in the project, or adds an existing
+  journal, search, report, rule, model or code space (`mnnn project add`). **Add
+  current dataset** attaches the dataset open in Data, with the current time range
+  (`a` in the TUI / `mnnn project add`); remove takes a series or other item out of
+  the project without deleting it (`mnnn project drop`). Opening a series shows it
+  in Data with the project's saved time range. **Import archive**
+  (Projects ▸ Import archive…) reads a `.mnnp` or JSON pack (`mnnn project import`);
+  Dart only passes the path, and archive bytes stay in Rust. **Journals** list,
+  create (optionally in a project), rename, change format, fork and delete journals,
+  and write, edit or remove entries plus journal-level notes (`mnnn journal`).
+  Word-span highlights, images, copying entries and document export stay in the
+  TUI. **Searches** save a live search (query and target: series, journals or
+  records), rename, fork or delete it (`mnnn search save|edit|fork|remove`).
+  Refining a search with the full sidebar filters, overwriting one or applying it
+  to Data stays in the TUI. **Reports** create (optionally attached to a project),
+  rename, describe and delete reports, and add, edit, move or remove text, authors,
+  journal, project, series, code and model sections (`mnnn report`). Records
+  sections and PDF/preview export stay in the TUI. Reviews, Notifications, Rules,
+  Code spaces, Pipes and Pipelines stay in the TUI.
 - **Net:** status and peers like `mnnn net status` / `mnnn net peers`, plus the write
   flows the TUI and CLI provide for the node itself: start and stop (the node runs in
   this process, like the TUI; `mnnn net stop` can still ask it to stop), connect

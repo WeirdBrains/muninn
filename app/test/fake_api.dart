@@ -129,6 +129,14 @@ class FakeApi implements MuninnApi {
   final removedProjects = <String>[];
   final addedSeries = <({String projectId, Dataset d, TimeRange range})>[];
   final removedSeries = <int>[];
+  final itemsByProject = <String, List<ProjectItemInfo>>{};
+  List<JournalInfo> journalList = [];
+  List<JournalEntryInfo> entryList = [];
+  List<JournalNoteInfo> noteList = [];
+  List<SearchInfo> searchList = [];
+  List<ReportInfo> reportList = [];
+  List<ReportSectionInfo> sectionList = [];
+  final extraCalls = <String>[];
   Object? projectError;
 
   @override
@@ -205,6 +213,7 @@ class FakeApi implements MuninnApi {
     removedProjects.add(id);
     projects = projects.where((p) => p.id != id).toList();
     seriesByProject.remove(id);
+    itemsByProject.remove(id);
   }
 
   @override
@@ -251,6 +260,457 @@ class FakeApi implements MuninnApi {
           .where((s) => s.itemId != itemId)
           .toList();
     }
+    for (final id in itemsByProject.keys.toList()) {
+      itemsByProject[id] = [
+        for (final i in itemsByProject[id]!)
+          if (i.itemId != itemId) i,
+      ];
+    }
+  }
+
+  @override
+  Future<List<ProjectItemInfo>> projectItems(String projectId) async {
+    final series = [
+      for (final s in seriesByProject[projectId] ?? const <ProjectSeries>[])
+        ProjectItemInfo(
+          itemId: s.itemId,
+          kind: 'result',
+          name: '${s.source} · ${s.base}/${s.quote}',
+          source: s.source,
+          base: s.base,
+          quote: s.quote,
+          durationS: s.durationS,
+          from: s.from,
+          to: s.to,
+        ),
+    ];
+    return [...series, ...?itemsByProject[projectId]];
+  }
+
+  @override
+  Future<String> addProjectItem(String project, String kind, String key) async {
+    extraCalls.add('add-item:$project:$kind:$key');
+    final list = List<ProjectItemInfo>.from(
+      itemsByProject[project] ?? const [],
+    );
+    list.add(
+      ProjectItemInfo(
+        itemId: nextItemId++,
+        kind: kind == 'search' ? 'live_search' : kind,
+        name: key,
+        refId: key,
+      ),
+    );
+    itemsByProject[project] = list;
+    return 'added $kind $key to $project';
+  }
+
+  @override
+  Future<String> projectImport(String path, {String? name}) async {
+    extraCalls.add('import:$path');
+    final p = Project(
+      id: 'p$nextProject',
+      shortId: 'imp$nextProject',
+      name: name ?? 'Imported',
+      description: '',
+    );
+    nextProject++;
+    projects = [...projects, p];
+    seriesByProject[p.id] = [];
+    return 'imported project ${p.name} from $path';
+  }
+
+  @override
+  Future<String> projectExport(
+    String id,
+    String path, {
+    String format = 'archive',
+    bool noData = false,
+  }) async {
+    extraCalls.add('export:$id:$path:$format');
+    return 'exported project $id to $path';
+  }
+
+  @override
+  Future<List<JournalInfo>> journals() async => List.of(journalList);
+
+  @override
+  Future<JournalInfo> createJournal(
+    String name, {
+    String? project,
+    String format = 'markdown',
+  }) async {
+    extraCalls.add('journal-create:$name');
+    final j = JournalInfo(
+      id: 'j${journalList.length + 1}',
+      shortId: 'j${journalList.length + 1}',
+      name: name,
+      projectId: project,
+      format: format,
+    );
+    journalList = [...journalList, j];
+    if (project != null) {
+      await addProjectItem(project, 'journal', j.name);
+    }
+    return j;
+  }
+
+  @override
+  Future<JournalInfo> updateJournal(
+    String id, {
+    String? name,
+    String? format,
+  }) async {
+    extraCalls.add('journal-edit:$id');
+    journalList = [
+      for (final j in journalList)
+        if (j.id == id)
+          JournalInfo(
+            id: j.id,
+            shortId: j.shortId,
+            name: name ?? j.name,
+            projectId: j.projectId,
+            projectName: j.projectName,
+            format: format ?? j.format,
+            entries: j.entries,
+            forkedFrom: j.forkedFrom,
+          )
+        else
+          j,
+    ];
+    return journalList.firstWhere((j) => j.id == id);
+  }
+
+  @override
+  Future<String> removeJournal(String id) async {
+    extraCalls.add('journal-remove:$id');
+    final name = journalList.firstWhere((j) => j.id == id).name;
+    journalList = [
+      for (final j in journalList)
+        if (j.id != id) j,
+    ];
+    return 'removed journal $name';
+  }
+
+  @override
+  Future<JournalInfo> forkJournal(
+    String id, {
+    String? project,
+    String? name,
+  }) async {
+    extraCalls.add('journal-fork:$id');
+    final j = journalList.firstWhere((x) => x.id == id);
+    final f = JournalInfo(
+      id: 'j${journalList.length + 1}',
+      shortId: 'jf',
+      name: name ?? '${j.name} (fork)',
+      projectId: project,
+    );
+    journalList = [...journalList, f];
+    return f;
+  }
+
+  @override
+  Future<List<JournalEntryInfo>> journalEntries(String journal) async => [
+    for (final e in entryList)
+      if (e.journalId == journal) e,
+  ];
+
+  @override
+  Future<JournalEntryInfo> addJournalEntry(
+    String journal, {
+    String title = '',
+    String body = '',
+    String? format,
+  }) async {
+    extraCalls.add('entry-add:$journal');
+    final e = JournalEntryInfo(
+      id: 'e${entryList.length + 1}',
+      shortId: 'e${entryList.length + 1}',
+      journalId: journal,
+      title: title,
+      heading: title.isEmpty ? body : title,
+      body: body,
+      format: format ?? 'markdown',
+    );
+    entryList = [...entryList, e];
+    return e;
+  }
+
+  @override
+  Future<JournalEntryInfo> updateJournalEntry(
+    String entry, {
+    String? title,
+    String? body,
+    String? format,
+  }) async {
+    extraCalls.add('entry-edit:$entry');
+    entryList = [
+      for (final e in entryList)
+        if (e.id == entry)
+          JournalEntryInfo(
+            id: e.id,
+            shortId: e.shortId,
+            journalId: e.journalId,
+            title: title ?? e.title,
+            heading: title ?? e.heading,
+            body: body ?? e.body,
+            format: format ?? e.format,
+            position: e.position,
+          )
+        else
+          e,
+    ];
+    return entryList.firstWhere((e) => e.id == entry);
+  }
+
+  @override
+  Future<String> removeJournalEntry(String entry) async {
+    extraCalls.add('entry-remove:$entry');
+    entryList = [
+      for (final e in entryList)
+        if (e.id != entry) e,
+    ];
+    return 'removed entry $entry';
+  }
+
+  @override
+  Future<List<JournalNoteInfo>> journalNotes(String journal) async =>
+      List.of(noteList);
+
+  @override
+  Future<JournalNoteInfo> addJournalNote(String journal, String body) async {
+    extraCalls.add('note:$journal');
+    final n = JournalNoteInfo(
+      id: 'n${noteList.length + 1}',
+      shortId: 'n${noteList.length + 1}',
+      body: body,
+    );
+    noteList = [...noteList, n];
+    return n;
+  }
+
+  @override
+  Future<List<SearchInfo>> searches() async => List.of(searchList);
+
+  @override
+  Future<SearchInfo> saveSearch(
+    String name, {
+    String query = '',
+    String target = 'series',
+  }) async {
+    extraCalls.add('search-save:$name');
+    final s = SearchInfo(
+      id: 's${searchList.length + 1}',
+      shortId: 's${searchList.length + 1}',
+      name: name,
+      query: query,
+      target: target,
+      describe: '$target "$query"',
+    );
+    searchList = [...searchList, s];
+    return s;
+  }
+
+  @override
+  Future<SearchInfo> renameSearch(String id, String name) async {
+    extraCalls.add('search-rename:$id');
+    searchList = [
+      for (final s in searchList)
+        if (s.id == id)
+          SearchInfo(
+            id: s.id,
+            shortId: s.shortId,
+            name: name,
+            target: s.target,
+            query: s.query,
+            describe: s.describe,
+            matches: s.matches,
+            forkedFrom: s.forkedFrom,
+          )
+        else
+          s,
+    ];
+    return searchList.firstWhere((s) => s.id == id);
+  }
+
+  @override
+  Future<SearchInfo> forkSearch(String id, {String? name}) async {
+    extraCalls.add('search-fork:$id');
+    final s = searchList.firstWhere((x) => x.id == id);
+    final f = SearchInfo(
+      id: 's${searchList.length + 1}',
+      shortId: 'sf',
+      name: name ?? '${s.name} (fork)',
+      target: s.target,
+      query: s.query,
+      describe: s.describe,
+    );
+    searchList = [...searchList, f];
+    return f;
+  }
+
+  @override
+  Future<String> removeSearch(String id) async {
+    extraCalls.add('search-remove:$id');
+    searchList = [
+      for (final s in searchList)
+        if (s.id != id) s,
+    ];
+    return 'removed live search $id';
+  }
+
+  @override
+  Future<List<ReportInfo>> reports() async => List.of(reportList);
+
+  @override
+  Future<ReportInfo> createReport(
+    String name, {
+    String description = '',
+    String? project,
+  }) async {
+    extraCalls.add('report-create:$name');
+    final r = ReportInfo(
+      id: 'r${reportList.length + 1}',
+      shortId: 'r${reportList.length + 1}',
+      name: name,
+      description: description,
+    );
+    reportList = [...reportList, r];
+    if (project != null) {
+      await addProjectItem(project, 'report', r.name);
+    }
+    return r;
+  }
+
+  @override
+  Future<ReportInfo> updateReport(
+    String id, {
+    String? name,
+    String? description,
+  }) async {
+    extraCalls.add('report-edit:$id');
+    reportList = [
+      for (final r in reportList)
+        if (r.id == id)
+          ReportInfo(
+            id: r.id,
+            shortId: r.shortId,
+            name: name ?? r.name,
+            description: description ?? r.description,
+            sections: r.sections,
+          )
+        else
+          r,
+    ];
+    return reportList.firstWhere((r) => r.id == id);
+  }
+
+  @override
+  Future<String> removeReport(String id) async {
+    extraCalls.add('report-remove:$id');
+    reportList = [
+      for (final r in reportList)
+        if (r.id != id) r,
+    ];
+    return 'removed report $id';
+  }
+
+  @override
+  Future<List<ReportSectionInfo>> reportSections(String report) async => [
+    for (final s in sectionList)
+      if (s.reportId == report) s,
+  ];
+
+  @override
+  Future<ReportSectionInfo> addReportSection(
+    String report, {
+    String kind = 'text',
+    String title = '',
+    String body = '',
+    String format = 'markdown',
+    String? target,
+  }) async {
+    extraCalls.add('section-add:$report:$kind');
+    final s = ReportSectionInfo(
+      id: 'sec${sectionList.length + 1}',
+      shortId: 'sec${sectionList.length + 1}',
+      reportId: report,
+      position: sectionList.length + 1,
+      kind: kind,
+      title: title,
+      heading: title.isEmpty ? kind : title,
+      body: body,
+      format: format,
+    );
+    sectionList = [...sectionList, s];
+    return s;
+  }
+
+  @override
+  Future<ReportSectionInfo> updateReportSection(
+    String report,
+    String section, {
+    String? title,
+    String? body,
+    String? format,
+  }) async {
+    extraCalls.add('section-edit:$section');
+    sectionList = [
+      for (final s in sectionList)
+        if (s.id == section)
+          ReportSectionInfo(
+            id: s.id,
+            shortId: s.shortId,
+            reportId: s.reportId,
+            position: s.position,
+            kind: s.kind,
+            title: title ?? s.title,
+            heading: title ?? s.heading,
+            body: body ?? s.body,
+            format: format ?? s.format,
+          )
+        else
+          s,
+    ];
+    return sectionList.firstWhere((s) => s.id == section);
+  }
+
+  @override
+  Future<String> removeReportSection(String report, String section) async {
+    extraCalls.add('section-remove:$section');
+    sectionList = [
+      for (final s in sectionList)
+        if (s.id != section) s,
+    ];
+    return 'removed section $section';
+  }
+
+  @override
+  Future<ReportSectionInfo> moveReportSection(
+    String report,
+    String section,
+    int to,
+  ) async {
+    extraCalls.add('section-move:$section:$to');
+    sectionList = [
+      for (final s in sectionList)
+        if (s.id == section)
+          ReportSectionInfo(
+            id: s.id,
+            shortId: s.shortId,
+            reportId: s.reportId,
+            position: to,
+            kind: s.kind,
+            title: s.title,
+            heading: s.heading,
+            body: s.body,
+            format: s.format,
+          )
+        else
+          s,
+    ];
+    return sectionList.firstWhere((s) => s.id == section);
   }
 
   @override
