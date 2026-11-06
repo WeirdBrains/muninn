@@ -1,6 +1,9 @@
-//! Reports (`mnnn report` / TUI Reports): list, create, sections.
+//! Reports (`mnnn report` / TUI Reports): list, create, sections, preview and export.
 use super::data::open_write;
-use muninn_core::store::{EntryFormat, NewAction, NewSection, Report, Section, SectionChange, SectionKind, Store};
+use muninn_core::export::files::{self as export_files, OutFormat, Target};
+use muninn_core::model::{Duration, Symbol};
+use muninn_core::store::{EntryFormat, NewAction, NewSection, Report, Section, SectionChange, SectionKind, SeriesRef, Store};
+use std::path::PathBuf;
 
 pub struct ReportInfo {
     pub id: String,
@@ -106,11 +109,29 @@ pub fn report_sections(report: String) -> anyhow::Result<Vec<SectionInfo>> {
 }
 
 fn parse_kind(kind: &str) -> anyhow::Result<SectionKind> {
-    SectionKind::parse(kind.trim().to_ascii_lowercase().as_str()).ok_or_else(|| {
-        anyhow::anyhow!("`{kind}`: a section is text, records, series, journal, project, authors, code or model")
-    })
+    SectionKind::parse(kind.trim().to_ascii_lowercase().as_str())
+        .ok_or_else(|| anyhow::anyhow!("`{kind}`: a section is text, records, series, journal, project, authors, code or model"))
 }
 
+fn parse_series_ref(store: &Store, s: &str, from: Option<i64>, to: Option<i64>) -> anyhow::Result<SeriesRef> {
+    let parts: Vec<&str> = s.split(':').collect();
+    let [src, sym, per] = parts.as_slice() else {
+        return Err(anyhow::anyhow!("invalid series `{s}` (use SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m)"));
+    };
+    let r = SeriesRef {
+        source: src.trim().to_string(),
+        symbol: store.canonical_symbol(&Symbol::parse(sym)?)?,
+        duration: Duration::parse(per)?,
+        from,
+        to,
+    };
+    if !store.series()?.iter().any(|x| x.source == r.source && x.symbol == r.symbol && x.duration == r.duration) {
+        return Err(anyhow::anyhow!("no series {} (see Data or `mnnn search find`)", r.label()));
+    }
+    Ok(r)
+}
+
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn add_section_of(
     store: &Store,
     report: &str,
@@ -119,6 +140,9 @@ pub(crate) fn add_section_of(
     body: &str,
     format: &str,
     target: Option<&str>,
+    from: Option<i64>,
+    to: Option<i64>,
+    rows: Option<i64>,
 ) -> anyhow::Result<SectionInfo> {
     let r = store.find_report(report)?;
     let kind = parse_kind(kind)?;
@@ -164,7 +188,16 @@ pub(crate) fn add_section_of(
             s
         }
         SectionKind::Records => {
-            return Err(anyhow::anyhow!("records sections stay in the TUI or `mnnn report add --records`"));
+            let key = target
+                .map(str::trim)
+                .filter(|x| !x.is_empty())
+                .ok_or_else(|| anyhow::anyhow!("name the series as SOURCE:SYMBOL:PERIOD (e.g. binance:BTC/USDT:5m)"))?;
+            let mut s = NewSection::new(SectionKind::Records);
+            s.params.series = Some(parse_series_ref(store, key, from, to)?);
+            if let Some(n) = rows {
+                s.params.rows = Some(n.max(0) as usize);
+            }
+            s
         }
     };
     if !title.trim().is_empty() && s.title.is_empty() {
@@ -180,7 +213,8 @@ pub(crate) fn add_section_of(
     Ok(section_info(sec))
 }
 
-/// `mnnn report add` for text, journal, project, authors, series, code or model sections.
+/// `mnnn report add` for text, records, journal, project, authors, series, code or model sections.
+#[allow(clippy::too_many_arguments)]
 pub fn add_report_section(
     report: String,
     kind: String,
@@ -188,8 +222,46 @@ pub fn add_report_section(
     body: String,
     format: String,
     target: Option<String>,
+    from: Option<i64>,
+    to: Option<i64>,
+    rows: Option<i64>,
 ) -> anyhow::Result<SectionInfo> {
-    add_section_of(&open_write()?, &report, &kind, &title, &body, &format, target.as_deref())
+    add_section_of(&open_write()?, &report, &kind, &title, &body, &format, target.as_deref(), from, to, rows)
+}
+
+pub struct ReportExportInfo {
+    pub path: String,
+    pub files: i64,
+    pub message: String,
+}
+
+pub(crate) fn export_report_of(store: &Store, report: &str, format: &str, out: &str) -> anyhow::Result<ReportExportInfo> {
+    let r = store.find_report(report)?;
+    let fmt = OutFormat::parse(format)?;
+    let dest = PathBuf::from(out);
+    let files = export_files::write_recorded(store, &Target::Report(r.id.clone()), fmt, &dest, "app")?;
+    let n = files.len() as i64;
+    Ok(ReportExportInfo {
+        path: dest.display().to_string(),
+        files: n,
+        message: format!("exported report {} to {} ({})", r.name, dest.display(), fmt.as_str()),
+    })
+}
+
+/// Export a report as PDF, Word, HTML, LaTeX, text, JSON or CSV (`mnnn report export` / TUI `E`). File bytes stay in Rust.
+pub fn export_report(report: String, format: String, out: String) -> anyhow::Result<ReportExportInfo> {
+    export_report_of(&open_write()?, &report, &format, &out)
+}
+
+pub(crate) fn preview_report_of(store: &Store, report: &str, width: i64) -> anyhow::Result<String> {
+    let r = store.find_report(report)?;
+    let doc = muninn_core::export::docs::report(store, &r.id)?;
+    Ok(muninn_core::render::text::write(&doc, width.max(40) as usize))
+}
+
+/// Print a report as text (`mnnn report preview` / TUI `v`). No file is written.
+pub fn preview_report(report: String, width: i64) -> anyhow::Result<String> {
+    preview_report_of(&super::data::open()?, &report, width)
 }
 
 pub(crate) fn update_section_of(
@@ -204,7 +276,12 @@ pub(crate) fn update_section_of(
     let s = store.find_section(&r.id, section)?;
     let format = format.map(EntryFormat::parse).transpose()?;
     let s = store.update_section(&s.id, &SectionChange { title: title.map(str::to_string), body: body.map(str::to_string), format, params: None })?;
-    note(store, "report.section.edit", format!("edit section {} of report {}", s.heading(), r.name), serde_json::json!({ "report": r.id, "section": s.id }));
+    note(
+        store,
+        "report.section.edit",
+        format!("edit section {} of report {}", s.heading(), r.name),
+        serde_json::json!({ "report": r.id, "section": s.id }),
+    );
     Ok(section_info(s))
 }
 
@@ -223,7 +300,12 @@ pub(crate) fn remove_section_of(store: &Store, report: &str, section: &str) -> a
     let s = store.find_section(&r.id, section)?;
     let heading = s.heading();
     store.remove_section(&s.id)?;
-    note(store, "report.section.remove", format!("remove section {heading} from report {}", r.name), serde_json::json!({ "report": r.id, "section": s.id }));
+    note(
+        store,
+        "report.section.remove",
+        format!("remove section {heading} from report {}", r.name),
+        serde_json::json!({ "report": r.id, "section": s.id }),
+    );
     Ok(format!("removed section {heading}"))
 }
 
@@ -235,7 +317,12 @@ pub(crate) fn move_section_of(store: &Store, report: &str, section: &str, to: us
     let r = store.find_report(report)?;
     let s = store.find_section(&r.id, section)?;
     let s = store.move_section(&s.id, to)?;
-    note(store, "report.section.move", format!("move section {} in report {}", s.heading(), r.name), serde_json::json!({ "report": r.id, "section": s.id, "to": to }));
+    note(
+        store,
+        "report.section.move",
+        format!("move section {} in report {}", s.heading(), r.name),
+        serde_json::json!({ "report": r.id, "section": s.id, "to": to }),
+    );
     Ok(section_info(s))
 }
 
@@ -253,9 +340,9 @@ mod tests {
         let s = Store::open_in_memory().unwrap();
         let r = create_report_of(&s, "Weekly", "notes", None).unwrap();
         assert_eq!((r.name.as_str(), r.description.as_str(), r.sections), ("Weekly", "notes", 0));
-        let a = add_section_of(&s, &r.id, "text", "Intro", "hello", "markdown", None).unwrap();
+        let a = add_section_of(&s, &r.id, "text", "Intro", "hello", "markdown", None, None, None, None).unwrap();
         assert_eq!((a.kind.as_str(), a.title.as_str(), a.body.as_str(), a.position), ("text", "Intro", "hello", 1));
-        let b = add_section_of(&s, &r.id, "authors", "Who", "", "", None).unwrap();
+        let b = add_section_of(&s, &r.id, "authors", "Who", "", "", None, None, None, None).unwrap();
         assert_eq!(b.kind, "authors");
         let b = move_section_of(&s, &r.id, &b.id, 1).unwrap();
         assert_eq!(b.position, 1);
@@ -270,5 +357,40 @@ mod tests {
         crate::api::data::lock();
         assert!(create_report("X".into(), "".into(), None).is_err());
         assert!(reports().is_err());
+        assert!(export_report("x".into(), "json".into(), "/tmp/x.json".into()).is_err());
+        assert!(preview_report("x".into(), 80).is_err());
+    }
+
+    fn store_with_bars() -> Store {
+        let mut s = Store::open_in_memory().unwrap();
+        let src = s.add_source("coinbase", "csv", None).unwrap();
+        let t0 = 1_704_067_200_000i64;
+        let bars = vec![muninn_core::model::Bar { ts: t0, open: 1.0, high: 2.0, low: 0.5, close: 1.5, volume: 3.0, flags: 0 }];
+        s.upsert_bars(&src, &muninn_core::model::Symbol::new("BTC", "USD"), muninn_core::model::Duration(300), &bars).unwrap();
+        s
+    }
+
+    #[test]
+    fn records_section_preview_and_export() {
+        let s = store_with_bars();
+        let r = create_report_of(&s, "Weekly", "notes", None).unwrap();
+        let missing = add_section_of(&s, &r.id, "records", "Bars", "", "", None, None, None, None).map(|_| ()).unwrap_err();
+        assert!(missing.to_string().contains("SOURCE:SYMBOL:PERIOD"), "{missing}");
+        let unknown = add_section_of(&s, &r.id, "records", "Bars", "", "", Some("nope:FOO/BAR:1m"), None, None, None).map(|_| ()).unwrap_err();
+        assert!(unknown.to_string().contains("no series"), "{unknown}");
+        let from = 1_704_067_200_000i64;
+        let a = add_section_of(&s, &r.id, "records", "Bars", "", "", Some("coinbase:BTC/USD:5m"), Some(from), None, Some(10)).unwrap();
+        assert_eq!(a.kind, "records");
+        assert_eq!(a.title, "Bars");
+        let text = preview_report_of(&s, &r.id, 80).unwrap();
+        assert!(text.contains("Weekly") || text.contains("Bars") || text.contains("BTC"), "preview was: {text}");
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("weekly.json");
+        let exp = export_report_of(&s, &r.id, "json", out.to_str().unwrap()).unwrap();
+        assert!(out.is_file());
+        assert!(exp.message.contains("json"));
+        assert!(exp.files >= 1);
+        let body = std::fs::read_to_string(&out).unwrap();
+        assert!(body.contains("Weekly") || body.contains("Bars") || body.contains("BTC"), "{body}");
     }
 }
