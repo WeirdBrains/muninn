@@ -416,8 +416,13 @@ On Linux amd64 that writes:
 
 - `$DIST/muninn-app-<ver>-x86_64-unknown-linux-gnu.tar.gz` — relocatable bundle; run `./muninn`
 - `$DIST/muninn-app_<ver>-1_amd64.deb` — installs to `/opt/muninn`, with a wrapper at `/usr/bin/muninn`
+- `$DIST/muninn-app-<ver>-1.x86_64.rpm` — same layout as the `.deb`. Needs `rpmbuild`
+  (`rpm-tools` / `rpm-build`). A relocated `rpmbuild` should set `RPM_CONFIGDIR` to
+  its `usr/lib/rpm` directory. On aarch64 the filename uses `aarch64`.
 
-Needs GTK 3 at runtime. `SKIP_BUILD=1` reuses `app/build/linux/<arch>/release/bundle`.
+Needs GTK 3 at runtime (`gtk3` and `glib2` on the RPM). `SKIP_BUILD=1` reuses
+`app/build/linux/<arch>/release/bundle`. The script skips the `.rpm` if `rpmbuild`
+is not on `PATH`.
 
 On macOS (Swift Package Manager, not CocoaPods) the same script writes:
 
@@ -429,10 +434,11 @@ On macOS (Swift Package Manager, not CocoaPods) the same script writes:
 The image is not notarized. Drag Muninn into Applications, or open the `.app` from
 the disk image. The data directory is still `MUNINN_HOME` or `~/.muninn`.
 
-Still planned: Windows setup / MSIX, Homebrew cask, `.rpm` for other arches,
-TestFlight, Google Play testing tracks, then store listings. Builds can later
-be attached to GitHub releases (APKs, TestFlight links) once those recipes exist;
-this script does not cut a tag.
+Still planned: Windows setup / MSIX, Homebrew cask, Apple notarization,
+iOS / TestFlight, an Android APK (needs an SDK with accepted licenses; do not
+auto-accept them), then store listings. Builds can later be attached to GitHub
+releases (APKs, TestFlight links) once those recipes exist; this script does
+not cut a tag.
 
 ## Icons
 
@@ -462,10 +468,15 @@ git checkout ios/Runner.xcodeproj/project.pbxproj   # the tool rewrites a settin
 - **Disk:** a debug macOS build of `muninn_ffi` needs about 10 GB of Rust build output;
   free at least 25 GB before building macOS, iOS and Android on one Mac.
 - **Flutter version:** the app needs Flutter 3.47.9 (Dart 3.13.7) or newer.
-- **Android SDK on Linux:** install the command-line tools, then
+- **Android SDK on Linux:** if `flutter doctor` reports "Unable to locate Android SDK",
+  install the command-line tools, then
   `sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"`,
   `flutter config --android-sdk ~/Android/Sdk`, `flutter doctor --android-licenses`, and
   `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android`.
+- **Android SDK on macOS:** the SDK may already be present (Android Studio) while
+  `flutter doctor` still reports some licenses not accepted. Do not auto-accept
+  licenses. Also confirm a real JDK (`/usr/libexec/java_home` or Android Studio's
+  JBR) before `flutter build apk`. No APK eyeball artifact has been built yet.
 
 ## Tests
 

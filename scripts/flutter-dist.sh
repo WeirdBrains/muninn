@@ -3,6 +3,7 @@
 #   Linux:
 #     $DIST/muninn-app-<ver>-<triple>.tar.gz   relocatable bundle (run ./muninn)
 #     $DIST/muninn-app_<ver>-1_<debarch>.deb   installs to /opt/muninn
+#     $DIST/muninn-app-<ver>-1.<rpmarch>.rpm  installs to /opt/muninn (needs rpmbuild)
 #   macOS:
 #     $DIST/muninn-app-<ver>-<triple>.dmg      .app plus an Applications shortcut
 #
@@ -16,6 +17,8 @@
 # GitHub release. Set CARGO_TARGET_DIR to keep the Rust build off a small disk
 # (Native Assets honors it via cargo when the toolchain consults the env).
 # Apple builds use Swift Package Manager, not CocoaPods.
+# Linux .rpm creation needs rpmbuild (rpm-tools / rpm-build). A relocated
+# rpmbuild should set RPM_CONFIGDIR to its usr/lib/rpm directory.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ver="$(scripts/version.sh)"
@@ -68,8 +71,8 @@ INSTALL
   echo "$dist/$name.tar.gz"
 
   deb_root=$dist/.deb-root-$$
-  cleanup() { rm -rf "$deb_root"; }
-  trap cleanup EXIT
+  rpm_top=$dist/.rpmbuild-$$
+  trap 'rm -rf "'"$deb_root"'" "'"$rpm_top"'"' EXIT
   mkdir -p "$deb_root/opt/muninn" \
            "$deb_root/usr/bin" \
            "$deb_root/usr/share/applications" \
@@ -120,6 +123,81 @@ CONTROL
     rm -rf "$tmp"
   fi
   echo "$dist/$deb_name"
+
+  case "$arch" in
+    x86_64|amd64) rpm_arch=x86_64 ;;
+    aarch64|arm64) rpm_arch=aarch64 ;;
+    *) rpm_arch= ;;
+  esac
+  if [[ -z ${rpm_arch:-} ]]; then
+    :
+  elif ! command -v rpmbuild >/dev/null; then
+    echo "skipping rpm: rpmbuild not found (install rpm-tools / rpm-build)" >&2
+  else
+    mkdir -p "$rpm_top"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+    cat > "$rpm_top/SPECS/muninn-app.spec" <<SPEC
+%global debug_package %{nil}
+%global _build_id_links none
+%global __os_install_post %{nil}
+Name: muninn-app
+Version: ${ver}
+Release: 1
+Summary: Muninn graphical workbench for market data
+License: BSD-3-Clause
+URL: https://muninn.weirdbrains.com
+Group: Applications/Engineering
+AutoReqProv: no
+BuildArch: ${rpm_arch}
+Requires: gtk3
+Requires: glib2
+
+%description
+The Flutter desktop app for Muninn (publisher WeirdBrains). It uses the
+same encrypted store as the mnnn CLI/TUI (MUNINN_HOME or ~/.muninn).
+This package does not replace the muninn CLI package (which installs
+/usr/bin/mnnn).
+
+%prep
+
+%install
+mkdir -p %{buildroot}/opt/muninn \
+         %{buildroot}/usr/bin \
+         %{buildroot}/usr/share/applications \
+         %{buildroot}/usr/share/icons/hicolor/256x256/apps \
+         %{buildroot}/usr/share/doc/muninn-app
+cp -a ${bundle}/. %{buildroot}/opt/muninn/
+chmod 755 %{buildroot}/opt/muninn/muninn
+printf '%s\n' '#!/bin/sh' 'exec /opt/muninn/muninn "\$@"' > %{buildroot}/usr/bin/muninn
+chmod 755 %{buildroot}/usr/bin/muninn
+sed 's|^Exec=muninn\$|Exec=/opt/muninn/muninn|' \
+  ${root}/app/linux/com.weirdbrains.muninn.desktop \
+  > %{buildroot}/usr/share/applications/com.weirdbrains.muninn.desktop
+install -m644 ${root}/app/assets/icon/muninn-256.png \
+  %{buildroot}/usr/share/icons/hicolor/256x256/apps/com.weirdbrains.muninn.png
+install -m644 ${root}/LICENSE %{buildroot}/usr/share/doc/muninn-app/copyright
+install -m644 ${root}/CHANGELOG.md %{buildroot}/usr/share/doc/muninn-app/changelog
+install -m644 ${root}/app/README.md %{buildroot}/usr/share/doc/muninn-app/README.md
+
+%files
+%defattr(-,root,root,-)
+/opt/muninn
+/usr/bin/muninn
+/usr/share/applications/com.weirdbrains.muninn.desktop
+/usr/share/icons/hicolor/256x256/apps/com.weirdbrains.muninn.png
+%doc /usr/share/doc/muninn-app/README.md
+%doc /usr/share/doc/muninn-app/changelog
+%license /usr/share/doc/muninn-app/copyright
+SPEC
+    rpmbuild -bb --define "_topdir $rpm_top" --define "_tmppath $rpm_top" \
+      --define "_dbpath $rpm_top/rpmdb" \
+      "$rpm_top/SPECS/muninn-app.spec"
+    rpm_name=muninn-app-${ver}-1.${rpm_arch}.rpm
+    cp "$rpm_top/RPMS/${rpm_arch}/$rpm_name" "$dist/$rpm_name"
+    rm -rf "$rpm_top"
+    echo "$dist/$rpm_name"
+  fi
+  rm -rf "$deb_root"
+  trap - EXIT
 }
 
 # Copy the .app into a read-write dmg, add an Applications shortcut, convert to UDZO.
