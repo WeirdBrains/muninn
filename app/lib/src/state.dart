@@ -101,6 +101,11 @@ final orgOverviewProvider = FutureProvider<OrgOverview?>((ref) {
   return ref.watch(apiProvider).orgOverview();
 });
 
+/// `mnnn keys status` does not need the store password (the CLI does not either).
+final keysStatusProvider = FutureProvider<KeysStatus>((ref) {
+  return ref.watch(apiProvider).keysStatus();
+});
+
 /// The selected section (both the desktop menus and the mobile bottom bar drive it).
 enum Section { home, data, projects, net, orgs, keys, help }
 

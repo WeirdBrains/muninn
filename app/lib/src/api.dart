@@ -308,6 +308,28 @@ class OrgOverview {
   final List<OrgMirror> mirrors;
 }
 
+/// What `mnnn keys status` prints. No master key, words, shards or wrapped keys.
+class ServiceKeyInfo {
+  const ServiceKeyInfo({required this.version, this.retired = false});
+  final int version;
+  final bool retired;
+}
+
+class KeysStatus {
+  const KeysStatus({
+    this.initialized = false,
+    this.dbId = '',
+    this.database = '',
+    this.serviceVersion = 0,
+    this.services = const [],
+  });
+  final bool initialized;
+  final String dbId;
+  final String database;
+  final int serviceVersion;
+  final List<ServiceKeyInfo> services;
+}
+
 abstract class MuninnApi {
   About about();
   Future<List<String>> listThemes();
@@ -360,4 +382,6 @@ abstract class MuninnApi {
   Future<NetOverview> netOverview();
   /// `mnnn org list` and the fields `mnnn org show` prints for orgs this node owns.
   Future<OrgOverview> orgOverview();
+  /// `mnnn keys status`: database id, path and service-key versions. No key material.
+  Future<KeysStatus> keysStatus();
 }

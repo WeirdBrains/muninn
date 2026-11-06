@@ -5,8 +5,8 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
 Projects (create, rename, describe, delete, attach and detach series), a read-only Net
-status and peers view, a read-only Orgs list, File ▸ Import… / Export… (CSV, Parquet, JSON),
-and File ▸ Preferences….
+status and peers view, a read-only Orgs list, a read-only Keys status, File ▸ Import… / Export…
+(CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
 
@@ -32,7 +32,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export… and Preferences… are wired, as is Projects ▸ New project…
-  and Net ▸ Status… / Peers… and Orgs ▸ Organizations…; Keys still points at the CLI.
+  and Net ▸ Status… / Peers…, Orgs ▸ Organizations… and Keys ▸ Status…. Help still points at the CLI.
 - **Phone layout** (narrower than 720 px): bottom navigation (Home, Data, Projects, Net,
   More), 48 px+ targets, safe areas, theme as a bottom sheet; nothing is hover-only.
 - **Themes:** every theme from `assets/themes/*.toml` plus your own in `<home>/themes/`,
@@ -42,6 +42,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Unlock:** Home, Data, Projects, Net and Orgs ask for the Muninn password once per session. The
   key stays in Rust memory (never in Dart, never on disk); **File ▸ Lock** forgets it.
   Dashboard reads, Net status and the Orgs list open the store **read-only** (no migrations).
+  Keys status does not unlock the store (same as `mnnn keys status`).
   **File ▸ Import…**, **Export…** and project writes (create, rename, describe, delete,
   attach or detach a series) open it for writes after the same unlock.
 - **Home:** where the data lives, and the projects and datasets in it.
@@ -83,6 +84,13 @@ Users never need Rust: release builds ship the compiled library.
   endpoints and template names), orgs this node has joined (status, role, node), and
   mirrors (slug and when they were fetched, not the snapshot). Create, edit, join, leave
   and hosting stay in the TUI or CLI.
+- **Keys:** read-only status, like `mnnn keys status`. It reads the same data dir as the
+  store (on a phone, the platform-secure app sandbox; on desktop, the TUI home) and shows
+  whether keys are initialized, the database id, the database path, the current service-key
+  version, and each on-disk service key as active or retired. The master key, recovery
+  words, shards, passphrases, wrapped keys and raw key bytes stay in Rust and are never
+  sent to Dart. Initialize, rotate, rekey, export, recover and re-issue shards stay in
+  the TUI or CLI.
 - **Import** (File ▸ Import…): pick a file or folder (CSV, TSV, TXT, JSON, NDJSON, JSONL)
   and store each file as it is in a source, like `mnnn ingest path`. An optional source
   name overrides the folder's name (else `local`). Progress is byte-based; Cancel keeps
@@ -101,15 +109,17 @@ Users never need Rust: release builds ship the compiled library.
 
 ## Data
 
-Desktop shares the TUI's data dir: `MUNINN_HOME`, else `~/.muninn`. Mobile keeps its
-own data in the app sandbox and will sync with a desktop node over the existing
-network and sync (see [sync](sync.md)); that comes in a later phase.
+Desktop shares the TUI's data dir: `MUNINN_HOME`, else `~/.muninn`. On a phone the
+database, keys (the envelope and service keys), preferences and themes live in the
+platform-secure app sandbox — the same data dir the store already uses — not a
+desktop-style `~/.muninn`. Sync with a desktop node over the existing network
+comes in a later phase (see [sync](sync.md)).
 
 ## How it fits together
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars, ingest and bar export, net status and peers, org list), exposed with
+  projects and datasets, downsampled bars, ingest and bar export, net status and peers, org list, keys status), exposed with
   flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.

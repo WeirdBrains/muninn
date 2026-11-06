@@ -7,6 +7,7 @@ import 'api.dart';
 import 'rust/api/about.dart' as r_about;
 import 'rust/api/data.dart' as r_data;
 import 'rust/api/info.dart' as r_info;
+import 'rust/api/keys.dart' as r_keys;
 import 'rust/api/io.dart' as r_io;
 import 'rust/api/net.dart' as r_net;
 import 'rust/api/orgs.dart' as r_orgs;
@@ -299,6 +300,18 @@ class FfiMuninnApi implements MuninnApi {
       mirrors: [
         for (final m in o.mirrors) OrgMirror(slug: m.slug, fetchedAt: m.fetchedAt.toInt()),
       ],
+    );
+  }
+
+  @override
+  Future<KeysStatus> keysStatus() async {
+    final s = await r_keys.keysStatus(home: home);
+    return KeysStatus(
+      initialized: s.initialized,
+      dbId: s.dbId,
+      database: s.database,
+      serviceVersion: s.serviceVersion.toInt(),
+      services: [for (final x in s.services) ServiceKeyInfo(version: x.version.toInt(), retired: x.retired)],
     );
   }
 }

@@ -227,4 +227,15 @@ class FakeApi implements MuninnApi {
 
   @override
   Future<OrgOverview> orgOverview() async => orgs;
+
+  KeysStatus keys = const KeysStatus(
+    initialized: true,
+    dbId: 'db-aaaa-bbbb',
+    database: '/tmp/muninn-test/storage/muninn.database',
+    serviceVersion: 1,
+    services: [ServiceKeyInfo(version: 1, retired: false)],
+  );
+
+  @override
+  Future<KeysStatus> keysStatus() async => keys;
 }
