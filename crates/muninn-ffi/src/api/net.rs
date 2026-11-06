@@ -4,10 +4,11 @@
 //! never leave this crate. Invite links hold no secret.
 use super::data::{open, open_write};
 use super::info::paths;
-use muninn_core::net::{self, Node, auto, client, identity, local};
+use muninn_core::net::{self, auto, client, identity, local, Node};
 use muninn_core::prefs::Preferences;
 use muninn_core::store::{Exchange, ExchangeStatus, ShareKind, Store};
-use std::path::Path;
+use secrecy::SecretString;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
@@ -124,7 +125,6 @@ pub(crate) fn net_overview_of(store: &Store, home: &Path) -> anyhow::Result<NetO
 pub fn net_overview(home: Option<String>) -> anyhow::Result<NetOverview> {
     net_overview_of(&open()?, &paths(home)?.home)
 }
-
 
 const ORIGIN: &str = "app";
 
@@ -283,13 +283,7 @@ pub(crate) fn shared_of(store: &Store) -> anyhow::Result<Vec<NetShareInfo>> {
             None => "everyone with an exchange".to_string(),
             Some(x) => store.exchange(x)?.map(|x| x.title()).unwrap_or_else(|| x.clone()),
         };
-        out.push(NetShareInfo {
-            short_id: s.short_id().to_string(),
-            id: s.id,
-            kind: s.kind.as_str().to_string(),
-            name: s.name,
-            with,
-        });
+        out.push(NetShareInfo { short_id: s.short_id().to_string(), id: s.id, kind: s.kind.as_str().to_string(), name: s.name, with });
     }
     Ok(out)
 }
@@ -336,12 +330,7 @@ pub(crate) fn share_of(store: &Store, kind: &str, item: &str, with: &[String]) -
     let fresh = made.iter().filter(|(_, new)| *new).count();
     let s = &made[0].0;
     let who = if with.is_empty() { "every key exchange".to_string() } else { with.join(", ") };
-    Ok(format!(
-        "sharing {} {} with {who}{}",
-        s.kind.label(),
-        s.name,
-        if fresh == 0 { " (already)" } else { "" }
-    ))
+    Ok(format!("sharing {} {} with {who}{}", s.kind.label(), s.name, if fresh == 0 { " (already)" } else { "" }))
 }
 
 pub(crate) fn unshare_of(store: &Store, kind: &str, item: &str, with: &[String]) -> anyhow::Result<String> {
@@ -669,7 +658,9 @@ pub fn net_config_set(home: Option<String>, cfg: NetConfig) -> anyhow::Result<St
     prefs.hosting.autostart = cfg.host_autostart;
     prefs.save(&p)?;
     if let Ok(s) = open_write() {
-        s.note_action(&muninn_core::store::NewAction::new("net.config", ORIGIN, "network settings changed").params(serde_json::to_value(&prefs.net)?));
+        s.note_action(
+            &muninn_core::store::NewAction::new("net.config", ORIGIN, "network settings changed").params(serde_json::to_value(&prefs.net)?),
+        );
     }
     let later = if hosted_node().is_some() { " (applies when the node starts again)" } else { "" };
     Ok(format!("saved network settings{later}"))
@@ -869,14 +860,18 @@ pub fn net_remote_list(home: Option<String>, exchange: String) -> anyhow::Result
         &ephemeral
     };
     let items = client::remote_list(&store, node, &x, &prefs.net.relays)?;
-    Ok(items
-        .into_iter()
-        .map(|i| NetRemoteItem { id: i.id, kind: i.kind.label().into(), name: i.name, about: i.about })
-        .collect())
+    Ok(items.into_iter().map(|i| NetRemoteItem { id: i.id, kind: i.kind.label().into(), name: i.name, about: i.about }).collect())
 }
 
 /// `mnnn net fetch` / TUI Enter on a remote item. Bytes stay in Rust (import or write [path]).
-pub fn net_fetch(home: Option<String>, exchange: String, item: String, format: Option<String>, path: Option<String>, import: bool) -> anyhow::Result<String> {
+pub fn net_fetch(
+    home: Option<String>,
+    exchange: String,
+    item: String,
+    format: Option<String>,
+    path: Option<String>,
+    import: bool,
+) -> anyhow::Result<String> {
     let p = paths(home)?;
     let mut store = open_write()?;
     let prefs = prefs_of(&p.home);
@@ -968,9 +963,10 @@ pub fn net_shards(home: Option<String>) -> anyhow::Result<NetShards> {
 fn master_from_key_file(home: &std::path::Path, file: &str, pass: Option<String>) -> anyhow::Result<muninn_core::crypto::Key32> {
     let paths = muninn_core::paths::Paths::resolve(Some(home.to_path_buf()), None)?;
     let text = muninn_core::crypto::keyring::read_maybe_age(std::path::Path::new(file), || {
-        pass.clone().filter(|s| !s.is_empty()).map(secrecy::SecretString::from).ok_or_else(|| {
-            muninn_core::Error::missing("file password", "this key file is encrypted: type its password")
-        })
+        pass.clone()
+            .filter(|s| !s.is_empty())
+            .map(secrecy::SecretString::from)
+            .ok_or_else(|| muninn_core::Error::missing("file password", "this key file is encrypted: type its password"))
     })?;
     let t = text.trim();
     let m = if t.len() == 64 && t.chars().all(|c| c.is_ascii_hexdigit()) {
@@ -1012,7 +1008,12 @@ pub fn net_shard_entrust(
         &ephemeral
     };
     let e = client::entrust(&store, node, &master, &secrecy::SecretString::from(shard_password), &to, threshold as usize, &prefs.net.relays, ORIGIN)?;
-    let mut msg = format!("entrusted: any {} of {} shards restore your key (set {})", e.threshold, e.placed.len(), muninn_core::store::projects::short_of(&e.set));
+    let mut msg = format!(
+        "entrusted: any {} of {} shards restore your key (set {})",
+        e.threshold,
+        e.placed.len(),
+        muninn_core::store::projects::short_of(&e.set)
+    );
     for pl in &e.placed {
         let who = store.exchange(&pl.exchange_id)?.map(|x| x.title()).unwrap_or_default();
         msg.push_str(&format!("; {who} holds shard {}/{}", pl.index, pl.total));
@@ -1053,15 +1054,13 @@ pub fn net_shard_drop(home: Option<String>, id: String) -> anyhow::Result<String
     let s = open_write()?;
     let held = s.held_shards()?;
     let want = id.trim();
-    let h = held
-        .iter()
-        .find(|h| h.id == want || h.id.starts_with(want))
-        .ok_or_else(|| anyhow::anyhow!("no held shard `{want}`"))?;
+    let h = held.iter().find(|h| h.id == want || h.id.starts_with(want)).ok_or_else(|| anyhow::anyhow!("no held shard `{want}`"))?;
     let owner = if h.owner_label.is_empty() { h.owner_peer.clone() } else { h.owner_label.clone() };
     let set = h.set_id.clone();
     s.drop_held_shard(&h.id)?;
     s.note_action(
-        &muninn_core::store::NewAction::new("net.shard.drop", ORIGIN, "a held dark shard dropped").params(serde_json::json!({ "peer": owner, "set": set })),
+        &muninn_core::store::NewAction::new("net.shard.drop", ORIGIN, "a held dark shard dropped")
+            .params(serde_json::json!({ "peer": owner, "set": set })),
     );
     Ok("dropped".into())
 }
@@ -1138,6 +1137,69 @@ pub fn net_broadcast(home: Option<String>, topic: String, text: String, to: Stri
     Ok(msg)
 }
 
+/// What `mnnn net exchange restore` peeks: counts and whether this node's identity would change. No keys.
+pub struct NetExchangeBackupPeek {
+    pub peer_id: String,
+    pub exchanges: u32,
+    pub identity_replaced: bool,
+}
+
+fn exchange_export_of(s: &Store, out: &str, password: &str) -> anyhow::Result<String> {
+    let out = out.trim();
+    if out.is_empty() {
+        return Err(anyhow::anyhow!("pick a file to write the encrypted backup"));
+    }
+    if password.is_empty() {
+        return Err(anyhow::anyhow!("export password must not be empty"));
+    }
+    let bytes = net::backup::export(s, &SecretString::from(password))?;
+    muninn_core::paths::write_private(&PathBuf::from(out), &bytes)?;
+    Ok(format!("wrote {out} ({} exchange(s), age-encrypted)", s.exchanges()?.len()))
+}
+
+/// `mnnn net exchange export`. Writes an age-encrypted backup; bytes and keys stay in Rust.
+pub fn net_exchange_export(home: Option<String>, out: String, password: String) -> anyhow::Result<String> {
+    let _ = home;
+    exchange_export_of(&open_write()?, &out, &password)
+}
+
+fn exchange_restore_peek_of(s: &Store, file: &str, password: &str) -> anyhow::Result<NetExchangeBackupPeek> {
+    let file = file.trim();
+    if file.is_empty() {
+        return Err(anyhow::anyhow!("pick a backup file"));
+    }
+    if password.is_empty() {
+        return Err(anyhow::anyhow!("export password must not be empty"));
+    }
+    let bytes = std::fs::read(file).map_err(|e| anyhow::anyhow!("{file}: {e}"))?;
+    let (peer_id, exchanges, identity_replaced) = net::backup::peek(s, &bytes, &SecretString::from(password))?;
+    Ok(NetExchangeBackupPeek { peer_id, exchanges: exchanges as u32, identity_replaced })
+}
+
+/// Peek a backup without restoring. Decrypts in Rust; no identity or exchange keys come back.
+pub fn net_exchange_restore_peek(home: Option<String>, file: String, password: String) -> anyhow::Result<NetExchangeBackupPeek> {
+    let _ = home;
+    exchange_restore_peek_of(&open_write()?, &file, &password)
+}
+
+fn exchange_restore_of(s: &Store, file: &str, password: &str, confirm_replace: bool) -> anyhow::Result<String> {
+    let peek = exchange_restore_peek_of(s, file, password)?;
+    if peek.identity_replaced && !confirm_replace {
+        return Err(anyhow::anyhow!(
+            "this database's node identity would become {}; confirm to continue (exchanges made with the current identity stop working)",
+            muninn_core::store::net::short_peer(&peek.peer_id)
+        ));
+    }
+    let bytes = std::fs::read(file.trim()).map_err(|e| anyhow::anyhow!("{}: {e}", file.trim()))?;
+    let r = net::backup::restore(s, &bytes, &SecretString::from(password), ORIGIN)?;
+    Ok(format!("restored {} key exchange(s) and {} peer(s) for node {}", r.exchanges, r.peers, muninn_core::store::net::short_peer(&r.peer_id)))
+}
+
+/// `mnnn net exchange restore`. Call peek first; pass `confirm_replace` when identity would change.
+pub fn net_exchange_restore(home: Option<String>, file: String, password: String, confirm_replace: bool) -> anyhow::Result<String> {
+    let _ = home;
+    exchange_restore_of(&open_write()?, &file, &password, confirm_replace)
+}
 
 #[cfg(test)]
 mod tests {
@@ -1271,11 +1333,7 @@ mod tests {
     fn stop_idle_or_ask_the_other_process() {
         let home = tempfile::tempdir().unwrap();
         assert!(stop_of(home.path()).unwrap().contains("no node"));
-        let st = muninn_core::net::node::Status {
-            peer_id: "12D3KooWabc".into(),
-            started_at: 1_704_067_200_000,
-            ..Default::default()
-        };
+        let st = muninn_core::net::node::Status { peer_id: "12D3KooWabc".into(), started_at: 1_704_067_200_000, ..Default::default() };
         local::write(home.path(), "desk", &st).unwrap();
         assert!(local::running(home.path()).is_some());
         let msg = stop_of(home.path()).unwrap();
@@ -1326,5 +1384,59 @@ mod tests {
         assert!(net_shards(None).is_err());
         assert!(net_broadcast(None, "t".into(), "".into(), "nodes".into()).is_err());
         assert!(net_search(None, "x".into(), vec![], false, 200).is_err());
+        assert!(net_exchange_export(None, "/tmp/x.age".into(), "pw".into()).is_err());
+        assert!(net_exchange_restore_peek(None, "/tmp/x.age".into(), "pw".into()).is_err());
+        assert!(net_exchange_restore(None, "/tmp/x.age".into(), "pw".into(), false).is_err());
+    }
+
+    #[test]
+    fn exchange_backup_round_trips_without_exposing_keys() {
+        use muninn_core::crypto;
+        use muninn_core::store::{ExchangeStatus, NewExchange};
+
+        let a = Store::open_in_memory().unwrap();
+        let kp = identity::load_or_create(&a).unwrap();
+        a.insert_exchange(
+            &NewExchange {
+                id: "x1".into(),
+                label: "lab".into(),
+                role: "offerer".into(),
+                status: Some(ExchangeStatus::Offered),
+                peer_id: None,
+                peer_label: String::new(),
+                scope: net::exchange::node_scope(),
+                offer: "tok".into(),
+                expires_at: None,
+            },
+            Some(&[7u8; 32]),
+        )
+        .unwrap();
+        a.complete_exchange("x1", "12D3KooWPeer", "ben", "ans", &crypto::Key32([9u8; 32]), "11111-22222", "ab").unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("exchanges.age");
+        let path = out.display().to_string();
+        assert!(exchange_export_of(&a, &path, "").is_err());
+        let msg = exchange_export_of(&a, &path, "pw").unwrap();
+        assert!(msg.contains("1 exchange"), "{msg}");
+        let raw = std::fs::read(&out).unwrap();
+        assert!(crypto::is_age(&raw), "backup must stay age-encrypted on disk");
+        assert!(!raw.windows(b"11111-22222".len()).any(|w| w == b"11111-22222"));
+        assert!(!std::str::from_utf8(&raw).map(|s| s.contains("12D3KooWPeer")).unwrap_or(false));
+
+        let b = Store::open_in_memory().unwrap();
+        let _other = identity::load_or_create(&b).unwrap();
+        let peek = exchange_restore_peek_of(&b, &path, "pw").unwrap();
+        assert!(peek.identity_replaced);
+        assert_eq!(peek.exchanges, 1);
+        assert_eq!(peek.peer_id, kp.public().to_peer_id().to_string());
+        let err = exchange_restore_of(&b, &path, "pw", false).unwrap_err().to_string();
+        assert!(err.contains("confirm"), "{err}");
+        let restored = exchange_restore_of(&b, &path, "pw", true).unwrap();
+        assert!(restored.contains("1 key exchange"), "{restored}");
+        assert_eq!(identity::load_or_create(&b).unwrap().public(), kp.public());
+        assert_eq!(b.exchange_key("x1").unwrap().unwrap().0, [9u8; 32]);
+        assert_eq!(b.exchange("x1").unwrap().unwrap().short_code.as_deref(), Some("11111-22222"));
+        assert!(exchange_restore_peek_of(&b, &path, "bad").is_err());
     }
 }
