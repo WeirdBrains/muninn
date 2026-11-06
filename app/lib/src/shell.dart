@@ -32,6 +32,7 @@ import 'views/keys_dialogs.dart';
 import 'views/net_dialogs.dart';
 import 'views/project_extras.dart';
 import 'views/projects.dart';
+import 'workspace.dart';
 
 /// Widths below this use the phone layout.
 const phoneBreakpoint = 720.0;
@@ -283,17 +284,170 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           ),
         ], controller: _fileMenu),
         menu('View', [
-          item(
-            'Change view (chart / list)',
-            () => ref.read(dataAsChartProvider.notifier).state = !ref.read(
-              dataAsChartProvider,
-            ),
+          SubmenuButton(
+            menuChildren: [
+              item('List', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                applyWorkspace(
+                  ref,
+                  ref
+                      .read(workspaceProvider)
+                      .split(
+                        ref.read(workspaceProvider).newDir,
+                        ref.read(workspaceAreaProvider),
+                        asChart: false,
+                      ),
+                  context: context,
+                );
+              }),
+              item('Chart', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                applyWorkspace(
+                  ref,
+                  ref
+                      .read(workspaceProvider)
+                      .split(
+                        ref.read(workspaceProvider).newDir,
+                        ref.read(workspaceAreaProvider),
+                        asChart: true,
+                      ),
+                  context: context,
+                );
+              }),
+            ],
+            child: const Text('New tile'),
           ),
+          SubmenuButton(
+            menuChildren: [
+              item('Right', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                applyWorkspace(
+                  ref,
+                  ref
+                      .read(workspaceProvider)
+                      .split(
+                        SplitDir.horizontal,
+                        ref.read(workspaceAreaProvider),
+                      ),
+                  context: context,
+                );
+              }),
+              item('Below', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                applyWorkspace(
+                  ref,
+                  ref
+                      .read(workspaceProvider)
+                      .split(
+                        SplitDir.vertical,
+                        ref.read(workspaceAreaProvider),
+                      ),
+                  context: context,
+                );
+              }),
+            ],
+            child: const Text('Split'),
+          ),
+          item('Close tile', () {
+            ref.read(sectionProvider.notifier).state = Section.data;
+            applyWorkspace(
+              ref,
+              ref.read(workspaceProvider).closeTile(),
+              context: context,
+            );
+          }),
+          item('Zoom tile', () {
+            ref.read(sectionProvider.notifier).state = Section.data;
+            setWorkspace(ref, ref.read(workspaceProvider).toggleZoom());
+          }),
+          item('Equalize', () {
+            ref.read(sectionProvider.notifier).state = Section.data;
+            setWorkspace(ref, ref.read(workspaceProvider).equalize());
+          }),
+          item('Change view', () {
+            ref.read(sectionProvider.notifier).state = Section.data;
+            toggleDataView(ref);
+          }),
+          item('Link tile', () {
+            ref.read(sectionProvider.notifier).state = Section.data;
+            setWorkspace(ref, ref.read(workspaceProvider).cycleLink());
+          }),
           item(
             'Chart layers…',
             () => showChartLayersSheet(context, ref),
             const SingleActivator(LogicalKeyboardKey.keyL, shift: true),
           ),
+          SubmenuButton(
+            menuChildren: [
+              item('Split', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                applyWorkspace(
+                  ref,
+                  ref.read(workspaceProvider).setContainer(ContainerMode.split),
+                  context: context,
+                );
+              }),
+              item('Tabbed', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                applyWorkspace(
+                  ref,
+                  ref
+                      .read(workspaceProvider)
+                      .setContainer(ContainerMode.tabbed),
+                  context: context,
+                );
+              }),
+              item('Stacked', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                applyWorkspace(
+                  ref,
+                  ref
+                      .read(workspaceProvider)
+                      .setContainer(ContainerMode.stacked),
+                  context: context,
+                );
+              }),
+            ],
+            child: const Text('Container'),
+          ),
+          SubmenuButton(
+            menuChildren: [
+              item('2-up', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                setWorkspace(
+                  ref,
+                  ref.read(workspaceProvider).preset(LayoutPreset.twoUp),
+                );
+              }),
+              item('3-column', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                setWorkspace(
+                  ref,
+                  ref.read(workspaceProvider).preset(LayoutPreset.threeColumn),
+                );
+              }),
+              item('Main + stack', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                setWorkspace(
+                  ref,
+                  ref.read(workspaceProvider).preset(LayoutPreset.mainStack),
+                );
+              }),
+              item('2×2', () {
+                ref.read(sectionProvider.notifier).state = Section.data;
+                setWorkspace(
+                  ref,
+                  ref.read(workspaceProvider).preset(LayoutPreset.grid2x2),
+                );
+              }),
+            ],
+            child: const Text('Layouts'),
+          ),
+          const Divider(),
+          item('Toggle sidebar', () {
+            ref.read(sectionProvider.notifier).state = Section.data;
+            setWorkspace(ref, ref.read(workspaceProvider).toggleSidebar());
+          }),
           item(
             'Refresh',
             () => refreshMuninn(ref),
@@ -341,7 +495,7 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           item('Journals…', () {
             ref.read(projectPaneProvider.notifier).state = ProjectPane.journals;
             go(Section.projects);
-          }),
+          }, const SingleActivator(LogicalKeyboardKey.keyJ, shift: true)),
           item('New journal…', () => showNewJournalDialog(context, ref)),
           item('Reports…', () {
             ref.read(projectPaneProvider.notifier).state = ProjectPane.reports;

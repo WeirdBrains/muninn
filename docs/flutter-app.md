@@ -51,8 +51,14 @@ Users never need Rust: release builds ship the compiled library.
   and Data ▸ Sources… / Symbols… writes (add, rename, remove, add symbol)
   open it for writes after the same unlock.
 - **Home:** where the data lives, and the projects and datasets in it.
-- **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range;
-  pick one to see it as a chart (candles when they fit, else a close line, volume
+- **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range.
+  On a wide window the sidebar sits next to a tiling workspace of chart and list
+  tiles, matching the TUI [tiling](tiling.md) model (binary tree, split / close /
+  focus / resize / zoom / link / tabbed and stacked containers, and the 2-up,
+  3-column, Main + stack and 2×2 presets). A session starts with one chart tile
+  (the app's existing Data default; the TUI starts with a list tile) and the layout
+  stays in memory — it does not write `[tui.layout]`. Pick a dataset to see it as a
+  chart (candles when they fit, else a close line, volume
   underneath) or a list of bars, newest first. **Data ▸ Sources…** lists ingest
   sources (`mnnn sources list`) with kind, locator and stored-item totals; you can
   add, rename or remove a source (remove asks the same confirmation as the CLI and
@@ -62,10 +68,11 @@ Users never need Rust: release builds ship the compiled library.
   add a pair with optional base aliases (`mnnn symbols add`). The TUI Sources /
   Symbols windows are read-only lists; writes match the CLI. These are not the
   sidebar Source / Symbol *filters*. Switch with the Chart / List buttons or
-  **View ▸ Change view** (`Ctrl-w t`, the same chord as the TUI). Rust downsamples to at most 600
+  **View ▸ Change view** (`Ctrl-w t`, the same chord as the TUI). The other
+  **View** tile actions and `Ctrl-w` chords match the TUI (see Keybindings). Rust downsamples to at most 600
   buckets (open = first, close = last, high/low = extremes, volume = sum), so long
-  ranges stay fast. Desktop shows the list and the chart side by side; on a phone the
-  chart opens on its own page. Pinch, a trackpad or the mouse wheel zooms the chart
+  ranges stay fast. On a phone the dataset list is the page and the chart opens on
+  its own route — there is no tiling. Pinch, a trackpad or the mouse wheel zooms the chart
   *inside* the selected time range (the picker and chips stay as they are; zoom does not
   re-query). Drag pans when zoomed; double-tap or **Reset zoom** shows the whole loaded
   window again. Tighten the time range if you need more detail than the 600 buckets.
@@ -217,7 +224,9 @@ Users never need Rust: release builds ship the compiled library.
   and the dataset open in Data — the same values already saved in `preferences.toml`
   (`[theme]`, `[tui.sidebar.filters]` from/to, `[app] dataset`) and shared with the TUI.
   Changing them here uses the same save path as the Theme menu, the time range picker
-  and Data. TUI-only layout (header size, sidebar, history bar) stays in `mnnn tui`.
+  and Data. Header size and the history bar stay in `mnnn tui`. The Flutter
+  sidebar and tile tree are session-only and do not write `[tui.layout]` or
+  `[tui.layouts]`.
 - **Help** (Help ▸ Topics… / Search help… / Keybindings, or `?` / F1): the same
   embedded `docs/` topics as `mnnn help` and the TUI. `?` and F1 open the topic
   for the current section (Data chart → [charts](charts.md), Keys → [keys](keys.md),
@@ -252,9 +261,27 @@ when a hardware keyboard is attached.
 | `R` | Rules (Shift+R) |
 | `V` | Reviews (Shift+V; lowercase `v` on the chart still toggles volume) |
 | `F` | Live searches (Shift+F) |
+| `J` | Journals (Shift+J, the TUI's `J`) |
 | `!` | Notifications |
 | `L` | Chart layers… |
-| `Ctrl-w t` | change view (chart ↔ list) |
+| `Ctrl-w t` | change view (chart ↔ list) of the focused tile |
+| `Ctrl-w v` / `s` | split the focused tile right / below |
+| `Ctrl-w q` / `c` | close the focused tile (the last tile cannot close) |
+| `Ctrl-w h` `j` `k` `l` or arrows | focus the tile in that direction |
+| `Ctrl-w Tab` / `w` | next tile |
+| `Ctrl-w Shift-Tab` / `W` / `p` | previous tile |
+| `Ctrl-w >` `<` | grow / shrink the tile horizontally |
+| `Ctrl-w +` `-` | grow / shrink the tile vertically |
+| `Ctrl-w =` | equalize split ratios |
+| `Ctrl-w x` | swap with the next tile |
+| `Ctrl-w z` | zoom (maximize) the focused tile |
+| `Ctrl-w e` | toggle the direction used by View ▸ New tile |
+| `Ctrl-w y` | link the focused tile to the next one, then unlink (title shows ⛓id) |
+| `Ctrl-b` | toggle the Data sidebar (wide windows) |
+| `/` | show the Data sidebar and focus it |
+| Tab / Shift-Tab | next / previous tile (when the sidebar is not focused) |
+| `Alt-1`…`Alt-9` | focus the tile with that id |
+| Esc | unfocus the sidebar |
 | F10 | open the File menu (stand-in for the TUI's "open the menu bar") |
 | `q` | quit (desktop only) |
 | Alt+letter | open that menu (File, View, Data, Projects, Net, Orgs, Keys, Theme, Help), matching each TUI menu mnemonic |
@@ -292,13 +319,30 @@ When the Data chart is showing:
 - **`q`** quits the desktop app (File ▸ Quit); on a phone the system back gesture leaves the app and `q` is ignored.
 - **F10** opens the File menu. Flutter's `MenuBar` has no TUI-style "menu bar focused" mode.
 - **Alt+letter** uses Flutter's `MenuAcceleratorLabel` (the same letters as the TUI, including Net `N` and Orgs `O`). On macOS the system menu bar may take precedence.
-- **Tiling** (`Ctrl-w` then `v`/`s`/`q`/`h`/`j`/`k`/`l`/… other than `t`): the app is not a tiled workspace, so those keys are unbound. `Ctrl-w t` still changes view.
-- **Ctrl-b** (toggle sidebar): the desktop Data list is always shown; phones use bottom navigation.
-- **Tab** / **Alt-1…9** tile focus: there are no tiles.
+- **Tiling** follows the TUI's i3-style binary tree on a wide window (width ≥ 720).
+  `Ctrl-w` is a prefix (the same as the TUI): it is not registered as `Ctrl+V` /
+  `Ctrl+S` / `Ctrl+Q`, so paste, save and quit stay with the platform. Minimum tile
+  size is 200×96 pixels (a stand-in for the TUI's 20×6 cells). Chart / list tiles
+  only — the app has no terminal tiles, code-result tiles or pipeline-monitor tiles.
+  Layout is session-only (not written to `[tui.layout]`). A fresh session is one
+  chart tile so existing Data behaviour stays; the TUI starts with a list tile.
+  Chart layers stay global (the TUI can set options per chart tile). Linking records
+  a pairing and shows ⛓id in the title; panning a linked list row to move another
+  tile's chart viewport stays in the TUI. View ▸ Layouts has 2-up, 3-column,
+  Main + stack and 2×2; Saved… / Save current… (`[tui.layouts]`) stay in the TUI.
+- **Ctrl-b** toggles the Data sidebar on a wide window. On a phone the dataset list
+  *is* the page, so `Ctrl-b` is unused.
+- **Tab** / **Shift-Tab** and **Alt-1…9** focus tiles on a wide window. `/` shows
+  and focuses the sidebar (highlights it) but does not invent the TUI's type-ahead
+  sidebar search. Esc or Tab leaves the sidebar. On a phone those keys do not
+  manage tiles.
+- **macOS:** the system menu bar may take Alt/Option letter accelerators, and
+  Option+1…9 may produce special characters instead of focusing a tile. Use the
+  View menu or Tab in that case.
 - Chart layer keys **`e` `m` `w` `g` `z`** match the TUI (envelope, moving averages, wick, gap, zero-volume). The averages use the loaded bars (including those off-screen when zoomed) the same way the TUI uses warmup history; they do not fetch extra bars beyond `queryBars`.
 - **← →** move the TUI chart crosshair; the app moves it by hover or touch.
 - **`[` `]` `{` `}` `@`** set the chart's visible window among already-loaded bars (the same start/end/jump idea as a TUI chart tile). They do not change the global `T` time-range filter, and they do not invent a separate bucket or query. `{` `}` `@` type a date; `[` `]` open the same calendar+time pickers the time-range dialog uses. At scale 1 (every loaded bar visible) `@` has nothing to pan.
-- Keys for windows the app does not have yet (`J` journals, `A` authors, `Y` history, and so on) are left unbound — they are not remapped to something else. Live searches use Shift+F (the TUI's `F`); pipelines use Shift+E.
+- Keys for windows the app does not have yet (`A` authors, `Y`/`u`/`U` history, and so on) are left unbound — they are not remapped to something else. Journals use Shift+J (the TUI's `J`). Live searches use Shift+F (the TUI's `F`); pipelines use Shift+E. The TUI history bar stays in the TUI.
 - In the TUI, `X` stops a node when the network window is focused; the app has no start/stop and `X` stays "clear the time range".
 - **`a`** toggles the area layer when the Data chart is showing (chart tile). Adding a series to a project is **Add current dataset** on the Projects page (the TUI's sidebar-focused `a`).
 - **Esc** closes dialogs through Flutter's usual dialog behaviour.
