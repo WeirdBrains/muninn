@@ -319,9 +319,18 @@ INSTALL
   zip=$dist/$name.zip
   rm -f "$zip"
   # Prefer PowerShell Compress-Archive on Windows; fall back to zip if present.
+  # Convert Git Bash / MSYS paths to Windows paths — Compress-Archive rejects /c/...
   if command -v powershell.exe >/dev/null 2>&1; then
+    local wstage wzip
+    if command -v cygpath >/dev/null 2>&1; then
+      wstage=$(cygpath -w "$stage")
+      wzip=$(cygpath -w "$zip")
+    else
+      wstage=$stage
+      wzip=$zip
+    fi
     powershell.exe -NoProfile -Command \
-      "Compress-Archive -Path (Join-Path -Path '$stage' -ChildPath '*') -DestinationPath '$zip' -Force" \
+      "Compress-Archive -Path (Join-Path -Path '$wstage' -ChildPath '*') -DestinationPath '$wzip' -Force" \
       >/dev/null
   elif command -v zip >/dev/null 2>&1; then
     ( cd "$dist" && zip -qr "$name.zip" "$name" )
