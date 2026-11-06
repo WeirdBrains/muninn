@@ -1,11 +1,12 @@
 //! Network status, peers, and writes (`mnnn net`): start/stop, connect, invites,
-//! relays and sharing. Uses the unlocked key in Rust; the node identity never
-//! leaves this crate. Invite links hold no secret.
+//! relays, sharing, settings, connections, exchanges, search, broadcast and dark shards.
+//! Uses the unlocked key in Rust; the node identity, exchange tokens and shard blobs
+//! never leave this crate. Invite links hold no secret.
 use super::data::{open, open_write};
 use super::info::paths;
 use muninn_core::net::{self, Node, auto, client, identity, local};
 use muninn_core::prefs::Preferences;
-use muninn_core::store::{ExchangeStatus, ShareKind, Store};
+use muninn_core::store::{Exchange, ExchangeStatus, ShareKind, Store};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -594,6 +595,550 @@ pub fn net_unshare(home: Option<String>, kind: String, item: String, with: Vec<S
     unshare_of(&open_write()?, &kind, &item, &with)
 }
 
+/// `mnnn net config` / TUI Net ▸ Settings… (plus CLI extras the TUI page does not list).
+pub struct NetConfig {
+    pub label: String,
+    pub port: u16,
+    pub listen: Vec<String>,
+    pub mdns: bool,
+    pub relay_server: bool,
+    pub autostart: bool,
+    pub host_autostart: bool,
+    pub accept: String,
+    pub bootstrap: Vec<String>,
+    pub external_addresses: Vec<String>,
+    pub collab_transport: String,
+    pub collab_bind: String,
+    pub collab_port: u16,
+    pub collab_advertise: Vec<String>,
+}
+
+fn config_of(home: &Path) -> NetConfig {
+    let p = prefs_of(home);
+    let n = &p.net;
+    NetConfig {
+        label: n.label.clone(),
+        port: n.port,
+        listen: n.listen.clone(),
+        mdns: n.mdns,
+        relay_server: n.relay_server,
+        autostart: n.autostart,
+        host_autostart: p.hosting.autostart,
+        accept: if n.accept_anyone() { "anyone".into() } else { "known".into() },
+        bootstrap: n.bootstrap.clone(),
+        external_addresses: n.external_addresses.clone(),
+        collab_transport: n.collab_transport.clone(),
+        collab_bind: n.collab_bind.clone(),
+        collab_port: n.collab_port,
+        collab_advertise: n.collab_advertise.clone(),
+    }
+}
+
+/// Read network settings from preferences.toml (does not create the file).
+pub fn net_config(home: Option<String>) -> anyhow::Result<NetConfig> {
+    Ok(config_of(&paths(home)?.home))
+}
+
+/// Save network settings (`mnnn net config`). Relays are left to the Relays page.
+pub fn net_config_set(home: Option<String>, cfg: NetConfig) -> anyhow::Result<String> {
+    let p = paths(home)?;
+    let mut prefs = Preferences::load_or_create(&p)?;
+    let n = &mut prefs.net;
+    n.label = cfg.label.trim().to_string();
+    n.port = cfg.port;
+    n.listen = cfg.listen.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && s != "default").collect();
+    n.mdns = cfg.mdns;
+    n.relay_server = cfg.relay_server;
+    n.autostart = cfg.autostart;
+    let accept = cfg.accept.trim().to_ascii_lowercase();
+    if accept != "known" && accept != "anyone" {
+        return Err(anyhow::anyhow!("--accept: `known` or `anyone`"));
+    }
+    n.accept = accept;
+    n.bootstrap = cfg.bootstrap.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+    n.external_addresses = cfg.external_addresses.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+    n.collab_transport = muninn_core::collab::stream::Mode::parse(&cfg.collab_transport)?.as_str().into();
+    let bind = cfg.collab_bind.trim().to_string();
+    if bind.parse::<std::net::IpAddr>().is_err() {
+        return Err(anyhow::anyhow!("collab bind: an IP address (like 0.0.0.0 or 127.0.0.1)"));
+    }
+    n.collab_bind = bind;
+    n.collab_port = cfg.collab_port;
+    n.collab_advertise = cfg.collab_advertise.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+    n.node_config("check")?;
+    prefs.hosting.autostart = cfg.host_autostart;
+    prefs.save(&p)?;
+    if let Ok(s) = open_write() {
+        s.note_action(&muninn_core::store::NewAction::new("net.config", ORIGIN, "network settings changed").params(serde_json::to_value(&prefs.net)?));
+    }
+    let later = if hosted_node().is_some() { " (applies when the node starts again)" } else { "" };
+    Ok(format!("saved network settings{later}"))
+}
+
+pub struct NetMeInfo {
+    pub user_id: String,
+    pub short_id: String,
+    pub name: String,
+    pub nodes: i64,
+}
+
+pub struct NetConnNode {
+    pub short_id: String,
+    pub label: String,
+    pub active: bool,
+    pub state: String,
+}
+
+pub struct NetConnectionInfo {
+    pub user_id: String,
+    pub short_id: String,
+    pub name: String,
+    pub trusted: bool,
+    pub nodes: i64,
+    pub since: i64,
+    pub node_list: Vec<NetConnNode>,
+}
+
+pub struct NetConnections {
+    pub me: Option<NetMeInfo>,
+    pub connections: Vec<NetConnectionInfo>,
+}
+
+fn connections_of(s: &Store) -> anyhow::Result<NetConnections> {
+    let me = s.users()?.into_iter().find(|u| u.mine).map(|u| {
+        let nodes = s.user_nodes(&u.id).ok().map(|n| n.iter().filter(|x| x.active()).count() as i64).unwrap_or(0);
+        NetMeInfo { short_id: u.short_id().to_string(), name: u.name(), user_id: u.id, nodes }
+    });
+    let mut connections = Vec::new();
+    for c in s.connections()? {
+        let Some(u) = s.user(&c.user_id)? else { continue };
+        let node_list = s
+            .user_nodes(&u.id)?
+            .into_iter()
+            .map(|n| {
+                let active = n.active();
+                let state = match n.revoked_at {
+                    Some(t) => format!("revoked {}", muninn_core::ingest::time::fmt_ts(t)),
+                    None => format!("linked {}", muninn_core::ingest::time::fmt_ts(n.issued_at)),
+                };
+                NetConnNode { short_id: muninn_core::store::net::short_peer(&n.peer_id).to_string(), label: n.label, active, state }
+            })
+            .collect::<Vec<_>>();
+        let nodes = node_list.iter().filter(|n| n.active).count() as i64;
+        connections.push(NetConnectionInfo {
+            short_id: u.short_id().to_string(),
+            name: u.name(),
+            user_id: u.id,
+            trusted: c.trusted,
+            nodes,
+            since: c.created_at,
+            node_list,
+        });
+    }
+    Ok(NetConnections { me, connections })
+}
+
+/// `mnnn connection list` / TUI Net ▸ Connections…. No user keys leave Rust.
+pub fn net_connections(home: Option<String>) -> anyhow::Result<NetConnections> {
+    let _ = home;
+    connections_of(&open()?)
+}
+
+/// `mnnn connection trust` / TUI `t`.
+pub fn net_connection_trust(home: Option<String>, user: String, trusted: bool) -> anyhow::Result<String> {
+    let _ = home;
+    let (u, changed) = muninn_core::net::user::set_trust(&open_write()?, user.trim(), trusted, ORIGIN)?;
+    let word = if trusted { "trusted" } else { "untrusted" };
+    Ok(if changed { format!("{} is now {word}", u.name()) } else { format!("{} was already {word}", u.name()) })
+}
+
+/// `mnnn connection remove` / TUI `d`.
+pub fn net_connection_remove(home: Option<String>, user: String) -> anyhow::Result<String> {
+    let _ = home;
+    let u = muninn_core::net::user::remove_connection(&open_write()?, user.trim(), ORIGIN)?;
+    Ok(format!("connection with {} removed", u.name()))
+}
+
+pub struct NetExchangeInfo {
+    pub id: String,
+    pub short_id: String,
+    pub title: String,
+    pub label: String,
+    pub status: String,
+    pub role: String,
+    pub peer_id: String,
+    pub peer_label: String,
+    pub short_code: Option<String>,
+    pub fingerprint: Option<String>,
+    pub expires_at: Option<i64>,
+    pub verified_at: Option<i64>,
+    pub revoked_at: Option<i64>,
+    pub created_at: i64,
+    pub active: bool,
+    pub incoming: bool,
+}
+
+fn exchange_info(x: &Exchange) -> NetExchangeInfo {
+    NetExchangeInfo {
+        short_id: x.short_id().to_string(),
+        title: x.title(),
+        label: x.label.clone(),
+        status: x.status.as_str().into(),
+        role: x.role.clone(),
+        peer_id: x.peer_id.as_deref().map(muninn_core::store::net::short_peer).unwrap_or_default().to_string(),
+        peer_label: x.peer_label.clone(),
+        short_code: x.short_code.clone(),
+        fingerprint: x.fingerprint.clone(),
+        expires_at: x.expires_at,
+        verified_at: x.verified_at,
+        revoked_at: x.revoked_at,
+        created_at: x.created_at,
+        active: x.status.active(),
+        incoming: x.status == ExchangeStatus::Incoming,
+        id: x.id.clone(),
+    }
+}
+
+fn exchanges_of(s: &Store) -> anyhow::Result<Vec<NetExchangeInfo>> {
+    Ok(s.exchanges()?.iter().map(exchange_info).collect())
+}
+
+/// `mnnn net exchange list` / TUI Net ▸ Nodes…. Tokens stay in Rust; short codes are meant to be read aloud.
+pub fn net_exchanges(home: Option<String>) -> anyhow::Result<Vec<NetExchangeInfo>> {
+    let _ = home;
+    exchanges_of(&open()?)
+}
+
+/// `mnnn net exchange label`.
+pub fn net_exchange_label(home: Option<String>, exchange: String, label: String) -> anyhow::Result<String> {
+    let _ = home;
+    let s = open_write()?;
+    let x = client::exchange_for(&s, exchange.trim())?;
+    s.label_exchange(&x.id, &label)?;
+    Ok(format!("exchange {} is now {label}", x.short_id()))
+}
+
+/// `mnnn net exchange verify`.
+pub fn net_exchange_verify(home: Option<String>, exchange: String, code: String) -> anyhow::Result<String> {
+    let _ = home;
+    let s = open_write()?;
+    let x = client::exchange_for(&s, exchange.trim())?;
+    let x = client::verify(&s, &x.id, code.trim(), ORIGIN)?;
+    Ok(format!("key exchange with {} verified", x.title()))
+}
+
+/// `mnnn net exchange revoke` / TUI disconnect on a node.
+pub fn net_exchange_revoke(home: Option<String>, exchange: String) -> anyhow::Result<String> {
+    let p = paths(home)?;
+    let store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let x = client::exchange_for(&store, exchange.trim())?;
+    let owned = hosted_node();
+    let (x, told) = client::revoke(&store, owned.as_deref(), &x.id, &prefs.net.relays, ORIGIN)?;
+    let mut msg = format!("disconnected from {}", x.title());
+    if let Some(Err(e)) = told {
+        msg.push_str(&format!("; {} was not reachable ({})", x.title(), auto::plain(&e)));
+    }
+    Ok(msg)
+}
+
+pub struct NetRemoteItem {
+    pub id: String,
+    pub kind: String,
+    pub name: String,
+    pub about: String,
+}
+
+/// `mnnn net list` / TUI Nodes ▸ L. Needs a running or ephemeral node.
+pub fn net_remote_list(home: Option<String>, exchange: String) -> anyhow::Result<Vec<NetRemoteItem>> {
+    let p = paths(home)?;
+    let store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let x = client::exchange_for(&store, exchange.trim())?;
+    if !x.status.active() {
+        return Err(anyhow::anyhow!("{} is {}", x.title(), x.status.as_str()));
+    }
+    let kp = identity::load_or_create(&store)?;
+    let my = local::my_label(&store, &prefs.net);
+    let owned = hosted_node();
+    let ephemeral;
+    let node: &Node = if let Some(n) = owned.as_ref() {
+        n
+    } else {
+        ephemeral = local::ephemeral(&kp, open_write()?, &my, &prefs.net)?;
+        &ephemeral
+    };
+    let items = client::remote_list(&store, node, &x, &prefs.net.relays)?;
+    Ok(items
+        .into_iter()
+        .map(|i| NetRemoteItem { id: i.id, kind: i.kind.label().into(), name: i.name, about: i.about })
+        .collect())
+}
+
+/// `mnnn net fetch` / TUI Enter on a remote item. Bytes stay in Rust (import or write [path]).
+pub fn net_fetch(home: Option<String>, exchange: String, item: String, format: Option<String>, path: Option<String>, import: bool) -> anyhow::Result<String> {
+    let p = paths(home)?;
+    let mut store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let x = client::exchange_for(&store, exchange.trim())?;
+    let kp = identity::load_or_create(&store)?;
+    let my = local::my_label(&store, &prefs.net);
+    let owned = hosted_node();
+    let ephemeral;
+    let node: &Node = if let Some(n) = owned.as_ref() {
+        n
+    } else {
+        ephemeral = local::ephemeral(&kp, open_write()?, &my, &prefs.net)?;
+        &ephemeral
+    };
+    let it = client::fetch(&store, node, &x, item.trim(), format.as_deref(), &prefs.net.relays, ORIGIN)?;
+    let mut parts = Vec::new();
+    if import {
+        let made = client::import_item(&mut store, &it, &x.title(), ORIGIN)?;
+        parts.push(format!("imported {made}"));
+    }
+    if let Some(path) = path.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
+        let n = it.data.len();
+        std::fs::write(&path, &it.data)?;
+        parts.push(format!("wrote {path} ({n} bytes)"));
+    }
+    if parts.is_empty() {
+        return Err(anyhow::anyhow!("choose Import or a file to write (the item stays in Rust)"));
+    }
+    Ok(parts.join("; "))
+}
+
+pub struct NetEntrustedInfo {
+    pub set_id: String,
+    pub index: u32,
+    pub threshold: u32,
+    pub total: u32,
+    pub exchange: String,
+    pub status: String,
+}
+
+pub struct NetHeldInfo {
+    pub id: String,
+    pub short_id: String,
+    pub set_id: String,
+    pub index: u32,
+    pub threshold: u32,
+    pub total: u32,
+    pub owner: String,
+    pub exchange: String,
+}
+
+pub struct NetShards {
+    pub entrusted: Vec<NetEntrustedInfo>,
+    pub held: Vec<NetHeldInfo>,
+}
+
+fn shards_of(s: &Store) -> anyhow::Result<NetShards> {
+    let mut entrusted = Vec::new();
+    for e in s.entrusted()? {
+        let (exchange, status) = match s.exchange(&e.exchange_id)? {
+            Some(x) => (x.title(), x.status.as_str().to_string()),
+            None => (String::new(), String::new()),
+        };
+        entrusted.push(NetEntrustedInfo { set_id: e.set_id, index: e.index, threshold: e.threshold, total: e.total, exchange, status });
+    }
+    let mut held = Vec::new();
+    for h in s.held_shards()? {
+        let owner = if h.owner_label.is_empty() { muninn_core::store::net::short_peer(&h.owner_peer).to_string() } else { h.owner_label };
+        held.push(NetHeldInfo {
+            short_id: muninn_core::store::projects::short_of(&h.id).to_string(),
+            set_id: h.set_id,
+            index: h.index,
+            threshold: h.threshold,
+            total: h.total,
+            owner,
+            exchange: h.exchange_id,
+            id: h.id,
+        });
+    }
+    Ok(NetShards { entrusted, held })
+}
+
+/// `mnnn net shard list` / TUI Dark shards. Sealed blobs stay in Rust.
+pub fn net_shards(home: Option<String>) -> anyhow::Result<NetShards> {
+    let _ = home;
+    shards_of(&open()?)
+}
+
+fn master_from_key_file(home: &std::path::Path, file: &str, pass: Option<String>) -> anyhow::Result<muninn_core::crypto::Key32> {
+    let paths = muninn_core::paths::Paths::resolve(Some(home.to_path_buf()), None)?;
+    let text = muninn_core::crypto::keyring::read_maybe_age(std::path::Path::new(file), || {
+        pass.clone().filter(|s| !s.is_empty()).map(secrecy::SecretString::from).ok_or_else(|| {
+            muninn_core::Error::missing("file password", "this key file is encrypted: type its password")
+        })
+    })?;
+    let t = text.trim();
+    let m = if t.len() == 64 && t.chars().all(|c| c.is_ascii_hexdigit()) {
+        muninn_core::crypto::Key32::from_hex(t)?
+    } else {
+        muninn_core::crypto::from_words(t)?
+    };
+    muninn_core::crypto::keyring::verify_master(&paths, &m)?;
+    Ok(m)
+}
+
+/// `mnnn net shard entrust` / TUI Entrust…. Master comes from a key file; shard password is not stored.
+pub fn net_shard_entrust(
+    home: Option<String>,
+    to: Vec<String>,
+    threshold: u32,
+    key_file: String,
+    file_password: Option<String>,
+    shard_password: String,
+) -> anyhow::Result<String> {
+    if to.len() < 2 {
+        return Err(anyhow::anyhow!("pick at least two connected nodes: each holds one shard"));
+    }
+    if shard_password.is_empty() {
+        return Err(anyhow::anyhow!("type a shard password: you need it again to restore"));
+    }
+    let p = paths(home)?;
+    let store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let master = master_from_key_file(&p.home, key_file.trim(), file_password)?;
+    let kp = identity::load_or_create(&store)?;
+    let my = local::my_label(&store, &prefs.net);
+    let owned = hosted_node();
+    let ephemeral;
+    let node: &Node = if let Some(n) = owned.as_ref() {
+        n
+    } else {
+        ephemeral = local::ephemeral(&kp, open_write()?, &my, &prefs.net)?;
+        &ephemeral
+    };
+    let e = client::entrust(&store, node, &master, &secrecy::SecretString::from(shard_password), &to, threshold as usize, &prefs.net.relays, ORIGIN)?;
+    let mut msg = format!("entrusted: any {} of {} shards restore your key (set {})", e.threshold, e.placed.len(), muninn_core::store::projects::short_of(&e.set));
+    for pl in &e.placed {
+        let who = store.exchange(&pl.exchange_id)?.map(|x| x.title()).unwrap_or_default();
+        msg.push_str(&format!("; {who} holds shard {}/{}", pl.index, pl.total));
+    }
+    Ok(msg)
+}
+
+/// TUI “Check restore”: gather shards and verify they rebuild this database's key. The key never leaves Rust.
+pub fn net_shard_check(home: Option<String>, shard_password: String) -> anyhow::Result<String> {
+    if shard_password.is_empty() {
+        return Err(anyhow::anyhow!("type your shard password to check the shards restore your key"));
+    }
+    let p = paths(home)?;
+    let store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let kp = identity::load_or_create(&store)?;
+    let my = local::my_label(&store, &prefs.net);
+    let owned = hosted_node();
+    let ephemeral;
+    let node: &Node = if let Some(n) = owned.as_ref() {
+        n
+    } else {
+        ephemeral = local::ephemeral(&kp, open_write()?, &my, &prefs.net)?;
+        &ephemeral
+    };
+    let (key, g) = client::gather(&store, node, &secrecy::SecretString::from(shard_password), None, &[], &prefs.net.relays, ORIGIN)?;
+    muninn_core::crypto::keyring::verify_master(&p, &key)?;
+    let mut msg = format!("your shards restore this database's key ({} answered, {} needed: {})", g.got, g.threshold, g.from.join(", "));
+    for e in &g.errors {
+        msg.push_str(&format!("; {e}"));
+    }
+    Ok(msg)
+}
+
+/// `mnnn net shard drop` / TUI `d` on a held shard.
+pub fn net_shard_drop(home: Option<String>, id: String) -> anyhow::Result<String> {
+    let _ = home;
+    let s = open_write()?;
+    let held = s.held_shards()?;
+    let want = id.trim();
+    let h = held
+        .iter()
+        .find(|h| h.id == want || h.id.starts_with(want))
+        .ok_or_else(|| anyhow::anyhow!("no held shard `{want}`"))?;
+    let owner = if h.owner_label.is_empty() { h.owner_peer.clone() } else { h.owner_label.clone() };
+    let set = h.set_id.clone();
+    s.drop_held_shard(&h.id)?;
+    s.note_action(
+        &muninn_core::store::NewAction::new("net.shard.drop", ORIGIN, "a held dark shard dropped").params(serde_json::json!({ "peer": owner, "set": set })),
+    );
+    Ok("dropped".into())
+}
+
+pub struct NetSearchOrigin {
+    pub origin: String,
+    pub peer: Option<String>,
+    pub exchange: Option<String>,
+    pub error: Option<String>,
+    pub truncated: bool,
+    pub lines: Vec<String>,
+}
+
+/// `mnnn net search` / TUI Network search… (runs a saved live search here and on peers).
+pub fn net_search(home: Option<String>, saved: String, only: Vec<String>, remote_only: bool, limit: u32) -> anyhow::Result<Vec<NetSearchOrigin>> {
+    let p = paths(home)?;
+    let store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let name = saved.trim();
+    if name.is_empty() {
+        return Err(anyhow::anyhow!("pick a saved live search to run across your peers"));
+    }
+    let spec = store.find_live_search(name)?.spec;
+    let kp = identity::load_or_create(&store)?;
+    let my = local::my_label(&store, &prefs.net);
+    let owned = hosted_node();
+    let ephemeral;
+    let node: &Node = if let Some(n) = owned.as_ref() {
+        n
+    } else {
+        ephemeral = local::ephemeral(&kp, open_write()?, &my, &prefs.net)?;
+        &ephemeral
+    };
+    let cap = if limit == 0 { 200 } else { limit as usize };
+    let res = client::search(&store, Some(node), &spec, &only, !remote_only, cap, &prefs.net.relays, ORIGIN)?;
+    Ok(res
+        .into_iter()
+        .map(|o| NetSearchOrigin {
+            origin: o.origin,
+            peer: o.peer,
+            exchange: o.exchange,
+            error: o.error,
+            truncated: o.truncated,
+            lines: o.found.iter().map(|f| f.line()).collect(),
+        })
+        .collect())
+}
+
+/// `mnnn net broadcast`.
+pub fn net_broadcast(home: Option<String>, topic: String, text: String, to: String) -> anyhow::Result<String> {
+    let p = paths(home)?;
+    let store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let dest = muninn_core::net::broadcast::To::parse(&store, to.trim())?;
+    if muninn_core::net::broadcast::targets(&store, &dest)?.is_empty() {
+        return Err(anyhow::anyhow!("no one to tell: no active {} exchanges", dest.text(&store)));
+    }
+    let kp = identity::load_or_create(&store)?;
+    let my = local::my_label(&store, &prefs.net);
+    let owned = hosted_node();
+    let ephemeral;
+    let node: &Node = if let Some(n) = owned.as_ref() {
+        n
+    } else {
+        ephemeral = local::ephemeral(&kp, open_write()?, &my, &prefs.net)?;
+        &ephemeral
+    };
+    let by = muninn_core::net::broadcast::From { node, label: &my, relays: &prefs.net.relays };
+    let r = muninn_core::net::broadcast::send(&store, &by, &dest, topic.trim(), &text, ORIGIN)?;
+    let mut msg = format!("sent to {} node(s)", r.sent.len());
+    for (who, e) in &r.failed {
+        msg.push_str(&format!("; {who}: {e}"));
+    }
+    Ok(msg)
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -742,5 +1287,44 @@ mod tests {
     fn start_refused_when_another_process_is_running() {
         lock();
         assert!(net_start(None).is_err());
+    }
+
+    #[test]
+    fn config_round_trip_does_not_create_prefs_on_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path().display().to_string();
+        let c = config_of(dir.path());
+        assert!(c.mdns && c.autostart && c.accept == "known");
+        assert!(!dir.path().join("preferences.toml").exists(), "reading config must not create preferences");
+        let mut n = c;
+        n.label = "desk".into();
+        n.mdns = false;
+        n.accept = "anyone".into();
+        n.external_addresses = vec!["example.com:4741".into()];
+        assert!(net_config_set(Some(home.clone()), n).is_ok());
+        let got = config_of(dir.path());
+        assert_eq!(got.label, "desk");
+        assert!(!got.mdns);
+        assert_eq!(got.accept, "anyone");
+        assert_eq!(got.external_addresses, vec!["example.com:4741"]);
+    }
+
+    #[test]
+    fn connections_exchanges_and_shards_list_without_secrets() {
+        let s = Store::open_in_memory().unwrap();
+        assert!(connections_of(&s).unwrap().connections.is_empty());
+        assert!(exchanges_of(&s).unwrap().is_empty());
+        let sh = shards_of(&s).unwrap();
+        assert!(sh.entrusted.is_empty() && sh.held.is_empty());
+    }
+
+    #[test]
+    fn leftover_writes_need_unlock() {
+        lock();
+        assert!(net_connection_trust(None, "x".into(), true).is_err());
+        assert!(net_exchanges(None).is_err());
+        assert!(net_shards(None).is_err());
+        assert!(net_broadcast(None, "t".into(), "".into(), "nodes".into()).is_err());
+        assert!(net_search(None, "x".into(), vec![], false, 200).is_err());
     }
 }
