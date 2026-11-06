@@ -114,6 +114,23 @@ void main() {
     await t.pumpAndSettle();
     expect(c.read(chartLayersProvider).volume, isFalse);
 
+    expect(c.read(chartLayersProvider).envelope, isFalse);
+    expect(c.read(chartLayersProvider).ma, isFalse);
+    expect(c.read(chartLayersProvider).wicks, isFalse);
+    expect(c.read(chartLayersProvider).gaps, isTrue);
+    expect(c.read(chartLayersProvider).zeroVolume, isFalse);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyE);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyM);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyW);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyG);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await t.pumpAndSettle();
+    expect(c.read(chartLayersProvider).envelope, isTrue);
+    expect(c.read(chartLayersProvider).ma, isTrue);
+    expect(c.read(chartLayersProvider).wicks, isTrue);
+    expect(c.read(chartLayersProvider).gaps, isFalse);
+    expect(c.read(chartLayersProvider).zeroVolume, isTrue);
+
     await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await t.sendKeyEvent(LogicalKeyboardKey.digit3);
     await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);

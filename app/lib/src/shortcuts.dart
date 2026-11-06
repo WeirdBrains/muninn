@@ -199,6 +199,15 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
     }
 
     if (_chartShowing) {
+      if (ch == 'M' || (key == LogicalKeyboardKey.keyM && shift)) {
+        showMovingAveragesDialog(context, ref);
+        return KeyEventResult.handled;
+      }
+      if (ch == 'N' || (key == LogicalKeyboardKey.keyN && shift)) {
+        final cur = ref.read(chartLineMetricProvider);
+        ref.read(chartLineMetricProvider.notifier).state = cur.next;
+        return KeyEventResult.handled;
+      }
       if (_toggleLayer(ch, key, shift)) return KeyEventResult.handled;
       if (_zoomOrPan(key, ch, shift)) return KeyEventResult.handled;
     }
@@ -220,8 +229,18 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
       next = (l) => l.copyWith(line: !l.line);
     } else if (ch == 'a' || (key == LogicalKeyboardKey.keyA && !shift)) {
       next = (l) => l.copyWith(area: !l.area);
+    } else if (ch == 'e' || (key == LogicalKeyboardKey.keyE && !shift)) {
+      next = (l) => l.copyWith(envelope: !l.envelope);
     } else if (ch == 'v' || (key == LogicalKeyboardKey.keyV && !shift)) {
       next = (l) => l.copyWith(volume: !l.volume);
+    } else if (ch == 'm' || (key == LogicalKeyboardKey.keyM && !shift)) {
+      next = (l) => l.copyWith(ma: !l.ma);
+    } else if (ch == 'w' || (key == LogicalKeyboardKey.keyW && !shift)) {
+      next = (l) => l.copyWith(wicks: !l.wicks);
+    } else if (ch == 'g' || (key == LogicalKeyboardKey.keyG && !shift)) {
+      next = (l) => l.copyWith(gaps: !l.gaps);
+    } else if (ch == 'z' || (key == LogicalKeyboardKey.keyZ && !shift)) {
+      next = (l) => l.copyWith(zeroVolume: !l.zeroVolume);
     } else if (ch == '#' ||
         key == LogicalKeyboardKey.numberSign ||
         (key == LogicalKeyboardKey.digit3 && shift)) {

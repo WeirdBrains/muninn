@@ -72,11 +72,15 @@ Users never need Rust: release builds ship the compiled library.
 - **Chart readout:** hover over the chart (or touch / drag on a phone) to show that bar's
   time, open, high, low, close and volume above it; a guide line marks the bar.
 - **Chart layers:** **View ▸ Chart layers…** (or the layers button next to Chart / List,
-  or `L`) toggles the same kind of layers as the TUI: candles (`c`), OHLC bars (`b`), a
-  close line (`n`), area under the line (`a`), volume (`v`), grid (`#`), crosshair (`x`)
-  and the price (`y`) / time (`t`) axes. Defaults match the TUI (candles, volume, grid,
-  crosshair and both axes on). Moving averages, wick and gap markers and the high/low
-  envelope stay in the TUI (`e`, `m`, `w`, `g`, `z` are unbound here).
+  or `L`) toggles the same layers as the TUI: candles (`c`), OHLC bars (`b`), a line
+  (`n`), area under the line (`a`), high/low envelope (`e`, 20-bar highest high / lowest
+  low), volume (`v`), moving averages (`m`; default `sma20,sma50`, edit with `M` or the
+  sheet), wick markers (`w`, including a ▼ on shooting stars), gap markers (`g`, on by
+  default), zero-volume markers (`z`, a circle where volume is 0), grid (`#`), crosshair
+  (`x`) and the price (`y`) / time (`t`) axes. Defaults match the TUI (candles, volume,
+  gaps, grid, crosshair and both axes on). `N` cycles the line metric (close, typical,
+  median, …) the same way a TUI chart tile does. Themes colour envelope, averages and
+  markers from `context.muninn` (`chart_*`, `warning`).
 - **Projects:** pages for Projects, Journals, Searches and Reports, like the TUI
   Projects window. Pick a project to see the series and other items saved in it.
   **New project** (or Projects ▸ New project…) creates one (`mnnn project create`);
@@ -199,7 +203,9 @@ When the Data chart is showing:
 
 | key | action |
 |-----|--------|
-| `c` `b` `n` `a` `v` `#` `x` `y` `t` | toggle candles, OHLC bars, line, area, volume, grid, crosshair, price axis, time axis |
+| `c` `b` `n` `a` `e` `v` `m` `w` `g` `z` `#` `x` `y` `t` | toggle candles, OHLC bars, line, area, envelope, volume, moving averages, wick markers, gap markers, zero-volume markers, grid, crosshair, price axis, time axis |
+| `N` | cycle the line metric (open → high → low → close → typical → median → ohlc avg → vwap) |
+| `M` | edit moving averages (`sma20, ema50`, period 2..1000) |
 | `+` / `-` | zoom in / out around the centre (inside the loaded bars, same as pinch) |
 | `h` `l`, PgUp PgDn | pan a quarter / a full screen |
 | Home / End, `0` | first bars / latest |
@@ -219,7 +225,7 @@ When the Data chart is showing:
 - **Tiling** (`Ctrl-w` then `v`/`s`/`q`/`h`/`j`/`k`/`l`/… other than `t`): the app is not a tiled workspace, so those keys are unbound. `Ctrl-w t` still changes view.
 - **Ctrl-b** (toggle sidebar): the desktop Data list is always shown; phones use bottom navigation.
 - **Tab** / **Alt-1…9** tile focus: there are no tiles.
-- Chart layer keys **`e` `m` `w` `g` `z`** (envelope, moving averages, wick, gap, zero-volume) stay in the TUI; those layers are not drawn yet.
+- Chart layer keys **`e` `m` `w` `g` `z`** match the TUI (envelope, moving averages, wick, gap, zero-volume). The averages use the loaded bars (including those off-screen when zoomed) the same way the TUI uses warmup history; they do not fetch extra bars beyond `queryBars`.
 - **← →** move the TUI chart crosshair; the app moves it by hover or touch.
 - **`[` `]` `{` `}` `@`** period start/end on a chart tile stay in the TUI (the app uses the global `T` picker).
 - Keys for windows the app does not have yet (`F` live searches, `J` journals, `E` pipelines, `A` authors, `Y` history, and so on) are left unbound — they are not remapped to something else.

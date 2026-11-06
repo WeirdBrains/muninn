@@ -87,7 +87,12 @@ class ChartLayers {
     this.ohlc = false,
     this.line = false,
     this.area = false,
+    this.envelope = false,
     this.volume = true,
+    this.ma = false,
+    this.wicks = false,
+    this.gaps = true,
+    this.zeroVolume = false,
     this.grid = true,
     this.crosshair = true,
     this.priceAxis = true,
@@ -97,7 +102,12 @@ class ChartLayers {
       ohlc,
       line,
       area,
+      envelope,
       volume,
+      ma,
+      wicks,
+      gaps,
+      zeroVolume,
       grid,
       crosshair,
       priceAxis,
@@ -108,7 +118,12 @@ class ChartLayers {
     bool? ohlc,
     bool? line,
     bool? area,
+    bool? envelope,
     bool? volume,
+    bool? ma,
+    bool? wicks,
+    bool? gaps,
+    bool? zeroVolume,
     bool? grid,
     bool? crosshair,
     bool? priceAxis,
@@ -118,7 +133,12 @@ class ChartLayers {
     ohlc: ohlc ?? this.ohlc,
     line: line ?? this.line,
     area: area ?? this.area,
+    envelope: envelope ?? this.envelope,
     volume: volume ?? this.volume,
+    ma: ma ?? this.ma,
+    wicks: wicks ?? this.wicks,
+    gaps: gaps ?? this.gaps,
+    zeroVolume: zeroVolume ?? this.zeroVolume,
     grid: grid ?? this.grid,
     crosshair: crosshair ?? this.crosshair,
     priceAxis: priceAxis ?? this.priceAxis,
@@ -132,7 +152,12 @@ class ChartLayers {
       other.ohlc == ohlc &&
       other.line == line &&
       other.area == area &&
+      other.envelope == envelope &&
       other.volume == volume &&
+      other.ma == ma &&
+      other.wicks == wicks &&
+      other.gaps == gaps &&
+      other.zeroVolume == zeroVolume &&
       other.grid == grid &&
       other.crosshair == crosshair &&
       other.priceAxis == priceAxis &&
@@ -144,7 +169,12 @@ class ChartLayers {
     ohlc,
     line,
     area,
+    envelope,
     volume,
+    ma,
+    wicks,
+    gaps,
+    zeroVolume,
     grid,
     crosshair,
     priceAxis,
@@ -155,6 +185,96 @@ class ChartLayers {
 final chartLayersProvider = StateProvider<ChartLayers>(
   (ref) => const ChartLayers(),
 );
+
+/// TUI line metric (`N` on a chart tile). VWAP per bar is the typical price.
+enum ChartLineMetric { open, high, low, close, typical, median, ohlcAvg, vwap }
+
+extension ChartLineMetricX on ChartLineMetric {
+  String get label => switch (this) {
+    ChartLineMetric.open => 'open',
+    ChartLineMetric.high => 'high',
+    ChartLineMetric.low => 'low',
+    ChartLineMetric.close => 'close',
+    ChartLineMetric.typical => 'typical',
+    ChartLineMetric.median => 'median',
+    ChartLineMetric.ohlcAvg => 'ohlc avg',
+    ChartLineMetric.vwap => 'vwap',
+  };
+
+  double value(BarPoint b) => switch (this) {
+    ChartLineMetric.open => b.open,
+    ChartLineMetric.high => b.high,
+    ChartLineMetric.low => b.low,
+    ChartLineMetric.close => b.close,
+    ChartLineMetric.typical ||
+    ChartLineMetric.vwap => (b.high + b.low + b.close) / 3,
+    ChartLineMetric.median => (b.high + b.low) / 2,
+    ChartLineMetric.ohlcAvg => (b.open + b.high + b.low + b.close) / 4,
+  };
+
+  ChartLineMetric get next {
+    const all = ChartLineMetric.values;
+    return all[(index + 1) % all.length];
+  }
+}
+
+final chartLineMetricProvider = StateProvider<ChartLineMetric>(
+  (ref) => ChartLineMetric.close,
+);
+
+/// A TUI moving average (`sma20`, `ema50`). Period is 2..1000.
+class ChartMa {
+  const ChartMa({required this.ema, required this.period});
+  final bool ema;
+  final int period;
+  String get label => '${ema ? 'ema' : 'sma'}$period';
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChartMa && other.ema == ema && other.period == period;
+
+  @override
+  int get hashCode => Object.hash(ema, period);
+}
+
+/// TUI default: `sma20,sma50`.
+const defaultChartMas = [
+  ChartMa(ema: false, period: 20),
+  ChartMa(ema: false, period: 50),
+];
+
+final chartMasProvider = StateProvider<List<ChartMa>>((ref) => defaultChartMas);
+
+/// Parse `sma20, ema50` the way the TUI `M` prompt does.
+List<ChartMa> parseChartMas(String s) {
+  final out = <ChartMa>[];
+  for (final raw in s.split(RegExp(r'[,\s]+'))) {
+    final p = raw.trim().toLowerCase();
+    if (p.isEmpty) continue;
+    var ema = false;
+    var n = p;
+    if (p.startsWith('ema')) {
+      ema = true;
+      n = p.substring(3);
+    } else if (p.startsWith('sma')) {
+      n = p.substring(3);
+    }
+    final period = int.tryParse(n);
+    if (period == null) {
+      throw FormatException('bad moving average `$p` (use sma20, ema50)');
+    }
+    if (period < 2 || period > 1000) {
+      throw FormatException('period $period out of range 2..1000');
+    }
+    out.add(ChartMa(ema: ema, period: period));
+  }
+  if (out.isEmpty) {
+    throw const FormatException(
+      'give at least one moving average (sma20, ema50)',
+    );
+  }
+  return out;
+}
 
 /// Visible slice of the already-loaded bars (pinch, wheel, or `+`/`-` / `h`/`l`).
 class ChartViewport {

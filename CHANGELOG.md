@@ -20,6 +20,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: Net start/stop, connect, invites, relays and sharing (`mnnn net`); the node identity stays in Rust
 - Flutter app: Orgs create, edit, remove, join, apply, leave, members, roles, resources and hosting (`mnnn org`); host certificates stay in Rust
 - Flutter app: Project extras — journals, live searches, reports and import/export archives (`mnnn journal` / `search` / `report` / `project import|export|add`); archive bytes stay in Rust
+- Flutter app: Data chart layers for high/low envelope, moving averages (sma/ema), wick, gap and zero-volume markers (`e m w g z`, `M`/`N`), matching the TUI
 
 ## [2.22.0] - 2026-11-05
 
