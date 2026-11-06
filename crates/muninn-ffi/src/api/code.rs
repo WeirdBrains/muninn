@@ -64,6 +64,7 @@ pub struct LivePipeInfo {
     pub updated: i64,
 }
 
+#[derive(Debug)]
 pub struct PipeRunResult {
     pub hops: Vec<String>,
     pub saved: Vec<String>,
@@ -176,11 +177,23 @@ pub fn code_spaces() -> anyhow::Result<Vec<CodeSpaceInfo>> {
 }
 
 /// `mnnn code create` / TUI `n`. [from] is an existing space or built-in parser.
-pub fn code_create(name: String, lang: String, description: String, source: Option<String>, from: Option<String>, input: Option<String>) -> anyhow::Result<CodeSpaceInfo> {
+pub fn code_create(
+    name: String,
+    lang: String,
+    description: String,
+    source: Option<String>,
+    from: Option<String>,
+    input: Option<String>,
+) -> anyhow::Result<CodeSpaceInfo> {
     let store = open_write()?;
     let lang = if lang.trim().is_empty() {
         if let Some(f) = from.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            store.find_code_space(f).map(|c| c.lang).ok().or_else(|| code::parsers::builtin(f).map(|_| Lang::Rust)).ok_or_else(|| anyhow::anyhow!("no code space or built-in `{f}`"))?
+            store
+                .find_code_space(f)
+                .map(|c| c.lang)
+                .ok()
+                .or_else(|| code::parsers::builtin(f).map(|_| Lang::Rust))
+                .ok_or_else(|| anyhow::anyhow!("no code space or built-in `{f}`"))?
         } else {
             return Err(anyhow::anyhow!("pick a language (math, polars, rust, python or plugin)"));
         }
@@ -195,7 +208,14 @@ pub fn code_create(name: String, lang: String, description: String, source: Opti
 }
 
 /// `mnnn code edit` / TUI editor save. A changed source needs approving again.
-pub fn code_edit(space: String, name: Option<String>, description: Option<String>, lang: Option<String>, source: Option<String>, input: Option<String>) -> anyhow::Result<CodeSpaceInfo> {
+pub fn code_edit(
+    space: String,
+    name: Option<String>,
+    description: Option<String>,
+    lang: Option<String>,
+    source: Option<String>,
+    input: Option<String>,
+) -> anyhow::Result<CodeSpaceInfo> {
     let store = open_write()?;
     let c = store.find_code_space(space.trim())?;
     let ch = CodeChange {
@@ -298,11 +318,7 @@ pub fn code_parsers_install(name: Option<String>) -> anyhow::Result<String> {
             continue;
         }
         let (c, new) = code::parsers::install(&store, ORIGIN, b)?;
-        done.push(if new {
-            format!("{} installed (approve it on first run)", c.name)
-        } else {
-            format!("{} already installed", c.name)
-        });
+        done.push(if new { format!("{} installed (approve it on first run)", c.name) } else { format!("{} already installed", c.name) });
     }
     if done.is_empty() {
         return Err(anyhow::anyhow!("no built-in `{}` (see Code ▸ Parsers)", want.unwrap_or_default()));
@@ -329,15 +345,18 @@ fn live_pipes_of(store: &Store) -> anyhow::Result<Vec<LivePipeInfo>> {
         let pos = match list.iter().position(|p| p.token == token) {
             Some(i) => i,
             None => {
-                list.insert(0, LivePipeInfo {
-                    token: token.clone(),
-                    origin: a.origin.clone(),
-                    status: "running".into(),
-                    pipeline: String::new(),
-                    hops: vec![],
-                    saved: vec![],
-                    updated: a.created_at,
-                });
+                list.insert(
+                    0,
+                    LivePipeInfo {
+                        token: token.clone(),
+                        origin: a.origin.clone(),
+                        status: "running".into(),
+                        pipeline: String::new(),
+                        hops: vec![],
+                        saved: vec![],
+                        updated: a.created_at,
+                    },
+                );
                 list.truncate(KEEP_PIPES);
                 0
             }
@@ -347,16 +366,19 @@ fn live_pipes_of(store: &Store) -> anyhow::Result<Vec<LivePipeInfo>> {
         match a.kind.as_str() {
             "pipe.start" => {
                 p.pipeline = a.params["pipeline"].as_str().unwrap_or_default().to_string();
-                p.hops = strs(&a.params, "plan").into_iter().map(|n| LiveHopInfo {
-                    name: n,
-                    status: "waiting".into(),
-                    rows: 0,
-                    ms: 0,
-                    columns: vec![],
-                    error: String::new(),
-                    state: String::new(),
-                    rows_in: 0,
-                }).collect();
+                p.hops = strs(&a.params, "plan")
+                    .into_iter()
+                    .map(|n| LiveHopInfo {
+                        name: n,
+                        status: "waiting".into(),
+                        rows: 0,
+                        ms: 0,
+                        columns: vec![],
+                        error: String::new(),
+                        state: String::new(),
+                        rows_in: 0,
+                    })
+                    .collect();
             }
             "pipe.hop" => {
                 let i = a.params["i"].as_u64().unwrap_or(0) as usize;
@@ -407,26 +429,88 @@ pub fn pipes_live() -> anyhow::Result<Vec<LivePipeInfo>> {
     live_pipes_of(&open()?)
 }
 
-/// `mnnn pipe SOURCE STEP… [--to TARGET]`. Standard input (`-`) stays in the CLI.
-pub fn pipe_run(source: String, steps: Vec<String>, to: Vec<String>) -> anyhow::Result<PipeRunResult> {
-    let store = open_write()?;
-    let src = code::pipe::Source::parse(source.trim())?;
-    if matches!(src, code::pipe::Source::Stdin) {
-        return Err(anyhow::anyhow!("standard input (`-`) stays in the CLI (`mnnn pipe - …`)"));
+fn nonempty(s: Option<String>) -> Option<String> {
+    s.map(|x| x.trim().to_string()).filter(|x| !x.is_empty())
+}
+
+fn stdin_body(stdin: Option<String>, stdin_file: Option<String>) -> anyhow::Result<String> {
+    if let Some(path) = nonempty(stdin_file) {
+        return std::fs::read_to_string(&path).map_err(|e| anyhow::anyhow!("{path}: {e}"));
     }
-    let steps = steps.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).map(code::pipe::Step::parse).collect::<muninn_core::error::Result<Vec<_>>>()?;
-    let to = to.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).map(code::pipe::Sink::parse).collect::<muninn_core::error::Result<Vec<_>>>()?;
-    let mut names: Vec<String> = steps.iter().filter_map(|s| if let code::pipe::Step::Code(n) = s { Some(code::split_options(n).0) } else { None }).collect();
-    if let code::pipe::Source::Code(n) = &src {
+    Ok(stdin.unwrap_or_default())
+}
+
+fn chunk_frames(text: &str, chunk: usize, keep_header: bool) -> Vec<(String, String)> {
+    if chunk == 0 {
+        return vec![("stdin".into(), text.to_string())];
+    }
+    let mut head: Option<String> = None;
+    let mut buf: Vec<String> = vec![];
+    let mut out = Vec::new();
+    let mut n = 0usize;
+    let mut flush = |buf: &mut Vec<String>, head: &Option<String>| {
+        if buf.is_empty() {
+            return;
+        }
+        n += 1;
+        let body = head.iter().cloned().chain(buf.drain(..)).collect::<Vec<_>>().join("\n");
+        out.push((format!("stdin#{n}"), body));
+    };
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if keep_header && head.is_none() && buf.is_empty() {
+            head = Some(line.to_string());
+            continue;
+        }
+        buf.push(line.to_string());
+        if buf.len() >= chunk {
+            flush(&mut buf, &head);
+        }
+    }
+    flush(&mut buf, &head);
+    if out.is_empty() {
+        out.push(("stdin".into(), text.to_string()));
+    }
+    out
+}
+
+fn apply_pipe_format(store: &Store, src: &code::pipe::Source, format: Option<&str>, steps: &mut Vec<code::pipe::Step>) -> anyhow::Result<()> {
+    let Some(f) = format.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(());
+    };
+    if !matches!(src, code::pipe::Source::Stdin) {
+        return Err(anyhow::anyhow!("--format parses standard input: use it with `-`"));
+    }
+    let b = code::parsers::for_format(f).ok_or_else(|| anyhow::anyhow!("--format {f}: csv, json or ndjson (or put your own parser step first)"))?;
+    let (c, _) = code::parsers::install(store, ORIGIN, b)?;
+    steps.insert(0, code::pipe::Step::Code(c.name));
+    Ok(())
+}
+
+fn approve_pipe_spaces(store: &Store, src: &code::pipe::Source, steps: &[code::pipe::Step]) -> anyhow::Result<()> {
+    let mut names: Vec<String> =
+        steps.iter().filter_map(|s| if let code::pipe::Step::Code(n) = s { Some(code::split_options(n).0) } else { None }).collect();
+    if let code::pipe::Source::Code(n) = src {
         names.push(n.clone());
     }
     for n in &names {
         let c = store.find_code_space(n)?;
-        approve_if_needed(&store, &c)?;
+        approve_if_needed(store, &c)?;
     }
-    let env = CodeEnv::for_store(&store)?;
+    Ok(())
+}
+
+fn pipe_result(
+    store: &Store,
+    env: &CodeEnv,
+    src: &code::pipe::Source,
+    steps: &[code::pipe::Step],
+    to: &[code::pipe::Sink],
+) -> anyhow::Result<PipeRunResult> {
     let mut extra = Vec::new();
-    let p = code::pipe::run(&store, &env, ORIGIN, &src, &steps, &to, &mut |l| extra.push(l.to_string()))?;
+    let p = code::pipe::run(store, env, ORIGIN, src, steps, to, &mut |l| extra.push(l.to_string()))?;
     let mut lines = extra;
     for (c, info) in &p.runs {
         if p.runs.len() > 1 {
@@ -446,6 +530,62 @@ pub fn pipe_run(source: String, steps: Vec<String>, to: Vec<String>) -> anyhow::
         lines.extend(code::pipe::markdown(f, 30).lines().map(str::to_string));
     }
     Ok(PipeRunResult { hops: p.hops, saved: p.saved, lines })
+}
+
+fn pipe_run_of(
+    store: &Store,
+    source: &str,
+    steps: &[String],
+    to: &[String],
+    stdin: Option<String>,
+    stdin_file: Option<String>,
+    format: Option<String>,
+    chunk: u32,
+    keep_header: bool,
+) -> anyhow::Result<PipeRunResult> {
+    let src = code::pipe::Source::parse(source.trim())?;
+    let mut steps =
+        steps.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).map(code::pipe::Step::parse).collect::<muninn_core::error::Result<Vec<_>>>()?;
+    apply_pipe_format(store, &src, format.as_deref(), &mut steps)?;
+    let to = to.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).map(code::pipe::Sink::parse).collect::<muninn_core::error::Result<Vec<_>>>()?;
+    approve_pipe_spaces(store, &src, &steps)?;
+    let env = CodeEnv::for_store(store)?;
+    if !matches!(src, code::pipe::Source::Stdin) {
+        return pipe_result(store, &env, &src, &steps, &to);
+    }
+    let text = stdin_body(stdin, stdin_file)?;
+    if text.is_empty() {
+        return Err(anyhow::anyhow!("standard input is empty: paste text or choose a file"));
+    }
+    let keep_header = keep_header || format.as_deref().is_some_and(|f| f.eq_ignore_ascii_case("csv"));
+    let frames = chunk_frames(&text, chunk as usize, keep_header);
+    let mut acc = PipeRunResult { hops: vec![], saved: vec![], lines: vec![] };
+    for (label, body) in &frames {
+        let frame_src = code::pipe::Source::Frame(code::parsers::raw_frame(body, label));
+        let r = pipe_result(store, &env, &frame_src, &steps, &to)?;
+        if frames.len() > 1 {
+            acc.lines.push(format!("-- {label} --"));
+        }
+        acc.lines.extend(r.lines);
+        acc.saved.extend(r.saved);
+        acc.hops = r.hops;
+    }
+    Ok(acc)
+}
+
+/// `mnnn pipe SOURCE STEP… [--to TARGET] [--format csv|json|ndjson] [--chunk N]`.
+/// Source `-` is standard input: paste text or pass a file path (Rust reads the bytes).
+pub fn pipe_run(
+    source: String,
+    steps: Vec<String>,
+    to: Vec<String>,
+    stdin: Option<String>,
+    stdin_file: Option<String>,
+    format: Option<String>,
+    chunk: u32,
+    keep_header: bool,
+) -> anyhow::Result<PipeRunResult> {
+    pipe_run_of(&open_write()?, &source, &steps, &to, stdin, stdin_file, format, chunk, keep_header)
 }
 
 fn node_spec(n: &pl::Node) -> String {
@@ -524,7 +664,9 @@ pub fn pipeline_create(name: String, description: String, nodes: Vec<String>, ed
     let edges: Vec<String> = edges.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
     let g = pl::Graph::parse(&nodes, &edges)?;
     let p = store.create_pipeline(&name, &description, &g)?;
-    store.note_action(&NewAction::new("pipeline.create", ORIGIN, format!("pipeline {} created", p.name)).params(json!({ "pipeline": p.id, "graph": p.graph })));
+    store.note_action(
+        &NewAction::new("pipeline.create", ORIGIN, format!("pipeline {} created", p.name)).params(json!({ "pipeline": p.id, "graph": p.graph })),
+    );
     Ok(pipeline_info(&store, p))
 }
 
@@ -559,7 +701,8 @@ pub fn pipeline_edit(
     let changed = (g != p.graph).then_some(&g);
     let q = store.update_pipeline(&p.id, name.as_deref().map(str::trim).filter(|s| !s.is_empty()), description.as_deref(), changed)?;
     store.note_action(
-        &NewAction::new("pipeline.edit", ORIGIN, format!("pipeline {} edited (v{})", q.name, q.version)).params(json!({ "pipeline": q.id, "graph": q.graph })),
+        &NewAction::new("pipeline.edit", ORIGIN, format!("pipeline {} edited (v{})", q.name, q.version))
+            .params(json!({ "pipeline": q.id, "graph": q.graph })),
     );
     Ok(pipeline_info(&store, q))
 }
@@ -584,20 +727,9 @@ pub fn pipeline_approve(pipeline: String) -> anyhow::Result<String> {
     Ok(muninn_core::tui::designer::approve(&store, ORIGIN, &p)?)
 }
 
-/// `mnnn pipeline run` (no standard input; that stays in the CLI).
-pub fn pipeline_run(pipeline: String) -> anyhow::Result<PipelineRunResult> {
-    let store = open_write()?;
-    let p = store.find_pipeline(pipeline.trim())?;
-    if p.draft {
-        return Err(anyhow::anyhow!("{} is a draft from a peer: approve it before it runs", p.name));
-    }
-    for n in p.graph.code_spaces() {
-        let c = store.find_code_space(&n)?;
-        approve_if_needed(&store, &c)?;
-    }
-    let env = CodeEnv::for_store(&store)?;
+fn pipeline_run_once(store: &Store, env: &CodeEnv, p: &Pipeline, input: Option<serde_json::Value>) -> anyhow::Result<PipelineRunResult> {
     let mut extra = Vec::new();
-    let r = pl::run(&store, &env, ORIGIN, &p, None, &mut |l| extra.push(l.to_string()))?;
+    let r = pl::run(store, env, ORIGIN, p, input, &mut |l| extra.push(l.to_string()))?;
     let mut lines = extra;
     for n in &r.nodes {
         let extra = n.error.clone().unwrap_or_else(|| format!("{} → {} rows, {} ms", n.rows_in, n.rows_out, n.ms));
@@ -608,6 +740,164 @@ pub fn pipeline_run(pipeline: String) -> anyhow::Result<PipelineRunResult> {
     }
     let landed = r.landed.iter().map(|(m, k)| format!("{k} rows → model {m}")).collect();
     Ok(PipelineRunResult { ok: r.ok(), lines, landed })
+}
+
+fn pipeline_run_of(
+    store: &Store,
+    pipeline: &str,
+    stdin: Option<String>,
+    stdin_file: Option<String>,
+    chunk: u32,
+    keep_header: bool,
+) -> anyhow::Result<PipelineRunResult> {
+    let p = store.find_pipeline(pipeline.trim())?;
+    if p.draft {
+        return Err(anyhow::anyhow!("{} is a draft from a peer: approve it before it runs", p.name));
+    }
+    for n in p.graph.code_spaces() {
+        let c = store.find_code_space(&n)?;
+        approve_if_needed(store, &c)?;
+    }
+    let env = CodeEnv::for_store(store)?;
+    let wants_stdin = p.graph.nodes.iter().any(|n| matches!(&n.kind, pl::NodeKind::Source { source } if source == "-"));
+    let text = stdin_body(stdin, stdin_file)?;
+    if !wants_stdin {
+        return pipeline_run_once(store, &env, &p, None);
+    }
+    if text.is_empty() {
+        return Err(anyhow::anyhow!("{} reads standard input (`-`): paste text or choose a file", p.name));
+    }
+    let frames = chunk_frames(&text, chunk as usize, keep_header);
+    let mut acc = PipelineRunResult { ok: true, lines: vec![], landed: vec![] };
+    for (label, body) in &frames {
+        let r = pipeline_run_once(store, &env, &p, Some(code::parsers::raw_frame(body, label)))?;
+        if frames.len() > 1 {
+            acc.lines.push(format!("-- {label} --"));
+        }
+        acc.lines.extend(r.lines);
+        acc.landed.extend(r.landed);
+        acc.ok = acc.ok && r.ok;
+    }
+    Ok(acc)
+}
+
+/// `mnnn pipeline run` (optional standard input when a source node is `-`).
+pub fn pipeline_run(
+    pipeline: String,
+    stdin: Option<String>,
+    stdin_file: Option<String>,
+    chunk: u32,
+    keep_header: bool,
+) -> anyhow::Result<PipelineRunResult> {
+    pipeline_run_of(&open_write()?, &pipeline, stdin, stdin_file, chunk, keep_header)
+}
+
+/// TUI designer `t`: also save this node's output to `journal:NAME` or `model:NAME`.
+pub fn pipeline_tee(pipeline: String, node: String, sink: String) -> anyhow::Result<PipelineInfo> {
+    pipeline_tee_of(&open_write()?, &pipeline, &node, &sink)
+}
+
+fn pipeline_tee_of(store: &Store, pipeline: &str, node: &str, sink: &str) -> anyhow::Result<PipelineInfo> {
+    let p = store.find_pipeline(pipeline.trim())?;
+    let sink = sink.trim();
+    code::pipe::Sink::parse(sink)?;
+    let node = node.trim();
+    let mut g = p.graph.clone();
+    let n = g.nodes.iter_mut().find(|n| n.id == node).ok_or_else(|| anyhow::anyhow!("no node `{node}` in {}", p.name))?;
+    n.tees.push(sink.to_string());
+    let q = store.update_pipeline(&p.id, None, None, Some(&g))?;
+    store.note_action(
+        &NewAction::new("pipeline.edit", ORIGIN, format!("pipeline {} also saves {} to {sink}", q.name, node))
+            .params(json!({ "pipeline": q.id, "graph": q.graph })),
+    );
+    Ok(pipeline_info(store, q))
+}
+
+/// TUI designer `M`: end the node's branch in a model table, making the model when it is new.
+pub fn pipeline_end_in_model(pipeline: String, node: String, model: String) -> anyhow::Result<PipelineInfo> {
+    pipeline_end_in_model_of(&open_write()?, &pipeline, &node, &model)
+}
+
+fn pipeline_end_in_model_of(store: &Store, pipeline: &str, node: &str, model: &str) -> anyhow::Result<PipelineInfo> {
+    let p = store.find_pipeline(pipeline.trim())?;
+    let model = model.trim();
+    if model.is_empty() {
+        return Err(anyhow::anyhow!("a model name"));
+    }
+    let node = node.trim();
+    let n = p.graph.node(node).ok_or_else(|| anyhow::anyhow!("no node `{node}` in {}", p.name))?.clone();
+    if store.find_model(model).is_err() {
+        store.create_model(model, &format!("rows of pipeline {}", p.name), muninn_core::store::Design::default(), true)?;
+    }
+    let mut id = format!("{}_out", n.id);
+    while p.graph.node(&id).is_some() {
+        id.push('_');
+    }
+    let mut g = p.graph.clone();
+    g.add_node(&format!("{}={}", id, pl::NodeKind::Sink { model: model.to_string() }.text()))?;
+    g.add_edges(&format!("{}>{id}", n.id))?;
+    let q = store.update_pipeline(&p.id, None, None, Some(&g))?;
+    store.note_action(
+        &NewAction::new("pipeline.edit", ORIGIN, format!("pipeline {} ends {} in model {model}", q.name, node))
+            .params(json!({ "pipeline": q.id, "graph": q.graph })),
+    );
+    Ok(pipeline_info(store, q))
+}
+
+pub struct PipelineMonitorNode {
+    pub id: String,
+    pub kind: String,
+    pub status: String,
+    pub rows_in: i64,
+    pub rows_out: i64,
+    pub ms: i64,
+}
+
+pub struct PipelineMonitor {
+    pub pipeline: String,
+    pub state: String,
+    pub nodes: Vec<PipelineMonitorNode>,
+    pub landed: Vec<String>,
+}
+
+/// TUI monitor tile: each node's status, rows and what landed in the latest run.
+pub fn pipeline_monitor(pipeline: String) -> anyhow::Result<PipelineMonitor> {
+    pipeline_monitor_of(&open()?, &pipeline)
+}
+
+fn pipeline_monitor_of(store: &Store, pipeline: &str) -> anyhow::Result<PipelineMonitor> {
+    let p = store.find_pipeline(pipeline.trim())?;
+    let list = live_pipes_of(store)?;
+    let run = list.iter().find(|r| r.pipeline == p.name);
+    let order = p.graph.order().unwrap_or_else(|_| p.graph.nodes.iter().map(|n| n.id.clone()).collect());
+    let mut first_open = true;
+    let mut nodes = Vec::new();
+    for id in order {
+        let Some(n) = p.graph.node(&id) else { continue };
+        let mut s = PipelineMonitorNode { id: n.id.clone(), kind: n.kind.text(), status: "idle".into(), rows_in: 0, rows_out: 0, ms: 0 };
+        if let Some(r) = run {
+            match r.hops.iter().find(|h| h.name.starts_with(&format!("{} (", n.id)) && h.status != "waiting") {
+                Some(h) => {
+                    s.status = if h.state.is_empty() { h.status.clone() } else { h.state.clone() };
+                    s.rows_in = h.rows_in;
+                    s.rows_out = h.rows;
+                    s.ms = h.ms;
+                }
+                None if r.status == "running" && first_open => {
+                    s.status = "running".into();
+                    first_open = false;
+                }
+                None => {}
+            }
+        }
+        nodes.push(s);
+    }
+    Ok(PipelineMonitor {
+        pipeline: p.name,
+        state: run.map(|r| r.status.clone()).unwrap_or_else(|| "not run yet".into()),
+        nodes,
+        landed: run.map(|r| r.saved.clone()).unwrap_or_default(),
+    })
 }
 
 /// `mnnn pipeline export`. Bytes stay in Rust; Dart passes the path.
@@ -651,7 +941,8 @@ mod tests {
     fn code_create_edit_remove_without_running() {
         let s = Store::open_in_memory().unwrap();
         assert!(code_spaces_of(&s).unwrap().is_empty());
-        let c = code::create(&s, "test", "mean", "avg close", Lang::Math, code::template(Lang::Math), muninn_core::store::CodeInput::default()).unwrap();
+        let c =
+            code::create(&s, "test", "mean", "avg close", Lang::Math, code::template(Lang::Math), muninn_core::store::CodeInput::default()).unwrap();
         let list = code_spaces_of(&s).unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].name, "mean");
@@ -668,7 +959,11 @@ mod tests {
     fn pipeline_create_list_remove_without_running() {
         let s = Store::open_in_memory().unwrap();
         assert!(pipelines_of(&s).unwrap().is_empty());
-        let g = pl::Graph::parse(&["src=source:coinbase".into(), "bars=code:to-bars".into(), "out=model:bars".into()], &["src>bars".into(), "bars>out".into()]).unwrap();
+        let g = pl::Graph::parse(
+            &["src=source:coinbase".into(), "bars=code:to-bars".into(), "out=model:bars".into()],
+            &["src>bars".into(), "bars>out".into()],
+        )
+        .unwrap();
         let p = s.create_pipeline("bars-from-ingest", "raw data to bars", &g).unwrap();
         let list = pipelines_of(&s).unwrap();
         assert_eq!(list.len(), 1);
@@ -685,6 +980,58 @@ mod tests {
         let s = Store::open_in_memory().unwrap();
         assert!(live_pipes_of(&s).unwrap().is_empty());
         assert!(code::parsers::BUILTINS.iter().any(|b| b.name == "parse-csv" || b.name.contains("csv") || b.name.contains("to-bars")));
+    }
+
+    fn with_code_home() -> std::path::PathBuf {
+        let home = std::env::temp_dir().join(format!("muninn-ffi-code-home-{}", std::process::id()));
+        std::fs::create_dir_all(&home).unwrap();
+        muninn_core::code::set_home(&home);
+        home
+    }
+
+    #[test]
+    fn pipe_stdin_is_a_raw_text_frame_and_format_needs_stdin() {
+        let _home = with_code_home();
+        let s = Store::open_in_memory().unwrap();
+        let r = pipe_run_of(&s, "-", &[], &[], Some("hello\nworld".into()), None, None, 0, false).unwrap();
+        let text = r.lines.join("\n");
+        assert!(text.contains("hello") && text.contains("world"), "{text}");
+        let err = pipe_run_of(&s, "source:coinbase", &[], &[], None, None, Some("csv".into()), 0, false).unwrap_err().to_string();
+        assert!(err.contains("--format"), "{err}");
+        let err = pipe_run_of(&s, "-", &[], &[], Some("".into()), None, None, 0, false).unwrap_err().to_string();
+        assert!(err.contains("empty"), "{err}");
+    }
+
+    #[test]
+    fn pipe_chunk_and_stdin_file_match_cli() {
+        let _home = with_code_home();
+        let s = Store::open_in_memory().unwrap();
+        let r = pipe_run_of(&s, "-", &[], &[], Some("a\nb\nc\nd".into()), None, None, 2, false).unwrap();
+        let text = r.lines.join("\n");
+        assert!(text.contains("stdin#1") && text.contains("stdin#2"), "{text}");
+        let dir = std::env::temp_dir();
+        let path = dir.join("muninn-pipe-stdin-test.txt");
+        std::fs::write(&path, "from-file\n").unwrap();
+        let r = pipe_run_of(&s, "-", &[], &[], None, Some(path.to_string_lossy().into()), None, 0, false).unwrap();
+        let text = r.lines.join("\n");
+        assert!(text.contains("from-file"), "{text}");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn pipeline_tee_end_in_model_and_monitor() {
+        let s = Store::open_in_memory().unwrap();
+        let g = pl::Graph::parse(&["src=source:coinbase".into(), "bars=code:to-bars".into()], &["src>bars".into()]).unwrap();
+        let p = s.create_pipeline("feed", "ticks", &g).unwrap();
+        let t = pipeline_tee_of(&s, &p.id, "src", "journal:Raw").unwrap();
+        assert!(t.node_specs.iter().any(|n| n.contains("journal:Raw")), "{:?}", t.node_specs);
+        let e = pipeline_end_in_model_of(&s, &p.id, "bars", "ticks").unwrap();
+        assert!(e.node_specs.iter().any(|n| n.contains("model:ticks")), "{:?}", e.node_specs);
+        assert!(e.edge_specs.iter().any(|x| x.contains("bars>")), "{:?}", e.edge_specs);
+        assert!(s.find_model("ticks").is_ok());
+        let m = pipeline_monitor_of(&s, &p.id).unwrap();
+        assert_eq!(m.state, "not run yet");
+        assert!(m.nodes.iter().any(|n| n.id == "src" && n.status == "idle"));
     }
 
     #[test]

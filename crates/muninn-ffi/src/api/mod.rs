@@ -2,20 +2,22 @@
 //! Thin wrappers over `muninn-core`; no logic beyond shaping data for Dart.
 pub mod about;
 pub mod code;
+pub mod collab;
 pub mod data;
 pub mod help;
 pub mod info;
 pub mod io;
 pub mod journals;
 pub mod keys;
+pub mod mcp;
 pub mod net;
+pub mod notify;
 pub mod orgs;
 pub mod prefs;
-pub mod reports;
-pub mod rules;
-pub mod reviews;
-pub mod notify;
 pub mod projects;
+pub mod reports;
+pub mod reviews;
+pub mod rules;
 pub mod searches;
 pub mod themes;
 
