@@ -113,15 +113,17 @@ Users never need Rust: release builds ship the compiled library.
   create (optionally in a project), rename, change format, fork and delete journals,
   and write, edit or remove entries plus journal-level notes (`mnnn journal`).
   **Highlights** mark selected words of an entry (optional comment; TUI `m` /
-  `mnnn journal highlight`). **Notes on words** attach a note to an entry or a
+  `mnnn journal highlight`); the entry view has a TUI-style word cursor so you
+  can tap (and shift-tap) words to prefill the highlight. **Notes on words** attach a note to an entry or a
   span (`mnnn journal note --entry`). **Images** attach from a file path (Rust
   reads the bytes) and save an attached image to a path (`mnnn journal attach` /
-  `image`); Dart never sees the bytes. **Copy** adds selected entries (with their
+  `image`); the entry view shows a downscaled PNG thumbnail, and Dart never sees
+  the original bytes. **Copy** adds selected entries (with their
   notes, highlights and images) to another journal or a new one (`mnnn journal
   copy`). **Export** writes PDF, Word, HTML, LaTeX, text or JSON to a path
   (`mnnn journal export`); **Import journal** reads a JSON export (`mnnn journal
   import`); **Print** saves a PDF and can send it to `lp`/`lpr` (`mnnn journal
-  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (`mnnn search save|edit`, TUI `w`), apply a series search to Data (TUI Enter), and rename, fork or delete it (`mnnn search fork|remove`). Shift+F opens Live searches, matching the TUI's `F`. Applying a journals or records search opens a found-views list (TUI Enter on those targets); a series search still applies to Data. **Reports** create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI `v` / `mnnn report preview`) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI `E` / `mnnn report export`). File bytes stay in Rust. **Code spaces** list, create
+  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (`mnnn search save|edit`, TUI `w`), apply a series search to Data (TUI Enter), and rename, fork or delete it (`mnnn search fork|remove`). Shift+F opens Live searches, matching the TUI's `F`. Applying a journals or records search opens a found-views list (TUI Enter on those targets); a series search still applies to Data. Found records show the model and a brief, but tapping one does not open a model or record pane — the app has no model viewer yet. **Reports** create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI `v` / `mnnn report preview`) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI `E` / `mnnn report export`). File bytes stay in Rust. **Code spaces** list, create
   (from a language template, another space or a built-in parser), edit source and
   input, approve, check, build, run and remove (`mnnn code` / TUI Code, `C`).
   Built-in parsers can be listed and installed (`mnnn code parsers --install`).
@@ -139,8 +141,8 @@ Users never need Rust: release builds ship the compiled library.
   bytes stay in Rust. Tee… (TUI `t`) saves a selected node's output to
   `journal:NAME` or `model:NAME` as it flows on; End in model… (TUI `M`) ends a
   branch in a model table, making the model when it is new; Monitor… shows the
-  same per-node status, rows and landed data as a TUI `monitor:PIPELINE` tile.
-  Embedding that monitor as a workspace tile stays with tiling extras. **Rules** list, create, edit, enable or disable, test,
+  same per-node status, rows and landed data as a TUI `monitor:PIPELINE` tile
+  in the Data workspace (shared layout key `monitor:PIPELINE`). **Rules** list, create, edit, enable or disable, test,
   dry-run, tick due scheduled rules, list event kinds and remove (`mnnn rule` /
   TUI Rules, `R`). **Reviews** list yours and ones you joined, request a review,
   show the thread and the thing under review, comment, suggest, highlight, vote,
@@ -340,8 +342,8 @@ When the Data chart is showing:
 - **Tiling** follows the TUI's i3-style binary tree on a wide window (width ≥ 720).
   `Ctrl-w` is a prefix (the same as the TUI): it is not registered as `Ctrl+V` /
   `Ctrl+S` / `Ctrl+Q`, so paste, save and quit stay with the platform. Minimum tile
-  size is 200×96 pixels (a stand-in for the TUI's 20×6 cells). Chart / list tiles
-  only — the app has no terminal tiles, code-result tiles or pipeline-monitor tiles.
+  size is 200×96 pixels (a stand-in for the TUI's 20×6 cells). Chart, list and pipeline-monitor (`monitor:PIPELINE`) tiles
+  — the app has no terminal tiles or code-result tiles.
   The live layout is session-only (not written to `[tui.layout]`). A fresh session is one
   chart tile so existing Data behaviour stays; the TUI starts with a list tile.
   Chart layers and the visible window are stored on each tile (like the TUI). Linking records

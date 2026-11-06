@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_entry_note_of`, `add_entry_of`, `add_highlight_of`, `add_journal_note_of`, `annotation_info`, `attach_image_of`, `copy_entries_of`, `create_journal_of`, `entries_of`, `entry_annotations_of`, `entry_images_of`, `entry_info`, `export_journal_of`, `fmt`, `fork_journal_of`, `image_info`, `import_journal_of`, `journal_info`, `journal_notes_of`, `journals_of`, `kind_label`, `note`, `parse_fmt`, `print_journal_of`, `remove_annotation_of`, `remove_entry_of`, `remove_journal_of`, `resolve_span`, `save_image_of`, `update_annotation_of`, `update_entry_of`, `update_journal_of`
+// These functions are ignored because they are not marked as `pub`: `add_entry_note_of`, `add_entry_of`, `add_highlight_of`, `add_journal_note_of`, `annotation_info`, `attach_image_of`, `copy_entries_of`, `create_journal_of`, `entries_of`, `entry_annotations_of`, `entry_images_of`, `entry_info`, `export_journal_of`, `fmt`, `fork_journal_of`, `image_data`, `image_info`, `import_journal_of`, `journal_image_thumbnail_of`, `journal_info`, `journal_notes_of`, `journals_of`, `kind_label`, `note`, `parse_fmt`, `print_journal_of`, `remove_annotation_of`, `remove_entry_of`, `remove_journal_of`, `resolve_span`, `save_image_of`, `shrink_preview`, `update_annotation_of`, `update_entry_of`, `update_journal_of`
 
 /// `mnnn journal list`.
 Future<List<JournalInfo>> journals() =>
@@ -157,6 +157,13 @@ Future<JournalImageInfo> attachJournalImage({
 /// Write an attached image to a file (`mnnn journal image`). Bytes never return to Dart.
 Future<String> saveJournalImage({required String id, required String out}) =>
     RustLib.instance.api.crateApiJournalsSaveJournalImage(id: id, out: out);
+
+/// A downscaled PNG preview of an attached image. The original bytes stay in the store.
+Future<Uint8List> journalImageThumbnail({required String id, int? maxPx}) =>
+    RustLib.instance.api.crateApiJournalsJournalImageThumbnail(
+      id: id,
+      maxPx: maxPx,
+    );
 
 /// Copy entries (with notes, highlights and images) to another journal (`mnnn journal copy`).
 Future<List<EntryInfo>> copyJournalEntries({

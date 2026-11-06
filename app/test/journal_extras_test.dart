@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muninn/src/app.dart';
 import 'package:muninn/src/state.dart';
+import 'package:muninn/src/views/journal_extras.dart';
 
 import 'fake_api.dart';
 
@@ -69,7 +70,34 @@ void main() {
     expect(find.byKey(const ValueKey('entry-attach-e1')), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-copy-e1')), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-note-words-e1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-word-e1-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-word-e1-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-word-e1-3')), findsOneWidget);
     expect(find.textContaining('Coming to the app'), findsNothing);
+  });
+
+  test('journalWords splits on whitespace like the TUI', () {
+    expect(journalWords('the quick brown fox'), [
+      (0, 3),
+      (4, 9),
+      (10, 15),
+      (16, 19),
+    ]);
+    expect(journalSlice('the quick brown fox', 4, 15), 'quick brown');
+  });
+
+  testWidgets('tapping a word prefills the Highlight dialog', (t) async {
+    final (api, _) = await openNotes(t);
+    await t.tap(find.byKey(const ValueKey('entry-word-e1-1')));
+    await t.pumpAndSettle();
+    await press(t, find.byKey(const ValueKey('entry-highlight-e1')));
+    expect(
+      t.widget<TextField>(find.byKey(const ValueKey('journal-hl-words'))).controller?.text,
+      'quick',
+    );
+    await t.tap(find.byKey(const ValueKey('journal-hl-save')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('highlight:e1:quick'));
   });
 
   testWidgets('Highlight records selected words, not a placeholder', (t) async {
@@ -122,6 +150,8 @@ void main() {
     await t.pumpAndSettle();
     expect(api.extraCalls, contains('attach:e1:/tmp/dot.png'));
     expect(find.text('dot.png'), findsOneWidget);
+    expect(find.byKey(const ValueKey('image-thumb-img1')), findsOneWidget);
+    expect(api.extraCalls, contains('image-thumb:img1'));
   });
 
   testWidgets('Import journal from the pane', (t) async {

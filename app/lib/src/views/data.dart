@@ -14,6 +14,7 @@ import '../time_range.dart';
 import '../workspace.dart';
 import '../tiling_extras.dart';
 import 'chart.dart';
+import 'project_compute.dart';
 import 'unlock.dart';
 
 class DataView extends ConsumerWidget {
@@ -221,8 +222,7 @@ class _ContainerBar extends ConsumerWidget {
     final m = context.muninn;
     final titles = [split.a, split.b].map((n) {
       final t = n.tiles().first;
-      final view = t.asChart ? 'chart' : 'list';
-      return ('$view ${t.datasetKey ?? ''}'.trim(), t.id);
+      return (t.label, t.id);
     }).toList();
     final stacked = split.mode == ContainerMode.stacked;
     return Material(
@@ -293,7 +293,7 @@ class _TileChrome extends ConsumerWidget {
     final m = context.muninn;
     final ws = ref.watch(workspaceProvider);
     final focused = ws.focus == tile.id && !ws.sidebarFocused;
-    final view = tile.asChart ? 'chart' : 'list';
+    final view = tile.label;
     final link = tile.link == null ? '' : ' ⛓${tile.link}';
     return GestureDetector(
       onTap: () => setWorkspace(ref, ws.focusTile(tile.id)),
@@ -337,6 +337,9 @@ class SeriesPanel extends ConsumerWidget {
     final m = context.muninn;
     final ws = ref.watch(workspaceProvider);
     final tile = tileId == null ? null : ws.tile(tileId!);
+    if (tile != null && tile.isMonitor) {
+      return PipelineMonitorPane(pipeline: tile.monitorPipeline!);
+    }
     final key = tile?.datasetKey ?? ref.watch(selectedDatasetProvider);
     final bool asChart = tile?.asChart ?? ref.watch(dataAsChartProvider);
     final o = ref.watch(overviewProvider).value;

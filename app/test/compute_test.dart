@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:muninn/src/api.dart';
 import 'package:muninn/src/app.dart';
 import 'package:muninn/src/state.dart';
+import 'package:muninn/src/workspace.dart';
 
 import 'fake_api.dart';
 
@@ -163,7 +164,7 @@ void main() {
   testWidgets('Pipeline tee, end-in-model and monitor match the TUI canvas', (
     t,
   ) async {
-    final (api, _) = await pump(t);
+    final (api, c) = await pump(t);
     api.pipelineList = const [
       PipelineInfo(
         id: 'p1',
@@ -210,6 +211,11 @@ void main() {
     await t.tap(find.text('Monitor…'));
     await t.pumpAndSettle();
     expect(api.extraCalls, contains('pipeline-monitor:p1'));
+    expect(c.read(sectionProvider), Section.data);
+    expect(
+      c.read(workspaceProvider).tiles.any((t) => t.frameKey == 'monitor:p1'),
+      isTrue,
+    );
     expect(find.textContaining('Monitor · feed'), findsOneWidget);
     expect(find.byKey(const ValueKey('pipeline-monitor-src')), findsOneWidget);
   });

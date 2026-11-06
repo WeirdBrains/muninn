@@ -617,6 +617,10 @@ class FfiMuninnApi implements MuninnApi {
       r_journals.saveJournalImage(id: id, out: out);
 
   @override
+  Future<Uint8List> journalImageThumbnail(String id, {int? maxPx}) =>
+      r_journals.journalImageThumbnail(id: id, maxPx: maxPx);
+
+  @override
   Future<List<JournalEntryInfo>> copyJournalEntries(
     List<String> entries, {
     String? to,

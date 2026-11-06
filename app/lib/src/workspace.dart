@@ -41,6 +41,7 @@ class WsTile {
     this.layers = const ChartLayers(),
     this.viewport = const ChartViewport(),
     this.listCursorTs,
+    this.frameKey,
   });
   final int id;
   final bool asChart;
@@ -49,26 +50,44 @@ class WsTile {
   final ChartLayers layers;
   final ChartViewport viewport;
   final int? listCursorTs;
+  /// `monitor:PIPELINE`, shared with the TUI's `FrameTile.key`.
+  final String? frameKey;
+
+  bool get isMonitor =>
+      frameKey != null && frameKey!.startsWith('monitor:') && frameKey!.length > 8;
+
+  String? get monitorPipeline =>
+      isMonitor ? frameKey!.substring('monitor:'.length) : null;
+
+  String get label {
+    if (isMonitor) return 'monitor · $monitorPipeline';
+    final view = asChart ? 'chart' : 'list';
+    return '$view ${datasetKey ?? ''}'.trim();
+  }
 
   WsTile copyWith({
     bool? asChart,
     String? datasetKey,
     int? link,
     bool clearLink = false,
+    bool clearDataset = false,
     ChartLayers? layers,
     ChartViewport? viewport,
     int? listCursorTs,
     bool clearListCursor = false,
+    String? frameKey,
+    bool clearFrame = false,
   }) => WsTile(
     id: id,
     asChart: asChart ?? this.asChart,
-    datasetKey: datasetKey ?? this.datasetKey,
+    datasetKey: clearDataset ? datasetKey : (datasetKey ?? this.datasetKey),
     link: clearLink ? link : (link ?? this.link),
     layers: layers ?? this.layers,
     viewport: viewport ?? this.viewport,
     listCursorTs: clearListCursor
         ? listCursorTs
         : (listCursorTs ?? this.listCursorTs),
+    frameKey: clearFrame ? frameKey : (frameKey ?? this.frameKey),
   );
 }
 
@@ -175,6 +194,26 @@ class Workspace {
 
   Workspace updateTile(int id, WsTile Function(WsTile) f) =>
       _copy(root: root.mapTiles((t) => t.id == id ? f(t) : t));
+
+  /// Open or focus a pipeline monitor tile (`monitor:PIPELINE`), like the TUI's `m`.
+  Workspace openMonitor(String pipeline, Size area) {
+    final key = 'monitor:$pipeline';
+    for (final t in tiles) {
+      if (t.frameKey == key) return focusTile(t.id);
+    }
+    var ws = this;
+    final blank = focused.datasetKey == null && focused.frameKey == null;
+    if (!blank) {
+      var op = split(SplitDir.horizontal, area);
+      if (op.error != null) op = split(SplitDir.vertical, area);
+      if (op.error != null) return this;
+      ws = op.workspace;
+    }
+    return ws.updateTile(
+      ws.focus,
+      (t) => t.copyWith(frameKey: key, clearDataset: true, datasetKey: null),
+    );
+  }
 
   String encode() => jsonEncode(toJson());
 
@@ -733,6 +772,14 @@ class Workspace {
   }
 }
 
+String? _frameKey(dynamic v) {
+  if (v is Map) {
+    final key = v['key'];
+    if (key is String && key.trim().isNotEmpty) return key;
+  }
+  return null;
+}
+
 int _asInt(dynamic v, [int d = 0]) {
   if (v is int) return v;
   if (v is num) return v.toInt();
@@ -753,6 +800,8 @@ Map<String, dynamic> _nodeToJson(WsNode n) {
         'asChart': tile.asChart,
         if (tile.datasetKey != null) 'datasetKey': tile.datasetKey,
         if (tile.link != null) 'link': tile.link,
+        if (tile.frameKey != null)
+          'frame': {'key': tile.frameKey, 'table': false, 'columns': <String>[]},
         'layers': tile.layers.toJson(),
         'viewportScale': tile.viewport.scale,
         'viewportStart': tile.viewport.start,
@@ -801,6 +850,7 @@ WsNode _nodeFromJson(dynamic v) {
       asChart: j['asChart'] != false,
       datasetKey: j['datasetKey'] as String?,
       link: j['link'] == null ? null : _asInt(j['link']),
+      frameKey: _frameKey(j['frame']),
       layers: ChartLayers.fromJson(
         layers is Map<String, dynamic>
             ? layers

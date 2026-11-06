@@ -1,10 +1,12 @@
 /// Journal leftovers: word-span highlights, images, copy entries, document
 /// export/import and print (`mnnn journal highlight|attach|copy|export|import|print`).
-/// Themes via [context.muninn]. Image bytes stay in Rust; Dart only passes paths.
+/// Themes via [context.muninn]. Image bytes stay in Rust; Dart only passes paths
+/// and receives a downscaled PNG preview for the entry view.
 library;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api.dart';
@@ -78,11 +80,12 @@ Future<void> showJournalPrintDialog(
 Future<void> showJournalHighlightDialog(
   BuildContext context,
   WidgetRef ref,
-  JournalEntryInfo entry,
-) async {
+  JournalEntryInfo entry, {
+  String? words,
+}) async {
   final created = await showDialog<JournalAnnotationInfo>(
     context: context,
-    builder: (ctx) => _HighlightDialog(entry: entry),
+    builder: (ctx) => _HighlightDialog(entry: entry, initialWords: words ?? ''),
   );
   if (created == null) {
     return;
@@ -135,13 +138,48 @@ Future<void> showJournalCopyDialog(
   refreshProjectExtras(ref);
 }
 
+/// Character spans of the words (runs of non-space), matching the TUI's `journals::words`.
+List<(int, int)> journalWords(String body) {
+  final v = <(int, int)>[];
+  int? start;
+  var i = 0;
+  for (final r in body.runes) {
+    final space = String.fromCharCodes([r]).trim().isEmpty;
+    if (!space && start == null) {
+      start = i;
+    } else if (space && start != null) {
+      v.add((start, i));
+      start = null;
+    }
+    i++;
+  }
+  if (start != null) v.add((start, i));
+  return v;
+}
+
+String journalSlice(String body, int start, int end) {
+  final rs = body.runes.toList();
+  if (start < 0) start = 0;
+  if (end > rs.length) end = rs.length;
+  if (start >= end) return '';
+  return String.fromCharCodes(rs.sublist(start, end));
+}
+
 /// Highlight, attach, copy and word-notes for one entry, plus its marks and images.
-class JournalEntryExtras extends ConsumerWidget {
+class JournalEntryExtras extends ConsumerStatefulWidget {
   const JournalEntryExtras(this.entry, {super.key});
   final JournalEntryInfo entry;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<JournalEntryExtras> createState() => _JournalEntryExtrasState();
+}
+
+class _JournalEntryExtrasState extends ConsumerState<JournalEntryExtras> {
+  String selectedWords = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final entry = widget.entry;
     final m = context.muninn;
     final api = ref.watch(apiProvider);
     return Padding(
@@ -149,14 +187,23 @@ class JournalEntryExtras extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (entry.body.isNotEmpty)
+            JournalWordPane(
+              entry: entry,
+              onSelection: (w) => setState(() => selectedWords = w),
+            ),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
               OutlinedButton(
                 key: ValueKey('entry-highlight-${entry.id}'),
-                onPressed: () =>
-                    showJournalHighlightDialog(context, ref, entry),
+                onPressed: () => showJournalHighlightDialog(
+                  context,
+                  ref,
+                  entry,
+                  words: selectedWords,
+                ),
                 child: const Text('Highlight'),
               ),
               OutlinedButton(
@@ -248,7 +295,7 @@ class JournalEntryExtras extends ConsumerWidget {
                     ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.image_outlined, color: m.accent),
+                      leading: _ImageThumb(image: img),
                       title: Text(img.name),
                       subtitle: Text(
                         '${img.mime} · ${img.size} bytes',
@@ -291,16 +338,158 @@ class JournalEntryExtras extends ConsumerWidget {
   }
 }
 
-class _HighlightDialog extends ConsumerStatefulWidget {
-  const _HighlightDialog({required this.entry});
+class JournalWordPane extends ConsumerStatefulWidget {
+  const JournalWordPane({
+    super.key,
+    required this.entry,
+    required this.onSelection,
+  });
   final JournalEntryInfo entry;
+  final ValueChanged<String> onSelection;
+
+  @override
+  ConsumerState<JournalWordPane> createState() => _JournalWordPaneState();
+}
+
+class _JournalWordPaneState extends ConsumerState<JournalWordPane> {
+  int cursor = 0;
+  int? anchor;
+
+  List<(int, int)> get _spans => journalWords(widget.entry.body);
+
+  String _selection() {
+    final w = _spans;
+    if (w.isEmpty) return '';
+    final c = cursor.clamp(0, w.length - 1);
+    final a = (anchor ?? c).clamp(0, w.length - 1);
+    final lo = a < c ? a : c;
+    final hi = a < c ? c : a;
+    return journalSlice(widget.entry.body, w[lo].$1, w[hi].$2);
+  }
+
+  void _tap(int i) {
+    setState(() {
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        anchor ??= cursor;
+        cursor = i;
+      } else {
+        cursor = i;
+        anchor = null;
+      }
+    });
+    widget.onSelection(_selection());
+  }
+
+  bool _marked(int start, int end, List<JournalAnnotationInfo> anns) {
+    for (final a in anns) {
+      if (a.start != null && a.end != null) {
+        if (start < a.end! && end > a.start!) return true;
+        continue;
+      }
+      final q = a.quote;
+      if (q == null || q.isEmpty) continue;
+      final i = widget.entry.body.indexOf(q);
+      if (i >= 0 && start < i + q.length && end > i) return true;
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    final w = _spans;
+    if (w.isEmpty) return const SizedBox.shrink();
+    final anns =
+        ref.watch(apiProvider).entryAnnotations(widget.entry.id);
+    return FutureBuilder<List<JournalAnnotationInfo>>(
+      future: anns,
+      builder: (ctx, snap) {
+        final marks = snap.data ?? const <JournalAnnotationInfo>[];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (var i = 0; i < w.length; i++)
+                GestureDetector(
+                  onTap: () => _tap(i),
+                  child: Container(
+                    key: ValueKey('entry-word-${widget.entry.id}-$i'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: () {
+                        final lo = (anchor ?? cursor).clamp(0, w.length - 1);
+                        final hi = cursor.clamp(0, w.length - 1);
+                        final a = lo < hi ? lo : hi;
+                        final b = lo < hi ? hi : lo;
+                        if (i >= a && i <= b && (anchor != null || i == cursor)) {
+                          return m.selectionBg;
+                        }
+                        if (_marked(w[i].$1, w[i].$2, marks)) {
+                          return m.warning.withValues(alpha: 0.35);
+                        }
+                        return null;
+                      }(),
+                      border: i == cursor
+                          ? Border(bottom: BorderSide(color: m.accent, width: 2))
+                          : null,
+                    ),
+                    child: Text(
+                      journalSlice(widget.entry.body, w[i].$1, w[i].$2),
+                      style: TextStyle(
+                        color: i == cursor ? m.selectionFg : m.fg,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ImageThumb extends ConsumerWidget {
+  const _ImageThumb({required this.image});
+  final JournalImageInfo image;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final m = context.muninn;
+    return SizedBox(
+      key: ValueKey('image-thumb-${image.id}'),
+      width: 48,
+      height: 48,
+      child: FutureBuilder<Uint8List>(
+        future: ref.read(apiProvider).journalImageThumbnail(image.id),
+        builder: (ctx, snap) {
+          final bytes = snap.data;
+          if (bytes != null && bytes.isNotEmpty) {
+            return Image.memory(bytes, fit: BoxFit.cover);
+          }
+          return Icon(Icons.image_outlined, color: m.accent);
+        },
+      ),
+    );
+  }
+}
+
+class _HighlightDialog extends ConsumerStatefulWidget {
+  const _HighlightDialog({required this.entry, this.initialWords = ''});
+  final JournalEntryInfo entry;
+  final String initialWords;
 
   @override
   ConsumerState<_HighlightDialog> createState() => _HighlightDialogState();
 }
 
 class _HighlightDialogState extends ConsumerState<_HighlightDialog> {
-  final words = TextEditingController();
+  late final words = TextEditingController(text: widget.initialWords);
   final comment = TextEditingController();
   bool running = false;
   String? error;

@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
+import '../workspace.dart';
 
 void _ok(BuildContext context, String msg, {Color? color}) {
   ScaffoldMessenger.of(context)
@@ -881,7 +882,7 @@ class PipelinesPane extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 Text(
-                  "Pipelines are saved graphs: ingest data through code spaces and into models. Nodes are ID=KIND (src=source:coinbase, bars=code:to-bars, out=model:bars); edges are FROM>TO. Tee… saves a node along the way (journal:NAME or model:NAME); End in model… is the TUI's M; Monitor… shows each node's status from the latest run. After ingest stores raw files, bars come from a pipeline.",
+                  "Pipelines are saved graphs: ingest data through code spaces and into models. Nodes are ID=KIND (src=source:coinbase, bars=code:to-bars, out=model:bars); edges are FROM>TO. Tee… saves a node along the way (journal:NAME or model:NAME); End in model… is the TUI's M; Monitor… opens a Data workspace tile with each node's status from the latest run (the TUI's monitor:PIPELINE tile). After ingest stores raw files, bars come from a pipeline.",
                   style: TextStyle(color: m.muted),
                 ),
                 const SizedBox(height: 12),
@@ -1029,7 +1030,7 @@ Future<void> _pipelineAction(
         }
       case 'monitor':
         if (context.mounted) {
-          await showPipelineMonitorDialog(context, ref, p);
+          openPipelineMonitorTile(ref, p);
         }
       case 'approve':
         final msg = await ref.read(apiProvider).pipelineApprove(p.id);
@@ -1391,60 +1392,65 @@ Future<void> showPipelineEndInModelDialog(
   }
 }
 
-Future<void> showPipelineMonitorDialog(
-  BuildContext context,
-  WidgetRef ref,
-  PipelineInfo p,
-) async {
-  try {
-    final mon = await ref.read(apiProvider).pipelineMonitor(p.id);
-    if (!context.mounted) return;
+/// Open a workspace tile for a pipeline monitor (TUI `m` / `monitor:PIPELINE`).
+void openPipelineMonitorTile(WidgetRef ref, PipelineInfo p) {
+  ref.read(sectionProvider.notifier).state = Section.data;
+  final area = ref.read(workspaceAreaProvider);
+  setWorkspace(ref, ref.read(workspaceProvider).openMonitor(p.id, area));
+}
+
+/// The TUI monitor tile: each node's status, rows and rate from the latest run.
+class PipelineMonitorPane extends ConsumerWidget {
+  const PipelineMonitorPane({super.key, required this.pipeline});
+  final String pipeline;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final m = context.muninn;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: m.bg,
-        title: Text(
-          'Monitor · ${mon.pipeline}',
-          style: TextStyle(color: m.header),
-        ),
-        content: SizedBox(
-          width: 520,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "The TUI monitor tile: each node's status, rows in/out and rate from the latest run (${mon.state}). Embedding this as a workspace tile stays with tiling extras.",
-                  style: TextStyle(color: m.muted),
+    return FutureBuilder<PipelineMonitor>(
+      future: ref.read(apiProvider).pipelineMonitor(pipeline),
+      builder: (ctx, snap) {
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text('${snap.error}', style: TextStyle(color: m.error)),
+          );
+        }
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final mon = snap.data!;
+        return Padding(
+          padding: const EdgeInsets.all(12),
+          child: ListView(
+            children: [
+              Text(
+                'Monitor · ${mon.pipeline}',
+                style: TextStyle(
+                  color: m.header,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
                 ),
-                const SizedBox(height: 8),
-                for (final n in mon.nodes)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      '${n.id}  ${n.kind}  ${n.status}  in ${n.rowsIn}  out ${n.rowsOut}  ${n.ms} ms',
-                      key: ValueKey('pipeline-monitor-${n.id}'),
-                      style: TextStyle(fontFamily: 'monospace', color: m.fg),
-                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(mon.state, style: TextStyle(color: m.muted)),
+              const SizedBox(height: 8),
+              for (final n in mon.nodes)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    '${n.id}  ${n.kind}  ${n.status}  in ${n.rowsIn}  out ${n.rowsOut}  ${n.ms} ms',
+                    key: ValueKey('pipeline-monitor-${n.id}'),
+                    style: TextStyle(fontFamily: 'monospace', color: m.fg),
                   ),
-                for (final s in mon.landed)
-                  Text('landed $s', style: TextStyle(color: m.accent)),
-              ],
-            ),
+                ),
+              for (final line in mon.landed)
+                Text('landed $line', style: TextStyle(color: m.accent)),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+        );
+      },
     );
-  } catch (e) {
-    if (context.mounted) _ok(context, '$e', color: context.muninn.error);
   }
 }
 

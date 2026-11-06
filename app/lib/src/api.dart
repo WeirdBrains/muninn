@@ -1,6 +1,8 @@
 /// What the UI needs from Muninn. [FfiMuninnApi] calls Rust (muninn-ffi); tests use a fake.
 library;
 
+import 'dart:typed_data';
+
 class MuninnTheme {
   const MuninnTheme({
     required this.name,
@@ -1667,6 +1669,9 @@ abstract class MuninnApi {
     String? name,
   });
   Future<String> saveJournalImage(String id, String out);
+  /// Downscaled PNG preview. Empty when the attachment is not a decodable
+  /// image. Original bytes stay in Rust.
+  Future<Uint8List> journalImageThumbnail(String id, {int? maxPx});
   Future<List<JournalEntryInfo>> copyJournalEntries(
     List<String> entries, {
     String? to,

@@ -7,9 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `app_to_tile`, `dir_name`, `horizontal`, `key_to_series`, `layers_from_json`, `layers_to_json`, `load`, `mode_name`, `node_from_json`, `node_to_json`, `parse_dir`, `parse_mode`, `save`, `scale_to_zoom`, `series_to_key`, `tile_to_app`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AppLayout`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`
+// These functions are ignored because they are not marked as `pub`: `app_to_tile`, `dir_name`, `frame_from_json`, `frame_to_json`, `key_to_series`, `layers_from_json`, `layers_to_json`, `load`, `mode_name`, `node_from_json`, `node_to_json`, `parse_dir`, `parse_mode`, `save`, `scale_to_zoom`, `series_to_key`, `tile_to_app`
 
 /// Names of saved layouts, sorted like the TUI picker.
 Future<List<String>> savedLayouts({String? home}) =>

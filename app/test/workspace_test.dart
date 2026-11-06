@@ -179,6 +179,18 @@ void main() {
     expect(loaded.linkedTo(1).single.id, 2);
   });
 
+  test('named-layout JSON round-trips a pipeline monitor frame', () {
+    final ws = Workspace.single().openMonitor('feed', area);
+    expect(ws.focused.frameKey, 'monitor:feed');
+    expect(ws.focused.isMonitor, isTrue);
+    expect(ws.focused.monitorPipeline, 'feed');
+    expect(ws.encode(), contains('monitor:feed'));
+    final loaded = Workspace.decode(ws.encode());
+    expect(loaded.focused.frameKey, 'monitor:feed');
+    expect(loaded.focused.isMonitor, isTrue);
+    expect(loaded.focused.datasetKey, isNull);
+  });
+
   testWidgets(
     'Ctrl-w v splits; Tab and Alt-2 move focus; Ctrl-b hides the sidebar',
     (t) async {

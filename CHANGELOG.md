@@ -29,10 +29,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: live-search refine/overwrite with sidebar filters and apply-to-Data (Shift+F), plus report records sections and PDF/preview export (`mnnn search` / `mnnn report`); file bytes stay in Rust
 - Flutter app: Data tiling workspace, sidebar toggle and multi-tile focus matching the TUI (`Ctrl-w` besides `t`, `Ctrl-b`, Tab, Alt-1…9); layout is session-only and themes stay shared
 - Flutter app: Net exchange export/restore (password-sealed; secrets stay in Rust), broadcast to `org:SLUG`, network search `--only` a subset of peers, and giving a code space to an owned organization
-- Flutter app: pipe standard input (`-`) with `--format`, `--chunk` and `--keep-header`; pipeline tee, end-in-model and a monitor matching the TUI designer (workspace monitor tiles stay with tiling extras)
+- Flutter app: pipe standard input (`-`) with `--format`, `--chunk` and `--keep-header`; pipeline tee, end-in-model and a monitor matching the TUI designer
 - Flutter app: Net ▸ MCP… (list servers/clients, tools and approvals; tokens stay in Rust) and Peers, messages & live (TUI `W`: stored messages and sessions; sending and joining stay in the TUI)
 - Flutter app: Orgs rest — templates, domains, certificates/ACME, browse, fetch/give/mirror, sync-code, endpoints, org projects, code serve and member sign-in (`mnnn org`); certificate PEM and private keys stay in Rust
 - Flutter app: tiling extras — named layouts (`[tui.layouts]`, shared with the TUI), the history bar (`Y` / `u` / `U`), File ▸ Authors… (`A`), per-tile chart layers and viewport, linked list↔chart pan, and found-views when applying a journals or records search
+- Flutter app: pipeline monitor as a Data workspace tile (`monitor:PIPELINE`, shared with the TUI)
+- Flutter app: journal word-cursor highlighting and image thumbnails (downscaled PNG preview; original bytes stay in Rust)
 
 ## [2.22.0] - 2026-11-05
 
