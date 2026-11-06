@@ -270,4 +270,113 @@ void main() {
     expect(api.netCalls, contains('broadcast:nodes:hello:world'));
     expect(find.textContaining('sent to 0 node(s)'), findsOneWidget);
   });
+
+  testWidgets('Broadcast can target org:SLUG', (t) async {
+    final (api, _) = await pump(t);
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Broadcast…'));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('net-broadcast-topic')),
+      'hello',
+    );
+    await t.enterText(
+      find.byKey(const ValueKey('net-broadcast-text')),
+      'world',
+    );
+    await t.enterText(find.byKey(const ValueKey('net-broadcast-org')), 'lab');
+    await t.tap(find.byKey(const ValueKey('net-broadcast-confirm')));
+    await t.pumpAndSettle();
+    expect(api.netCalls, contains('broadcast:org:lab:hello:world'));
+  });
+
+  testWidgets('Network search --only a subset of peers', (t) async {
+    final (api, _) = await pump(t);
+    api.searchList = [
+      const SearchInfo(
+        id: 's1',
+        shortId: 's1short',
+        name: 'wide',
+        query: 'BTC',
+      ),
+    ];
+    api.exchanges = const [
+      NetExchangeInfo(id: 'ex1', shortId: 'ex1s', title: 'ben', active: true),
+    ];
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Network search…'));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('net-search-only-ex1')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('net-search-run')));
+    await t.pumpAndSettle();
+    expect(api.netCalls, contains('search:wide:all:only=ex1'));
+  });
+
+  testWidgets('Export exchanges writes a sealed backup', (t) async {
+    final (api, _) = await pump(t);
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Nodes…'));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('net-exchange-export')));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('net-exchange-export-out')),
+      '/tmp/muninn-exchanges.age',
+    );
+    await t.enterText(
+      find.byKey(const ValueKey('net-exchange-export-password')),
+      'pw',
+    );
+    await t.tap(find.byKey(const ValueKey('net-exchange-export-confirm')));
+    await t.pumpAndSettle();
+    expect(api.netCalls, contains('exchange-export:/tmp/muninn-exchanges.age'));
+    expect(
+      find.textContaining('wrote /tmp/muninn-exchanges.age'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Restore exchanges asks before replacing the node identity', (
+    t,
+  ) async {
+    final (api, _) = await pump(t);
+    api.exchangePeek = const NetExchangeBackupPeek(
+      peerId: '12D3KooWPeer',
+      exchanges: 1,
+      identityReplaced: true,
+    );
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Restore exchanges…'));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('net-exchange-restore-file')),
+      '/tmp/muninn-exchanges.age',
+    );
+    await t.enterText(
+      find.byKey(const ValueKey('net-exchange-restore-password')),
+      'pw',
+    );
+    await t.tap(find.byKey(const ValueKey('net-exchange-restore-confirm')));
+    await t.pumpAndSettle();
+    expect(
+      api.netCalls,
+      contains('exchange-restore-peek:/tmp/muninn-exchanges.age'),
+    );
+    expect(find.text('Replace node identity'), findsOneWidget);
+    await t.tap(find.text('Confirm'));
+    await t.pumpAndSettle();
+    expect(
+      api.netCalls,
+      contains('exchange-restore:/tmp/muninn-exchanges.age:true'),
+    );
+  });
 }

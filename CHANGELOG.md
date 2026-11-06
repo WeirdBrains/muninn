@@ -28,6 +28,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: journal extras — word-span highlights, notes on words, images (path-only), copy entries, document export/import and print (`mnnn journal`); image bytes stay in Rust
 - Flutter app: live-search refine/overwrite with sidebar filters and apply-to-Data (Shift+F), plus report records sections and PDF/preview export (`mnnn search` / `mnnn report`); file bytes stay in Rust
 - Flutter app: Data tiling workspace, sidebar toggle and multi-tile focus matching the TUI (`Ctrl-w` besides `t`, `Ctrl-b`, Tab, Alt-1…9); layout is session-only and themes stay shared
+- Flutter app: Net exchange export/restore (password-sealed; secrets stay in Rust), broadcast to `org:SLUG`, network search `--only` a subset of peers, and giving a code space to an owned organization
 - Flutter app: Orgs rest — templates, domains, certificates/ACME, browse, fetch/give/mirror, sync-code, endpoints, org projects, code serve and member sign-in (`mnnn org`); certificate PEM and private keys stay in Rust
 
 ## [2.22.0] - 2026-11-05

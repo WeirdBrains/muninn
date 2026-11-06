@@ -349,6 +349,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NetEntrustedInfo dco_decode_net_entrusted_info(dynamic raw);
 
   @protected
+  NetExchangeBackupPeek dco_decode_net_exchange_backup_peek(dynamic raw);
+
+  @protected
   NetExchangeInfo dco_decode_net_exchange_info(dynamic raw);
 
   @protected
@@ -966,6 +969,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   NetEntrustedInfo sse_decode_net_entrusted_info(SseDeserializer deserializer);
+
+  @protected
+  NetExchangeBackupPeek sse_decode_net_exchange_backup_peek(
+    SseDeserializer deserializer,
+  );
 
   @protected
   NetExchangeInfo sse_decode_net_exchange_info(SseDeserializer deserializer);
@@ -1737,6 +1745,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_net_entrusted_info(
     NetEntrustedInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_net_exchange_backup_peek(
+    NetExchangeBackupPeek self,
     SseSerializer serializer,
   );
 

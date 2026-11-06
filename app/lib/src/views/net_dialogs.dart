@@ -658,9 +658,16 @@ Future<void> showNetBroadcastDialog(BuildContext context, WidgetRef ref) async {
   if (!ref.read(unlockedProvider)) {
     return;
   }
+  List<OrgInfo> orgs = const [];
+  try {
+    orgs = (await ref.read(orgOverviewProvider.future))?.mine ?? const [];
+  } catch (_) {}
+  if (!context.mounted) {
+    return;
+  }
   final result = await showDialog<(String, String, String)>(
     context: context,
-    builder: (ctx) => const _BroadcastDialog(),
+    builder: (ctx) => _BroadcastDialog(orgs: orgs),
   );
   if (result == null || !context.mounted) {
     return;
@@ -674,7 +681,8 @@ Future<void> showNetBroadcastDialog(BuildContext context, WidgetRef ref) async {
 }
 
 class _BroadcastDialog extends StatefulWidget {
-  const _BroadcastDialog();
+  const _BroadcastDialog({this.orgs = const []});
+  final List<OrgInfo> orgs;
   @override
   State<_BroadcastDialog> createState() => _BroadcastDialogState();
 }
@@ -682,12 +690,14 @@ class _BroadcastDialog extends StatefulWidget {
 class _BroadcastDialogState extends State<_BroadcastDialog> {
   final _topic = TextEditingController();
   final _text = TextEditingController();
+  final _orgSlug = TextEditingController();
   String _to = 'nodes';
 
   @override
   void dispose() {
     _topic.dispose();
     _text.dispose();
+    _orgSlug.dispose();
     super.dispose();
   }
 
@@ -720,16 +730,29 @@ class _BroadcastDialogState extends State<_BroadcastDialog> {
             DropdownButtonFormField<String>(
               key: const ValueKey('net-broadcast-to'),
               initialValue: _to,
-              items: const [
-                DropdownMenuItem(value: 'nodes', child: Text('nodes')),
-                DropdownMenuItem(
+              items: [
+                const DropdownMenuItem(value: 'nodes', child: Text('nodes')),
+                const DropdownMenuItem(
                   value: 'connections',
                   child: Text('connections'),
                 ),
-                DropdownMenuItem(value: 'all', child: Text('all')),
+                const DropdownMenuItem(value: 'all', child: Text('all')),
+                for (final o in widget.orgs)
+                  DropdownMenuItem(
+                    value: 'org:${o.slug}',
+                    child: Text('${o.name} (org:${o.slug})'),
+                  ),
               ],
               onChanged: (v) => setState(() => _to = v ?? 'nodes'),
               decoration: const InputDecoration(labelText: 'To'),
+            ),
+            TextField(
+              key: const ValueKey('net-broadcast-org'),
+              controller: _orgSlug,
+              decoration: const InputDecoration(
+                labelText: 'Or org slug (org:SLUG)',
+                hintText: 'lab',
+              ),
             ),
           ],
         ),
@@ -741,11 +764,13 @@ class _BroadcastDialogState extends State<_BroadcastDialog> {
         ),
         FilledButton(
           key: const ValueKey('net-broadcast-confirm'),
-          onPressed: () => Navigator.pop(context, (
-            _topic.text.trim(),
-            _text.text.trim(),
-            _to,
-          )),
+          onPressed: () {
+            final slug = _orgSlug.text.trim();
+            final to = slug.isEmpty
+                ? _to
+                : (slug.startsWith('org:') ? slug : 'org:$slug');
+            Navigator.pop(context, (_topic.text.trim(), _text.text.trim(), to));
+          },
           child: const Text('Send'),
         ),
       ],
@@ -831,8 +856,7 @@ class _EntrustDialogState extends ConsumerState<_EntrustDialog> {
   Widget build(BuildContext context) {
     final m = context.muninn;
     final xs =
-        ref.watch(netExchangesProvider).value ??
-        const <NetExchangeInfo>[];
+        ref.watch(netExchangesProvider).value ?? const <NetExchangeInfo>[];
     final active = [
       for (final x in xs)
         if (x.active) x,
@@ -997,4 +1021,248 @@ Future<void> showNetShardCheckDialog(
     return;
   }
   await _after(context, ref, ref.read(apiProvider).netShardCheck(pw));
+}
+
+class _ExchangeBackupFields {
+  const _ExchangeBackupFields({required this.path, required this.password});
+  final String path;
+  final String password;
+}
+
+Future<void> showNetExchangeExportDialog(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  ref.read(sectionProvider.notifier).state = Section.net;
+  ref.read(netPaneProvider.notifier).state = NetPane.exchanges;
+  if (!ref.read(unlockedProvider)) {
+    return;
+  }
+  final result = await showDialog<_ExchangeBackupFields>(
+    context: context,
+    builder: (ctx) => const _ExchangeExportDialog(),
+  );
+  if (result == null || !context.mounted) {
+    return;
+  }
+  await _after(
+    context,
+    ref,
+    ref
+        .read(apiProvider)
+        .netExchangeExport(out: result.path, password: result.password),
+  );
+}
+
+class _ExchangeExportDialog extends StatefulWidget {
+  const _ExchangeExportDialog();
+  @override
+  State<_ExchangeExportDialog> createState() => _ExchangeExportDialogState();
+}
+
+class _ExchangeExportDialogState extends State<_ExchangeExportDialog> {
+  final _out = TextEditingController();
+  final _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _out.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    return AlertDialog(
+      backgroundColor: m.bg,
+      title: Text('Export exchanges', style: TextStyle(color: m.header)),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Writes the node identity, exchange keys and known peers to an age-encrypted file. The password seals the file; bytes never enter Dart.',
+              style: TextStyle(color: m.muted),
+            ),
+            TextField(
+              key: const ValueKey('net-exchange-export-out'),
+              controller: _out,
+              decoration: const InputDecoration(
+                labelText: 'Output file',
+                hintText: 'muninn-exchanges.age',
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () async {
+                  final path = await FilePicker.platform.saveFile(
+                    fileName: 'muninn-exchanges.age',
+                  );
+                  if (path != null) {
+                    _out.text = path;
+                  }
+                },
+                child: const Text('Choose file…'),
+              ),
+            ),
+            TextField(
+              key: const ValueKey('net-exchange-export-password'),
+              controller: _password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Export password'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('net-exchange-export-confirm'),
+          onPressed: () => Navigator.pop(
+            context,
+            _ExchangeBackupFields(
+              path: _out.text.trim(),
+              password: _password.text,
+            ),
+          ),
+          child: const Text('Export'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> showNetExchangeRestoreDialog(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  ref.read(sectionProvider.notifier).state = Section.net;
+  ref.read(netPaneProvider.notifier).state = NetPane.exchanges;
+  if (!ref.read(unlockedProvider)) {
+    return;
+  }
+  final result = await showDialog<_ExchangeBackupFields>(
+    context: context,
+    builder: (ctx) => const _ExchangeRestoreDialog(),
+  );
+  if (result == null || !context.mounted) {
+    return;
+  }
+  try {
+    final api = ref.read(apiProvider);
+    final peek = await api.netExchangeRestorePeek(
+      file: result.path,
+      password: result.password,
+    );
+    var confirm = !peek.identityReplaced;
+    if (peek.identityReplaced && context.mounted) {
+      confirm = await confirmNet(
+        context,
+        'Replace node identity',
+        "This database's node identity becomes ${peek.peerId} (from the backup). Exchanges made with the current identity stop working. Continue?",
+      );
+    }
+    if (!confirm || !context.mounted) {
+      return;
+    }
+    await _after(
+      context,
+      ref,
+      api.netExchangeRestore(
+        file: result.path,
+        password: result.password,
+        confirmReplace: peek.identityReplaced,
+      ),
+    );
+  } catch (e) {
+    if (context.mounted) {
+      _snack(context, '$e', error: true);
+    }
+  }
+}
+
+class _ExchangeRestoreDialog extends StatefulWidget {
+  const _ExchangeRestoreDialog();
+  @override
+  State<_ExchangeRestoreDialog> createState() => _ExchangeRestoreDialogState();
+}
+
+class _ExchangeRestoreDialogState extends State<_ExchangeRestoreDialog> {
+  final _file = TextEditingController();
+  final _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _file.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    return AlertDialog(
+      backgroundColor: m.bg,
+      title: Text('Restore exchanges', style: TextStyle(color: m.header)),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Restores the node identity and key exchanges from a password-sealed backup. Decrypts in Rust; keys never enter Dart. If this database already has a different identity, you will be asked to confirm.',
+              style: TextStyle(color: m.muted),
+            ),
+            TextField(
+              key: const ValueKey('net-exchange-restore-file'),
+              controller: _file,
+              decoration: const InputDecoration(labelText: 'Backup file'),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () async {
+                  final r = await FilePicker.platform.pickFiles();
+                  final path = r?.files.single.path;
+                  if (path != null) {
+                    _file.text = path;
+                  }
+                },
+                child: const Text('Choose file…'),
+              ),
+            ),
+            TextField(
+              key: const ValueKey('net-exchange-restore-password'),
+              controller: _password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Export password'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('net-exchange-restore-confirm'),
+          onPressed: () => Navigator.pop(
+            context,
+            _ExchangeBackupFields(
+              path: _file.text.trim(),
+              password: _password.text,
+            ),
+          ),
+          child: const Text('Restore'),
+        ),
+      ],
+    );
+  }
 }

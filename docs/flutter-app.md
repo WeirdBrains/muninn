@@ -125,8 +125,10 @@ Users never need Rust: release builds ship the compiled library.
   (from a language template, another space or a built-in parser), edit source and
   input, approve, check, build, run and remove (`mnnn code` / TUI Code, `C`).
   Built-in parsers can be listed and installed (`mnnn code parsers --install`).
-  Giving a space to an organization, piping a prior step into it (`>`), result
-  tiles and writing the plugin SDK stay in the TUI or CLI. **Pipes** show live
+  **Give to org…** (the TUI Code window `g`) assigns a space to an organization
+  you own (`mnnn org resource add`); members pull it with Sync code. Piping a
+  prior step into a space (`>`), result tiles and writing the plugin SDK stay
+  in the TUI or CLI. **Pipes** show live
   and recent runs from history (the TUI Pipes window) and run a pipe
   (`mnnn pipe SOURCE STEP… [--to TARGET]`). Standard input (`-`) and chunked
   streaming stay in the CLI. **Pipelines** list, create and edit a graph (nodes
@@ -159,13 +161,14 @@ Users never need Rust: release builds ship the compiled library.
   user keys leave Rust), key exchanges (`mnnn net exchange` / TUI Nodes: list,
   verify, label, revoke, list what a peer shares and fetch it — import or write a
   path; bytes stay in Rust), network search (run a saved live search here and on
-  peers), broadcast (`mnnn net broadcast`), and dark shards (list entrusted and held,
+  peers, optionally `--only` a subset of exchanges), broadcast (`mnnn net broadcast`,
+  including `org:SLUG`), export or restore a password-sealed exchange backup
+  (`mnnn net exchange export|restore`; bytes and keys stay in Rust), and dark shards (list entrusted and held,
   entrust from a key file, check that gathered shards restore this database's key,
   drop a held shard). The node identity, exchange offer/answer tokens, shard blobs
   and the master key stay in Rust. Short codes and fingerprints are meant to be read
   aloud, as in the TUI. On a phone the node uses the same platform-secure app sandbox
-  the store already uses. Exporting or restoring a password-sealed exchange
-  (`mnnn net exchange export|restore`), creating or accepting a raw exchange token
+  the store already uses. Creating or accepting a raw exchange token
   (the hidden CLI; the TUI and app use invite links instead), and restoring a key
   from shards or a backup when this database cannot open (`mnnn net shard` /
   `mnnn keys recover`) stay in the CLI.

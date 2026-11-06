@@ -566,6 +566,14 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
             ref.read(netPaneProvider.notifier).state = NetPane.exchanges;
             go(Section.net);
           }),
+          item(
+            'Export exchanges…',
+            () => showNetExchangeExportDialog(context, ref),
+          ),
+          item(
+            'Restore exchanges…',
+            () => showNetExchangeRestoreDialog(context, ref),
+          ),
           item('Peers…', () {
             ref.read(netPaneProvider.notifier).state = NetPane.peers;
             go(Section.net);

@@ -2559,7 +2559,10 @@ class FakeApi implements MuninnApi {
     bool remoteOnly = false,
     int limit = 200,
   }) async {
-    netCalls.add('search:$saved:${remoteOnly ? "remote" : "all"}');
+    netCalls.add(
+      'search:$saved:${remoteOnly ? "remote" : "all"}'
+      '${only.isEmpty ? '' : ':only=${only.join(",")}'}',
+    );
     return List.of(searchHits);
   }
 
@@ -2571,6 +2574,51 @@ class FakeApi implements MuninnApi {
   }) async {
     netCalls.add('broadcast:$to:$topic:$text');
     return 'sent to 0 node(s)';
+  }
+
+  NetExchangeBackupPeek exchangePeek = const NetExchangeBackupPeek(
+    peerId: '12D3KooWPeer',
+    exchanges: 1,
+  );
+
+  @override
+  Future<String> netExchangeExport({
+    required String out,
+    required String password,
+  }) async {
+    if (password.isEmpty) {
+      throw 'export password must not be empty';
+    }
+    netCalls.add('exchange-export:$out');
+    return 'wrote $out (0 exchange(s), age-encrypted)';
+  }
+
+  @override
+  Future<NetExchangeBackupPeek> netExchangeRestorePeek({
+    required String file,
+    required String password,
+  }) async {
+    if (password.isEmpty) {
+      throw 'export password must not be empty';
+    }
+    netCalls.add('exchange-restore-peek:$file');
+    return exchangePeek;
+  }
+
+  @override
+  Future<String> netExchangeRestore({
+    required String file,
+    required String password,
+    bool confirmReplace = false,
+  }) async {
+    if (password.isEmpty) {
+      throw 'export password must not be empty';
+    }
+    if (exchangePeek.identityReplaced && !confirmReplace) {
+      throw "this database's node identity would become ${exchangePeek.peerId}; confirm to continue";
+    }
+    netCalls.add('exchange-restore:$file:$confirmReplace');
+    return 'restored ${exchangePeek.exchanges} key exchange(s) for node ${exchangePeek.peerId}';
   }
 
   OrgOverview orgs = const OrgOverview(

@@ -1895,6 +1895,41 @@ class FfiMuninnApi implements MuninnApi {
   }) => r_net.netBroadcast(home: home, topic: topic, text: text, to: to);
 
   @override
+  Future<String> netExchangeExport({
+    required String out,
+    required String password,
+  }) => r_net.netExchangeExport(home: home, out: out, password: password);
+
+  @override
+  Future<NetExchangeBackupPeek> netExchangeRestorePeek({
+    required String file,
+    required String password,
+  }) async {
+    final p = await r_net.netExchangeRestorePeek(
+      home: home,
+      file: file,
+      password: password,
+    );
+    return NetExchangeBackupPeek(
+      peerId: p.peerId,
+      exchanges: p.exchanges,
+      identityReplaced: p.identityReplaced,
+    );
+  }
+
+  @override
+  Future<String> netExchangeRestore({
+    required String file,
+    required String password,
+    bool confirmReplace = false,
+  }) => r_net.netExchangeRestore(
+    home: home,
+    file: file,
+    password: password,
+    confirmReplace: confirmReplace,
+  );
+
+  @override
   Future<OrgOverview> orgOverview() async =>
       _orgOverview(await r_orgs.orgOverview());
 

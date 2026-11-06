@@ -1134,17 +1134,33 @@ class _ExchangesPane extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 Text(
-                  'Key exchanges (Nodes). Invite tokens stay in Rust. Short codes are meant to be read aloud. Export or restore a sealed exchange with the CLI (`mnnn net exchange export|restore`).',
+                  'Key exchanges (Nodes). Invite tokens stay in Rust. Short codes are meant to be read aloud. Export or restore writes an age-encrypted backup; keys stay in Rust.',
                   style: TextStyle(color: m.muted),
                 ),
                 const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton.icon(
-                    onPressed: () => showNetInviteOrConnectDialog(context, ref),
-                    icon: const Icon(Icons.link),
-                    label: const Text('Invite or connect…'),
-                  ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () =>
+                          showNetInviteOrConnectDialog(context, ref),
+                      icon: const Icon(Icons.link),
+                      label: const Text('Invite or connect…'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('net-exchange-export'),
+                      onPressed: () =>
+                          showNetExchangeExportDialog(context, ref),
+                      child: const Text('Export…'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('net-exchange-restore'),
+                      onPressed: () =>
+                          showNetExchangeRestoreDialog(context, ref),
+                      child: const Text('Restore…'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 if (all.isEmpty)
@@ -1235,6 +1251,7 @@ class _SearchPane extends ConsumerStatefulWidget {
 class _SearchPaneState extends ConsumerState<_SearchPane> {
   String? _saved;
   bool _remoteOnly = false;
+  final Set<String> _only = <String>{};
   List<NetSearchOrigin>? _hits;
   bool _busy = false;
 
@@ -1247,7 +1264,7 @@ class _SearchPaneState extends ConsumerState<_SearchPane> {
     try {
       final hits = await ref
           .read(apiProvider)
-          .netSearch(name, remoteOnly: _remoteOnly);
+          .netSearch(name, remoteOnly: _remoteOnly, only: _only.toList());
       if (mounted) {
         setState(() {
           _hits = hits;
@@ -1298,6 +1315,47 @@ class _SearchPaneState extends ConsumerState<_SearchPane> {
           title: const Text('Peers only (skip the local search)'),
           value: _remoteOnly,
           onChanged: (v) => setState(() => _remoteOnly = v ?? false),
+        ),
+        Builder(
+          builder: (context) {
+            final exchanges =
+                ref.watch(netExchangesProvider).value ??
+                const <NetExchangeInfo>[];
+            if (exchanges.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Only these exchanges (--only)',
+                  style: TextStyle(color: context.muninn.muted),
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final x in exchanges)
+                      FilterChip(
+                        key: ValueKey('net-search-only-${x.id}'),
+                        label: Text(x.title.isEmpty ? x.shortId : x.title),
+                        selected:
+                            _only.contains(x.id) || _only.contains(x.title),
+                        onSelected: (on) => setState(() {
+                          if (on) {
+                            _only.add(x.id);
+                          } else {
+                            _only.remove(x.id);
+                            _only.remove(x.title);
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            );
+          },
         ),
         Align(
           alignment: Alignment.centerLeft,

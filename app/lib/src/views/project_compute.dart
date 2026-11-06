@@ -180,6 +180,10 @@ class CodeSpacesPane extends ConsumerWidget {
                           ),
                           PopupMenuItem(value: 'check', child: Text('Check')),
                           PopupMenuItem(value: 'build', child: Text('Build')),
+                          PopupMenuItem(
+                            value: 'give',
+                            child: Text('Give to org…'),
+                          ),
                           PopupMenuItem(value: 'remove', child: Text('Remove')),
                         ],
                       ),
@@ -238,6 +242,8 @@ Future<void> _codeAction(
         if (context.mounted) {
           await _showLines(context, 'Build ${c.name}', [...r.logs, ...r.lines]);
         }
+      case 'give':
+        await showCodeGiveToOrgDialog(context, ref, c);
       case 'remove':
         if (!await _confirm(
           context,
@@ -252,6 +258,91 @@ Future<void> _codeAction(
     }
   } catch (e) {
     if (context.mounted) _ok(context, '$e', color: m.error);
+  }
+}
+
+Future<void> showCodeGiveToOrgDialog(
+  BuildContext context,
+  WidgetRef ref,
+  CodeSpaceInfo c,
+) async {
+  List<OrgInfo> orgs = const [];
+  try {
+    orgs = (await ref.read(orgOverviewProvider.future))?.mine ?? const [];
+  } catch (e) {
+    if (context.mounted) {
+      _ok(context, '$e', color: context.muninn.error);
+    }
+    return;
+  }
+  if (!context.mounted) {
+    return;
+  }
+  if (orgs.isEmpty) {
+    _ok(context, 'Create an organization first.');
+    return;
+  }
+  var slug = orgs.first.slug;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) {
+      final m = context.muninn;
+      return StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: m.bg,
+          title: Text(
+            'Give ${c.name} to an org',
+            style: TextStyle(color: m.header),
+          ),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Members pull it with Sync code (`mnnn org sync-code`). This is the TUI Code window g / giving a space to an organization you own.',
+                  style: TextStyle(color: m.muted),
+                ),
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('code-give-org'),
+                  initialValue: slug,
+                  items: [
+                    for (final o in orgs)
+                      DropdownMenuItem(
+                        value: o.slug,
+                        child: Text('${o.name} (${o.slug})'),
+                      ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setSt(() => slug = v);
+                  },
+                  decoration: const InputDecoration(labelText: 'Organization'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const ValueKey('code-give-save'),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Give'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  if (ok != true || !context.mounted) {
+    return;
+  }
+  final msg = await ref.read(apiProvider).orgResourceAdd(slug, 'code', c.id);
+  refreshProjectExtras(ref);
+  if (context.mounted) {
+    _ok(context, msg);
   }
 }
 

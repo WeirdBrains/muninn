@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `check_relay_addr`, `config_of`, `connections_of`, `edit_prefs`, `exchange_info`, `exchanges_of`, `hosted_node`, `invite_info`, `invite_of`, `invites_of`, `link_of`, `master_from_key_file`, `net_overview_of`, `parse_kind`, `peers_of`, `prefs_of`, `reap_hosted`, `relays_of`, `request_info`, `shards_of`, `share_of`, `shared_of`, `status_of`, `stop_of`, `unshare_of`
+// These functions are ignored because they are not marked as `pub`: `check_relay_addr`, `config_of`, `connections_of`, `edit_prefs`, `exchange_export_of`, `exchange_info`, `exchange_restore_of`, `exchange_restore_peek_of`, `exchanges_of`, `hosted_node`, `invite_info`, `invite_of`, `invites_of`, `link_of`, `master_from_key_file`, `net_overview_of`, `parse_kind`, `peers_of`, `prefs_of`, `reap_hosted`, `relays_of`, `request_info`, `shards_of`, `share_of`, `shared_of`, `status_of`, `stop_of`, `unshare_of`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `HostedDriver`
 
 /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
@@ -252,6 +252,41 @@ Future<String> netBroadcast({
   to: to,
 );
 
+/// `mnnn net exchange export`. Writes an age-encrypted backup; bytes and keys stay in Rust.
+Future<String> netExchangeExport({
+  String? home,
+  required String out,
+  required String password,
+}) => RustLib.instance.api.crateApiNetNetExchangeExport(
+  home: home,
+  out: out,
+  password: password,
+);
+
+/// Peek a backup without restoring. Decrypts in Rust; no identity or exchange keys come back.
+Future<NetExchangeBackupPeek> netExchangeRestorePeek({
+  String? home,
+  required String file,
+  required String password,
+}) => RustLib.instance.api.crateApiNetNetExchangeRestorePeek(
+  home: home,
+  file: file,
+  password: password,
+);
+
+/// `mnnn net exchange restore`. Call peek first; pass `confirm_replace` when identity would change.
+Future<String> netExchangeRestore({
+  String? home,
+  required String file,
+  required String password,
+  required bool confirmReplace,
+}) => RustLib.instance.api.crateApiNetNetExchangeRestore(
+  home: home,
+  file: file,
+  password: password,
+  confirmReplace: confirmReplace,
+);
+
 /// `mnnn net config` / TUI Net ▸ Settings… (plus CLI extras the TUI page does not list).
 class NetConfig {
   final String label;
@@ -450,6 +485,32 @@ class NetEntrustedInfo {
           total == other.total &&
           exchange == other.exchange &&
           status == other.status;
+}
+
+/// What `mnnn net exchange restore` peeks: counts and whether this node's identity would change. No keys.
+class NetExchangeBackupPeek {
+  final String peerId;
+  final int exchanges;
+  final bool identityReplaced;
+
+  const NetExchangeBackupPeek({
+    required this.peerId,
+    required this.exchanges,
+    required this.identityReplaced,
+  });
+
+  @override
+  int get hashCode =>
+      peerId.hashCode ^ exchanges.hashCode ^ identityReplaced.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetExchangeBackupPeek &&
+          runtimeType == other.runtimeType &&
+          peerId == other.peerId &&
+          exchanges == other.exchanges &&
+          identityReplaced == other.identityReplaced;
 }
 
 class NetExchangeInfo {

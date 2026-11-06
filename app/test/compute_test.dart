@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:muninn/src/api.dart';
 import 'package:muninn/src/app.dart';
 import 'package:muninn/src/state.dart';
 
@@ -96,5 +97,23 @@ void main() {
     await t.pumpAndSettle();
     expect(api.extraCalls, contains('pipeline-create:bars-from-ingest'));
     expect(find.text('bars-from-ingest'), findsOneWidget);
+  });
+
+  testWidgets('Code space can be given to an owned organization', (t) async {
+    final (api, _) = await pump(t);
+    api.codeList = const [CodeSpaceInfo(id: 'c1', shortId: 'c1', name: 'calc')];
+    await unlock(t);
+    await t.tap(find.text('Projects'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Code spaces…'));
+    await t.pumpAndSettle();
+    await t.tap(find.byType(PopupMenuButton<String>));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Give to org…'));
+    await t.pumpAndSettle();
+    expect(find.textContaining('Lab'), findsWidgets);
+    await t.tap(find.byKey(const ValueKey('code-give-save')));
+    await t.pumpAndSettle();
+    expect(api.orgCalls, contains('resource-add:lab:code:c1'));
   });
 }

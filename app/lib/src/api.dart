@@ -899,6 +899,18 @@ class NetShards {
   final List<NetHeldInfo> held;
 }
 
+/// Peek of `mnnn net exchange restore` (no keys). Identity would be replaced if true.
+class NetExchangeBackupPeek {
+  const NetExchangeBackupPeek({
+    required this.peerId,
+    this.exchanges = 0,
+    this.identityReplaced = false,
+  });
+  final String peerId;
+  final int exchanges;
+  final bool identityReplaced;
+}
+
 class NetSearchOrigin {
   const NetSearchOrigin({
     required this.origin,
@@ -1864,6 +1876,25 @@ abstract class MuninnApi {
 
   /// `mnnn net broadcast`. [to] is `nodes`, `connections`, `all` or `org:SLUG`.
   Future<String> netBroadcast(String topic, String text, {String to = 'nodes'});
+
+  /// `mnnn net exchange export`. Writes an age-encrypted backup; bytes stay in Rust.
+  Future<String> netExchangeExport({
+    required String out,
+    required String password,
+  });
+
+  /// Peek a backup without restoring. Decrypts in Rust; no keys come back.
+  Future<NetExchangeBackupPeek> netExchangeRestorePeek({
+    required String file,
+    required String password,
+  });
+
+  /// `mnnn net exchange restore`. Pass [confirmReplace] when peek said the identity would change.
+  Future<String> netExchangeRestore({
+    required String file,
+    required String password,
+    bool confirmReplace = false,
+  });
 
   /// `mnnn org list` and the fields `mnnn org show` prints for orgs this node owns.
   Future<OrgOverview> orgOverview();
