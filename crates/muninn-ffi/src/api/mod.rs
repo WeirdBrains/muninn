@@ -5,11 +5,14 @@ pub mod data;
 pub mod help;
 pub mod info;
 pub mod io;
+pub mod journals;
 pub mod keys;
 pub mod net;
 pub mod orgs;
 pub mod prefs;
+pub mod reports;
 pub mod projects;
+pub mod searches;
 pub mod themes;
 
 #[flutter_rust_bridge::frb(init)]

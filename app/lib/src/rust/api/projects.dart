@@ -8,7 +8,7 @@ import 'data.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_project_series_of`, `create_project_of`, `note`, `params`, `remove_project_of`, `remove_project_series_of`, `series_ref`, `summarize`, `update_project_of`
+// These functions are ignored because they are not marked as `pub`: `add_project_item_of`, `add_project_series_of`, `create_project_of`, `export_path`, `export_project_of`, `import_project_of`, `note`, `params`, `parse_kind`, `project_items_of`, `remove_project_of`, `remove_project_series_of`, `series_ref`, `summarize`, `update_project_of`
 
 /// `mnnn project create NAME`.
 Future<ProjectSummary> createProject({
@@ -57,3 +57,95 @@ Future<bool> addProjectSeries({
 /// Take a series result out of a project (`mnnn project drop`). The series itself stays.
 Future<void> removeProjectSeries({required PlatformInt64 itemId}) =>
     RustLib.instance.api.crateApiProjectsRemoveProjectSeries(itemId: itemId);
+
+/// `mnnn project show` items (live searches, results, journals, reports, rules, models, code).
+Future<List<ProjectItemInfo>> projectItems({required String projectId}) =>
+    RustLib.instance.api.crateApiProjectsProjectItems(projectId: projectId);
+
+/// `mnnn project add --journal|--search|--report|--rule|--model|--code`.
+Future<String> addProjectItem({
+  required String project,
+  required String kind,
+  required String key,
+}) => RustLib.instance.api.crateApiProjectsAddProjectItem(
+  project: project,
+  kind: kind,
+  key: key,
+);
+
+/// `mnnn project import` a `.mnnp` archive or JSON pack.
+Future<String> projectImport({required String path, String? name}) =>
+    RustLib.instance.api.crateApiProjectsProjectImport(path: path, name: name);
+
+/// `mnnn project export` as an archive (`.mnnp`) or JSON pack. `no_data` leaves bars out.
+Future<String> projectExport({
+  required String id,
+  required String path,
+  required String format,
+  required bool noData,
+}) => RustLib.instance.api.crateApiProjectsProjectExport(
+  id: id,
+  path: path,
+  format: format,
+  noData: noData,
+);
+
+/// One item in a project (`mnnn project show`), any kind the store already has.
+class ProjectItemInfo {
+  final PlatformInt64 itemId;
+  final String kind;
+  final String name;
+  final String detail;
+  final String refId;
+  final String? source;
+  final String? base;
+  final String? quote;
+  final PlatformInt64? durationS;
+  final PlatformInt64? from;
+  final PlatformInt64? to;
+
+  const ProjectItemInfo({
+    required this.itemId,
+    required this.kind,
+    required this.name,
+    required this.detail,
+    required this.refId,
+    this.source,
+    this.base,
+    this.quote,
+    this.durationS,
+    this.from,
+    this.to,
+  });
+
+  @override
+  int get hashCode =>
+      itemId.hashCode ^
+      kind.hashCode ^
+      name.hashCode ^
+      detail.hashCode ^
+      refId.hashCode ^
+      source.hashCode ^
+      base.hashCode ^
+      quote.hashCode ^
+      durationS.hashCode ^
+      from.hashCode ^
+      to.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProjectItemInfo &&
+          runtimeType == other.runtimeType &&
+          itemId == other.itemId &&
+          kind == other.kind &&
+          name == other.name &&
+          detail == other.detail &&
+          refId == other.refId &&
+          source == other.source &&
+          base == other.base &&
+          quote == other.quote &&
+          durationS == other.durationS &&
+          from == other.from &&
+          to == other.to;
+}

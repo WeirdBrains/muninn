@@ -8,11 +8,14 @@ import 'api/data.dart';
 import 'api/help.dart';
 import 'api/info.dart';
 import 'api/io.dart';
+import 'api/journals.dart';
 import 'api/keys.dart';
 import 'api/net.dart';
 import 'api/orgs.dart';
 import 'api/prefs.dart';
 import 'api/projects.dart';
+import 'api/reports.dart';
+import 'api/searches.dart';
 import 'api/themes.dart';
 
 import 'dart:async';
@@ -68,6 +71,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DatasetSummary dco_decode_dataset_summary(dynamic raw);
 
   @protected
+  EntryInfo dco_decode_entry_info(dynamic raw);
+
+  @protected
   ExportOutcome dco_decode_export_outcome(dynamic raw);
 
   @protected
@@ -92,6 +98,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IngestProgressSnap dco_decode_ingest_progress_snap(dynamic raw);
 
   @protected
+  JournalInfo dco_decode_journal_info(dynamic raw);
+
+  @protected
+  JournalNoteInfo dco_decode_journal_note_info(dynamic raw);
+
+  @protected
   KeysStatus dco_decode_keys_status(dynamic raw);
 
   @protected
@@ -104,10 +116,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<DatasetSummary> dco_decode_list_dataset_summary(dynamic raw);
 
   @protected
+  List<EntryInfo> dco_decode_list_entry_info(dynamic raw);
+
+  @protected
   List<HelpTopicInfo> dco_decode_list_help_topic_info(dynamic raw);
 
   @protected
   List<IngestFileReport> dco_decode_list_ingest_file_report(dynamic raw);
+
+  @protected
+  List<JournalInfo> dco_decode_list_journal_info(dynamic raw);
+
+  @protected
+  List<JournalNoteInfo> dco_decode_list_journal_note_info(dynamic raw);
 
   @protected
   List<NetInviteInfo> dco_decode_list_net_invite_info(dynamic raw);
@@ -146,10 +167,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<ProjectItemInfo> dco_decode_list_project_item_info(dynamic raw);
+
+  @protected
   List<ProjectSeries> dco_decode_list_project_series(dynamic raw);
 
   @protected
   List<ProjectSummary> dco_decode_list_project_summary(dynamic raw);
+
+  @protected
+  List<ReportInfo> dco_decode_list_report_info(dynamic raw);
+
+  @protected
+  List<SearchInfo> dco_decode_list_search_info(dynamic raw);
+
+  @protected
+  List<SectionInfo> dco_decode_list_section_info(dynamic raw);
 
   @protected
   List<ServiceKeyInfo> dco_decode_list_service_key_info(dynamic raw);
@@ -238,16 +271,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Overview dco_decode_overview(dynamic raw);
 
   @protected
+  ProjectItemInfo dco_decode_project_item_info(dynamic raw);
+
+  @protected
   ProjectSeries dco_decode_project_series(dynamic raw);
 
   @protected
   ProjectSummary dco_decode_project_summary(dynamic raw);
 
   @protected
+  ReportInfo dco_decode_report_info(dynamic raw);
+
+  @protected
   RevealHandle dco_decode_reveal_handle(dynamic raw);
 
   @protected
   SavedState dco_decode_saved_state(dynamic raw);
+
+  @protected
+  SearchInfo dco_decode_search_info(dynamic raw);
+
+  @protected
+  SectionInfo dco_decode_section_info(dynamic raw);
 
   @protected
   ServiceKeyInfo dco_decode_service_key_info(dynamic raw);
@@ -311,6 +356,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DatasetSummary sse_decode_dataset_summary(SseDeserializer deserializer);
 
   @protected
+  EntryInfo sse_decode_entry_info(SseDeserializer deserializer);
+
+  @protected
   ExportOutcome sse_decode_export_outcome(SseDeserializer deserializer);
 
   @protected
@@ -337,6 +385,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  JournalInfo sse_decode_journal_info(SseDeserializer deserializer);
+
+  @protected
+  JournalNoteInfo sse_decode_journal_note_info(SseDeserializer deserializer);
+
+  @protected
   KeysStatus sse_decode_keys_status(SseDeserializer deserializer);
 
   @protected
@@ -351,12 +405,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<EntryInfo> sse_decode_list_entry_info(SseDeserializer deserializer);
+
+  @protected
   List<HelpTopicInfo> sse_decode_list_help_topic_info(
     SseDeserializer deserializer,
   );
 
   @protected
   List<IngestFileReport> sse_decode_list_ingest_file_report(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<JournalInfo> sse_decode_list_journal_info(SseDeserializer deserializer);
+
+  @protected
+  List<JournalNoteInfo> sse_decode_list_journal_note_info(
     SseDeserializer deserializer,
   );
 
@@ -409,6 +474,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<ProjectItemInfo> sse_decode_list_project_item_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ProjectSeries> sse_decode_list_project_series(
     SseDeserializer deserializer,
   );
@@ -417,6 +487,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ProjectSummary> sse_decode_list_project_summary(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<ReportInfo> sse_decode_list_report_info(SseDeserializer deserializer);
+
+  @protected
+  List<SearchInfo> sse_decode_list_search_info(SseDeserializer deserializer);
+
+  @protected
+  List<SectionInfo> sse_decode_list_section_info(SseDeserializer deserializer);
 
   @protected
   List<ServiceKeyInfo> sse_decode_list_service_key_info(
@@ -511,16 +590,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Overview sse_decode_overview(SseDeserializer deserializer);
 
   @protected
+  ProjectItemInfo sse_decode_project_item_info(SseDeserializer deserializer);
+
+  @protected
   ProjectSeries sse_decode_project_series(SseDeserializer deserializer);
 
   @protected
   ProjectSummary sse_decode_project_summary(SseDeserializer deserializer);
 
   @protected
+  ReportInfo sse_decode_report_info(SseDeserializer deserializer);
+
+  @protected
   RevealHandle sse_decode_reveal_handle(SseDeserializer deserializer);
 
   @protected
   SavedState sse_decode_saved_state(SseDeserializer deserializer);
+
+  @protected
+  SearchInfo sse_decode_search_info(SseDeserializer deserializer);
+
+  @protected
+  SectionInfo sse_decode_section_info(SseDeserializer deserializer);
 
   @protected
   ServiceKeyInfo sse_decode_service_key_info(SseDeserializer deserializer);
@@ -601,6 +692,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_entry_info(EntryInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_export_outcome(ExportOutcome self, SseSerializer serializer);
 
   @protected
@@ -631,6 +725,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_journal_info(JournalInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_journal_note_info(
+    JournalNoteInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_keys_status(KeysStatus self, SseSerializer serializer);
 
   @protected
@@ -646,6 +749,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_entry_info(
+    List<EntryInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_help_topic_info(
     List<HelpTopicInfo> self,
     SseSerializer serializer,
@@ -654,6 +763,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_ingest_file_report(
     List<IngestFileReport> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_journal_info(
+    List<JournalInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_journal_note_info(
+    List<JournalNoteInfo> self,
     SseSerializer serializer,
   );
 
@@ -727,6 +848,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_project_item_info(
+    List<ProjectItemInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_project_series(
     List<ProjectSeries> self,
     SseSerializer serializer,
@@ -735,6 +862,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_project_summary(
     List<ProjectSummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_report_info(
+    List<ReportInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_search_info(
+    List<SearchInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_section_info(
+    List<SectionInfo> self,
     SseSerializer serializer,
   );
 
@@ -850,6 +995,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_overview(Overview self, SseSerializer serializer);
 
   @protected
+  void sse_encode_project_item_info(
+    ProjectItemInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_project_series(ProjectSeries self, SseSerializer serializer);
 
   @protected
@@ -859,10 +1010,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_report_info(ReportInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_reveal_handle(RevealHandle self, SseSerializer serializer);
 
   @protected
   void sse_encode_saved_state(SavedState self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_search_info(SearchInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_section_info(SectionInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_service_key_info(
