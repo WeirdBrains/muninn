@@ -3,7 +3,9 @@
 //! roll versions back, and attach model-owned rules (via the rules API).
 use super::data::{open, open_write};
 use muninn_core::designer::{self as d};
+use muninn_core::rules;
 use muninn_core::store::models::bar_key;
+use muninn_core::store::templates::{self as tpl, ImportOpts, Template};
 use muninn_core::store::{ApplyOpts, Design, Field, FieldOp, FieldType, Model, ModelVersion, NewAction, OwnerKind, Plan, Record, RecordQuery, Store};
 use serde_json::Value;
 
@@ -58,6 +60,33 @@ pub struct ModelVersionInfo {
     pub field_count: u32,
     pub current: bool,
     pub steps: Vec<String>,
+}
+
+pub struct ModelTemplateInfo {
+    pub name: String,
+    pub source: String,
+    pub description: String,
+    pub field_count: u32,
+    pub rule_count: u32,
+    pub record_count: u32,
+}
+
+pub struct ModelImportPlanInfo {
+    pub template_name: String,
+    pub model: String,
+    pub merge: bool,
+    pub clash: bool,
+    pub suggested_name: String,
+    pub from: i64,
+    pub to: i64,
+    pub records: u32,
+    pub rules: u32,
+    pub lost: u32,
+    pub destructive: bool,
+    pub blocked: Vec<String>,
+    pub kept: Vec<String>,
+    pub lines: Vec<String>,
+    pub summary: String,
 }
 
 #[derive(Debug)]
@@ -453,6 +482,272 @@ pub fn model_rule_ids(key: String) -> anyhow::Result<Vec<String>> {
     model_rule_homes_of(&open()?, &key)
 }
 
+pub(crate) fn model_restore_field_of(store: &Store, key: &str, field_id: &str) -> anyhow::Result<ModelInfo> {
+    let m = store.find_model(key.trim())?;
+    let mut design = m.pending().clone();
+    let was = m.design.by_id(field_id).cloned();
+    let pending = design.by_id(field_id).is_some();
+    match (was, pending) {
+        (Some(w), false) => {
+            let at = m.design.fields.iter().position(|f| f.id == w.id).unwrap_or(design.fields.len()).min(design.fields.len());
+            design.fields.insert(at, w);
+        }
+        (Some(w), true) => {
+            if let Some(f) = design.fields.iter_mut().find(|f| f.id == w.id) {
+                *f = w;
+            }
+        }
+        (None, true) => design.fields.retain(|f| f.id != field_id),
+        (None, false) => return Err(anyhow::anyhow!("that field no longer exists")),
+    }
+    let ops = d::diff_ops(store, m.pending(), &design);
+    let n = store.set_model_draft(&m.id, Some(design))?;
+    note(store, d::act_model_edit(&n, &ops, None));
+    Ok(model_info(store, &n))
+}
+
+/// Undo the draft change to one field, keeping its id (TUI `u`).
+/// A dropped field is put back; a changed field is restored; a newly added field is removed.
+pub fn model_restore_field(key: String, field_id: String) -> anyhow::Result<ModelInfo> {
+    model_restore_field_of(&open_write()?, &key, &field_id)
+}
+
+fn read_template(source: &str) -> anyhow::Result<Template> {
+    let source = source.trim();
+    if let Some(n) = source.strip_prefix("builtin:") {
+        return tpl::builtin_template(n).ok_or_else(|| anyhow::anyhow!("no built-in template `{n}`"));
+    }
+    if let Some(t) = tpl::builtin_template(source) {
+        return Ok(t);
+    }
+    let bytes = std::fs::read(source).map_err(|e| anyhow::anyhow!("{source}: {e}"))?;
+    Ok(Template::parse(&bytes)?)
+}
+
+/// Built-in design templates (`mnnn model templates` / TUI `i` `builtin:bars`).
+pub fn model_templates() -> anyhow::Result<Vec<ModelTemplateInfo>> {
+    Ok(tpl::builtin_templates()
+        .into_iter()
+        .map(|t| ModelTemplateInfo {
+            source: format!("builtin:{}", t.name),
+            field_count: t.design.fields.len() as u32,
+            rule_count: t.rules.len() as u32,
+            record_count: t.records.len() as u32,
+            name: t.name,
+            description: t.description,
+        })
+        .collect())
+}
+
+pub(crate) fn model_export_template_of(store: &Store, key: &str, path: &str, records: bool) -> anyhow::Result<String> {
+    let m = store.find_model(key.trim())?;
+    let t = store.export_template(&m.id, records)?;
+    std::fs::write(path, t.to_json()?)?;
+    store.note_action(
+        &NewAction::new("model.export", "app", format!("export model {} as a template", t.name))
+            .params(serde_json::json!({ "model": t.name, "out": path, "records": t.records.len() })),
+    );
+    Ok(format!(
+        "wrote template {} ({} field(s), {} rule(s), {} sample record(s)) to {path}",
+        t.name,
+        t.design.fields.len(),
+        t.rules.len(),
+        t.records.len()
+    ))
+}
+
+/// Export a design as a template file (TUI export; records optional).
+pub fn model_export_template(key: String, path: String, records: bool) -> anyhow::Result<String> {
+    model_export_template_of(&open_write()?, &key, path.trim(), records)
+}
+
+pub(crate) fn model_import_preview_of(
+    store: &Store,
+    source: &str,
+    name: Option<&str>,
+    merge: bool,
+    draft: bool,
+    no_records: bool,
+) -> anyhow::Result<ModelImportPlanInfo> {
+    let t = read_template(source)?;
+    let opts = ImportOpts { name: name.map(|s| s.to_string()).filter(|s| !s.is_empty()), merge, draft, no_records };
+    let clash = store.template_clash(&t, &opts)?;
+    let suggested = clash.as_ref().map(|m| tpl::free_model_name(store, &m.name)).transpose()?.unwrap_or_else(|| t.name.clone());
+    match clash {
+        Some(existing) if !opts.merge && opts.name.is_none() => {
+            return Ok(ModelImportPlanInfo {
+                template_name: t.name,
+                model: existing.name,
+                merge: false,
+                clash: true,
+                suggested_name: suggested.clone(),
+                from: 0,
+                to: 0,
+                records: 0,
+                rules: 0,
+                lost: 0,
+                destructive: false,
+                blocked: vec![],
+                kept: vec![],
+                lines: vec![],
+                summary: format!("that model exists: a new name, or merge (suggested {suggested})"),
+            });
+        }
+        _ => {}
+    }
+    let p = store.plan_template(&t, &opts)?;
+    let plan = plan_info(store, &p.plan);
+    Ok(ModelImportPlanInfo {
+        template_name: t.name.clone(),
+        model: p.model.clone(),
+        merge: p.merge,
+        clash: false,
+        suggested_name: suggested,
+        from: plan.from,
+        to: plan.to,
+        records: p.records as u32,
+        rules: p.rules as u32,
+        lost: plan.lost,
+        destructive: plan.destructive,
+        blocked: plan.blocked.clone(),
+        kept: p.kept.clone(),
+        lines: plan.lines,
+        summary: format!(
+            "template {} {} model {} (v{} → v{}; {} sample records, {} rules off)",
+            t.name,
+            if p.merge { "into" } else { "as" },
+            p.model,
+            plan.from,
+            plan.to,
+            p.records,
+            p.rules
+        ),
+    })
+}
+
+/// Preview importing a template file or `builtin:NAME` (TUI import).
+pub fn model_import_preview(source: String, name: Option<String>, merge: bool, draft: bool, no_records: bool) -> anyhow::Result<ModelImportPlanInfo> {
+    model_import_preview_of(&open()?, &source, name.as_deref(), merge, draft, no_records)
+}
+
+pub(crate) fn model_import_template_of(
+    store: &Store,
+    source: &str,
+    name: Option<&str>,
+    merge: bool,
+    draft: bool,
+    no_records: bool,
+    destructive: bool,
+) -> anyhow::Result<String> {
+    let t = read_template(source)?;
+    let opts = ImportOpts { name: name.map(|s| s.to_string()).filter(|s| !s.is_empty()), merge, draft, no_records };
+    let p = store.plan_template(&t, &opts)?;
+    if !p.plan.blocked.is_empty() {
+        return Err(anyhow::anyhow!("{} cannot be imported as it is: {}", p.model, p.plan.blocked.join("; ")));
+    }
+    if p.plan.destructive() && !destructive {
+        return Err(anyhow::anyhow!("importing {} into {} loses {} stored value(s)", t.name, p.model, p.plan.lost()));
+    }
+    let done = store.import_template(&t, &opts, destructive || p.plan.lost() > 0)?;
+    store.note_action(
+        &NewAction::new("model.import", "app", format!("import template {}: {}", t.name, done.summary()))
+            .params(serde_json::json!({ "template": t.name, "model": done.model.id })),
+    );
+    Ok(done.summary())
+}
+
+/// Import a template file or `builtin:NAME` (TUI import / `mnnn model import`).
+pub fn model_import_template(
+    source: String,
+    name: Option<String>,
+    merge: bool,
+    draft: bool,
+    no_records: bool,
+    destructive: bool,
+) -> anyhow::Result<String> {
+    model_import_template_of(&open_write()?, &source, name.as_deref(), merge, draft, no_records, destructive)
+}
+
+fn assignment_map(values: &str) -> anyhow::Result<serde_json::Map<String, serde_json::Value>> {
+    let items: Vec<String> = if values.contains(';') || values.contains('\n') {
+        rules::split_list(&values.replace('\n', ";"))
+    } else {
+        values.split_whitespace().map(str::to_string).filter(|s| !s.is_empty()).collect()
+    };
+    Ok(d::parse_assignments(&items)?)
+}
+
+pub(crate) fn model_record_create_of(store: &Store, model: &str, values: &str) -> anyhow::Result<RecordInfo> {
+    let m = store.find_model(model.trim())?;
+    let r = store.create_record(&m, &assignment_map(values)?)?;
+    note(store, d::act_record_create(&m, &r));
+    Ok(record_info(&m, &r))
+}
+
+/// Create a record (`field=value …` / TUI `n`).
+pub fn model_record_create(model: String, values: String) -> anyhow::Result<RecordInfo> {
+    model_record_create_of(&open_write()?, &model, &values)
+}
+
+pub(crate) fn model_record_update_of(store: &Store, model: &str, id: &str, values: &str) -> anyhow::Result<RecordInfo> {
+    let m = store.find_model(model.trim())?;
+    let old = store.find_record(&m, id.trim())?;
+    let vals = assignment_map(values)?;
+    let changes: serde_json::Map<String, serde_json::Value> = vals.into_iter().filter(|(f, x)| old.values.get(f) != Some(x)).collect();
+    let r = store.update_record(&m, &old.id, &changes)?;
+    note(store, d::act_record_update(&m, Some(&r), 1, &[], &changes));
+    Ok(record_info(&m, &r))
+}
+
+/// Update one record (`field=value …`; empty value clears it / TUI `e`).
+pub fn model_record_update(model: String, id: String, values: String) -> anyhow::Result<RecordInfo> {
+    model_record_update_of(&open_write()?, &model, &id, &values)
+}
+
+pub(crate) fn model_record_update_many_of(store: &Store, model: &str, text: &str, values: &str) -> anyhow::Result<String> {
+    let m = store.find_model(model.trim())?;
+    if text.trim().is_empty() {
+        return Err(anyhow::anyhow!("set a filter first: bulk update changes every record it matches"));
+    }
+    let vals = assignment_map(values)?;
+    let q = RecordQuery { text: text.to_string(), limit: None, ..Default::default() };
+    let ids: Vec<String> = store.records(&m, &q)?.into_iter().map(|r| r.id).collect();
+    let n = ids.iter().try_fold(0usize, |n, id| store.update_record(&m, id, &vals).map(|_| n + 1))?;
+    note(store, d::act_record_update(&m, None, n, &[], &vals));
+    Ok(format!("updated {n} {} records", m.name))
+}
+
+/// Set fields on every record matching [text] (TUI `U`).
+pub fn model_record_update_many(model: String, text: String, values: String) -> anyhow::Result<String> {
+    model_record_update_many_of(&open_write()?, &model, &text, &values)
+}
+
+pub(crate) fn model_record_delete_of(store: &Store, model: &str, id: &str) -> anyhow::Result<String> {
+    let m = store.find_model(model.trim())?;
+    let r = store.delete_record(&m, id.trim())?;
+    note(store, d::act_record_delete(&m, Some(&r), 1, &[]));
+    Ok(format!("deleted {} record {}", m.name, r.short_id()))
+}
+
+/// Delete one record (TUI `d`).
+pub fn model_record_delete(model: String, id: String) -> anyhow::Result<String> {
+    model_record_delete_of(&open_write()?, &model, &id)
+}
+
+pub(crate) fn model_rule_try_of(store: &Store, rule: &str) -> anyhow::Result<Vec<String>> {
+    let r = store.find_rule(rule.trim())?;
+    let a = rules::last_trigger(store)?.ok_or_else(|| anyhow::anyhow!("nothing in the history yet to run it on"))?;
+    let res = rules::run(store, &r, &a);
+    let mut lines = vec![format!("ran {} on #{} {}: {}", r.name, a.id, a.kind, res.status)];
+    lines.extend(res.messages.iter().map(|m| format!("  {m}")));
+    Ok(lines)
+}
+
+/// Run a model-owned rule on the last history action (TUI Rules Enter).
+pub fn model_rule_try(rule: String) -> anyhow::Result<Vec<String>> {
+    model_rule_try_of(&open_write()?, &rule)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -513,6 +808,33 @@ mod tests {
 
         let hist = model_history_of(&s, &m.id).unwrap();
         assert!(hist.iter().any(|v| v.version == 1 && v.current));
+        let memo = m.design_fields.iter().find(|f| f.name == "memo").unwrap().id.clone();
+        let m = model_edit_of(&s, &m.id, &[], &[], &["memo".into()], &[], &[]).unwrap();
+        let dropped = m.design_fields.iter().find(|f| f.id == memo).expect("dropped memo keeps its id");
+        assert!(dropped.dropped);
+        let m = model_restore_field_of(&s, &m.id, &memo).unwrap();
+        let restored = m.design_fields.iter().find(|f| f.id == memo).unwrap();
+        assert!(!restored.dropped);
+        assert_eq!(restored.name, "memo");
+
+        let rec = model_record_create_of(&s, &m.id, "memo=hello").unwrap();
+        assert!(rec.fields.iter().any(|f| f.name == "memo" && f.value == "hello"));
+        let rec = model_record_update_of(&s, &m.id, &rec.id, "memo=hi").unwrap();
+        assert!(rec.fields.iter().any(|f| f.name == "memo" && f.value == "hi"));
+        let msg = model_record_delete_of(&s, &m.id, &rec.id).unwrap();
+        assert!(msg.contains("deleted"));
+
+        let path = std::env::temp_dir().join(format!("muninn-tpl-{}.json", m.id));
+        model_export_template_of(&s, &m.id, path.to_str().unwrap(), false).unwrap();
+        let preview = model_import_preview_of(&s, path.to_str().unwrap(), Some("signals_copy"), false, false, true).unwrap();
+        assert!(!preview.clash, "{}", preview.summary);
+        let imported = model_import_template_of(&s, path.to_str().unwrap(), Some("signals_copy"), false, false, true, false).unwrap();
+        assert!(imported.contains("signals_copy"), "{imported}");
+        let _ = std::fs::remove_file(&path);
+
+        let builtins = model_templates().unwrap();
+        assert!(builtins.iter().any(|t| t.source == "builtin:bars"));
+
         let msg = model_remove_of(&s, &m.id, true).unwrap();
         assert!(msg.contains("signals"));
     }
