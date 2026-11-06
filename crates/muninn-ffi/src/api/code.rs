@@ -900,6 +900,49 @@ fn pipeline_monitor_of(store: &Store, pipeline: &str) -> anyhow::Result<Pipeline
     })
 }
 
+pub struct PipeFrameInfo {
+    pub key: String,
+    pub columns: Vec<String>,
+    pub cells: Vec<String>,
+    pub row_count: u32,
+}
+
+fn frame_cell(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::Null => String::new(),
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        other => other.to_string(),
+    }
+}
+
+pub(crate) fn latest_pipe_frame_of(store: &Store, key: &str) -> anyhow::Result<Option<PipeFrameInfo>> {
+    let acts = store.actions_of_kind("pipe.frame")?;
+    let mut frame = None;
+    for a in acts {
+        if a.params.get("key").and_then(|v| v.as_str()) == Some(key) {
+            frame = a.params.get("frame").cloned();
+        }
+    }
+    let Some(f) = frame else { return Ok(None) };
+    let cols = muninn_core::tui::frametile::columns(&f);
+    let n = muninn_core::tui::frametile::rows(&f);
+    let mut cells = Vec::with_capacity(cols.len() * n);
+    for i in 0..n {
+        for c in &cols {
+            let col = f.get("columns").and_then(|x| x.get(c)).and_then(|x| x.as_array());
+            cells.push(col.and_then(|a| a.get(i)).map(frame_cell).unwrap_or_default());
+        }
+    }
+    Ok(Some(PipeFrameInfo { key: key.to_string(), columns: cols, cells, row_count: n as u32 }))
+}
+
+/// Latest `pipe.frame` for a data tile key (`code:SPACE` or `view:PIPELINE/NODE`).
+pub fn latest_pipe_frame(key: String) -> anyhow::Result<Option<PipeFrameInfo>> {
+    latest_pipe_frame_of(&open()?, &key)
+}
+
 /// `mnnn pipeline export`. Bytes stay in Rust; Dart passes the path.
 pub fn pipeline_export(pipeline: String, path: String, templates: bool) -> anyhow::Result<String> {
     let store = open()?;
@@ -936,6 +979,23 @@ pub fn pipeline_import(path: String, name: Option<String>, merge: bool) -> anyho
 mod tests {
     use super::*;
     use muninn_core::store::Store;
+    use serde_json::json;
+
+    #[test]
+    fn latest_pipe_frame_reads_the_last_code_result() {
+        let s = Store::open_in_memory().unwrap();
+        assert!(latest_pipe_frame_of(&s, "code:mean").unwrap().is_none());
+        let frame = json!({
+            "fields": [{"name": "ts"}, {"name": "px"}],
+            "columns": {"ts": [1, 2], "px": [10.5, 11.0]}
+        });
+        muninn_core::code::pipe::note_frame(&s, "test", "code:mean", &frame);
+        let got = latest_pipe_frame_of(&s, "code:mean").unwrap().expect("frame");
+        assert_eq!(got.columns, vec!["ts", "px"]);
+        assert_eq!(got.row_count, 2);
+        assert_eq!(got.cells, vec!["1", "10.5", "2", "11.0"]);
+        assert!(latest_pipe_frame_of(&s, "code:other").unwrap().is_none());
+    }
 
     #[test]
     fn code_create_edit_remove_without_running() {

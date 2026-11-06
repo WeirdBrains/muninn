@@ -69,6 +69,24 @@ pub fn set_history_open(home: Option<String>, open: bool) -> anyhow::Result<()> 
     save(&p, &prefs)
 }
 
+/// The live workspace tree (`[tui.layout]`), shared with the TUI. Missing when never saved.
+pub fn live_layout(home: Option<String>) -> anyhow::Result<Option<String>> {
+    let prefs = Preferences::load_or_create(&paths(home)?)?;
+    match prefs.tui.layout.as_ref() {
+        Some(l) => Ok(Some(tile_to_app(l)?)),
+        None => Ok(None),
+    }
+}
+
+/// Write the live workspace tree to `[tui.layout]`, like the TUI after every layout change.
+pub fn save_live_layout(home: Option<String>, json: String) -> anyhow::Result<String> {
+    let layout = app_to_tile(&json)?;
+    let (p, mut prefs) = load(home)?;
+    prefs.tui.layout = Some(layout);
+    save(&p, &prefs)?;
+    Ok("saved layout".into())
+}
+
 fn app_to_tile(json: &str) -> anyhow::Result<TileLayout> {
     let app: serde_json::Value = serde_json::from_str(json)?;
     Ok(TileLayout {
@@ -319,5 +337,20 @@ mod tests {
         assert!(!history_open(home.clone()).unwrap());
         set_history_open(home.clone(), true).unwrap();
         assert!(history_open(home).unwrap());
+    }
+
+    #[test]
+    fn live_layout_round_trips_through_tui_layout_pref() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = Some(dir.path().display().to_string());
+        assert!(live_layout(home.clone()).unwrap().is_none());
+        let json = r#"{"focus":2,"nextId":3,"zoomed":false,"newDir":"horizontal","root":{"type":"split","dir":"horizontal","ratio":0.5,"mode":"split","active":0,"a":{"type":"tile","id":1,"asChart":true,"datasetKey":"binance:BTC/USDT:300"},"b":{"type":"tile","id":2,"asChart":false,"frame":{"key":"code:mean"}}}}"#;
+        assert_eq!(save_live_layout(home.clone(), json.into()).unwrap(), "saved layout");
+        let loaded = live_layout(home.clone()).unwrap().expect("saved");
+        assert!(loaded.contains("code:mean") && loaded.contains("BTC/USDT"), "{loaded}");
+        let prefs = Preferences::load_or_create(&paths(home).unwrap()).unwrap();
+        let t = prefs.tui.layout.expect("tui.layout");
+        assert_eq!(t.focus, 2);
+        assert_eq!(t.tile(2).unwrap().frame.as_ref().map(|f| f.key.as_str()), Some("code:mean"));
     }
 }

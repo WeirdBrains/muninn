@@ -13,6 +13,7 @@ pub mod journals;
 pub mod keys;
 pub mod layouts;
 pub mod mcp;
+pub mod models;
 pub mod net;
 pub mod notify;
 pub mod orgs;
