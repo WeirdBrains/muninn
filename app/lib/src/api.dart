@@ -440,6 +440,32 @@ class OrgOverview {
   final List<OrgMirror> mirrors;
 }
 
+/// What `mnnn org host status` shows. No certificate private key.
+class OrgHostStatus {
+  const OrgHostStatus({
+    this.running = false,
+    this.ours = false,
+    this.url = '',
+    this.addr = '',
+    this.pid,
+    this.orgs = const [],
+    this.mirrors = const [],
+    this.certSource = '',
+    this.httpAddr,
+    this.autostart = false,
+  });
+  final bool running;
+  final bool ours;
+  final String url;
+  final String addr;
+  final int? pid;
+  final List<String> orgs;
+  final List<String> mirrors;
+  final String certSource;
+  final String? httpAddr;
+  final bool autostart;
+}
+
 /// What `mnnn keys status` prints. No master key, words, shards or wrapped keys.
 class ServiceKeyInfo {
   const ServiceKeyInfo({required this.version, this.retired = false});
@@ -571,6 +597,74 @@ abstract class MuninnApi {
 
   /// `mnnn org list` and the fields `mnnn org show` prints for orgs this node owns.
   Future<OrgOverview> orgOverview();
+
+  /// `mnnn org create` / TUI New organization.
+  Future<OrgInfo> orgCreate(
+    String name, {
+    String? slug,
+    String description = '',
+    bool publicOrg = false,
+    bool openAccess = false,
+  });
+
+  /// `mnnn org edit` / TUI rename and settings.
+  Future<OrgInfo> orgEdit(
+    String org, {
+    String? name,
+    String? slug,
+    String? description,
+    String? visibility,
+    String? access,
+    bool? hosted,
+    bool? memberAuth,
+    bool? gated,
+    String? template,
+    String? applyRole,
+    String? inviteRole,
+  });
+
+  /// `mnnn org remove`. Resources stay on this node.
+  Future<String> orgRemove(String org);
+
+  Future<String> orgJoin(String token);
+  Future<String> orgApply(String target, String org, {String note = ''});
+  Future<String> orgSync(String org);
+  Future<String> orgLeave(String org);
+
+  Future<OrgRoleInfo> orgRoleCreate(
+    String org,
+    String name, {
+    int rank = 30,
+    List<String> perms = const [],
+  });
+  Future<OrgRoleInfo> orgRoleEdit(
+    String org,
+    String role, {
+    String? name,
+    int? rank,
+    List<String>? perms,
+  });
+  Future<String> orgRoleRemove(String org, String role);
+
+  Future<String> orgMemberInvite(String org, {String? to});
+  Future<String> orgMemberApprove(String org, String member);
+  Future<String> orgMemberReject(String org, String member);
+  Future<String> orgMemberRole(String org, String member, String role);
+  Future<String> orgMemberKick(
+    String org,
+    String member, {
+    String leftovers = 'keep',
+  });
+
+  Future<String> orgResourceAdd(String org, String kind, String name);
+  Future<String> orgResourcePublish(String org, String resource);
+  Future<String> orgResourceArchive(String org, String resource);
+  Future<String> orgResourceRelease(String org, String resource);
+
+  Future<OrgHostStatus> orgHostStatus();
+  Future<OrgHostStatus> orgHostStart();
+  Future<String> orgHostStop();
+  Future<String> orgHostAutostart(bool on);
 
   /// `mnnn keys status`: database id, path and service-key versions. No key material.
   Future<KeysStatus> keysStatus();

@@ -461,79 +461,170 @@ class FfiMuninnApi implements MuninnApi {
   }) => r_net.netUnshare(home: home, kind: kind, item: item, with_: withPeers);
 
   @override
-  Future<OrgOverview> orgOverview() async {
-    final o = await r_orgs.orgOverview();
-    return OrgOverview(
-      mine: [
-        for (final x in o.mine)
-          OrgInfo(
-            id: x.id,
-            shortId: x.shortId,
-            name: x.name,
-            slug: x.slug,
-            description: x.description,
-            visibility: x.visibility,
-            access: x.access,
-            hosted: x.hosted,
-            memberAuth: x.memberAuth,
-            gated: x.gated,
-            members: x.members.toInt(),
-            applyRole: x.applyRole,
-            inviteRole: x.inviteRole,
-            template: x.template,
-            roles: [
-              for (final r in x.roles)
-                OrgRoleInfo(name: r.name, rank: r.rank.toInt(), perms: r.perms),
-            ],
-            memberList: [
-              for (final m in x.memberList)
-                OrgMemberInfo(
-                  shortId: m.shortId,
-                  title: m.title,
-                  role: m.role,
-                  status: m.status,
-                  note: m.note,
-                ),
-            ],
-            resources: [
-              for (final r in x.resources)
-                OrgResourceInfo(
-                  kind: r.kind,
-                  name: r.name,
-                  state: r.state,
-                  published: r.published,
-                ),
-            ],
-            projects: x.projects,
-            endpoints: [
-              for (final e in x.endpoints)
-                OrgEndpointInfo(
-                  name: e.name,
-                  kind: e.kind,
-                  perm: e.perm,
-                  anyone: e.anyone,
-                ),
-            ],
-            templates: x.templates,
-          ),
-      ],
-      joined: [
-        for (final j in o.joined)
-          OrgJoined(
-            name: j.name,
-            slug: j.slug,
-            status: j.status,
-            role: j.role,
-            node: j.node,
-            perms: j.perms,
-          ),
-      ],
-      mirrors: [
-        for (final m in o.mirrors)
-          OrgMirror(slug: m.slug, fetchedAt: m.fetchedAt.toInt()),
-      ],
+  Future<OrgOverview> orgOverview() async =>
+      _orgOverview(await r_orgs.orgOverview());
+
+  @override
+  Future<OrgInfo> orgCreate(
+    String name, {
+    String? slug,
+    String description = '',
+    bool publicOrg = false,
+    bool openAccess = false,
+  }) async => _orgInfo(
+    await r_orgs.orgCreate(
+      name: name,
+      slug: slug,
+      description: description,
+      public: publicOrg,
+      open: openAccess,
+    ),
+  );
+
+  @override
+  Future<OrgInfo> orgEdit(
+    String org, {
+    String? name,
+    String? slug,
+    String? description,
+    String? visibility,
+    String? access,
+    bool? hosted,
+    bool? memberAuth,
+    bool? gated,
+    String? template,
+    String? applyRole,
+    String? inviteRole,
+  }) async => _orgInfo(
+    await r_orgs.orgEdit(
+      org: org,
+      name: name,
+      slug: slug,
+      description: description,
+      visibility: visibility,
+      access: access,
+      hosted: hosted,
+      memberAuth: memberAuth,
+      gated: gated,
+      template: template,
+      applyRole: applyRole,
+      inviteRole: inviteRole,
+    ),
+  );
+
+  @override
+  Future<String> orgRemove(String org) => r_orgs.orgRemove(org: org);
+
+  @override
+  Future<String> orgJoin(String token) =>
+      r_orgs.orgJoin(home: home, token: token);
+
+  @override
+  Future<String> orgApply(String target, String org, {String note = ''}) =>
+      r_orgs.orgApply(home: home, target: target, org: org, note: note);
+
+  @override
+  Future<String> orgSync(String org) => r_orgs.orgSync(home: home, org: org);
+
+  @override
+  Future<String> orgLeave(String org) => r_orgs.orgLeave(home: home, org: org);
+
+  @override
+  Future<OrgRoleInfo> orgRoleCreate(
+    String org,
+    String name, {
+    int rank = 30,
+    List<String> perms = const [],
+  }) async {
+    final r = await r_orgs.orgRoleCreate(
+      org: org,
+      name: name,
+      rank: PlatformInt64Util.from(rank),
+      perms: perms,
     );
+    return OrgRoleInfo(name: r.name, rank: r.rank.toInt(), perms: r.perms);
   }
+
+  @override
+  Future<OrgRoleInfo> orgRoleEdit(
+    String org,
+    String role, {
+    String? name,
+    int? rank,
+    List<String>? perms,
+  }) async {
+    final r = await r_orgs.orgRoleEdit(
+      org: org,
+      role: role,
+      name: name,
+      rank: rank == null ? null : PlatformInt64Util.from(rank),
+      perms: perms,
+    );
+    return OrgRoleInfo(name: r.name, rank: r.rank.toInt(), perms: r.perms);
+  }
+
+  @override
+  Future<String> orgRoleRemove(String org, String role) =>
+      r_orgs.orgRoleRemove(org: org, role: role);
+
+  @override
+  Future<String> orgMemberInvite(String org, {String? to}) =>
+      r_orgs.orgMemberInvite(home: home, org: org, to: to);
+
+  @override
+  Future<String> orgMemberApprove(String org, String member) =>
+      r_orgs.orgMemberApprove(home: home, org: org, member: member);
+
+  @override
+  Future<String> orgMemberReject(String org, String member) =>
+      r_orgs.orgMemberReject(org: org, member: member);
+
+  @override
+  Future<String> orgMemberRole(String org, String member, String role) =>
+      r_orgs.orgMemberRole(org: org, member: member, role: role);
+
+  @override
+  Future<String> orgMemberKick(
+    String org,
+    String member, {
+    String leftovers = 'keep',
+  }) => r_orgs.orgMemberKick(
+    home: home,
+    org: org,
+    member: member,
+    leftovers: leftovers,
+  );
+
+  @override
+  Future<String> orgResourceAdd(String org, String kind, String name) =>
+      r_orgs.orgResourceAdd(org: org, kind: kind, name: name);
+
+  @override
+  Future<String> orgResourcePublish(String org, String resource) =>
+      r_orgs.orgResourcePublish(org: org, resource: resource);
+
+  @override
+  Future<String> orgResourceArchive(String org, String resource) =>
+      r_orgs.orgResourceArchive(org: org, resource: resource);
+
+  @override
+  Future<String> orgResourceRelease(String org, String resource) =>
+      r_orgs.orgResourceRelease(org: org, resource: resource);
+
+  @override
+  Future<OrgHostStatus> orgHostStatus() async =>
+      _orgHost(await r_orgs.orgHostStatus(home: home));
+
+  @override
+  Future<OrgHostStatus> orgHostStart() async =>
+      _orgHost(await r_orgs.orgHostStart(home: home));
+
+  @override
+  Future<String> orgHostStop() => r_orgs.orgHostStop(home: home);
+
+  @override
+  Future<String> orgHostAutostart(bool on) =>
+      r_orgs.orgHostAutostart(home: home, on_: on);
 
   @override
   Future<KeysStatus> keysStatus() async {
@@ -702,3 +793,86 @@ class FfiMuninnApi implements MuninnApi {
     ),
   );
 }
+
+OrgOverview _orgOverview(r_orgs.OrgOverview o) => OrgOverview(
+  mine: [for (final x in o.mine) _orgInfo(x)],
+  joined: [
+    for (final j in o.joined)
+      OrgJoined(
+        name: j.name,
+        slug: j.slug,
+        status: j.status,
+        role: j.role,
+        node: j.node,
+        perms: j.perms,
+      ),
+  ],
+  mirrors: [
+    for (final m in o.mirrors)
+      OrgMirror(slug: m.slug, fetchedAt: m.fetchedAt.toInt()),
+  ],
+);
+
+OrgInfo _orgInfo(r_orgs.OrgInfo x) => OrgInfo(
+  id: x.id,
+  shortId: x.shortId,
+  name: x.name,
+  slug: x.slug,
+  description: x.description,
+  visibility: x.visibility,
+  access: x.access,
+  hosted: x.hosted,
+  memberAuth: x.memberAuth,
+  gated: x.gated,
+  members: x.members.toInt(),
+  applyRole: x.applyRole,
+  inviteRole: x.inviteRole,
+  template: x.template,
+  roles: [
+    for (final r in x.roles)
+      OrgRoleInfo(name: r.name, rank: r.rank.toInt(), perms: r.perms),
+  ],
+  memberList: [
+    for (final m in x.memberList)
+      OrgMemberInfo(
+        shortId: m.shortId,
+        title: m.title,
+        role: m.role,
+        status: m.status,
+        note: m.note,
+      ),
+  ],
+  resources: [
+    for (final r in x.resources)
+      OrgResourceInfo(
+        kind: r.kind,
+        name: r.name,
+        state: r.state,
+        published: r.published,
+      ),
+  ],
+  projects: x.projects,
+  endpoints: [
+    for (final e in x.endpoints)
+      OrgEndpointInfo(
+        name: e.name,
+        kind: e.kind,
+        perm: e.perm,
+        anyone: e.anyone,
+      ),
+  ],
+  templates: x.templates,
+);
+
+OrgHostStatus _orgHost(r_orgs.OrgHostStatus s) => OrgHostStatus(
+  running: s.running,
+  ours: s.ours,
+  url: s.url,
+  addr: s.addr,
+  pid: s.pid?.toInt(),
+  orgs: s.orgs,
+  mirrors: s.mirrors,
+  certSource: s.certSource,
+  httpAddr: s.httpAddr,
+  autostart: s.autostart,
+);

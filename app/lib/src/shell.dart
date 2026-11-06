@@ -22,6 +22,7 @@ import 'views/help.dart';
 import 'views/home.dart';
 import 'views/net.dart';
 import 'views/orgs.dart';
+import 'views/orgs_dialogs.dart';
 import 'views/keys.dart';
 import 'views/keys_dialogs.dart';
 import 'views/net_dialogs.dart';
@@ -247,7 +248,14 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
         item('Network search…', () => later('Network search', 'mnnn net search')),
         item('Dark shards…', () => later('Dark shards', 'mnnn net shard')),
       ]),
-      menu('Orgs', [item('Organizations…', () => go(Section.orgs), const SingleActivator(LogicalKeyboardKey.keyG, shift: true))]),
+      menu('Orgs', [
+        item('Organizations…', () => go(Section.orgs), const SingleActivator(LogicalKeyboardKey.keyG, shift: true)),
+        item('New organization…', () => showOrgCreateDialog(context, ref)),
+        item('Join…', () => showOrgJoinDialog(context, ref)),
+        item('Apply…', () => showOrgApplyDialog(context, ref)),
+        item('Start site', () => orgHostStart(context, ref)),
+        item('Stop site', () => orgHostStop(context, ref)),
+      ]),
       menu('Keys', [
         item('Status…', () => go(Section.keys)),
         item('Initialize…', () => showKeysInitDialog(context, ref)),

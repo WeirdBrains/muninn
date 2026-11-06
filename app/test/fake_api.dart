@@ -619,6 +619,321 @@ class FakeApi implements MuninnApi {
   @override
   Future<OrgOverview> orgOverview() async => orgs;
 
+  final List<String> orgCalls = [];
+  OrgHostStatus host = const OrgHostStatus();
+
+  @override
+  Future<OrgInfo> orgCreate(
+    String name, {
+    String? slug,
+    String description = '',
+    bool publicOrg = false,
+    bool openAccess = false,
+  }) async {
+    orgCalls.add('create:$name');
+    final org = OrgInfo(
+      id: 'o${orgs.mine.length + 1}',
+      shortId: 'new${orgs.mine.length + 1}',
+      name: name,
+      slug: slug ?? name.toLowerCase().replaceAll(' ', '-'),
+      description: description,
+      visibility: publicOrg ? 'public' : 'private',
+      access: openAccess ? 'open' : 'members',
+      members: 1,
+      applyRole: 'user',
+      inviteRole: 'user',
+      roles: const [
+        OrgRoleInfo(name: 'owner', rank: 100, perms: ['*']),
+      ],
+      memberList: const [
+        OrgMemberInfo(
+          shortId: 'me',
+          title: 'me',
+          role: 'owner',
+          status: 'member',
+        ),
+      ],
+    );
+    orgs = OrgOverview(
+      mine: [...orgs.mine, org],
+      joined: orgs.joined,
+      mirrors: orgs.mirrors,
+    );
+    return org;
+  }
+
+  @override
+  Future<OrgInfo> orgEdit(
+    String org, {
+    String? name,
+    String? slug,
+    String? description,
+    String? visibility,
+    String? access,
+    bool? hosted,
+    bool? memberAuth,
+    bool? gated,
+    String? template,
+    String? applyRole,
+    String? inviteRole,
+  }) async {
+    orgCalls.add('edit:$org');
+    OrgInfo? updated;
+    orgs = OrgOverview(
+      mine: [
+        for (final o in orgs.mine)
+          if (o.id == org || o.slug == org || o.name == org)
+            updated = OrgInfo(
+              id: o.id,
+              shortId: o.shortId,
+              name: name ?? o.name,
+              slug: slug ?? o.slug,
+              description: description ?? o.description,
+              visibility: visibility ?? o.visibility,
+              access: access ?? o.access,
+              hosted: hosted ?? o.hosted,
+              memberAuth: memberAuth ?? o.memberAuth,
+              gated: gated ?? o.gated,
+              members: o.members,
+              applyRole: applyRole ?? o.applyRole,
+              inviteRole: inviteRole ?? o.inviteRole,
+              template: template ?? o.template,
+              roles: o.roles,
+              memberList: o.memberList,
+              resources: o.resources,
+              projects: o.projects,
+              endpoints: o.endpoints,
+              templates: o.templates,
+            )
+          else
+            o,
+      ],
+      joined: orgs.joined,
+      mirrors: orgs.mirrors,
+    );
+    return updated ?? (throw 'no organization `$org`');
+  }
+
+  @override
+  Future<String> orgRemove(String org) async {
+    orgCalls.add('remove:$org');
+    final had = orgs.mine.where(
+      (o) => o.id == org || o.slug == org || o.name == org,
+    );
+    if (had.isEmpty) throw 'no organization `$org`';
+    final name = had.first.name;
+    orgs = OrgOverview(
+      mine: [
+        for (final o in orgs.mine)
+          if (!(o.id == org || o.slug == org || o.name == org)) o,
+      ],
+      joined: orgs.joined,
+      mirrors: orgs.mirrors,
+    );
+    return 'removed $name (its resources stay here)';
+  }
+
+  @override
+  Future<String> orgJoin(String token) async {
+    orgCalls.add('join:$token');
+    if (token.trim().isEmpty) throw 'paste an invitation token or link';
+    orgs = OrgOverview(
+      mine: orgs.mine,
+      joined: [
+        ...orgs.joined,
+        OrgJoined(
+          name: 'Joined',
+          slug: 'joined',
+          status: 'member',
+          role: 'user',
+          node: 'peerpeer',
+        ),
+      ],
+      mirrors: orgs.mirrors,
+    );
+    return 'joined Joined as user';
+  }
+
+  @override
+  Future<String> orgApply(String target, String org, {String note = ''}) async {
+    orgCalls.add('apply:$target:$org');
+    if (target.trim().isEmpty || org.trim().isEmpty) {
+      throw 'apply to NODE and name the organization';
+    }
+    orgs = OrgOverview(
+      mine: orgs.mine,
+      joined: [
+        ...orgs.joined,
+        OrgJoined(
+          name: org,
+          slug: org.toLowerCase(),
+          status: 'applied',
+          role: '',
+          node: target,
+        ),
+      ],
+      mirrors: orgs.mirrors,
+    );
+    return 'applied to $org (applied)';
+  }
+
+  @override
+  Future<String> orgSync(String org) async {
+    orgCalls.add('sync:$org');
+    return '$org: member as user';
+  }
+
+  @override
+  Future<String> orgLeave(String org) async {
+    orgCalls.add('leave:$org');
+    orgs = OrgOverview(
+      mine: orgs.mine,
+      joined: [
+        for (final j in orgs.joined)
+          if (j.slug != org && j.name != org) j,
+      ],
+      mirrors: orgs.mirrors,
+    );
+    return 'left $org';
+  }
+
+  @override
+  Future<OrgRoleInfo> orgRoleCreate(
+    String org,
+    String name, {
+    int rank = 30,
+    List<String> perms = const [],
+  }) async {
+    orgCalls.add('role-create:$org:$name');
+    return OrgRoleInfo(name: name, rank: rank, perms: perms);
+  }
+
+  @override
+  Future<OrgRoleInfo> orgRoleEdit(
+    String org,
+    String role, {
+    String? name,
+    int? rank,
+    List<String>? perms,
+  }) async {
+    orgCalls.add('role-edit:$org:$role');
+    return OrgRoleInfo(
+      name: name ?? role,
+      rank: rank ?? 30,
+      perms: perms ?? const [],
+    );
+  }
+
+  @override
+  Future<String> orgRoleRemove(String org, String role) async {
+    orgCalls.add('role-remove:$org:$role');
+    return 'removed role $role';
+  }
+
+  @override
+  Future<String> orgMemberInvite(String org, {String? to}) async {
+    orgCalls.add('invite:$org:${to ?? ""}');
+    return 'invited guest to $org as user. Invitation token from me: TOKEN';
+  }
+
+  @override
+  Future<String> orgMemberApprove(String org, String member) async {
+    orgCalls.add('approve:$org:$member');
+    return 'approved $member as user';
+  }
+
+  @override
+  Future<String> orgMemberReject(String org, String member) async {
+    orgCalls.add('reject:$org:$member');
+    return 'rejected $member';
+  }
+
+  @override
+  Future<String> orgMemberRole(String org, String member, String role) async {
+    orgCalls.add('member-role:$org:$member:$role');
+    return '$member is now $role';
+  }
+
+  @override
+  Future<String> orgMemberKick(
+    String org,
+    String member, {
+    String leftovers = 'keep',
+  }) async {
+    orgCalls.add('kick:$org:$member:$leftovers');
+    return 'removed $member';
+  }
+
+  @override
+  Future<String> orgResourceAdd(String org, String kind, String name) async {
+    orgCalls.add('resource-add:$org:$kind:$name');
+    return '$kind $name belongs to $org';
+  }
+
+  @override
+  Future<String> orgResourcePublish(String org, String resource) async {
+    orgCalls.add('publish:$org:$resource');
+    return '$resource: published members';
+  }
+
+  @override
+  Future<String> orgResourceArchive(String org, String resource) async {
+    orgCalls.add('archive:$org:$resource');
+    return '$resource: archived';
+  }
+
+  @override
+  Future<String> orgResourceRelease(String org, String resource) async {
+    orgCalls.add('release:$org:$resource');
+    return "$resource is no longer $org's (it stays here)";
+  }
+
+  @override
+  Future<OrgHostStatus> orgHostStatus() async => host;
+
+  @override
+  Future<OrgHostStatus> orgHostStart() async {
+    orgCalls.add('host-start');
+    host = const OrgHostStatus(
+      running: true,
+      ours: true,
+      url: 'https://127.0.0.1:8443/',
+      addr: '127.0.0.1:8443',
+      pid: 1,
+      orgs: ['lab'],
+      certSource: 'self-signed',
+    );
+    return host;
+  }
+
+  @override
+  Future<String> orgHostStop() async {
+    orgCalls.add('host-stop');
+    final was = host.running;
+    host = OrgHostStatus(autostart: host.autostart);
+    return was ? 'site stopped' : 'the site is not being served';
+  }
+
+  @override
+  Future<String> orgHostAutostart(bool on) async {
+    orgCalls.add('host-autostart:$on');
+    host = OrgHostStatus(
+      running: host.running,
+      ours: host.ours,
+      url: host.url,
+      addr: host.addr,
+      pid: host.pid,
+      orgs: host.orgs,
+      mirrors: host.mirrors,
+      certSource: host.certSource,
+      httpAddr: host.httpAddr,
+      autostart: on,
+    );
+    return on
+        ? 'the site starts with the node'
+        : 'the site starts only when asked';
+  }
+
   KeysStatus keys = const KeysStatus(
     initialized: true,
     dbId: 'db-aaaa-bbbb',

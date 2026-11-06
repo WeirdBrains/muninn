@@ -273,6 +273,16 @@ final orgOverviewProvider = FutureProvider<OrgOverview?>((ref) {
   return ref.watch(apiProvider).orgOverview();
 });
 
+final orgHostStatusProvider = FutureProvider<OrgHostStatus?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).orgHostStatus();
+});
+
+void refreshOrgs(WidgetRef ref) {
+  ref.invalidate(orgOverviewProvider);
+  ref.invalidate(orgHostStatusProvider);
+}
+
 /// `mnnn keys status` does not need the store password (the CLI does not either).
 final keysStatusProvider = FutureProvider<KeysStatus>((ref) {
   return ref.watch(apiProvider).keysStatus();

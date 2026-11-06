@@ -4,7 +4,7 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
-Projects (create, rename, describe, delete, attach and detach series), Net status, peers, start/stop, connect, invites, relays and sharing, a read-only Orgs list, Keys status and writes, File ▸ Import… / Export…
+Projects (create, rename, describe, delete, attach and detach series), Net status, peers, start/stop, connect, invites, relays and sharing, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
 (CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
@@ -31,7 +31,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project…
-  and Net ▸ Status / Start / Stop / Invite or connect / Peers / Relays / Shared, Orgs ▸ Organizations… and Keys ▸ Status… plus Initialize, Rotate,
+  and Net ▸ Status / Start / Stop / Invite or connect / Peers / Relays / Shared, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site and Keys ▸ Status… plus Initialize, Rotate,
   Rekey, Export, Recover and Re-issue shards. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
@@ -44,7 +44,7 @@ Users never need Rust: release builds ship the compiled library.
   `mnnn theme set` / `mnnn theme mode`), so the TUI and the app follow each other.
 - **Unlock:** Home, Data, Projects, Net and Orgs ask for the Muninn password once per session. The
   key stays in Rust memory (never in Dart, never on disk); **File ▸ Lock** forgets it.
-  Dashboard reads and the Orgs list open the store **read-only** (no migrations). Net status is read-only; start/stop, connect, invites, relays and sharing open it for writes after the same unlock.
+  Dashboard reads open the store **read-only** (no migrations). Net and Orgs overviews are read-only; Net writes and Orgs writes (create, edit, join, members, roles, resources, hosting) open the store for writes after the same unlock.
   Keys status does not unlock the store (same as `mnnn keys status`).
   **File ▸ Import…**, **Export…** and project writes (create, rename, describe, delete,
   attach or detach a series) open it for writes after the same unlock.
@@ -96,12 +96,21 @@ Users never need Rust: release builds ship the compiled library.
   platform-secure app sandbox the store already uses. Network settings, manual key
   exchanges, listing or fetching what a peer shares, network search, broadcast and
   dark shards stay in the TUI or CLI.
-- **Orgs:** read-only list and detail, like `mnnn org list` / `mnnn org show` (and the
-  TUI's Organizations and Joined pages). It shows organizations this node owns (visibility,
-  access, hosted, member count; expand for description, roles, members, resources, projects,
-  endpoints and template names), orgs this node has joined (status, role, node), and
-  mirrors (slug and when they were fetched, not the snapshot). Create, edit, join, leave
-  and hosting stay in the TUI or CLI.
+- **Orgs:** list and detail like `mnnn org list` / `mnnn org show` (and the TUI's
+  Organizations and Joined pages), plus the write flows those surfaces already have:
+  create (`mnnn org create` / New organization), edit (name, slug, description,
+  visibility, access, hosted, member sign-in, gated, template, apply/invite defaults),
+  remove, join with an invitation token or link, apply to an org on another node, sync
+  and leave, member invite / approve / reject / role / kick, role create / edit
+  permissions / remove, resource add / publish cycle / archive-restore / release, and
+  hosting start / stop / autostart (`mnnn org host`). Start site serves hosted orgs
+  in-process, the same way the TUI does; if another process is serving, Stop site asks
+  it to stop. When hosting autostart is on, starting the node also starts the site
+  (TUI / `mnnn net start`). Invite tokens are shown so the other node can join, matching
+  the TUI; host certificates and private keys stay in Rust. On a phone the site and
+  store use the same platform-secure app sandbox. Templates (HTML/CSS, assets, build),
+  domains, certificates, ACME, browse, fetch/give/mirror, endpoints, org projects and
+  code serve stay in the TUI or CLI.
 - **Keys:** status like `mnnn keys status`, plus the write flows the CLI provides
   (Initialize, Rotate, Rekey, Export, Recover from words or shards, Re-issue shards).
   It uses the same data dir as the store (on a phone, the platform-secure app sandbox;
@@ -213,7 +222,7 @@ comes in a later phase (see [sync](sync.md)).
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars, ingest and bar export, net status and peers, org list, keys status and writes, help topics), exposed with
+  projects and datasets, downsampled bars, ingest and bar export, net status and peers, org list and writes, keys status and writes, help topics), exposed with
   flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.
