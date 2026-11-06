@@ -10,6 +10,7 @@ import 'api/about.dart';
 import 'api/data.dart';
 import 'api/info.dart';
 import 'api/io.dart';
+import 'api/keys.dart';
 import 'api/net.dart';
 import 'api/orgs.dart';
 import 'api/prefs.dart';
@@ -80,6 +81,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IngestProgressSnap dco_decode_ingest_progress_snap(dynamic raw);
 
   @protected
+  KeysStatus dco_decode_keys_status(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
@@ -123,6 +127,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ProjectSummary> dco_decode_list_project_summary(dynamic raw);
+
+  @protected
+  List<ServiceKeyInfo> dco_decode_list_service_key_info(dynamic raw);
 
   @protected
   List<ThemeRole> dco_decode_list_theme_role(dynamic raw);
@@ -185,6 +192,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SavedState dco_decode_saved_state(dynamic raw);
+
+  @protected
+  ServiceKeyInfo dco_decode_service_key_info(dynamic raw);
 
   @protected
   ThemeChoice dco_decode_theme_choice(dynamic raw);
@@ -257,6 +267,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  KeysStatus sse_decode_keys_status(SseDeserializer deserializer);
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
@@ -312,6 +325,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ProjectSummary> sse_decode_list_project_summary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ServiceKeyInfo> sse_decode_list_service_key_info(
     SseDeserializer deserializer,
   );
 
@@ -378,6 +396,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SavedState sse_decode_saved_state(SseDeserializer deserializer);
+
+  @protected
+  ServiceKeyInfo sse_decode_service_key_info(SseDeserializer deserializer);
 
   @protected
   ThemeChoice sse_decode_theme_choice(SseDeserializer deserializer);
@@ -470,6 +491,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_keys_status(KeysStatus self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
@@ -547,6 +571,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_project_summary(
     List<ProjectSummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_service_key_info(
+    List<ServiceKeyInfo> self,
     SseSerializer serializer,
   );
 
@@ -630,6 +660,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_saved_state(SavedState self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_service_key_info(
+    ServiceKeyInfo self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_theme_choice(ThemeChoice self, SseSerializer serializer);

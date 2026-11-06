@@ -4,6 +4,7 @@ pub mod about;
 pub mod data;
 pub mod info;
 pub mod io;
+pub mod keys;
 pub mod net;
 pub mod orgs;
 pub mod prefs;
