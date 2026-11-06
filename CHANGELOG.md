@@ -40,7 +40,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: live workspace tree written to `[tui.layout]` after unlock (shared with the TUI)
 - Flutter app: model designer can create and edit fields as a draft, preview and apply migrations, roll versions back, and attach model-owned rules (`mnnn model` / TUI `D`)
 - Flutter app: model designer restores dropped fields by id (TUI `u`), imports and exports templates (`builtin:bars`, `.template.json`), creates, edits and bulk-updates records, and tests, dry-runs or runs a model-owned rule on the last history action (TUI `x` / Enter)
-- `scripts/flutter-dist.sh` builds Linux tarball and `.deb` packages of the Flutter app (package name `muninn-app`, separate from the TUI `muninn` packages)
+- `scripts/flutter-dist.sh` builds Linux tarball and `.deb` packages of the Flutter app, and a macOS `.dmg` with `Muninn.app` plus an Applications shortcut (package name `muninn-app`, separate from the TUI `muninn` packages)
 
 ## [2.22.0] - 2026-11-05
 

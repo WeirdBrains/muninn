@@ -419,10 +419,20 @@ On Linux amd64 that writes:
 
 Needs GTK 3 at runtime. `SKIP_BUILD=1` reuses `app/build/linux/<arch>/release/bundle`.
 
-Still planned: Windows setup / MSIX, macOS `.dmg`, Homebrew cask, `.rpm` for other
-arches, TestFlight, Google Play testing tracks, then store listings. Builds can
-later be attached to GitHub releases (APKs, TestFlight links) once those recipes
-exist; this script does not cut a tag.
+On macOS (Swift Package Manager, not CocoaPods) the same script writes:
+
+- `$DIST/muninn-app-<ver>-universal-apple-darwin.dmg` — `Muninn.app` plus an Applications
+  shortcut, LICENSE and changelog (`universal` when `flutter build macos --release`
+  produces a fat arm64+x86_64 binary; otherwise `aarch64-apple-darwin` or
+  `x86_64-apple-darwin`). `SKIP_BUILD=1` reuses `app/build/macos/Build/Products/Release/*.app`.
+
+The image is not notarized. Drag Muninn into Applications, or open the `.app` from
+the disk image. The data directory is still `MUNINN_HOME` or `~/.muninn`.
+
+Still planned: Windows setup / MSIX, Homebrew cask, `.rpm` for other arches,
+TestFlight, Google Play testing tracks, then store listings. Builds can later
+be attached to GitHub releases (APKs, TestFlight links) once those recipes exist;
+this script does not cut a tag.
 
 ## Icons
 
