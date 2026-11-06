@@ -194,7 +194,7 @@ const features = [
 const installs = [
   (
     'Windows (setup.exe)',
-    'Download muninn-2.22.0-x86_64-windows-setup.exe from the release and run it.\nThe installer is unsigned, so SmartScreen may warn: More info, then Run anyway. Firewall prompt: Allow for peer-to-peer.\nOr: winget install WeirdBrains.Muninn (it can seem to hang at "Starting package install" while SmartScreen checks the unsigned installer)',
+    'Download muninn-2.22.0-x86_64-windows-setup.exe from the release and run it.\nThe installer is unsigned, so SmartScreen may warn: More info, then Run anyway. Firewall prompt: Allow for peer-to-peer.\nOr: winget install WeirdBrains.muninn.tui (it can seem to hang at "Starting package install" while SmartScreen checks the unsigned installer)',
   ),
   (
     'macOS (dmg)',

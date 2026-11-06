@@ -46,7 +46,7 @@ fn the_site_links_releases_docs_and_install_steps() {
         "brew install",
         "windows-setup.exe",
         "macos.dmg",
-        "winget install WeirdBrains.Muninn",
+        "winget install WeirdBrains.muninn.tui",
     ] {
         assert!(app.contains(want), "site/lib/app.dart lacks {want}");
     }

@@ -86,15 +86,15 @@ fn the_homebrew_tap_has_a_formula_and_a_cask() {
 #[test]
 fn the_winget_manifests_use_the_inno_setup_installer() {
     let ver = env!("CARGO_PKG_VERSION");
-    let dir = format!("packaging/winget/manifests/w/WeirdBrains/Muninn/{ver}");
-    let inst = read(&format!("{dir}/WeirdBrains.Muninn.installer.yaml"));
-    for want in ["InstallerType: inno", "Scope: user", "PackageIdentifier: WeirdBrains.Muninn"] {
+    let dir = format!("packaging/winget/manifests/w/WeirdBrains/muninn/tui/{ver}");
+    let inst = read(&format!("{dir}/WeirdBrains.muninn.tui.installer.yaml"));
+    for want in ["InstallerType: inno", "Scope: user", "PackageIdentifier: WeirdBrains.muninn.tui"] {
         assert!(inst.contains(want), "winget installer lacks {want}");
     }
     for arch in ["x86_64", "aarch64"] {
         assert!(inst.contains(&format!("v{ver}/muninn-{ver}-{arch}-windows-setup.exe")));
     }
-    assert!(read(&format!("{dir}/WeirdBrains.Muninn.yaml")).contains(&format!("PackageVersion: {ver}")));
+    assert!(read(&format!("{dir}/WeirdBrains.muninn.tui.yaml")).contains(&format!("PackageVersion: {ver}")));
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn every_packaging_template_pins_the_workspace_version() {
         assert!(read(p).lines().any(|l| l == format!("pkgver={ver}")), "{p} should have pkgver={ver}");
     }
     assert!(read("site/lib/app.dart").contains(&format!("const version = '{ver}';")));
-    let winget: Vec<_> = std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("packaging/winget/manifests/w/WeirdBrains/Muninn"))
+    let winget: Vec<_> = std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("packaging/winget/manifests/w/WeirdBrains/muninn/tui"))
         .unwrap()
         .map(|e| e.unwrap().file_name().into_string().unwrap())
         .collect();
@@ -183,7 +183,7 @@ fn fill_sums_skips_missing_dmg_and_setup_exes_but_not_tarballs() {
     assert!(out.join("arch/PKGBUILD").exists() && out.join("homebrew/Formula/muninn.rb").exists());
     assert!(!out.join("homebrew/Casks/muninn.rb").exists());
     assert!(!out.join("homebrew/Casks/muninn-app.rb").exists());
-    assert!(!out.join(format!("winget/manifests/w/WeirdBrains/Muninn/{ver}")).exists());
+    assert!(!out.join(format!("winget/manifests/w/WeirdBrains/muninn/tui/{ver}")).exists());
     // everything there: every file, with the setup sums in the installer manifest
     let extra =
         [format!("muninn-{ver}-macos.dmg"), format!("muninn-{ver}-x86_64-windows-setup.exe"), format!("muninn-{ver}-aarch64-windows-setup.exe"), format!("muninn-app-{ver}-universal-apple-darwin.dmg")];
@@ -193,7 +193,7 @@ fn fill_sums_skips_missing_dmg_and_setup_exes_but_not_tarballs() {
     assert!(o.status.success() && !String::from_utf8_lossy(&o.stderr).contains("warning"), "{}", String::from_utf8_lossy(&o.stderr));
     assert!(out.join("homebrew/Casks/muninn.rb").exists());
     assert!(out.join("homebrew/Casks/muninn-app.rb").exists());
-    let inst = std::fs::read_to_string(out.join(format!("winget/manifests/w/WeirdBrains/Muninn/{ver}/WeirdBrains.Muninn.installer.yaml"))).unwrap();
+    let inst = std::fs::read_to_string(out.join(format!("winget/manifests/w/WeirdBrains/muninn/tui/{ver}/WeirdBrains.muninn.tui.installer.yaml"))).unwrap();
     assert!(inst.contains(&format!("{:064X}", 6)) && inst.contains(&format!("{:064X}", 7)), "{inst}");
     // a missing tarball still fails, naming it
     sums(&names[1..]);

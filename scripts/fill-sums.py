@@ -6,7 +6,7 @@ Usage: scripts/fill-sums.py [<version>] <dist-dir>
 Reads <dist-dir>/SHA256SUMS and writes into <dist-dir>/packaging/:
   arch/PKGBUILD (muninn-bin), homebrew/Formula/muninn.rb, homebrew/Casks/muninn.rb,
   homebrew/Casks/muninn-app.rb,
-  winget/manifests/w/WeirdBrains/Muninn/<version>/*.yaml (ready for winget-pkgs)
+  winget/manifests/w/WeirdBrains/muninn/tui/<version>/*.yaml (ready for winget-pkgs)
 The Linux and macOS tarballs must be listed (else it fails, naming them). The TUI
 macOS .dmg, the Flutter muninn-app .dmg and the Windows setup.exe are built on
 other machines and may be missing: then that cask or the winget manifests are
@@ -78,7 +78,7 @@ if app_dmg:
     write("homebrew/Casks/muninn-app.rb", s)
 
 # winget: newest template directory, retargeted to this version; Inno Setup installers
-wroot = "winget/manifests/w/WeirdBrains/Muninn"
+wroot = "winget/manifests/w/WeirdBrains/muninn/tui"
 tdir = sorted((root / "packaging" / wroot).iterdir(),
               key=lambda p: [int(x) for x in p.name.split(".")])[-1]
 setups = {a: optional(f"muninn-{ver}-{a}-windows-setup.exe", "the winget manifests") for a in ("x86_64", "aarch64")}

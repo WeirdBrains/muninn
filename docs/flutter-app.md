@@ -398,6 +398,8 @@ See [architecture](architecture.md) for the crate layout.
 - Publisher **WeirdBrains**; homepage and support: https://muninn.weirdbrains.com
 - Bundle / application id: `com.weirdbrains.muninn` (Android, iOS, macOS); Linux
   application id `com.weirdbrains.muninn`; Windows company name WeirdBrains.
+  Windows MSIX/Store identity: `WeirdBrains.Muninn`. The TUI winget package is
+  `WeirdBrains.muninn.tui` (not this id).
 - Apple builds use Swift Package Manager (`flutter config --enable-swift-package-manager`),
   not CocoaPods.
 
@@ -479,6 +481,9 @@ same script writes:
   (`certutil -user -addstore Root test_certificate.pfx` after exporting / using
   the cert the `msix` package generates under the app directory), then
   `Add-AppxPackage .\muninn-app-<ver>-x86_64.msix`.
+
+The Flutter MSIX/Store `identity_name` is `WeirdBrains.Muninn` (`app/pubspec.yaml`).
+The TUI/CLI winget id is `WeirdBrains.muninn.tui` (see `packaging/winget/`).
 
 Needs Visual Studio Build Tools with the Windows desktop C++ workload, Flutter
 Windows desktop enabled (`flutter config --enable-windows-desktop`), and Inno

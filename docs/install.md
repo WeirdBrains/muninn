@@ -58,12 +58,21 @@ if you like.
 ### Windows: winget
 
 ```powershell
-winget install WeirdBrains.Muninn
+winget install WeirdBrains.muninn.tui
 ```
 
-This runs the same `setup.exe` silently. Muninn's entry was submitted to the public winget
-catalogue with v2.22.0; until Microsoft merges it, winget reports "No package found", so
-use `setup.exe` meanwhile. Uninstall: `winget uninstall WeirdBrains.Muninn`.
+This runs the same TUI `setup.exe` silently (`mnnn`). The winget id is
+`WeirdBrains.muninn.tui` (the Flutter app's MSIX/Store id is `WeirdBrains.Muninn`).
+Nothing is in the public catalogue yet, so winget reports "No package found" until a
+winget-pkgs PR lands — use `setup.exe` meanwhile. Uninstall:
+`winget uninstall WeirdBrains.muninn.tui`.
+
+If you previously installed under the old id `WeirdBrains.Muninn`:
+
+```powershell
+winget uninstall WeirdBrains.Muninn
+winget install WeirdBrains.muninn.tui
+```
 
 Because the installer is unsigned, SmartScreen may check it before it runs, and winget can
 seem to hang at **Starting package install…** while it does (or while a SmartScreen prompt

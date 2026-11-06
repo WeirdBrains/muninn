@@ -86,7 +86,7 @@ Every package ships a prebuilt `mnnn` binary; no Rust is needed. Downloads and
 | Fedora | `muninn-2.20.1-1.x86_64.rpm`, `muninn-2.20.1-1.aarch64.rpm` | `sudo dnf install ./muninn-2.20.1-1.x86_64.rpm` |
 | Arch Linux | `muninn-bin-2.20.1-1-x86_64.pkg.tar.zst`, `…-aarch64.pkg.tar.zst` | `sudo pacman -U muninn-bin-2.20.1-1-x86_64.pkg.tar.zst` |
 | Homebrew | tap `weirdbrains/tap` | `brew install weirdbrains/tap/muninn` (or `--cask` for Muninn.app) |
-| Windows (x64, arm64) | `muninn-2.20.1-x86_64-windows-setup.exe`, `…-aarch64-windows-setup.exe` (and portable zips) | run the setup.exe, or `winget install WeirdBrains.Muninn` |
+| Windows (x64, arm64) | `muninn-2.20.1-x86_64-windows-setup.exe`, `…-aarch64-windows-setup.exe` (and portable zips) | run the setup.exe, or `winget install WeirdBrains.muninn.tui` |
 | macOS app | `muninn-2.20.1-macos.dmg` | open it and drag Muninn to Applications |
 
 Then try it somewhere disposable:

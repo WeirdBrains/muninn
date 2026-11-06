@@ -32,7 +32,7 @@ releases are made.
 5. Publish the package managers from `dist/packaging`: copy `homebrew/Formula/muninn.rb`,
    `homebrew/Casks/muninn.rb` and `homebrew/Casks/muninn-app.rb` into
    [WeirdBrains/homebrew-tap](https://github.com/WeirdBrains/homebrew-tap) and push; copy
-   `winget/manifests/w/WeirdBrains/Muninn/X.Y.Z` into a fork of microsoft/winget-pkgs,
+   `winget/manifests/w/WeirdBrains/muninn/tui/X.Y.Z` into a fork of microsoft/winget-pkgs,
    run `winget validate --manifest` on Windows, and open a PR.
 
 The release is named `Muninn vX.Y.Z` and its notes are the version's `CHANGELOG.md`

@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Changed
+- Windows winget PackageIdentifier for the TUI/CLI is now `WeirdBrains.muninn.tui` (was `WeirdBrains.Muninn`, reserved for the Flutter app MSIX/Store identity). Existing winget users: `winget uninstall WeirdBrains.Muninn` then `winget install WeirdBrains.muninn.tui`.
+
 ### Added
 - Flutter app: File ▸ Import… and Export… (CSV, Parquet, JSON), opening the store for writes after unlock
 - Flutter app: File ▸ Preferences… edits the saved theme, mode, time range and dataset in preferences.toml (shared with the TUI)

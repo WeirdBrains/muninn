@@ -42,7 +42,7 @@ pinned=(
 )
 sed -i "s/$oldre/$ver/g" "${pinned[@]}"
 # winget: move the template directory to the new version
-wd=packaging/winget/manifests/w/WeirdBrains/Muninn
+wd=packaging/winget/manifests/w/WeirdBrains/muninn/tui
 git mv "$wd/$old" "$wd/$ver"
 sed -i "s/$oldre/$ver/g" "$wd/$ver"/*.yaml
 
