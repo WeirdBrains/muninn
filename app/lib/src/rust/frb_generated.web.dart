@@ -46,6 +46,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AboutInfo dco_decode_about_info(dynamic raw);
 
   @protected
+  AliasInfo dco_decode_alias_info(dynamic raw);
+
+  @protected
   BarPoint dco_decode_bar_point(dynamic raw);
 
   @protected
@@ -110,6 +113,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<AliasInfo> dco_decode_list_alias_info(dynamic raw);
 
   @protected
   List<BarPoint> dco_decode_list_bar_point(dynamic raw);
@@ -188,6 +194,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ServiceKeyInfo> dco_decode_list_service_key_info(dynamic raw);
+
+  @protected
+  List<SourceDataItem> dco_decode_list_source_data_item(dynamic raw);
+
+  @protected
+  List<SourceInfo> dco_decode_list_source_info(dynamic raw);
+
+  @protected
+  List<SymbolInfo> dco_decode_list_symbol_info(dynamic raw);
 
   @protected
   List<ThemeRole> dco_decode_list_theme_role(dynamic raw);
@@ -300,6 +315,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ServiceKeyInfo dco_decode_service_key_info(dynamic raw);
 
   @protected
+  SourceDataItem dco_decode_source_data_item(dynamic raw);
+
+  @protected
+  SourceInfo dco_decode_source_info(dynamic raw);
+
+  @protected
+  SymbolInfo dco_decode_symbol_info(dynamic raw);
+
+  @protected
   ThemeChoice dco_decode_theme_choice(dynamic raw);
 
   @protected
@@ -325,6 +349,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AboutInfo sse_decode_about_info(SseDeserializer deserializer);
+
+  @protected
+  AliasInfo sse_decode_alias_info(SseDeserializer deserializer);
 
   @protected
   BarPoint sse_decode_bar_point(SseDeserializer deserializer);
@@ -397,6 +424,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<AliasInfo> sse_decode_list_alias_info(SseDeserializer deserializer);
 
   @protected
   List<BarPoint> sse_decode_list_bar_point(SseDeserializer deserializer);
@@ -503,6 +533,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ServiceKeyInfo> sse_decode_list_service_key_info(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<SourceDataItem> sse_decode_list_source_data_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<SourceInfo> sse_decode_list_source_info(SseDeserializer deserializer);
+
+  @protected
+  List<SymbolInfo> sse_decode_list_symbol_info(SseDeserializer deserializer);
 
   @protected
   List<ThemeRole> sse_decode_list_theme_role(SseDeserializer deserializer);
@@ -619,6 +660,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ServiceKeyInfo sse_decode_service_key_info(SseDeserializer deserializer);
 
   @protected
+  SourceDataItem sse_decode_source_data_item(SseDeserializer deserializer);
+
+  @protected
+  SourceInfo sse_decode_source_info(SseDeserializer deserializer);
+
+  @protected
+  SymbolInfo sse_decode_symbol_info(SseDeserializer deserializer);
+
+  @protected
   ThemeChoice sse_decode_theme_choice(SseDeserializer deserializer);
 
   @protected
@@ -650,6 +700,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_about_info(AboutInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_alias_info(AliasInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_bar_point(BarPoint self, SseSerializer serializer);
@@ -740,6 +793,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_alias_info(
+    List<AliasInfo> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_bar_point(List<BarPoint> self, SseSerializer serializer);
@@ -892,6 +951,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_source_data_item(
+    List<SourceDataItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_source_info(
+    List<SourceInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_symbol_info(
+    List<SymbolInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_theme_role(
     List<ThemeRole> self,
     SseSerializer serializer,
@@ -1031,6 +1108,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     ServiceKeyInfo self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_source_data_item(
+    SourceDataItem self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_source_info(SourceInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_symbol_info(SymbolInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_theme_choice(ThemeChoice self, SseSerializer serializer);

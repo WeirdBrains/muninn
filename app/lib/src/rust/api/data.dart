@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `open_write`, `open`, `overview_of`, `project_series_of`, `query_of`
+// These functions are ignored because they are not marked as `pub`: `add_source_of`, `add_symbol_of`, `data_item`, `export_source_data_of`, `list_aliases_of`, `list_source_data_of`, `list_sources_of`, `list_symbols_of`, `open_write`, `open`, `overview_of`, `project_series_of`, `query_of`, `remove_source_of`, `rename_source_of`, `source_info`
 
 /// Unlock with the Muninn password. The key stays in Rust; Dart never sees it.
 Future<void> unlock({String? home, required String password}) =>
@@ -44,6 +44,82 @@ Future<List<BarPoint>> queryBars({
   to: to,
   maxPoints: maxPoints,
 );
+
+/// `mnnn sources list`. The store is opened read-only.
+Future<List<SourceInfo>> listSources() =>
+    RustLib.instance.api.crateApiDataListSources();
+
+/// `mnnn sources add`. Opens the store for writes.
+Future<SourceInfo> addSource({
+  required String name,
+  required String kind,
+  String? locator,
+}) => RustLib.instance.api.crateApiDataAddSource(
+  name: name,
+  kind: kind,
+  locator: locator,
+);
+
+/// `mnnn sources rename`. Recomputes bar ids; returns how many bars changed.
+Future<PlatformInt64> renameSource({
+  required String from,
+  required String to,
+}) => RustLib.instance.api.crateApiDataRenameSource(from: from, to: to);
+
+/// `mnnn sources remove`. Deletes the source, its bars and its stored items.
+Future<PlatformInt64> removeSource({required String name}) =>
+    RustLib.instance.api.crateApiDataRemoveSource(name: name);
+
+/// `mnnn sources data NAME`. Metadata only; bytes stay in Rust.
+Future<List<SourceDataItem>> listSourceData({required String name}) =>
+    RustLib.instance.api.crateApiDataListSourceData(name: name);
+
+/// `mnnn sources cat NAME ITEM`: write the stored bytes to [path]. The blob never enters Dart.
+Future<PlatformInt64> exportSourceData({
+  required String name,
+  required String item,
+  required String path,
+}) => RustLib.instance.api.crateApiDataExportSourceData(
+  name: name,
+  item: item,
+  path: path,
+);
+
+/// `mnnn symbols list` (the pairs). Aliases are [`list_aliases`].
+Future<List<SymbolInfo>> listSymbols() =>
+    RustLib.instance.api.crateApiDataListSymbols();
+
+/// `alias A -> C` lines from `mnnn symbols list`.
+Future<List<AliasInfo>> listAliases() =>
+    RustLib.instance.api.crateApiDataListAliases();
+
+/// `mnnn symbols add`. [aliases] apply to the base asset (e.g. XBT for BTC).
+Future<SymbolInfo> addSymbol({
+  required String symbol,
+  required List<String> aliases,
+}) => RustLib.instance.api.crateApiDataAddSymbol(
+  symbol: symbol,
+  aliases: aliases,
+);
+
+/// An asset alias (`alias XBT -> BTC` on `mnnn symbols list`).
+class AliasInfo {
+  final String alias;
+  final String canonical;
+
+  const AliasInfo({required this.alias, required this.canonical});
+
+  @override
+  int get hashCode => alias.hashCode ^ canonical.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AliasInfo &&
+          runtimeType == other.runtimeType &&
+          alias == other.alias &&
+          canonical == other.canonical;
+}
 
 class BarPoint {
   final PlatformInt64 ts;
@@ -229,4 +305,117 @@ class ProjectSummary {
           name == other.name &&
           description == other.description &&
           updatedAt == other.updatedAt;
+}
+
+/// One stored item under a source (`mnnn sources data`), without its bytes.
+class SourceDataItem {
+  final String id;
+  final String name;
+  final String format;
+  final String locator;
+  final PlatformInt64 size;
+  final String contentHash;
+  final PlatformInt64 receivedAt;
+
+  const SourceDataItem({
+    required this.id,
+    required this.name,
+    required this.format,
+    required this.locator,
+    required this.size,
+    required this.contentHash,
+    required this.receivedAt,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      format.hashCode ^
+      locator.hashCode ^
+      size.hashCode ^
+      contentHash.hashCode ^
+      receivedAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SourceDataItem &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          format == other.format &&
+          locator == other.locator &&
+          size == other.size &&
+          contentHash == other.contentHash &&
+          receivedAt == other.receivedAt;
+}
+
+/// One ingest source (`mnnn sources list` / TUI Data ▸ Sources…).
+class SourceInfo {
+  final String id;
+  final String name;
+  final String kind;
+  final String? locator;
+  final PlatformInt64 createdAt;
+  final PlatformInt64 items;
+  final PlatformInt64 bytes;
+
+  const SourceInfo({
+    required this.id,
+    required this.name,
+    required this.kind,
+    this.locator,
+    required this.createdAt,
+    required this.items,
+    required this.bytes,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      kind.hashCode ^
+      locator.hashCode ^
+      createdAt.hashCode ^
+      items.hashCode ^
+      bytes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SourceInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          kind == other.kind &&
+          locator == other.locator &&
+          createdAt == other.createdAt &&
+          items == other.items &&
+          bytes == other.bytes;
+}
+
+/// A known trading pair (`mnnn symbols list` / TUI Data ▸ Symbols…).
+class SymbolInfo {
+  final String symbol;
+  final String base;
+  final String quote;
+
+  const SymbolInfo({
+    required this.symbol,
+    required this.base,
+    required this.quote,
+  });
+
+  @override
+  int get hashCode => symbol.hashCode ^ base.hashCode ^ quote.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SymbolInfo &&
+          runtimeType == other.runtimeType &&
+          symbol == other.symbol &&
+          base == other.base &&
+          quote == other.quote;
 }

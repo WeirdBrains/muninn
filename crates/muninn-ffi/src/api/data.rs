@@ -4,7 +4,8 @@
 use super::info::paths;
 use muninn_core::crypto::Key32;
 use muninn_core::model::{Duration, Symbol};
-use muninn_core::store::{BarFilter, Store};
+use muninn_core::store::{BarFilter, NewAction, Store};
+use serde_json::json;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -195,6 +196,186 @@ pub(crate) fn query_of(
         .collect())
 }
 
+/// One ingest source (`mnnn sources list` / TUI Data ▸ Sources…).
+pub struct SourceInfo {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub locator: Option<String>,
+    pub created_at: i64,
+    pub items: i64,
+    pub bytes: i64,
+}
+
+/// One stored item under a source (`mnnn sources data`), without its bytes.
+pub struct SourceDataItem {
+    pub id: String,
+    pub name: String,
+    pub format: String,
+    pub locator: String,
+    pub size: i64,
+    pub content_hash: String,
+    pub received_at: i64,
+}
+
+/// A known trading pair (`mnnn symbols list` / TUI Data ▸ Symbols…).
+pub struct SymbolInfo {
+    pub symbol: String,
+    pub base: String,
+    pub quote: String,
+}
+
+/// An asset alias (`alias XBT -> BTC` on `mnnn symbols list`).
+pub struct AliasInfo {
+    pub alias: String,
+    pub canonical: String,
+}
+
+fn source_info(s: &Store, src: muninn_core::model::Source) -> anyhow::Result<SourceInfo> {
+    let (items, bytes) = s.source_data_totals(&src.id)?;
+    Ok(SourceInfo {
+        id: src.id,
+        name: src.name,
+        kind: src.kind,
+        locator: src.locator,
+        created_at: src.created_at,
+        items: items as i64,
+        bytes: bytes as i64,
+    })
+}
+
+pub(crate) fn list_sources_of(s: &Store) -> anyhow::Result<Vec<SourceInfo>> {
+    s.sources()?.into_iter().map(|src| source_info(s, src)).collect()
+}
+
+/// `mnnn sources list`. The store is opened read-only.
+pub fn list_sources() -> anyhow::Result<Vec<SourceInfo>> {
+    list_sources_of(&open()?)
+}
+
+pub(crate) fn add_source_of(s: &Store, name: &str, kind: &str, locator: Option<&str>) -> anyhow::Result<SourceInfo> {
+    let kind = if kind.trim().is_empty() { "file" } else { kind.trim() };
+    let src = s.add_source(name, kind, locator)?;
+    source_info(s, src)
+}
+
+/// `mnnn sources add`. Opens the store for writes.
+pub fn add_source(name: String, kind: String, locator: Option<String>) -> anyhow::Result<SourceInfo> {
+    let s = open_write()?;
+    let info = add_source_of(&s, &name, &kind, locator.as_deref())?;
+    s.note_action(&NewAction::new("source.add", "app", format!("add source {}", info.name)).params(json!({ "source": info.name, "kind": info.kind })));
+    Ok(info)
+}
+
+pub(crate) fn rename_source_of(s: &mut Store, from: &str, to: &str) -> anyhow::Result<i64> {
+    Ok(s.rename_source(from, to)? as i64)
+}
+
+/// `mnnn sources rename`. Recomputes bar ids; returns how many bars changed.
+pub fn rename_source(from: String, to: String) -> anyhow::Result<i64> {
+    let mut s = open_write()?;
+    let n = rename_source_of(&mut s, &from, &to)?;
+    s.note_action(
+        &NewAction::new("source.rename", "app", format!("rename source {from} to {to}")).params(json!({ "from": from, "to": to, "bars": n })),
+    );
+    Ok(n)
+}
+
+pub(crate) fn remove_source_of(s: &Store, name: &str) -> anyhow::Result<i64> {
+    Ok(s.remove_source(name)? as i64)
+}
+
+/// `mnnn sources remove`. Deletes the source, its bars and its stored items.
+pub fn remove_source(name: String) -> anyhow::Result<i64> {
+    let s = open_write()?;
+    let n = remove_source_of(&s, &name)?;
+    s.note_action(
+        &NewAction::new("source.remove", "app", format!("remove source {name} ({n} bars)")).params(json!({ "source": name, "bars": n })),
+    );
+    Ok(n)
+}
+
+fn data_item(i: muninn_core::store::SourceData) -> SourceDataItem {
+    SourceDataItem {
+        id: i.id,
+        name: i.name,
+        format: i.format,
+        locator: i.locator,
+        size: i.size.min(i64::MAX as u64) as i64,
+        content_hash: i.content_hash,
+        received_at: i.received_at,
+    }
+}
+
+pub(crate) fn list_source_data_of(s: &Store, name: &str) -> anyhow::Result<Vec<SourceDataItem>> {
+    let src = s.source_by_name(name)?.ok_or_else(|| anyhow::anyhow!("no source `{name}`"))?;
+    Ok(s.source_data(&src.id)?.into_iter().map(data_item).collect())
+}
+
+/// `mnnn sources data NAME`. Metadata only; bytes stay in Rust.
+pub fn list_source_data(name: String) -> anyhow::Result<Vec<SourceDataItem>> {
+    list_source_data_of(&open()?, &name)
+}
+
+pub(crate) fn export_source_data_of(s: &Store, name: &str, item: &str, path: &str) -> anyhow::Result<i64> {
+    let src = s.source_by_name(name)?.ok_or_else(|| anyhow::anyhow!("no source `{name}`"))?;
+    let want = item.trim();
+    let found: Vec<_> = s.source_data(&src.id)?.into_iter().filter(|i| i.id.starts_with(want)).collect();
+    let i = match found.as_slice() {
+        [one] => one,
+        [] => anyhow::bail!("no item `{item}` in {name} (`mnnn sources data {name}`)"),
+        _ => anyhow::bail!("`{item}` matches {} items; give more of the id", found.len()),
+    };
+    let bytes = s.source_data_bytes(&i.id)?;
+    let n = bytes.len() as i64;
+    std::fs::write(path, bytes)?;
+    Ok(n)
+}
+
+/// `mnnn sources cat NAME ITEM`: write the stored bytes to [path]. The blob never enters Dart.
+pub fn export_source_data(name: String, item: String, path: String) -> anyhow::Result<i64> {
+    export_source_data_of(&open()?, &name, &item, &path)
+}
+
+pub(crate) fn list_symbols_of(s: &Store) -> anyhow::Result<Vec<SymbolInfo>> {
+    Ok(s.symbols()?
+        .into_iter()
+        .map(|sym| SymbolInfo { symbol: sym.display(), base: sym.base, quote: sym.quote })
+        .collect())
+}
+
+/// `mnnn symbols list` (the pairs). Aliases are [`list_aliases`].
+pub fn list_symbols() -> anyhow::Result<Vec<SymbolInfo>> {
+    list_symbols_of(&open()?)
+}
+
+pub(crate) fn list_aliases_of(s: &Store) -> anyhow::Result<Vec<AliasInfo>> {
+    Ok(s.aliases()?.into_iter().map(|(alias, canonical)| AliasInfo { alias, canonical }).collect())
+}
+
+/// `alias A -> C` lines from `mnnn symbols list`.
+pub fn list_aliases() -> anyhow::Result<Vec<AliasInfo>> {
+    list_aliases_of(&open()?)
+}
+
+pub(crate) fn add_symbol_of(s: &Store, symbol: &str, aliases: &[String]) -> anyhow::Result<SymbolInfo> {
+    let sym = Symbol::parse(symbol)?;
+    s.add_symbol(&sym, aliases)?;
+    Ok(SymbolInfo { symbol: sym.display(), base: sym.base, quote: sym.quote })
+}
+
+/// `mnnn symbols add`. [aliases] apply to the base asset (e.g. XBT for BTC).
+pub fn add_symbol(symbol: String, aliases: Vec<String>) -> anyhow::Result<SymbolInfo> {
+    let s = open_write()?;
+    let info = add_symbol_of(&s, &symbol, &aliases)?;
+    s.note_action(
+        &NewAction::new("symbol.add", "app", format!("add symbol {}", info.symbol))
+            .params(json!({ "symbol": info.symbol, "aliases": aliases })),
+    );
+    Ok(info)
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,5 +421,50 @@ mod tests {
         assert!(ps[0].item_id > 0);
         assert_eq!((ps[0].base.as_str(), ps[0].from, ps[0].to), ("BTC", Some(t0), None));
         assert_eq!(overview_of(&s).unwrap().datasets[0].count, 1000);
+    }
+
+    #[test]
+    fn sources_and_symbols_match_cli() {
+        use muninn_core::store::NewSourceData;
+        let mut s = Store::open_in_memory().unwrap();
+        let added = add_source_of(&s, "local", "directory", Some("/d")).unwrap();
+        assert_eq!((added.name.as_str(), added.kind.as_str(), added.locator.as_deref(), added.items), ("local", "directory", Some("/d"), 0));
+        assert_eq!(list_sources_of(&s).unwrap().len(), 1);
+
+        let bytes = b"hello,bars\n";
+        let n = NewSourceData { locator: "/d/x.csv", name: "x.csv", format: "csv", content_hash: "h1", data: bytes, run_id: None };
+        s.add_source_data(&added.id, &n).unwrap();
+        let items = list_source_data_of(&s, "local").unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!((items[0].name.as_str(), items[0].size, items[0].format.as_str()), ("x.csv", bytes.len() as i64, "csv"));
+        assert_eq!(list_sources_of(&s).unwrap()[0].items, 1);
+
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("out.csv");
+        let wrote = export_source_data_of(&s, "local", &items[0].id[..8], dest.to_str().unwrap()).unwrap();
+        assert_eq!(wrote, bytes.len() as i64);
+        assert_eq!(std::fs::read(&dest).unwrap(), bytes);
+
+        let src = s.add_source("coinbase", "csv", None).unwrap();
+        let t0 = 1_704_067_200_000i64;
+        let bars = vec![muninn_core::model::Bar { ts: t0, open: 1.0, high: 2.0, low: 0.5, close: 1.5, volume: 1.0, flags: 0 }];
+        s.upsert_bars(&src, &Symbol::new("BTC", "USD"), Duration(300), &bars).unwrap();
+        let n = rename_source_of(&mut s, "coinbase", "cb").unwrap();
+        assert_eq!(n, 1);
+        assert!(s.source_by_name("coinbase").unwrap().is_none());
+        assert_eq!(s.source_by_name("cb").unwrap().unwrap().name, "cb");
+
+        let sym = add_symbol_of(&s, "ETH/USDT", &["ETHER".into()]).unwrap();
+        assert_eq!((sym.symbol.as_str(), sym.base.as_str(), sym.quote.as_str()), ("ETH/USDT", "ETH", "USDT"));
+        let symbols = list_symbols_of(&s).unwrap();
+        assert!(symbols.iter().any(|x| x.symbol == "BTC/USD"));
+        assert!(symbols.iter().any(|x| x.symbol == "ETH/USDT"));
+        let aliases = list_aliases_of(&s).unwrap();
+        assert!(aliases.iter().any(|a| a.alias == "ETHER" && a.canonical == "ETH"));
+
+        let removed = remove_source_of(&s, "local").unwrap();
+        assert_eq!(removed, 0);
+        assert!(list_sources_of(&s).unwrap().iter().all(|x| x.name != "local"));
+        assert!(list_source_data_of(&s, "local").is_err());
     }
 }
