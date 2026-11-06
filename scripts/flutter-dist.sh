@@ -378,27 +378,38 @@ INSTALL
     echo "skipping setup.exe: Inno Setup ISCC not found (winget install --id JRSoftware.InnoSetup -e)" >&2
   fi
 
-  # MSIX via the msix pub package (store: false; unsigned eyeball OK)
-  if ( cd "$root/app" && dart run msix:create --help >/dev/null 2>&1 ); then
-    ( cd "$root/app" && dart run msix:create )
-    msix_built=
-    for cand in \
-      "$bundle/muninn.msix" \
-      "$root/app/build/windows/$flutter_arch/runner/Release/muninn.msix" \
-      "$bundle"/*.msix \
-      "$root/app/build/windows/$flutter_arch/runner/Release"/*.msix; do
-      if [[ -f $cand ]]; then msix_built=$cand; break; fi
-    done
-    # Also search freshly under build/
-    if [[ -z ${msix_built:-} ]]; then
-      msix_built=$(find "$root/app/build/windows" -name '*.msix' -type f 2>/dev/null | head -1 || true)
+  # MSIX via the msix pub package (store: false; test-cert signed, no interactive
+  # cert install prompt). msix has no --help; detect via pubspec.lock / .dart_tool.
+  if grep -qE '^[[:space:]]*msix:' "$root/app/pubspec.yaml" 2>/dev/null; then
+    local msix_out_dir=$dist
+    if command -v cygpath >/dev/null 2>&1; then
+      msix_out_dir=$(cygpath -w "$dist")
     fi
-    if [[ -n ${msix_built:-} && -f $msix_built ]]; then
-      msix_out=$dist/muninn-app-$ver-x86_64.msix
-      cp "$msix_built" "$msix_out"
+    local msix_args=(--install-certificate false --output-path "$msix_out_dir" --output-name "muninn-app-$ver-x86_64")
+    if [[ ${SKIP_BUILD:-} == 1 ]]; then
+      msix_args+=(--build-windows false)
+    fi
+    ( cd "$root/app" && dart run msix:create "${msix_args[@]}" )
+    msix_out=$dist/muninn-app-$ver-x86_64.msix
+    if [[ -f $msix_out ]]; then
       echo "$msix_out"
     else
-      echo "skipping msix copy: dart run msix:create produced no .msix under app/build/windows" >&2
+      # Fallback: copy whatever msix wrote under the release folder
+      msix_built=
+      shopt -s nullglob
+      for cand in "$bundle"/muninn-app*.msix "$bundle"/*.msix           "$root/app/build/windows/$flutter_arch/runner/Release"/*.msix; do
+        if [[ -f $cand ]]; then msix_built=$cand; break; fi
+      done
+      shopt -u nullglob
+      if [[ -z ${msix_built:-} ]]; then
+        msix_built=$(find "$root/app/build/windows" -name '*.msix' -type f 2>/dev/null | head -1 || true)
+      fi
+      if [[ -n ${msix_built:-} && -f $msix_built && $(stat -c%s "$msix_built" 2>/dev/null || stat -f%z "$msix_built") -gt 1000 ]]; then
+        cp "$msix_built" "$msix_out"
+        echo "$msix_out"
+      else
+        echo "skipping msix copy: dart run msix:create produced no usable .msix" >&2
+      fi
     fi
   else
     echo "skipping msix: add msix as a Flutter app dev_dependency and run flutter pub get" >&2

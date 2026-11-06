@@ -113,6 +113,7 @@ msix_config:
   logo_path: assets/logo/muninn-raven.png
   capabilities: internetClient
   store: false
+  install_certificate: false
   output_name: muninn-app
 
 # Launcher icons, from the approved raven tile (assets/logo/muninn-raven.svg, the same file

@@ -472,8 +472,13 @@ same script writes:
   from `packaging/windows/muninn-app.iss` (AppId and `{localappdata}\Programs\MuninnApp`
   are separate from the TUI `muninn.iss` / `{userpf}\Muninn`). Adds a Start Menu
   entry and optionally the install folder to the user PATH for `muninn.exe`
-- `$DIST/muninn-app-<ver>-x86_64.msix` — `dart run msix:create` (unsigned /
-  `store: false` eyeball; skipped if the `msix` package is missing)
+- `$DIST/muninn-app-<ver>-x86_64.msix` — `dart run msix:create` (`store: false`,
+  test-certificate signed with `install_certificate: false` so packaging stays
+  non-interactive; skipped if the `msix` package is missing). To install the
+  eyeball package: enable Developer Mode, or install the test certificate once
+  (`certutil -user -addstore Root test_certificate.pfx` after exporting / using
+  the cert the `msix` package generates under the app directory), then
+  `Add-AppxPackage .\muninn-app-<ver>-x86_64.msix`.
 
 Needs Visual Studio Build Tools with the Windows desktop C++ workload, Flutter
 Windows desktop enabled (`flutter config --enable-windows-desktop`), and Inno
