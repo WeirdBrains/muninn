@@ -651,13 +651,86 @@ class FfiMuninnApi implements MuninnApi {
     for (final s in await r_searches.searches()) _search(s),
   ];
 
+  Int64List _i64s(List<int> xs) => Int64List.fromList(xs);
+
   @override
   Future<SearchInfo> saveSearch(
     String name, {
     String query = '',
     String target = 'series',
+    List<String> sources = const [],
+    List<String> symbols = const [],
+    List<String> periods = const [],
+    List<int> years = const [],
+    int? from,
+    int? to,
+    String? price,
+    double? min,
+    double? max,
+    String? sort,
+    bool desc = false,
+    String? model,
+    List<String> conditions = const [],
   }) async => _search(
-    await r_searches.saveSearch(name: name, query: query, target: target),
+    await r_searches.saveSearchSpec(
+      name: name,
+      query: query,
+      target: target,
+      sources: sources,
+      symbols: symbols,
+      periods: periods,
+      years: _i64s(years),
+      from: from == null ? null : PlatformInt64Util.from(from),
+      to: to == null ? null : PlatformInt64Util.from(to),
+      price: price,
+      min: min,
+      max: max,
+      sort: sort,
+      desc: desc,
+      model: model,
+      conditions: conditions,
+    ),
+  );
+
+  @override
+  Future<SearchInfo> editSearch(
+    String id, {
+    String? name,
+    String query = '',
+    String target = 'series',
+    List<String> sources = const [],
+    List<String> symbols = const [],
+    List<String> periods = const [],
+    List<int> years = const [],
+    int? from,
+    int? to,
+    String? price,
+    double? min,
+    double? max,
+    String? sort,
+    bool desc = false,
+    String? model,
+    List<String> conditions = const [],
+  }) async => _search(
+    await r_searches.editSearch(
+      id: id,
+      name: name,
+      query: query,
+      target: target,
+      sources: sources,
+      symbols: symbols,
+      periods: periods,
+      years: _i64s(years),
+      from: from == null ? null : PlatformInt64Util.from(from),
+      to: to == null ? null : PlatformInt64Util.from(to),
+      price: price,
+      min: min,
+      max: max,
+      sort: sort,
+      desc: desc,
+      model: model,
+      conditions: conditions,
+    ),
   );
 
   @override
@@ -714,6 +787,9 @@ class FfiMuninnApi implements MuninnApi {
     String body = '',
     String format = 'markdown',
     String? target,
+    int? from,
+    int? to,
+    int? rows,
   }) async => _section(
     await r_reports.addReportSection(
       report: report,
@@ -722,8 +798,33 @@ class FfiMuninnApi implements MuninnApi {
       body: body,
       format: format,
       target: target,
+      from: from == null ? null : PlatformInt64Util.from(from),
+      to: to == null ? null : PlatformInt64Util.from(to),
+      rows: rows == null ? null : PlatformInt64Util.from(rows),
     ),
   );
+
+  @override
+  Future<ReportExportInfo> exportReport(
+    String report, {
+    String format = 'pdf',
+    required String out,
+  }) async {
+    final r = await r_reports.exportReport(
+      report: report,
+      format: format,
+      out: out,
+    );
+    return ReportExportInfo(
+      path: r.path,
+      files: r.files.toInt(),
+      message: r.message,
+    );
+  }
+
+  @override
+  Future<String> previewReport(String report, {int width = 100}) => r_reports
+      .previewReport(report: report, width: PlatformInt64Util.from(width));
 
   @override
   Future<ReportSectionInfo> updateReportSection(
@@ -2559,6 +2660,19 @@ SearchInfo _search(r_searches.SearchInfo s) => SearchInfo(
   describe: s.describe,
   matches: s.matches.toInt(),
   forkedFrom: s.forkedFrom,
+  sources: s.sources,
+  symbols: s.symbols,
+  periods: s.periods,
+  years: List<int>.from(s.years),
+  from: s.from?.toInt(),
+  to: s.to?.toInt(),
+  priceMetric: s.priceMetric,
+  priceMin: s.priceMin,
+  priceMax: s.priceMax,
+  sort: s.sort,
+  desc: s.desc,
+  model: s.model,
+  conditions: s.conditions,
 );
 
 ReportInfo _report(r_reports.ReportInfo r) => ReportInfo(

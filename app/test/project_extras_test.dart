@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muninn/src/app.dart';
+import 'package:muninn/src/api.dart';
 import 'package:muninn/src/state.dart';
 
 import 'fake_api.dart';
@@ -109,6 +110,47 @@ void main() {
     await t.pumpAndSettle();
     expect(api.extraCalls, contains('search-fork:s1'));
     expect(find.text('ETH hunt (fork)'), findsOneWidget);
+
+    await t.tap(find.byKey(const ValueKey('search-menu-s1')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Refine…'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('search-sources')), 'binance');
+    await t.enterText(find.byKey(const ValueKey('search-symbols')), 'ETH/USDT');
+    await t.enterText(find.byKey(const ValueKey('search-periods')), '1h');
+    await t.enterText(find.byKey(const ValueKey('search-from')), '2024-01-01');
+    await t.enterText(find.byKey(const ValueKey('search-to')), '2024-01-02');
+    await t.tap(find.byKey(const ValueKey('search-save')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('search-edit:s1'));
+    expect(api.searchList.first.sources, ['binance']);
+    expect(api.searchList.first.from, isNotNull);
+
+    await t.tap(find.byKey(const ValueKey('search-menu-s1')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Apply to Data'));
+    await t.pumpAndSettle();
+    expect(c.read(sectionProvider), Section.data);
+    expect(c.read(timeRangeProvider).from, isNotNull);
+    expect(c.read(selectedDatasetProvider), 'binance:ETH/USDT:3600');
+
+    c.read(sectionProvider.notifier).state = Section.projects;
+    c.read(projectPaneProvider.notifier).state = ProjectPane.searches;
+    await t.pumpAndSettle();
+    c.read(timeRangeProvider.notifier).state = const TimeRange(
+      from: 1000,
+      to: 2000,
+    );
+    c.read(selectedDatasetProvider.notifier).state = 'coinbase:BTC/USD:300';
+    await t.tap(find.byKey(const ValueKey('search-menu-s1')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Overwrite with current view'));
+    await t.pumpAndSettle();
+    expect(api.searchList.first.sources, ['coinbase']);
+    expect(api.searchList.first.symbols, ['BTC/USD']);
+    expect(api.searchList.first.periods, ['5m']);
+    expect(api.searchList.first.from, 1000);
+    expect(api.searchList.first.to, 2000);
   });
 
   testWidgets('reports pane creates a text section and deletes', (t) async {
@@ -138,6 +180,39 @@ void main() {
     await t.pumpAndSettle();
     expect(api.extraCalls, contains('section-add:r1:text'));
     expect(find.text('Intro'), findsOneWidget);
+
+    await t.tap(find.byKey(const ValueKey('report-add-section')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('section-kind')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('records').last);
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('section-title')), 'Bars');
+    await t.enterText(
+      find.byKey(const ValueKey('section-target')),
+      'coinbase:BTC/USD:5m',
+    );
+    await t.tap(find.byKey(const ValueKey('section-save')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('section-add:r1:records'));
+    expect(find.text('Bars'), findsOneWidget);
+
+    await t.tap(find.byKey(const ValueKey('report-preview')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('report-preview:r1'));
+    expect(find.byKey(const ValueKey('report-preview-text')), findsOneWidget);
+    await t.tap(find.text('Close'));
+    await t.pumpAndSettle();
+
+    await t.tap(find.byKey(const ValueKey('report-export')));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('report-export-out')),
+      '/tmp/weekly.pdf',
+    );
+    await t.tap(find.byKey(const ValueKey('report-export-save')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('report-export:r1:pdf:/tmp/weekly.pdf'));
 
     await t.tap(find.byKey(const ValueKey('report-menu-r1')));
     await t.pumpAndSettle();

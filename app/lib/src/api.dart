@@ -269,10 +269,40 @@ class SearchInfo {
     this.describe = '',
     this.matches = 0,
     this.forkedFrom,
+    this.sources = const [],
+    this.symbols = const [],
+    this.periods = const [],
+    this.years = const [],
+    this.from,
+    this.to,
+    this.priceMetric = 'close',
+    this.priceMin,
+    this.priceMax,
+    this.sort = 'year',
+    this.desc = false,
+    this.model,
+    this.conditions = const [],
   });
   final String id, shortId, name, target, query, describe;
   final int matches;
   final String? forkedFrom;
+  final List<String> sources, symbols, periods, conditions;
+  final List<int> years;
+  final int? from, to;
+  final String priceMetric, sort;
+  final double? priceMin, priceMax;
+  final bool desc;
+  final String? model;
+}
+
+class ReportExportInfo {
+  const ReportExportInfo({
+    required this.path,
+    this.files = 1,
+    this.message = '',
+  });
+  final String path, message;
+  final int files;
 }
 
 class ReportInfo {
@@ -1479,6 +1509,38 @@ abstract class MuninnApi {
     String name, {
     String query = '',
     String target = 'series',
+    List<String> sources = const [],
+    List<String> symbols = const [],
+    List<String> periods = const [],
+    List<int> years = const [],
+    int? from,
+    int? to,
+    String? price,
+    double? min,
+    double? max,
+    String? sort,
+    bool desc = false,
+    String? model,
+    List<String> conditions = const [],
+  });
+  Future<SearchInfo> editSearch(
+    String id, {
+    String? name,
+    String query = '',
+    String target = 'series',
+    List<String> sources = const [],
+    List<String> symbols = const [],
+    List<String> periods = const [],
+    List<int> years = const [],
+    int? from,
+    int? to,
+    String? price,
+    double? min,
+    double? max,
+    String? sort,
+    bool desc = false,
+    String? model,
+    List<String> conditions = const [],
   });
   Future<SearchInfo> renameSearch(String id, String name);
   Future<SearchInfo> forkSearch(String id, {String? name});
@@ -1504,7 +1566,16 @@ abstract class MuninnApi {
     String body = '',
     String format = 'markdown',
     String? target,
+    int? from,
+    int? to,
+    int? rows,
   });
+  Future<ReportExportInfo> exportReport(
+    String report, {
+    String format = 'pdf',
+    required String out,
+  });
+  Future<String> previewReport(String report, {int width = 100});
   Future<ReportSectionInfo> updateReportSection(
     String report,
     String section, {

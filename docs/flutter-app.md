@@ -114,13 +114,7 @@ Users never need Rust: release builds ship the compiled library.
   copy`). **Export** writes PDF, Word, HTML, LaTeX, text or JSON to a path
   (`mnnn journal export`); **Import journal** reads a JSON export (`mnnn journal
   import`); **Print** saves a PDF and can send it to `lp`/`lpr` (`mnnn journal
-  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query and target: series, journals or
-  records), rename, fork or delete it (`mnnn search save|edit|fork|remove`).
-  Refining a search with the full sidebar filters, overwriting one or applying it
-  to Data stays in the TUI. **Reports** create (optionally attached to a project),
-  rename, describe and delete reports, and add, edit, move or remove text, authors,
-  journal, project, series, code and model sections (`mnnn report`). Records
-  sections and PDF/preview export stay in the TUI. **Code spaces** list, create
+  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (`mnnn search save|edit`, TUI `w`), apply a series search to Data (TUI Enter), and rename, fork or delete it (`mnnn search fork|remove`). Shift+F opens Live searches, matching the TUI's `F`. Applying a journals or records search to the TUI found-views stays in the TUI. **Reports** create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI `v` / `mnnn report preview`) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI `E` / `mnnn report export`). File bytes stay in Rust. **Code spaces** list, create
   (from a language template, another space or a built-in parser), edit source and
   input, approve, check, build, run and remove (`mnnn code` / TUI Code, `C`).
   Built-in parsers can be listed and installed (`mnnn code parsers --install`).
@@ -257,6 +251,7 @@ when a hardware keyboard is attached.
 | `E` | Pipelines (Shift+E; lowercase `e` on the chart still toggles the envelope) |
 | `R` | Rules (Shift+R) |
 | `V` | Reviews (Shift+V; lowercase `v` on the chart still toggles volume) |
+| `F` | Live searches (Shift+F) |
 | `!` | Notifications |
 | `L` | Chart layers… |
 | `Ctrl-w t` | change view (chart ↔ list) |
@@ -303,7 +298,7 @@ When the Data chart is showing:
 - Chart layer keys **`e` `m` `w` `g` `z`** match the TUI (envelope, moving averages, wick, gap, zero-volume). The averages use the loaded bars (including those off-screen when zoomed) the same way the TUI uses warmup history; they do not fetch extra bars beyond `queryBars`.
 - **← →** move the TUI chart crosshair; the app moves it by hover or touch.
 - **`[` `]` `{` `}` `@`** set the chart's visible window among already-loaded bars (the same start/end/jump idea as a TUI chart tile). They do not change the global `T` time-range filter, and they do not invent a separate bucket or query. `{` `}` `@` type a date; `[` `]` open the same calendar+time pickers the time-range dialog uses. At scale 1 (every loaded bar visible) `@` has nothing to pan.
-- Keys for windows the app does not have yet (`F` live searches, `J` journals, `E` pipelines, `A` authors, `Y` history, and so on) are left unbound — they are not remapped to something else.
+- Keys for windows the app does not have yet (`J` journals, `A` authors, `Y` history, and so on) are left unbound — they are not remapped to something else. Live searches use Shift+F (the TUI's `F`); pipelines use Shift+E.
 - In the TUI, `X` stops a node when the network window is focused; the app has no start/stop and `X` stays "clear the time range".
 - **`a`** toggles the area layer when the Data chart is showing (chart tile). Adding a series to a project is **Add current dataset** on the Projects page (the TUI's sidebar-focused `a`).
 - **Esc** closes dialogs through Flutter's usual dialog behaviour.

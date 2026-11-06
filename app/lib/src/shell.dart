@@ -333,7 +333,7 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           item('Live searches…', () {
             ref.read(projectPaneProvider.notifier).state = ProjectPane.searches;
             go(Section.projects);
-          }),
+          }, const SingleActivator(LogicalKeyboardKey.keyF, shift: true)),
           item(
             'Save search as live search…',
             () => showSaveSearchDialog(context, ref),

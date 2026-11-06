@@ -11,12 +11,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
+import '../time_range.dart';
 import 'journal_extras.dart';
 
 void _ok(BuildContext context, String msg, {Color? color}) {
   ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
 }
+
+List<String> _csv(String s) => s
+    .split(RegExp(r'[,;\n]+'))
+    .map((x) => x.trim())
+    .where((x) => x.isNotEmpty)
+    .toList();
+
+String _csvJoin(Iterable<String> xs) => xs.join(', ');
+
+List<int> _yearsOf(String s) => [
+  for (final p in _csv(s))
+    if (int.tryParse(p) != null) int.parse(p),
+];
 
 Future<void> showImportProjectDialog(
   BuildContext context,
@@ -452,6 +466,30 @@ class _JournalDetail extends ConsumerWidget {
   }
 }
 
+void applySearchToData(WidgetRef ref, SearchInfo s) {
+  ref.read(timeRangeProvider.notifier).state = TimeRange(
+    from: s.from,
+    to: s.to,
+  );
+  final o = ref.read(overviewProvider).value;
+  if (o != null &&
+      s.sources.length == 1 &&
+      s.symbols.length == 1 &&
+      s.periods.length == 1) {
+    final matches = [
+      for (final d in o.datasets)
+        if (d.source == s.sources.first &&
+            d.symbol == s.symbols.first &&
+            d.duration == s.periods.first)
+          d,
+    ];
+    if (matches.length == 1) {
+      ref.read(selectedDatasetProvider.notifier).state = matches.first.key;
+    }
+  }
+  ref.read(sectionProvider.notifier).state = Section.data;
+}
+
 class SearchesPane extends ConsumerWidget {
   const SearchesPane({super.key});
 
@@ -515,6 +553,18 @@ class SearchesPane extends ConsumerWidget {
                                 _onSearchAction(context, ref, s, v),
                             itemBuilder: (ctx) => const [
                               PopupMenuItem(
+                                value: 'apply',
+                                child: Text('Apply to Data'),
+                              ),
+                              PopupMenuItem(
+                                value: 'refine',
+                                child: Text('Refine…'),
+                              ),
+                              PopupMenuItem(
+                                value: 'overwrite',
+                                child: Text('Overwrite with current view'),
+                              ),
+                              PopupMenuItem(
                                 value: 'rename',
                                 child: Text('Rename…'),
                               ),
@@ -546,6 +596,38 @@ Future<void> _onSearchAction(
   String action,
 ) async {
   switch (action) {
+    case 'apply':
+      applySearchToData(ref, s);
+      if (context.mounted) {
+        _ok(context, 'applied ${s.name} to Data');
+      }
+    case 'refine':
+      final refined = await showDialog<SearchInfo>(
+        context: context,
+        builder: (ctx) => _SearchFieldsDialog(search: s, mode: 'refine'),
+      );
+      if (refined == null) return;
+      refreshProjectExtras(ref);
+    case 'overwrite':
+      if (!ref.read(unlockedProvider)) return;
+      final range = ref.read(timeRangeProvider);
+      final d = ref.read(selectedDatasetValueProvider);
+      await ref
+          .read(apiProvider)
+          .editSearch(
+            s.id,
+            query: '',
+            target: 'series',
+            sources: d == null ? const <String>[] : [d.source],
+            symbols: d == null ? const <String>[] : [d.symbol],
+            periods: d == null ? const <String>[] : [d.duration],
+            from: range.from,
+            to: range.to,
+          );
+      refreshProjectExtras(ref);
+      if (context.mounted) {
+        _ok(context, 'overwrote ${s.name} with the current Data view');
+      }
     case 'rename':
       final updated = await showDialog<SearchInfo>(
         context: context,
@@ -646,6 +728,14 @@ class ReportsPane extends ConsumerWidget {
                                     _onReportAction(context, ref, r, v),
                                 itemBuilder: (ctx) => const [
                                   PopupMenuItem(
+                                    value: 'preview',
+                                    child: Text('Preview…'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'export',
+                                    child: Text('Export…'),
+                                  ),
+                                  PopupMenuItem(
                                     value: 'rename',
                                     child: Text('Rename…'),
                                   ),
@@ -684,6 +774,10 @@ Future<void> _onReportAction(
   String action,
 ) async {
   switch (action) {
+    case 'preview':
+      await showReportPreviewDialog(context, ref, r);
+    case 'export':
+      await showReportExportDialog(context, ref, r);
     case 'rename':
       final updated = await showDialog<ReportInfo>(
         context: context,
@@ -736,18 +830,37 @@ class _ReportDetail extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(72, 0, 16, 8),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const ValueKey('report-add-section'),
-              onPressed: () async {
-                final created = await showDialog<ReportSectionInfo>(
-                  context: context,
-                  builder: (ctx) => _SectionFieldsDialog(report: report),
-                );
-                if (created == null) return;
-                refreshProjectExtras(ref);
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add section'),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  key: const ValueKey('report-add-section'),
+                  onPressed: () async {
+                    final created = await showDialog<ReportSectionInfo>(
+                      context: context,
+                      builder: (ctx) => _SectionFieldsDialog(report: report),
+                    );
+                    if (created == null) return;
+                    refreshProjectExtras(ref);
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add section'),
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey('report-preview'),
+                  onPressed: () =>
+                      showReportPreviewDialog(context, ref, report),
+                  icon: const Icon(Icons.visibility),
+                  label: const Text('Preview'),
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey('report-export'),
+                  onPressed: () => showReportExportDialog(context, ref, report),
+                  icon: const Icon(Icons.ios_share),
+                  label: const Text('Export'),
+                ),
+              ],
             ),
           ),
         ),
@@ -1296,32 +1409,91 @@ class _SearchFieldsDialog extends ConsumerStatefulWidget {
 class _SearchFieldsDialogState extends ConsumerState<_SearchFieldsDialog> {
   late final TextEditingController name;
   late final TextEditingController query;
+  late final TextEditingController sources;
+  late final TextEditingController symbols;
+  late final TextEditingController periods;
+  late final TextEditingController years;
+  late final TextEditingController from;
+  late final TextEditingController to;
+  late final TextEditingController min;
+  late final TextEditingController max;
+  late final TextEditingController model;
+  late final TextEditingController conditions;
   late String target;
+  late String price;
+  late String sort;
+  late bool desc;
   bool running = false;
   String? error;
+
+  bool get showFilters => widget.mode == 'create' || widget.mode == 'refine';
 
   @override
   void initState() {
     super.initState();
+    final s = widget.search;
+    final range = ref.read(timeRangeProvider);
+    final d = ref.read(selectedDatasetValueProvider);
+    final creating = widget.mode == 'create' && s == null;
     name = TextEditingController(
-      text: widget.mode == 'fork'
-          ? '${widget.search?.name ?? ''} (fork)'
-          : widget.search?.name ?? '',
+      text: widget.mode == 'fork' ? '${s?.name ?? ''} (fork)' : s?.name ?? '',
     );
-    query = TextEditingController(text: widget.search?.query ?? '');
-    target = widget.search?.target ?? 'series';
+    query = TextEditingController(text: s?.query ?? '');
+    target = s?.target ?? 'series';
+    sources = TextEditingController(
+      text: creating && d != null ? d.source : _csvJoin(s?.sources ?? const []),
+    );
+    symbols = TextEditingController(
+      text: creating && d != null ? d.symbol : _csvJoin(s?.symbols ?? const []),
+    );
+    periods = TextEditingController(
+      text: creating && d != null
+          ? d.duration
+          : _csvJoin(s?.periods ?? const []),
+    );
+    years = TextEditingController(
+      text: _csvJoin((s?.years ?? const []).map((y) => '$y')),
+    );
+    final fromMs = creating ? range.from : s?.from;
+    final toMs = creating ? range.to : s?.to;
+    from = TextEditingController(text: fromMs == null ? '' : fmtUtc(fromMs));
+    to = TextEditingController(text: toMs == null ? '' : fmtUtc(toMs));
+    min = TextEditingController(
+      text: s?.priceMin == null ? '' : '${s!.priceMin}',
+    );
+    max = TextEditingController(
+      text: s?.priceMax == null ? '' : '${s!.priceMax}',
+    );
+    model = TextEditingController(text: s?.model ?? '');
+    conditions = TextEditingController(
+      text: _csvJoin(s?.conditions ?? const []),
+    );
+    price = s?.priceMetric ?? 'close';
+    sort = s?.sort ?? 'year';
+    desc = s?.desc ?? false;
   }
 
   @override
   void dispose() {
     name.dispose();
     query.dispose();
+    sources.dispose();
+    symbols.dispose();
+    periods.dispose();
+    years.dispose();
+    from.dispose();
+    to.dispose();
+    min.dispose();
+    max.dispose();
+    model.dispose();
+    conditions.dispose();
     super.dispose();
   }
 
   String get title => switch (widget.mode) {
     'rename' => 'Rename live search',
     'fork' => 'Fork live search',
+    'refine' => 'Refine live search',
     _ => 'Save search as live search',
   };
 
@@ -1347,11 +1519,44 @@ class _SearchFieldsDialogState extends ConsumerState<_SearchFieldsDialog> {
           result = await api.renameSearch(widget.search!.id, n);
         case 'fork':
           result = await api.forkSearch(widget.search!.id, name: n);
+        case 'refine':
+          result = await api.editSearch(
+            widget.search!.id,
+            name: n,
+            query: query.text.trim(),
+            target: target,
+            sources: _csv(sources.text),
+            symbols: _csv(symbols.text),
+            periods: _csv(periods.text),
+            years: _yearsOf(years.text),
+            from: parseUtcMs(from.text),
+            to: parseUtcMs(to.text),
+            price: price,
+            min: double.tryParse(min.text.trim()),
+            max: double.tryParse(max.text.trim()),
+            sort: sort,
+            desc: desc,
+            model: model.text.trim().isEmpty ? null : model.text.trim(),
+            conditions: _csv(conditions.text),
+          );
         default:
           result = await api.saveSearch(
             n,
             query: query.text.trim(),
             target: target,
+            sources: _csv(sources.text),
+            symbols: _csv(symbols.text),
+            periods: _csv(periods.text),
+            years: _yearsOf(years.text),
+            from: parseUtcMs(from.text),
+            to: parseUtcMs(to.text),
+            price: price,
+            min: double.tryParse(min.text.trim()),
+            max: double.tryParse(max.text.trim()),
+            sort: sort,
+            desc: desc,
+            model: model.text.trim().isEmpty ? null : model.text.trim(),
+            conditions: _csv(conditions.text),
           );
       }
       if (mounted) Navigator.pop(context, result);
@@ -1365,7 +1570,138 @@ class _SearchFieldsDialogState extends ConsumerState<_SearchFieldsDialog> {
   @override
   Widget build(BuildContext context) {
     final m = context.muninn;
-    final create = widget.mode == 'create';
+    final fields = <Widget>[
+      TextField(
+        key: const ValueKey('search-name'),
+        controller: name,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Name'),
+      ),
+      if (showFilters) ...[
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-query'),
+          controller: query,
+          decoration: const InputDecoration(labelText: 'Query'),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: const ValueKey('search-target'),
+          initialValue: target,
+          decoration: const InputDecoration(labelText: 'Target'),
+          items: const [
+            DropdownMenuItem(value: 'series', child: Text('series')),
+            DropdownMenuItem(value: 'journals', child: Text('journals')),
+            DropdownMenuItem(value: 'records', child: Text('records')),
+          ],
+          onChanged: (v) {
+            if (v != null) setState(() => target = v);
+          },
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-sources'),
+          controller: sources,
+          decoration: const InputDecoration(labelText: 'Sources'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-symbols'),
+          controller: symbols,
+          decoration: const InputDecoration(labelText: 'Symbols'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-periods'),
+          controller: periods,
+          decoration: const InputDecoration(labelText: 'Periods'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-years'),
+          controller: years,
+          decoration: const InputDecoration(labelText: 'Years'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-from'),
+          controller: from,
+          decoration: const InputDecoration(labelText: 'From (UTC)'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-to'),
+          controller: to,
+          decoration: const InputDecoration(labelText: 'To (UTC)'),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: const ValueKey('search-price'),
+          initialValue: price,
+          decoration: const InputDecoration(labelText: 'Price metric'),
+          items: const [
+            DropdownMenuItem(value: 'open', child: Text('open')),
+            DropdownMenuItem(value: 'high', child: Text('high')),
+            DropdownMenuItem(value: 'low', child: Text('low')),
+            DropdownMenuItem(value: 'close', child: Text('close')),
+            DropdownMenuItem(value: 'typical', child: Text('typical')),
+            DropdownMenuItem(value: 'median', child: Text('median')),
+            DropdownMenuItem(value: 'ohlc avg', child: Text('ohlc avg')),
+            DropdownMenuItem(value: 'vwap', child: Text('vwap')),
+          ],
+          onChanged: (v) {
+            if (v != null) setState(() => price = v);
+          },
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-min'),
+          controller: min,
+          decoration: const InputDecoration(labelText: 'Min price'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-max'),
+          controller: max,
+          decoration: const InputDecoration(labelText: 'Max price'),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: const ValueKey('search-sort'),
+          initialValue: sort,
+          decoration: const InputDecoration(labelText: 'Sort'),
+          items: const [
+            DropdownMenuItem(value: 'year', child: Text('year')),
+            DropdownMenuItem(value: 'name', child: Text('name')),
+          ],
+          onChanged: (v) {
+            if (v != null) setState(() => sort = v);
+          },
+        ),
+        CheckboxListTile(
+          key: const ValueKey('search-desc'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Descending'),
+          value: desc,
+          onChanged: (v) => setState(() => desc = v ?? false),
+        ),
+        TextField(
+          key: const ValueKey('search-model'),
+          controller: model,
+          decoration: const InputDecoration(labelText: 'Model (records)'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('search-conditions'),
+          controller: conditions,
+          decoration: const InputDecoration(labelText: 'Conditions (records)'),
+        ),
+      ],
+      if (error != null) ...[
+        const SizedBox(height: 12),
+        Text(error!, style: TextStyle(color: m.error)),
+      ],
+    ];
     return AlertDialog(
       title: Row(
         children: [
@@ -1383,44 +1719,18 @@ class _SearchFieldsDialogState extends ConsumerState<_SearchFieldsDialog> {
         ],
       ),
       content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              key: const ValueKey('search-name'),
-              controller: name,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Name'),
+        width: 480,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: fields,
             ),
-            if (create) ...[
-              const SizedBox(height: 12),
-              TextField(
-                key: const ValueKey('search-query'),
-                controller: query,
-                decoration: const InputDecoration(labelText: 'Query'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: const ValueKey('search-target'),
-                initialValue: target,
-                decoration: const InputDecoration(labelText: 'Target'),
-                items: const [
-                  DropdownMenuItem(value: 'series', child: Text('series')),
-                  DropdownMenuItem(value: 'journals', child: Text('journals')),
-                  DropdownMenuItem(value: 'records', child: Text('records')),
-                ],
-                onChanged: (v) {
-                  if (v != null) setState(() => target = v);
-                },
-              ),
-            ],
-            if (error != null) ...[
-              const SizedBox(height: 12),
-              Text(error!, style: TextStyle(color: m.error)),
-            ],
-          ],
+          ),
         ),
       ),
       actions: [
@@ -1596,6 +1906,9 @@ class _SectionFieldsDialogState extends ConsumerState<_SectionFieldsDialog> {
   late final TextEditingController title;
   late final TextEditingController body;
   late final TextEditingController target;
+  late final TextEditingController from;
+  late final TextEditingController to;
+  late final TextEditingController rows;
   late String kind;
   late String format;
   bool running = false;
@@ -1603,6 +1916,7 @@ class _SectionFieldsDialogState extends ConsumerState<_SectionFieldsDialog> {
 
   static const kinds = [
     'text',
+    'records',
     'authors',
     'journal',
     'project',
@@ -1614,9 +1928,18 @@ class _SectionFieldsDialogState extends ConsumerState<_SectionFieldsDialog> {
   @override
   void initState() {
     super.initState();
+    final d = ref.read(selectedDatasetValueProvider);
+    final range = ref.read(timeRangeProvider);
     title = TextEditingController(text: widget.section?.title ?? '');
     body = TextEditingController(text: widget.section?.body ?? '');
-    target = TextEditingController();
+    target = TextEditingController(
+      text: d == null ? '' : '${d.source}:${d.symbol}:${d.duration}',
+    );
+    from = TextEditingController(
+      text: range.from == null ? '' : fmtUtc(range.from!),
+    );
+    to = TextEditingController(text: range.to == null ? '' : fmtUtc(range.to!));
+    rows = TextEditingController();
     kind = widget.section?.kind ?? 'text';
     format = widget.section?.format ?? 'markdown';
   }
@@ -1626,6 +1949,9 @@ class _SectionFieldsDialogState extends ConsumerState<_SectionFieldsDialog> {
     title.dispose();
     body.dispose();
     target.dispose();
+    from.dispose();
+    to.dispose();
+    rows.dispose();
     super.dispose();
   }
 
@@ -1649,6 +1975,9 @@ class _SectionFieldsDialogState extends ConsumerState<_SectionFieldsDialog> {
           body: body.text,
           format: format,
           target: target.text.trim().isEmpty ? null : target.text.trim(),
+          from: parseUtcMs(from.text),
+          to: parseUtcMs(to.text),
+          rows: int.tryParse(rows.text.trim()),
         );
       } else {
         result = await api.updateReportSection(
@@ -1676,7 +2005,8 @@ class _SectionFieldsDialogState extends ConsumerState<_SectionFieldsDialog> {
         kind == 'project' ||
         kind == 'series' ||
         kind == 'code' ||
-        kind == 'model';
+        kind == 'model' ||
+        kind == 'records';
     return AlertDialog(
       title: Row(
         children: [
@@ -1695,65 +2025,89 @@ class _SectionFieldsDialogState extends ConsumerState<_SectionFieldsDialog> {
       ),
       content: SizedBox(
         width: 480,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (create) ...[
-              DropdownButtonFormField<String>(
-                key: const ValueKey('section-kind'),
-                initialValue: kind,
-                decoration: const InputDecoration(labelText: 'Kind'),
-                items: [
-                  for (final k in kinds)
-                    DropdownMenuItem(value: k, child: Text(k)),
-                ],
-                onChanged: (v) {
-                  if (v != null) setState(() => kind = v);
-                },
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (create) ...[
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('section-kind'),
+                  initialValue: kind,
+                  decoration: const InputDecoration(labelText: 'Kind'),
+                  items: [
+                    for (final k in kinds)
+                      DropdownMenuItem(value: k, child: Text(k)),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => kind = v);
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+              TextField(
+                key: const ValueKey('section-title'),
+                controller: title,
+                decoration: const InputDecoration(labelText: 'Title'),
               ),
-              const SizedBox(height: 12),
-            ],
-            TextField(
-              key: const ValueKey('section-title'),
-              controller: title,
-              decoration: const InputDecoration(labelText: 'Title'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const ValueKey('section-body'),
-              controller: body,
-              minLines: 3,
-              maxLines: 6,
-              decoration: const InputDecoration(labelText: 'Body'),
-            ),
-            if (create && needsTarget) ...[
               const SizedBox(height: 12),
               TextField(
-                key: const ValueKey('section-target'),
-                controller: target,
-                decoration: const InputDecoration(
-                  labelText: 'Target (name or id)',
-                ),
+                key: const ValueKey('section-body'),
+                controller: body,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(labelText: 'Body'),
               ),
-            ],
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: format,
-              decoration: const InputDecoration(labelText: 'Format'),
-              items: const [
-                DropdownMenuItem(value: 'markdown', child: Text('markdown')),
-                DropdownMenuItem(value: 'latex', child: Text('latex')),
+              if (create && needsTarget) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  key: const ValueKey('section-target'),
+                  controller: target,
+                  decoration: InputDecoration(
+                    labelText: kind == 'records'
+                        ? 'Series (SOURCE:SYMBOL:PERIOD)'
+                        : 'Target (name or id)',
+                  ),
+                ),
               ],
-              onChanged: (v) {
-                if (v != null) setState(() => format = v);
-              },
-            ),
-            if (error != null) ...[
+              if (create && kind == 'records') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  key: const ValueKey('section-from'),
+                  controller: from,
+                  decoration: const InputDecoration(labelText: 'From (UTC)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const ValueKey('section-to'),
+                  controller: to,
+                  decoration: const InputDecoration(labelText: 'To (UTC)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const ValueKey('section-rows'),
+                  controller: rows,
+                  decoration: const InputDecoration(labelText: 'Rows (0: all)'),
+                ),
+              ],
               const SizedBox(height: 12),
-              Text(error!, style: TextStyle(color: m.error)),
+              DropdownButtonFormField<String>(
+                initialValue: format,
+                decoration: const InputDecoration(labelText: 'Format'),
+                items: const [
+                  DropdownMenuItem(value: 'markdown', child: Text('markdown')),
+                  DropdownMenuItem(value: 'latex', child: Text('latex')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => format = v);
+                },
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 12),
+                Text(error!, style: TextStyle(color: m.error)),
+              ],
             ],
-          ],
+          ),
         ),
       ),
       actions: [
@@ -2243,6 +2597,221 @@ class _ConfirmRemoveDialogState extends ConsumerState<_ConfirmRemoveDialog> {
           onPressed: running ? null : _go,
           style: FilledButton.styleFrom(backgroundColor: m.error),
           child: const Text('Delete'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> showReportPreviewDialog(
+  BuildContext context,
+  WidgetRef ref,
+  ReportInfo report,
+) async {
+  await showDialog<String>(
+    context: context,
+    builder: (ctx) => _PreviewReportDialog(report: report),
+  );
+}
+
+Future<void> showReportExportDialog(
+  BuildContext context,
+  WidgetRef ref,
+  ReportInfo report,
+) async {
+  final ok = await showDialog<ReportExportInfo>(
+    context: context,
+    builder: (ctx) => _ExportReportDialog(report: report),
+  );
+  if (ok == null || !context.mounted) return;
+  refreshProjectExtras(ref);
+  _ok(context, ok.message.isEmpty ? 'exported to ${ok.path}' : ok.message);
+}
+
+class _PreviewReportDialog extends ConsumerStatefulWidget {
+  const _PreviewReportDialog({required this.report});
+  final ReportInfo report;
+
+  @override
+  ConsumerState<_PreviewReportDialog> createState() =>
+      _PreviewReportDialogState();
+}
+
+class _PreviewReportDialogState extends ConsumerState<_PreviewReportDialog> {
+  String? text;
+  String? error;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final t = await ref.read(apiProvider).previewReport(widget.report.id);
+      if (mounted) {
+        setState(() {
+          text = t;
+          loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          error = e.toString();
+          loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    return AlertDialog(
+      title: Text(
+        'Preview ${widget.report.name}',
+        style: TextStyle(color: m.header, fontWeight: FontWeight.w800),
+      ),
+      content: SizedBox(
+        width: 560,
+        height: 420,
+        child: loading
+            ? const Center(child: CircularProgressIndicator())
+            : error != null
+            ? Text(error!, style: TextStyle(color: m.error))
+            : SingleChildScrollView(
+                key: const ValueKey('report-preview-text'),
+                child: SelectableText(
+                  text ?? '',
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                ),
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ExportReportDialog extends ConsumerStatefulWidget {
+  const _ExportReportDialog({required this.report});
+  final ReportInfo report;
+
+  @override
+  ConsumerState<_ExportReportDialog> createState() =>
+      _ExportReportDialogState();
+}
+
+class _ExportReportDialogState extends ConsumerState<_ExportReportDialog> {
+  late final TextEditingController out;
+  String format = 'pdf';
+  bool running = false;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    out = TextEditingController(text: '${widget.report.name}.pdf');
+  }
+
+  @override
+  void dispose() {
+    out.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final dest = out.text.trim();
+    if (dest.isEmpty) {
+      setState(() => error = 'Give a path to write.');
+      return;
+    }
+    setState(() {
+      running = true;
+      error = null;
+    });
+    try {
+      final r = await ref
+          .read(apiProvider)
+          .exportReport(widget.report.id, format: format, out: dest);
+      if (mounted) Navigator.pop(context, r);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    return AlertDialog(
+      title: Text(
+        'Export ${widget.report.name}',
+        style: TextStyle(color: m.header, fontWeight: FontWeight.w800),
+      ),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              key: const ValueKey('report-export-format'),
+              initialValue: format,
+              decoration: const InputDecoration(labelText: 'Format'),
+              items: const [
+                DropdownMenuItem(value: 'pdf', child: Text('PDF')),
+                DropdownMenuItem(value: 'docx', child: Text('Word')),
+                DropdownMenuItem(value: 'html', child: Text('HTML')),
+                DropdownMenuItem(value: 'latex', child: Text('LaTeX')),
+                DropdownMenuItem(value: 'text', child: Text('Plain text')),
+                DropdownMenuItem(value: 'json', child: Text('JSON')),
+                DropdownMenuItem(value: 'csv', child: Text('CSV')),
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => format = v);
+              },
+            ),
+            TextField(
+              key: const ValueKey('report-export-out'),
+              controller: out,
+              decoration: const InputDecoration(labelText: 'Output path'),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () async {
+                  final picked = await FilePicker.platform.saveFile(
+                    fileName: '${widget.report.name}.$format',
+                  );
+                  if (picked != null) out.text = picked;
+                },
+                child: const Text('Browse…'),
+              ),
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 12),
+              Text(error!, style: TextStyle(color: m.error)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: running ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('report-export-save'),
+          onPressed: running ? null : _save,
+          child: const Text('Export'),
         ),
       ],
     );

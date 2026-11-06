@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `fork_search_of`, `info`, `note`, `parse_target`, `remove_search_of`, `rename_search_of`, `save_search_of`, `searches_of`
+// These functions are ignored because they are not marked as `pub`: `edit_search_of`, `fork_search_of`, `info`, `nonempty_parts`, `note`, `parse_price`, `parse_sort`, `parse_target`, `remove_search_of`, `rename_search_of`, `save_search_of`, `save_search_spec_of`, `searches_of`, `spec_from`
 
 /// `mnnn search list`.
 Future<List<SearchInfo>> searches() =>
@@ -22,6 +22,82 @@ Future<SearchInfo> saveSearch({
   name: name,
   query: query,
   target: target,
+);
+
+/// `mnnn search save` with the full sidebar filters (sources, symbols, periods, years, range, price, sort).
+Future<SearchInfo> saveSearchSpec({
+  required String name,
+  required String query,
+  required String target,
+  required List<String> sources,
+  required List<String> symbols,
+  required List<String> periods,
+  required Int64List years,
+  PlatformInt64? from,
+  PlatformInt64? to,
+  String? price,
+  double? min,
+  double? max,
+  String? sort,
+  required bool desc,
+  String? model,
+  required List<String> conditions,
+}) => RustLib.instance.api.crateApiSearchesSaveSearchSpec(
+  name: name,
+  query: query,
+  target: target,
+  sources: sources,
+  symbols: symbols,
+  periods: periods,
+  years: years,
+  from: from,
+  to: to,
+  price: price,
+  min: min,
+  max: max,
+  sort: sort,
+  desc: desc,
+  model: model,
+  conditions: conditions,
+);
+
+/// Refine or overwrite a live search (`mnnn search edit` / TUI `w`).
+Future<SearchInfo> editSearch({
+  required String id,
+  String? name,
+  required String query,
+  required String target,
+  required List<String> sources,
+  required List<String> symbols,
+  required List<String> periods,
+  required Int64List years,
+  PlatformInt64? from,
+  PlatformInt64? to,
+  String? price,
+  double? min,
+  double? max,
+  String? sort,
+  required bool desc,
+  String? model,
+  required List<String> conditions,
+}) => RustLib.instance.api.crateApiSearchesEditSearch(
+  id: id,
+  name: name,
+  query: query,
+  target: target,
+  sources: sources,
+  symbols: symbols,
+  periods: periods,
+  years: years,
+  from: from,
+  to: to,
+  price: price,
+  min: min,
+  max: max,
+  sort: sort,
+  desc: desc,
+  model: model,
+  conditions: conditions,
 );
 
 Future<SearchInfo> renameSearch({required String id, required String name}) =>
@@ -42,6 +118,19 @@ class SearchInfo {
   final String describe;
   final PlatformInt64 matches;
   final String? forkedFrom;
+  final List<String> sources;
+  final List<String> symbols;
+  final List<String> periods;
+  final Int64List years;
+  final PlatformInt64? from;
+  final PlatformInt64? to;
+  final String priceMetric;
+  final double? priceMin;
+  final double? priceMax;
+  final String sort;
+  final bool desc;
+  final String? model;
+  final List<String> conditions;
 
   const SearchInfo({
     required this.id,
@@ -52,6 +141,19 @@ class SearchInfo {
     required this.describe,
     required this.matches,
     this.forkedFrom,
+    required this.sources,
+    required this.symbols,
+    required this.periods,
+    required this.years,
+    this.from,
+    this.to,
+    required this.priceMetric,
+    this.priceMin,
+    this.priceMax,
+    required this.sort,
+    required this.desc,
+    this.model,
+    required this.conditions,
   });
 
   @override
@@ -63,7 +165,20 @@ class SearchInfo {
       query.hashCode ^
       describe.hashCode ^
       matches.hashCode ^
-      forkedFrom.hashCode;
+      forkedFrom.hashCode ^
+      sources.hashCode ^
+      symbols.hashCode ^
+      periods.hashCode ^
+      years.hashCode ^
+      from.hashCode ^
+      to.hashCode ^
+      priceMetric.hashCode ^
+      priceMin.hashCode ^
+      priceMax.hashCode ^
+      sort.hashCode ^
+      desc.hashCode ^
+      model.hashCode ^
+      conditions.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -77,5 +192,18 @@ class SearchInfo {
           query == other.query &&
           describe == other.describe &&
           matches == other.matches &&
-          forkedFrom == other.forkedFrom;
+          forkedFrom == other.forkedFrom &&
+          sources == other.sources &&
+          symbols == other.symbols &&
+          periods == other.periods &&
+          years == other.years &&
+          from == other.from &&
+          to == other.to &&
+          priceMetric == other.priceMetric &&
+          priceMin == other.priceMin &&
+          priceMax == other.priceMax &&
+          sort == other.sort &&
+          desc == other.desc &&
+          model == other.model &&
+          conditions == other.conditions;
 }

@@ -698,11 +698,71 @@ class FakeApi implements MuninnApi {
   @override
   Future<List<SearchInfo>> searches() async => List.of(searchList);
 
+  SearchInfo _withSearch(
+    SearchInfo s, {
+    String? id,
+    String? shortId,
+    String? name,
+    String? target,
+    String? query,
+    String? describe,
+    List<String>? sources,
+    List<String>? symbols,
+    List<String>? periods,
+    List<int>? years,
+    int? from,
+    int? to,
+    bool clearFrom = false,
+    bool clearTo = false,
+    String? priceMetric,
+    double? priceMin,
+    double? priceMax,
+    String? sort,
+    bool? desc,
+    String? model,
+    List<String>? conditions,
+  }) => SearchInfo(
+    id: id ?? s.id,
+    shortId: shortId ?? s.shortId,
+    name: name ?? s.name,
+    target: target ?? s.target,
+    query: query ?? s.query,
+    describe: describe ?? s.describe,
+    matches: s.matches,
+    forkedFrom: s.forkedFrom,
+    sources: sources ?? s.sources,
+    symbols: symbols ?? s.symbols,
+    periods: periods ?? s.periods,
+    years: years ?? s.years,
+    from: clearFrom ? from : (from ?? s.from),
+    to: clearTo ? to : (to ?? s.to),
+    priceMetric: priceMetric ?? s.priceMetric,
+    priceMin: priceMin ?? s.priceMin,
+    priceMax: priceMax ?? s.priceMax,
+    sort: sort ?? s.sort,
+    desc: desc ?? s.desc,
+    model: model ?? s.model,
+    conditions: conditions ?? s.conditions,
+  );
+
   @override
   Future<SearchInfo> saveSearch(
     String name, {
     String query = '',
     String target = 'series',
+    List<String> sources = const [],
+    List<String> symbols = const [],
+    List<String> periods = const [],
+    List<int> years = const [],
+    int? from,
+    int? to,
+    String? price,
+    double? min,
+    double? max,
+    String? sort,
+    bool desc = false,
+    String? model,
+    List<String> conditions = const [],
   }) async {
     extraCalls.add('search-save:$name');
     final s = SearchInfo(
@@ -712,26 +772,69 @@ class FakeApi implements MuninnApi {
       query: query,
       target: target,
       describe: '$target "$query"',
+      sources: sources,
+      symbols: symbols,
+      periods: periods,
+      years: years,
+      from: from,
+      to: to,
+      priceMetric: price ?? 'close',
+      priceMin: min,
+      priceMax: max,
+      sort: sort ?? 'year',
+      desc: desc,
+      model: model,
+      conditions: conditions,
     );
     searchList = [...searchList, s];
     return s;
   }
 
   @override
-  Future<SearchInfo> renameSearch(String id, String name) async {
-    extraCalls.add('search-rename:$id');
+  Future<SearchInfo> editSearch(
+    String id, {
+    String? name,
+    String query = '',
+    String target = 'series',
+    List<String> sources = const [],
+    List<String> symbols = const [],
+    List<String> periods = const [],
+    List<int> years = const [],
+    int? from,
+    int? to,
+    String? price,
+    double? min,
+    double? max,
+    String? sort,
+    bool desc = false,
+    String? model,
+    List<String> conditions = const [],
+  }) async {
+    extraCalls.add('search-edit:$id');
     searchList = [
       for (final s in searchList)
         if (s.id == id)
-          SearchInfo(
-            id: s.id,
-            shortId: s.shortId,
-            name: name,
-            target: s.target,
-            query: s.query,
-            describe: s.describe,
-            matches: s.matches,
-            forkedFrom: s.forkedFrom,
+          _withSearch(
+            s,
+            name: name ?? s.name,
+            query: query,
+            target: target,
+            describe: '$target "$query"',
+            sources: sources,
+            symbols: symbols,
+            periods: periods,
+            years: years,
+            from: from,
+            to: to,
+            clearFrom: true,
+            clearTo: true,
+            priceMetric: price ?? 'close',
+            priceMin: min,
+            priceMax: max,
+            sort: sort ?? 'year',
+            desc: desc,
+            model: model,
+            conditions: conditions,
           )
         else
           s,
@@ -740,16 +843,24 @@ class FakeApi implements MuninnApi {
   }
 
   @override
+  Future<SearchInfo> renameSearch(String id, String name) async {
+    extraCalls.add('search-rename:$id');
+    searchList = [
+      for (final s in searchList)
+        if (s.id == id) _withSearch(s, name: name) else s,
+    ];
+    return searchList.firstWhere((s) => s.id == id);
+  }
+
+  @override
   Future<SearchInfo> forkSearch(String id, {String? name}) async {
     extraCalls.add('search-fork:$id');
     final s = searchList.firstWhere((x) => x.id == id);
-    final f = SearchInfo(
+    final f = _withSearch(
+      s,
       id: 's${searchList.length + 1}',
       shortId: 'sf',
       name: name ?? '${s.name} (fork)',
-      target: s.target,
-      query: s.query,
-      describe: s.describe,
     );
     searchList = [...searchList, f];
     return f;
@@ -835,6 +946,9 @@ class FakeApi implements MuninnApi {
     String body = '',
     String format = 'markdown',
     String? target,
+    int? from,
+    int? to,
+    int? rows,
   }) async {
     extraCalls.add('section-add:$report:$kind');
     final s = ReportSectionInfo(
@@ -850,6 +964,26 @@ class FakeApi implements MuninnApi {
     );
     sectionList = [...sectionList, s];
     return s;
+  }
+
+  @override
+  Future<ReportExportInfo> exportReport(
+    String report, {
+    String format = 'pdf',
+    required String out,
+  }) async {
+    extraCalls.add('report-export:$report:$format:$out');
+    return ReportExportInfo(
+      path: out,
+      message: 'exported report $report to $out ($format)',
+    );
+  }
+
+  @override
+  Future<String> previewReport(String report, {int width = 100}) async {
+    extraCalls.add('report-preview:$report');
+    final r = reportList.firstWhere((x) => x.id == report);
+    return '${r.name}\n${r.description}'.trim();
   }
 
   @override

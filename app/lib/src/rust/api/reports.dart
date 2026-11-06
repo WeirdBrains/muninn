@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_section_of`, `create_report_of`, `move_section_of`, `note`, `parse_kind`, `remove_report_of`, `remove_section_of`, `report_info`, `reports_of`, `section_info`, `sections_of`, `update_report_of`, `update_section_of`
+// These functions are ignored because they are not marked as `pub`: `add_section_of`, `create_report_of`, `export_report_of`, `move_section_of`, `note`, `parse_kind`, `parse_series_ref`, `preview_report_of`, `remove_report_of`, `remove_section_of`, `report_info`, `reports_of`, `section_info`, `sections_of`, `update_report_of`, `update_section_of`
 
 Future<List<ReportInfo>> reports() =>
     RustLib.instance.api.crateApiReportsReports();
@@ -38,7 +38,7 @@ Future<String> removeReport({required String id}) =>
 Future<List<SectionInfo>> reportSections({required String report}) =>
     RustLib.instance.api.crateApiReportsReportSections(report: report);
 
-/// `mnnn report add` for text, journal, project, authors, series, code or model sections.
+/// `mnnn report add` for text, records, journal, project, authors, series, code or model sections.
 Future<SectionInfo> addReportSection({
   required String report,
   required String kind,
@@ -46,6 +46,9 @@ Future<SectionInfo> addReportSection({
   required String body,
   required String format,
   String? target,
+  PlatformInt64? from,
+  PlatformInt64? to,
+  PlatformInt64? rows,
 }) => RustLib.instance.api.crateApiReportsAddReportSection(
   report: report,
   kind: kind,
@@ -53,6 +56,29 @@ Future<SectionInfo> addReportSection({
   body: body,
   format: format,
   target: target,
+  from: from,
+  to: to,
+  rows: rows,
+);
+
+/// Export a report as PDF, Word, HTML, LaTeX, text, JSON or CSV (`mnnn report export` / TUI `E`). File bytes stay in Rust.
+Future<ReportExportInfo> exportReport({
+  required String report,
+  required String format,
+  required String out,
+}) => RustLib.instance.api.crateApiReportsExportReport(
+  report: report,
+  format: format,
+  out: out,
+);
+
+/// Print a report as text (`mnnn report preview` / TUI `v`). No file is written.
+Future<String> previewReport({
+  required String report,
+  required PlatformInt64 width,
+}) => RustLib.instance.api.crateApiReportsPreviewReport(
+  report: report,
+  width: width,
 );
 
 Future<SectionInfo> updateReportSection({
@@ -86,6 +112,30 @@ Future<SectionInfo> moveReportSection({
   section: section,
   to: to,
 );
+
+class ReportExportInfo {
+  final String path;
+  final PlatformInt64 files;
+  final String message;
+
+  const ReportExportInfo({
+    required this.path,
+    required this.files,
+    required this.message,
+  });
+
+  @override
+  int get hashCode => path.hashCode ^ files.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReportExportInfo &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          files == other.files &&
+          message == other.message;
+}
 
 class ReportInfo {
   final String id;
