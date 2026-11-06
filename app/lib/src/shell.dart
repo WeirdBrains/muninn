@@ -17,6 +17,7 @@ import 'theme/muninn_theme.dart';
 import 'time_range.dart';
 import 'views/data.dart';
 import 'views/home.dart';
+import 'views/net.dart';
 import 'views/projects.dart';
 import 'views/placeholder.dart';
 
@@ -106,7 +107,7 @@ Widget sectionView(Section s) => switch (s) {
       Section.home => const HomeView(),
       Section.data => const DataView(),
       Section.projects => const ProjectsView(),
-      Section.net => const PlaceholderView(title: 'Net', cli: 'mnnn net status', icon: Icons.hub_outlined),
+      Section.net => const NetView(),
       Section.orgs => const PlaceholderView(title: 'Orgs', cli: 'mnnn org list', icon: Icons.apartment_outlined),
       Section.keys => const PlaceholderView(title: 'Keys', cli: 'mnnn keys status', icon: Icons.key_outlined),
       Section.help => const PlaceholderView(title: 'Help', cli: 'mnnn help', icon: Icons.help_outline),
@@ -186,7 +187,7 @@ class MuninnMenuBar extends ConsumerWidget {
       ]),
       menu('View', [
         item('Change view (chart / list)', () => ref.read(dataAsChartProvider.notifier).state = !ref.read(dataAsChartProvider)),
-        item('Refresh', () => ref.invalidate(overviewProvider)),
+        item('Refresh', () { ref.invalidate(overviewProvider); ref.invalidate(netOverviewProvider); }),
       ]),
       menu('Data', [
         item('Datasets', () => go(Section.data)),
@@ -205,7 +206,10 @@ class MuninnMenuBar extends ConsumerWidget {
         item('Projects…', () => go(Section.projects)),
         item('New project…', () => showNewProjectDialog(context, ref)),
       ]),
-      menu('Net', [item('Status…', () => go(Section.net))]),
+      menu('Net', [
+        item('Status…', () => go(Section.net)),
+        item('Peers…', () => go(Section.net)),
+      ]),
       menu('Orgs', [item('Organizations…', () => go(Section.orgs))]),
       menu('Keys', [item('Status…', () => go(Section.keys))]),
       menu('Theme', [

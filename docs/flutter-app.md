@@ -4,8 +4,8 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
-Projects (create, rename, describe, delete, attach and detach series), File ▸ Import… /
-Export… (CSV, Parquet, JSON), and File ▸ Preferences….
+Projects (create, rename, describe, delete, attach and detach series), a read-only Net
+status and peers view, File ▸ Import… / Export… (CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
 
@@ -30,19 +30,19 @@ Users never need Rust: release builds ship the compiled library.
 - **Header:** the raven (themed) and the big MUNINN wordmark, as on the website.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
-  File ▸ Import…, Export… and Preferences… are wired, as is Projects ▸ New project…;
-  Net, Orgs and Keys still point at the CLI.
+  File ▸ Import…, Export… and Preferences… are wired, as is Projects ▸ New project…
+  and Net ▸ Status… / Peers…; Orgs and Keys still point at the CLI.
 - **Phone layout** (narrower than 720 px): bottom navigation (Home, Data, Projects, Net,
   More), 48 px+ targets, safe areas, theme as a bottom sheet; nothing is hover-only.
 - **Themes:** every theme from `assets/themes/*.toml` plus your own in `<home>/themes/`,
   light, dark or system (Theme menu, or the palette button on phones). The app starts on
   the theme in `preferences.toml` and saves your choice there (`[theme]`, the same as
   `mnnn theme set` / `mnnn theme mode`), so the TUI and the app follow each other.
-- **Unlock:** Home, Data and Projects ask for the Muninn password once per session. The
+- **Unlock:** Home, Data, Projects and Net ask for the Muninn password once per session. The
   key stays in Rust memory (never in Dart, never on disk); **File ▸ Lock** forgets it.
-  Dashboard reads open the store **read-only** (no migrations). **File ▸ Import…**,
-  **Export…** and project writes (create, rename, describe, delete, attach or detach a
-  series) open it for writes after the same unlock.
+  Dashboard reads and the Net status view open the store **read-only** (no migrations).
+  **File ▸ Import…**, **Export…** and project writes (create, rename, describe, delete,
+  attach or detach a series) open it for writes after the same unlock.
 - **Home:** where the data lives, and the projects and datasets in it.
 - **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range;
   pick one to see it as a chart (candles when they fit, else a close line, volume
@@ -70,6 +70,12 @@ Users never need Rust: release builds ship the compiled library.
   a series out of the project without deleting it (`mnnn project drop`). Opening a
   series shows it in Data with the project's saved time range. Journals, searches,
   reports and import/export archives stay out of the app (use the TUI or CLI).
+- **Net:** read-only status and peers, like `mnnn net status` and `mnnn net peers` (and
+  the TUI's Node / Peers pages). It shows whether a node is running (`MUNINN_HOME/net/node.json`,
+  no secrets), the peer id and identity fingerprint if the node already has one (the key
+  stays in Rust; an identity is not created just by opening this view), reachable
+  addresses, NAT / mDNS / relay, exchange and share counts, and known peers. Start, stop,
+  connect, invite, relays, sharing and dark shards stay in the TUI or CLI.
 - **Import** (File ▸ Import…): pick a file or folder (CSV, TSV, TXT, JSON, NDJSON, JSONL)
   and store each file as it is in a source, like `mnnn ingest path`. An optional source
   name overrides the folder's name (else `local`). Progress is byte-based; Cancel keeps
@@ -96,7 +102,7 @@ network and sync (see [sync](sync.md)); that comes in a later phase.
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars, ingest and bar export), exposed with
+  projects and datasets, downsampled bars, ingest and bar export, net status and peers), exposed with
   flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.

@@ -10,6 +10,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: File ▸ Import… and Export… (CSV, Parquet, JSON), opening the store for writes after unlock
 - Flutter app: File ▸ Preferences… edits the saved theme, mode, time range and dataset in preferences.toml (shared with the TUI)
 - Flutter app: Projects can create, rename, describe and delete projects, and attach or detach a series (the same store APIs as `mnnn project` / the TUI)
+- Flutter app: read-only Net status and peers (`mnnn net status` / `mnnn net peers`); the node key stays in Rust
 
 ## [2.22.0] - 2026-11-05
 

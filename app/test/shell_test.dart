@@ -32,7 +32,8 @@ void main() {
     expect(find.byType(MenuBar), findsNothing);
     await t.tap(find.text('Net'));
     await t.pumpAndSettle();
-    expect(find.textContaining('mnnn net status'), findsOneWidget);
+    expect(find.textContaining('Coming to the app'), findsNothing);
+    expect(find.text('Unlock'), findsOneWidget);
   });
 
   testWidgets('theme menu switches theme', (t) async {

@@ -8,6 +8,7 @@ import 'rust/api/about.dart' as r_about;
 import 'rust/api/data.dart' as r_data;
 import 'rust/api/info.dart' as r_info;
 import 'rust/api/io.dart' as r_io;
+import 'rust/api/net.dart' as r_net;
 import 'rust/api/prefs.dart' as r_prefs;
 import 'rust/api/projects.dart' as r_projects;
 import 'rust/api/themes.dart' as r_themes;
@@ -218,4 +219,41 @@ class FfiMuninnApi implements MuninnApi {
 
   @override
   Future<void> removeProjectSeries(int itemId) => r_projects.removeProjectSeries(itemId: PlatformInt64Util.from(itemId));
+
+  @override
+  Future<NetOverview> netOverview() async {
+    final o = await r_net.netOverview(home: home);
+    return NetOverview(
+      status: NetStatus(
+        label: o.status.label,
+        peerId: o.status.peerId,
+        fingerprint: o.status.fingerprint,
+        running: o.status.running,
+        pid: o.status.pid?.toInt(),
+        startedAt: o.status.startedAt?.toInt(),
+        nat: o.status.nat,
+        mdns: o.status.mdns,
+        relayServer: o.status.relayServer,
+        addresses: o.status.addresses,
+        reservations: o.status.reservations,
+        connected: o.status.connected.toInt(),
+        exchangesActive: o.status.exchangesActive.toInt(),
+        incoming: o.status.incoming.toInt(),
+        shared: o.status.shared.toInt(),
+      ),
+      peers: [
+        for (final p in o.peers)
+          NetPeerInfo(
+            peerId: p.peerId,
+            shortId: p.shortId,
+            label: p.label,
+            user: p.user,
+            caps: p.caps,
+            link: p.link,
+            source: p.source,
+            lastSeen: p.lastSeen.toInt(),
+          ),
+      ],
+    );
+  }
 }

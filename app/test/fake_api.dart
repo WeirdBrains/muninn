@@ -195,4 +195,12 @@ class FakeApi implements MuninnApi {
     if (exportError != null) throw exportError!;
     return nextExport;
   }
+
+  NetOverview net = const NetOverview(
+    status: NetStatus(label: 'muninn'),
+    peers: [NetPeerInfo(peerId: '12D3KooWtestpeer', shortId: 'estpeer', label: 'lab', caps: 'muninn', source: 'mdns', lastSeen: 1704067200000)],
+  );
+
+  @override
+  Future<NetOverview> netOverview() async => net;
 }

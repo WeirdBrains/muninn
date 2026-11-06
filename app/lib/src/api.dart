@@ -84,6 +84,56 @@ class ProjectSeries {
   String get key => '$source:$base/$quote:$durationS';
 }
 
+/// `mnnn net status`: the node and counts (no keys).
+class NetStatus {
+  const NetStatus({
+    required this.label,
+    this.peerId,
+    this.fingerprint,
+    this.running = false,
+    this.pid,
+    this.startedAt,
+    this.nat = '',
+    this.mdns = false,
+    this.relayServer = false,
+    this.addresses = const [],
+    this.reservations = const [],
+    this.connected = 0,
+    this.exchangesActive = 0,
+    this.incoming = 0,
+    this.shared = 0,
+  });
+  final String label, nat;
+  final String? peerId, fingerprint;
+  final bool running, mdns, relayServer;
+  final int? pid, startedAt;
+  final List<String> addresses, reservations;
+  final int connected, exchangesActive, incoming, shared;
+}
+
+/// `mnnn net peers`: a known peer (public facts only).
+class NetPeerInfo {
+  const NetPeerInfo({
+    required this.peerId,
+    required this.shortId,
+    this.label = '',
+    this.user = '',
+    this.caps = '',
+    this.link = '-',
+    this.source = '',
+    this.lastSeen = 0,
+  });
+  final String peerId, shortId, label, user, caps, link, source;
+  final int lastSeen;
+}
+
+class NetOverview {
+  const NetOverview({required this.status, this.peers = const []});
+  final NetStatus status;
+  final List<NetPeerInfo> peers;
+}
+
+
 class Overview {
   const Overview({required this.projects, required this.datasets});
   final List<Project> projects;
@@ -190,4 +240,6 @@ abstract class MuninnApi {
   Future<bool> addProjectSeries(String projectId, Dataset d, TimeRange range);
   /// Take a series result out of a project (`mnnn project drop`). The series stays.
   Future<void> removeProjectSeries(int itemId);
+  /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
+  Future<NetOverview> netOverview();
 }
