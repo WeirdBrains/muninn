@@ -96,6 +96,11 @@ final netOverviewProvider = FutureProvider<NetOverview?>((ref) {
   return ref.watch(apiProvider).netOverview();
 });
 
+final orgOverviewProvider = FutureProvider<OrgOverview?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).orgOverview();
+});
+
 /// The selected section (both the desktop menus and the mobile bottom bar drive it).
 enum Section { home, data, projects, net, orgs, keys, help }
 

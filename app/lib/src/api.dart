@@ -192,6 +192,122 @@ class ExportResult {
   final int rows;
 }
 
+/// An organization this node owns (`mnnn org list` / `mnnn org show`).
+class OrgInfo {
+  const OrgInfo({
+    required this.id,
+    required this.shortId,
+    required this.name,
+    required this.slug,
+    this.description = '',
+    this.visibility = 'private',
+    this.access = 'members',
+    this.hosted = false,
+    this.memberAuth = false,
+    this.gated = false,
+    this.members = 0,
+    this.applyRole = '-',
+    this.inviteRole = '-',
+    this.template = 'default',
+    this.roles = const [],
+    this.memberList = const [],
+    this.resources = const [],
+    this.projects = const [],
+    this.endpoints = const [],
+    this.templates = const [],
+  });
+  final String id;
+  final String shortId;
+  final String name;
+  final String slug;
+  final String description;
+  final String visibility;
+  final String access;
+  final String applyRole;
+  final String inviteRole;
+  final String template;
+  final bool hosted;
+  final bool memberAuth;
+  final bool gated;
+  final int members;
+  final List<OrgRoleInfo> roles;
+  final List<OrgMemberInfo> memberList;
+  final List<OrgResourceInfo> resources;
+  final List<String> projects;
+  final List<String> templates;
+  final List<OrgEndpointInfo> endpoints;
+}
+
+class OrgRoleInfo {
+  const OrgRoleInfo({required this.name, this.rank = 0, this.perms = const []});
+  final String name;
+  final int rank;
+  final List<String> perms;
+}
+
+class OrgMemberInfo {
+  const OrgMemberInfo({
+    required this.shortId,
+    required this.title,
+    this.role = '-',
+    this.status = '',
+    this.note = '',
+  });
+  final String shortId;
+  final String title;
+  final String role;
+  final String status;
+  final String note;
+}
+
+class OrgResourceInfo {
+  const OrgResourceInfo({required this.kind, required this.name, this.state = '', this.published = ''});
+  final String kind;
+  final String name;
+  final String state;
+  final String published;
+}
+
+class OrgEndpointInfo {
+  const OrgEndpointInfo({required this.name, required this.kind, this.perm = '', this.anyone = false});
+  final String name;
+  final String kind;
+  final String perm;
+  final bool anyone;
+}
+
+/// An org on another node that this node applied to or belongs to.
+class OrgJoined {
+  const OrgJoined({
+    required this.name,
+    required this.slug,
+    this.status = '',
+    this.role = '',
+    this.node = '',
+    this.perms = const [],
+  });
+  final String name;
+  final String slug;
+  final String status;
+  final String role;
+  final String node;
+  final List<String> perms;
+}
+
+/// A public copy of another node's org (no snapshot).
+class OrgMirror {
+  const OrgMirror({required this.slug, this.fetchedAt = 0});
+  final String slug;
+  final int fetchedAt;
+}
+
+class OrgOverview {
+  const OrgOverview({this.mine = const [], this.joined = const [], this.mirrors = const []});
+  final List<OrgInfo> mine;
+  final List<OrgJoined> joined;
+  final List<OrgMirror> mirrors;
+}
+
 abstract class MuninnApi {
   About about();
   Future<List<String>> listThemes();
@@ -242,4 +358,6 @@ abstract class MuninnApi {
   Future<void> removeProjectSeries(int itemId);
   /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
   Future<NetOverview> netOverview();
+  /// `mnnn org list` and the fields `mnnn org show` prints for orgs this node owns.
+  Future<OrgOverview> orgOverview();
 }

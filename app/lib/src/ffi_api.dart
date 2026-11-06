@@ -9,6 +9,7 @@ import 'rust/api/data.dart' as r_data;
 import 'rust/api/info.dart' as r_info;
 import 'rust/api/io.dart' as r_io;
 import 'rust/api/net.dart' as r_net;
+import 'rust/api/orgs.dart' as r_orgs;
 import 'rust/api/prefs.dart' as r_prefs;
 import 'rust/api/projects.dart' as r_projects;
 import 'rust/api/themes.dart' as r_themes;
@@ -253,6 +254,50 @@ class FfiMuninnApi implements MuninnApi {
             source: p.source,
             lastSeen: p.lastSeen.toInt(),
           ),
+      ],
+    );
+  }
+
+  @override
+  Future<OrgOverview> orgOverview() async {
+    final o = await r_orgs.orgOverview();
+    return OrgOverview(
+      mine: [
+        for (final x in o.mine)
+          OrgInfo(
+            id: x.id,
+            shortId: x.shortId,
+            name: x.name,
+            slug: x.slug,
+            description: x.description,
+            visibility: x.visibility,
+            access: x.access,
+            hosted: x.hosted,
+            memberAuth: x.memberAuth,
+            gated: x.gated,
+            members: x.members.toInt(),
+            applyRole: x.applyRole,
+            inviteRole: x.inviteRole,
+            template: x.template,
+            roles: [for (final r in x.roles) OrgRoleInfo(name: r.name, rank: r.rank.toInt(), perms: r.perms)],
+            memberList: [
+              for (final m in x.memberList)
+                OrgMemberInfo(shortId: m.shortId, title: m.title, role: m.role, status: m.status, note: m.note),
+            ],
+            resources: [
+              for (final r in x.resources) OrgResourceInfo(kind: r.kind, name: r.name, state: r.state, published: r.published),
+            ],
+            projects: x.projects,
+            endpoints: [for (final e in x.endpoints) OrgEndpointInfo(name: e.name, kind: e.kind, perm: e.perm, anyone: e.anyone)],
+            templates: x.templates,
+          ),
+      ],
+      joined: [
+        for (final j in o.joined)
+          OrgJoined(name: j.name, slug: j.slug, status: j.status, role: j.role, node: j.node, perms: j.perms),
+      ],
+      mirrors: [
+        for (final m in o.mirrors) OrgMirror(slug: m.slug, fetchedAt: m.fetchedAt.toInt()),
       ],
     );
   }

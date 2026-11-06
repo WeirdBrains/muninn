@@ -203,4 +203,28 @@ class FakeApi implements MuninnApi {
 
   @override
   Future<NetOverview> netOverview() async => net;
+
+  OrgOverview orgs = const OrgOverview(
+    mine: [
+      OrgInfo(
+        id: 'o1',
+        shortId: 'abc12345',
+        name: 'Lab',
+        slug: 'lab',
+        description: 'we look',
+        visibility: 'private',
+        access: 'members',
+        members: 1,
+        applyRole: 'user',
+        inviteRole: 'user',
+        roles: [OrgRoleInfo(name: 'owner', rank: 100, perms: ['*'])],
+        memberList: [OrgMemberInfo(shortId: 'm1', title: 'alice', role: 'owner', status: 'member')],
+      ),
+    ],
+    joined: [OrgJoined(name: 'Desk', slug: 'desk', status: 'member', role: 'user', node: 'abcdefgh', perms: ['read'])],
+    mirrors: [OrgMirror(slug: 'copy', fetchedAt: 1704067200000)],
+  );
+
+  @override
+  Future<OrgOverview> orgOverview() async => orgs;
 }

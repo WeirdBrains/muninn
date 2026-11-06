@@ -18,6 +18,7 @@ import 'time_range.dart';
 import 'views/data.dart';
 import 'views/home.dart';
 import 'views/net.dart';
+import 'views/orgs.dart';
 import 'views/projects.dart';
 import 'views/placeholder.dart';
 
@@ -108,7 +109,7 @@ Widget sectionView(Section s) => switch (s) {
       Section.data => const DataView(),
       Section.projects => const ProjectsView(),
       Section.net => const NetView(),
-      Section.orgs => const PlaceholderView(title: 'Orgs', cli: 'mnnn org list', icon: Icons.apartment_outlined),
+      Section.orgs => const OrgsView(),
       Section.keys => const PlaceholderView(title: 'Keys', cli: 'mnnn keys status', icon: Icons.key_outlined),
       Section.help => const PlaceholderView(title: 'Help', cli: 'mnnn help', icon: Icons.help_outline),
     };
@@ -187,7 +188,7 @@ class MuninnMenuBar extends ConsumerWidget {
       ]),
       menu('View', [
         item('Change view (chart / list)', () => ref.read(dataAsChartProvider.notifier).state = !ref.read(dataAsChartProvider)),
-        item('Refresh', () { ref.invalidate(overviewProvider); ref.invalidate(netOverviewProvider); }),
+        item('Refresh', () { ref.invalidate(overviewProvider); ref.invalidate(netOverviewProvider); ref.invalidate(orgOverviewProvider); }),
       ]),
       menu('Data', [
         item('Datasets', () => go(Section.data)),
