@@ -2,11 +2,14 @@
 # Cross-build Windows binaries from Linux with llvm-mingw (no system packages):
 #   LLVM_MINGW=~/.local/opt/llvm-mingw-<ver>-ucrt-ubuntu-22.04-x86_64 scripts/cross-windows.sh [x86_64|aarch64 ...]
 # Needs: rustup target add x86_64-pc-windows-gnullvm aarch64-pc-windows-gnullvm
-# Output: target/<arch>-pc-windows-gnullvm/release/mnnn.exe, then dist/*.zip via scripts/dist.sh.
+# Output: ${CARGO_TARGET_DIR:-target}/<arch>-pc-windows-gnullvm/release/mnnn.exe, then dist/*.zip
+# via scripts/dist.sh. Honours CARGO_TARGET_DIR so the zip is the binary just built, not a
+# stale one left under ./target from an earlier run.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 : "${LLVM_MINGW:?set LLVM_MINGW to an llvm-mingw toolchain directory}"
 export PATH="$LLVM_MINGW/bin:$HOME/.cargo/bin:$PATH"   # rustup cargo has the windows targets
+td="${CARGO_TARGET_DIR:-target}"
 for arch in "${@:-x86_64 aarch64}"; do
   for a in $arch; do
     t="$a-pc-windows-gnullvm"; T="$(echo "$t" | tr a-z- A-Z_)"; u="${t//-/_}"
@@ -17,11 +20,11 @@ for arch in "${@:-x86_64 aarch64}"; do
     if [[ $a == aarch64 ]]; then
       # openssl-src has no mapping for aarch64 mingw: build OpenSSL (mingwarm64) from the
       # vendored openssl-src sources once and link it statically instead.
-      ossl="$PWD/target/openssl-$t"
+      ossl="$td/openssl-$t"
       if [[ ! -f "$ossl/lib/libcrypto.a" ]]; then
         cargo fetch --locked >/dev/null
         srcdir="$(ls -d "${CARGO_HOME:-$HOME/.cargo}"/registry/src/*/openssl-src-300.*/openssl | sort -V | tail -1)"
-        bld="$PWD/target/openssl-build-$t"; rm -rf "$bld"; cp -r "$srcdir" "$bld"
+        bld="$td/openssl-build-$t"; rm -rf "$bld"; cp -r "$srcdir" "$bld"
         (cd "$bld" && ./Configure mingwarm64 no-shared no-module no-legacy no-dso no-engine no-apps no-tests no-docs no-ui-console --prefix="$ossl" --libdir=lib \
             CC=aarch64-w64-mingw32-clang AR=llvm-ar RANLIB=llvm-ranlib RC=aarch64-w64-mingw32-windres \
           && make -j"$(nproc)" build_libs >/dev/null && make install_dev >/dev/null)
@@ -30,6 +33,6 @@ for arch in "${@:-x86_64 aarch64}"; do
     fi
     cargo build --locked --release -p muninn --target "$t"   # the mnnn bin only, not the FFI crate
     unset OPENSSL_NO_VENDOR OPENSSL_STATIC OPENSSL_DIR
-    scripts/dist.sh "$t"
+    scripts/dist.sh "$t" "$td/$t/release/mnnn.exe"
   done
 done

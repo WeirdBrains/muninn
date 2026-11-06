@@ -120,6 +120,15 @@ fn every_packaging_template_pins_the_workspace_version() {
 }
 
 #[test]
+fn cross_windows_sh_packages_from_cargo_target_dir() {
+    let sh = read("scripts/cross-windows.sh");
+    assert!(sh.contains(r#"td="${CARGO_TARGET_DIR:-target}""#), "scripts/cross-windows.sh must honour CARGO_TARGET_DIR");
+    assert!(sh.contains(r#"scripts/dist.sh "$t" "$td/$t/release/mnnn.exe""#), "scripts/cross-windows.sh must pass the built exe path to dist.sh");
+    // OpenSSL for aarch64 also lives under $td, not a hard-coded ./target
+    assert!(sh.contains(r#"ossl="$td/openssl-$t""#) && !sh.contains("$PWD/target/openssl"), "{sh}");
+}
+
+#[test]
 fn release_sh_is_safe_in_a_shared_checkout() {
     let sh = read("scripts/release.sh");
     for bad in ["git add -A\n", "git add .", "commit -a", "commit -qa", "git stash", "git reset", "git clean", "push"] {

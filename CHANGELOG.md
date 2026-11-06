@@ -37,6 +37,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Fixed
 - Windows uninstall removes exactly Muninn's folder from the user PATH (any case, trailing backslash or semicolon), keeping every other entry and the REG_EXPAND_SZ type; reinstalling never adds it twice
+- `scripts/cross-windows.sh` packages the binary from `CARGO_TARGET_DIR` (default `target/`), so a release zip is the exe just built and not a stale one left under `./target`
 
 ## [2.21.0] - 2026-11-04
 
