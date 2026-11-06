@@ -343,11 +343,14 @@ INSTALL
   # Inno Setup (muninn-app.iss) — separate AppId/dir from TUI muninn.iss
   iscc=${ISCC:-}
   if [[ -z $iscc ]]; then
+    # Git Bash may lack USER (Windows uses USERNAME); avoid set -u trips.
+    local win_user=${USERNAME:-${USER:-}}
+    local localapp=${LOCALAPPDATA:-$HOME/AppData/Local}
     for cand in \
-      "$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe" \
-      "/c/Users/$USER/AppData/Local/Programs/Inno Setup 6/ISCC.exe" \
+      "$localapp/Programs/Inno Setup 6/ISCC.exe" \
+      "/c/Users/$win_user/AppData/Local/Programs/Inno Setup 6/ISCC.exe" \
       "$HOME/AppData/Local/Programs/Inno Setup 6/ISCC.exe"; do
-      if [[ -f $cand ]]; then iscc=$cand; break; fi
+      if [[ -n $cand && -f $cand ]]; then iscc=$cand; break; fi
     done
   fi
   icon=$root/app/windows/runner/resources/app_icon.ico
