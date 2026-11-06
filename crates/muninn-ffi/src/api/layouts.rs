@@ -4,6 +4,7 @@ use super::info::paths;
 use muninn_core::model::Duration;
 use muninn_core::prefs::Preferences;
 use muninn_core::tui::chart::{ChartOpts, Layers};
+use muninn_core::tui::frametile::FrameTile;
 use muninn_core::tui::layout::{Container, Dir, Mode, Node, SeriesKey, Tile, TileLayout, View};
 
 fn load(home: Option<String>) -> anyhow::Result<(muninn_core::paths::Paths, Preferences)> {
@@ -115,7 +116,7 @@ fn node_from_json(v: &serde_json::Value) -> anyhow::Result<Node> {
         link,
         list: Default::default(),
         chart,
-        frame: None,
+        frame: frame_from_json(v.get("frame")),
     }))
 }
 
@@ -132,6 +133,9 @@ fn node_to_json(n: &Node) -> serde_json::Value {
             if let Some(link) = t.link {
                 m.insert("link".into(), link.into());
             }
+            if let Some(f) = t.frame.as_deref() {
+                m.insert("frame".into(), frame_to_json(f));
+            }
             m.insert("layers".into(), layers_to_json(&t.chart.layers));
             m.insert("viewportScale".into(), (t.chart.zoom as f64).into());
             m.insert("viewportStart".into(), 0.into());
@@ -147,6 +151,25 @@ fn node_to_json(n: &Node) -> serde_json::Value {
             "b": node_to_json(&c.b),
         }),
     }
+}
+
+fn frame_from_json(v: Option<&serde_json::Value>) -> Option<Box<FrameTile>> {
+    let v = v?;
+    let key = v.get("key").and_then(|x| x.as_str()).unwrap_or("").trim();
+    if key.is_empty() {
+        return None;
+    }
+    let columns =
+        v.get("columns").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+    Some(Box::new(FrameTile { key: key.to_string(), table: v.get("table").and_then(|x| x.as_bool()).unwrap_or(false), columns }))
+}
+
+fn frame_to_json(f: &FrameTile) -> serde_json::Value {
+    serde_json::json!({
+        "key": f.key,
+        "table": f.table,
+        "columns": f.columns,
+    })
 }
 
 fn key_to_series(key: &str) -> Option<SeriesKey> {
@@ -270,17 +293,18 @@ mod tests {
         let home = Some(dir.path().display().to_string());
         assert!(saved_layouts(home.clone()).unwrap().is_empty());
         assert!(!dir.path().join("preferences.toml").exists() || saved_layouts(home.clone()).unwrap().is_empty());
-        let json = r#"{"focus":1,"nextId":3,"zoomed":false,"newDir":"horizontal","root":{"type":"split","dir":"horizontal","ratio":0.5,"mode":"split","active":0,"a":{"type":"tile","id":1,"asChart":true,"datasetKey":"binance:BTC/USDT:300","layers":{"envelope":true,"volume":false}},"b":{"type":"tile","id":2,"asChart":false,"datasetKey":"binance:ETH/USDT:3600","link":1}}}"#;
+        let json = r#"{"focus":1,"nextId":3,"zoomed":false,"newDir":"horizontal","root":{"type":"split","dir":"horizontal","ratio":0.5,"mode":"split","active":0,"a":{"type":"tile","id":1,"asChart":true,"datasetKey":"binance:BTC/USDT:300","layers":{"envelope":true,"volume":false}},"b":{"type":"tile","id":2,"asChart":false,"datasetKey":"binance:ETH/USDT:3600","link":1,"frame":{"key":"monitor:feed"}}}}"#;
         assert_eq!(save_named_layout(home.clone(), "quad".into(), json.into()).unwrap(), "saved layout quad");
         assert_eq!(saved_layouts(home.clone()).unwrap(), vec!["quad"]);
         let loaded = named_layout(home.clone(), "quad".into()).unwrap();
-        assert!(loaded.contains("BTC/USDT") && loaded.contains("ETH/USDT"), "{loaded}");
+        assert!(loaded.contains("BTC/USDT") && loaded.contains("ETH/USDT") && loaded.contains("monitor:feed"), "{loaded}");
         assert!(loaded.contains("\"asChart\":true") && loaded.contains("\"link\":1"), "{loaded}");
         // shared with the TUI
         let prefs = Preferences::load_or_create(&paths(home.clone()).unwrap()).unwrap();
         let t = prefs.tui.layouts.get("quad").unwrap();
         assert_eq!(t.tiles().len(), 2);
         assert_eq!(t.tile(2).unwrap().link, Some(1));
+        assert_eq!(t.tile(2).unwrap().frame.as_ref().map(|f| f.key.as_str()), Some("monitor:feed"));
         assert!(t.tile(1).unwrap().chart.layers.envelope);
         assert!(!t.tile(1).unwrap().chart.layers.volume);
         assert_eq!(t.tile(1).unwrap().series.as_ref().unwrap().duration, "5m");

@@ -431,27 +431,32 @@ pub fn attach_journal_image(entry: String, path: String, name: Option<String>) -
     attach_image_of(&open_write()?, &entry, &path, name.as_deref())
 }
 
-pub(crate) fn save_image_of(store: &Store, id: &str, out: &str) -> anyhow::Result<String> {
-    let (a, data) = match store.attachment_data(id)? {
-        Some(pair) => pair,
+fn image_data(store: &Store, id: &str) -> anyhow::Result<(muninn_core::store::Attachment, Vec<u8>)> {
+    let id = id.trim();
+    match store.attachment_data(id)? {
+        Some(pair) => Ok(pair),
         None => {
             let mut hits = vec![];
             for j in store.journals()? {
                 for e in store.entries(&j.id)? {
                     for att in store.attachments(&e.id)? {
-                        if att.id.starts_with(id.trim()) {
+                        if att.id.starts_with(id) {
                             hits.push(att.id);
                         }
                     }
                 }
             }
             match hits.as_slice() {
-                [one] => store.attachment_data(one)?.ok_or_else(|| anyhow::anyhow!("image `{id}` not found"))?,
-                [] => return Err(anyhow::anyhow!("image `{id}` not found")),
-                _ => return Err(anyhow::anyhow!("image `{id}` is ambiguous")),
+                [one] => store.attachment_data(one)?.ok_or_else(|| anyhow::anyhow!("image `{id}` not found")),
+                [] => Err(anyhow::anyhow!("image `{id}` not found")),
+                _ => Err(anyhow::anyhow!("image `{id}` is ambiguous")),
             }
         }
-    };
+    }
+}
+
+pub(crate) fn save_image_of(store: &Store, id: &str, out: &str) -> anyhow::Result<String> {
+    let (a, data) = image_data(store, id)?;
     let out = Path::new(out);
     if let Some(dir) = out.parent().filter(|p| !p.as_os_str().is_empty()) {
         std::fs::create_dir_all(dir)?;
@@ -463,6 +468,28 @@ pub(crate) fn save_image_of(store: &Store, id: &str, out: &str) -> anyhow::Resul
 /// Write an attached image to a file (`mnnn journal image`). Bytes never return to Dart.
 pub fn save_journal_image(id: String, out: String) -> anyhow::Result<String> {
     save_image_of(&open_write()?, &id, &out)
+}
+
+fn shrink_preview(data: &[u8], max_px: u32) -> Vec<u8> {
+    let Ok(img) = image::load_from_memory(data) else {
+        return Vec::new();
+    };
+    let img = img.thumbnail(max_px, max_px);
+    let mut out = Vec::new();
+    if img.write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png).is_err() {
+        return Vec::new();
+    }
+    out
+}
+
+pub(crate) fn journal_image_thumbnail_of(store: &Store, id: &str, max_px: u32) -> anyhow::Result<Vec<u8>> {
+    let (_, data) = image_data(store, id)?;
+    Ok(shrink_preview(&data, max_px.max(16)))
+}
+
+/// A downscaled PNG preview of an attached image. The original bytes stay in the store.
+pub fn journal_image_thumbnail(id: String, max_px: Option<u32>) -> anyhow::Result<Vec<u8>> {
+    journal_image_thumbnail_of(&super::data::open()?, &id, max_px.unwrap_or(96))
 }
 
 pub(crate) fn copy_entries_of(
@@ -661,6 +688,19 @@ mod tests {
         assert!(msg.contains("out.png"));
         assert!(!msg.contains("not-a-real-png-but-ok"), "image bytes must not appear in the message");
         assert_eq!(std::fs::read(&out).unwrap(), b"not-a-real-png-but-ok");
+        assert!(journal_image_thumbnail_of(&s, &a.id, 32).unwrap().is_empty(), "invalid images have no preview");
+        let red = {
+            let img = image::RgbImage::from_pixel(8, 8, image::Rgb([200, 30, 30]));
+            let mut buf = Vec::new();
+            image::DynamicImage::ImageRgb8(img).write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png).unwrap();
+            buf
+        };
+        let red_path = dir.path().join("red.png");
+        std::fs::write(&red_path, &red).unwrap();
+        let preview = attach_image_of(&s, &e.id, red_path.to_str().unwrap(), Some("red.png")).unwrap();
+        let thumb = journal_image_thumbnail_of(&s, &preview.id, 4).unwrap();
+        assert!(thumb.starts_with(b"\x89PNG"), "preview is a PNG, got {} bytes", thumb.len());
+        assert!(!thumb.is_empty());
         let dest = create_journal_of(&s, "Other", None, "markdown").unwrap();
         let copied = copy_entries_of(&s, &[e.id.clone()], Some(&dest.id), None, None).unwrap();
         assert_eq!(copied.len(), 1);
