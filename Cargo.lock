@@ -4403,6 +4403,7 @@ dependencies = [
  "flutter_rust_bridge",
  "muninn-core",
  "secrecy",
+ "serde_json",
  "tempfile",
  "toml 0.9.12+spec-1.1.0",
 ]

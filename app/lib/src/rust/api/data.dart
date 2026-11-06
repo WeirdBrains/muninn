@@ -153,6 +153,8 @@ class Overview {
 
 /// A dataset a project points at, with the project's saved range (if any).
 class ProjectSeries {
+  /// The project item id (`mnnn project drop PROJECT ITEM`).
+  final PlatformInt64 itemId;
   final String source;
   final String base;
   final String quote;
@@ -161,6 +163,7 @@ class ProjectSeries {
   final PlatformInt64? to;
 
   const ProjectSeries({
+    required this.itemId,
     required this.source,
     required this.base,
     required this.quote,
@@ -171,6 +174,7 @@ class ProjectSeries {
 
   @override
   int get hashCode =>
+      itemId.hashCode ^
       source.hashCode ^
       base.hashCode ^
       quote.hashCode ^
@@ -183,6 +187,7 @@ class ProjectSeries {
       identical(this, other) ||
       other is ProjectSeries &&
           runtimeType == other.runtimeType &&
+          itemId == other.itemId &&
           source == other.source &&
           base == other.base &&
           quote == other.quote &&

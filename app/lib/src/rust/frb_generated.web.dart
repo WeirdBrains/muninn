@@ -11,6 +11,7 @@ import 'api/data.dart';
 import 'api/info.dart';
 import 'api/io.dart';
 import 'api/prefs.dart';
+import 'api/projects.dart';
 import 'api/themes.dart';
 
 import 'dart:async';

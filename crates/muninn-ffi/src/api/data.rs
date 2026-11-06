@@ -87,6 +87,8 @@ pub fn overview() -> anyhow::Result<Overview> {
 
 /// A dataset a project points at, with the project's saved range (if any).
 pub struct ProjectSeries {
+    /// The project item id (`mnnn project drop PROJECT ITEM`).
+    pub item_id: i64,
     pub source: String,
     pub base: String,
     pub quote: String,
@@ -103,8 +105,17 @@ pub fn project_series(project_id: String) -> anyhow::Result<Vec<ProjectSeries>> 
 pub(crate) fn project_series_of(s: &Store, project_id: &str) -> anyhow::Result<Vec<ProjectSeries>> {
     Ok(s.project_items(project_id)?
         .iter()
-        .filter_map(|i| i.series())
-        .map(|r| ProjectSeries { source: r.source, base: r.symbol.base, quote: r.symbol.quote, duration_s: r.duration.0, from: r.from, to: r.to })
+        .filter_map(|i| {
+            i.series().map(|r| ProjectSeries {
+                item_id: i.id,
+                source: r.source,
+                base: r.symbol.base,
+                quote: r.symbol.quote,
+                duration_s: r.duration.0,
+                from: r.from,
+                to: r.to,
+            })
+        })
         .collect())
 }
 
@@ -226,6 +237,7 @@ mod tests {
         s.add_project_result(&p.id, &r).unwrap();
         let ps = project_series_of(&s, &p.id).unwrap();
         assert_eq!(ps.len(), 1);
+        assert!(ps[0].item_id > 0);
         assert_eq!((ps[0].base.as_str(), ps[0].from, ps[0].to), ("BTC", Some(t0), None));
         assert_eq!(overview_of(&s).unwrap().datasets[0].count, 1000);
     }
