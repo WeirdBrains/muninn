@@ -1,6 +1,7 @@
 //! The API the Flutter app calls (generated bindings: `app/lib/src/rust/`).
 //! Thin wrappers over `muninn-core`; no logic beyond shaping data for Dart.
 pub mod about;
+pub mod code;
 pub mod data;
 pub mod help;
 pub mod info;
