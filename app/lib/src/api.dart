@@ -295,6 +295,74 @@ class SearchInfo {
   final String? model;
 }
 
+class HistoryRowInfo {
+  const HistoryRowInfo({
+    required this.id,
+    this.kind = '',
+    this.summary = '',
+    this.depth = 0,
+    this.head = false,
+    this.current = false,
+    this.fork = false,
+    this.createdAt = 0,
+  });
+  final int id, depth, createdAt;
+  final String kind, summary;
+  final bool head, current, fork;
+}
+
+class HistoryMoveInfo {
+  const HistoryMoveInfo({
+    this.from,
+    this.to,
+    this.theme = '',
+    this.mode = '',
+    this.rangeFrom,
+    this.rangeTo,
+  });
+  final int? from, to, rangeFrom, rangeTo;
+  final String theme, mode;
+}
+
+class AuthorInfo {
+  const AuthorInfo({
+    required this.id,
+    required this.shortId,
+    required this.name,
+    this.email = '',
+    this.details = const [],
+    this.current = false,
+  });
+  final String id, shortId, name, email;
+  final List<String> details;
+  final bool current;
+}
+
+class FoundEntryInfo {
+  const FoundEntryInfo({
+    required this.journalId,
+    required this.journalName,
+    required this.entryId,
+    this.heading = '',
+    this.title = '',
+    this.createdAt = 0,
+  });
+  final String journalId, journalName, entryId, heading, title;
+  final int createdAt;
+}
+
+class FoundRecordInfo {
+  const FoundRecordInfo({
+    required this.modelId,
+    required this.modelName,
+    required this.recordId,
+    this.brief = '',
+    this.createdAt = 0,
+  });
+  final String modelId, modelName, recordId, brief;
+  final int createdAt;
+}
+
 class ReportExportInfo {
   const ReportExportInfo({
     required this.path,
@@ -1435,6 +1503,16 @@ abstract class MuninnApi {
   Future<void> saveTimeRange(TimeRange range);
   Future<void> saveDataset(String? key);
 
+  /// Named workspace layouts in `[tui.layouts]`, shared with the TUI.
+  Future<List<String>> savedLayouts();
+  Future<String> saveNamedLayout(String name, String json);
+  Future<String> namedLayout(String name);
+  Future<String> removeNamedLayout(String name);
+
+  /// History bar visibility (`[tui.history_open]`, TUI `Y`).
+  Future<bool> historyOpen();
+  Future<void> setHistoryOpen(bool open);
+
   /// Unlock with the Muninn password; the key stays in Rust. Throws on a wrong password.
   Future<void> unlock(String password);
   void lock();
@@ -1655,6 +1733,41 @@ abstract class MuninnApi {
   Future<SearchInfo> renameSearch(String id, String name);
   Future<SearchInfo> forkSearch(String id, {String? name});
   Future<String> removeSearch(String id);
+
+  /// Journal entries / records matching a live search (TUI apply → found-views).
+  Future<List<FoundEntryInfo>> searchFoundEntries(
+    String query, {
+    int? from,
+    int? to,
+  });
+  Future<List<FoundRecordInfo>> searchFoundRecords(
+    String query, {
+    int? from,
+    int? to,
+  });
+
+  /// Action history (`View ▸ History`, TUI `Y` / `u` / `U`).
+  Future<List<HistoryRowInfo>> historyTree();
+  Future<HistoryMoveInfo> historyBack();
+  Future<HistoryMoveInfo> historyForward();
+  Future<HistoryMoveInfo> historyGoto(int? id);
+
+  /// File ▸ Authors… (TUI `A`).
+  Future<List<AuthorInfo>> authors();
+  Future<AuthorInfo> addAuthor(
+    String name, {
+    String? email,
+    List<String> details = const [],
+  });
+  Future<AuthorInfo> updateAuthor(
+    String id, {
+    String? name,
+    String? email,
+    List<String> details = const [],
+    bool replaceDetails = false,
+  });
+  Future<String> removeAuthor(String id);
+  Future<String> setCurrentAuthor(String? id);
 
   Future<List<ReportInfo>> reports();
   Future<ReportInfo> createReport(

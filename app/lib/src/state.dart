@@ -180,6 +180,44 @@ class ChartLayers {
     priceAxis,
     timeAxis,
   );
+
+  Map<String, dynamic> toJson() => {
+    'candles': candles,
+    'ohlc': ohlc,
+    'line': line,
+    'area': area,
+    'envelope': envelope,
+    'volume': volume,
+    'ma': ma,
+    'wicks': wicks,
+    'gaps': gaps,
+    'zeroVolume': zeroVolume,
+    'grid': grid,
+    'crosshair': crosshair,
+    'priceAxis': priceAxis,
+    'timeAxis': timeAxis,
+  };
+
+  factory ChartLayers.fromJson(Map<String, dynamic>? j) {
+    if (j == null) return const ChartLayers();
+    bool g(String k, bool d) => j[k] as bool? ?? d;
+    return ChartLayers(
+      candles: g('candles', true),
+      ohlc: g('ohlc', false),
+      line: g('line', false),
+      area: g('area', false),
+      envelope: g('envelope', false),
+      volume: g('volume', true),
+      ma: g('ma', false),
+      wicks: g('wicks', false),
+      gaps: g('gaps', true),
+      zeroVolume: g('zeroVolume', false),
+      grid: g('grid', true),
+      crosshair: g('crosshair', true),
+      priceAxis: g('priceAxis', true),
+      timeAxis: g('timeAxis', true),
+    );
+  }
 }
 
 final chartLayersProvider = StateProvider<ChartLayers>(
@@ -355,6 +393,11 @@ class ChartViewport {
 
   @override
   int get hashCode => Object.hash(scale, start);
+
+  Map<String, dynamic> toJson() => {'scale': scale, 'start': start};
+
+  factory ChartViewport.fromParts({double? scale, int? start}) =>
+      ChartViewport(scale: scale ?? 1, start: start ?? 0);
 }
 
 final chartViewportProvider = StateProvider<ChartViewport>(

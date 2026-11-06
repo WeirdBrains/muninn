@@ -16,6 +16,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api.dart';
 import '../state.dart';
+import '../workspace.dart';
+import '../tiling_extras.dart';
 import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 
@@ -25,9 +27,11 @@ class BarChart extends ConsumerStatefulWidget {
     super.key,
     required this.bars,
     this.layers = const ChartLayers(),
+    this.tileId,
   });
   final List<BarPoint> bars;
   final ChartLayers layers;
+  final int? tileId;
   @override
   ConsumerState<BarChart> createState() => _BarChartState();
 }
@@ -97,7 +101,23 @@ class _BarChartState extends ConsumerState<BarChart> {
 
   List<BarPoint> get _all => widget.bars;
 
-  ChartViewport get _view => ref.read(chartViewportProvider);
+  ChartViewport get _view {
+    final id = widget.tileId;
+    if (id != null) {
+      final t = ref.read(workspaceProvider).tile(id);
+      if (t != null) return t.viewport;
+    }
+    return ref.read(chartViewportProvider);
+  }
+
+  void _setView(ChartViewport v) {
+    final id = widget.tileId;
+    if (id != null) {
+      syncLinkedFromChart(ref, id, v, _all);
+    } else {
+      ref.read(chartViewportProvider.notifier).state = v;
+    }
+  }
 
   int get _visibleCount => _view.visibleCount(_all.length);
 
@@ -127,16 +147,12 @@ class _BarChartState extends ConsumerState<BarChart> {
     final n = _all.length;
     if (n == 0 || width <= 0) return;
     final frac = (focalX / width).clamp(0.0, 1.0);
-    ref.read(chartViewportProvider.notifier).state = _view.zoomAt(
-      newScale,
-      n: n,
-      frac: frac,
-    );
+    _setView(_view.zoomAt(newScale, n: n, frac: frac));
   }
 
   void _resetZoom() {
     if (_view.scale == 1 && _view.start == 0) return;
-    ref.read(chartViewportProvider.notifier).state = const ChartViewport();
+    _setView(const ChartViewport());
   }
 
   @override
@@ -144,13 +160,20 @@ class _BarChartState extends ConsumerState<BarChart> {
     super.didUpdateWidget(old);
     if (!listEquals(old.bars, widget.bars)) {
       _hover = null;
-      ref.read(chartViewportProvider.notifier).state = const ChartViewport();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _setView(const ChartViewport());
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(chartViewportProvider);
+    if (widget.tileId != null) {
+      ref.watch(workspaceProvider);
+    } else {
+      ref.watch(chartViewportProvider);
+    }
     final m = context.muninn;
     final layers = widget.layers;
     final mas = ref.watch(chartMasProvider);
@@ -249,12 +272,12 @@ class _BarChartState extends ConsumerState<BarChart> {
                                         width *
                                         vis))
                                 .round();
-                        ref
-                            .read(chartViewportProvider.notifier)
-                            .state = ChartViewport(
-                          scale: _view.scale,
-                          start: newStart,
-                        ).clampTo(all.length);
+                        _setView(
+                          ChartViewport(
+                            scale: _view.scale,
+                            start: newStart,
+                          ).clampTo(all.length),
+                        );
                       }
                       _at(d.localFocalPoint.dx, width);
                     },
@@ -628,22 +651,32 @@ class BarChartPainter extends CustomPainter {
 /// The TUI's Chart layers sheet (`L` / View ▸ Chart layers…).
 Future<void> showChartLayersSheet(
   BuildContext context,
-  WidgetRef ref,
-) => showModalBottomSheet(
+  WidgetRef ref, {
+  int? tileId,
+}) => showModalBottomSheet(
   context: context,
   showDragHandle: true,
   builder: (ctx) => Consumer(
     builder: (ctx, ref, _) {
-      final layers = ref.watch(chartLayersProvider);
+      final ws = ref.watch(workspaceProvider);
+      final layers =
+          (tileId != null ? ws.tile(tileId)?.layers : null) ??
+          ws.focused.layers;
       final m = ctx.muninn;
+      void setLayers(ChartLayers next) {
+        ref.read(chartLayersProvider.notifier).state = next;
+        final cur = ref.read(workspaceProvider);
+        final id = tileId ?? cur.focus;
+        setWorkspace(ref, cur.updateTile(id, (t) => t.copyWith(layers: next)));
+      }
+
       Widget tile(String title, bool value, ChartLayers Function(bool) next) =>
           SwitchListTile(
             minTileHeight: 56,
             title: Text(title),
             value: value,
             activeThumbColor: m.accent,
-            onChanged: (v) =>
-                ref.read(chartLayersProvider.notifier).state = next(v),
+            onChanged: (v) => setLayers(next(v)),
           );
       return SafeArea(
         child: ListView(
@@ -834,36 +867,54 @@ class _MovingAveragesDialogState extends State<_MovingAveragesDialog> {
 
 /// The list form of the same bars (View ▸ Change view).
 class BarTable extends StatelessWidget {
-  const BarTable({super.key, required this.bars});
+  const BarTable({
+    super.key,
+    required this.bars,
+    this.selectedTs,
+    this.onSelect,
+  });
   final List<BarPoint> bars;
+  final int? selectedTs;
+  final ValueChanged<int>? onSelect;
 
   @override
   Widget build(BuildContext context) {
     final m = context.muninn;
     String n(double v) => v.toStringAsPrecision(6);
+    final selected = selectedTs == null
+        ? -1
+        : nearestBarIndex(bars, selectedTs!);
     return ListView.builder(
       itemCount: bars.length,
       itemExtent: 32,
       itemBuilder: (_, i) {
-        final b = bars[bars.length - 1 - i];
-        return Row(
-          children: [
-            SizedBox(
-              width: 140,
-              child: Text(fmtUtc(b.ts), style: TextStyle(color: m.muted)),
+        final idx = bars.length - 1 - i;
+        final b = bars[idx];
+        final sel = idx == selected;
+        return Material(
+          color: sel ? m.selectionBg : Colors.transparent,
+          child: InkWell(
+            onTap: onSelect == null ? null : () => onSelect!(b.ts),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 140,
+                  child: Text(fmtUtc(b.ts), style: TextStyle(color: m.muted)),
+                ),
+                for (final v in [b.open, b.high, b.low])
+                  Expanded(child: Text(n(v))),
+                Expanded(
+                  child: Text(
+                    n(b.close),
+                    style: TextStyle(color: b.close >= b.open ? m.up : m.down),
+                  ),
+                ),
+                Expanded(
+                  child: Text(n(b.volume), style: TextStyle(color: m.muted)),
+                ),
+              ],
             ),
-            for (final v in [b.open, b.high, b.low])
-              Expanded(child: Text(n(v))),
-            Expanded(
-              child: Text(
-                n(b.close),
-                style: TextStyle(color: b.close >= b.open ? m.up : m.down),
-              ),
-            ),
-            Expanded(
-              child: Text(n(b.volume), style: TextStyle(color: m.muted)),
-            ),
-          ],
+          ),
         );
       },
     );

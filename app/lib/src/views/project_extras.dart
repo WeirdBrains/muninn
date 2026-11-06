@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api.dart';
 import '../state.dart';
+import '../tiling_extras.dart';
 import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 import 'journal_extras.dart';
@@ -466,6 +467,23 @@ class _JournalDetail extends ConsumerWidget {
   }
 }
 
+Future<void> applySearch(
+  WidgetRef ref,
+  SearchInfo s,
+  BuildContext context,
+) async {
+  final target = s.target.toLowerCase();
+  if (target == 'journals' || target == 'journal') {
+    await showFoundEntriesDialog(context, ref, s);
+    return;
+  }
+  if (target == 'records' || target == 'record') {
+    await showFoundRecordsDialog(context, ref, s);
+    return;
+  }
+  applySearchToData(ref, s);
+}
+
 void applySearchToData(WidgetRef ref, SearchInfo s) {
   ref.read(timeRangeProvider.notifier).state = TimeRange(
     from: s.from,
@@ -554,7 +572,7 @@ class SearchesPane extends ConsumerWidget {
                             itemBuilder: (ctx) => const [
                               PopupMenuItem(
                                 value: 'apply',
-                                child: Text('Apply to Data'),
+                                child: Text('Apply'),
                               ),
                               PopupMenuItem(
                                 value: 'refine',
@@ -597,9 +615,14 @@ Future<void> _onSearchAction(
 ) async {
   switch (action) {
     case 'apply':
-      applySearchToData(ref, s);
+      await applySearch(ref, s, context);
       if (context.mounted) {
-        _ok(context, 'applied ${s.name} to Data');
+        _ok(
+          context,
+          s.target.toLowerCase() == 'series' || s.target.isEmpty
+              ? 'applied ${s.name} to Data'
+              : 'applied ${s.name}',
+        );
       }
     case 'refine':
       final refined = await showDialog<SearchInfo>(

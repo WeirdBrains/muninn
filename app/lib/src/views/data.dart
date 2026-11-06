@@ -12,6 +12,7 @@ import '../state.dart';
 import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 import '../workspace.dart';
+import '../tiling_extras.dart';
 import 'chart.dart';
 import 'unlock.dart';
 
@@ -31,9 +32,16 @@ class DataView extends ConsumerWidget {
         }
         final ws = ref.watch(workspaceProvider);
         final m = context.muninn;
+        final historyOpen = ref.watch(historyOpenProvider);
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (historyOpen)
+              const SizedBox(
+                key: ValueKey('history-pane'),
+                width: 280,
+                child: HistoryPane(),
+              ),
             if (ws.sidebarVisible) ...[
               SizedBox(
                 width: 320,
@@ -374,7 +382,8 @@ class SeriesPanel extends ConsumerWidget {
                     tooltip: 'Chart layers',
                     icon: const Icon(Icons.layers_outlined),
                     iconSize: 28,
-                    onPressed: () => showChartLayersSheet(context, ref),
+                    onPressed: () =>
+                        showChartLayersSheet(context, ref, tileId: tile?.id),
                   ),
                   SegmentedButton<bool>(
                     segments: const [
@@ -419,9 +428,17 @@ class SeriesPanel extends ConsumerWidget {
                   : (asChart
                         ? BarChart(
                             bars: rows,
-                            layers: ref.watch(chartLayersProvider),
+                            layers:
+                                tile?.layers ?? ref.watch(chartLayersProvider),
+                            tileId: tile?.id,
                           )
-                        : BarTable(bars: rows)),
+                        : BarTable(
+                            bars: rows,
+                            selectedTs: tile?.listCursorTs,
+                            onSelect: tile == null
+                                ? null
+                                : (ts) => syncLinkedFromList(ref, tile.id, ts),
+                          )),
             ),
           ),
         ],

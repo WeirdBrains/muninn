@@ -1,9 +1,12 @@
 /// Desktop tiling workspace, matching the TUI's i3-style binary tree
 /// (`docs/tiling.md`): split, close, focus, resize, zoom, link, containers,
-/// presets. Session-only; the TUI persists `[tui.layout]` in preferences.toml.
+/// presets. The live tree is session-only (`[tui.layout]` is not written on
+/// start); named layouts save to `[tui.layouts]` and are shared with the TUI.
 library;
 
+import 'dart:convert';
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -35,22 +38,37 @@ class WsTile {
     this.asChart = true,
     this.datasetKey,
     this.link,
+    this.layers = const ChartLayers(),
+    this.viewport = const ChartViewport(),
+    this.listCursorTs,
   });
   final int id;
   final bool asChart;
   final String? datasetKey;
   final int? link;
+  final ChartLayers layers;
+  final ChartViewport viewport;
+  final int? listCursorTs;
 
   WsTile copyWith({
     bool? asChart,
     String? datasetKey,
     int? link,
     bool clearLink = false,
+    ChartLayers? layers,
+    ChartViewport? viewport,
+    int? listCursorTs,
+    bool clearListCursor = false,
   }) => WsTile(
     id: id,
     asChart: asChart ?? this.asChart,
     datasetKey: datasetKey ?? this.datasetKey,
     link: clearLink ? link : (link ?? this.link),
+    layers: layers ?? this.layers,
+    viewport: viewport ?? this.viewport,
+    listCursorTs: clearListCursor
+        ? listCursorTs
+        : (listCursorTs ?? this.listCursorTs),
   );
 }
 
@@ -145,6 +163,39 @@ class Workspace {
     }
     return null;
   }
+
+  /// Tiles paired with [id], matching the TUI's `linked(id)` (either direction).
+  List<WsTile> linkedTo(int id) {
+    final me = tile(id)?.link;
+    return [
+      for (final t in tiles)
+        if (t.id != id && (t.link == id || me == t.id)) t,
+    ];
+  }
+
+  Workspace updateTile(int id, WsTile Function(WsTile) f) =>
+      _copy(root: root.mapTiles((t) => t.id == id ? f(t) : t));
+
+  String encode() => jsonEncode(toJson());
+
+  Map<String, dynamic> toJson() => {
+    'focus': focus,
+    'nextId': nextId,
+    'zoomed': zoomed,
+    'newDir': newDir == SplitDir.vertical ? 'vertical' : 'horizontal',
+    'root': _nodeToJson(root),
+  };
+
+  static Workspace decode(String json) =>
+      Workspace.fromJson(jsonDecode(json) as Map<String, dynamic>);
+
+  factory Workspace.fromJson(Map<String, dynamic> j) => Workspace(
+    root: _nodeFromJson(j['root']),
+    focus: _asInt(j['focus'], 1),
+    nextId: _asInt(j['nextId'], 2),
+    zoomed: j['zoomed'] == true,
+    newDir: j['newDir'] == 'vertical' ? SplitDir.vertical : SplitDir.horizontal,
+  );
 
   Workspace _copy({
     WsNode? root,
@@ -306,6 +357,8 @@ class Workspace {
       id: id,
       asChart: asChart ?? old.tile.asChart,
       datasetKey: old.tile.datasetKey,
+      layers: old.tile.layers,
+      viewport: old.tile.viewport,
     );
     final next = _replace(
       path,
@@ -467,13 +520,19 @@ class Workspace {
 
   (Rect, Rect) _splitRect(Rect r, SplitDir dir, double ratio) {
     if (dir == SplitDir.horizontal) {
-      final w = (r.width * ratio).roundToDouble().clamp(0.0, r.width).toDouble();
+      final w = (r.width * ratio)
+          .roundToDouble()
+          .clamp(0.0, r.width)
+          .toDouble();
       return (
         Rect.fromLTWH(r.left, r.top, w, r.height),
         Rect.fromLTWH(r.left + w, r.top, r.width - w, r.height),
       );
     }
-    final h = (r.height * ratio).roundToDouble().clamp(0.0, r.height).toDouble();
+    final h = (r.height * ratio)
+        .roundToDouble()
+        .clamp(0.0, r.height)
+        .toDouble();
     return (
       Rect.fromLTWH(r.left, r.top, r.width, h),
       Rect.fromLTWH(r.left, r.top + h, r.width, r.height - h),
@@ -674,6 +733,92 @@ class Workspace {
   }
 }
 
+int _asInt(dynamic v, [int d = 0]) {
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return d;
+}
+
+double _asDouble(dynamic v, [double d = 0]) {
+  if (v is num) return v.toDouble();
+  return d;
+}
+
+Map<String, dynamic> _nodeToJson(WsNode n) {
+  switch (n) {
+    case WsLeaf(:final tile):
+      return {
+        'type': 'tile',
+        'id': tile.id,
+        'asChart': tile.asChart,
+        if (tile.datasetKey != null) 'datasetKey': tile.datasetKey,
+        if (tile.link != null) 'link': tile.link,
+        'layers': tile.layers.toJson(),
+        'viewportScale': tile.viewport.scale,
+        'viewportStart': tile.viewport.start,
+        if (tile.listCursorTs != null) 'listCursorTs': tile.listCursorTs,
+      };
+    case WsSplit(
+      :final dir,
+      :final ratio,
+      :final a,
+      :final b,
+      :final mode,
+      :final active,
+    ):
+      return {
+        'type': 'split',
+        'dir': dir == SplitDir.vertical ? 'vertical' : 'horizontal',
+        'mode': mode.name,
+        'ratio': ratio,
+        'active': active,
+        'a': _nodeToJson(a),
+        'b': _nodeToJson(b),
+      };
+  }
+}
+
+WsNode _nodeFromJson(dynamic v) {
+  final j = v is Map<String, dynamic> ? v : Map<String, dynamic>.from(v as Map);
+  if (j['type'] == 'split') {
+    return WsSplit(
+      dir: j['dir'] == 'vertical' ? SplitDir.vertical : SplitDir.horizontal,
+      ratio: _asDouble(j['ratio'], 0.5),
+      mode: switch (j['mode']) {
+        'tabbed' => ContainerMode.tabbed,
+        'stacked' => ContainerMode.stacked,
+        _ => ContainerMode.split,
+      },
+      active: _asInt(j['active']),
+      a: _nodeFromJson(j['a']),
+      b: _nodeFromJson(j['b']),
+    );
+  }
+  final layers = j['layers'];
+  return WsLeaf(
+    WsTile(
+      id: _asInt(j['id'], 1),
+      asChart: j['asChart'] != false,
+      datasetKey: j['datasetKey'] as String?,
+      link: j['link'] == null ? null : _asInt(j['link']),
+      layers: ChartLayers.fromJson(
+        layers is Map<String, dynamic>
+            ? layers
+            : (layers is Map ? Map<String, dynamic>.from(layers) : null),
+      ),
+      viewport: ChartViewport.fromParts(
+        scale: j['viewportScale'] is num
+            ? (j['viewportScale'] as num).toDouble()
+            : null,
+        start: j['viewportStart'] == null ? null : _asInt(j['viewportStart']),
+      ),
+      listCursorTs: j['listCursorTs'] == null
+          ? null
+          : _asInt(j['listCursorTs']),
+    ),
+  );
+}
+
 final workspaceProvider = StateProvider<Workspace>((ref) => Workspace.single());
 
 final workspaceAreaProvider = StateProvider<Size>(
@@ -701,6 +846,8 @@ void syncWorkspaceSelection(WidgetRef ref) {
     ref.read(selectedDatasetProvider.notifier).state = key;
   }
   ref.read(dataAsChartProvider.notifier).state = ws.focused.asChart;
+  ref.read(chartLayersProvider.notifier).state = ws.focused.layers;
+  ref.read(chartViewportProvider.notifier).state = ws.focused.viewport;
 }
 
 void applyWorkspace(WidgetRef ref, WsOp op, {BuildContext? context}) {

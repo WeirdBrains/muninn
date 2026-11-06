@@ -33,6 +33,7 @@ import 'views/net_dialogs.dart';
 import 'views/project_extras.dart';
 import 'views/projects.dart';
 import 'workspace.dart';
+import 'tiling_extras.dart';
 
 /// Widths below this use the phone layout.
 const phoneBreakpoint = 720.0;
@@ -276,6 +277,11 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           ),
           item('Export…', () => showExportDialog(context, ref)),
           item('Preferences…', () => showPreferencesDialog(context, ref)),
+          item(
+            'Authors…',
+            () => showAuthorsDialog(context, ref),
+            const SingleActivator(LogicalKeyboardKey.keyA, shift: true),
+          ),
           const Divider(),
           item(
             'Quit',
@@ -440,8 +446,26 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
                   ref.read(workspaceProvider).preset(LayoutPreset.grid2x2),
                 );
               }),
+              const Divider(),
+              item('Save current…', () => showSaveLayoutDialog(context, ref)),
+              item('Saved…', () => showSavedLayoutsDialog(context, ref)),
             ],
             child: const Text('Layouts'),
+          ),
+          item(
+            'History',
+            () => toggleHistory(ref),
+            const SingleActivator(LogicalKeyboardKey.keyY, shift: true),
+          ),
+          item(
+            'Step back',
+            () => stepHistory(ref, back: true).catchError((_) {}),
+            const SingleActivator(LogicalKeyboardKey.keyU),
+          ),
+          item(
+            'Step forward',
+            () => stepHistory(ref, back: false).catchError((_) {}),
+            const SingleActivator(LogicalKeyboardKey.keyU, shift: true),
           ),
           const Divider(),
           item('Toggle sidebar', () {

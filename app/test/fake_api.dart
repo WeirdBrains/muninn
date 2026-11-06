@@ -89,6 +89,48 @@ class FakeApi implements MuninnApi {
   @override
   Future<void> saveDataset(String? key) async => saves.add('dataset=$key');
 
+  final Map<String, String> namedLayouts = {};
+  bool historyBarOpen = false;
+  List<HistoryRowInfo> historyList = const [];
+  List<AuthorInfo> authorList = const [];
+  List<FoundEntryInfo> foundEntries = const [];
+  List<FoundRecordInfo> foundRecords = const [];
+
+  @override
+  Future<List<String>> savedLayouts() async =>
+      namedLayouts.keys.toList()..sort();
+
+  @override
+  Future<String> saveNamedLayout(String name, String json) async {
+    extraCalls.add('layout-save:$name');
+    namedLayouts[name] = json;
+    return 'saved layout $name';
+  }
+
+  @override
+  Future<String> namedLayout(String name) async {
+    extraCalls.add('layout-load:$name');
+    final json = namedLayouts[name];
+    if (json == null) throw 'no saved layout `$name`';
+    return json;
+  }
+
+  @override
+  Future<String> removeNamedLayout(String name) async {
+    extraCalls.add('layout-remove:$name');
+    if (namedLayouts.remove(name) == null) throw 'no saved layout `$name`';
+    return 'removed layout $name';
+  }
+
+  @override
+  Future<bool> historyOpen() async => historyBarOpen;
+
+  @override
+  Future<void> setHistoryOpen(bool open) async {
+    extraCalls.add('history-open:$open');
+    historyBarOpen = open;
+  }
+
   bool unlocked = false;
   final queries = <TimeRange>[];
 
@@ -874,6 +916,132 @@ class FakeApi implements MuninnApi {
         if (s.id != id) s,
     ];
     return 'removed live search $id';
+  }
+
+  @override
+  Future<List<FoundEntryInfo>> searchFoundEntries(
+    String query, {
+    int? from,
+    int? to,
+  }) async {
+    extraCalls.add('found-entries:$query');
+    return List.of(foundEntries);
+  }
+
+  @override
+  Future<List<FoundRecordInfo>> searchFoundRecords(
+    String query, {
+    int? from,
+    int? to,
+  }) async {
+    extraCalls.add('found-records:$query');
+    return List.of(foundRecords);
+  }
+
+  @override
+  Future<List<HistoryRowInfo>> historyTree() async => List.of(historyList);
+
+  HistoryMoveInfo _historyMove() =>
+      const HistoryMoveInfo(theme: 'tokyo-night', mode: 'dark');
+
+  @override
+  Future<HistoryMoveInfo> historyBack() async {
+    extraCalls.add('history-back');
+    return _historyMove();
+  }
+
+  @override
+  Future<HistoryMoveInfo> historyForward() async {
+    extraCalls.add('history-forward');
+    return _historyMove();
+  }
+
+  @override
+  Future<HistoryMoveInfo> historyGoto(int? id) async {
+    extraCalls.add('history-goto:$id');
+    return _historyMove();
+  }
+
+  @override
+  Future<List<AuthorInfo>> authors() async => List.of(authorList);
+
+  @override
+  Future<AuthorInfo> addAuthor(
+    String name, {
+    String? email,
+    List<String> details = const [],
+  }) async {
+    extraCalls.add('author-add:$name');
+    final a = AuthorInfo(
+      id: 'a${authorList.length + 1}',
+      shortId: 'a${authorList.length + 1}',
+      name: name,
+      email: email ?? '',
+      details: details,
+      current: authorList.isEmpty,
+    );
+    authorList = [...authorList, a];
+    return a;
+  }
+
+  @override
+  Future<AuthorInfo> updateAuthor(
+    String id, {
+    String? name,
+    String? email,
+    List<String> details = const [],
+    bool replaceDetails = false,
+  }) async {
+    extraCalls.add('author-edit:$id');
+    AuthorInfo? updated;
+    final next = <AuthorInfo>[];
+    for (final a in authorList) {
+      if (a.id == id) {
+        updated = AuthorInfo(
+          id: a.id,
+          shortId: a.shortId,
+          name: name ?? a.name,
+          email: email ?? a.email,
+          details: replaceDetails
+              ? details
+              : (details.isEmpty ? a.details : details),
+          current: a.current,
+        );
+        next.add(updated);
+      } else {
+        next.add(a);
+      }
+    }
+    authorList = next;
+    if (updated == null) throw 'no author `$id`';
+    return updated;
+  }
+
+  @override
+  Future<String> removeAuthor(String id) async {
+    extraCalls.add('author-remove:$id');
+    authorList = [
+      for (final a in authorList)
+        if (a.id != id) a,
+    ];
+    return 'removed $id';
+  }
+
+  @override
+  Future<String> setCurrentAuthor(String? id) async {
+    extraCalls.add('author-current:$id');
+    authorList = [
+      for (final a in authorList)
+        AuthorInfo(
+          id: a.id,
+          shortId: a.shortId,
+          name: a.name,
+          email: a.email,
+          details: a.details,
+          current: a.id == id,
+        ),
+    ];
+    return id == null ? 'no current author' : '$id is current';
   }
 
   @override

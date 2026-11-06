@@ -145,6 +145,40 @@ void main() {
     );
   });
 
+  test('named-layout JSON round-trips layers, viewport and links', () {
+    var ws = Workspace.single(datasetKey: 'binance:BTC/USDT:300')
+        .split(SplitDir.horizontal, area)
+        .workspace;
+    ws = ws
+        .focusTile(1)
+        .updateTile(
+          1,
+          (t) => t.copyWith(
+            layers: t.layers.copyWith(envelope: true, volume: false),
+            viewport: const ChartViewport(scale: 2, start: 3),
+          ),
+        )
+        .focusTile(2)
+        .cycleLink();
+    expect(ws.tile(2)!.link, 1);
+    expect(ws.linkedTo(1).map((t) => t.id), [2]);
+    expect(ws.linkedTo(2).map((t) => t.id), [1]);
+
+    final json = ws.encode();
+    expect(json, contains('binance:BTC/USDT:300'));
+    expect(json, contains('"envelope":true'));
+    final loaded = Workspace.decode(json);
+    expect(loaded.focus, ws.focus);
+    expect(loaded.tiles, hasLength(2));
+    expect(loaded.tile(1)!.layers.envelope, isTrue);
+    expect(loaded.tile(1)!.layers.volume, isFalse);
+    expect(loaded.tile(1)!.viewport.scale, 2);
+    expect(loaded.tile(1)!.viewport.start, 3);
+    expect(loaded.tile(2)!.link, 1);
+    expect(loaded.tile(2)!.asChart, isTrue);
+    expect(loaded.linkedTo(1).single.id, 2);
+  });
+
   testWidgets(
     'Ctrl-w v splits; Tab and Alt-2 move focus; Ctrl-b hides the sidebar',
     (t) async {

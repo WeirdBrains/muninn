@@ -121,7 +121,7 @@ Users never need Rust: release builds ship the compiled library.
   copy`). **Export** writes PDF, Word, HTML, LaTeX, text or JSON to a path
   (`mnnn journal export`); **Import journal** reads a JSON export (`mnnn journal
   import`); **Print** saves a PDF and can send it to `lp`/`lpr` (`mnnn journal
-  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (`mnnn search save|edit`, TUI `w`), apply a series search to Data (TUI Enter), and rename, fork or delete it (`mnnn search fork|remove`). Shift+F opens Live searches, matching the TUI's `F`. Applying a journals or records search to the TUI found-views stays in the TUI. **Reports** create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI `v` / `mnnn report preview`) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI `E` / `mnnn report export`). File bytes stay in Rust. **Code spaces** list, create
+  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (`mnnn search save|edit`, TUI `w`), apply a series search to Data (TUI Enter), and rename, fork or delete it (`mnnn search fork|remove`). Shift+F opens Live searches, matching the TUI's `F`. Applying a journals or records search opens a found-views list (TUI Enter on those targets); a series search still applies to Data. **Reports** create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI `v` / `mnnn report preview`) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI `E` / `mnnn report export`). File bytes stay in Rust. **Code spaces** list, create
   (from a language template, another space or a built-in parser), edit source and
   input, approve, check, build, run and remove (`mnnn code` / TUI Code, `C`).
   Built-in parsers can be listed and installed (`mnnn code parsers --install`).
@@ -238,9 +238,10 @@ Users never need Rust: release builds ship the compiled library.
   and the dataset open in Data — the same values already saved in `preferences.toml`
   (`[theme]`, `[tui.sidebar.filters]` from/to, `[app] dataset`) and shared with the TUI.
   Changing them here uses the same save path as the Theme menu, the time range picker
-  and Data. Header size and the history bar stay in `mnnn tui`. The Flutter
-  sidebar and tile tree are session-only and do not write `[tui.layout]` or
-  `[tui.layouts]`.
+  and Data. Header size stays in `mnnn tui`. Named layouts write `[tui.layouts]`
+  (shared with the TUI); the live tile tree is still session-only and does not
+  write `[tui.layout]` on start. The history bar (`Y` / `u` / `U`) stores
+  `[tui.history_open]` the same way the TUI does.
 - **Help** (Help ▸ Topics… / Search help… / Keybindings, or `?` / F1): the same
   embedded `docs/` topics as `mnnn help` and the TUI. `?` and F1 open the topic
   for the current section (Data chart → [charts](charts.md), Keys → [keys](keys.md),
@@ -278,6 +279,9 @@ when a hardware keyboard is attached.
 | `J` | Journals (Shift+J, the TUI's `J`) |
 | `!` | Notifications |
 | `L` | Chart layers… |
+| `A` | Authors… (Shift+A; lowercase `a` on the chart still toggles area) |
+| `Y` | toggle the history bar (Shift+Y; lowercase `y` on the chart still toggles the price axis) |
+| `u` / `U` | history step back / forward |
 | `Ctrl-w t` | change view (chart ↔ list) of the focused tile |
 | `Ctrl-w v` / `s` | split the focused tile right / below |
 | `Ctrl-w q` / `c` | close the focused tile (the last tile cannot close) |
@@ -338,12 +342,13 @@ When the Data chart is showing:
   `Ctrl+S` / `Ctrl+Q`, so paste, save and quit stay with the platform. Minimum tile
   size is 200×96 pixels (a stand-in for the TUI's 20×6 cells). Chart / list tiles
   only — the app has no terminal tiles, code-result tiles or pipeline-monitor tiles.
-  Layout is session-only (not written to `[tui.layout]`). A fresh session is one
+  The live layout is session-only (not written to `[tui.layout]`). A fresh session is one
   chart tile so existing Data behaviour stays; the TUI starts with a list tile.
-  Chart layers stay global (the TUI can set options per chart tile). Linking records
-  a pairing and shows ⛓id in the title; panning a linked list row to move another
-  tile's chart viewport stays in the TUI. View ▸ Layouts has 2-up, 3-column,
-  Main + stack and 2×2; Saved… / Save current… (`[tui.layouts]`) stay in the TUI.
+  Chart layers and the visible window are stored on each tile (like the TUI). Linking records
+  a pairing and shows ⛓id in the title; selecting a row in a linked list centres the paired
+  chart, and panning a linked chart updates the list cursor.
+  View ▸ Layouts has 2-up, 3-column, Main + stack and 2×2, plus Save current… / Saved…
+  written to `[tui.layouts]` (shared with the TUI).
 - **Ctrl-b** toggles the Data sidebar on a wide window. On a phone the dataset list
   *is* the page, so `Ctrl-b` is unused.
 - **Tab** / **Shift-Tab** and **Alt-1…9** focus tiles on a wide window. `/` shows
@@ -356,7 +361,8 @@ When the Data chart is showing:
 - Chart layer keys **`e` `m` `w` `g` `z`** match the TUI (envelope, moving averages, wick, gap, zero-volume). The averages use the loaded bars (including those off-screen when zoomed) the same way the TUI uses warmup history; they do not fetch extra bars beyond `queryBars`.
 - **← →** move the TUI chart crosshair; the app moves it by hover or touch.
 - **`[` `]` `{` `}` `@`** set the chart's visible window among already-loaded bars (the same start/end/jump idea as a TUI chart tile). They do not change the global `T` time-range filter, and they do not invent a separate bucket or query. `{` `}` `@` type a date; `[` `]` open the same calendar+time pickers the time-range dialog uses. At scale 1 (every loaded bar visible) `@` has nothing to pan.
-- Keys for windows the app does not have yet (`A` authors, `Y`/`u`/`U` history, and so on) are left unbound — they are not remapped to something else. Journals use Shift+J (the TUI's `J`). Live searches use Shift+F (the TUI's `F`); pipelines use Shift+E. The TUI history bar stays in the TUI.
+- **`A`** opens File ▸ Authors… (the TUI's authors window). Lowercase `a` on a chart still toggles the area layer.
+- **`Y`** toggles the history bar; **`u`** / **`U`** step back / forward (the TUI's history keys). Lowercase `y` on a chart still toggles the price axis. Journals use Shift+J (the TUI's `J`). Live searches use Shift+F (the TUI's `F`); pipelines use Shift+E.
 - In the TUI, `X` stops a node when the network window is focused; the app has no start/stop and `X` stays "clear the time range".
 - **`a`** toggles the area layer when the Data chart is showing (chart tile). Adding a series to a project is **Add current dataset** on the Projects page (the TUI's sidebar-focused `a`).
 - **Esc** closes dialogs through Flutter's usual dialog behaviour.

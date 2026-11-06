@@ -18,6 +18,7 @@ import 'views/project_compute.dart';
 import 'views/project_collab.dart';
 import 'views/projects.dart';
 import 'workspace.dart';
+import 'tiling_extras.dart';
 
 /// F10 asks the desktop menu bar to open (File, the first menu).
 final menuBarRequestProvider = StateProvider<int>((ref) => 0);
@@ -174,7 +175,24 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
       }
     }
 
-    // Shift+letter menu shortcuts (T, X, P, K, G, L, W) — same characters as the TUI.
+    // Shift+letter menu shortcuts (T, X, P, K, G, L, W, A, Y) — same characters as the TUI.
+    if (ch == 'Y' || (key == LogicalKeyboardKey.keyY && shift)) {
+      toggleHistory(ref);
+      return KeyEventResult.handled;
+    }
+    if (ch == 'A' || (key == LogicalKeyboardKey.keyA && shift)) {
+      showAuthorsDialog(context, ref);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyU || ch == 'u' || ch == 'U') {
+      stepHistory(ref, back: !shift).catchError((e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('$e')));
+        }
+      });
+      return KeyEventResult.handled;
+    }
     if (ch == 'T' || (key == LogicalKeyboardKey.keyT && shift)) {
       showTimeRangePicker(context, ref);
       return KeyEventResult.handled;
@@ -367,8 +385,8 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
       next = (l) => l.copyWith(timeAxis: !l.timeAxis);
     }
     if (next == null) return false;
-    final cur = ref.read(chartLayersProvider);
-    ref.read(chartLayersProvider.notifier).state = next(cur);
+    final cur = ref.read(workspaceProvider).focused.layers;
+    applyFocusedLayers(ref, next(cur));
     return true;
   }
 
@@ -447,10 +465,11 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
         : await pickUtcMs(context, null);
     if (ts == null || !context.mounted) return;
     final i = nearestBarIndex(bars, ts);
-    final v = ref.read(chartViewportProvider);
-    ref.read(chartViewportProvider.notifier).state = start
-        ? v.periodStart(i, bars.length)
-        : v.periodEnd(i, bars.length);
+    final v = ref.read(workspaceProvider).focused.viewport;
+    applyFocusedViewport(
+      ref,
+      start ? v.periodStart(i, bars.length) : v.periodEnd(i, bars.length),
+    );
   }
 
   Future<void> _jumpChartDate(BuildContext context) async {
@@ -462,37 +481,34 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
     );
     if (ts == null || !context.mounted) return;
     final i = nearestBarIndex(bars, ts);
-    final v = ref.read(chartViewportProvider);
-    ref.read(chartViewportProvider.notifier).state = v.jumpTo(i, bars.length);
+    final v = ref.read(workspaceProvider).focused.viewport;
+    applyFocusedViewport(ref, v.jumpTo(i, bars.length));
   }
 
   void _zoom(double factor) {
     final n = _focusedBars()?.length ?? 0;
     if (n == 0) return;
-    final v = ref.read(chartViewportProvider);
-    ref.read(chartViewportProvider.notifier).state = v.zoomAt(
-      v.scale * factor,
-      n: n,
-    );
+    final v = ref.read(workspaceProvider).focused.viewport;
+    applyFocusedViewport(ref, v.zoomAt(v.scale * factor, n: n));
   }
 
   void _pan(double screens) {
     final n = _focusedBars()?.length ?? 0;
     if (n == 0) return;
-    final v = ref.read(chartViewportProvider);
+    final v = ref.read(workspaceProvider).focused.viewport;
     var delta = (v.visibleCount(n) * screens).round();
     if (delta == 0 && screens != 0) delta = screens < 0 ? -1 : 1;
-    ref.read(chartViewportProvider.notifier).state = v.panBy(delta, n);
+    applyFocusedViewport(ref, v.panBy(delta, n));
   }
 
   void _jump({required bool latest}) {
     final n = _focusedBars()?.length ?? 0;
     if (n == 0) return;
-    final v = ref.read(chartViewportProvider);
-    ref.read(chartViewportProvider.notifier).state = ChartViewport(
-      scale: v.scale,
-      start: latest ? n : 0,
-    ).clampTo(n);
+    final v = ref.read(workspaceProvider).focused.viewport;
+    applyFocusedViewport(
+      ref,
+      ChartViewport(scale: v.scale, start: latest ? n : 0).clampTo(n),
+    );
   }
 
   void _selectAdjacentDataset(int delta) {

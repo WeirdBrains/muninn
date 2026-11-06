@@ -128,7 +128,7 @@ void main() {
 
     await t.tap(find.byKey(const ValueKey('search-menu-s1')));
     await t.pumpAndSettle();
-    await t.tap(find.text('Apply to Data'));
+    await t.tap(find.text('Apply'));
     await t.pumpAndSettle();
     expect(c.read(sectionProvider), Section.data);
     expect(c.read(timeRangeProvider).from, isNotNull);

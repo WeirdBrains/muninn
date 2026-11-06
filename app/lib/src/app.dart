@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'shell.dart';
 import 'state.dart';
+import 'tiling_extras.dart';
 import 'theme/muninn_theme.dart';
 
 class MuninnApp extends ConsumerStatefulWidget {
@@ -11,7 +12,8 @@ class MuninnApp extends ConsumerStatefulWidget {
   ConsumerState<MuninnApp> createState() => _MuninnAppState();
 }
 
-class _MuninnAppState extends ConsumerState<MuninnApp> with WidgetsBindingObserver {
+class _MuninnAppState extends ConsumerState<MuninnApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -27,7 +29,15 @@ class _MuninnAppState extends ConsumerState<MuninnApp> with WidgetsBindingObserv
           ..setMode(s.mode);
         ref.read(timeRangeProvider.notifier).state = s.range;
         ref.read(selectedDatasetProvider.notifier).state = s.dataset;
-      } catch (_) {/* defaults stay */}
+        try {
+          ref.read(historyOpenProvider.notifier).state = await api
+              .historyOpen();
+        } catch (_) {
+          /* defaults stay */
+        }
+      } catch (_) {
+        /* defaults stay */
+      }
       if (!mounted) return;
       // From here on every change is saved, whichever picker made it (desktop menus, phone sheet,
       // Shift+T, Projects): preferences.toml is shared with the TUI.
@@ -41,6 +51,9 @@ class _MuninnAppState extends ConsumerState<MuninnApp> with WidgetsBindingObserv
       });
       ref.listenManual(selectedDatasetProvider, (a, b) {
         if (a != b) save(() => api.saveDataset(b));
+      });
+      ref.listenManual(historyOpenProvider, (a, b) {
+        if (a != b) save(() => api.setHistoryOpen(b));
       });
     });
   }
@@ -62,7 +75,10 @@ class _MuninnAppState extends ConsumerState<MuninnApp> with WidgetsBindingObserv
     final t = ref.watch(resolvedThemeProvider);
     final theme = t.value;
     if (theme == null) {
-      return const MaterialApp(debugShowCheckedModeBanner: false, home: Scaffold(body: Center(child: CircularProgressIndicator())));
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
     }
     return MaterialApp(
       title: 'Muninn',

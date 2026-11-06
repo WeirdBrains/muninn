@@ -7,14 +7,17 @@
 // ignore_for_file: argument_type_not_assignable
 
 import 'api/about.dart';
+import 'api/authors.dart';
 import 'api/code.dart';
 import 'api/collab.dart';
 import 'api/data.dart';
 import 'api/help.dart';
+import 'api/history.dart';
 import 'api/info.dart';
 import 'api/io.dart';
 import 'api/journals.dart';
 import 'api/keys.dart';
+import 'api/layouts.dart';
 import 'api/mcp.dart';
 import 'api/net.dart';
 import 'api/notify.dart';
@@ -53,6 +56,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AliasInfo dco_decode_alias_info(dynamic raw);
+
+  @protected
+  AuthorInfo dco_decode_author_info(dynamic raw);
 
   @protected
   BarPoint dco_decode_bar_point(dynamic raw);
@@ -109,10 +115,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double dco_decode_f_64(dynamic raw);
 
   @protected
+  FoundEntry dco_decode_found_entry(dynamic raw);
+
+  @protected
+  FoundRecord dco_decode_found_record(dynamic raw);
+
+  @protected
   HelpTopic dco_decode_help_topic(dynamic raw);
 
   @protected
   HelpTopicInfo dco_decode_help_topic_info(dynamic raw);
+
+  @protected
+  HistoryMove dco_decode_history_move(dynamic raw);
+
+  @protected
+  HistoryRow dco_decode_history_row(dynamic raw);
 
   @protected
   PlatformInt64 dco_decode_i_64(dynamic raw);
@@ -151,6 +169,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<AliasInfo> dco_decode_list_alias_info(dynamic raw);
 
   @protected
+  List<AuthorInfo> dco_decode_list_author_info(dynamic raw);
+
+  @protected
   List<BarPoint> dco_decode_list_bar_point(dynamic raw);
 
   @protected
@@ -166,7 +187,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<EntryInfo> dco_decode_list_entry_info(dynamic raw);
 
   @protected
+  List<FoundEntry> dco_decode_list_found_entry(dynamic raw);
+
+  @protected
+  List<FoundRecord> dco_decode_list_found_record(dynamic raw);
+
+  @protected
   List<HelpTopicInfo> dco_decode_list_help_topic_info(dynamic raw);
+
+  @protected
+  List<HistoryRow> dco_decode_list_history_row(dynamic raw);
 
   @protected
   List<IngestFileReport> dco_decode_list_ingest_file_report(dynamic raw);
@@ -634,6 +664,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AliasInfo sse_decode_alias_info(SseDeserializer deserializer);
 
   @protected
+  AuthorInfo sse_decode_author_info(SseDeserializer deserializer);
+
+  @protected
   BarPoint sse_decode_bar_point(SseDeserializer deserializer);
 
   @protected
@@ -692,10 +725,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double sse_decode_f_64(SseDeserializer deserializer);
 
   @protected
+  FoundEntry sse_decode_found_entry(SseDeserializer deserializer);
+
+  @protected
+  FoundRecord sse_decode_found_record(SseDeserializer deserializer);
+
+  @protected
   HelpTopic sse_decode_help_topic(SseDeserializer deserializer);
 
   @protected
   HelpTopicInfo sse_decode_help_topic_info(SseDeserializer deserializer);
+
+  @protected
+  HistoryMove sse_decode_history_move(SseDeserializer deserializer);
+
+  @protected
+  HistoryRow sse_decode_history_row(SseDeserializer deserializer);
 
   @protected
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
@@ -740,6 +785,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<AliasInfo> sse_decode_list_alias_info(SseDeserializer deserializer);
 
   @protected
+  List<AuthorInfo> sse_decode_list_author_info(SseDeserializer deserializer);
+
+  @protected
   List<BarPoint> sse_decode_list_bar_point(SseDeserializer deserializer);
 
   @protected
@@ -761,9 +809,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<EntryInfo> sse_decode_list_entry_info(SseDeserializer deserializer);
 
   @protected
+  List<FoundEntry> sse_decode_list_found_entry(SseDeserializer deserializer);
+
+  @protected
+  List<FoundRecord> sse_decode_list_found_record(SseDeserializer deserializer);
+
+  @protected
   List<HelpTopicInfo> sse_decode_list_help_topic_info(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<HistoryRow> sse_decode_list_history_row(SseDeserializer deserializer);
 
   @protected
   List<IngestFileReport> sse_decode_list_ingest_file_report(
@@ -1327,6 +1384,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_alias_info(AliasInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_author_info(AuthorInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_bar_point(BarPoint self, SseSerializer serializer);
 
   @protected
@@ -1405,10 +1465,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_f_64(double self, SseSerializer serializer);
 
   @protected
+  void sse_encode_found_entry(FoundEntry self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_found_record(FoundRecord self, SseSerializer serializer);
+
+  @protected
   void sse_encode_help_topic(HelpTopic self, SseSerializer serializer);
 
   @protected
   void sse_encode_help_topic_info(HelpTopicInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_history_move(HistoryMove self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_history_row(HistoryRow self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
@@ -1468,6 +1540,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_author_info(
+    List<AuthorInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_bar_point(List<BarPoint> self, SseSerializer serializer);
 
   @protected
@@ -1495,8 +1573,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_found_entry(
+    List<FoundEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_found_record(
+    List<FoundRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_help_topic_info(
     List<HelpTopicInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_history_row(
+    List<HistoryRow> self,
     SseSerializer serializer,
   );
 

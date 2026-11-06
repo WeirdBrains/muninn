@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `edit_search_of`, `fork_search_of`, `info`, `nonempty_parts`, `note`, `parse_price`, `parse_sort`, `parse_target`, `remove_search_of`, `rename_search_of`, `save_search_of`, `save_search_spec_of`, `searches_of`, `spec_from`
+// These functions are ignored because they are not marked as `pub`: `edit_search_of`, `fork_search_of`, `found_spec`, `info`, `nonempty_parts`, `note`, `parse_price`, `parse_sort`, `parse_target`, `remove_search_of`, `rename_search_of`, `save_search_of`, `save_search_spec_of`, `search_found_entries_of`, `search_found_records_of`, `searches_of`, `spec_from`
 
 /// `mnnn search list`.
 Future<List<SearchInfo>> searches() =>
@@ -108,6 +108,102 @@ Future<SearchInfo> forkSearch({required String id, String? name}) =>
 
 Future<String> removeSearch({required String id}) =>
     RustLib.instance.api.crateApiSearchesRemoveSearch(id: id);
+
+/// Journal entries matching a live search (TUI apply → found-views).
+Future<List<FoundEntry>> searchFoundEntries({
+  required String query,
+  PlatformInt64? from,
+  PlatformInt64? to,
+}) => RustLib.instance.api.crateApiSearchesSearchFoundEntries(
+  query: query,
+  from: from,
+  to: to,
+);
+
+/// Records matching a live search (TUI apply → found-views).
+Future<List<FoundRecord>> searchFoundRecords({
+  required String query,
+  PlatformInt64? from,
+  PlatformInt64? to,
+}) => RustLib.instance.api.crateApiSearchesSearchFoundRecords(
+  query: query,
+  from: from,
+  to: to,
+);
+
+class FoundEntry {
+  final String journalId;
+  final String journalName;
+  final String entryId;
+  final String heading;
+  final String title;
+  final PlatformInt64 createdAt;
+
+  const FoundEntry({
+    required this.journalId,
+    required this.journalName,
+    required this.entryId,
+    required this.heading,
+    required this.title,
+    required this.createdAt,
+  });
+
+  @override
+  int get hashCode =>
+      journalId.hashCode ^
+      journalName.hashCode ^
+      entryId.hashCode ^
+      heading.hashCode ^
+      title.hashCode ^
+      createdAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FoundEntry &&
+          runtimeType == other.runtimeType &&
+          journalId == other.journalId &&
+          journalName == other.journalName &&
+          entryId == other.entryId &&
+          heading == other.heading &&
+          title == other.title &&
+          createdAt == other.createdAt;
+}
+
+class FoundRecord {
+  final String modelId;
+  final String modelName;
+  final String recordId;
+  final String brief;
+  final PlatformInt64 createdAt;
+
+  const FoundRecord({
+    required this.modelId,
+    required this.modelName,
+    required this.recordId,
+    required this.brief,
+    required this.createdAt,
+  });
+
+  @override
+  int get hashCode =>
+      modelId.hashCode ^
+      modelName.hashCode ^
+      recordId.hashCode ^
+      brief.hashCode ^
+      createdAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FoundRecord &&
+          runtimeType == other.runtimeType &&
+          modelId == other.modelId &&
+          modelName == other.modelName &&
+          recordId == other.recordId &&
+          brief == other.brief &&
+          createdAt == other.createdAt;
+}
 
 class SearchInfo {
   final String id;

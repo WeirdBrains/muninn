@@ -14,6 +14,9 @@ import 'rust/api/keys.dart' as r_keys;
 import 'rust/api/mcp.dart' as r_mcp;
 import 'rust/api/io.dart' as r_io;
 import 'rust/api/journals.dart' as r_journals;
+import 'rust/api/authors.dart' as r_authors;
+import 'rust/api/history.dart' as r_history;
+import 'rust/api/layouts.dart' as r_layouts;
 import 'rust/api/net.dart' as r_net;
 import 'rust/api/orgs.dart' as r_orgs;
 import 'rust/api/prefs.dart' as r_prefs;
@@ -97,6 +100,28 @@ class FfiMuninnApi implements MuninnApi {
   @override
   Future<void> saveDataset(String? key) =>
       r_prefs.saveDataset(home: home, key: key);
+
+  @override
+  Future<List<String>> savedLayouts() => r_layouts.savedLayouts(home: home);
+
+  @override
+  Future<String> saveNamedLayout(String name, String json) =>
+      r_layouts.saveNamedLayout(home: home, name: name, json: json);
+
+  @override
+  Future<String> namedLayout(String name) =>
+      r_layouts.namedLayout(home: home, name: name);
+
+  @override
+  Future<String> removeNamedLayout(String name) =>
+      r_layouts.removeNamedLayout(home: home, name: name);
+
+  @override
+  Future<bool> historyOpen() => r_layouts.historyOpen(home: home);
+
+  @override
+  Future<void> setHistoryOpen(bool open) =>
+      r_layouts.setHistoryOpen(home: home, open: open);
 
   @override
   Future<DataDir> dataDir() async {
@@ -745,6 +770,92 @@ class FfiMuninnApi implements MuninnApi {
 
   @override
   Future<String> removeSearch(String id) => r_searches.removeSearch(id: id);
+
+  @override
+  Future<List<FoundEntryInfo>> searchFoundEntries(
+    String query, {
+    int? from,
+    int? to,
+  }) async => [
+    for (final e in await r_searches.searchFoundEntries(
+      query: query,
+      from: from == null ? null : PlatformInt64Util.from(from),
+      to: to == null ? null : PlatformInt64Util.from(to),
+    ))
+      _foundEntry(e),
+  ];
+
+  @override
+  Future<List<FoundRecordInfo>> searchFoundRecords(
+    String query, {
+    int? from,
+    int? to,
+  }) async => [
+    for (final e in await r_searches.searchFoundRecords(
+      query: query,
+      from: from == null ? null : PlatformInt64Util.from(from),
+      to: to == null ? null : PlatformInt64Util.from(to),
+    ))
+      _foundRecord(e),
+  ];
+
+  @override
+  Future<List<HistoryRowInfo>> historyTree() async => [
+    for (final r in await r_history.historyTree()) _historyRow(r),
+  ];
+
+  @override
+  Future<HistoryMoveInfo> historyBack() async =>
+      _historyMove(await r_history.historyBack());
+
+  @override
+  Future<HistoryMoveInfo> historyForward() async =>
+      _historyMove(await r_history.historyForward());
+
+  @override
+  Future<HistoryMoveInfo> historyGoto(int? id) async => _historyMove(
+    await r_history.historyGoto(
+      id: id == null ? null : PlatformInt64Util.from(id),
+    ),
+  );
+
+  @override
+  Future<List<AuthorInfo>> authors() async => [
+    for (final a in await r_authors.authors()) _author(a),
+  ];
+
+  @override
+  Future<AuthorInfo> addAuthor(
+    String name, {
+    String? email,
+    List<String> details = const [],
+  }) async => _author(
+    await r_authors.addAuthor(name: name, email: email, details: details),
+  );
+
+  @override
+  Future<AuthorInfo> updateAuthor(
+    String id, {
+    String? name,
+    String? email,
+    List<String> details = const [],
+    bool replaceDetails = false,
+  }) async => _author(
+    await r_authors.updateAuthor(
+      id: id,
+      name: name,
+      email: email,
+      details: details,
+      replaceDetails: replaceDetails,
+    ),
+  );
+
+  @override
+  Future<String> removeAuthor(String id) => r_authors.removeAuthor(id: id);
+
+  @override
+  Future<String> setCurrentAuthor(String? id) =>
+      r_authors.setCurrentAuthor(id: id);
 
   @override
   Future<List<ReportInfo>> reports() async => [
@@ -2895,4 +3006,50 @@ ReportSectionInfo _section(r_reports.SectionInfo s) => ReportSectionInfo(
   heading: s.heading,
   body: s.body,
   format: s.format,
+);
+
+FoundEntryInfo _foundEntry(r_searches.FoundEntry e) => FoundEntryInfo(
+  journalId: e.journalId,
+  journalName: e.journalName,
+  entryId: e.entryId,
+  heading: e.heading,
+  title: e.title,
+  createdAt: e.createdAt.toInt(),
+);
+
+FoundRecordInfo _foundRecord(r_searches.FoundRecord e) => FoundRecordInfo(
+  modelId: e.modelId,
+  modelName: e.modelName,
+  recordId: e.recordId,
+  brief: e.brief,
+  createdAt: e.createdAt.toInt(),
+);
+
+HistoryRowInfo _historyRow(r_history.HistoryRow r) => HistoryRowInfo(
+  id: r.id.toInt(),
+  kind: r.kind,
+  summary: r.summary,
+  depth: r.depth.toInt(),
+  head: r.head,
+  current: r.current,
+  fork: r.fork,
+  createdAt: r.createdAt.toInt(),
+);
+
+HistoryMoveInfo _historyMove(r_history.HistoryMove m) => HistoryMoveInfo(
+  from: m.from?.toInt(),
+  to: m.to?.toInt(),
+  theme: m.theme,
+  mode: m.mode,
+  rangeFrom: m.rangeFrom?.toInt(),
+  rangeTo: m.rangeTo?.toInt(),
+);
+
+AuthorInfo _author(r_authors.AuthorInfo a) => AuthorInfo(
+  id: a.id,
+  shortId: a.shortId,
+  name: a.name,
+  email: a.email,
+  details: a.details,
+  current: a.current,
 );
