@@ -403,10 +403,12 @@ See [architecture](architecture.md) for the crate layout.
 
 ## Distribution
 
-Linux desktop packages of the Flutter app are built with `scripts/flutter-dist.sh`.
+Desktop packages of the Flutter app are built with `scripts/flutter-dist.sh`
+(Linux, macOS, and Windows via Git Bash or `scripts/flutter-dist.ps1`).
 The package name is `muninn-app` so it does not clash with the TUI/CLI `muninn`
-packages (which install `/usr/bin/mnnn`). File bytes stay in the bundle; the
-script does not touch `~/.muninn` and does not publish a GitHub release.
+packages (which install `/usr/bin/mnnn` or `muninn-*-windows-setup.exe`). File
+bytes stay in the bundle; the script does not touch `~/.muninn` /
+`%USERPROFILE%\.muninn` and does not publish a GitHub release.
 
 ```
 DIST=/path/to/out CARGO_TARGET_DIR=/path/to/cargo-target scripts/flutter-dist.sh
@@ -461,10 +463,38 @@ copied into the tap:
 brew install --cask weirdbrains/tap/muninn-app
 ```
 
-Still planned: Windows setup / MSIX, Apple notarization, iOS / TestFlight, a
-signed Play upload / testing track, then store listings. An arm64 release APK can
-be built locally (see below). Builds can later be attached to GitHub releases
-once those recipes exist; this script does not cut a tag.
+On Windows (Git Bash / MINGW, or `scripts/flutter-dist.ps1` from PowerShell) the
+same script writes:
+
+- `$DIST/muninn-app-<ver>-x86_64-pc-windows-msvc.zip` — portable Flutter release
+  runner folder (`muninn.exe`, DLLs, `data/`); run `muninn.exe`
+- `$DIST/muninn-app-<ver>-x86_64-windows-setup.exe` — Inno Setup 6.3+ installer
+  from `packaging/windows/muninn-app.iss` (AppId and `{localappdata}\Programs\MuninnApp`
+  are separate from the TUI `muninn.iss` / `{userpf}\Muninn`). Adds a Start Menu
+  entry and optionally the install folder to the user PATH for `muninn.exe`
+- `$DIST/muninn-app-<ver>-x86_64.msix` — `dart run msix:create` (unsigned /
+  `store: false` eyeball; skipped if the `msix` package is missing)
+
+Needs Visual Studio Build Tools with the Windows desktop C++ workload, Flutter
+Windows desktop enabled (`flutter config --enable-windows-desktop`), and Inno
+Setup (`winget install --id JRSoftware.InnoSetup -e`) for the setup.exe. Set
+`CARGO_TARGET_DIR` to a scratch directory under the user profile so Native Assets
+Rust output does not fill the clone. `SKIP_BUILD=1` reuses
+`app/build/windows/x64/runner/Release`. The script does not touch
+`%USERPROFILE%\.muninn`.
+
+PowerShell:
+
+```powershell
+$env:DIST = 'C:\path\to\out'
+$env:CARGO_TARGET_DIR = 'C:\Users\...\.cache\muninn-flutter-windows-cargo'
+.\scripts\flutter-dist.ps1
+```
+
+Still planned: Apple notarization, iOS / TestFlight, a signed Play upload /
+testing track, Windows code-signing / Store listing, then store listings. An
+arm64 release APK can be built locally (see below). Builds can later be attached
+to GitHub releases once those recipes exist; this script does not cut a tag.
 
 ## Icons
 

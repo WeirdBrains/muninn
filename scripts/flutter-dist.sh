@@ -6,6 +6,10 @@
 #     $DIST/muninn-app-<ver>-1.<rpmarch>.rpm  installs to /opt/muninn (needs rpmbuild)
 #   macOS:
 #     $DIST/muninn-app-<ver>-<triple>.dmg      .app plus an Applications shortcut
+#   Windows (Git Bash / MINGW / MSYS; see also scripts/flutter-dist.ps1):
+#     $DIST/muninn-app-<ver>-x86_64-pc-windows-msvc.zip
+#     $DIST/muninn-app-<ver>-x86_64-windows-setup.exe   (Inno Setup; muninn-app.iss)
+#     $DIST/muninn-app-<ver>-x86_64.msix                (dart run msix:create; unsigned OK)
 #
 # Usage:
 #   scripts/flutter-dist.sh
@@ -13,12 +17,15 @@
 #   SKIP_BUILD=1 scripts/flutter-dist.sh   # reuse an existing release bundle
 #
 # Package name is muninn-app so it does not clash with the TUI/CLI package muninn
-# (which installs /usr/bin/mnnn). Does not touch ~/.muninn. Does not publish a
-# GitHub release. Set CARGO_TARGET_DIR to keep the Rust build off a small disk
-# (Native Assets honors it via cargo when the toolchain consults the env).
+# (which installs /usr/bin/mnnn / muninn-*-windows-setup.exe). Does not touch
+# ~/.muninn or %USERPROFILE%\.muninn. Does not publish a GitHub release.
+# Set CARGO_TARGET_DIR to keep the Rust build off a small disk (Native Assets
+# honors it via cargo when the toolchain consults the env).
 # Apple builds use Swift Package Manager, not CocoaPods.
 # Linux .rpm creation needs rpmbuild (rpm-tools / rpm-build). A relocated
 # rpmbuild should set RPM_CONFIGDIR to its usr/lib/rpm directory.
+# Windows needs Inno Setup 6.3+ (ISCC) for the setup.exe and the msix pub
+# package for the .msix; either artifact is skipped with a message if missing.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ver="$(scripts/version.sh)"
@@ -270,11 +277,130 @@ package_macos() {
   echo "$dmg"
 }
 
+
+package_windows() {
+  local triple flutter_arch bundle name stage zip setup iscc icon msix_built msix_out win_ver
+  case "$arch" in
+    x86_64|amd64|i686) # uname -m on Git Bash is often x86_64
+      # Flutter Windows desktop currently ships an x64 runner folder.
+      triple=x86_64-pc-windows-msvc
+      flutter_arch=x64
+      ;;
+    *)
+      echo "unsupported Windows arch: $arch (expected x86_64)" >&2
+      exit 1
+      ;;
+  esac
+  bundle=$root/app/build/windows/$flutter_arch/runner/Release
+  if [[ ${SKIP_BUILD:-} != 1 ]]; then
+    flutter config --enable-windows-desktop >/dev/null
+    ( cd "$root/app" && flutter pub get && flutter build windows --release )
+  fi
+  [[ -f $bundle/muninn.exe ]] || { echo "missing release runner at $bundle (run flutter build windows --release)" >&2; exit 1; }
+
+  name=muninn-app-$ver-$triple
+  stage=$dist/$name
+  rm -rf "$stage"
+  mkdir -p "$stage"
+  # Copy the release folder contents (exe, dlls, data/)
+  cp -a "$bundle/." "$stage/"
+  cp "$root/LICENSE" "$root/CHANGELOG.md" "$root/app/README.md" "$stage/"
+  cat > "$stage/INSTALL.txt" <<INSTALL
+Muninn graphical app $ver ($triple)
+
+Run muninn.exe from this folder, or install with the matching
+muninn-app-<ver>-x86_64-windows-setup.exe / .msix.
+
+The data directory is MUNINN_HOME or %USERPROFILE%\\.muninn (the same store as
+the TUI/CLI). This package does not include the mnnn CLI; that ships in the
+separate muninn packages. The setup and MSIX are not code-signed.
+INSTALL
+
+  zip=$dist/$name.zip
+  rm -f "$zip"
+  # Prefer PowerShell Compress-Archive on Windows; fall back to zip if present.
+  if command -v powershell.exe >/dev/null 2>&1; then
+    powershell.exe -NoProfile -Command \
+      "Compress-Archive -Path (Join-Path -Path '$stage' -ChildPath '*') -DestinationPath '$zip' -Force" \
+      >/dev/null
+  elif command -v zip >/dev/null 2>&1; then
+    ( cd "$dist" && zip -qr "$name.zip" "$name" )
+  else
+    echo "neither powershell.exe nor zip found; cannot write $zip" >&2
+    exit 1
+  fi
+  echo "$zip"
+
+  # Inno Setup (muninn-app.iss) — separate AppId/dir from TUI muninn.iss
+  iscc=${ISCC:-}
+  if [[ -z $iscc ]]; then
+    for cand in \
+      "$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe" \
+      "/c/Users/$USER/AppData/Local/Programs/Inno Setup 6/ISCC.exe" \
+      "$HOME/AppData/Local/Programs/Inno Setup 6/ISCC.exe"; do
+      if [[ -f $cand ]]; then iscc=$cand; break; fi
+    done
+  fi
+  icon=$root/app/windows/runner/resources/app_icon.ico
+  if [[ -n $iscc && -f $iscc ]]; then
+    # ISCC wants Windows paths; convert when cygpath exists.
+    local isrc iout iico iiss
+    isrc=$stage
+    iout=$dist
+    iico=$icon
+    iiss=$root/packaging/windows/muninn-app.iss
+    if command -v cygpath >/dev/null 2>&1; then
+      isrc=$(cygpath -w "$isrc")
+      iout=$(cygpath -w "$iout")
+      iico=$(cygpath -w "$iico")
+      iiss=$(cygpath -w "$iiss")
+      iscc=$(cygpath -w "$iscc")
+    fi
+    "$iscc" //Q //DAppVersion="$ver" //DArch=x86_64 \
+      "//DSrcDir=$isrc" "//DOutDir=$iout" "//DIconFile=$iico" \
+      "$iiss"
+    setup=$dist/muninn-app-$ver-x86_64-windows-setup.exe
+    [[ -f $setup ]] || { echo "ISCC did not write $setup" >&2; exit 1; }
+    echo "$setup"
+  else
+    echo "skipping setup.exe: Inno Setup ISCC not found (winget install --id JRSoftware.InnoSetup -e)" >&2
+  fi
+
+  # MSIX via the msix pub package (store: false; unsigned eyeball OK)
+  if ( cd "$root/app" && dart run msix:create --help >/dev/null 2>&1 ); then
+    ( cd "$root/app" && dart run msix:create )
+    msix_built=
+    for cand in \
+      "$bundle/muninn.msix" \
+      "$root/app/build/windows/$flutter_arch/runner/Release/muninn.msix" \
+      "$bundle"/*.msix \
+      "$root/app/build/windows/$flutter_arch/runner/Release"/*.msix; do
+      if [[ -f $cand ]]; then msix_built=$cand; break; fi
+    done
+    # Also search freshly under build/
+    if [[ -z ${msix_built:-} ]]; then
+      msix_built=$(find "$root/app/build/windows" -name '*.msix' -type f 2>/dev/null | head -1 || true)
+    fi
+    if [[ -n ${msix_built:-} && -f $msix_built ]]; then
+      msix_out=$dist/muninn-app-$ver-x86_64.msix
+      cp "$msix_built" "$msix_out"
+      echo "$msix_out"
+    else
+      echo "skipping msix copy: dart run msix:create produced no .msix under app/build/windows" >&2
+    fi
+  else
+    echo "skipping msix: add msix as a Flutter app dev_dependency and run flutter pub get" >&2
+  fi
+}
+
 case "$host" in
   Linux) package_linux ;;
   Darwin) package_macos ;;
+  MINGW*|MSYS*|CYGWIN*|Windows_NT)
+    package_windows
+    ;;
   *)
-    echo "scripts/flutter-dist.sh packages Linux and macOS only (host is $host)" >&2
+    echo "scripts/flutter-dist.sh packages Linux, macOS, and Windows (host is $host)" >&2
     exit 1
     ;;
 esac

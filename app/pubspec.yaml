@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.21.0+1
+version: 2.22.0+1
 homepage: https://muninn.weirdbrains.com
 repository: https://github.com/WeirdBrains/muninn
 
@@ -57,6 +57,7 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.4
+  msix: ^3.16.24
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -108,10 +109,11 @@ msix_config:
   display_name: Muninn
   publisher_display_name: WeirdBrains
   identity_name: WeirdBrains.Muninn
-  msix_version: 2.21.0.0
+  msix_version: 2.22.0.0
   logo_path: assets/logo/muninn-raven.png
   capabilities: internetClient
   store: false
+  output_name: muninn-app
 
 # Launcher icons, from the approved raven tile (assets/logo/muninn-raven.svg, the same file
 # as assets/icons/muninn.svg). Regenerate: see docs/flutter-app.md "Icons".
