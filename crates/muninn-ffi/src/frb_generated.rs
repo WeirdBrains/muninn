@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -257550499;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1829528115;
 
 // Section: executor
 
@@ -2864,6 +2864,295 @@ fn wire__crate__api__orgs__org_apply_impl(
         },
     )
 }
+fn wire__crate__api__orgs__org_browse_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_browse",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_target = <String>::sse_decode(&mut deserializer);
+            let api_org = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_browse(api_home, api_target, api_org)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_call_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_call",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_endpoint = <String>::sse_decode(&mut deserializer);
+            let api_input = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_call(api_home, api_org, api_endpoint, api_input)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_cert_acme_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_cert_acme",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_org = <Option<String>>::sse_decode(&mut deserializer);
+            let api_challenge = <Option<String>>::sse_decode(&mut deserializer);
+            let api_email = <Option<String>>::sse_decode(&mut deserializer);
+            let api_domain = <Option<String>>::sse_decode(&mut deserializer);
+            let api_directory = <Option<String>>::sse_decode(&mut deserializer);
+            let api_profile = <Option<String>>::sse_decode(&mut deserializer);
+            let api_http_port = <Option<i64>>::sse_decode(&mut deserializer);
+            let api_off = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_cert_acme(
+                        api_home,
+                        api_org,
+                        api_challenge,
+                        api_email,
+                        api_domain,
+                        api_directory,
+                        api_profile,
+                        api_http_port,
+                        api_off,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_cert_clear_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_cert_clear",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_cert_clear(api_org)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_cert_renew_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_cert_renew",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_org = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_cert_renew(api_home, api_org)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_cert_set_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_cert_set",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_cert = <String>::sse_decode(&mut deserializer);
+            let api_key = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_cert_set(api_org, api_cert, api_key)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_cert_status_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_cert_status",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_org = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_cert_status(api_home, api_org)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_code_list_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_code_list",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_code_list(api_org)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_code_serve_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_code_serve",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_space = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_code_serve(api_org, api_space)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_code_stop_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_code_stop",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_space = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_code_stop(api_org, api_space)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__orgs__org_create_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2888,6 +3177,86 @@ fn wire__crate__api__orgs__org_create_impl(
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
                     let output_ok = crate::api::orgs::org_create(api_name, api_slug, api_description, api_public, api_open)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_domain_add_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_domain_add",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_domain = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_domain_add(api_org, api_domain)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_domain_remove_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_domain_remove",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_domain = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_domain_remove(api_org, api_domain)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_domains_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_domains",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_domains(api_org)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -2938,6 +3307,123 @@ fn wire__crate__api__orgs__org_edit_impl(
                         api_apply_role,
                         api_invite_role,
                     )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_endpoint_add_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_endpoint_add",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            let api_kind = <String>::sse_decode(&mut deserializer);
+            let api_target = <String>::sse_decode(&mut deserializer);
+            let api_perm = <Option<String>>::sse_decode(&mut deserializer);
+            let api_anyone = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_endpoint_add(api_org, api_name, api_kind, api_target, api_perm, api_anyone)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_endpoint_remove_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_endpoint_remove",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_endpoint_remove(api_org, api_name)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_fetch_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_fetch",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_resource = <String>::sse_decode(&mut deserializer);
+            let api_format = <Option<String>>::sse_decode(&mut deserializer);
+            let api_out = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_fetch(api_home, api_org, api_resource, api_format, api_out)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_give_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_give",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_kind = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_give(api_home, api_org, api_kind, api_name)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -3243,6 +3729,33 @@ fn wire__crate__api__orgs__org_member_role_impl(
         },
     )
 }
+fn wire__crate__api__orgs__org_mirror_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_mirror",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_mirror(api_home, api_org)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__orgs__org_overview_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -3262,6 +3775,89 @@ fn wire__crate__api__orgs__org_overview_impl(
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
                     let output_ok = crate::api::orgs::org_overview()?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_project_add_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_project_add",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_project = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_project_add(api_org, api_project)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_project_member_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_project_member",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_project = <String>::sse_decode(&mut deserializer);
+            let api_member = <String>::sse_decode(&mut deserializer);
+            let api_role = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_project_member(api_org, api_project, api_member, api_role)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_project_remove_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_project_remove",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_project = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_project_remove(api_org, api_project)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -3489,6 +4085,33 @@ fn wire__crate__api__orgs__org_role_remove_impl(
         },
     )
 }
+fn wire__crate__api__orgs__org_sign_in_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_sign_in",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_site = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_sign_in(api_org, api_site)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__orgs__org_sync_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -3510,6 +4133,262 @@ fn wire__crate__api__orgs__org_sync_impl(
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
                     let output_ok = crate::api::orgs::org_sync(api_home, api_org)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_sync_code_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_sync_code",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_sync_code(api_home, api_org)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_template_add_asset_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_template_add_asset",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_template = <String>::sse_decode(&mut deserializer);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            let api_name = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_template_add_asset(api_org, api_template, api_path, api_name)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_template_build_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_template_build",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_template = <String>::sse_decode(&mut deserializer);
+            let api_cmd = <Option<String>>::sse_decode(&mut deserializer);
+            let api_src = <Option<String>>::sse_decode(&mut deserializer);
+            let api_out = <Option<String>>::sse_decode(&mut deserializer);
+            let api_clear = <bool>::sse_decode(&mut deserializer);
+            let api_no_run = <bool>::sse_decode(&mut deserializer);
+            let api_approve = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok =
+                        crate::api::orgs::org_template_build(api_org, api_template, api_cmd, api_src, api_out, api_clear, api_no_run, api_approve)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_template_preview_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_template_preview",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_home = <Option<String>>::sse_decode(&mut deserializer);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_template = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_template_preview(api_home, api_org, api_template)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_template_remove_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_template_remove",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_template = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_template_remove(api_org, api_template)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_template_remove_asset_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_template_remove_asset",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_template = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_template_remove_asset(api_org, api_template, api_name)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_template_save_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_template_save",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            let api_html = <String>::sse_decode(&mut deserializer);
+            let api_css = <String>::sse_decode(&mut deserializer);
+            let api_use_it = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_template_save(api_org, api_name, api_html, api_css, api_use_it)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_template_show_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_template_show",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            let api_template = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_template_show(api_org, api_template)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__orgs__org_templates_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "org_templates",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_org = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>((move || {
+                    let output_ok = crate::api::orgs::org_templates(api_org)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -6268,6 +7147,54 @@ impl SseDecode for Vec<crate::api::notify::NotificationKindInfo> {
     }
 }
 
+impl SseDecode for Vec<crate::api::orgs::OrgBrowseItem> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::orgs::OrgBrowseItem>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::orgs::OrgCertInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::orgs::OrgCertInfo>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::orgs::OrgCodeServedInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::orgs::OrgCodeServedInfo>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::orgs::OrgDomainInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::orgs::OrgDomainInfo>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::orgs::OrgEndpointInfo> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -6347,6 +7274,30 @@ impl SseDecode for Vec<crate::api::orgs::OrgRoleInfo> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::orgs::OrgRoleInfo>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::orgs::OrgSyncCodeItem> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::orgs::OrgSyncCodeItem>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::orgs::OrgTemplateInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::orgs::OrgTemplateInfo>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -7125,6 +8076,86 @@ impl SseDecode for Option<Vec<String>> {
     }
 }
 
+impl SseDecode for crate::api::orgs::OrgBrowseItem {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_slug = <String>::sse_decode(deserializer);
+        let mut var_visibility = <String>::sse_decode(deserializer);
+        let mut var_access = <String>::sse_decode(deserializer);
+        let mut var_members = <i64>::sse_decode(deserializer);
+        let mut var_description = <String>::sse_decode(deserializer);
+        return crate::api::orgs::OrgBrowseItem {
+            name: var_name,
+            slug: var_slug,
+            visibility: var_visibility,
+            access: var_access,
+            members: var_members,
+            description: var_description,
+        };
+    }
+}
+
+impl SseDecode for crate::api::orgs::OrgCertInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_org = <String>::sse_decode(deserializer);
+        let mut var_slug = <String>::sse_decode(deserializer);
+        let mut var_domains = <Vec<String>>::sse_decode(deserializer);
+        let mut var_source = <String>::sse_decode(deserializer);
+        let mut var_names = <Vec<String>>::sse_decode(deserializer);
+        let mut var_notAfter = <String>::sse_decode(deserializer);
+        let mut var_issuer = <String>::sse_decode(deserializer);
+        let mut var_acmeEnabled = <bool>::sse_decode(deserializer);
+        let mut var_acmeEmail = <String>::sse_decode(deserializer);
+        let mut var_retryAttempts = <i64>::sse_decode(deserializer);
+        let mut var_retryNext = <String>::sse_decode(deserializer);
+        let mut var_retryError = <String>::sse_decode(deserializer);
+        return crate::api::orgs::OrgCertInfo {
+            org: var_org,
+            slug: var_slug,
+            domains: var_domains,
+            source: var_source,
+            names: var_names,
+            not_after: var_notAfter,
+            issuer: var_issuer,
+            acme_enabled: var_acmeEnabled,
+            acme_email: var_acmeEmail,
+            retry_attempts: var_retryAttempts,
+            retry_next: var_retryNext,
+            retry_error: var_retryError,
+        };
+    }
+}
+
+impl SseDecode for crate::api::orgs::OrgCertOverview {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_node = <crate::api::orgs::OrgNodeCertInfo>::sse_decode(deserializer);
+        let mut var_orgs = <Vec<crate::api::orgs::OrgCertInfo>>::sse_decode(deserializer);
+        return crate::api::orgs::OrgCertOverview { node: var_node, orgs: var_orgs };
+    }
+}
+
+impl SseDecode for crate::api::orgs::OrgCodeServedInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_lang = <String>::sse_decode(deserializer);
+        let mut var_shortId = <String>::sse_decode(deserializer);
+        return crate::api::orgs::OrgCodeServedInfo { name: var_name, lang: var_lang, short_id: var_shortId };
+    }
+}
+
+impl SseDecode for crate::api::orgs::OrgDomainInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_org = <String>::sse_decode(deserializer);
+        let mut var_domain = <String>::sse_decode(deserializer);
+        return crate::api::orgs::OrgDomainInfo { org: var_org, domain: var_domain };
+    }
+}
+
 impl SseDecode for crate::api::orgs::OrgEndpointInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -7133,6 +8164,18 @@ impl SseDecode for crate::api::orgs::OrgEndpointInfo {
         let mut var_perm = <String>::sse_decode(deserializer);
         let mut var_anyone = <bool>::sse_decode(deserializer);
         return crate::api::orgs::OrgEndpointInfo { name: var_name, kind: var_kind, perm: var_perm, anyone: var_anyone };
+    }
+}
+
+impl SseDecode for crate::api::orgs::OrgFetchResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_format = <String>::sse_decode(deserializer);
+        let mut var_size = <i64>::sse_decode(deserializer);
+        let mut var_text = <Option<String>>::sse_decode(deserializer);
+        let mut var_written = <String>::sse_decode(deserializer);
+        return crate::api::orgs::OrgFetchResult { name: var_name, format: var_format, size: var_size, text: var_text, written: var_written };
     }
 }
 
@@ -7246,6 +8289,38 @@ impl SseDecode for crate::api::orgs::OrgMirror {
     }
 }
 
+impl SseDecode for crate::api::orgs::OrgNodeCertInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_source = <String>::sse_decode(deserializer);
+        let mut var_names = <Vec<String>>::sse_decode(deserializer);
+        let mut var_notAfter = <String>::sse_decode(deserializer);
+        let mut var_issuer = <String>::sse_decode(deserializer);
+        let mut var_acmeEnabled = <bool>::sse_decode(deserializer);
+        let mut var_acmeDomain = <String>::sse_decode(deserializer);
+        let mut var_acmeEmail = <String>::sse_decode(deserializer);
+        let mut var_acmeDirectory = <String>::sse_decode(deserializer);
+        let mut var_acmeProfile = <String>::sse_decode(deserializer);
+        let mut var_acmeChallenge = <String>::sse_decode(deserializer);
+        let mut var_acmeHttpPort = <i64>::sse_decode(deserializer);
+        let mut var_selfSignedDays = <i64>::sse_decode(deserializer);
+        return crate::api::orgs::OrgNodeCertInfo {
+            source: var_source,
+            names: var_names,
+            not_after: var_notAfter,
+            issuer: var_issuer,
+            acme_enabled: var_acmeEnabled,
+            acme_domain: var_acmeDomain,
+            acme_email: var_acmeEmail,
+            acme_directory: var_acmeDirectory,
+            acme_profile: var_acmeProfile,
+            acme_challenge: var_acmeChallenge,
+            acme_http_port: var_acmeHttpPort,
+            self_signed_days: var_selfSignedDays,
+        };
+    }
+}
+
 impl SseDecode for crate::api::orgs::OrgOverview {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -7274,6 +8349,43 @@ impl SseDecode for crate::api::orgs::OrgRoleInfo {
         let mut var_rank = <i64>::sse_decode(deserializer);
         let mut var_perms = <Vec<String>>::sse_decode(deserializer);
         return crate::api::orgs::OrgRoleInfo { name: var_name, rank: var_rank, perms: var_perms };
+    }
+}
+
+impl SseDecode for crate::api::orgs::OrgSyncCodeItem {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_state = <String>::sse_decode(deserializer);
+        return crate::api::orgs::OrgSyncCodeItem { name: var_name, state: var_state };
+    }
+}
+
+impl SseDecode for crate::api::orgs::OrgTemplateInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_inUse = <bool>::sse_decode(deserializer);
+        let mut var_updatedAt = <String>::sse_decode(deserializer);
+        let mut var_assetNames = <Vec<String>>::sse_decode(deserializer);
+        let mut var_buildCmd = <String>::sse_decode(deserializer);
+        let mut var_buildSrc = <String>::sse_decode(deserializer);
+        let mut var_buildOut = <String>::sse_decode(deserializer);
+        let mut var_buildApproved = <bool>::sse_decode(deserializer);
+        let mut var_html = <String>::sse_decode(deserializer);
+        let mut var_css = <String>::sse_decode(deserializer);
+        return crate::api::orgs::OrgTemplateInfo {
+            name: var_name,
+            in_use: var_inUse,
+            updated_at: var_updatedAt,
+            asset_names: var_assetNames,
+            build_cmd: var_buildCmd,
+            build_src: var_buildSrc,
+            build_out: var_buildOut,
+            build_approved: var_buildApproved,
+            html: var_html,
+            css: var_css,
+        };
     }
 }
 
@@ -7917,104 +9029,135 @@ fn pde_ffi_dispatcher_primary_impl(
         101 => wire__crate__api__notify__notifications_impl(port, ptr, rust_vec_len, data_len),
         102 => wire__crate__api__notify__notifications_unread_count_impl(port, ptr, rust_vec_len, data_len),
         103 => wire__crate__api__orgs__org_apply_impl(port, ptr, rust_vec_len, data_len),
-        104 => wire__crate__api__orgs__org_create_impl(port, ptr, rust_vec_len, data_len),
-        105 => wire__crate__api__orgs__org_edit_impl(port, ptr, rust_vec_len, data_len),
-        106 => wire__crate__api__orgs__org_host_autostart_impl(port, ptr, rust_vec_len, data_len),
-        107 => wire__crate__api__orgs__org_host_start_impl(port, ptr, rust_vec_len, data_len),
-        108 => wire__crate__api__orgs__org_host_status_impl(port, ptr, rust_vec_len, data_len),
-        109 => wire__crate__api__orgs__org_host_stop_impl(port, ptr, rust_vec_len, data_len),
-        110 => wire__crate__api__orgs__org_join_impl(port, ptr, rust_vec_len, data_len),
-        111 => wire__crate__api__orgs__org_leave_impl(port, ptr, rust_vec_len, data_len),
-        112 => wire__crate__api__orgs__org_member_approve_impl(port, ptr, rust_vec_len, data_len),
-        113 => wire__crate__api__orgs__org_member_invite_impl(port, ptr, rust_vec_len, data_len),
-        114 => wire__crate__api__orgs__org_member_kick_impl(port, ptr, rust_vec_len, data_len),
-        115 => wire__crate__api__orgs__org_member_reject_impl(port, ptr, rust_vec_len, data_len),
-        116 => wire__crate__api__orgs__org_member_role_impl(port, ptr, rust_vec_len, data_len),
-        117 => wire__crate__api__orgs__org_overview_impl(port, ptr, rust_vec_len, data_len),
-        118 => wire__crate__api__orgs__org_remove_impl(port, ptr, rust_vec_len, data_len),
-        119 => wire__crate__api__orgs__org_resource_add_impl(port, ptr, rust_vec_len, data_len),
-        120 => wire__crate__api__orgs__org_resource_archive_impl(port, ptr, rust_vec_len, data_len),
-        121 => wire__crate__api__orgs__org_resource_publish_impl(port, ptr, rust_vec_len, data_len),
-        122 => wire__crate__api__orgs__org_resource_release_impl(port, ptr, rust_vec_len, data_len),
-        123 => wire__crate__api__orgs__org_role_create_impl(port, ptr, rust_vec_len, data_len),
-        124 => wire__crate__api__orgs__org_role_edit_impl(port, ptr, rust_vec_len, data_len),
-        125 => wire__crate__api__orgs__org_role_remove_impl(port, ptr, rust_vec_len, data_len),
-        126 => wire__crate__api__orgs__org_sync_impl(port, ptr, rust_vec_len, data_len),
-        127 => wire__crate__api__data__overview_impl(port, ptr, rust_vec_len, data_len),
-        128 => wire__crate__api__code__pipe_run_impl(port, ptr, rust_vec_len, data_len),
-        129 => wire__crate__api__code__pipeline_approve_impl(port, ptr, rust_vec_len, data_len),
-        130 => wire__crate__api__code__pipeline_create_impl(port, ptr, rust_vec_len, data_len),
-        131 => wire__crate__api__code__pipeline_edit_impl(port, ptr, rust_vec_len, data_len),
-        132 => wire__crate__api__code__pipeline_export_impl(port, ptr, rust_vec_len, data_len),
-        133 => wire__crate__api__code__pipeline_import_impl(port, ptr, rust_vec_len, data_len),
-        134 => wire__crate__api__code__pipeline_import_plan_impl(port, ptr, rust_vec_len, data_len),
-        135 => wire__crate__api__code__pipeline_remove_impl(port, ptr, rust_vec_len, data_len),
-        136 => wire__crate__api__code__pipeline_run_impl(port, ptr, rust_vec_len, data_len),
-        137 => wire__crate__api__code__pipelines_impl(port, ptr, rust_vec_len, data_len),
-        138 => wire__crate__api__code__pipes_live_impl(port, ptr, rust_vec_len, data_len),
-        139 => wire__crate__api__projects__project_export_impl(port, ptr, rust_vec_len, data_len),
-        140 => wire__crate__api__projects__project_import_impl(port, ptr, rust_vec_len, data_len),
-        141 => wire__crate__api__projects__project_items_impl(port, ptr, rust_vec_len, data_len),
-        142 => wire__crate__api__data__project_series_impl(port, ptr, rust_vec_len, data_len),
-        143 => wire__crate__api__data__query_bars_impl(port, ptr, rust_vec_len, data_len),
-        144 => wire__crate__api__journals__remove_journal_impl(port, ptr, rust_vec_len, data_len),
-        145 => wire__crate__api__journals__remove_journal_entry_impl(port, ptr, rust_vec_len, data_len),
-        146 => wire__crate__api__projects__remove_project_impl(port, ptr, rust_vec_len, data_len),
-        147 => wire__crate__api__projects__remove_project_series_impl(port, ptr, rust_vec_len, data_len),
-        148 => wire__crate__api__reports__remove_report_impl(port, ptr, rust_vec_len, data_len),
-        149 => wire__crate__api__reports__remove_report_section_impl(port, ptr, rust_vec_len, data_len),
-        150 => wire__crate__api__searches__remove_search_impl(port, ptr, rust_vec_len, data_len),
-        151 => wire__crate__api__data__remove_source_impl(port, ptr, rust_vec_len, data_len),
-        152 => wire__crate__api__searches__rename_search_impl(port, ptr, rust_vec_len, data_len),
-        153 => wire__crate__api__data__rename_source_impl(port, ptr, rust_vec_len, data_len),
-        154 => wire__crate__api__reports__report_sections_impl(port, ptr, rust_vec_len, data_len),
-        155 => wire__crate__api__reports__reports_impl(port, ptr, rust_vec_len, data_len),
-        156 => wire__crate__api__reviews__review_accept_impl(port, ptr, rust_vec_len, data_len),
-        157 => wire__crate__api__reviews__review_close_impl(port, ptr, rust_vec_len, data_len),
-        158 => wire__crate__api__reviews__review_comment_impl(port, ptr, rust_vec_len, data_len),
-        159 => wire__crate__api__reviews__review_drop_impl(port, ptr, rust_vec_len, data_len),
-        160 => wire__crate__api__reviews__review_highlight_impl(port, ptr, rust_vec_len, data_len),
-        161 => wire__crate__api__reviews__review_invite_impl(port, ptr, rust_vec_len, data_len),
-        162 => wire__crate__api__reviews__review_join_impl(port, ptr, rust_vec_len, data_len),
-        163 => wire__crate__api__reviews__review_leave_impl(port, ptr, rust_vec_len, data_len),
-        164 => wire__crate__api__reviews__review_merge_impl(port, ptr, rust_vec_len, data_len),
-        165 => wire__crate__api__reviews__review_reject_impl(port, ptr, rust_vec_len, data_len),
-        166 => wire__crate__api__reviews__review_remove_impl(port, ptr, rust_vec_len, data_len),
-        167 => wire__crate__api__reviews__review_reopen_impl(port, ptr, rust_vec_len, data_len),
-        168 => wire__crate__api__reviews__review_request_impl(port, ptr, rust_vec_len, data_len),
-        169 => wire__crate__api__reviews__review_revisions_impl(port, ptr, rust_vec_len, data_len),
-        170 => wire__crate__api__reviews__review_show_impl(port, ptr, rust_vec_len, data_len),
-        171 => wire__crate__api__reviews__review_suggest_impl(port, ptr, rust_vec_len, data_len),
-        172 => wire__crate__api__reviews__review_sync_impl(port, ptr, rust_vec_len, data_len),
-        173 => wire__crate__api__reviews__review_view_impl(port, ptr, rust_vec_len, data_len),
-        174 => wire__crate__api__reviews__review_vote_impl(port, ptr, rust_vec_len, data_len),
-        175 => wire__crate__api__reviews__review_withdraw_impl(port, ptr, rust_vec_len, data_len),
-        176 => wire__crate__api__reviews__reviews_impl(port, ptr, rust_vec_len, data_len),
-        177 => wire__crate__api__reviews__reviews_joined_impl(port, ptr, rust_vec_len, data_len),
-        178 => wire__crate__api__rules__rule_create_impl(port, ptr, rust_vec_len, data_len),
-        179 => wire__crate__api__rules__rule_disable_impl(port, ptr, rust_vec_len, data_len),
-        180 => wire__crate__api__rules__rule_dry_run_impl(port, ptr, rust_vec_len, data_len),
-        181 => wire__crate__api__rules__rule_edit_impl(port, ptr, rust_vec_len, data_len),
-        182 => wire__crate__api__rules__rule_enable_impl(port, ptr, rust_vec_len, data_len),
-        183 => wire__crate__api__rules__rule_events_impl(port, ptr, rust_vec_len, data_len),
-        184 => wire__crate__api__rules__rule_remove_impl(port, ptr, rust_vec_len, data_len),
-        185 => wire__crate__api__rules__rule_show_impl(port, ptr, rust_vec_len, data_len),
-        186 => wire__crate__api__rules__rule_test_impl(port, ptr, rust_vec_len, data_len),
-        187 => wire__crate__api__rules__rule_tick_impl(port, ptr, rust_vec_len, data_len),
-        188 => wire__crate__api__rules__rules_impl(port, ptr, rust_vec_len, data_len),
-        189 => wire__crate__api__prefs__save_dataset_impl(port, ptr, rust_vec_len, data_len),
-        190 => wire__crate__api__searches__save_search_impl(port, ptr, rust_vec_len, data_len),
-        191 => wire__crate__api__prefs__save_theme_impl(port, ptr, rust_vec_len, data_len),
-        192 => wire__crate__api__prefs__save_theme_mode_impl(port, ptr, rust_vec_len, data_len),
-        193 => wire__crate__api__prefs__save_time_range_impl(port, ptr, rust_vec_len, data_len),
-        194 => wire__crate__api__prefs__saved_state_impl(port, ptr, rust_vec_len, data_len),
-        195 => wire__crate__api__searches__searches_impl(port, ptr, rust_vec_len, data_len),
-        196 => wire__crate__api__data__unlock_impl(port, ptr, rust_vec_len, data_len),
-        197 => wire__crate__api__journals__update_journal_impl(port, ptr, rust_vec_len, data_len),
-        198 => wire__crate__api__journals__update_journal_entry_impl(port, ptr, rust_vec_len, data_len),
-        199 => wire__crate__api__projects__update_project_impl(port, ptr, rust_vec_len, data_len),
-        200 => wire__crate__api__reports__update_report_impl(port, ptr, rust_vec_len, data_len),
-        201 => wire__crate__api__reports__update_report_section_impl(port, ptr, rust_vec_len, data_len),
+        104 => wire__crate__api__orgs__org_browse_impl(port, ptr, rust_vec_len, data_len),
+        105 => wire__crate__api__orgs__org_call_impl(port, ptr, rust_vec_len, data_len),
+        106 => wire__crate__api__orgs__org_cert_acme_impl(port, ptr, rust_vec_len, data_len),
+        107 => wire__crate__api__orgs__org_cert_clear_impl(port, ptr, rust_vec_len, data_len),
+        108 => wire__crate__api__orgs__org_cert_renew_impl(port, ptr, rust_vec_len, data_len),
+        109 => wire__crate__api__orgs__org_cert_set_impl(port, ptr, rust_vec_len, data_len),
+        110 => wire__crate__api__orgs__org_cert_status_impl(port, ptr, rust_vec_len, data_len),
+        111 => wire__crate__api__orgs__org_code_list_impl(port, ptr, rust_vec_len, data_len),
+        112 => wire__crate__api__orgs__org_code_serve_impl(port, ptr, rust_vec_len, data_len),
+        113 => wire__crate__api__orgs__org_code_stop_impl(port, ptr, rust_vec_len, data_len),
+        114 => wire__crate__api__orgs__org_create_impl(port, ptr, rust_vec_len, data_len),
+        115 => wire__crate__api__orgs__org_domain_add_impl(port, ptr, rust_vec_len, data_len),
+        116 => wire__crate__api__orgs__org_domain_remove_impl(port, ptr, rust_vec_len, data_len),
+        117 => wire__crate__api__orgs__org_domains_impl(port, ptr, rust_vec_len, data_len),
+        118 => wire__crate__api__orgs__org_edit_impl(port, ptr, rust_vec_len, data_len),
+        119 => wire__crate__api__orgs__org_endpoint_add_impl(port, ptr, rust_vec_len, data_len),
+        120 => wire__crate__api__orgs__org_endpoint_remove_impl(port, ptr, rust_vec_len, data_len),
+        121 => wire__crate__api__orgs__org_fetch_impl(port, ptr, rust_vec_len, data_len),
+        122 => wire__crate__api__orgs__org_give_impl(port, ptr, rust_vec_len, data_len),
+        123 => wire__crate__api__orgs__org_host_autostart_impl(port, ptr, rust_vec_len, data_len),
+        124 => wire__crate__api__orgs__org_host_start_impl(port, ptr, rust_vec_len, data_len),
+        125 => wire__crate__api__orgs__org_host_status_impl(port, ptr, rust_vec_len, data_len),
+        126 => wire__crate__api__orgs__org_host_stop_impl(port, ptr, rust_vec_len, data_len),
+        127 => wire__crate__api__orgs__org_join_impl(port, ptr, rust_vec_len, data_len),
+        128 => wire__crate__api__orgs__org_leave_impl(port, ptr, rust_vec_len, data_len),
+        129 => wire__crate__api__orgs__org_member_approve_impl(port, ptr, rust_vec_len, data_len),
+        130 => wire__crate__api__orgs__org_member_invite_impl(port, ptr, rust_vec_len, data_len),
+        131 => wire__crate__api__orgs__org_member_kick_impl(port, ptr, rust_vec_len, data_len),
+        132 => wire__crate__api__orgs__org_member_reject_impl(port, ptr, rust_vec_len, data_len),
+        133 => wire__crate__api__orgs__org_member_role_impl(port, ptr, rust_vec_len, data_len),
+        134 => wire__crate__api__orgs__org_mirror_impl(port, ptr, rust_vec_len, data_len),
+        135 => wire__crate__api__orgs__org_overview_impl(port, ptr, rust_vec_len, data_len),
+        136 => wire__crate__api__orgs__org_project_add_impl(port, ptr, rust_vec_len, data_len),
+        137 => wire__crate__api__orgs__org_project_member_impl(port, ptr, rust_vec_len, data_len),
+        138 => wire__crate__api__orgs__org_project_remove_impl(port, ptr, rust_vec_len, data_len),
+        139 => wire__crate__api__orgs__org_remove_impl(port, ptr, rust_vec_len, data_len),
+        140 => wire__crate__api__orgs__org_resource_add_impl(port, ptr, rust_vec_len, data_len),
+        141 => wire__crate__api__orgs__org_resource_archive_impl(port, ptr, rust_vec_len, data_len),
+        142 => wire__crate__api__orgs__org_resource_publish_impl(port, ptr, rust_vec_len, data_len),
+        143 => wire__crate__api__orgs__org_resource_release_impl(port, ptr, rust_vec_len, data_len),
+        144 => wire__crate__api__orgs__org_role_create_impl(port, ptr, rust_vec_len, data_len),
+        145 => wire__crate__api__orgs__org_role_edit_impl(port, ptr, rust_vec_len, data_len),
+        146 => wire__crate__api__orgs__org_role_remove_impl(port, ptr, rust_vec_len, data_len),
+        147 => wire__crate__api__orgs__org_sign_in_impl(port, ptr, rust_vec_len, data_len),
+        148 => wire__crate__api__orgs__org_sync_impl(port, ptr, rust_vec_len, data_len),
+        149 => wire__crate__api__orgs__org_sync_code_impl(port, ptr, rust_vec_len, data_len),
+        150 => wire__crate__api__orgs__org_template_add_asset_impl(port, ptr, rust_vec_len, data_len),
+        151 => wire__crate__api__orgs__org_template_build_impl(port, ptr, rust_vec_len, data_len),
+        152 => wire__crate__api__orgs__org_template_preview_impl(port, ptr, rust_vec_len, data_len),
+        153 => wire__crate__api__orgs__org_template_remove_impl(port, ptr, rust_vec_len, data_len),
+        154 => wire__crate__api__orgs__org_template_remove_asset_impl(port, ptr, rust_vec_len, data_len),
+        155 => wire__crate__api__orgs__org_template_save_impl(port, ptr, rust_vec_len, data_len),
+        156 => wire__crate__api__orgs__org_template_show_impl(port, ptr, rust_vec_len, data_len),
+        157 => wire__crate__api__orgs__org_templates_impl(port, ptr, rust_vec_len, data_len),
+        158 => wire__crate__api__data__overview_impl(port, ptr, rust_vec_len, data_len),
+        159 => wire__crate__api__code__pipe_run_impl(port, ptr, rust_vec_len, data_len),
+        160 => wire__crate__api__code__pipeline_approve_impl(port, ptr, rust_vec_len, data_len),
+        161 => wire__crate__api__code__pipeline_create_impl(port, ptr, rust_vec_len, data_len),
+        162 => wire__crate__api__code__pipeline_edit_impl(port, ptr, rust_vec_len, data_len),
+        163 => wire__crate__api__code__pipeline_export_impl(port, ptr, rust_vec_len, data_len),
+        164 => wire__crate__api__code__pipeline_import_impl(port, ptr, rust_vec_len, data_len),
+        165 => wire__crate__api__code__pipeline_import_plan_impl(port, ptr, rust_vec_len, data_len),
+        166 => wire__crate__api__code__pipeline_remove_impl(port, ptr, rust_vec_len, data_len),
+        167 => wire__crate__api__code__pipeline_run_impl(port, ptr, rust_vec_len, data_len),
+        168 => wire__crate__api__code__pipelines_impl(port, ptr, rust_vec_len, data_len),
+        169 => wire__crate__api__code__pipes_live_impl(port, ptr, rust_vec_len, data_len),
+        170 => wire__crate__api__projects__project_export_impl(port, ptr, rust_vec_len, data_len),
+        171 => wire__crate__api__projects__project_import_impl(port, ptr, rust_vec_len, data_len),
+        172 => wire__crate__api__projects__project_items_impl(port, ptr, rust_vec_len, data_len),
+        173 => wire__crate__api__data__project_series_impl(port, ptr, rust_vec_len, data_len),
+        174 => wire__crate__api__data__query_bars_impl(port, ptr, rust_vec_len, data_len),
+        175 => wire__crate__api__journals__remove_journal_impl(port, ptr, rust_vec_len, data_len),
+        176 => wire__crate__api__journals__remove_journal_entry_impl(port, ptr, rust_vec_len, data_len),
+        177 => wire__crate__api__projects__remove_project_impl(port, ptr, rust_vec_len, data_len),
+        178 => wire__crate__api__projects__remove_project_series_impl(port, ptr, rust_vec_len, data_len),
+        179 => wire__crate__api__reports__remove_report_impl(port, ptr, rust_vec_len, data_len),
+        180 => wire__crate__api__reports__remove_report_section_impl(port, ptr, rust_vec_len, data_len),
+        181 => wire__crate__api__searches__remove_search_impl(port, ptr, rust_vec_len, data_len),
+        182 => wire__crate__api__data__remove_source_impl(port, ptr, rust_vec_len, data_len),
+        183 => wire__crate__api__searches__rename_search_impl(port, ptr, rust_vec_len, data_len),
+        184 => wire__crate__api__data__rename_source_impl(port, ptr, rust_vec_len, data_len),
+        185 => wire__crate__api__reports__report_sections_impl(port, ptr, rust_vec_len, data_len),
+        186 => wire__crate__api__reports__reports_impl(port, ptr, rust_vec_len, data_len),
+        187 => wire__crate__api__reviews__review_accept_impl(port, ptr, rust_vec_len, data_len),
+        188 => wire__crate__api__reviews__review_close_impl(port, ptr, rust_vec_len, data_len),
+        189 => wire__crate__api__reviews__review_comment_impl(port, ptr, rust_vec_len, data_len),
+        190 => wire__crate__api__reviews__review_drop_impl(port, ptr, rust_vec_len, data_len),
+        191 => wire__crate__api__reviews__review_highlight_impl(port, ptr, rust_vec_len, data_len),
+        192 => wire__crate__api__reviews__review_invite_impl(port, ptr, rust_vec_len, data_len),
+        193 => wire__crate__api__reviews__review_join_impl(port, ptr, rust_vec_len, data_len),
+        194 => wire__crate__api__reviews__review_leave_impl(port, ptr, rust_vec_len, data_len),
+        195 => wire__crate__api__reviews__review_merge_impl(port, ptr, rust_vec_len, data_len),
+        196 => wire__crate__api__reviews__review_reject_impl(port, ptr, rust_vec_len, data_len),
+        197 => wire__crate__api__reviews__review_remove_impl(port, ptr, rust_vec_len, data_len),
+        198 => wire__crate__api__reviews__review_reopen_impl(port, ptr, rust_vec_len, data_len),
+        199 => wire__crate__api__reviews__review_request_impl(port, ptr, rust_vec_len, data_len),
+        200 => wire__crate__api__reviews__review_revisions_impl(port, ptr, rust_vec_len, data_len),
+        201 => wire__crate__api__reviews__review_show_impl(port, ptr, rust_vec_len, data_len),
+        202 => wire__crate__api__reviews__review_suggest_impl(port, ptr, rust_vec_len, data_len),
+        203 => wire__crate__api__reviews__review_sync_impl(port, ptr, rust_vec_len, data_len),
+        204 => wire__crate__api__reviews__review_view_impl(port, ptr, rust_vec_len, data_len),
+        205 => wire__crate__api__reviews__review_vote_impl(port, ptr, rust_vec_len, data_len),
+        206 => wire__crate__api__reviews__review_withdraw_impl(port, ptr, rust_vec_len, data_len),
+        207 => wire__crate__api__reviews__reviews_impl(port, ptr, rust_vec_len, data_len),
+        208 => wire__crate__api__reviews__reviews_joined_impl(port, ptr, rust_vec_len, data_len),
+        209 => wire__crate__api__rules__rule_create_impl(port, ptr, rust_vec_len, data_len),
+        210 => wire__crate__api__rules__rule_disable_impl(port, ptr, rust_vec_len, data_len),
+        211 => wire__crate__api__rules__rule_dry_run_impl(port, ptr, rust_vec_len, data_len),
+        212 => wire__crate__api__rules__rule_edit_impl(port, ptr, rust_vec_len, data_len),
+        213 => wire__crate__api__rules__rule_enable_impl(port, ptr, rust_vec_len, data_len),
+        214 => wire__crate__api__rules__rule_events_impl(port, ptr, rust_vec_len, data_len),
+        215 => wire__crate__api__rules__rule_remove_impl(port, ptr, rust_vec_len, data_len),
+        216 => wire__crate__api__rules__rule_show_impl(port, ptr, rust_vec_len, data_len),
+        217 => wire__crate__api__rules__rule_test_impl(port, ptr, rust_vec_len, data_len),
+        218 => wire__crate__api__rules__rule_tick_impl(port, ptr, rust_vec_len, data_len),
+        219 => wire__crate__api__rules__rules_impl(port, ptr, rust_vec_len, data_len),
+        220 => wire__crate__api__prefs__save_dataset_impl(port, ptr, rust_vec_len, data_len),
+        221 => wire__crate__api__searches__save_search_impl(port, ptr, rust_vec_len, data_len),
+        222 => wire__crate__api__prefs__save_theme_impl(port, ptr, rust_vec_len, data_len),
+        223 => wire__crate__api__prefs__save_theme_mode_impl(port, ptr, rust_vec_len, data_len),
+        224 => wire__crate__api__prefs__save_time_range_impl(port, ptr, rust_vec_len, data_len),
+        225 => wire__crate__api__prefs__saved_state_impl(port, ptr, rust_vec_len, data_len),
+        226 => wire__crate__api__searches__searches_impl(port, ptr, rust_vec_len, data_len),
+        227 => wire__crate__api__data__unlock_impl(port, ptr, rust_vec_len, data_len),
+        228 => wire__crate__api__journals__update_journal_impl(port, ptr, rust_vec_len, data_len),
+        229 => wire__crate__api__journals__update_journal_entry_impl(port, ptr, rust_vec_len, data_len),
+        230 => wire__crate__api__projects__update_project_impl(port, ptr, rust_vec_len, data_len),
+        231 => wire__crate__api__reports__update_report_impl(port, ptr, rust_vec_len, data_len),
+        232 => wire__crate__api__reports__update_report_section_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -8033,7 +9176,7 @@ fn pde_ffi_dispatcher_sync_impl(
         35 => wire__crate__api__io__ingest_progress_impl(ptr, rust_vec_len, data_len),
         37 => wire__crate__api__data__is_unlocked_impl(ptr, rust_vec_len, data_len),
         57 => wire__crate__api__data__lock_impl(ptr, rust_vec_len, data_len),
-        202 => wire__crate__api__info__version_impl(ptr, rust_vec_len, data_len),
+        233 => wire__crate__api__info__version_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -8829,6 +9972,88 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::notify::NotificationKindInfo>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgBrowseItem {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.slug.into_into_dart().into_dart(),
+            self.visibility.into_into_dart().into_dart(),
+            self.access.into_into_dart().into_dart(),
+            self.members.into_into_dart().into_dart(),
+            self.description.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgBrowseItem {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgBrowseItem> for crate::api::orgs::OrgBrowseItem {
+    fn into_into_dart(self) -> crate::api::orgs::OrgBrowseItem {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgCertInfo {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.org.into_into_dart().into_dart(),
+            self.slug.into_into_dart().into_dart(),
+            self.domains.into_into_dart().into_dart(),
+            self.source.into_into_dart().into_dart(),
+            self.names.into_into_dart().into_dart(),
+            self.not_after.into_into_dart().into_dart(),
+            self.issuer.into_into_dart().into_dart(),
+            self.acme_enabled.into_into_dart().into_dart(),
+            self.acme_email.into_into_dart().into_dart(),
+            self.retry_attempts.into_into_dart().into_dart(),
+            self.retry_next.into_into_dart().into_dart(),
+            self.retry_error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgCertInfo {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgCertInfo> for crate::api::orgs::OrgCertInfo {
+    fn into_into_dart(self) -> crate::api::orgs::OrgCertInfo {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgCertOverview {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.node.into_into_dart().into_dart(), self.orgs.into_into_dart().into_dart()].into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgCertOverview {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgCertOverview> for crate::api::orgs::OrgCertOverview {
+    fn into_into_dart(self) -> crate::api::orgs::OrgCertOverview {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgCodeServedInfo {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.name.into_into_dart().into_dart(), self.lang.into_into_dart().into_dart(), self.short_id.into_into_dart().into_dart()].into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgCodeServedInfo {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgCodeServedInfo> for crate::api::orgs::OrgCodeServedInfo {
+    fn into_into_dart(self) -> crate::api::orgs::OrgCodeServedInfo {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgDomainInfo {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.org.into_into_dart().into_dart(), self.domain.into_into_dart().into_dart()].into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgDomainInfo {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgDomainInfo> for crate::api::orgs::OrgDomainInfo {
+    fn into_into_dart(self) -> crate::api::orgs::OrgDomainInfo {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgEndpointInfo {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -8843,6 +10068,25 @@ impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgEndpointInfo {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgEndpointInfo {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgEndpointInfo> for crate::api::orgs::OrgEndpointInfo {
     fn into_into_dart(self) -> crate::api::orgs::OrgEndpointInfo {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgFetchResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.format.into_into_dart().into_dart(),
+            self.size.into_into_dart().into_dart(),
+            self.text.into_into_dart().into_dart(),
+            self.written.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgFetchResult {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgFetchResult> for crate::api::orgs::OrgFetchResult {
+    fn into_into_dart(self) -> crate::api::orgs::OrgFetchResult {
         self
     }
 }
@@ -8956,6 +10200,32 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgMirror> for crate::a
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgNodeCertInfo {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.source.into_into_dart().into_dart(),
+            self.names.into_into_dart().into_dart(),
+            self.not_after.into_into_dart().into_dart(),
+            self.issuer.into_into_dart().into_dart(),
+            self.acme_enabled.into_into_dart().into_dart(),
+            self.acme_domain.into_into_dart().into_dart(),
+            self.acme_email.into_into_dart().into_dart(),
+            self.acme_directory.into_into_dart().into_dart(),
+            self.acme_profile.into_into_dart().into_dart(),
+            self.acme_challenge.into_into_dart().into_dart(),
+            self.acme_http_port.into_into_dart().into_dart(),
+            self.self_signed_days.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgNodeCertInfo {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgNodeCertInfo> for crate::api::orgs::OrgNodeCertInfo {
+    fn into_into_dart(self) -> crate::api::orgs::OrgNodeCertInfo {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgOverview {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [self.mine.into_into_dart().into_dart(), self.joined.into_into_dart().into_dart(), self.mirrors.into_into_dart().into_dart()].into_dart()
@@ -8994,6 +10264,42 @@ impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgRoleInfo {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgRoleInfo {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgRoleInfo> for crate::api::orgs::OrgRoleInfo {
     fn into_into_dart(self) -> crate::api::orgs::OrgRoleInfo {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgSyncCodeItem {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.name.into_into_dart().into_dart(), self.state.into_into_dart().into_dart()].into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgSyncCodeItem {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgSyncCodeItem> for crate::api::orgs::OrgSyncCodeItem {
+    fn into_into_dart(self) -> crate::api::orgs::OrgSyncCodeItem {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::orgs::OrgTemplateInfo {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.in_use.into_into_dart().into_dart(),
+            self.updated_at.into_into_dart().into_dart(),
+            self.asset_names.into_into_dart().into_dart(),
+            self.build_cmd.into_into_dart().into_dart(),
+            self.build_src.into_into_dart().into_dart(),
+            self.build_out.into_into_dart().into_dart(),
+            self.build_approved.into_into_dart().into_dart(),
+            self.html.into_into_dart().into_dart(),
+            self.css.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::orgs::OrgTemplateInfo {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::orgs::OrgTemplateInfo> for crate::api::orgs::OrgTemplateInfo {
+    fn into_into_dart(self) -> crate::api::orgs::OrgTemplateInfo {
         self
     }
 }
@@ -10000,6 +11306,46 @@ impl SseEncode for Vec<crate::api::notify::NotificationKindInfo> {
     }
 }
 
+impl SseEncode for Vec<crate::api::orgs::OrgBrowseItem> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::orgs::OrgBrowseItem>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::orgs::OrgCertInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::orgs::OrgCertInfo>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::orgs::OrgCodeServedInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::orgs::OrgCodeServedInfo>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::orgs::OrgDomainInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::orgs::OrgDomainInfo>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::orgs::OrgEndpointInfo> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -10066,6 +11412,26 @@ impl SseEncode for Vec<crate::api::orgs::OrgRoleInfo> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::orgs::OrgRoleInfo>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::orgs::OrgSyncCodeItem> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::orgs::OrgSyncCodeItem>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::orgs::OrgTemplateInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::orgs::OrgTemplateInfo>::sse_encode(item, serializer);
         }
     }
 }
@@ -10640,6 +12006,61 @@ impl SseEncode for Option<Vec<String>> {
     }
 }
 
+impl SseEncode for crate::api::orgs::OrgBrowseItem {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.slug, serializer);
+        <String>::sse_encode(self.visibility, serializer);
+        <String>::sse_encode(self.access, serializer);
+        <i64>::sse_encode(self.members, serializer);
+        <String>::sse_encode(self.description, serializer);
+    }
+}
+
+impl SseEncode for crate::api::orgs::OrgCertInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.org, serializer);
+        <String>::sse_encode(self.slug, serializer);
+        <Vec<String>>::sse_encode(self.domains, serializer);
+        <String>::sse_encode(self.source, serializer);
+        <Vec<String>>::sse_encode(self.names, serializer);
+        <String>::sse_encode(self.not_after, serializer);
+        <String>::sse_encode(self.issuer, serializer);
+        <bool>::sse_encode(self.acme_enabled, serializer);
+        <String>::sse_encode(self.acme_email, serializer);
+        <i64>::sse_encode(self.retry_attempts, serializer);
+        <String>::sse_encode(self.retry_next, serializer);
+        <String>::sse_encode(self.retry_error, serializer);
+    }
+}
+
+impl SseEncode for crate::api::orgs::OrgCertOverview {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::orgs::OrgNodeCertInfo>::sse_encode(self.node, serializer);
+        <Vec<crate::api::orgs::OrgCertInfo>>::sse_encode(self.orgs, serializer);
+    }
+}
+
+impl SseEncode for crate::api::orgs::OrgCodeServedInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.lang, serializer);
+        <String>::sse_encode(self.short_id, serializer);
+    }
+}
+
+impl SseEncode for crate::api::orgs::OrgDomainInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.org, serializer);
+        <String>::sse_encode(self.domain, serializer);
+    }
+}
+
 impl SseEncode for crate::api::orgs::OrgEndpointInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -10647,6 +12068,17 @@ impl SseEncode for crate::api::orgs::OrgEndpointInfo {
         <String>::sse_encode(self.kind, serializer);
         <String>::sse_encode(self.perm, serializer);
         <bool>::sse_encode(self.anyone, serializer);
+    }
+}
+
+impl SseEncode for crate::api::orgs::OrgFetchResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.format, serializer);
+        <i64>::sse_encode(self.size, serializer);
+        <Option<String>>::sse_encode(self.text, serializer);
+        <String>::sse_encode(self.written, serializer);
     }
 }
 
@@ -10723,6 +12155,24 @@ impl SseEncode for crate::api::orgs::OrgMirror {
     }
 }
 
+impl SseEncode for crate::api::orgs::OrgNodeCertInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.source, serializer);
+        <Vec<String>>::sse_encode(self.names, serializer);
+        <String>::sse_encode(self.not_after, serializer);
+        <String>::sse_encode(self.issuer, serializer);
+        <bool>::sse_encode(self.acme_enabled, serializer);
+        <String>::sse_encode(self.acme_domain, serializer);
+        <String>::sse_encode(self.acme_email, serializer);
+        <String>::sse_encode(self.acme_directory, serializer);
+        <String>::sse_encode(self.acme_profile, serializer);
+        <String>::sse_encode(self.acme_challenge, serializer);
+        <i64>::sse_encode(self.acme_http_port, serializer);
+        <i64>::sse_encode(self.self_signed_days, serializer);
+    }
+}
+
 impl SseEncode for crate::api::orgs::OrgOverview {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -10748,6 +12198,30 @@ impl SseEncode for crate::api::orgs::OrgRoleInfo {
         <String>::sse_encode(self.name, serializer);
         <i64>::sse_encode(self.rank, serializer);
         <Vec<String>>::sse_encode(self.perms, serializer);
+    }
+}
+
+impl SseEncode for crate::api::orgs::OrgSyncCodeItem {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.state, serializer);
+    }
+}
+
+impl SseEncode for crate::api::orgs::OrgTemplateInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <bool>::sse_encode(self.in_use, serializer);
+        <String>::sse_encode(self.updated_at, serializer);
+        <Vec<String>>::sse_encode(self.asset_names, serializer);
+        <String>::sse_encode(self.build_cmd, serializer);
+        <String>::sse_encode(self.build_src, serializer);
+        <String>::sse_encode(self.build_out, serializer);
+        <bool>::sse_encode(self.build_approved, serializer);
+        <String>::sse_encode(self.html, serializer);
+        <String>::sse_encode(self.css, serializer);
     }
 }
 
