@@ -17,6 +17,9 @@ import 'rust/api/orgs.dart' as r_orgs;
 import 'rust/api/prefs.dart' as r_prefs;
 import 'rust/api/projects.dart' as r_projects;
 import 'rust/api/reports.dart' as r_reports;
+import 'rust/api/notify.dart' as r_notify;
+import 'rust/api/reviews.dart' as r_reviews;
+import 'rust/api/rules.dart' as r_rules;
 import 'rust/api/searches.dart' as r_searches;
 import 'rust/api/themes.dart' as r_themes;
 
@@ -853,6 +856,410 @@ class FfiMuninnApi implements MuninnApi {
     String? name,
     bool merge = false,
   }) => r_code.pipelineImport(path: path, name: name, merge: merge);
+
+  RuleInfo _rule(r_rules.RuleInfo r) => RuleInfo(
+    id: r.id,
+    shortId: r.shortId,
+    name: r.name,
+    description: r.description,
+    enabled: r.enabled,
+    home: r.home,
+    brief: r.brief,
+    onText: r.onText,
+    whenText: r.whenText,
+    thenText: r.thenText,
+    related: r.related,
+    runs: r.runs.toInt(),
+    lastStatus: r.lastStatus,
+    lastRunAt: r.lastRunAt.toInt(),
+    nextRun: r.nextRun.toInt(),
+    createdAt: r.createdAt.toInt(),
+  );
+
+  @override
+  Future<List<RuleInfo>> rules() async => [
+    for (final r in await r_rules.rules()) _rule(r),
+  ];
+
+  @override
+  Future<RuleInfo> ruleCreate(
+    String name, {
+    String description = '',
+    String on = '',
+    String when = '',
+    String then = '',
+    String home = '',
+    bool related = false,
+  }) async => _rule(
+    await r_rules.ruleCreate(
+      name: name,
+      description: description,
+      on_: on,
+      when: when,
+      then: then,
+      home: home,
+      related: related,
+    ),
+  );
+
+  @override
+  Future<RuleInfo> ruleEdit(
+    String rule, {
+    String? name,
+    String? description,
+    String? on,
+    String? when,
+    String? then,
+    String? home,
+    bool? related,
+    bool noSchedule = false,
+  }) async => _rule(
+    await r_rules.ruleEdit(
+      rule: rule,
+      name: name,
+      description: description,
+      on_: on,
+      when: when,
+      then: then,
+      home: home,
+      related: related,
+      noSchedule: noSchedule,
+    ),
+  );
+
+  @override
+  Future<String> ruleRemove(String rule) => r_rules.ruleRemove(rule: rule);
+
+  @override
+  Future<String> ruleEnable(String rule) => r_rules.ruleEnable(rule: rule);
+
+  @override
+  Future<String> ruleDisable(String rule) => r_rules.ruleDisable(rule: rule);
+
+  @override
+  Future<List<String>> ruleShow(String rule) => r_rules.ruleShow(rule: rule);
+
+  @override
+  Future<List<String>> ruleTest({String? rule, int? action}) =>
+      r_rules.ruleTest(
+        rule: rule,
+        action: action == null ? null : PlatformInt64Util.from(action),
+      );
+
+  @override
+  Future<List<String>> ruleDryRun({String? rule, int? action}) =>
+      r_rules.ruleDryRun(
+        rule: rule,
+        action: action == null ? null : PlatformInt64Util.from(action),
+      );
+
+  @override
+  Future<String> ruleTick() => r_rules.ruleTick();
+
+  @override
+  Future<List<RuleEventInfo>> ruleEvents({String? kind}) async => [
+    for (final e in await r_rules.ruleEvents(kind: kind))
+      RuleEventInfo(kind: e.kind, about: e.about, fields: e.fields),
+  ];
+
+  NotificationInfo _note(r_notify.NotificationInfo n) => NotificationInfo(
+    id: n.id,
+    shortId: n.shortId,
+    title: n.title,
+    kind: n.kind,
+    level: n.level,
+    body: n.body,
+    link: n.link,
+    linkLabel: n.linkLabel,
+    actionId: n.actionId.toInt(),
+    createdAt: n.createdAt.toInt(),
+    read: n.read,
+    readAt: n.readAt.toInt(),
+  );
+
+  @override
+  Future<List<NotificationInfo>> notifications({
+    bool unread = false,
+    int limit = 50,
+  }) async => [
+    for (final n in await r_notify.notifications(
+      unread: unread,
+      limit: PlatformInt64Util.from(limit),
+    ))
+      _note(n),
+  ];
+
+  @override
+  Future<int> notificationsUnreadCount() async =>
+      (await r_notify.notificationsUnreadCount()).toInt();
+
+  @override
+  Future<NotificationInfo> notificationShow(String id) async =>
+      _note(await r_notify.notificationShow(id: id));
+
+  @override
+  Future<String> notificationRead(String id) =>
+      r_notify.notificationRead(id: id);
+
+  @override
+  Future<String> notificationUnread(String id) =>
+      r_notify.notificationUnread(id: id);
+
+  @override
+  Future<String> notificationReadAll() => r_notify.notificationReadAll();
+
+  @override
+  Future<NotificationInfo> notificationSend(
+    String title, {
+    String body = '',
+    String? link,
+    String level = 'info',
+  }) async => _note(
+    await r_notify.notificationSend(
+      title: title,
+      body: body,
+      link: link,
+      level: level,
+    ),
+  );
+
+  @override
+  Future<List<NotificationKindInfo>> notificationKinds() async => [
+    for (final k in await r_notify.notificationKinds())
+      NotificationKindInfo(kind: k.kind, about: k.about, muted: k.muted),
+  ];
+
+  @override
+  Future<String> notificationMute(String kind) =>
+      r_notify.notificationMute(kind: kind);
+
+  @override
+  Future<String> notificationUnmute(String kind) =>
+      r_notify.notificationUnmute(kind: kind);
+
+  ReviewInfo _rev(r_reviews.ReviewInfo r) => ReviewInfo(
+    id: r.id,
+    shortId: r.shortId,
+    title: r.title,
+    kind: r.kind,
+    name: r.name,
+    note: r.note,
+    status: r.status,
+    allow: r.allow,
+    items: r.items.toInt(),
+    votesApprove: r.votesApprove.toInt(),
+    votesChanges: r.votesChanges.toInt(),
+    votesReject: r.votesReject.toInt(),
+    createdAt: r.createdAt.toInt(),
+    updatedAt: r.updatedAt.toInt(),
+  );
+
+  ReviewItemInfo _rit(r_reviews.ReviewItemInfo i) => ReviewItemInfo(
+    id: i.id,
+    shortId: i.shortId,
+    line: i.line,
+    kind: i.kind,
+    who: i.who,
+    state: i.state,
+    field: i.field,
+    target: i.target,
+    quote: i.quote,
+    body: i.body,
+    value: i.value,
+    createdAt: i.createdAt.toInt(),
+  );
+
+  ReviewDetail _detail(r_reviews.ReviewDetail d) => ReviewDetail(
+    review: _rev(d.review),
+    mine: d.mine,
+    note: d.note,
+    youMay: d.youMay,
+    peer: d.peer,
+    reviewers: [
+      for (final v in d.reviewers)
+        ReviewerInfo(
+          id: v.id,
+          shortId: v.shortId,
+          title: v.title,
+          status: v.status,
+          label: v.label,
+        ),
+    ],
+    items: [for (final i in d.items) _rit(i)],
+  );
+
+  @override
+  Future<List<ReviewInfo>> reviews() async => [
+    for (final r in await r_reviews.reviews()) _rev(r),
+  ];
+
+  @override
+  Future<List<ReviewingInfo>> reviewsJoined() async => [
+    for (final g in await r_reviews.reviewsJoined())
+      ReviewingInfo(
+        id: g.id,
+        shortId: g.shortId,
+        title: g.title,
+        kind: g.kind,
+        name: g.name,
+        status: g.status,
+        allow: g.allow,
+        peer: g.peer,
+        items: g.items.toInt(),
+        updatedAt: g.updatedAt.toInt(),
+      ),
+  ];
+
+  @override
+  Future<ReviewInfo> reviewRequest(
+    String kind,
+    String target, {
+    String title = '',
+    String note = '',
+    List<String> allow = const [],
+  }) async => _rev(
+    await r_reviews.reviewRequest(
+      kind: kind,
+      target: target,
+      title: title,
+      note: note,
+      allow: allow,
+    ),
+  );
+
+  @override
+  Future<ReviewDetail> reviewShow(String review) async =>
+      _detail(await r_reviews.reviewShow(review: review));
+
+  @override
+  Future<List<String>> reviewView(String review) =>
+      r_reviews.reviewView(review: review);
+
+  @override
+  Future<String> reviewInvite(
+    String review, {
+    String label = '',
+    String? peer,
+  }) => r_reviews.reviewInvite(review: review, label: label, peer: peer);
+
+  @override
+  Future<String> reviewJoin(String token, {String label = ''}) =>
+      r_reviews.reviewJoin(token: token, label: label);
+
+  @override
+  Future<String> reviewSync(String review) =>
+      r_reviews.reviewSync(review: review);
+
+  @override
+  Future<String> reviewComment(
+    String review,
+    String text, {
+    String? field,
+    String? at,
+    int nth = 1,
+    String? entry,
+    String? reply,
+  }) => r_reviews.reviewComment(
+    review: review,
+    text: text,
+    field: field,
+    at: at,
+    nth: PlatformInt64Util.from(nth),
+    entry: entry,
+    reply: reply,
+  );
+
+  @override
+  Future<String> reviewSuggest(
+    String review,
+    String to, {
+    String why = '',
+    String? field,
+    String? at,
+    int nth = 1,
+    String? entry,
+  }) => r_reviews.reviewSuggest(
+    review: review,
+    to: to,
+    why: why,
+    field: field,
+    at: at,
+    nth: PlatformInt64Util.from(nth),
+    entry: entry,
+  );
+
+  @override
+  Future<String> reviewHighlight(
+    String review, {
+    String? field,
+    String? at,
+    int nth = 1,
+    String? entry,
+    String? color,
+    String note = '',
+  }) => r_reviews.reviewHighlight(
+    review: review,
+    field: field,
+    at: at,
+    nth: PlatformInt64Util.from(nth),
+    entry: entry,
+    color: color,
+    note: note,
+  );
+
+  @override
+  Future<String> reviewVote(
+    String review,
+    String vote, {
+    String? on,
+    String note = '',
+  }) => r_reviews.reviewVote(review: review, vote: vote, on_: on, note: note);
+
+  @override
+  Future<String> reviewWithdraw(String review, String item) =>
+      r_reviews.reviewWithdraw(review: review, item: item);
+
+  @override
+  Future<String> reviewAccept(
+    String review, {
+    List<String> items = const [],
+    bool all = false,
+  }) => r_reviews.reviewAccept(review: review, items: items, all: all);
+
+  @override
+  Future<String> reviewReject(
+    String review, {
+    List<String> items = const [],
+    bool all = false,
+  }) => r_reviews.reviewReject(review: review, items: items, all: all);
+
+  @override
+  Future<String> reviewMerge(String review, {bool force = false}) =>
+      r_reviews.reviewMerge(review: review, force: force);
+
+  @override
+  Future<String> reviewClose(String review) =>
+      r_reviews.reviewClose(review: review);
+
+  @override
+  Future<String> reviewReopen(String review) =>
+      r_reviews.reviewReopen(review: review);
+
+  @override
+  Future<String> reviewDrop(String review, String reviewer) =>
+      r_reviews.reviewDrop(review: review, reviewer: reviewer);
+
+  @override
+  Future<String> reviewLeave(String review) =>
+      r_reviews.reviewLeave(review: review);
+
+  @override
+  Future<String> reviewRemove(String review) =>
+      r_reviews.reviewRemove(review: review);
+
+  @override
+  Future<List<String>> reviewRevisions(String kind, String target) =>
+      r_reviews.reviewRevisions(kind: kind, target: target);
 
   @override
   Future<NetOverview> netOverview() async {

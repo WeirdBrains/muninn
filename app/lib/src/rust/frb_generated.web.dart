@@ -15,10 +15,13 @@ import 'api/io.dart';
 import 'api/journals.dart';
 import 'api/keys.dart';
 import 'api/net.dart';
+import 'api/notify.dart';
 import 'api/orgs.dart';
 import 'api/prefs.dart';
 import 'api/projects.dart';
 import 'api/reports.dart';
+import 'api/reviews.dart';
+import 'api/rules.dart';
 import 'api/searches.dart';
 import 'api/themes.dart';
 
@@ -200,6 +203,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<NetShareInfo> dco_decode_list_net_share_info(dynamic raw);
 
   @protected
+  List<NotificationInfo> dco_decode_list_notification_info(dynamic raw);
+
+  @protected
+  List<NotificationKindInfo> dco_decode_list_notification_kind_info(
+    dynamic raw,
+  );
+
+  @protected
   List<OrgEndpointInfo> dco_decode_list_org_endpoint_info(dynamic raw);
 
   @protected
@@ -237,6 +248,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ReportInfo> dco_decode_list_report_info(dynamic raw);
+
+  @protected
+  List<ReviewInfo> dco_decode_list_review_info(dynamic raw);
+
+  @protected
+  List<ReviewItemInfo> dco_decode_list_review_item_info(dynamic raw);
+
+  @protected
+  List<ReviewerInfo> dco_decode_list_reviewer_info(dynamic raw);
+
+  @protected
+  List<ReviewingInfo> dco_decode_list_reviewing_info(dynamic raw);
+
+  @protected
+  List<RuleEventInfo> dco_decode_list_rule_event_info(dynamic raw);
+
+  @protected
+  List<RuleInfo> dco_decode_list_rule_info(dynamic raw);
 
   @protected
   List<SearchInfo> dco_decode_list_search_info(dynamic raw);
@@ -326,6 +355,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NetStatus dco_decode_net_status(dynamic raw);
 
   @protected
+  NotificationInfo dco_decode_notification_info(dynamic raw);
+
+  @protected
+  NotificationKindInfo dco_decode_notification_kind_info(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
@@ -404,6 +439,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RevealHandle dco_decode_reveal_handle(dynamic raw);
+
+  @protected
+  ReviewDetail dco_decode_review_detail(dynamic raw);
+
+  @protected
+  ReviewInfo dco_decode_review_info(dynamic raw);
+
+  @protected
+  ReviewItemInfo dco_decode_review_item_info(dynamic raw);
+
+  @protected
+  ReviewerInfo dco_decode_reviewer_info(dynamic raw);
+
+  @protected
+  ReviewingInfo dco_decode_reviewing_info(dynamic raw);
+
+  @protected
+  RuleEventInfo dco_decode_rule_event_info(dynamic raw);
+
+  @protected
+  RuleInfo dco_decode_rule_info(dynamic raw);
 
   @protected
   SavedState dco_decode_saved_state(dynamic raw);
@@ -646,6 +702,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<NotificationInfo> sse_decode_list_notification_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<NotificationKindInfo> sse_decode_list_notification_kind_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<OrgEndpointInfo> sse_decode_list_org_endpoint_info(
     SseDeserializer deserializer,
   );
@@ -697,6 +763,32 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ReportInfo> sse_decode_list_report_info(SseDeserializer deserializer);
+
+  @protected
+  List<ReviewInfo> sse_decode_list_review_info(SseDeserializer deserializer);
+
+  @protected
+  List<ReviewItemInfo> sse_decode_list_review_item_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ReviewerInfo> sse_decode_list_reviewer_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ReviewingInfo> sse_decode_list_reviewing_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<RuleEventInfo> sse_decode_list_rule_event_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<RuleInfo> sse_decode_list_rule_info(SseDeserializer deserializer);
 
   @protected
   List<SearchInfo> sse_decode_list_search_info(SseDeserializer deserializer);
@@ -792,6 +884,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NetStatus sse_decode_net_status(SseDeserializer deserializer);
 
   @protected
+  NotificationInfo sse_decode_notification_info(SseDeserializer deserializer);
+
+  @protected
+  NotificationKindInfo sse_decode_notification_kind_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
@@ -878,6 +978,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RevealHandle sse_decode_reveal_handle(SseDeserializer deserializer);
+
+  @protected
+  ReviewDetail sse_decode_review_detail(SseDeserializer deserializer);
+
+  @protected
+  ReviewInfo sse_decode_review_info(SseDeserializer deserializer);
+
+  @protected
+  ReviewItemInfo sse_decode_review_item_info(SseDeserializer deserializer);
+
+  @protected
+  ReviewerInfo sse_decode_reviewer_info(SseDeserializer deserializer);
+
+  @protected
+  ReviewingInfo sse_decode_reviewing_info(SseDeserializer deserializer);
+
+  @protected
+  RuleEventInfo sse_decode_rule_event_info(SseDeserializer deserializer);
+
+  @protected
+  RuleInfo sse_decode_rule_info(SseDeserializer deserializer);
 
   @protected
   SavedState sse_decode_saved_state(SseDeserializer deserializer);
@@ -1189,6 +1310,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_notification_info(
+    List<NotificationInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_notification_kind_info(
+    List<NotificationKindInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_org_endpoint_info(
     List<OrgEndpointInfo> self,
     SseSerializer serializer,
@@ -1262,6 +1395,39 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     List<ReportInfo> self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_list_review_info(
+    List<ReviewInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_review_item_info(
+    List<ReviewItemInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_reviewer_info(
+    List<ReviewerInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_reviewing_info(
+    List<ReviewingInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_rule_event_info(
+    List<RuleEventInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_rule_info(List<RuleInfo> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_search_info(
@@ -1390,6 +1556,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_net_status(NetStatus self, SseSerializer serializer);
 
   @protected
+  void sse_encode_notification_info(
+    NotificationInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_notification_kind_info(
+    NotificationKindInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
@@ -1496,6 +1674,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_reveal_handle(RevealHandle self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_review_detail(ReviewDetail self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_review_info(ReviewInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_review_item_info(
+    ReviewItemInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_reviewer_info(ReviewerInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_reviewing_info(ReviewingInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_rule_event_info(RuleEventInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_rule_info(RuleInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_saved_state(SavedState self, SseSerializer serializer);

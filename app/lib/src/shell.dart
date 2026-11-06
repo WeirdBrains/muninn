@@ -18,6 +18,7 @@ import 'theme/muninn_theme.dart';
 import 'time_range.dart';
 import 'views/catalog.dart';
 import 'views/project_compute.dart';
+import 'views/project_collab.dart';
 import 'views/chart.dart';
 import 'views/data.dart';
 import 'views/help.dart';
@@ -363,6 +364,25 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
             go(Section.projects);
           }, const SingleActivator(LogicalKeyboardKey.keyE, shift: true)),
           item('New pipeline…', () => showNewPipelineDialog(context, ref)),
+          item('Rules…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.rules;
+            go(Section.projects);
+          }, const SingleActivator(LogicalKeyboardKey.keyR, shift: true)),
+          item('New rule…', () => showNewRuleDialog(context, ref)),
+          item('Reviews…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.reviews;
+            go(Section.projects);
+          }, const SingleActivator(LogicalKeyboardKey.keyV, shift: true)),
+          item('New review…', () => showNewReviewDialog(context, ref)),
+          item('Notifications…', () {
+            ref.read(projectPaneProvider.notifier).state =
+                ProjectPane.notifications;
+            go(Section.projects);
+          }),
+          item(
+            'Send a notification…',
+            () => showSendNotificationDialog(context, ref),
+          ),
         ]),
         menu('Net', [
           item('Status…', () {

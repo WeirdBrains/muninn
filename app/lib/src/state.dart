@@ -401,7 +401,7 @@ final projectSeriesProvider = FutureProvider<List<ProjectSeries>?>((ref) {
   return ref.watch(apiProvider).projectSeries(p.id);
 });
 
-/// Projects window pages (TUI Projects / Journals / Searches / Reports / Code / Pipes / Pipelines).
+/// Projects window pages (TUI Projects / Journals / Searches / Reports / Code / Pipes / Pipelines / Rules / Reviews / Notifications).
 enum ProjectPane {
   projects,
   journals,
@@ -410,6 +410,9 @@ enum ProjectPane {
   code,
   pipes,
   pipelines,
+  rules,
+  reviews,
+  notifications,
 }
 
 final projectPaneProvider = StateProvider<ProjectPane>(
@@ -474,6 +477,29 @@ final pipelinesProvider = FutureProvider<List<PipelineInfo>?>((ref) {
   return ref.watch(apiProvider).pipelines();
 });
 
+final rulesProvider = FutureProvider<List<RuleInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).rules();
+});
+
+final reviewsProvider = FutureProvider<List<ReviewInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).reviews();
+});
+
+final reviewsJoinedProvider = FutureProvider<List<ReviewingInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).reviewsJoined();
+});
+
+final notificationsUnreadOnlyProvider = StateProvider<bool>((ref) => false);
+
+final notificationsProvider = FutureProvider<List<NotificationInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  final unread = ref.watch(notificationsUnreadOnlyProvider);
+  return ref.watch(apiProvider).notifications(unread: unread);
+});
+
 void refreshProjectExtras(WidgetRef ref) {
   ref.invalidate(overviewProvider);
   ref.invalidate(projectSeriesProvider);
@@ -487,6 +513,10 @@ void refreshProjectExtras(WidgetRef ref) {
   ref.invalidate(codeSpacesProvider);
   ref.invalidate(pipesLiveProvider);
   ref.invalidate(pipelinesProvider);
+  ref.invalidate(rulesProvider);
+  ref.invalidate(reviewsProvider);
+  ref.invalidate(reviewsJoinedProvider);
+  ref.invalidate(notificationsProvider);
 }
 
 final netOverviewProvider = FutureProvider<NetOverview?>((ref) {

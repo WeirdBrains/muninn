@@ -1049,6 +1049,521 @@ class FakeApi implements MuninnApi {
     return 'imported pipeline demo v1';
   }
 
+  List<RuleInfo> ruleList = [];
+  List<ReviewInfo> reviewList = [];
+  List<ReviewingInfo> reviewingList = [];
+  List<NotificationInfo> notificationList = [];
+  List<NotificationKindInfo> notificationKindList = const [
+    NotificationKindInfo(kind: 'review.comment', about: 'a reviewer commented'),
+    NotificationKindInfo(kind: 'notify', about: 'a warning from Muninn'),
+  ];
+  final Map<String, List<ReviewItemInfo>> reviewItems = {};
+  int _ruleN = 0;
+  int _reviewN = 0;
+  int _noteN = 0;
+
+  @override
+  Future<List<RuleInfo>> rules() async => List.of(ruleList);
+
+  @override
+  Future<RuleInfo> ruleCreate(
+    String name, {
+    String description = '',
+    String on = '',
+    String when = '',
+    String then = '',
+    String home = '',
+    bool related = false,
+  }) async {
+    extraCalls.add('rule-create:$name:$on');
+    _ruleN += 1;
+    final r = RuleInfo(
+      id: 'r$_ruleN',
+      shortId: 'r$_ruleN',
+      name: name,
+      description: description,
+      onText: on,
+      whenText: when,
+      thenText: then,
+      home: home.isEmpty ? 'standalone' : home,
+      brief: '$on → $then',
+      related: related,
+      enabled: true,
+    );
+    ruleList = [...ruleList, r];
+    return r;
+  }
+
+  @override
+  Future<RuleInfo> ruleEdit(
+    String rule, {
+    String? name,
+    String? description,
+    String? on,
+    String? when,
+    String? then,
+    String? home,
+    bool? related,
+    bool noSchedule = false,
+  }) async {
+    extraCalls.add('rule-edit:$rule');
+    ruleList = [
+      for (final r in ruleList)
+        if (r.id == rule || r.name == rule)
+          RuleInfo(
+            id: r.id,
+            shortId: r.shortId,
+            name: name ?? r.name,
+            description: description ?? r.description,
+            enabled: r.enabled,
+            home: home ?? r.home,
+            brief: r.brief,
+            onText: on ?? r.onText,
+            whenText: when ?? r.whenText,
+            thenText: then ?? r.thenText,
+            related: related ?? r.related,
+            runs: r.runs,
+            lastStatus: r.lastStatus,
+          )
+        else
+          r,
+    ];
+    return ruleList.firstWhere((r) => r.id == rule || r.name == rule);
+  }
+
+  @override
+  Future<String> ruleRemove(String rule) async {
+    extraCalls.add('rule-remove:$rule');
+    final n = ruleList.firstWhere((r) => r.id == rule || r.name == rule).name;
+    ruleList = [
+      for (final r in ruleList)
+        if (r.id != rule && r.name != rule) r,
+    ];
+    return 'removed rule $n';
+  }
+
+  @override
+  Future<String> ruleEnable(String rule) async {
+    extraCalls.add('rule-enable:$rule');
+    ruleList = [
+      for (final r in ruleList)
+        if (r.id == rule || r.name == rule)
+          RuleInfo(
+            id: r.id,
+            shortId: r.shortId,
+            name: r.name,
+            description: r.description,
+            enabled: true,
+            home: r.home,
+            brief: r.brief,
+            onText: r.onText,
+            whenText: r.whenText,
+            thenText: r.thenText,
+            related: r.related,
+            runs: r.runs,
+          )
+        else
+          r,
+    ];
+    return 'rule $rule is on';
+  }
+
+  @override
+  Future<String> ruleDisable(String rule) async {
+    extraCalls.add('rule-disable:$rule');
+    ruleList = [
+      for (final r in ruleList)
+        if (r.id == rule || r.name == rule)
+          RuleInfo(
+            id: r.id,
+            shortId: r.shortId,
+            name: r.name,
+            description: r.description,
+            enabled: false,
+            home: r.home,
+            brief: r.brief,
+            onText: r.onText,
+            whenText: r.whenText,
+            thenText: r.thenText,
+            related: r.related,
+            runs: r.runs,
+          )
+        else
+          r,
+    ];
+    return 'rule $rule is off';
+  }
+
+  @override
+  Future<List<String>> ruleShow(String rule) async => [
+    'name: $rule',
+    'state: on',
+  ];
+
+  @override
+  Future<List<String>> ruleTest({String? rule, int? action}) async {
+    extraCalls.add('rule-test:${rule ?? "all"}');
+    return ['rule ${rule ?? "all"} vs #1 import:', '  → matches'];
+  }
+
+  @override
+  Future<List<String>> ruleDryRun({String? rule, int? action}) async {
+    extraCalls.add('rule-dry-run:${rule ?? "all"}');
+    return ['rule ${rule ?? "all"} vs #1 import:', '  would show "hi"'];
+  }
+
+  @override
+  Future<String> ruleTick() async {
+    extraCalls.add('rule-tick');
+    return 'no scheduled rules are due';
+  }
+
+  @override
+  Future<List<RuleEventInfo>> ruleEvents({String? kind}) async => [
+    const RuleEventInfo(
+      kind: 'import',
+      about: 'data was imported',
+      fields: 'inserted, path',
+    ),
+  ];
+
+  @override
+  Future<List<NotificationInfo>> notifications({
+    bool unread = false,
+    int limit = 50,
+  }) async {
+    final all = unread
+        ? notificationList.where((n) => !n.read)
+        : notificationList;
+    return all.take(limit).toList();
+  }
+
+  @override
+  Future<int> notificationsUnreadCount() async =>
+      notificationList.where((n) => !n.read).length;
+
+  NotificationInfo _mark(NotificationInfo n, bool read) => NotificationInfo(
+    id: n.id,
+    shortId: n.shortId,
+    title: n.title,
+    kind: n.kind,
+    level: n.level,
+    body: n.body,
+    link: n.link,
+    linkLabel: n.linkLabel,
+    createdAt: n.createdAt,
+    read: read,
+    readAt: read ? 1 : 0,
+  );
+
+  @override
+  Future<NotificationInfo> notificationShow(String id) async {
+    extraCalls.add('notify-show:$id');
+    notificationList = [
+      for (final n in notificationList)
+        if (n.id == id || n.shortId == id) _mark(n, true) else n,
+    ];
+    return notificationList.firstWhere((n) => n.id == id || n.shortId == id);
+  }
+
+  @override
+  Future<String> notificationRead(String id) async {
+    extraCalls.add('notify-read:$id');
+    notificationList = [
+      for (final n in notificationList)
+        if (n.id == id || n.shortId == id) _mark(n, true) else n,
+    ];
+    return 'read: $id';
+  }
+
+  @override
+  Future<String> notificationUnread(String id) async {
+    extraCalls.add('notify-unread:$id');
+    notificationList = [
+      for (final n in notificationList)
+        if (n.id == id || n.shortId == id) _mark(n, false) else n,
+    ];
+    return 'unread: $id';
+  }
+
+  @override
+  Future<String> notificationReadAll() async {
+    extraCalls.add('notify-read-all');
+    notificationList = [for (final n in notificationList) _mark(n, true)];
+    return 'marked ${notificationList.length} read';
+  }
+
+  @override
+  Future<NotificationInfo> notificationSend(
+    String title, {
+    String body = '',
+    String? link,
+    String level = 'info',
+  }) async {
+    extraCalls.add('notify-send:$title');
+    _noteN += 1;
+    final n = NotificationInfo(
+      id: 'n$_noteN',
+      shortId: 'n$_noteN',
+      title: title,
+      body: body,
+      link: link ?? '',
+      level: level,
+      kind: 'notify',
+    );
+    notificationList = [n, ...notificationList];
+    return n;
+  }
+
+  @override
+  Future<List<NotificationKindInfo>> notificationKinds() async =>
+      List.of(notificationKindList);
+
+  @override
+  Future<String> notificationMute(String kind) async {
+    extraCalls.add('notify-mute:$kind');
+    notificationKindList = [
+      for (final k in notificationKindList)
+        if (k.kind == kind)
+          NotificationKindInfo(kind: k.kind, about: k.about, muted: true)
+        else
+          k,
+    ];
+    return 'muted $kind';
+  }
+
+  @override
+  Future<String> notificationUnmute(String kind) async {
+    extraCalls.add('notify-unmute:$kind');
+    notificationKindList = [
+      for (final k in notificationKindList)
+        if (k.kind == kind)
+          NotificationKindInfo(kind: k.kind, about: k.about, muted: false)
+        else
+          k,
+    ];
+    return 'unmuted $kind';
+  }
+
+  @override
+  Future<List<ReviewInfo>> reviews() async => List.of(reviewList);
+
+  @override
+  Future<List<ReviewingInfo>> reviewsJoined() async => List.of(reviewingList);
+
+  @override
+  Future<ReviewInfo> reviewRequest(
+    String kind,
+    String target, {
+    String title = '',
+    String note = '',
+    List<String> allow = const [],
+  }) async {
+    extraCalls.add('review-request:$kind:$target');
+    _reviewN += 1;
+    final r = ReviewInfo(
+      id: 'v$_reviewN',
+      shortId: 'v$_reviewN',
+      title: title.isEmpty ? '$kind $target' : title,
+      kind: kind,
+      name: target,
+      note: note,
+      allow: allow.isEmpty
+          ? 'view, comment, suggest, highlight, vote'
+          : allow.join(', '),
+    );
+    reviewList = [...reviewList, r];
+    reviewItems[r.id] = [];
+    return r;
+  }
+
+  @override
+  Future<ReviewDetail> reviewShow(String review) async {
+    final r = reviewList.firstWhere(
+      (x) => x.id == review || x.name == review || x.shortId == review,
+    );
+    return ReviewDetail(
+      review: r,
+      items: List.of(reviewItems[r.id] ?? const []),
+      youMay: r.allow,
+      note: r.note,
+    );
+  }
+
+  @override
+  Future<List<String>> reviewView(String review) async => ['name: $review'];
+
+  @override
+  Future<String> reviewInvite(
+    String review, {
+    String label = '',
+    String? peer,
+  }) async {
+    extraCalls.add('review-invite:$review');
+    return 'mnnn-x1-demo-link';
+  }
+
+  @override
+  Future<String> reviewJoin(String token, {String label = ''}) async {
+    extraCalls.add('review-join:$token');
+    reviewingList = [
+      ...reviewingList,
+      ReviewingInfo(
+        id: 'j${reviewingList.length + 1}',
+        shortId: 'j1',
+        title: label.isEmpty ? token : label,
+        status: 'joined',
+      ),
+    ];
+    return 'reviewing $token';
+  }
+
+  @override
+  Future<String> reviewSync(String review) async {
+    extraCalls.add('review-sync:$review');
+    return 'synced $review';
+  }
+
+  @override
+  Future<String> reviewComment(
+    String review,
+    String text, {
+    String? field,
+    String? at,
+    int nth = 1,
+    String? entry,
+    String? reply,
+  }) async {
+    extraCalls.add('review-comment:$review');
+    final r = reviewList.firstWhere(
+      (x) => x.id == review || x.name == review || x.shortId == review,
+    );
+    final items = [...?reviewItems[r.id]];
+    items.add(
+      ReviewItemInfo(
+        id: 'i${items.length + 1}',
+        shortId: 'i${items.length + 1}',
+        line: 'comment: $text',
+        kind: 'comment',
+        body: text,
+        who: 'author',
+        state: 'open',
+      ),
+    );
+    reviewItems[r.id] = items;
+    return 'comment: $text';
+  }
+
+  @override
+  Future<String> reviewSuggest(
+    String review,
+    String to, {
+    String why = '',
+    String? field,
+    String? at,
+    int nth = 1,
+    String? entry,
+  }) async {
+    extraCalls.add('review-suggest:$review');
+    return 'suggest → $to';
+  }
+
+  @override
+  Future<String> reviewHighlight(
+    String review, {
+    String? field,
+    String? at,
+    int nth = 1,
+    String? entry,
+    String? color,
+    String note = '',
+  }) async {
+    extraCalls.add('review-highlight:$review');
+    return 'highlight';
+  }
+
+  @override
+  Future<String> reviewVote(
+    String review,
+    String vote, {
+    String? on,
+    String note = '',
+  }) async {
+    extraCalls.add('review-vote:$review:$vote');
+    return 'vote $vote';
+  }
+
+  @override
+  Future<String> reviewWithdraw(String review, String item) async {
+    extraCalls.add('review-withdraw:$review:$item');
+    return 'withdrew $item';
+  }
+
+  @override
+  Future<String> reviewAccept(
+    String review, {
+    List<String> items = const [],
+    bool all = false,
+  }) async {
+    extraCalls.add('review-accept:$review');
+    return 'accepted';
+  }
+
+  @override
+  Future<String> reviewReject(
+    String review, {
+    List<String> items = const [],
+    bool all = false,
+  }) async {
+    extraCalls.add('review-reject:$review');
+    return 'rejected';
+  }
+
+  @override
+  Future<String> reviewMerge(String review, {bool force = false}) async {
+    extraCalls.add('review-merge:$review');
+    return 'merged';
+  }
+
+  @override
+  Future<String> reviewClose(String review) async {
+    extraCalls.add('review-close:$review');
+    return 'closed $review';
+  }
+
+  @override
+  Future<String> reviewReopen(String review) async {
+    extraCalls.add('review-reopen:$review');
+    return 'opened $review';
+  }
+
+  @override
+  Future<String> reviewDrop(String review, String reviewer) async {
+    extraCalls.add('review-drop:$review:$reviewer');
+    return 'took $reviewer off';
+  }
+
+  @override
+  Future<String> reviewLeave(String review) async {
+    extraCalls.add('review-leave:$review');
+    return 'left $review';
+  }
+
+  @override
+  Future<String> reviewRemove(String review) async {
+    extraCalls.add('review-remove:$review');
+    reviewList = [
+      for (final r in reviewList)
+        if (r.id != review && r.name != review) r,
+    ];
+    return 'removed $review';
+  }
+
+  @override
+  Future<List<String>> reviewRevisions(String kind, String target) async => [
+    'no revisions yet',
+  ];
+
   @override
   Future<List<BarPoint>> queryBars(
     Dataset d,

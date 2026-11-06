@@ -398,6 +398,174 @@ class PipelineRunResult {
   final List<String> lines, landed;
 }
 
+class RuleInfo {
+  const RuleInfo({
+    required this.id,
+    required this.shortId,
+    required this.name,
+    this.description = '',
+    this.enabled = true,
+    this.home = '',
+    this.brief = '',
+    this.onText = '',
+    this.whenText = '',
+    this.thenText = '',
+    this.related = false,
+    this.runs = 0,
+    this.lastStatus = '',
+    this.lastRunAt = 0,
+    this.nextRun = 0,
+    this.createdAt = 0,
+  });
+  final String id,
+      shortId,
+      name,
+      description,
+      home,
+      brief,
+      onText,
+      whenText,
+      thenText,
+      lastStatus;
+  final bool enabled, related;
+  final int runs, lastRunAt, nextRun, createdAt;
+}
+
+class RuleEventInfo {
+  const RuleEventInfo({required this.kind, this.about = '', this.fields = ''});
+  final String kind, about, fields;
+}
+
+class NotificationInfo {
+  const NotificationInfo({
+    required this.id,
+    required this.shortId,
+    required this.title,
+    this.kind = '',
+    this.level = 'info',
+    this.body = '',
+    this.link = '',
+    this.linkLabel = '',
+    this.actionId = 0,
+    this.createdAt = 0,
+    this.read = false,
+    this.readAt = 0,
+  });
+  final String id, shortId, title, kind, level, body, link, linkLabel;
+  final int actionId, createdAt, readAt;
+  final bool read;
+}
+
+class NotificationKindInfo {
+  const NotificationKindInfo({
+    required this.kind,
+    this.about = '',
+    this.muted = false,
+  });
+  final String kind, about;
+  final bool muted;
+}
+
+class ReviewInfo {
+  const ReviewInfo({
+    required this.id,
+    required this.shortId,
+    required this.title,
+    this.kind = '',
+    this.name = '',
+    this.note = '',
+    this.status = 'open',
+    this.allow = '',
+    this.items = 0,
+    this.votesApprove = 0,
+    this.votesChanges = 0,
+    this.votesReject = 0,
+    this.createdAt = 0,
+    this.updatedAt = 0,
+  });
+  final String id, shortId, title, kind, name, note, status, allow;
+  final int items,
+      votesApprove,
+      votesChanges,
+      votesReject,
+      createdAt,
+      updatedAt;
+}
+
+class ReviewerInfo {
+  const ReviewerInfo({
+    required this.id,
+    required this.shortId,
+    required this.title,
+    this.status = '',
+    this.label = '',
+  });
+  final String id, shortId, title, status, label;
+}
+
+class ReviewItemInfo {
+  const ReviewItemInfo({
+    required this.id,
+    required this.shortId,
+    required this.line,
+    this.kind = '',
+    this.who = '',
+    this.state = '',
+    this.field = '',
+    this.target = '',
+    this.quote = '',
+    this.body = '',
+    this.value = '',
+    this.createdAt = 0,
+  });
+  final String id,
+      shortId,
+      line,
+      kind,
+      who,
+      state,
+      field,
+      target,
+      quote,
+      body,
+      value;
+  final int createdAt;
+}
+
+class ReviewDetail {
+  const ReviewDetail({
+    required this.review,
+    this.mine = true,
+    this.note = '',
+    this.reviewers = const [],
+    this.items = const [],
+    this.youMay = '',
+    this.peer = '',
+  });
+  final ReviewInfo review;
+  final bool mine;
+  final String note, youMay, peer;
+  final List<ReviewerInfo> reviewers;
+  final List<ReviewItemInfo> items;
+}
+
+class ReviewingInfo {
+  const ReviewingInfo({
+    required this.id,
+    required this.shortId,
+    required this.title,
+    this.kind = '',
+    this.name = '',
+    this.status = '',
+    this.allow = '',
+    this.peer = '',
+    this.items = 0,
+    this.updatedAt = 0,
+  });
+  final String id, shortId, title, kind, name, status, allow, peer;
+  final int items, updatedAt;
+}
+
 /// `mnnn net status`: the node and counts (no keys).
 class NetStatus {
   const NetStatus({
@@ -1176,6 +1344,124 @@ abstract class MuninnApi {
     String? name,
     bool merge = false,
   });
+
+  /// `mnnn rule` / TUI Rules… (`R`).
+  Future<List<RuleInfo>> rules();
+  Future<RuleInfo> ruleCreate(
+    String name, {
+    String description = '',
+    String on = '',
+    String when = '',
+    String then = '',
+    String home = '',
+    bool related = false,
+  });
+  Future<RuleInfo> ruleEdit(
+    String rule, {
+    String? name,
+    String? description,
+    String? on,
+    String? when,
+    String? then,
+    String? home,
+    bool? related,
+    bool noSchedule = false,
+  });
+  Future<String> ruleRemove(String rule);
+  Future<String> ruleEnable(String rule);
+  Future<String> ruleDisable(String rule);
+  Future<List<String>> ruleShow(String rule);
+  Future<List<String>> ruleTest({String? rule, int? action});
+  Future<List<String>> ruleDryRun({String? rule, int? action});
+  Future<String> ruleTick();
+  Future<List<RuleEventInfo>> ruleEvents({String? kind});
+
+  /// `mnnn notify` / TUI Notifications… (`!`).
+  Future<List<NotificationInfo>> notifications({
+    bool unread = false,
+    int limit = 50,
+  });
+  Future<int> notificationsUnreadCount();
+  Future<NotificationInfo> notificationShow(String id);
+  Future<String> notificationRead(String id);
+  Future<String> notificationUnread(String id);
+  Future<String> notificationReadAll();
+  Future<NotificationInfo> notificationSend(
+    String title, {
+    String body = '',
+    String? link,
+    String level = 'info',
+  });
+  Future<List<NotificationKindInfo>> notificationKinds();
+  Future<String> notificationMute(String kind);
+  Future<String> notificationUnmute(String kind);
+
+  /// `mnnn review` / TUI Reviews… (`V`). Exchange tokens and the node key stay in Rust.
+  Future<List<ReviewInfo>> reviews();
+  Future<List<ReviewingInfo>> reviewsJoined();
+  Future<ReviewInfo> reviewRequest(
+    String kind,
+    String target, {
+    String title = '',
+    String note = '',
+    List<String> allow = const [],
+  });
+  Future<ReviewDetail> reviewShow(String review);
+  Future<List<String>> reviewView(String review);
+  Future<String> reviewInvite(String review, {String label = '', String? peer});
+  Future<String> reviewJoin(String token, {String label = ''});
+  Future<String> reviewSync(String review);
+  Future<String> reviewComment(
+    String review,
+    String text, {
+    String? field,
+    String? at,
+    int nth = 1,
+    String? entry,
+    String? reply,
+  });
+  Future<String> reviewSuggest(
+    String review,
+    String to, {
+    String why = '',
+    String? field,
+    String? at,
+    int nth = 1,
+    String? entry,
+  });
+  Future<String> reviewHighlight(
+    String review, {
+    String? field,
+    String? at,
+    int nth = 1,
+    String? entry,
+    String? color,
+    String note = '',
+  });
+  Future<String> reviewVote(
+    String review,
+    String vote, {
+    String? on,
+    String note = '',
+  });
+  Future<String> reviewWithdraw(String review, String item);
+  Future<String> reviewAccept(
+    String review, {
+    List<String> items = const [],
+    bool all = false,
+  });
+  Future<String> reviewReject(
+    String review, {
+    List<String> items = const [],
+    bool all = false,
+  });
+  Future<String> reviewMerge(String review, {bool force = false});
+  Future<String> reviewClose(String review);
+  Future<String> reviewReopen(String review);
+  Future<String> reviewDrop(String review, String reviewer);
+  Future<String> reviewLeave(String review);
+  Future<String> reviewRemove(String review);
+  Future<List<String>> reviewRevisions(String kind, String target);
 
   /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
   Future<NetOverview> netOverview();

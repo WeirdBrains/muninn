@@ -15,6 +15,7 @@ import 'time_range.dart';
 import 'views/chart.dart';
 import 'views/help.dart';
 import 'views/project_compute.dart';
+import 'views/project_collab.dart';
 import 'views/projects.dart';
 
 /// F10 asks the desktop menu bar to open (File, the first menu).
@@ -168,6 +169,21 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
       ref.read(sectionProvider.notifier).state = Section.projects;
       return KeyEventResult.handled;
     }
+    if (ch == 'R' || (key == LogicalKeyboardKey.keyR && shift)) {
+      ref.read(projectPaneProvider.notifier).state = ProjectPane.rules;
+      ref.read(sectionProvider.notifier).state = Section.projects;
+      return KeyEventResult.handled;
+    }
+    if (ch == 'V' || (key == LogicalKeyboardKey.keyV && shift)) {
+      ref.read(projectPaneProvider.notifier).state = ProjectPane.reviews;
+      ref.read(sectionProvider.notifier).state = Section.projects;
+      return KeyEventResult.handled;
+    }
+    if (ch == '!') {
+      ref.read(projectPaneProvider.notifier).state = ProjectPane.notifications;
+      ref.read(sectionProvider.notifier).state = Section.projects;
+      return KeyEventResult.handled;
+    }
     if (ch == 'L' || (key == LogicalKeyboardKey.keyL && shift)) {
       showChartLayersSheet(context, ref);
       return KeyEventResult.handled;
@@ -192,6 +208,12 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
           showNewCodeSpaceDialog(context, ref);
         case ProjectPane.pipelines:
           showNewPipelineDialog(context, ref);
+        case ProjectPane.rules:
+          showNewRuleDialog(context, ref);
+        case ProjectPane.reviews:
+          showNewReviewDialog(context, ref);
+        case ProjectPane.notifications:
+          showSendNotificationDialog(context, ref);
         default:
           showNewProjectDialog(context, ref);
       }
