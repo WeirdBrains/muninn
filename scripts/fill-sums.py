@@ -5,10 +5,12 @@ Usage: scripts/fill-sums.py [<version>] <dist-dir>
 (the version defaults to [workspace.package] in Cargo.toml, via scripts/version.sh)
 Reads <dist-dir>/SHA256SUMS and writes into <dist-dir>/packaging/:
   arch/PKGBUILD (muninn-bin), homebrew/Formula/muninn.rb, homebrew/Casks/muninn.rb,
+  homebrew/Casks/muninn-app.rb,
   winget/manifests/w/WeirdBrains/Muninn/<version>/*.yaml (ready for winget-pkgs)
-The Linux and macOS tarballs must be listed (else it fails, naming them). The macOS .dmg
-and the Windows setup.exe are built on other machines and may be missing: then the cask
-or the winget manifests are skipped with a warning.
+The Linux and macOS tarballs must be listed (else it fails, naming them). The TUI
+macOS .dmg, the Flutter muninn-app .dmg and the Windows setup.exe are built on
+other machines and may be missing: then that cask or the winget manifests are
+skipped with a warning.
 """
 import pathlib, re, subprocess, sys
 
@@ -59,13 +61,21 @@ for i, l in enumerate(lines):
         lines[i + 1] = re.sub(r'sha256 ".*"', f'sha256 "{sha(m.group(1))}"', lines[i + 1])
 write("homebrew/Formula/muninn.rb", "\n".join(lines) + "\n")
 
-# Homebrew cask: the universal Muninn.app dmg
+# Homebrew cask: the universal TUI Muninn.app dmg
 dmg = optional(f"muninn-{ver}-macos.dmg", "the Homebrew cask")
 if dmg:
     s = (root / "packaging/homebrew/Casks/muninn.rb").read_text()
     s = re.sub(r'version ".*?"', f'version "{ver}"', s, count=1)
     s = re.sub(r'sha256 ".*?"', f'sha256 "{dmg}"', s, count=1)
     write("homebrew/Casks/muninn.rb", s)
+
+# Homebrew cask: the Flutter Muninn.app dmg from scripts/flutter-dist.sh
+app_dmg = optional(f"muninn-app-{ver}-universal-apple-darwin.dmg", "the Homebrew muninn-app cask")
+if app_dmg:
+    s = (root / "packaging/homebrew/Casks/muninn-app.rb").read_text()
+    s = re.sub(r'version ".*?"', f'version "{ver}"', s, count=1)
+    s = re.sub(r'sha256 ".*?"', f'sha256 "{app_dmg}"', s, count=1)
+    write("homebrew/Casks/muninn-app.rb", s)
 
 # winget: newest template directory, retargeted to this version; Inno Setup installers
 wroot = "winget/manifests/w/WeirdBrains/Muninn"

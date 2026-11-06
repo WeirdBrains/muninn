@@ -41,6 +41,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: model designer can create and edit fields as a draft, preview and apply migrations, roll versions back, and attach model-owned rules (`mnnn model` / TUI `D`)
 - Flutter app: model designer restores dropped fields by id (TUI `u`), imports and exports templates (`builtin:bars`, `.template.json`), creates, edits and bulk-updates records, and tests, dry-runs or runs a model-owned rule on the last history action (TUI `x` / Enter)
 - `scripts/flutter-dist.sh` builds Linux tarball, `.deb` and `.rpm` packages of the Flutter app, and a macOS `.dmg` with `Muninn.app` plus an Applications shortcut (package name `muninn-app`, separate from the TUI `muninn` packages)
+- Homebrew cask `packaging/homebrew/Casks/muninn-app.rb` (`brew install --cask weirdbrains/tap/muninn-app`) for the Flutter `Muninn.app`; `scripts/fill-sums.py` fills its sha256 when the Flutter `.dmg` is in `SHA256SUMS`. A local eyeball copies the cask into a personal tap and points `url` at the built `.dmg` with `file://`
+- Android: a release APK can be built with `flutter build apk --release --target-platform android-arm64` once the SDK licenses are accepted and Android Studio's JBR is on `JAVA_HOME`
 
 ## [2.22.0] - 2026-11-05
 

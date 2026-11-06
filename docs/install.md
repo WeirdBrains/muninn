@@ -91,14 +91,21 @@ Uninstall: drag Muninn from Applications to the Bin, and remove the `mnnn` link 
 
 ```sh
 brew install weirdbrains/tap/muninn            # the mnnn command (macOS or Linux, arm64 or x86_64)
-brew install --cask weirdbrains/tap/muninn     # or Muninn.app plus mnnn (macOS)
+brew install --cask weirdbrains/tap/muninn     # or the Terminal Muninn.app plus mnnn (macOS)
+brew install --cask weirdbrains/tap/muninn-app # Flutter graphical Muninn.app (macOS)
 ```
 
-Install one or the other, not both. Both come from the
+Install the formula or the TUI cask, not both (they both provide `mnnn`). The Flutter
+cask (`muninn-app`) also installs `Muninn.app`, so it conflicts with the TUI cask; it
+can sit alongside the formula. Both casks and the formula come from the
 [WeirdBrains/homebrew-tap](https://github.com/WeirdBrains/homebrew-tap) tap and are updated
-with each release (`brew upgrade`). The cask's app is not notarized; if macOS blocks it, see
+with each release (`brew upgrade`). The Flutter cask is copied into the tap once a
+release includes `muninn-app-<ver>-universal-apple-darwin.dmg` (`scripts/fill-sums.py`
+fills the checksum). Until then, a local `.dmg` can be installed from a checkout; see
+[docs/flutter-app.md](flutter-app.md). Neither app is notarized; if macOS blocks it, see
 step 3 under [macOS: dmg](#macos-dmg). Uninstall: `brew uninstall muninn` (or
-`brew uninstall --cask muninn`), then `brew untap weirdbrains/tap` if you like.
+`brew uninstall --cask muninn` / `brew uninstall --cask muninn-app`), then
+`brew untap weirdbrains/tap` if you like.
 
 ## Getting a release
 

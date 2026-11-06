@@ -29,8 +29,8 @@ releases are made.
    `gh release create vX.Y.Z --verify-tag --title "Muninn vX.Y.Z" --notes-file <(scripts/release-notes.sh X.Y.Z) dist/*`.
    Only the highest version is marked **Latest**: an older tag published later gets
    `--latest=false`. Assets can't change once a release is published.
-5. Publish the package managers from `dist/packaging`: copy `homebrew/Formula/muninn.rb`
-   and `homebrew/Casks/muninn.rb` into
+5. Publish the package managers from `dist/packaging`: copy `homebrew/Formula/muninn.rb`,
+   `homebrew/Casks/muninn.rb` and `homebrew/Casks/muninn-app.rb` into
    [WeirdBrains/homebrew-tap](https://github.com/WeirdBrains/homebrew-tap) and push; copy
    `winget/manifests/w/WeirdBrains/Muninn/X.Y.Z` into a fork of microsoft/winget-pkgs,
    run `winget validate --manifest` on Windows, and open a PR.

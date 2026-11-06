@@ -434,11 +434,37 @@ On macOS (Swift Package Manager, not CocoaPods) the same script writes:
 The image is not notarized. Drag Muninn into Applications, or open the `.app` from
 the disk image. The data directory is still `MUNINN_HOME` or `~/.muninn`.
 
-Still planned: Windows setup / MSIX, Homebrew cask, Apple notarization,
-iOS / TestFlight, an Android APK (needs an SDK with accepted licenses; do not
-auto-accept them), then store listings. Builds can later be attached to GitHub
-releases (APKs, TestFlight links) once those recipes exist; this script does
-not cut a tag.
+A Homebrew cask lives at `packaging/homebrew/Casks/muninn-app.rb` (token `muninn-app`,
+tap [weirdbrains/tap](https://github.com/WeirdBrains/homebrew-tap)). It installs the
+Flutter `Muninn.app` and conflicts with the TUI cask `muninn` (both use that name).
+It does not install `mnnn`; use the `muninn` formula for the CLI. `scripts/fill-sums.py`
+fills the sha256 when `muninn-app-<ver>-universal-apple-darwin.dmg` is listed in
+`SHA256SUMS`. Until a release publishes that asset (this script does not cut a tag), Homebrew 7+
+will not install a raw `.rb` path. Copy the cask into a local tap and point it at
+the built image:
+
+```sh
+brew tap-new --no-git "$USER/muninn-local"   # once
+cask="$(brew --repo "$USER/muninn-local")/Casks/muninn-app.rb"
+cp packaging/homebrew/Casks/muninn-app.rb "$cask"
+dmg=/absolute/path/to/muninn-app-<ver>-universal-apple-darwin.dmg
+sha=$(shasum -a 256 "$dmg" | awk '{print $1}')
+# In that copy only (do not commit it): url "file://$dmg" and sha256 "$sha"
+brew install --cask --appdir="${HOME}/Applications" "$USER/muninn-local/muninn-app"
+```
+
+`--appdir` keeps the TUI `Muninn.app` in `/Applications` untouched if it is already
+there. After a release that includes the Flutter `.dmg` and the filled cask is
+copied into the tap:
+
+```sh
+brew install --cask weirdbrains/tap/muninn-app
+```
+
+Still planned: Windows setup / MSIX, Apple notarization, iOS / TestFlight, a
+signed Play upload / testing track, then store listings. An arm64 release APK can
+be built locally (see below). Builds can later be attached to GitHub releases
+once those recipes exist; this script does not cut a tag.
 
 ## Icons
 
@@ -473,10 +499,15 @@ git checkout ios/Runner.xcodeproj/project.pbxproj   # the tool rewrites a settin
   `sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"`,
   `flutter config --android-sdk ~/Android/Sdk`, `flutter doctor --android-licenses`, and
   `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android`.
-- **Android SDK on macOS:** the SDK may already be present (Android Studio) while
-  `flutter doctor` still reports some licenses not accepted. Do not auto-accept
-  licenses. Also confirm a real JDK (`/usr/libexec/java_home` or Android Studio's
-  JBR) before `flutter build apk`. No APK eyeball artifact has been built yet.
+- **Android SDK on macOS:** Flutter can use Android Studio's bundled JBR even when
+  `/usr/libexec/java_home` fails and `/usr/bin/java` is only a stub. Set `JAVA_HOME`
+  to that JBR (for example `$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home`)
+  so `sdkmanager` runs. Pending licenses can be accepted non-interactively with
+  `yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses`. Then:
+  `cd app && flutter build apk --release --target-platform android-arm64`
+  writes `app/build/app/outputs/flutter-apk/app-release.apk`. Native Assets compile
+  into `app/.dart_tool/hooks_runner` (clear that and `app/build` after copying the
+  APK). This is an eyeball artifact, not a Play upload.
 
 ## Tests
 

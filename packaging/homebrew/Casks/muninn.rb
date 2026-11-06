@@ -10,6 +10,8 @@ cask "muninn" do
   desc "Local, encrypted workbench for market data with peer-to-peer data workflows"
   homepage "https://muninn.weirdbrains.com"
 
+  conflicts_with cask: "muninn-app"
+
   app "Muninn.app"
   binary "#{appdir}/Muninn.app/Contents/Resources/mnnn"
 

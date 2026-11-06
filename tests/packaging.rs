@@ -70,9 +70,15 @@ fn every_installer_icon_comes_from_the_one_source_image() {
 fn the_homebrew_tap_has_a_formula_and_a_cask() {
     let cask = read("packaging/homebrew/Casks/muninn.rb");
     assert!(cask.contains("muninn-#{version}-macos.dmg") && cask.contains("app \"Muninn.app\""));
+    let app_cask = read("packaging/homebrew/Casks/muninn-app.rb");
+    assert!(
+        app_cask.contains("muninn-app-#{version}-universal-apple-darwin.dmg")
+            && app_cask.contains("app \"Muninn.app\"")
+            && app_cask.contains("cask \"muninn-app\"")
+    );
     let formula = read("packaging/homebrew/Formula/muninn.rb");
     let ver = env!("CARGO_PKG_VERSION");
-    for rb in [&cask, &formula] {
+    for rb in [&cask, &app_cask, &formula] {
         assert!(rb.contains(&format!("version \"{ver}\"")), "homebrew version should be {ver}");
     }
 }
@@ -112,6 +118,7 @@ fn every_packaging_template_pins_the_workspace_version() {
         "packaging/arch/muninn-bin/PKGBUILD",
         "packaging/homebrew/Formula/muninn.rb",
         "packaging/homebrew/Casks/muninn.rb",
+        "packaging/homebrew/Casks/muninn-app.rb",
         "site/lib/app.dart",
         "docs/install.md",
     ] {
@@ -170,19 +177,22 @@ fn fill_sums_skips_missing_dmg_and_setup_exes_but_not_tarballs() {
     let err = String::from_utf8_lossy(&o.stderr);
     assert!(o.status.success(), "{err}");
     assert!(err.contains("macos.dmg is not in SHA256SUMS; skipping the Homebrew cask"), "{err}");
+    assert!(err.contains("universal-apple-darwin.dmg is not in SHA256SUMS; skipping the Homebrew muninn-app cask"), "{err}");
     assert!(err.contains("windows-setup.exe is not in SHA256SUMS; skipping the winget manifests"), "{err}");
     let out = dist.path().join("packaging");
     assert!(out.join("arch/PKGBUILD").exists() && out.join("homebrew/Formula/muninn.rb").exists());
     assert!(!out.join("homebrew/Casks/muninn.rb").exists());
+    assert!(!out.join("homebrew/Casks/muninn-app.rb").exists());
     assert!(!out.join(format!("winget/manifests/w/WeirdBrains/Muninn/{ver}")).exists());
     // everything there: every file, with the setup sums in the installer manifest
     let extra =
-        [format!("muninn-{ver}-macos.dmg"), format!("muninn-{ver}-x86_64-windows-setup.exe"), format!("muninn-{ver}-aarch64-windows-setup.exe")];
+        [format!("muninn-{ver}-macos.dmg"), format!("muninn-{ver}-x86_64-windows-setup.exe"), format!("muninn-{ver}-aarch64-windows-setup.exe"), format!("muninn-app-{ver}-universal-apple-darwin.dmg")];
     names.extend(extra.iter().map(String::as_str));
     sums(&names);
     let o = run();
     assert!(o.status.success() && !String::from_utf8_lossy(&o.stderr).contains("warning"), "{}", String::from_utf8_lossy(&o.stderr));
     assert!(out.join("homebrew/Casks/muninn.rb").exists());
+    assert!(out.join("homebrew/Casks/muninn-app.rb").exists());
     let inst = std::fs::read_to_string(out.join(format!("winget/manifests/w/WeirdBrains/Muninn/{ver}/WeirdBrains.Muninn.installer.yaml"))).unwrap();
     assert!(inst.contains(&format!("{:064X}", 6)) && inst.contains(&format!("{:064X}", 7)), "{inst}");
     // a missing tarball still fails, naming it

@@ -34,6 +34,7 @@ pinned=(
   packaging/arch/muninn-bin/PKGBUILD
   packaging/homebrew/Formula/muninn.rb
   packaging/homebrew/Casks/muninn.rb
+  packaging/homebrew/Casks/muninn-app.rb
   site/lib/app.dart
   docs/install.md
   docs/deploy-relay.md
