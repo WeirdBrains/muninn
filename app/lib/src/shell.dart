@@ -17,6 +17,7 @@ import 'state.dart';
 import 'theme/muninn_theme.dart';
 import 'time_range.dart';
 import 'views/catalog.dart';
+import 'views/project_compute.dart';
 import 'views/chart.dart';
 import 'views/data.dart';
 import 'views/help.dart';
@@ -346,6 +347,22 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           }),
           item('New report…', () => showNewReportDialog(context, ref)),
           item('Import archive…', () => showImportProjectDialog(context, ref)),
+          item('Code spaces…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.code;
+            go(Section.projects);
+          }, const SingleActivator(LogicalKeyboardKey.keyC, shift: true)),
+          item('New code space…', () => showNewCodeSpaceDialog(context, ref)),
+          item('Pipes (live)…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.pipes;
+            go(Section.projects);
+          }),
+          item('Run a pipe…', () => showRunPipeDialog(context, ref)),
+          item('Pipelines…', () {
+            ref.read(projectPaneProvider.notifier).state =
+                ProjectPane.pipelines;
+            go(Section.projects);
+          }, const SingleActivator(LogicalKeyboardKey.keyE, shift: true)),
+          item('New pipeline…', () => showNewPipelineDialog(context, ref)),
         ]),
         menu('Net', [
           item('Status…', () {

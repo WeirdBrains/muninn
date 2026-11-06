@@ -277,6 +277,127 @@ class ProjectSeries {
   String get key => '$source:$base/$quote:$durationS';
 }
 
+/// `mnnn code list` / TUI Code spaces…. [source] is the text the user wrote.
+class CodeSpaceInfo {
+  const CodeSpaceInfo({
+    required this.id,
+    required this.shortId,
+    required this.name,
+    this.description = '',
+    this.lang = 'math',
+    this.source = '',
+    this.input = 'none',
+    this.scope = 'user',
+    this.approved = false,
+    this.trustHash = '',
+    this.lastStatus = '',
+    this.lastError = '',
+    this.lastAt = 0,
+    this.lastMs = 0,
+    this.lastWrites = 0,
+  });
+  final String id, shortId, name, description, lang, source, input, scope;
+  final bool approved;
+  final String trustHash, lastStatus, lastError;
+  final int lastAt, lastMs, lastWrites;
+}
+
+class CodeParserInfo {
+  const CodeParserInfo({
+    required this.name,
+    this.about = '',
+    this.installed = false,
+  });
+  final String name, about;
+  final bool installed;
+}
+
+class CodeRunResult {
+  const CodeRunResult({
+    this.status = '',
+    this.error = '',
+    this.logs = const [],
+    this.lines = const [],
+    this.writes = 0,
+    this.ms = 0,
+  });
+  final String status, error;
+  final List<String> logs, lines;
+  final int writes, ms;
+}
+
+class LiveHopInfo {
+  const LiveHopInfo({
+    required this.name,
+    this.status = 'waiting',
+    this.rows = 0,
+    this.ms = 0,
+    this.columns = const [],
+    this.error = '',
+    this.state = '',
+    this.rowsIn = 0,
+  });
+  final String name, status, error, state;
+  final int rows, ms, rowsIn;
+  final List<String> columns;
+}
+
+class LivePipeInfo {
+  const LivePipeInfo({
+    required this.token,
+    this.origin = '',
+    this.status = 'running',
+    this.pipeline = '',
+    this.hops = const [],
+    this.saved = const [],
+    this.updated = 0,
+  });
+  final String token, origin, status, pipeline;
+  final List<LiveHopInfo> hops;
+  final List<String> saved;
+  final int updated;
+}
+
+class PipeRunResult {
+  const PipeRunResult({
+    this.hops = const [],
+    this.saved = const [],
+    this.lines = const [],
+  });
+  final List<String> hops, saved, lines;
+}
+
+class PipelineInfo {
+  const PipelineInfo({
+    required this.id,
+    required this.shortId,
+    required this.name,
+    this.description = '',
+    this.version = 1,
+    this.draft = false,
+    this.nodes = 0,
+    this.sinks = '',
+    this.problems = const [],
+    this.nodeSpecs = const [],
+    this.edgeSpecs = const [],
+    this.graphLines = const [],
+  });
+  final String id, shortId, name, description, sinks;
+  final int version, nodes;
+  final bool draft;
+  final List<String> problems, nodeSpecs, edgeSpecs, graphLines;
+}
+
+class PipelineRunResult {
+  const PipelineRunResult({
+    this.ok = true,
+    this.lines = const [],
+    this.landed = const [],
+  });
+  final bool ok;
+  final List<String> lines, landed;
+}
+
 /// `mnnn net status`: the node and counts (no keys).
 class NetStatus {
   const NetStatus({
@@ -985,6 +1106,76 @@ abstract class MuninnApi {
     String section,
     int to,
   );
+
+  /// `mnnn code list` / TUI Code spaces….
+  Future<List<CodeSpaceInfo>> codeSpaces();
+  Future<CodeSpaceInfo> codeCreate(
+    String name, {
+    String lang = 'math',
+    String description = '',
+    String? source,
+    String? from,
+    String? input,
+  });
+  Future<CodeSpaceInfo> codeEdit(
+    String space, {
+    String? name,
+    String? description,
+    String? lang,
+    String? source,
+    String? input,
+  });
+  Future<String> codeRemove(String space);
+  Future<String> codeApprove(String space);
+  Future<List<String>> codeCheck(String space);
+  Future<CodeRunResult> codeBuild(String space);
+  Future<CodeRunResult> codeRun(String space);
+  Future<List<CodeParserInfo>> codeParsers();
+  Future<String> codeParsersInstall({String? name});
+
+  /// TUI Pipes… (live history) and `mnnn pipe SOURCE STEP…`.
+  Future<List<LivePipeInfo>> pipesLive();
+  Future<PipeRunResult> pipeRun(
+    String source, {
+    List<String> steps = const [],
+    List<String> to = const [],
+  });
+
+  /// `mnnn pipeline` / TUI Pipelines… (`E`).
+  Future<List<PipelineInfo>> pipelines();
+  Future<PipelineInfo> pipelineCreate(
+    String name, {
+    String description = '',
+    List<String> nodes = const [],
+    List<String> edges = const [],
+  });
+  Future<PipelineInfo> pipelineEdit(
+    String pipeline, {
+    String? name,
+    String? description,
+    List<String> nodes = const [],
+    List<String> edges = const [],
+    List<String> removeNodes = const [],
+    List<String> removeEdges = const [],
+  });
+  Future<String> pipelineRemove(String pipeline);
+  Future<String> pipelineApprove(String pipeline);
+  Future<PipelineRunResult> pipelineRun(String pipeline);
+  Future<String> pipelineExport(
+    String pipeline,
+    String path, {
+    bool templates = true,
+  });
+  Future<List<String>> pipelineImportPlan(
+    String path, {
+    String? name,
+    bool merge = false,
+  });
+  Future<String> pipelineImport(
+    String path, {
+    String? name,
+    bool merge = false,
+  });
 
   /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
   Future<NetOverview> netOverview();

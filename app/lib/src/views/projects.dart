@@ -1,8 +1,8 @@
 /// Projects: create, rename, describe, delete, attach or detach series, plus
-/// journals, live searches, reports and archive import/export (`mnnn project`,
-/// `mnnn journal`, `mnnn search`, `mnnn report`). Opening a series shows it in
-/// Data with the project's saved time range. Writes reuse the unlocked session
-/// (`open_write`); the key stays in Rust.
+/// journals, live searches, reports, code spaces, live pipes, pipelines and
+/// archive import/export. Opening a series shows it in Data with the project's
+/// saved time range. Writes reuse the unlocked session (`open_write`); the key
+/// stays in Rust.
 library;
 
 import 'package:flutter/material.dart';
@@ -12,6 +12,7 @@ import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
 import '../time_range.dart';
+import 'project_compute.dart';
 import 'project_extras.dart';
 import 'unlock.dart';
 
@@ -60,6 +61,9 @@ class ProjectsView extends ConsumerWidget {
               ProjectPane.journals => const JournalsPane(),
               ProjectPane.searches => const SearchesPane(),
               ProjectPane.reports => const ReportsPane(),
+              ProjectPane.code => const CodeSpacesPane(),
+              ProjectPane.pipes => const PipesPane(),
+              ProjectPane.pipelines => const PipelinesPane(),
             },
           ),
         ],
@@ -72,6 +76,9 @@ class ProjectsView extends ConsumerWidget {
     ProjectPane.journals => 'Journals',
     ProjectPane.searches => 'Searches',
     ProjectPane.reports => 'Reports',
+    ProjectPane.code => 'Code',
+    ProjectPane.pipes => 'Pipes',
+    ProjectPane.pipelines => 'Pipelines',
   };
 }
 

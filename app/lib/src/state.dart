@@ -401,8 +401,16 @@ final projectSeriesProvider = FutureProvider<List<ProjectSeries>?>((ref) {
   return ref.watch(apiProvider).projectSeries(p.id);
 });
 
-/// Projects window pages (TUI Projects / Journals / Searches / Reports).
-enum ProjectPane { projects, journals, searches, reports }
+/// Projects window pages (TUI Projects / Journals / Searches / Reports / Code / Pipes / Pipelines).
+enum ProjectPane {
+  projects,
+  journals,
+  searches,
+  reports,
+  code,
+  pipes,
+  pipelines,
+}
 
 final projectPaneProvider = StateProvider<ProjectPane>(
   (ref) => ProjectPane.projects,
@@ -451,6 +459,21 @@ final reportSectionsProvider = FutureProvider<List<ReportSectionInfo>?>((ref) {
   return ref.watch(apiProvider).reportSections(r.id);
 });
 
+final codeSpacesProvider = FutureProvider<List<CodeSpaceInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).codeSpaces();
+});
+
+final pipesLiveProvider = FutureProvider<List<LivePipeInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).pipesLive();
+});
+
+final pipelinesProvider = FutureProvider<List<PipelineInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).pipelines();
+});
+
 void refreshProjectExtras(WidgetRef ref) {
   ref.invalidate(overviewProvider);
   ref.invalidate(projectSeriesProvider);
@@ -461,6 +484,9 @@ void refreshProjectExtras(WidgetRef ref) {
   ref.invalidate(searchesProvider);
   ref.invalidate(reportsProvider);
   ref.invalidate(reportSectionsProvider);
+  ref.invalidate(codeSpacesProvider);
+  ref.invalidate(pipesLiveProvider);
+  ref.invalidate(pipelinesProvider);
 }
 
 final netOverviewProvider = FutureProvider<NetOverview?>((ref) {

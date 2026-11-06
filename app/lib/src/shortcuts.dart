@@ -14,6 +14,7 @@ import 'state.dart';
 import 'time_range.dart';
 import 'views/chart.dart';
 import 'views/help.dart';
+import 'views/project_compute.dart';
 import 'views/projects.dart';
 
 /// F10 asks the desktop menu bar to open (File, the first menu).
@@ -157,6 +158,16 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
       ref.read(sectionProvider.notifier).state = Section.orgs;
       return KeyEventResult.handled;
     }
+    if (ch == 'C' || (key == LogicalKeyboardKey.keyC && shift)) {
+      ref.read(projectPaneProvider.notifier).state = ProjectPane.code;
+      ref.read(sectionProvider.notifier).state = Section.projects;
+      return KeyEventResult.handled;
+    }
+    if (ch == 'E' || (key == LogicalKeyboardKey.keyE && shift)) {
+      ref.read(projectPaneProvider.notifier).state = ProjectPane.pipelines;
+      ref.read(sectionProvider.notifier).state = Section.projects;
+      return KeyEventResult.handled;
+    }
     if (ch == 'L' || (key == LogicalKeyboardKey.keyL && shift)) {
       showChartLayersSheet(context, ref);
       return KeyEventResult.handled;
@@ -176,7 +187,14 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
     // Projects window: `n` new (TUI inside Projects).
     if (ref.read(sectionProvider) == Section.projects &&
         (ch == 'n' || (key == LogicalKeyboardKey.keyN && !shift))) {
-      showNewProjectDialog(context, ref);
+      switch (ref.read(projectPaneProvider)) {
+        case ProjectPane.code:
+          showNewCodeSpaceDialog(context, ref);
+        case ProjectPane.pipelines:
+          showNewPipelineDialog(context, ref);
+        default:
+          showNewProjectDialog(context, ref);
+      }
       return KeyEventResult.handled;
     }
 
@@ -349,8 +367,9 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
     if (ts == null || !context.mounted) return;
     final i = nearestBarIndex(bars, ts);
     final v = ref.read(chartViewportProvider);
-    ref.read(chartViewportProvider.notifier).state =
-        start ? v.periodStart(i, bars.length) : v.periodEnd(i, bars.length);
+    ref.read(chartViewportProvider.notifier).state = start
+        ? v.periodStart(i, bars.length)
+        : v.periodEnd(i, bars.length);
   }
 
   Future<void> _jumpChartDate(BuildContext context) async {

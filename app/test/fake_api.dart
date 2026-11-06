@@ -713,6 +713,342 @@ class FakeApi implements MuninnApi {
     return sectionList.firstWhere((s) => s.id == section);
   }
 
+  List<CodeSpaceInfo> codeList = [];
+  List<LivePipeInfo> pipeList = [];
+  List<PipelineInfo> pipelineList = [];
+  List<CodeParserInfo> parserList = const [
+    CodeParserInfo(
+      name: 'parse-csv',
+      about: 'CSV as it arrived',
+      installed: false,
+    ),
+    CodeParserInfo(
+      name: 'to-bars',
+      about: 'rows to OHLCV bars',
+      installed: false,
+    ),
+  ];
+  int _codeN = 0;
+  int _pipeN = 0;
+
+  @override
+  Future<List<CodeSpaceInfo>> codeSpaces() async => List.of(codeList);
+
+  @override
+  Future<CodeSpaceInfo> codeCreate(
+    String name, {
+    String lang = 'math',
+    String description = '',
+    String? source,
+    String? from,
+    String? input,
+  }) async {
+    extraCalls.add('code-create:$name:$lang');
+    _codeN += 1;
+    final c = CodeSpaceInfo(
+      id: 'c$_codeN',
+      shortId: 'c$_codeN',
+      name: name,
+      description: description,
+      lang: lang,
+      source:
+          source ?? (from != null ? 'from $from' : 'sma20 = sma(close, 20)'),
+      input: input ?? 'none',
+    );
+    codeList = [...codeList, c];
+    return c;
+  }
+
+  @override
+  Future<CodeSpaceInfo> codeEdit(
+    String space, {
+    String? name,
+    String? description,
+    String? lang,
+    String? source,
+    String? input,
+  }) async {
+    extraCalls.add('code-edit:$space');
+    codeList = [
+      for (final c in codeList)
+        if (c.id == space || c.shortId == space || c.name == space)
+          CodeSpaceInfo(
+            id: c.id,
+            shortId: c.shortId,
+            name: name ?? c.name,
+            description: description ?? c.description,
+            lang: lang ?? c.lang,
+            source: source ?? c.source,
+            input: input ?? c.input,
+            scope: c.scope,
+            approved: false,
+            trustHash: c.trustHash,
+            lastStatus: c.lastStatus,
+            lastError: c.lastError,
+            lastAt: c.lastAt,
+            lastMs: c.lastMs,
+            lastWrites: c.lastWrites,
+          )
+        else
+          c,
+    ];
+    return codeList.firstWhere((c) => c.id == space || c.name == space);
+  }
+
+  @override
+  Future<String> codeRemove(String space) async {
+    extraCalls.add('code-remove:$space');
+    final n = codeList.firstWhere((c) => c.id == space || c.name == space).name;
+    codeList = [
+      for (final c in codeList)
+        if (c.id != space && c.name != space) c,
+    ];
+    return 'removed code space $n';
+  }
+
+  @override
+  Future<String> codeApprove(String space) async {
+    extraCalls.add('code-approve:$space');
+    codeList = [
+      for (final c in codeList)
+        if (c.id == space || c.name == space)
+          CodeSpaceInfo(
+            id: c.id,
+            shortId: c.shortId,
+            name: c.name,
+            description: c.description,
+            lang: c.lang,
+            source: c.source,
+            input: c.input,
+            scope: c.scope,
+            approved: true,
+            trustHash: 'abcd1234abcd1234',
+            lastStatus: c.lastStatus,
+            lastError: c.lastError,
+            lastAt: c.lastAt,
+            lastMs: c.lastMs,
+            lastWrites: c.lastWrites,
+          )
+        else
+          c,
+    ];
+    return 'approved code space $space';
+  }
+
+  @override
+  Future<List<String>> codeCheck(String space) async {
+    extraCalls.add('code-check:$space');
+    return ['ok', 'approval: not approved'];
+  }
+
+  @override
+  Future<CodeRunResult> codeBuild(String space) async {
+    extraCalls.add('code-build:$space');
+    return const CodeRunResult(status: 'built', lines: ['built']);
+  }
+
+  @override
+  Future<CodeRunResult> codeRun(String space) async {
+    extraCalls.add('code-run:$space');
+    codeList = [
+      for (final c in codeList)
+        if (c.id == space || c.name == space)
+          CodeSpaceInfo(
+            id: c.id,
+            shortId: c.shortId,
+            name: c.name,
+            description: c.description,
+            lang: c.lang,
+            source: c.source,
+            input: c.input,
+            scope: c.scope,
+            approved: true,
+            trustHash: c.trustHash,
+            lastStatus: 'ok',
+            lastError: '',
+            lastAt: 1,
+            lastMs: 4,
+            lastWrites: 0,
+          )
+        else
+          c,
+    ];
+    return const CodeRunResult(status: 'ok', lines: ['mean close 101'], ms: 4);
+  }
+
+  @override
+  Future<List<CodeParserInfo>> codeParsers() async => List.of(parserList);
+
+  @override
+  Future<String> codeParsersInstall({String? name}) async {
+    extraCalls.add('code-parsers-install:${name ?? "all"}');
+    parserList = [
+      for (final p in parserList)
+        if (name == null || name.isEmpty || p.name == name)
+          CodeParserInfo(name: p.name, about: p.about, installed: true)
+        else
+          p,
+    ];
+    return 'installed';
+  }
+
+  @override
+  Future<List<LivePipeInfo>> pipesLive() async => List.of(pipeList);
+
+  @override
+  Future<PipeRunResult> pipeRun(
+    String source, {
+    List<String> steps = const [],
+    List<String> to = const [],
+  }) async {
+    extraCalls.add('pipe-run:$source:${steps.join("|")}');
+    _pipeN += 1;
+    pipeList = [
+      LivePipeInfo(
+        token: 't$_pipeN',
+        origin: 'app',
+        status: 'done',
+        hops: [
+          LiveHopInfo(name: source, status: 'ok', rows: 3),
+          for (final s in steps) LiveHopInfo(name: s, status: 'ok', rows: 3),
+        ],
+        saved: to,
+        updated: 1,
+      ),
+      ...pipeList,
+    ];
+    return PipeRunResult(
+      hops: [source, ...steps],
+      saved: to,
+      lines: ['pipe done'],
+    );
+  }
+
+  @override
+  Future<List<PipelineInfo>> pipelines() async => List.of(pipelineList);
+
+  @override
+  Future<PipelineInfo> pipelineCreate(
+    String name, {
+    String description = '',
+    List<String> nodes = const [],
+    List<String> edges = const [],
+  }) async {
+    extraCalls.add('pipeline-create:$name');
+    _codeN += 1;
+    final p = PipelineInfo(
+      id: 'p$_codeN',
+      shortId: 'p$_codeN',
+      name: name,
+      description: description,
+      nodes: nodes.length,
+      nodeSpecs: nodes,
+      edgeSpecs: edges,
+      graphLines: [...nodes, ...edges],
+      sinks: nodes.where((n) => n.contains('model:')).join(', '),
+    );
+    pipelineList = [...pipelineList, p];
+    return p;
+  }
+
+  @override
+  Future<PipelineInfo> pipelineEdit(
+    String pipeline, {
+    String? name,
+    String? description,
+    List<String> nodes = const [],
+    List<String> edges = const [],
+    List<String> removeNodes = const [],
+    List<String> removeEdges = const [],
+  }) async {
+    extraCalls.add('pipeline-edit:$pipeline');
+    pipelineList = [
+      for (final p in pipelineList)
+        if (p.id == pipeline || p.name == pipeline)
+          PipelineInfo(
+            id: p.id,
+            shortId: p.shortId,
+            name: name ?? p.name,
+            description: description ?? p.description,
+            version: p.version + 1,
+            draft: p.draft,
+            nodes: nodes.isEmpty ? p.nodes : nodes.length,
+            sinks: p.sinks,
+            problems: p.problems,
+            nodeSpecs: nodes.isEmpty ? p.nodeSpecs : nodes,
+            edgeSpecs: edges.isEmpty ? p.edgeSpecs : edges,
+            graphLines: [
+              ...(nodes.isEmpty ? p.nodeSpecs : nodes),
+              ...(edges.isEmpty ? p.edgeSpecs : edges),
+            ],
+          )
+        else
+          p,
+    ];
+    return pipelineList.firstWhere(
+      (p) => p.id == pipeline || p.name == pipeline,
+    );
+  }
+
+  @override
+  Future<String> pipelineRemove(String pipeline) async {
+    extraCalls.add('pipeline-remove:$pipeline');
+    final n = pipelineList
+        .firstWhere((p) => p.id == pipeline || p.name == pipeline)
+        .name;
+    pipelineList = [
+      for (final p in pipelineList)
+        if (p.id != pipeline && p.name != pipeline) p,
+    ];
+    return 'removed pipeline $n';
+  }
+
+  @override
+  Future<String> pipelineApprove(String pipeline) async {
+    extraCalls.add('pipeline-approve:$pipeline');
+    return 'approved $pipeline';
+  }
+
+  @override
+  Future<PipelineRunResult> pipelineRun(String pipeline) async {
+    extraCalls.add('pipeline-run:$pipeline');
+    return const PipelineRunResult(
+      ok: true,
+      lines: ['src  ok'],
+      landed: ['3 rows → model bars'],
+    );
+  }
+
+  @override
+  Future<String> pipelineExport(
+    String pipeline,
+    String path, {
+    bool templates = true,
+  }) async {
+    extraCalls.add('pipeline-export:$pipeline:$path');
+    return 'wrote $path';
+  }
+
+  @override
+  Future<List<String>> pipelineImportPlan(
+    String path, {
+    String? name,
+    bool merge = false,
+  }) async {
+    extraCalls.add('pipeline-import-plan:$path');
+    return ['pipeline demo: new'];
+  }
+
+  @override
+  Future<String> pipelineImport(
+    String path, {
+    String? name,
+    bool merge = false,
+  }) async {
+    extraCalls.add('pipeline-import:$path');
+    return 'imported pipeline demo v1';
+  }
+
   @override
   Future<List<BarPoint>> queryBars(
     Dataset d,

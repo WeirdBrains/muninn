@@ -5,6 +5,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'api.dart';
 import 'rust/api/about.dart' as r_about;
+import 'rust/api/code.dart' as r_code;
 import 'rust/api/data.dart' as r_data;
 import 'rust/api/help.dart' as r_help;
 import 'rust/api/info.dart' as r_info;
@@ -624,6 +625,234 @@ class FfiMuninnApi implements MuninnApi {
       to: PlatformInt64Util.from(to),
     ),
   );
+
+  CodeSpaceInfo _codeSpace(r_code.CodeSpaceInfo c) => CodeSpaceInfo(
+    id: c.id,
+    shortId: c.shortId,
+    name: c.name,
+    description: c.description,
+    lang: c.lang,
+    source: c.source,
+    input: c.input,
+    scope: c.scope,
+    approved: c.approved,
+    trustHash: c.trustHash,
+    lastStatus: c.lastStatus,
+    lastError: c.lastError,
+    lastAt: c.lastAt.toInt(),
+    lastMs: c.lastMs.toInt(),
+    lastWrites: c.lastWrites.toInt(),
+  );
+
+  CodeRunResult _codeRun(r_code.CodeRunResult r) => CodeRunResult(
+    status: r.status,
+    error: r.error,
+    logs: r.logs,
+    lines: r.lines,
+    writes: r.writes.toInt(),
+    ms: r.ms.toInt(),
+  );
+
+  @override
+  Future<List<CodeSpaceInfo>> codeSpaces() async => [
+    for (final c in await r_code.codeSpaces()) _codeSpace(c),
+  ];
+
+  @override
+  Future<CodeSpaceInfo> codeCreate(
+    String name, {
+    String lang = 'math',
+    String description = '',
+    String? source,
+    String? from,
+    String? input,
+  }) async => _codeSpace(
+    await r_code.codeCreate(
+      name: name,
+      lang: lang,
+      description: description,
+      source: source,
+      from: from,
+      input: input,
+    ),
+  );
+
+  @override
+  Future<CodeSpaceInfo> codeEdit(
+    String space, {
+    String? name,
+    String? description,
+    String? lang,
+    String? source,
+    String? input,
+  }) async => _codeSpace(
+    await r_code.codeEdit(
+      space: space,
+      name: name,
+      description: description,
+      lang: lang,
+      source: source,
+      input: input,
+    ),
+  );
+
+  @override
+  Future<String> codeRemove(String space) => r_code.codeRemove(space: space);
+
+  @override
+  Future<String> codeApprove(String space) => r_code.codeApprove(space: space);
+
+  @override
+  Future<List<String>> codeCheck(String space) =>
+      r_code.codeCheck(space: space);
+
+  @override
+  Future<CodeRunResult> codeBuild(String space) async =>
+      _codeRun(await r_code.codeBuild(space: space));
+
+  @override
+  Future<CodeRunResult> codeRun(String space) async =>
+      _codeRun(await r_code.codeRun(space: space));
+
+  @override
+  Future<List<CodeParserInfo>> codeParsers() async => [
+    for (final p in await r_code.codeParsers())
+      CodeParserInfo(name: p.name, about: p.about, installed: p.installed),
+  ];
+
+  @override
+  Future<String> codeParsersInstall({String? name}) =>
+      r_code.codeParsersInstall(name: name);
+
+  LiveHopInfo _hop(r_code.LiveHopInfo h) => LiveHopInfo(
+    name: h.name,
+    status: h.status,
+    rows: h.rows.toInt(),
+    ms: h.ms.toInt(),
+    columns: h.columns,
+    error: h.error,
+    state: h.state,
+    rowsIn: h.rowsIn.toInt(),
+  );
+
+  @override
+  Future<List<LivePipeInfo>> pipesLive() async => [
+    for (final p in await r_code.pipesLive())
+      LivePipeInfo(
+        token: p.token,
+        origin: p.origin,
+        status: p.status,
+        pipeline: p.pipeline,
+        hops: [for (final h in p.hops) _hop(h)],
+        saved: p.saved,
+        updated: p.updated.toInt(),
+      ),
+  ];
+
+  @override
+  Future<PipeRunResult> pipeRun(
+    String source, {
+    List<String> steps = const [],
+    List<String> to = const [],
+  }) async {
+    final r = await r_code.pipeRun(source: source, steps: steps, to: to);
+    return PipeRunResult(hops: r.hops, saved: r.saved, lines: r.lines);
+  }
+
+  PipelineInfo _pipeline(r_code.PipelineInfo p) => PipelineInfo(
+    id: p.id,
+    shortId: p.shortId,
+    name: p.name,
+    description: p.description,
+    version: p.version.toInt(),
+    draft: p.draft,
+    nodes: p.nodes.toInt(),
+    sinks: p.sinks,
+    problems: p.problems,
+    nodeSpecs: p.nodeSpecs,
+    edgeSpecs: p.edgeSpecs,
+    graphLines: p.graphLines,
+  );
+
+  @override
+  Future<List<PipelineInfo>> pipelines() async => [
+    for (final p in await r_code.pipelines()) _pipeline(p),
+  ];
+
+  @override
+  Future<PipelineInfo> pipelineCreate(
+    String name, {
+    String description = '',
+    List<String> nodes = const [],
+    List<String> edges = const [],
+  }) async => _pipeline(
+    await r_code.pipelineCreate(
+      name: name,
+      description: description,
+      nodes: nodes,
+      edges: edges,
+    ),
+  );
+
+  @override
+  Future<PipelineInfo> pipelineEdit(
+    String pipeline, {
+    String? name,
+    String? description,
+    List<String> nodes = const [],
+    List<String> edges = const [],
+    List<String> removeNodes = const [],
+    List<String> removeEdges = const [],
+  }) async => _pipeline(
+    await r_code.pipelineEdit(
+      pipeline: pipeline,
+      name: name,
+      description: description,
+      nodes: nodes,
+      edges: edges,
+      removeNodes: removeNodes,
+      removeEdges: removeEdges,
+    ),
+  );
+
+  @override
+  Future<String> pipelineRemove(String pipeline) =>
+      r_code.pipelineRemove(pipeline: pipeline);
+
+  @override
+  Future<String> pipelineApprove(String pipeline) =>
+      r_code.pipelineApprove(pipeline: pipeline);
+
+  @override
+  Future<PipelineRunResult> pipelineRun(String pipeline) async {
+    final r = await r_code.pipelineRun(pipeline: pipeline);
+    return PipelineRunResult(ok: r.ok, lines: r.lines, landed: r.landed);
+  }
+
+  @override
+  Future<String> pipelineExport(
+    String pipeline,
+    String path, {
+    bool templates = true,
+  }) => r_code.pipelineExport(
+    pipeline: pipeline,
+    path: path,
+    templates: templates,
+  );
+
+  @override
+  Future<List<String>> pipelineImportPlan(
+    String path, {
+    String? name,
+    bool merge = false,
+  }) => r_code.pipelineImportPlan(path: path, name: name, merge: merge);
+
+  @override
+  Future<String> pipelineImport(
+    String path, {
+    String? name,
+    bool merge = false,
+  }) => r_code.pipelineImport(path: path, name: name, merge: merge);
 
   @override
   Future<NetOverview> netOverview() async {

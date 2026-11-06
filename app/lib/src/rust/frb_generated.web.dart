@@ -7,6 +7,7 @@
 // ignore_for_file: argument_type_not_assignable
 
 import 'api/about.dart';
+import 'api/code.dart';
 import 'api/data.dart';
 import 'api/help.dart';
 import 'api/info.dart';
@@ -76,6 +77,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ThemeData dco_decode_box_autoadd_theme_data(dynamic raw);
 
   @protected
+  CodeParserInfo dco_decode_code_parser_info(dynamic raw);
+
+  @protected
+  CodeRunResult dco_decode_code_run_result(dynamic raw);
+
+  @protected
+  CodeSpaceInfo dco_decode_code_space_info(dynamic raw);
+
+  @protected
   DataDirInfo dco_decode_data_dir_info(dynamic raw);
 
   @protected
@@ -127,6 +137,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<BarPoint> dco_decode_list_bar_point(dynamic raw);
 
   @protected
+  List<CodeParserInfo> dco_decode_list_code_parser_info(dynamic raw);
+
+  @protected
+  List<CodeSpaceInfo> dco_decode_list_code_space_info(dynamic raw);
+
+  @protected
   List<DatasetSummary> dco_decode_list_dataset_summary(dynamic raw);
 
   @protected
@@ -143,6 +159,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<JournalNoteInfo> dco_decode_list_journal_note_info(dynamic raw);
+
+  @protected
+  List<LiveHopInfo> dco_decode_list_live_hop_info(dynamic raw);
+
+  @protected
+  List<LivePipeInfo> dco_decode_list_live_pipe_info(dynamic raw);
 
   @protected
   List<NetConnNode> dco_decode_list_net_conn_node(dynamic raw);
@@ -199,6 +221,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<OrgRoleInfo> dco_decode_list_org_role_info(dynamic raw);
 
   @protected
+  List<PipelineInfo> dco_decode_list_pipeline_info(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
@@ -233,6 +258,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ThemeRole> dco_decode_list_theme_role(dynamic raw);
+
+  @protected
+  LiveHopInfo dco_decode_live_hop_info(dynamic raw);
+
+  @protected
+  LivePipeInfo dco_decode_live_pipe_info(dynamic raw);
 
   @protected
   NetConfig dco_decode_net_config(dynamic raw);
@@ -351,6 +382,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Overview dco_decode_overview(dynamic raw);
 
   @protected
+  PipeRunResult dco_decode_pipe_run_result(dynamic raw);
+
+  @protected
+  PipelineInfo dco_decode_pipeline_info(dynamic raw);
+
+  @protected
+  PipelineRunResult dco_decode_pipeline_run_result(dynamic raw);
+
+  @protected
   ProjectItemInfo dco_decode_project_item_info(dynamic raw);
 
   @protected
@@ -451,6 +491,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ThemeData sse_decode_box_autoadd_theme_data(SseDeserializer deserializer);
 
   @protected
+  CodeParserInfo sse_decode_code_parser_info(SseDeserializer deserializer);
+
+  @protected
+  CodeRunResult sse_decode_code_run_result(SseDeserializer deserializer);
+
+  @protected
+  CodeSpaceInfo sse_decode_code_space_info(SseDeserializer deserializer);
+
+  @protected
   DataDirInfo sse_decode_data_dir_info(SseDeserializer deserializer);
 
   @protected
@@ -504,6 +553,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<BarPoint> sse_decode_list_bar_point(SseDeserializer deserializer);
 
   @protected
+  List<CodeParserInfo> sse_decode_list_code_parser_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<CodeSpaceInfo> sse_decode_list_code_space_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<DatasetSummary> sse_decode_list_dataset_summary(
     SseDeserializer deserializer,
   );
@@ -526,6 +585,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<JournalNoteInfo> sse_decode_list_journal_note_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<LiveHopInfo> sse_decode_list_live_hop_info(SseDeserializer deserializer);
+
+  @protected
+  List<LivePipeInfo> sse_decode_list_live_pipe_info(
     SseDeserializer deserializer,
   );
 
@@ -606,6 +673,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<OrgRoleInfo> sse_decode_list_org_role_info(SseDeserializer deserializer);
 
   @protected
+  List<PipelineInfo> sse_decode_list_pipeline_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
@@ -650,6 +722,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ThemeRole> sse_decode_list_theme_role(SseDeserializer deserializer);
+
+  @protected
+  LiveHopInfo sse_decode_live_hop_info(SseDeserializer deserializer);
+
+  @protected
+  LivePipeInfo sse_decode_live_pipe_info(SseDeserializer deserializer);
 
   @protected
   NetConfig sse_decode_net_config(SseDeserializer deserializer);
@@ -776,6 +854,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Overview sse_decode_overview(SseDeserializer deserializer);
 
   @protected
+  PipeRunResult sse_decode_pipe_run_result(SseDeserializer deserializer);
+
+  @protected
+  PipelineInfo sse_decode_pipeline_info(SseDeserializer deserializer);
+
+  @protected
+  PipelineRunResult sse_decode_pipeline_run_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ProjectItemInfo sse_decode_project_item_info(SseDeserializer deserializer);
 
   @protected
@@ -896,6 +985,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_code_parser_info(
+    CodeParserInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_code_run_result(CodeRunResult self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_code_space_info(CodeSpaceInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_data_dir_info(DataDirInfo self, SseSerializer serializer);
 
   @protected
@@ -962,6 +1063,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_bar_point(List<BarPoint> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_code_parser_info(
+    List<CodeParserInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_code_space_info(
+    List<CodeSpaceInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_dataset_summary(
     List<DatasetSummary> self,
     SseSerializer serializer,
@@ -994,6 +1107,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_journal_note_info(
     List<JournalNoteInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_live_hop_info(
+    List<LiveHopInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_live_pipe_info(
+    List<LivePipeInfo> self,
     SseSerializer serializer,
   );
 
@@ -1103,6 +1228,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_pipeline_info(
+    List<PipelineInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -1173,6 +1304,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     List<ThemeRole> self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_live_hop_info(LiveHopInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_live_pipe_info(LivePipeInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_net_config(NetConfig self, SseSerializer serializer);
@@ -1326,6 +1463,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_overview(Overview self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pipe_run_result(PipeRunResult self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pipeline_info(PipelineInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pipeline_run_result(
+    PipelineRunResult self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_project_item_info(

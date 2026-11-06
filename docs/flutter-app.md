@@ -4,7 +4,7 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
-Projects (create, rename, describe, delete, attach and detach series, journals, live searches, reports, import/export archives), Net status, peers, start/stop, connect, invites, relays, sharing, settings, connections, key exchanges, search, broadcast and dark shards, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
+Projects (create, rename, describe, delete, attach and detach series, journals, live searches, reports, code spaces, live pipes, pipelines, import/export archives), Net status, peers, start/stop, connect, invites, relays, sharing, settings, connections, key exchanges, search, broadcast and dark shards, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
 (CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
@@ -31,7 +31,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
-  Live searches… / Journals… / Reports… / Import archive… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
+  Live searches… / Journals… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
   Rekey, Export, Recover and Re-issue shards, and Data ▸ Sources… / Symbols…. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
@@ -112,8 +112,19 @@ Users never need Rust: release builds ship the compiled library.
   to Data stays in the TUI. **Reports** create (optionally attached to a project),
   rename, describe and delete reports, and add, edit, move or remove text, authors,
   journal, project, series, code and model sections (`mnnn report`). Records
-  sections and PDF/preview export stay in the TUI. Reviews, Notifications, Rules,
-  Code spaces, Pipes and Pipelines stay in the TUI.
+  sections and PDF/preview export stay in the TUI. **Code spaces** list, create
+  (from a language template, another space or a built-in parser), edit source and
+  input, approve, check, build, run and remove (`mnnn code` / TUI Code, `C`).
+  Built-in parsers can be listed and installed (`mnnn code parsers --install`).
+  Giving a space to an organization, piping a prior step into it (`>`), result
+  tiles and writing the plugin SDK stay in the TUI or CLI. **Pipes** show live
+  and recent runs from history (the TUI Pipes window) and run a pipe
+  (`mnnn pipe SOURCE STEP… [--to TARGET]`). Standard input (`-`) and chunked
+  streaming stay in the CLI. **Pipelines** list, create and edit a graph (nodes
+  `ID=KIND`, edges `FROM>TO`), run, approve a draft, remove, and export or import
+  a pipeline file (`mnnn pipeline` / TUI Pipelines, `E`); file bytes stay in Rust.
+  The visual node designer extras (tee/end-in-model from the canvas, monitor
+  tiles) stay in the TUI. Reviews, Notifications and Rules stay in the TUI.
 - **Net:** status and peers like `mnnn net status` / `mnnn net peers`, plus the write
   flows the TUI and CLI provide for the node itself: start and stop (the node runs in
   this process, like the TUI; `mnnn net stop` can still ask it to stop), connect
@@ -208,6 +219,8 @@ when a hardware keyboard is attached.
 | `K` | Net status |
 | `W` | Net peers (the Peers page of the Net view) |
 | `G` | Organizations |
+| `C` | Code spaces (Shift+C; lowercase `c` on the chart still toggles candles) |
+| `E` | Pipelines (Shift+E; lowercase `e` on the chart still toggles the envelope) |
 | `L` | Chart layers… |
 | `Ctrl-w t` | change view (chart ↔ list) |
 | F10 | open the File menu (stand-in for the TUI's "open the menu bar") |
@@ -270,7 +283,7 @@ comes in a later phase (see [sync](sync.md)).
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars, ingest and bar export, sources and symbols, net status, peers, settings, connections, exchanges, search, broadcast and dark shards, org list and writes, keys status and writes, help topics), exposed with
+  projects and datasets, downsampled bars, ingest and bar export, sources and symbols, code spaces, live pipes and pipelines, net status, peers, settings, connections, exchanges, search, broadcast and dark shards, org list and writes, keys status and writes, help topics), exposed with
   flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.
