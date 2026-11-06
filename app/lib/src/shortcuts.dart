@@ -197,6 +197,7 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
       return KeyEventResult.handled;
     }
     if (ch == 'W' || (key == LogicalKeyboardKey.keyW && shift)) {
+      ref.read(netPaneProvider.notifier).state = NetPane.collab;
       ref.read(sectionProvider.notifier).state = Section.net;
       return KeyEventResult.handled;
     }

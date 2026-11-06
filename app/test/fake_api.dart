@@ -1239,8 +1239,23 @@ class FakeApi implements MuninnApi {
     String source, {
     List<String> steps = const [],
     List<String> to = const [],
+    String? stdin,
+    String? stdinFile,
+    String? format,
+    int chunk = 0,
+    bool keepHeader = false,
   }) async {
     extraCalls.add('pipe-run:$source:${steps.join("|")}');
+    if (source == '-' ||
+        stdin != null ||
+        stdinFile != null ||
+        format != null ||
+        chunk > 0 ||
+        keepHeader) {
+      extraCalls.add(
+        'pipe-stdin:$source:format=${format ?? ''}:chunk=$chunk:file=${stdinFile ?? ''}:header=$keepHeader:text=${stdin ?? ''}',
+      );
+    }
     _pipeN += 1;
     pipeList = [
       LivePipeInfo(
@@ -1349,14 +1364,235 @@ class FakeApi implements MuninnApi {
   }
 
   @override
-  Future<PipelineRunResult> pipelineRun(String pipeline) async {
+  Future<PipelineRunResult> pipelineRun(
+    String pipeline, {
+    String? stdin,
+    String? stdinFile,
+    int chunk = 0,
+    bool keepHeader = false,
+  }) async {
     extraCalls.add('pipeline-run:$pipeline');
+    if (stdin != null || stdinFile != null || chunk > 0 || keepHeader) {
+      extraCalls.add(
+        'pipeline-run-stdin:$pipeline:chunk=$chunk:file=${stdinFile ?? ''}:header=$keepHeader',
+      );
+    }
     return const PipelineRunResult(
       ok: true,
       lines: ['src  ok'],
       landed: ['3 rows → model bars'],
     );
   }
+
+  @override
+  Future<PipelineInfo> pipelineTee(
+    String pipeline,
+    String node,
+    String sink,
+  ) async {
+    extraCalls.add('pipeline-tee:$pipeline:$node:$sink');
+    pipelineList = [
+      for (final p in pipelineList)
+        if (p.id == pipeline || p.name == pipeline)
+          PipelineInfo(
+            id: p.id,
+            shortId: p.shortId,
+            name: p.name,
+            description: p.description,
+            version: p.version + 1,
+            draft: p.draft,
+            nodes: p.nodes,
+            sinks: p.sinks,
+            problems: p.problems,
+            nodeSpecs: [
+              for (final n in p.nodeSpecs)
+                n.split('=').first == node ? '$n+$sink' : n,
+            ],
+            edgeSpecs: p.edgeSpecs,
+            graphLines: [...p.graphLines, '$node + $sink'],
+          )
+        else
+          p,
+    ];
+    return pipelineList.firstWhere(
+      (p) => p.id == pipeline || p.name == pipeline,
+      orElse: () => pipelineList.first,
+    );
+  }
+
+  @override
+  Future<PipelineInfo> pipelineEndInModel(
+    String pipeline,
+    String node,
+    String model,
+  ) async {
+    extraCalls.add('pipeline-end-in-model:$pipeline:$node:$model');
+    final id = '${node}_out';
+    pipelineList = [
+      for (final p in pipelineList)
+        if (p.id == pipeline || p.name == pipeline)
+          PipelineInfo(
+            id: p.id,
+            shortId: p.shortId,
+            name: p.name,
+            description: p.description,
+            version: p.version + 1,
+            draft: p.draft,
+            nodes: p.nodes + 1,
+            sinks: model,
+            problems: p.problems,
+            nodeSpecs: [...p.nodeSpecs, '$id=model:$model'],
+            edgeSpecs: [...p.edgeSpecs, '$node>$id'],
+            graphLines: [...p.graphLines, '$id = model:$model'],
+          )
+        else
+          p,
+    ];
+    return pipelineList.firstWhere(
+      (p) => p.id == pipeline || p.name == pipeline,
+      orElse: () => pipelineList.first,
+    );
+  }
+
+  @override
+  Future<PipelineMonitor> pipelineMonitor(String pipeline) async {
+    extraCalls.add('pipeline-monitor:$pipeline');
+    final p = pipelineList.cast<PipelineInfo?>().firstWhere(
+      (x) => x!.id == pipeline || x.name == pipeline,
+      orElse: () => null,
+    );
+    return PipelineMonitor(
+      pipeline: p?.name ?? pipeline,
+      state: 'not run yet',
+      nodes: [
+        for (final spec in p?.nodeSpecs ?? const <String>[])
+          PipelineMonitorNode(
+            id: spec.split('=').first,
+            kind: spec.contains('=') ? spec.split('=').last : spec,
+            status: 'idle',
+          ),
+      ],
+      landed: const [],
+    );
+  }
+
+  List<McpServerInfo> mcpServerList = const [];
+  List<McpClientInfo> mcpClientList = const [];
+  List<McpToolInfo> mcpToolList = const [];
+  List<PeerMessageInfo> peerMessageList = const [];
+  List<LiveSessionInfo> liveSessionList = const [];
+
+  @override
+  Future<List<McpServerInfo>> mcpServers() async => mcpServerList;
+
+  @override
+  Future<List<McpClientInfo>> mcpClients() async => mcpClientList;
+
+  @override
+  Future<List<McpToolInfo>> mcpServerTools(String server) async {
+    extraCalls.add('mcp-tools:$server');
+    return mcpToolList;
+  }
+
+  @override
+  Future<String> mcpApproveTool(
+    String server,
+    String tool, {
+    bool on = true,
+  }) async {
+    extraCalls.add('mcp-approve:$server:$tool:$on');
+    mcpToolList = [
+      for (final t in mcpToolList)
+        if (t.name == tool)
+          McpToolInfo(name: t.name, description: t.description, approved: on)
+        else
+          t,
+    ];
+    return on ? 'approved $server/$tool' : '$server/$tool needs approval again';
+  }
+
+  @override
+  Future<String> mcpRemoveServer(String server) async {
+    extraCalls.add('mcp-remove-server:$server');
+    mcpServerList = [
+      for (final s in mcpServerList)
+        if (s.id != server && s.name != server) s,
+    ];
+    return 'removed $server';
+  }
+
+  @override
+  Future<String> mcpClientRole(String client, String role) async {
+    extraCalls.add('mcp-client-role:$client:$role');
+    mcpClientList = [
+      for (final c in mcpClientList)
+        if (c.id == client || c.name == client)
+          McpClientInfo(
+            id: c.id,
+            name: c.name,
+            role: role,
+            createdAt: c.createdAt,
+            lastSeenAt: c.lastSeenAt,
+            revoked: c.revoked,
+          )
+        else
+          c,
+    ];
+    return '$client is now $role';
+  }
+
+  @override
+  Future<String> mcpClientRevoke(String client, {bool revoke = true}) async {
+    extraCalls.add('mcp-client-revoke:$client:$revoke');
+    return '${revoke ? "revoked" : "restored"} $client';
+  }
+
+  @override
+  Future<String> mcpRemoveClient(String client) async {
+    extraCalls.add('mcp-remove-client:$client');
+    mcpClientList = [
+      for (final c in mcpClientList)
+        if (c.id != client && c.name != client) c,
+    ];
+    return 'removed $client';
+  }
+
+  @override
+  Future<List<PeerMessageInfo>> peerMessages({String? peer}) async => [
+    for (final m in peerMessageList)
+      if (peer == null || peer.isEmpty || m.peer == peer || m.peerLabel == peer)
+        m,
+  ];
+
+  @override
+  Future<String> peerMessagesMarkRead({String? peer}) async {
+    extraCalls.add('peer-messages-read:${peer ?? ""}');
+    peerMessageList = [
+      for (final m in peerMessageList)
+        if (peer == null ||
+            peer.isEmpty ||
+            m.peer == peer ||
+            m.peerLabel == peer)
+          PeerMessageInfo(
+            id: m.id,
+            peer: m.peer,
+            peerLabel: m.peerLabel,
+            direction: m.direction,
+            about: m.about,
+            text: m.text,
+            createdAt: m.createdAt,
+            delivered: m.delivered,
+            read: true,
+            error: m.error,
+          )
+        else
+          m,
+    ];
+    return 'marked read';
+  }
+
+  @override
+  Future<List<LiveSessionInfo>> liveSessions() async => liveSessionList;
 
   @override
   Future<String> pipelineExport(

@@ -591,7 +591,7 @@ class PipesPane extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 Text(
-                  'Live pipes, from this app or the CLI (`mnnn pipe SOURCE STEP…`). Each hop shows its status, rows and errors. Standard input (`-`) stays in the CLI.',
+                  'Live pipes, from this app or the CLI (`mnnn pipe SOURCE STEP…`). Each hop shows its status, rows and errors. Source `-` is standard input: paste text or choose a file, optionally with `--format` (csv, json, ndjson) and `--chunk`.',
                   style: TextStyle(color: m.muted),
                 ),
                 const SizedBox(height: 12),
@@ -676,12 +676,28 @@ class _RunPipeDialogState extends ConsumerState<_RunPipeDialog> {
   final _source = TextEditingController();
   final _steps = TextEditingController();
   final _to = TextEditingController();
+  final _stdin = TextEditingController();
+  final _stdinFile = TextEditingController();
+  final _chunk = TextEditingController(text: '0');
+  String? _format;
+  bool _keepHeader = false;
+
+  bool get _isStdin => _source.text.trim() == '-';
+
+  @override
+  void initState() {
+    super.initState();
+    _source.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
     _source.dispose();
     _steps.dispose();
     _to.dispose();
+    _stdin.dispose();
+    _stdinFile.dispose();
+    _chunk.dispose();
     super.dispose();
   }
 
@@ -698,6 +714,15 @@ class _RunPipeDialogState extends ConsumerState<_RunPipeDialog> {
             _source.text.trim(),
             steps: _lines(_steps.text),
             to: _lines(_to.text),
+            stdin: _isStdin && _stdinFile.text.trim().isEmpty
+                ? _stdin.text
+                : null,
+            stdinFile: _isStdin && _stdinFile.text.trim().isNotEmpty
+                ? _stdinFile.text.trim()
+                : null,
+            format: _isStdin ? _format : null,
+            chunk: _isStdin ? (int.tryParse(_chunk.text.trim()) ?? 0) : 0,
+            keepHeader: _isStdin && _keepHeader,
           );
       if (!mounted) return;
       final host = Navigator.of(context).context;
@@ -719,41 +744,106 @@ class _RunPipeDialogState extends ConsumerState<_RunPipeDialog> {
     return AlertDialog(
       backgroundColor: m.bg,
       title: Text('Run a pipe', style: TextStyle(color: m.header)),
-      content: SizedBox(
-        width: 480,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Source: source:NAME, search:NAME, journal:NAME, code:SPACE or a model query. Steps: code:SPACE (options like code:to-bars?symbol=BTC/USDT&duration=5m), search:NAME, or a save. Final saves go in To.',
-              style: TextStyle(color: m.muted),
-            ),
-            TextField(
-              key: const ValueKey('pipe-source'),
-              controller: _source,
-              decoration: const InputDecoration(
-                labelText: 'Source',
-                hintText: 'source:coinbase',
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 480,
+          maxHeight: MediaQuery.sizeOf(context).height - 220,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Source: source:NAME, search:NAME, journal:NAME, code:SPACE, a model query, or `-` for standard input. Steps: code:SPACE (options like code:to-bars?symbol=BTC/USDT&duration=5m), search:NAME, or a save. Final saves go in To. `--format` (csv, json, ndjson) and `--chunk` apply only with `-`.',
+                style: TextStyle(color: m.muted),
               ),
-            ),
-            TextField(
-              key: const ValueKey('pipe-steps'),
-              controller: _steps,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Steps',
-                hintText:
-                    'code:parse-csv\ncode:to-bars?symbol=BTC/USDT&duration=5m',
+              TextField(
+                key: const ValueKey('pipe-source'),
+                controller: _source,
+                decoration: const InputDecoration(
+                  labelText: 'Source',
+                  hintText: 'source:coinbase',
+                ),
               ),
-            ),
-            TextField(
-              controller: _to,
-              decoration: const InputDecoration(
-                labelText: 'To (optional)',
-                hintText: 'model:bars  or journal:Notes',
+              TextField(
+                key: const ValueKey('pipe-steps'),
+                controller: _steps,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Steps',
+                  hintText: 'code:parse-csv\ncode:to-bars?symbol=BTC/USDT&duration=5m',
+                ),
               ),
-            ),
-          ],
+              TextField(
+                controller: _to,
+                decoration: const InputDecoration(
+                  labelText: 'To (optional)',
+                  hintText: 'model:bars  or journal:Notes',
+                ),
+              ),
+              if (_isStdin) ...[
+                TextField(
+                  key: const ValueKey('pipe-stdin'),
+                  controller: _stdin,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Standard input',
+                    hintText: 'Paste the text `mnnn pipe -` would read',
+                  ),
+                ),
+                TextField(
+                  key: const ValueKey('pipe-stdin-file'),
+                  controller: _stdinFile,
+                  decoration: const InputDecoration(
+                    labelText: 'Or a file (Rust reads the bytes)',
+                    hintText: '/tmp/ticks.csv',
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () async {
+                      final r = await FilePicker.platform.pickFiles();
+                      final path = r?.files.single.path;
+                      if (path != null) {
+                        _stdinFile.text = path;
+                      }
+                    },
+                    child: const Text('Choose file…'),
+                  ),
+                ),
+                DropdownButtonFormField<String?>(
+                  key: const ValueKey('pipe-format'),
+                  initialValue: _format,
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('(raw text)')),
+                    DropdownMenuItem(value: 'csv', child: Text('csv')),
+                    DropdownMenuItem(value: 'json', child: Text('json')),
+                    DropdownMenuItem(value: 'ndjson', child: Text('ndjson')),
+                  ],
+                  onChanged: (v) => setState(() => _format = v),
+                  decoration: const InputDecoration(
+                    labelText: '--format (optional)',
+                  ),
+                ),
+                TextField(
+                  key: const ValueKey('pipe-chunk'),
+                  controller: _chunk,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '--chunk (0: all at once)',
+                  ),
+                ),
+                CheckboxListTile(
+                  key: const ValueKey('pipe-keep-header'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('--keep-header (implied by --format csv)'),
+                  value: _keepHeader,
+                  onChanged: (v) => setState(() => _keepHeader = v ?? false),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
       actions: [
@@ -791,7 +881,7 @@ class PipelinesPane extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 Text(
-                  'Pipelines are saved graphs: ingest data through code spaces and into models. Nodes are ID=KIND (src=source:coinbase, bars=code:to-bars, out=model:bars); edges are FROM>TO. After ingest stores raw files, bars come from a pipeline.',
+                  "Pipelines are saved graphs: ingest data through code spaces and into models. Nodes are ID=KIND (src=source:coinbase, bars=code:to-bars, out=model:bars); edges are FROM>TO. Tee… saves a node along the way (journal:NAME or model:NAME); End in model… is the TUI's M; Monitor… shows each node's status from the latest run. After ingest stores raw files, bars come from a pipeline.",
                   style: TextStyle(color: m.muted),
                 ),
                 const SizedBox(height: 12),
@@ -846,6 +936,22 @@ class PipelinesPane extends ConsumerWidget {
                             child: Text('Edit…'),
                           ),
                           const PopupMenuItem(value: 'run', child: Text('Run')),
+                          const PopupMenuItem(
+                            value: 'run-stdin',
+                            child: Text('Run with stdin…'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'tee',
+                            child: Text('Tee…'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'end-model',
+                            child: Text('End in model…'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'monitor',
+                            child: Text('Monitor…'),
+                          ),
                           if (p.draft)
                             const PopupMenuItem(
                               value: 'approve',
@@ -908,6 +1014,22 @@ Future<void> _pipelineAction(
             ...r.lines,
             ...r.landed,
           ], error: !r.ok);
+        }
+      case 'run-stdin':
+        if (context.mounted) {
+          await showPipelineStdinRunDialog(context, ref, p);
+        }
+      case 'tee':
+        if (context.mounted) {
+          await showPipelineTeeDialog(context, ref, p);
+        }
+      case 'end-model':
+        if (context.mounted) {
+          await showPipelineEndInModelDialog(context, ref, p);
+        }
+      case 'monitor':
+        if (context.mounted) {
+          await showPipelineMonitorDialog(context, ref, p);
         }
       case 'approve':
         final msg = await ref.read(apiProvider).pipelineApprove(p.id);
@@ -1097,5 +1219,332 @@ class _PipelineDialogState extends ConsumerState<_PipelineDialog> {
         ),
       ],
     );
+  }
+}
+
+List<String> pipelineNodeIds(PipelineInfo p) => [
+  for (final n in p.nodeSpecs)
+    if (n.contains('=')) n.split('=').first else n,
+];
+
+Future<void> showPipelineTeeDialog(
+  BuildContext context,
+  WidgetRef ref,
+  PipelineInfo p,
+) async {
+  final ids = pipelineNodeIds(p);
+  if (ids.isEmpty) {
+    _ok(context, 'Add a node first.');
+    return;
+  }
+  var node = ids.first;
+  final sink = TextEditingController(text: 'journal:');
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) {
+      final m = ctx.muninn;
+      return StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: m.bg,
+          title: Text('Tee ${p.name}', style: TextStyle(color: m.header)),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Also save this node to a journal or model (the TUI canvas t). The data still flows on.',
+                  style: TextStyle(color: m.muted),
+                ),
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('pipeline-tee-node'),
+                  initialValue: node,
+                  items: [
+                    for (final id in ids)
+                      DropdownMenuItem(value: id, child: Text(id)),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setSt(() => node = v);
+                  },
+                  decoration: const InputDecoration(labelText: 'Node'),
+                ),
+                TextField(
+                  key: const ValueKey('pipeline-tee-sink'),
+                  controller: sink,
+                  decoration: const InputDecoration(
+                    labelText: 'Also save to',
+                    hintText: 'journal:NAME or model:NAME',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const ValueKey('pipeline-tee-save'),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Tee'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  if (ok != true || !context.mounted) {
+    return;
+  }
+  try {
+    await ref.read(apiProvider).pipelineTee(p.id, node, sink.text.trim());
+    refreshProjectExtras(ref);
+    if (context.mounted) {
+      _ok(context, '$node also saves to ${sink.text.trim()}');
+    }
+  } catch (e) {
+    if (context.mounted) _ok(context, '$e', color: context.muninn.error);
+  }
+}
+
+Future<void> showPipelineEndInModelDialog(
+  BuildContext context,
+  WidgetRef ref,
+  PipelineInfo p,
+) async {
+  final ids = pipelineNodeIds(p);
+  if (ids.isEmpty) {
+    _ok(context, 'Add a node first.');
+    return;
+  }
+  var node = ids.last;
+  final model = TextEditingController(text: '${node}_rows');
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) {
+      final m = ctx.muninn;
+      return StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: m.bg,
+          title: Text(
+            'End ${p.name} in a model',
+            style: TextStyle(color: m.header),
+          ),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "The TUI designer's M: end this node's branch in a model table, making the model when it is new.",
+                  style: TextStyle(color: m.muted),
+                ),
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('pipeline-end-node'),
+                  initialValue: node,
+                  items: [
+                    for (final id in ids)
+                      DropdownMenuItem(value: id, child: Text(id)),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setSt(() => node = v);
+                  },
+                  decoration: const InputDecoration(labelText: 'Node'),
+                ),
+                TextField(
+                  key: const ValueKey('pipeline-end-model'),
+                  controller: model,
+                  decoration: const InputDecoration(labelText: 'Model'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const ValueKey('pipeline-end-save'),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('End in model'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  if (ok != true || !context.mounted) {
+    return;
+  }
+  try {
+    await ref
+        .read(apiProvider)
+        .pipelineEndInModel(p.id, node, model.text.trim());
+    refreshProjectExtras(ref);
+    if (context.mounted) {
+      _ok(context, '$node ends in model ${model.text.trim()}');
+    }
+  } catch (e) {
+    if (context.mounted) _ok(context, '$e', color: context.muninn.error);
+  }
+}
+
+Future<void> showPipelineMonitorDialog(
+  BuildContext context,
+  WidgetRef ref,
+  PipelineInfo p,
+) async {
+  try {
+    final mon = await ref.read(apiProvider).pipelineMonitor(p.id);
+    if (!context.mounted) return;
+    final m = context.muninn;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: m.bg,
+        title: Text(
+          'Monitor · ${mon.pipeline}',
+          style: TextStyle(color: m.header),
+        ),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "The TUI monitor tile: each node's status, rows in/out and rate from the latest run (${mon.state}). Embedding this as a workspace tile stays with tiling extras.",
+                  style: TextStyle(color: m.muted),
+                ),
+                const SizedBox(height: 8),
+                for (final n in mon.nodes)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      '${n.id}  ${n.kind}  ${n.status}  in ${n.rowsIn}  out ${n.rowsOut}  ${n.ms} ms',
+                      key: ValueKey('pipeline-monitor-${n.id}'),
+                      style: TextStyle(fontFamily: 'monospace', color: m.fg),
+                    ),
+                  ),
+                for (final s in mon.landed)
+                  Text('landed $s', style: TextStyle(color: m.accent)),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  } catch (e) {
+    if (context.mounted) _ok(context, '$e', color: context.muninn.error);
+  }
+}
+
+Future<void> showPipelineStdinRunDialog(
+  BuildContext context,
+  WidgetRef ref,
+  PipelineInfo p,
+) async {
+  final stdin = TextEditingController();
+  final file = TextEditingController();
+  final chunk = TextEditingController(text: '0');
+  var keepHeader = false;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) {
+      final m = ctx.muninn;
+      return StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: m.bg,
+          title: Text(
+            'Run ${p.name} with stdin',
+            style: TextStyle(color: m.header),
+          ),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'When a source node is `-`, this is `mnnn pipeline run NAME -` [--chunk N] [--keep-header]. Paste text or choose a file; Rust reads the file.',
+                    style: TextStyle(color: m.muted),
+                  ),
+                  TextField(
+                    key: const ValueKey('pipeline-stdin'),
+                    controller: stdin,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Standard input',
+                    ),
+                  ),
+                  TextField(
+                    key: const ValueKey('pipeline-stdin-file'),
+                    controller: file,
+                    decoration: const InputDecoration(labelText: 'Or a file'),
+                  ),
+                  TextField(
+                    key: const ValueKey('pipeline-stdin-chunk'),
+                    controller: chunk,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: '--chunk (0: all at once)',
+                    ),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('--keep-header'),
+                    value: keepHeader,
+                    onChanged: (v) => setSt(() => keepHeader = v ?? false),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const ValueKey('pipeline-stdin-run'),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Run'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  if (ok != true || !context.mounted) {
+    return;
+  }
+  try {
+    final r = await ref
+        .read(apiProvider)
+        .pipelineRun(
+          p.id,
+          stdin: file.text.trim().isEmpty ? stdin.text : null,
+          stdinFile: file.text.trim().isNotEmpty ? file.text.trim() : null,
+          chunk: int.tryParse(chunk.text.trim()) ?? 0,
+          keepHeader: keepHeader,
+        );
+    refreshProjectExtras(ref);
+    if (context.mounted) {
+      await _showLines(context, '${p.name}: ${r.ok ? "ok" : "errors"}', [
+        ...r.lines,
+        ...r.landed,
+      ], error: !r.ok);
+    }
+  } catch (e) {
+    if (context.mounted) _ok(context, '$e', color: context.muninn.error);
   }
 }

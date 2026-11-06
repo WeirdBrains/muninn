@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
+import 'net_collab.dart';
+import 'net_mcp.dart';
 import '../time_range.dart';
 import 'net_dialogs.dart';
 import 'unlock.dart';
@@ -59,6 +61,8 @@ class NetView extends ConsumerWidget {
               NetPane.exchanges => _ExchangesPane(),
               NetPane.search => _SearchPane(),
               NetPane.shards => _ShardsPane(),
+              NetPane.mcp => const McpPane(),
+              NetPane.collab => const CollabPane(),
             },
           ),
         ],
@@ -77,6 +81,8 @@ class NetView extends ConsumerWidget {
     NetPane.exchanges => 'Nodes',
     NetPane.search => 'Search',
     NetPane.shards => 'Shards',
+    NetPane.mcp => 'MCP',
+    NetPane.collab => 'Messages & live',
   };
 }
 

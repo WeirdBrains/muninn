@@ -577,7 +577,15 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           item('Peers…', () {
             ref.read(netPaneProvider.notifier).state = NetPane.peers;
             go(Section.net);
+          }),
+          item('Peers, messages & live…', () {
+            ref.read(netPaneProvider.notifier).state = NetPane.collab;
+            go(Section.net);
           }, const SingleActivator(LogicalKeyboardKey.keyW, shift: true)),
+          item('MCP…', () {
+            ref.read(netPaneProvider.notifier).state = NetPane.mcp;
+            go(Section.net);
+          }),
           item('Relays…', () {
             ref.read(netPaneProvider.notifier).state = NetPane.relays;
             go(Section.net);

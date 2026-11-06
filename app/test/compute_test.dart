@@ -116,4 +116,101 @@ void main() {
     await t.pumpAndSettle();
     expect(api.orgCalls, contains('resource-add:lab:code:c1'));
   });
+
+  testWidgets('Pipe stdin, --format and --chunk match the CLI flags', (
+    t,
+  ) async {
+    final (api, _) = await pump(t);
+    await unlock(t);
+    await t.tap(find.text('Projects'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Pipes (live)…'));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('pipe-run')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('pipe-source')), '-');
+    await t.pump();
+    expect(find.byKey(const ValueKey('pipe-stdin')), findsOneWidget);
+    await t.enterText(
+      find.byKey(const ValueKey('pipe-stdin')),
+      'a,b\n1,2\n3,4',
+    );
+    await t.ensureVisible(find.byKey(const ValueKey('pipe-format')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('pipe-format')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('csv').last);
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('pipe-chunk')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('pipe-chunk')), '2');
+    await t.ensureVisible(find.byKey(const ValueKey('pipe-run-confirm')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('pipe-run-confirm')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('pipe-run:-:'));
+    expect(
+      api.extraCalls.any(
+        (c) =>
+            c.startsWith('pipe-stdin:-:format=csv:chunk=2') &&
+            c.contains('text=a,b'),
+      ),
+      isTrue,
+      reason: '${api.extraCalls}',
+    );
+  });
+
+  testWidgets('Pipeline tee, end-in-model and monitor match the TUI canvas', (
+    t,
+  ) async {
+    final (api, _) = await pump(t);
+    api.pipelineList = const [
+      PipelineInfo(
+        id: 'p1',
+        shortId: 'p1',
+        name: 'feed',
+        nodeSpecs: ['src=source:coinbase', 'bars=code:to-bars'],
+        edgeSpecs: ['src>bars'],
+        graphLines: ['src = source:coinbase → bars', 'bars = code:to-bars'],
+        nodes: 2,
+      ),
+    ];
+    await unlock(t);
+    await t.tap(find.text('Projects'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Pipelines…'));
+    await t.pumpAndSettle();
+    expect(find.text('feed'), findsOneWidget);
+    await t.tap(find.byType(PopupMenuButton<String>));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Tee…'));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('pipeline-tee-sink')),
+      'journal:Raw',
+    );
+    await t.tap(find.byKey(const ValueKey('pipeline-tee-save')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('pipeline-tee:p1:src:journal:Raw'));
+
+    await t.tap(find.byType(PopupMenuButton<String>));
+    await t.pumpAndSettle();
+    await t.tap(find.text('End in model…'));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('pipeline-end-model')),
+      'ticks',
+    );
+    await t.tap(find.byKey(const ValueKey('pipeline-end-save')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('pipeline-end-in-model:p1:bars:ticks'));
+
+    await t.tap(find.byType(PopupMenuButton<String>));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Monitor…'));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('pipeline-monitor:p1'));
+    expect(find.textContaining('Monitor · feed'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pipeline-monitor-src')), findsOneWidget);
+  });
 }

@@ -4,7 +4,7 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
-Projects (create, rename, describe, delete, attach and detach series, journals, live searches, reports, code spaces, live pipes, pipelines, rules, reviews, notifications, import/export archives), Net status, peers, start/stop, connect, invites, relays, sharing, settings, connections, key exchanges, search, broadcast and dark shards, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
+Projects (create, rename, describe, delete, attach and detach series, journals, live searches, reports, code spaces, live pipes, pipelines, rules, reviews, notifications, import/export archives), Net status, peers, start/stop, connect, invites, relays, sharing, settings, connections, key exchanges, search, broadcast, dark shards, MCP, and stored peer messages and live sessions, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
 (CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
@@ -31,7 +31,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
-  Live searches… / Journals… / New journal… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Rules… / Reviews… / Notifications… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
+  Live searches… / Journals… / New journal… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Rules… / Reviews… / Notifications… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Peers, messages & live / MCP / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
   Rekey, Export, Recover and Re-issue shards, and Data ▸ Sources… / Symbols…. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
@@ -130,12 +130,17 @@ Users never need Rust: release builds ship the compiled library.
   prior step into a space (`>`), result tiles and writing the plugin SDK stay
   in the TUI or CLI. **Pipes** show live
   and recent runs from history (the TUI Pipes window) and run a pipe
-  (`mnnn pipe SOURCE STEP… [--to TARGET]`). Standard input (`-`) and chunked
-  streaming stay in the CLI. **Pipelines** list, create and edit a graph (nodes
-  `ID=KIND`, edges `FROM>TO`), run, approve a draft, remove, and export or import
-  a pipeline file (`mnnn pipeline` / TUI Pipelines, `E`); file bytes stay in Rust.
-  The visual node designer extras (tee/end-in-model from the canvas, monitor
-  tiles) stay in the TUI. **Rules** list, create, edit, enable or disable, test,
+  (`mnnn pipe SOURCE STEP… [--to TARGET]`). Source `-` is standard input: paste
+  the text or choose a file (Rust reads the bytes), with the CLI's `--format`
+  (csv, json or ndjson), `--chunk` and `--keep-header`. **Pipelines** list, create
+  and edit a graph (nodes `ID=KIND`, edges `FROM>TO`), run (including `mnnn
+  pipeline run NAME -` with pasted or file stdin), approve a draft, remove, and
+  export or import a pipeline file (`mnnn pipeline` / TUI Pipelines, `E`); file
+  bytes stay in Rust. Tee… (TUI `t`) saves a selected node's output to
+  `journal:NAME` or `model:NAME` as it flows on; End in model… (TUI `M`) ends a
+  branch in a model table, making the model when it is new; Monitor… shows the
+  same per-node status, rows and landed data as a TUI `monitor:PIPELINE` tile.
+  Embedding that monitor as a workspace tile stays with tiling extras. **Rules** list, create, edit, enable or disable, test,
   dry-run, tick due scheduled rules, list event kinds and remove (`mnnn rule` /
   TUI Rules, `R`). **Reviews** list yours and ones you joined, request a review,
   show the thread and the thing under review, comment, suggest, highlight, vote,
@@ -163,9 +168,15 @@ Users never need Rust: release builds ship the compiled library.
   path; bytes stay in Rust), network search (run a saved live search here and on
   peers, optionally `--only` a subset of exchanges), broadcast (`mnnn net broadcast`,
   including `org:SLUG`), export or restore a password-sealed exchange backup
-  (`mnnn net exchange export|restore`; bytes and keys stay in Rust), and dark shards (list entrusted and held,
+  (`mnnn net exchange export|restore`; bytes and keys stay in Rust), dark shards (list entrusted and held,
   entrust from a key file, check that gathered shards restore this database's key,
-  drop a held shard). The node identity, exchange offer/answer tokens, shard blobs
+  drop a held shard), MCP servers and clients (`mnnn mcp` / TUI Net ▸ MCP…: list
+  servers and clients, show a server's tools, approve or withdraw a tool, change a
+  client's role, revoke, restore or remove; tokens and credential values stay in
+  Rust, and adding a server or client stays `mnnn mcp add` / `mnnn mcp client add`),
+  and Peers, messages & live (TUI `W`: list stored conversations and live sessions,
+  mark messages read). Sending a message or hosting/joining a live session needs the
+  node worker and stays in the TUI. The node identity, exchange offer/answer tokens, shard blobs
   and the master key stay in Rust. Short codes and fingerprints are meant to be read
   aloud, as in the TUI. On a phone the node uses the same platform-secure app sandbox
   the store already uses. Creating or accepting a raw exchange token
@@ -257,7 +268,7 @@ when a hardware keyboard is attached.
 | `i` | File ▸ Import… |
 | `P` | Projects |
 | `K` | Net status |
-| `W` | Net peers (the Peers page of the Net view) |
+| `W` | Peers, messages & live (stored messages and sessions; sending and joining stay in the TUI) |
 | `G` | Organizations |
 | `C` | Code spaces (Shift+C; lowercase `c` on the chart still toggles candles) |
 | `E` | Pipelines (Shift+E; lowercase `e` on the chart still toggles the envelope) |

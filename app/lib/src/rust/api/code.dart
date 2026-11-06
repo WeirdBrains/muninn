@@ -7,7 +7,8 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `approve_if_needed`, `code_spaces_of`, `edge_spec`, `graph_lines`, `hash16`, `live_pipes_of`, `node_spec`, `parse_lang`, `pipeline_info`, `pipelines_of`, `run_result`, `scope_label`, `source_from`, `space_info`, `strs`
+// These functions are ignored because they are not marked as `pub`: `apply_pipe_format`, `approve_if_needed`, `approve_pipe_spaces`, `chunk_frames`, `code_spaces_of`, `edge_spec`, `graph_lines`, `hash16`, `live_pipes_of`, `node_spec`, `nonempty`, `parse_lang`, `pipe_result`, `pipe_run_of`, `pipeline_end_in_model_of`, `pipeline_info`, `pipeline_monitor_of`, `pipeline_run_of`, `pipeline_run_once`, `pipeline_tee_of`, `pipelines_of`, `run_result`, `scope_label`, `source_from`, `space_info`, `stdin_body`, `strs`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`
 
 /// `mnnn code list` / TUI Code spaces….
 Future<List<CodeSpaceInfo>> codeSpaces() =>
@@ -79,15 +80,26 @@ Future<String> codeParsersInstall({String? name}) =>
 Future<List<LivePipeInfo>> pipesLive() =>
     RustLib.instance.api.crateApiCodePipesLive();
 
-/// `mnnn pipe SOURCE STEP… [--to TARGET]`. Standard input (`-`) stays in the CLI.
+/// `mnnn pipe SOURCE STEP… [--to TARGET] [--format csv|json|ndjson] [--chunk N]`.
+/// Source `-` is standard input: paste text or pass a file path (Rust reads the bytes).
 Future<PipeRunResult> pipeRun({
   required String source,
   required List<String> steps,
   required List<String> to,
+  String? stdin,
+  String? stdinFile,
+  String? format,
+  required int chunk,
+  required bool keepHeader,
 }) => RustLib.instance.api.crateApiCodePipeRun(
   source: source,
   steps: steps,
   to: to,
+  stdin: stdin,
+  stdinFile: stdinFile,
+  format: format,
+  chunk: chunk,
+  keepHeader: keepHeader,
 );
 
 /// `mnnn pipeline list` / TUI Pipelines….
@@ -134,9 +146,46 @@ Future<String> pipelineRemove({required String pipeline}) =>
 Future<String> pipelineApprove({required String pipeline}) =>
     RustLib.instance.api.crateApiCodePipelineApprove(pipeline: pipeline);
 
-/// `mnnn pipeline run` (no standard input; that stays in the CLI).
-Future<PipelineRunResult> pipelineRun({required String pipeline}) =>
-    RustLib.instance.api.crateApiCodePipelineRun(pipeline: pipeline);
+/// `mnnn pipeline run` (optional standard input when a source node is `-`).
+Future<PipelineRunResult> pipelineRun({
+  required String pipeline,
+  String? stdin,
+  String? stdinFile,
+  required int chunk,
+  required bool keepHeader,
+}) => RustLib.instance.api.crateApiCodePipelineRun(
+  pipeline: pipeline,
+  stdin: stdin,
+  stdinFile: stdinFile,
+  chunk: chunk,
+  keepHeader: keepHeader,
+);
+
+/// TUI designer `t`: also save this node's output to `journal:NAME` or `model:NAME`.
+Future<PipelineInfo> pipelineTee({
+  required String pipeline,
+  required String node,
+  required String sink,
+}) => RustLib.instance.api.crateApiCodePipelineTee(
+  pipeline: pipeline,
+  node: node,
+  sink: sink,
+);
+
+/// TUI designer `M`: end the node's branch in a model table, making the model when it is new.
+Future<PipelineInfo> pipelineEndInModel({
+  required String pipeline,
+  required String node,
+  required String model,
+}) => RustLib.instance.api.crateApiCodePipelineEndInModel(
+  pipeline: pipeline,
+  node: node,
+  model: model,
+);
+
+/// TUI monitor tile: each node's status, rows and what landed in the latest run.
+Future<PipelineMonitor> pipelineMonitor({required String pipeline}) =>
+    RustLib.instance.api.crateApiCodePipelineMonitor(pipeline: pipeline);
 
 /// `mnnn pipeline export`. Bytes stay in Rust; Dart passes the path.
 Future<String> pipelineExport({
@@ -484,6 +533,73 @@ class PipelineInfo {
           nodeSpecs == other.nodeSpecs &&
           edgeSpecs == other.edgeSpecs &&
           graphLines == other.graphLines;
+}
+
+class PipelineMonitor {
+  final String pipeline;
+  final String state;
+  final List<PipelineMonitorNode> nodes;
+  final List<String> landed;
+
+  const PipelineMonitor({
+    required this.pipeline,
+    required this.state,
+    required this.nodes,
+    required this.landed,
+  });
+
+  @override
+  int get hashCode =>
+      pipeline.hashCode ^ state.hashCode ^ nodes.hashCode ^ landed.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PipelineMonitor &&
+          runtimeType == other.runtimeType &&
+          pipeline == other.pipeline &&
+          state == other.state &&
+          nodes == other.nodes &&
+          landed == other.landed;
+}
+
+class PipelineMonitorNode {
+  final String id;
+  final String kind;
+  final String status;
+  final PlatformInt64 rowsIn;
+  final PlatformInt64 rowsOut;
+  final PlatformInt64 ms;
+
+  const PipelineMonitorNode({
+    required this.id,
+    required this.kind,
+    required this.status,
+    required this.rowsIn,
+    required this.rowsOut,
+    required this.ms,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      kind.hashCode ^
+      status.hashCode ^
+      rowsIn.hashCode ^
+      rowsOut.hashCode ^
+      ms.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PipelineMonitorNode &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          kind == other.kind &&
+          status == other.status &&
+          rowsIn == other.rowsIn &&
+          rowsOut == other.rowsOut &&
+          ms == other.ms;
 }
 
 class PipelineRunResult {

@@ -65,10 +65,13 @@ void main() {
     expect(c.read(sectionProvider), Section.help);
   });
 
-  testWidgets('W opens Net peers and L opens chart layers', (t) async {
+  testWidgets('W opens Net messages and live and L opens chart layers', (
+    t,
+  ) async {
     final (_, c) = await pump(t, const Size(1280, 800));
     await shiftLetter(t, LogicalKeyboardKey.keyW);
     expect(c.read(sectionProvider), Section.net);
+    expect(c.read(netPaneProvider), NetPane.collab);
 
     await shiftLetter(t, LogicalKeyboardKey.keyL);
     expect(find.text('Chart layers'), findsOneWidget);

@@ -536,6 +536,8 @@ enum NetPane {
   exchanges,
   search,
   shards,
+  mcp,
+  collab,
 }
 
 final netPaneProvider = StateProvider<NetPane>((ref) => NetPane.node);
@@ -575,6 +577,26 @@ final netShardsProvider = FutureProvider<NetShards?>((ref) {
   return ref.watch(apiProvider).netShards();
 });
 
+final mcpServersProvider = FutureProvider<List<McpServerInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).mcpServers();
+});
+
+final mcpClientsProvider = FutureProvider<List<McpClientInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).mcpClients();
+});
+
+final peerMessagesProvider = FutureProvider<List<PeerMessageInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).peerMessages();
+});
+
+final liveSessionsProvider = FutureProvider<List<LiveSessionInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).liveSessions();
+});
+
 void refreshNet(WidgetRef ref) {
   ref.invalidate(netOverviewProvider);
   ref.invalidate(netInvitesProvider);
@@ -584,6 +606,10 @@ void refreshNet(WidgetRef ref) {
   ref.invalidate(netConnectionsProvider);
   ref.invalidate(netExchangesProvider);
   ref.invalidate(netShardsProvider);
+  ref.invalidate(mcpServersProvider);
+  ref.invalidate(mcpClientsProvider);
+  ref.invalidate(peerMessagesProvider);
+  ref.invalidate(liveSessionsProvider);
 }
 
 final orgOverviewProvider = FutureProvider<OrgOverview?>((ref) {

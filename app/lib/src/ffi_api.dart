@@ -6,10 +6,12 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'api.dart';
 import 'rust/api/about.dart' as r_about;
 import 'rust/api/code.dart' as r_code;
+import 'rust/api/collab.dart' as r_collab;
 import 'rust/api/data.dart' as r_data;
 import 'rust/api/help.dart' as r_help;
 import 'rust/api/info.dart' as r_info;
 import 'rust/api/keys.dart' as r_keys;
+import 'rust/api/mcp.dart' as r_mcp;
 import 'rust/api/io.dart' as r_io;
 import 'rust/api/journals.dart' as r_journals;
 import 'rust/api/net.dart' as r_net;
@@ -988,8 +990,22 @@ class FfiMuninnApi implements MuninnApi {
     String source, {
     List<String> steps = const [],
     List<String> to = const [],
+    String? stdin,
+    String? stdinFile,
+    String? format,
+    int chunk = 0,
+    bool keepHeader = false,
   }) async {
-    final r = await r_code.pipeRun(source: source, steps: steps, to: to);
+    final r = await r_code.pipeRun(
+      source: source,
+      steps: steps,
+      to: to,
+      stdin: stdin,
+      stdinFile: stdinFile,
+      format: format,
+      chunk: chunk,
+      keepHeader: keepHeader,
+    );
     return PipeRunResult(hops: r.hops, saved: r.saved, lines: r.lines);
   }
 
@@ -1058,10 +1074,161 @@ class FfiMuninnApi implements MuninnApi {
       r_code.pipelineApprove(pipeline: pipeline);
 
   @override
-  Future<PipelineRunResult> pipelineRun(String pipeline) async {
-    final r = await r_code.pipelineRun(pipeline: pipeline);
+  Future<PipelineRunResult> pipelineRun(
+    String pipeline, {
+    String? stdin,
+    String? stdinFile,
+    int chunk = 0,
+    bool keepHeader = false,
+  }) async {
+    final r = await r_code.pipelineRun(
+      pipeline: pipeline,
+      stdin: stdin,
+      stdinFile: stdinFile,
+      chunk: chunk,
+      keepHeader: keepHeader,
+    );
     return PipelineRunResult(ok: r.ok, lines: r.lines, landed: r.landed);
   }
+
+  @override
+  Future<PipelineInfo> pipelineTee(
+    String pipeline,
+    String node,
+    String sink,
+  ) async => _pipeline(
+    await r_code.pipelineTee(pipeline: pipeline, node: node, sink: sink),
+  );
+
+  @override
+  Future<PipelineInfo> pipelineEndInModel(
+    String pipeline,
+    String node,
+    String model,
+  ) async => _pipeline(
+    await r_code.pipelineEndInModel(
+      pipeline: pipeline,
+      node: node,
+      model: model,
+    ),
+  );
+
+  PipelineMonitor _monitor(r_code.PipelineMonitor m) => PipelineMonitor(
+    pipeline: m.pipeline,
+    state: m.state,
+    nodes: [
+      for (final n in m.nodes)
+        PipelineMonitorNode(
+          id: n.id,
+          kind: n.kind,
+          status: n.status,
+          rowsIn: n.rowsIn.toInt(),
+          rowsOut: n.rowsOut.toInt(),
+          ms: n.ms.toInt(),
+        ),
+    ],
+    landed: m.landed,
+  );
+
+  @override
+  Future<PipelineMonitor> pipelineMonitor(String pipeline) async =>
+      _monitor(await r_code.pipelineMonitor(pipeline: pipeline));
+
+  McpServerInfo _mcpServer(r_mcp.McpServerInfo s) => McpServerInfo(
+    id: s.id,
+    name: s.name,
+    transport: s.transport,
+    command: s.command,
+    args: s.args,
+    url: s.url,
+    credentials: s.credentials,
+    createdAt: s.createdAt.toInt(),
+  );
+
+  McpClientInfo _mcpClient(r_mcp.McpClientInfo c) => McpClientInfo(
+    id: c.id,
+    name: c.name,
+    role: c.role,
+    createdAt: c.createdAt.toInt(),
+    lastSeenAt: c.lastSeenAt.toInt(),
+    revoked: c.revoked,
+  );
+
+  @override
+  Future<List<McpServerInfo>> mcpServers() async => [
+    for (final s in await r_mcp.mcpServers()) _mcpServer(s),
+  ];
+
+  @override
+  Future<List<McpClientInfo>> mcpClients() async => [
+    for (final c in await r_mcp.mcpClients()) _mcpClient(c),
+  ];
+
+  @override
+  Future<List<McpToolInfo>> mcpServerTools(String server) async => [
+    for (final t in await r_mcp.mcpServerTools(server: server))
+      McpToolInfo(
+        name: t.name,
+        description: t.description,
+        approved: t.approved,
+      ),
+  ];
+
+  @override
+  Future<String> mcpApproveTool(String server, String tool, {bool on = true}) =>
+      r_mcp.mcpApproveTool(server: server, tool: tool, on_: on);
+
+  @override
+  Future<String> mcpRemoveServer(String server) =>
+      r_mcp.mcpRemoveServer(server: server);
+
+  @override
+  Future<String> mcpClientRole(String client, String role) =>
+      r_mcp.mcpClientRole(client: client, role: role);
+
+  @override
+  Future<String> mcpClientRevoke(String client, {bool revoke = true}) =>
+      r_mcp.mcpClientRevoke(client: client, revoke: revoke);
+
+  @override
+  Future<String> mcpRemoveClient(String client) =>
+      r_mcp.mcpRemoveClient(client: client);
+
+  @override
+  Future<List<PeerMessageInfo>> peerMessages({String? peer}) async => [
+    for (final m in await r_collab.peerMessages(peer: peer))
+      PeerMessageInfo(
+        id: m.id,
+        peer: m.peer,
+        peerLabel: m.peerLabel,
+        direction: m.direction,
+        about: m.about,
+        text: m.text,
+        createdAt: m.createdAt.toInt(),
+        delivered: m.delivered,
+        read: m.read,
+        error: m.error,
+      ),
+  ];
+
+  @override
+  Future<String> peerMessagesMarkRead({String? peer}) =>
+      r_collab.peerMessagesMarkRead(peer: peer);
+
+  @override
+  Future<List<LiveSessionInfo>> liveSessions() async => [
+    for (final s in await r_collab.liveSessions())
+      LiveSessionInfo(
+        id: s.id,
+        kind: s.kind,
+        title: s.title,
+        role: s.role,
+        hostPeer: s.hostPeer,
+        status: s.status,
+        createdAt: s.createdAt.toInt(),
+        updatedAt: s.updatedAt.toInt(),
+      ),
+  ];
 
   @override
   Future<String> pipelineExport(

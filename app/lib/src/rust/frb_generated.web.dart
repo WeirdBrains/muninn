@@ -8,12 +8,14 @@
 
 import 'api/about.dart';
 import 'api/code.dart';
+import 'api/collab.dart';
 import 'api/data.dart';
 import 'api/help.dart';
 import 'api/info.dart';
 import 'api/io.dart';
 import 'api/journals.dart';
 import 'api/keys.dart';
+import 'api/mcp.dart';
 import 'api/net.dart';
 import 'api/notify.dart';
 import 'api/orgs.dart';
@@ -190,6 +192,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<LivePipeInfo> dco_decode_list_live_pipe_info(dynamic raw);
 
   @protected
+  List<LiveSessionInfo> dco_decode_list_live_session_info(dynamic raw);
+
+  @protected
+  List<McpClientInfo> dco_decode_list_mcp_client_info(dynamic raw);
+
+  @protected
+  List<McpServerInfo> dco_decode_list_mcp_server_info(dynamic raw);
+
+  @protected
+  List<McpToolInfo> dco_decode_list_mcp_tool_info(dynamic raw);
+
+  @protected
   List<NetConnNode> dco_decode_list_net_conn_node(dynamic raw);
 
   @protected
@@ -270,7 +284,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<OrgTemplateInfo> dco_decode_list_org_template_info(dynamic raw);
 
   @protected
+  List<PeerMessageInfo> dco_decode_list_peer_message_info(dynamic raw);
+
+  @protected
   List<PipelineInfo> dco_decode_list_pipeline_info(dynamic raw);
+
+  @protected
+  List<PipelineMonitorNode> dco_decode_list_pipeline_monitor_node(dynamic raw);
 
   @protected
   Int64List dco_decode_list_prim_i_64_strict(dynamic raw);
@@ -334,6 +354,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   LivePipeInfo dco_decode_live_pipe_info(dynamic raw);
+
+  @protected
+  LiveSessionInfo dco_decode_live_session_info(dynamic raw);
+
+  @protected
+  McpClientInfo dco_decode_mcp_client_info(dynamic raw);
+
+  @protected
+  McpServerInfo dco_decode_mcp_server_info(dynamic raw);
+
+  @protected
+  McpToolInfo dco_decode_mcp_tool_info(dynamic raw);
 
   @protected
   NetConfig dco_decode_net_config(dynamic raw);
@@ -491,10 +523,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Overview dco_decode_overview(dynamic raw);
 
   @protected
+  PeerMessageInfo dco_decode_peer_message_info(dynamic raw);
+
+  @protected
   PipeRunResult dco_decode_pipe_run_result(dynamic raw);
 
   @protected
   PipelineInfo dco_decode_pipeline_info(dynamic raw);
+
+  @protected
+  PipelineMonitor dco_decode_pipeline_monitor(dynamic raw);
+
+  @protected
+  PipelineMonitorNode dco_decode_pipeline_monitor_node(dynamic raw);
 
   @protected
   PipelineRunResult dco_decode_pipeline_run_result(dynamic raw);
@@ -756,6 +797,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<LiveSessionInfo> sse_decode_list_live_session_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<McpClientInfo> sse_decode_list_mcp_client_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<McpServerInfo> sse_decode_list_mcp_server_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<McpToolInfo> sse_decode_list_mcp_tool_info(SseDeserializer deserializer);
+
+  @protected
   List<NetConnNode> sse_decode_list_net_conn_node(SseDeserializer deserializer);
 
   @protected
@@ -870,7 +929,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<PeerMessageInfo> sse_decode_list_peer_message_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<PipelineInfo> sse_decode_list_pipeline_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<PipelineMonitorNode> sse_decode_list_pipeline_monitor_node(
     SseDeserializer deserializer,
   );
 
@@ -954,6 +1023,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   LivePipeInfo sse_decode_live_pipe_info(SseDeserializer deserializer);
+
+  @protected
+  LiveSessionInfo sse_decode_live_session_info(SseDeserializer deserializer);
+
+  @protected
+  McpClientInfo sse_decode_mcp_client_info(SseDeserializer deserializer);
+
+  @protected
+  McpServerInfo sse_decode_mcp_server_info(SseDeserializer deserializer);
+
+  @protected
+  McpToolInfo sse_decode_mcp_tool_info(SseDeserializer deserializer);
 
   @protected
   NetConfig sse_decode_net_config(SseDeserializer deserializer);
@@ -1125,10 +1206,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Overview sse_decode_overview(SseDeserializer deserializer);
 
   @protected
+  PeerMessageInfo sse_decode_peer_message_info(SseDeserializer deserializer);
+
+  @protected
   PipeRunResult sse_decode_pipe_run_result(SseDeserializer deserializer);
 
   @protected
   PipelineInfo sse_decode_pipeline_info(SseDeserializer deserializer);
+
+  @protected
+  PipelineMonitor sse_decode_pipeline_monitor(SseDeserializer deserializer);
+
+  @protected
+  PipelineMonitorNode sse_decode_pipeline_monitor_node(
+    SseDeserializer deserializer,
+  );
 
   @protected
   PipelineRunResult sse_decode_pipeline_run_result(
@@ -1451,6 +1543,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_live_session_info(
+    List<LiveSessionInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_mcp_client_info(
+    List<McpClientInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_mcp_server_info(
+    List<McpServerInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_mcp_tool_info(
+    List<McpToolInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_net_conn_node(
     List<NetConnNode> self,
     SseSerializer serializer,
@@ -1604,8 +1720,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_peer_message_info(
+    List<PeerMessageInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_pipeline_info(
     List<PipelineInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_pipeline_monitor_node(
+    List<PipelineMonitorNode> self,
     SseSerializer serializer,
   );
 
@@ -1725,6 +1853,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_live_pipe_info(LivePipeInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_live_session_info(
+    LiveSessionInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_mcp_client_info(McpClientInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_mcp_server_info(McpServerInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_mcp_tool_info(McpToolInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_net_config(NetConfig self, SseSerializer serializer);
@@ -1946,10 +2089,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_overview(Overview self, SseSerializer serializer);
 
   @protected
+  void sse_encode_peer_message_info(
+    PeerMessageInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_pipe_run_result(PipeRunResult self, SseSerializer serializer);
 
   @protected
   void sse_encode_pipeline_info(PipelineInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pipeline_monitor(
+    PipelineMonitor self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pipeline_monitor_node(
+    PipelineMonitorNode self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_pipeline_run_result(

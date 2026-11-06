@@ -8,7 +8,7 @@ import 'package:muninn/src/state.dart';
 import 'fake_api.dart';
 
 Future<(FakeApi, ProviderContainer)> pump(WidgetTester t) async {
-  t.view.physicalSize = const Size(1280, 800);
+  t.view.physicalSize = const Size(1280, 1024);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
   final api = FakeApi();
@@ -378,5 +378,79 @@ void main() {
       api.netCalls,
       contains('exchange-restore:/tmp/muninn-exchanges.age:true'),
     );
+  });
+
+  testWidgets('MCP servers and clients list without exposing secrets', (
+    t,
+  ) async {
+    final (api, c) = await pump(t);
+    api.mcpServerList = const [
+      McpServerInfo(
+        id: 'srv-1',
+        name: 'docs',
+        transport: 'http',
+        url: 'https://mcp.example/docs',
+        credentials: ['token'],
+      ),
+    ];
+    api.mcpClientList = const [
+      McpClientInfo(id: 'cli-1', name: 'editor', role: 'read'),
+    ];
+    api.mcpToolList = const [
+      McpToolInfo(name: 'search', description: 'look up docs', approved: false),
+    ];
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('MCP…'));
+    await t.pumpAndSettle();
+    expect(c.read(netPaneProvider), NetPane.mcp);
+    expect(find.text('docs'), findsOneWidget);
+    expect(find.textContaining('https://mcp.example/docs'), findsOneWidget);
+    expect(find.text('editor'), findsOneWidget);
+    expect(find.textContaining('secret'), findsNothing);
+    expect(find.textContaining('sk-'), findsNothing);
+    await t.tap(find.byKey(const ValueKey('mcp-server-srv-1')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('mcp-tools-srv-1')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('mcp-tools:srv-1'));
+    expect(find.text('search'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('mcp-tool-search')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('mcp-approve:srv-1:search:true'));
+    await t.tap(find.text('Close'));
+    await t.pumpAndSettle();
+  });
+
+  testWidgets('Peers messages and live list stored conversations', (t) async {
+    final (api, _) = await pump(t);
+    api.peerMessageList = const [
+      PeerMessageInfo(
+        id: 'm1',
+        peer: 'peer-a',
+        peerLabel: 'Alice',
+        direction: 'in',
+        text: 'hello from the node',
+      ),
+    ];
+    api.liveSessionList = const [
+      LiveSessionInfo(
+        id: 's1',
+        kind: 'board',
+        title: 'standup',
+        status: 'open',
+      ),
+    ];
+    await unlock(t);
+    await t.tap(find.text('Net'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Peers, messages & live…'));
+    await t.pumpAndSettle();
+    expect(find.text('hello from the node'), findsOneWidget);
+    expect(find.textContaining('standup'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('collab-mark-read')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('peer-messages-read:'));
   });
 }

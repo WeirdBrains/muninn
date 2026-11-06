@@ -471,6 +471,104 @@ class PipelineRunResult {
   final List<String> lines, landed;
 }
 
+class PipelineMonitorNode {
+  const PipelineMonitorNode({
+    required this.id,
+    this.kind = '',
+    this.status = 'idle',
+    this.rowsIn = 0,
+    this.rowsOut = 0,
+    this.ms = 0,
+  });
+  final String id, kind, status;
+  final int rowsIn, rowsOut, ms;
+}
+
+class PipelineMonitor {
+  const PipelineMonitor({
+    required this.pipeline,
+    this.state = 'not run yet',
+    this.nodes = const [],
+    this.landed = const [],
+  });
+  final String pipeline, state;
+  final List<PipelineMonitorNode> nodes;
+  final List<String> landed;
+}
+
+class McpServerInfo {
+  const McpServerInfo({
+    required this.id,
+    required this.name,
+    this.transport = '',
+    this.command = '',
+    this.args = const [],
+    this.url = '',
+    this.credentials = const [],
+    this.createdAt = 0,
+  });
+  final String id, name, transport, command, url;
+  final List<String> args, credentials;
+  final int createdAt;
+}
+
+class McpClientInfo {
+  const McpClientInfo({
+    required this.id,
+    required this.name,
+    this.role = 'read',
+    this.createdAt = 0,
+    this.lastSeenAt = 0,
+    this.revoked = false,
+  });
+  final String id, name, role;
+  final int createdAt, lastSeenAt;
+  final bool revoked;
+}
+
+class McpToolInfo {
+  const McpToolInfo({
+    required this.name,
+    this.description = '',
+    this.approved = false,
+  });
+  final String name, description;
+  final bool approved;
+}
+
+class PeerMessageInfo {
+  const PeerMessageInfo({
+    required this.id,
+    required this.peer,
+    this.peerLabel = '',
+    this.direction = 'in',
+    this.about = '',
+    this.text = '',
+    this.createdAt = 0,
+    this.delivered = false,
+    this.read = false,
+    this.error = '',
+  });
+  final String id, peer, peerLabel, direction, about, text, error;
+  final int createdAt;
+  final bool delivered, read;
+}
+
+class LiveSessionInfo {
+  const LiveSessionInfo({
+    required this.id,
+    this.kind = '',
+    this.title = '',
+    this.role = '',
+    this.hostPeer = '',
+    this.status = '',
+    this.createdAt = 0,
+    this.updatedAt = 0,
+  });
+  final String id, kind, title, role, hostPeer, status;
+  final int createdAt, updatedAt;
+}
+
 class RuleInfo {
   const RuleInfo({
     required this.id,
@@ -1634,6 +1732,11 @@ abstract class MuninnApi {
     String source, {
     List<String> steps = const [],
     List<String> to = const [],
+    String? stdin,
+    String? stdinFile,
+    String? format,
+    int chunk = 0,
+    bool keepHeader = false,
   });
 
   /// `mnnn pipeline` / TUI Pipelines… (`E`).
@@ -1655,7 +1758,35 @@ abstract class MuninnApi {
   });
   Future<String> pipelineRemove(String pipeline);
   Future<String> pipelineApprove(String pipeline);
-  Future<PipelineRunResult> pipelineRun(String pipeline);
+  Future<PipelineRunResult> pipelineRun(
+    String pipeline, {
+    String? stdin,
+    String? stdinFile,
+    int chunk = 0,
+    bool keepHeader = false,
+  });
+  Future<PipelineInfo> pipelineTee(String pipeline, String node, String sink);
+  Future<PipelineInfo> pipelineEndInModel(
+    String pipeline,
+    String node,
+    String model,
+  );
+  Future<PipelineMonitor> pipelineMonitor(String pipeline);
+
+  /// TUI Net ▸ MCP… (`mnnn mcp`). Tokens and credential values stay in Rust.
+  Future<List<McpServerInfo>> mcpServers();
+  Future<List<McpClientInfo>> mcpClients();
+  Future<List<McpToolInfo>> mcpServerTools(String server);
+  Future<String> mcpApproveTool(String server, String tool, {bool on = true});
+  Future<String> mcpRemoveServer(String server);
+  Future<String> mcpClientRole(String client, String role);
+  Future<String> mcpClientRevoke(String client, {bool revoke = true});
+  Future<String> mcpRemoveClient(String client);
+
+  /// TUI `W` messages and live sessions (listing what the store holds).
+  Future<List<PeerMessageInfo>> peerMessages({String? peer});
+  Future<String> peerMessagesMarkRead({String? peer});
+  Future<List<LiveSessionInfo>> liveSessions();
   Future<String> pipelineExport(
     String pipeline,
     String path, {
