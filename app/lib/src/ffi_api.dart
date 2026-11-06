@@ -946,6 +946,84 @@ class FfiMuninnApi implements MuninnApi {
       r_models.modelRuleIds(key: key);
 
   @override
+  Future<ModelInfo> modelRestoreField(String key, String fieldId) async =>
+      _model(await r_models.modelRestoreField(key: key, fieldId: fieldId));
+
+  @override
+  Future<List<ModelTemplateInfo>> modelTemplates() async => [
+    for (final t in await r_models.modelTemplates()) _modelTemplate(t),
+  ];
+
+  @override
+  Future<String> modelExportTemplate(
+    String key,
+    String path, {
+    bool records = false,
+  }) => r_models.modelExportTemplate(key: key, path: path, records: records);
+
+  @override
+  Future<ModelImportPlanInfo> modelImportPreview(
+    String source, {
+    String? name,
+    bool merge = false,
+    bool draft = false,
+    bool noRecords = false,
+  }) async => _modelImportPlan(
+    await r_models.modelImportPreview(
+      source: source,
+      name: name,
+      merge: merge,
+      draft: draft,
+      noRecords: noRecords,
+    ),
+  );
+
+  @override
+  Future<String> modelImportTemplate(
+    String source, {
+    String? name,
+    bool merge = false,
+    bool draft = false,
+    bool noRecords = false,
+    bool destructive = false,
+  }) => r_models.modelImportTemplate(
+    source: source,
+    name: name,
+    merge: merge,
+    draft: draft,
+    noRecords: noRecords,
+    destructive: destructive,
+  );
+
+  @override
+  Future<RecordInfo> modelRecordCreate(String model, String values) async =>
+      _record(await r_models.modelRecordCreate(model: model, values: values));
+
+  @override
+  Future<RecordInfo> modelRecordUpdate(
+    String model,
+    String id,
+    String values,
+  ) async => _record(
+    await r_models.modelRecordUpdate(model: model, id: id, values: values),
+  );
+
+  @override
+  Future<String> modelRecordUpdateMany(
+    String model,
+    String text,
+    String values,
+  ) => r_models.modelRecordUpdateMany(model: model, text: text, values: values);
+
+  @override
+  Future<String> modelRecordDelete(String model, String id) =>
+      r_models.modelRecordDelete(model: model, id: id);
+
+  @override
+  Future<List<String>> modelRuleTry(String rule) =>
+      r_models.modelRuleTry(rule: rule);
+
+  @override
   Future<List<HistoryRowInfo>> historyTree() async => [
     for (final r in await r_history.historyTree()) _historyRow(r),
   ];
@@ -3208,6 +3286,35 @@ ModelPlanInfo _modelPlan(r_models.ModelPlanInfo p) => ModelPlanInfo(
   blocked: p.blocked,
   lines: p.lines,
 );
+
+ModelTemplateInfo _modelTemplate(r_models.ModelTemplateInfo t) =>
+    ModelTemplateInfo(
+      name: t.name,
+      source: t.source,
+      description: t.description,
+      fieldCount: t.fieldCount,
+      ruleCount: t.ruleCount,
+      recordCount: t.recordCount,
+    );
+
+ModelImportPlanInfo _modelImportPlan(r_models.ModelImportPlanInfo p) =>
+    ModelImportPlanInfo(
+      templateName: p.templateName,
+      model: p.model,
+      merge: p.merge,
+      clash: p.clash,
+      suggestedName: p.suggestedName,
+      from: p.from.toInt(),
+      to: p.to.toInt(),
+      records: p.records,
+      rules: p.rules,
+      lost: p.lost,
+      destructive: p.destructive,
+      blocked: p.blocked,
+      kept: p.kept,
+      lines: p.lines,
+      summary: p.summary,
+    );
 
 ModelVersionInfo _modelVersion(r_models.ModelVersionInfo v) => ModelVersionInfo(
   version: v.version.toInt(),

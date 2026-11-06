@@ -91,4 +91,99 @@ void main() {
     expect(api.ruleList, isNotEmpty);
     expect(api.ruleList.first.home, 'model signals');
   });
+
+  testWidgets('model designer restores a dropped field with the same id', (
+    t,
+  ) async {
+    final (api, c) = await pump(t);
+    await unlock(t);
+    await api.modelCreate('signals', fields: 'memo:text', draft: false);
+    final model = api.modelList.first;
+    final memo = model.designFields.firstWhere((f) => f.name == 'memo');
+    await api.modelEdit(model.id, drop: [memo.name]);
+    c.read(projectPaneProvider.notifier).state = ProjectPane.models;
+    c.read(viewingModelIdProvider.notifier).state = model.id;
+    c.read(sectionProvider.notifier).state = Section.projects;
+    await t.pumpAndSettle();
+
+    expect(api.modelList.first.designFields.first.dropped, isTrue);
+    await t.tap(find.byKey(ValueKey('design-field-action-${memo.id}')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('model-restore:${model.id}:${memo.id}'));
+    final restored = api.modelList.first.designFields.firstWhere(
+      (f) => f.id == memo.id,
+    );
+    expect(restored.dropped, isFalse);
+    expect(restored.name, 'memo');
+  });
+
+  testWidgets('model designer imports a template and edits records', (t) async {
+    final (api, c) = await pump(t);
+    await unlock(t);
+    c.read(projectPaneProvider.notifier).state = ProjectPane.models;
+    c.read(sectionProvider.notifier).state = Section.projects;
+    await t.pumpAndSettle();
+
+    await t.tap(find.byKey(const ValueKey('model-import')));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('model-import-source')),
+      'builtin:bars',
+    );
+    await t.tap(find.byKey(const ValueKey('model-import-source-save')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('model-import:builtin:bars::false'));
+    expect(api.modelList.any((m) => m.name == 'imported'), isTrue);
+
+    final model = api.modelList.firstWhere((m) => m.name == 'imported');
+    c.read(viewingModelIdProvider.notifier).state = model.id;
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('model-tab-records')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('model-record-new')));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('record-values')),
+      'memo=hello',
+    );
+    await t.tap(find.byKey(const ValueKey('record-values-save')));
+    await t.pumpAndSettle();
+    expect(
+      api.extraCalls,
+      contains('model-record-create:${model.id}:memo=hello'),
+    );
+    expect(api.recordList, isNotEmpty);
+    expect(find.text('hello'), findsWidgets);
+  });
+
+  testWidgets('model designer dry-runs a rule on the last history action', (
+    t,
+  ) async {
+    final (api, c) = await pump(t);
+    await unlock(t);
+    await api.modelCreate('signals', fields: 'memo:text', draft: false);
+    await api.ruleCreate(
+      'feed',
+      on: 'import',
+      then: 'status hi',
+      home: 'model:signals',
+    );
+    c.read(projectPaneProvider.notifier).state = ProjectPane.models;
+    c.read(viewingModelIdProvider.notifier).state = api.modelList.first.id;
+    c.read(sectionProvider.notifier).state = Section.projects;
+    await t.pumpAndSettle();
+
+    await t.tap(find.byKey(const ValueKey('model-tab-rules')));
+    await t.pumpAndSettle();
+    final id = api.ruleList.first.id;
+    await t.tap(find.byKey(ValueKey('model-rule-dry-$id')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('rule-dry-run:$id'));
+    expect(find.textContaining('would show'), findsOneWidget);
+    await t.tap(find.text('Close'));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(ValueKey('model-rule-try-$id')));
+    await t.pumpAndSettle();
+    expect(api.extraCalls, contains('model-rule-try:$id'));
+  });
 }

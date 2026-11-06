@@ -102,6 +102,7 @@ class FakeApi implements MuninnApi {
   List<ModelVersionInfo> modelVersions = const [];
   int _modelSeq = 0;
   int _fieldSeq = 0;
+  int _recordSeq = 0;
   final Map<String, PipeFrameInfo> pipeFrames = {};
   String? liveLayoutJson;
 
@@ -1411,6 +1412,226 @@ class FakeApi implements MuninnApi {
       for (final r in ruleList)
         if (r.home == 'model ${m.name}' || r.home == 'model:${m.name}') r.id,
     ];
+  }
+
+  ModelInfo _withCount(ModelInfo m, int n) => ModelInfo(
+    id: m.id,
+    shortId: m.shortId,
+    name: m.name,
+    description: m.description,
+    builtin: m.builtin,
+    version: m.version,
+    isBars: m.isBars,
+    fields: m.fields,
+    recordCount: n,
+    hasDraft: m.hasDraft,
+    status: m.status,
+    designFields: m.designFields,
+  );
+
+  List<RecordField> _parseValues(String values) {
+    final parts = values.contains(';')
+        ? values.split(';')
+        : values.split(RegExp(r'\s+'));
+    return [
+      for (final p in parts)
+        if (p.contains('='))
+          RecordField(
+            name: p.split('=').first.trim(),
+            value: p.substring(p.indexOf('=') + 1).trim(),
+          ),
+    ];
+  }
+
+  @override
+  Future<ModelInfo> modelRestoreField(String key, String fieldId) async {
+    extraCalls.add('model-restore:$key:$fieldId');
+    final m = _findModel(key);
+    final fields = <DesignFieldInfo>[];
+    var found = false;
+    for (final f in m.designFields) {
+      if (f.id != fieldId) {
+        fields.add(f);
+        continue;
+      }
+      found = true;
+      if (f.mark.trim() == '+') continue;
+      fields.add(
+        DesignFieldInfo(
+          id: f.id,
+          name: f.name,
+          spec: f.spec,
+          ty: f.ty,
+          required: f.required,
+          unique: f.unique,
+          indexed: f.indexed,
+          defaultValue: f.defaultValue,
+          choices: f.choices,
+          about: f.about,
+          mark: ' ',
+          dropped: false,
+          builtin: f.builtin,
+        ),
+      );
+    }
+    if (!found) throw StateError('no field $fieldId');
+    final n = ModelInfo(
+      id: m.id,
+      shortId: m.shortId,
+      name: m.name,
+      description: m.description,
+      builtin: m.builtin,
+      version: m.version,
+      isBars: m.isBars,
+      fields: [
+        for (final f in fields)
+          if (!f.dropped) f.name,
+      ],
+      recordCount: m.recordCount,
+      hasDraft: true,
+      status: 'draft',
+      designFields: fields,
+    );
+    _putModel(n);
+    return n;
+  }
+
+  @override
+  Future<List<ModelTemplateInfo>> modelTemplates() async {
+    extraCalls.add('model-templates');
+    return const [
+      ModelTemplateInfo(
+        name: 'bars',
+        source: 'builtin:bars',
+        description: 'OHLCV bars',
+        fieldCount: 8,
+      ),
+    ];
+  }
+
+  @override
+  Future<String> modelExportTemplate(
+    String key,
+    String path, {
+    bool records = false,
+  }) async {
+    extraCalls.add('model-export:$key:$path:$records');
+    final m = _findModel(key);
+    return 'wrote template ${m.name} to $path';
+  }
+
+  @override
+  Future<ModelImportPlanInfo> modelImportPreview(
+    String source, {
+    String? name,
+    bool merge = false,
+    bool draft = false,
+    bool noRecords = false,
+  }) async {
+    extraCalls.add('model-import-preview:$source');
+    final want = (name == null || name.isEmpty) ? 'imported' : name;
+    return ModelImportPlanInfo(
+      templateName: source.startsWith('builtin:')
+          ? source.substring(8)
+          : 'file',
+      model: want,
+      merge: merge,
+      summary: 'preview $source as $want',
+    );
+  }
+
+  @override
+  Future<String> modelImportTemplate(
+    String source, {
+    String? name,
+    bool merge = false,
+    bool draft = false,
+    bool noRecords = false,
+    bool destructive = false,
+  }) async {
+    extraCalls.add('model-import:$source:${name ?? ""}:$merge');
+    if (!merge) {
+      await modelCreate(name ?? 'imported', fields: 'memo:text', draft: draft);
+    }
+    return 'imported $source as ${name ?? "imported"}';
+  }
+
+  @override
+  Future<RecordInfo> modelRecordCreate(String model, String values) async {
+    extraCalls.add('model-record-create:$model:$values');
+    final m = _findModel(model);
+    final id = 'r${++_recordSeq}';
+    final rec = RecordInfo(
+      id: id,
+      shortId: id,
+      modelId: m.id,
+      fields: _parseValues(values),
+    );
+    recordList = [...recordList, rec];
+    _putModel(_withCount(m, m.recordCount + 1));
+    return rec;
+  }
+
+  @override
+  Future<RecordInfo> modelRecordUpdate(
+    String model,
+    String id,
+    String values,
+  ) async {
+    extraCalls.add('model-record-update:$model:$id:$values');
+    final old = recordList.firstWhere((r) => r.id == id || r.shortId == id);
+    final next = Map<String, String>.from({
+      for (final f in old.fields) f.name: f.value,
+    });
+    for (final f in _parseValues(values)) {
+      next[f.name] = f.value;
+    }
+    final rec = RecordInfo(
+      id: old.id,
+      shortId: old.shortId,
+      modelId: old.modelId,
+      version: old.version + 1,
+      fields: [
+        for (final e in next.entries) RecordField(name: e.key, value: e.value),
+      ],
+    );
+    recordList = [
+      for (final r in recordList)
+        if (r.id == old.id) rec else r,
+    ];
+    return rec;
+  }
+
+  @override
+  Future<String> modelRecordUpdateMany(
+    String model,
+    String text,
+    String values,
+  ) async {
+    extraCalls.add('model-record-update-many:$model:$text:$values');
+    final rows = await modelRecords(model, text: text);
+    for (final r in rows) {
+      await modelRecordUpdate(model, r.id, values);
+    }
+    return 'updated ${rows.length} records';
+  }
+
+  @override
+  Future<String> modelRecordDelete(String model, String id) async {
+    extraCalls.add('model-record-delete:$model:$id');
+    final m = _findModel(model);
+    recordList = [
+      for (final r in recordList)
+        if (!(r.modelId == m.id && (r.id == id || r.shortId == id))) r,
+    ];
+    _putModel(_withCount(m, m.recordCount > 0 ? m.recordCount - 1 : 0));
+    return 'deleted record $id';
+  }
+
+  @override
+  Future<List<String>> modelRuleTry(String rule) async {
+    extraCalls.add('model-rule-try:$rule');
+    return ['ran $rule on #1 import: ok', '  hi'];
   }
 
   @override

@@ -251,6 +251,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ModelInfo> dco_decode_list_model_info(dynamic raw);
 
   @protected
+  List<ModelTemplateInfo> dco_decode_list_model_template_info(dynamic raw);
+
+  @protected
   List<ModelVersionInfo> dco_decode_list_model_version_info(dynamic raw);
 
   @protected
@@ -424,10 +427,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   McpToolInfo dco_decode_mcp_tool_info(dynamic raw);
 
   @protected
+  ModelImportPlanInfo dco_decode_model_import_plan_info(dynamic raw);
+
+  @protected
   ModelInfo dco_decode_model_info(dynamic raw);
 
   @protected
   ModelPlanInfo dco_decode_model_plan_info(dynamic raw);
+
+  @protected
+  ModelTemplateInfo dco_decode_model_template_info(dynamic raw);
 
   @protected
   ModelVersionInfo dco_decode_model_version_info(dynamic raw);
@@ -949,6 +958,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ModelInfo> sse_decode_list_model_info(SseDeserializer deserializer);
 
   @protected
+  List<ModelTemplateInfo> sse_decode_list_model_template_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ModelVersionInfo> sse_decode_list_model_version_info(
     SseDeserializer deserializer,
   );
@@ -1182,10 +1196,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   McpToolInfo sse_decode_mcp_tool_info(SseDeserializer deserializer);
 
   @protected
+  ModelImportPlanInfo sse_decode_model_import_plan_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ModelInfo sse_decode_model_info(SseDeserializer deserializer);
 
   @protected
   ModelPlanInfo sse_decode_model_plan_info(SseDeserializer deserializer);
+
+  @protected
+  ModelTemplateInfo sse_decode_model_template_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ModelVersionInfo sse_decode_model_version_info(SseDeserializer deserializer);
@@ -1815,6 +1839,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_model_template_info(
+    List<ModelTemplateInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_model_version_info(
     List<ModelVersionInfo> self,
     SseSerializer serializer,
@@ -2136,10 +2166,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_mcp_tool_info(McpToolInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_model_import_plan_info(
+    ModelImportPlanInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_model_info(ModelInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_model_plan_info(ModelPlanInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_model_template_info(
+    ModelTemplateInfo self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_model_version_info(

@@ -1,6 +1,7 @@
 /// Model designer (TUI Data ▸ Model designer… / `D` / `mnnn model`).
-/// Create and edit fields as a draft, preview and apply migrations, roll
-/// versions back, and attach model-owned rules.
+/// Create and edit fields as a draft, restore dropped fields by id, import
+/// and export templates, create/edit records, preview and apply migrations,
+/// roll versions back, and attach, dry-run or run model-owned rules.
 library;
 
 import 'package:flutter/material.dart';
@@ -127,6 +128,126 @@ class _PromptDialogState extends State<_PromptDialog> {
   }
 }
 
+Future<void> _showLines(
+  BuildContext context,
+  String title,
+  List<String> lines,
+) async {
+  if (!context.mounted) return;
+  final m = context.muninn;
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: m.bg,
+      title: Text(title, style: TextStyle(color: m.header)),
+      content: SizedBox(
+        width: 520,
+        height: 360,
+        child: SelectableText(
+          lines.isEmpty ? '(no output)' : lines.join('\n'),
+          style: TextStyle(color: m.fg, fontFamily: 'monospace'),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _exportTemplate(
+  BuildContext context,
+  WidgetRef ref,
+  ModelInfo model,
+) async {
+  final path = await _prompt(
+    context,
+    title: 'Export template',
+    label: 'Path (.template.json)',
+    value: '${model.name}.template.json',
+    keyName: 'model-export-path',
+  );
+  if (path == null || path.trim().isEmpty) return;
+  try {
+    final msg = await ref
+        .read(apiProvider)
+        .modelExportTemplate(model.id, path.trim());
+    refreshProjectExtras(ref);
+    if (context.mounted) _ok(context, msg);
+  } catch (e) {
+    if (context.mounted) _ok(context, '$e', color: context.muninn.error);
+  }
+}
+
+Future<void> _importTemplate(BuildContext context, WidgetRef ref) async {
+  final source = await _prompt(
+    context,
+    title: 'Import template',
+    label: 'Path or builtin:bars',
+    value: 'builtin:bars',
+    keyName: 'model-import-source',
+  );
+  if (source == null || source.trim().isEmpty) return;
+  try {
+    final api = ref.read(apiProvider);
+    var name = '';
+    var merge = false;
+    var preview = await api.modelImportPreview(source.trim());
+    if (preview.clash) {
+      if (!context.mounted) return;
+      final picked = await _prompt(
+        context,
+        title: 'Model ${preview.model} exists',
+        label: 'A new name, or merge',
+        value: preview.suggestedName,
+        keyName: 'model-import-name',
+      );
+      if (picked == null) return;
+      if (picked.trim().toLowerCase() == 'merge') {
+        merge = true;
+      } else {
+        name = picked.trim();
+      }
+      preview = await api.modelImportPreview(
+        source.trim(),
+        name: name.isEmpty ? null : name,
+        merge: merge,
+      );
+    }
+    if (preview.blocked.isNotEmpty) {
+      if (context.mounted) {
+        _ok(context, preview.blocked.join('; '), color: context.muninn.error);
+      }
+      return;
+    }
+    var destructive = false;
+    if (preview.destructive) {
+      if (!context.mounted) return;
+      if (!await _confirm(
+        context,
+        'Import template',
+        'This loses ${preview.lost} value${preview.lost == 1 ? '' : 's'}. Import anyway?',
+      )) {
+        return;
+      }
+      destructive = true;
+    }
+    final msg = await api.modelImportTemplate(
+      source.trim(),
+      name: name.isEmpty ? null : name,
+      merge: merge,
+      destructive: destructive,
+    );
+    refreshProjectExtras(ref);
+    if (context.mounted) _ok(context, msg);
+  } catch (e) {
+    if (context.mounted) _ok(context, '$e', color: context.muninn.error);
+  }
+}
+
 class ModelsPane extends ConsumerWidget {
   const ModelsPane({super.key});
 
@@ -171,6 +292,13 @@ class ModelsPane extends ConsumerWidget {
                         label: const Text('New model…'),
                       ),
                       const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        key: const ValueKey('model-import'),
+                        onPressed: () => _importTemplate(context, ref),
+                        icon: const Icon(Icons.file_download_outlined),
+                        label: const Text('Import template…'),
+                      ),
+                      const SizedBox(height: 8),
                       if (all.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 16),
@@ -202,6 +330,8 @@ class ModelsPane extends ConsumerWidget {
                                 model.id;
                             ref.read(viewingRecordIdProvider.notifier).state =
                                 null;
+                            ref.read(modelRecordsQueryProvider.notifier).state =
+                                '';
                           },
                         ),
                     ],
@@ -568,6 +698,12 @@ class _DesignTab extends ConsumerWidget {
                   : null,
               child: const Text('Discard draft'),
             ),
+            OutlinedButton.icon(
+              key: const ValueKey('model-export'),
+              onPressed: () => _exportTemplate(context, ref, model),
+              icon: const Icon(Icons.file_upload_outlined),
+              label: const Text('Export template…'),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -663,12 +799,17 @@ class _DesignTab extends ConsumerWidget {
                   icon: const Icon(Icons.edit_outlined),
                 ),
                 IconButton(
-                  tooltip: fields[i].dropped ? 'Restore' : 'Drop',
+                  key: ValueKey('design-field-action-${fields[i].id}'),
+                  tooltip: fields[i].dropped
+                      ? 'Restore (same field id)'
+                      : fields[i].mark.trim() == '~'
+                      ? 'Undo change'
+                      : 'Drop',
                   onPressed: () => run(() async {
-                    if (fields[i].dropped) {
+                    if (fields[i].dropped || fields[i].mark.trim() == '~') {
                       await ref
                           .read(apiProvider)
-                          .modelEdit(model.id, add: [fields[i].spec]);
+                          .modelRestoreField(model.id, fields[i].id);
                     } else {
                       await ref
                           .read(apiProvider)
@@ -676,7 +817,9 @@ class _DesignTab extends ConsumerWidget {
                     }
                   }),
                   icon: Icon(
-                    fields[i].dropped ? Icons.undo : Icons.delete_outline,
+                    fields[i].dropped || fields[i].mark.trim() == '~'
+                        ? Icons.undo
+                        : Icons.delete_outline,
                   ),
                 ),
               ],
@@ -891,6 +1034,73 @@ class _RulesTab extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           TextButton(
+                            key: ValueKey('model-rule-test-${r.id}'),
+                            onPressed: () async {
+                              try {
+                                final lines = await ref
+                                    .read(apiProvider)
+                                    .ruleTest(rule: r.id);
+                                if (context.mounted) {
+                                  await _showLines(
+                                    context,
+                                    'Test ${r.name}',
+                                    lines,
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  _ok(context, '$e', color: m.error);
+                                }
+                              }
+                            },
+                            child: const Text('Test'),
+                          ),
+                          TextButton(
+                            key: ValueKey('model-rule-dry-${r.id}'),
+                            onPressed: () async {
+                              try {
+                                final lines = await ref
+                                    .read(apiProvider)
+                                    .ruleDryRun(rule: r.id);
+                                if (context.mounted) {
+                                  await _showLines(
+                                    context,
+                                    'Dry run ${r.name}',
+                                    lines,
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  _ok(context, '$e', color: m.error);
+                                }
+                              }
+                            },
+                            child: const Text('Dry run'),
+                          ),
+                          TextButton(
+                            key: ValueKey('model-rule-try-${r.id}'),
+                            onPressed: () async {
+                              try {
+                                final lines = await ref
+                                    .read(apiProvider)
+                                    .modelRuleTry(r.id);
+                                refreshProjectExtras(ref);
+                                if (context.mounted) {
+                                  await _showLines(
+                                    context,
+                                    'Run ${r.name}',
+                                    lines,
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  _ok(context, '$e', color: m.error);
+                                }
+                              }
+                            },
+                            child: const Text('Run'),
+                          ),
+                          TextButton(
                             onPressed: () async {
                               try {
                                 if (r.enabled) {
@@ -1043,9 +1253,72 @@ class _RecordsColumn extends ConsumerWidget {
   final ModelInfo model;
   final String? recordId;
 
+  String _assignments(RecordInfo r) => [
+    for (final f in r.fields)
+      if (!f.name.startsWith('_') && f.name != 'id') '${f.name}=${f.value}',
+  ].join('; ');
+
+  Future<void> _newRecord(BuildContext context, WidgetRef ref) async {
+    final values = await _prompt(
+      context,
+      title: 'New record',
+      label: 'field=value; field=value',
+      keyName: 'record-values',
+    );
+    if (values == null || values.trim().isEmpty) return;
+    try {
+      final rec = await ref
+          .read(apiProvider)
+          .modelRecordCreate(model.id, values.trim());
+      refreshProjectExtras(ref);
+      ref.read(viewingRecordIdProvider.notifier).state = rec.id;
+      if (context.mounted) {
+        _ok(context, 'created ${model.name} record ${rec.shortId}');
+      }
+    } catch (e) {
+      if (context.mounted) _ok(context, '$e', color: context.muninn.error);
+    }
+  }
+
+  Future<void> _bulkUpdate(BuildContext context, WidgetRef ref) async {
+    final text = ref.read(modelRecordsQueryProvider).trim();
+    if (text.isEmpty) {
+      _ok(
+        context,
+        'set a filter first: bulk update changes every matching record',
+      );
+      return;
+    }
+    final values = await _prompt(
+      context,
+      title: 'Update matching records',
+      label: 'field=value; field=value',
+      keyName: 'record-bulk-values',
+    );
+    if (values == null || values.trim().isEmpty) return;
+    if (!context.mounted) return;
+    if (!await _confirm(
+      context,
+      'Update matching records',
+      'Set ${values.trim()} on every ${model.name} record matching "$text"?',
+    )) {
+      return;
+    }
+    try {
+      final msg = await ref
+          .read(apiProvider)
+          .modelRecordUpdateMany(model.id, text, values.trim());
+      refreshProjectExtras(ref);
+      if (context.mounted) _ok(context, msg);
+    } catch (e) {
+      if (context.mounted) _ok(context, '$e', color: context.muninn.error);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final m = context.muninn;
+    final query = ref.watch(modelRecordsQueryProvider);
     return ref
         .watch(modelRecordsProvider)
         .when(
@@ -1067,6 +1340,33 @@ class _RecordsColumn extends ConsumerWidget {
                       Text(
                         '${model.name} · ${rows.length} shown',
                         style: TextStyle(color: m.muted),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('model-record-filter'),
+                        decoration: InputDecoration(
+                          labelText: query.isEmpty
+                              ? 'Filter'
+                              : 'Filter · $query',
+                          isDense: true,
+                        ),
+                        onSubmitted: (v) =>
+                            ref.read(modelRecordsQueryProvider.notifier).state =
+                                v,
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.icon(
+                        key: const ValueKey('model-record-new'),
+                        onPressed: () => _newRecord(context, ref),
+                        icon: const Icon(Icons.add),
+                        label: const Text('New record…'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        key: const ValueKey('model-record-bulk'),
+                        onPressed: () => _bulkUpdate(context, ref),
+                        icon: const Icon(Icons.edit_note),
+                        label: const Text('Update matching…'),
                       ),
                       if (rows.isEmpty)
                         Padding(
@@ -1094,7 +1394,11 @@ class _RecordsColumn extends ConsumerWidget {
                 ),
                 VerticalDivider(width: 1, color: m.border),
                 Expanded(
-                  child: _RecordDetail(modelId: model.id, recordId: recordId),
+                  child: _RecordDetail(
+                    model: model,
+                    recordId: recordId,
+                    assignmentsOf: _assignments,
+                  ),
                 ),
               ],
             );
@@ -1112,9 +1416,63 @@ class _RecordsColumn extends ConsumerWidget {
 }
 
 class _RecordDetail extends ConsumerWidget {
-  const _RecordDetail({required this.modelId, this.recordId});
-  final String modelId;
+  const _RecordDetail({
+    required this.model,
+    this.recordId,
+    required this.assignmentsOf,
+  });
+  final ModelInfo model;
   final String? recordId;
+  final String Function(RecordInfo) assignmentsOf;
+
+  Future<void> _edit(
+    BuildContext context,
+    WidgetRef ref,
+    RecordInfo rec,
+  ) async {
+    final values = await _prompt(
+      context,
+      title: 'Edit record',
+      label: 'field=value; an empty value clears it',
+      value: assignmentsOf(rec),
+      keyName: 'record-edit-values',
+      maxLines: 4,
+    );
+    if (values == null) return;
+    try {
+      await ref.read(apiProvider).modelRecordUpdate(model.id, rec.id, values);
+      refreshProjectExtras(ref);
+      if (context.mounted) {
+        _ok(context, 'updated ${model.name} record ${rec.shortId}');
+      }
+    } catch (e) {
+      if (context.mounted) _ok(context, '$e', color: context.muninn.error);
+    }
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    RecordInfo rec,
+  ) async {
+    if (!await _confirm(
+      context,
+      'Delete record',
+      'Delete ${model.name} record ${rec.shortId}?',
+    )) {
+      return;
+    }
+    try {
+      final msg = await ref
+          .read(apiProvider)
+          .modelRecordDelete(model.id, rec.id);
+      ref.read(viewingRecordIdProvider.notifier).state = null;
+      refreshProjectExtras(ref);
+      if (context.mounted) _ok(context, msg);
+    } catch (e) {
+      if (context.mounted) _ok(context, '$e', color: context.muninn.error);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1145,6 +1503,24 @@ class _RecordDetail extends ConsumerWidget {
                 Text(
                   rec.shortId,
                   style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      key: const ValueKey('model-record-edit'),
+                      onPressed: () => _edit(context, ref, rec),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit…'),
+                    ),
+                    OutlinedButton.icon(
+                      key: const ValueKey('model-record-delete'),
+                      onPressed: () => _delete(context, ref, rec),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Delete'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 for (final f in rec.fields)

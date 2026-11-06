@@ -401,6 +401,43 @@ class ModelPlanInfo {
   final List<String> blocked, lines;
 }
 
+class ModelTemplateInfo {
+  const ModelTemplateInfo({
+    required this.name,
+    required this.source,
+    this.description = '',
+    this.fieldCount = 0,
+    this.ruleCount = 0,
+    this.recordCount = 0,
+  });
+  final String name, source, description;
+  final int fieldCount, ruleCount, recordCount;
+}
+
+class ModelImportPlanInfo {
+  const ModelImportPlanInfo({
+    this.templateName = '',
+    this.model = '',
+    this.merge = false,
+    this.clash = false,
+    this.suggestedName = '',
+    this.from = 0,
+    this.to = 0,
+    this.records = 0,
+    this.rules = 0,
+    this.lost = 0,
+    this.destructive = false,
+    this.blocked = const [],
+    this.kept = const [],
+    this.lines = const [],
+    this.summary = '',
+  });
+  final String templateName, model, suggestedName, summary;
+  final bool merge, clash, destructive;
+  final int from, to, records, rules, lost;
+  final List<String> blocked, kept, lines;
+}
+
 class ModelVersionInfo {
   const ModelVersionInfo({
     required this.version,
@@ -1904,6 +1941,37 @@ abstract class MuninnApi {
   });
   Future<String> modelRemove(String key, {bool destructive = false});
   Future<List<String>> modelRuleIds(String key);
+  Future<ModelInfo> modelRestoreField(String key, String fieldId);
+  Future<List<ModelTemplateInfo>> modelTemplates();
+  Future<String> modelExportTemplate(
+    String key,
+    String path, {
+    bool records = false,
+  });
+  Future<ModelImportPlanInfo> modelImportPreview(
+    String source, {
+    String? name,
+    bool merge = false,
+    bool draft = false,
+    bool noRecords = false,
+  });
+  Future<String> modelImportTemplate(
+    String source, {
+    String? name,
+    bool merge = false,
+    bool draft = false,
+    bool noRecords = false,
+    bool destructive = false,
+  });
+  Future<RecordInfo> modelRecordCreate(String model, String values);
+  Future<RecordInfo> modelRecordUpdate(String model, String id, String values);
+  Future<String> modelRecordUpdateMany(
+    String model,
+    String text,
+    String values,
+  );
+  Future<String> modelRecordDelete(String model, String id);
+  Future<List<String>> modelRuleTry(String rule);
 
   /// Action history (`View ▸ History`, TUI `Y` / `u` / `U`).
   Future<List<HistoryRowInfo>> historyTree();

@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `design_fields`, `field_info`, `model_apply_of`, `model_create_of`, `model_discard_of`, `model_edit_of`, `model_history_of`, `model_info`, `model_of`, `model_plan_of`, `model_record_of`, `model_records_of`, `model_remove_of`, `model_rename_of`, `model_rollback_of`, `model_rollback_plan_of`, `model_rule_homes_of`, `model_set_field_of`, `models_of`, `note`, `parse_ops`, `plan_info`, `record_info`, `val_str`, `version_info`
+// These functions are ignored because they are not marked as `pub`: `assignment_map`, `design_fields`, `field_info`, `model_apply_of`, `model_create_of`, `model_discard_of`, `model_edit_of`, `model_export_template_of`, `model_history_of`, `model_import_preview_of`, `model_import_template_of`, `model_info`, `model_of`, `model_plan_of`, `model_record_create_of`, `model_record_delete_of`, `model_record_of`, `model_record_update_many_of`, `model_record_update_of`, `model_records_of`, `model_remove_of`, `model_rename_of`, `model_restore_field_of`, `model_rollback_of`, `model_rollback_plan_of`, `model_rule_homes_of`, `model_rule_try_of`, `model_set_field_of`, `models_of`, `note`, `parse_ops`, `plan_info`, `read_template`, `record_info`, `val_str`, `version_info`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`, `fmt`
 
 /// Models in the store (`mnnn model list` / TUI Data ▸ Model designer…).
@@ -142,6 +142,102 @@ Future<String> modelRemove({required String key, required bool destructive}) =>
 Future<List<String>> modelRuleIds({required String key}) =>
     RustLib.instance.api.crateApiModelsModelRuleIds(key: key);
 
+/// Undo the draft change to one field, keeping its id (TUI `u`).
+/// A dropped field is put back; a changed field is restored; a newly added field is removed.
+Future<ModelInfo> modelRestoreField({
+  required String key,
+  required String fieldId,
+}) => RustLib.instance.api.crateApiModelsModelRestoreField(
+  key: key,
+  fieldId: fieldId,
+);
+
+/// Built-in design templates (`mnnn model templates` / TUI `i` `builtin:bars`).
+Future<List<ModelTemplateInfo>> modelTemplates() =>
+    RustLib.instance.api.crateApiModelsModelTemplates();
+
+/// Export a design as a template file (TUI export; records optional).
+Future<String> modelExportTemplate({
+  required String key,
+  required String path,
+  required bool records,
+}) => RustLib.instance.api.crateApiModelsModelExportTemplate(
+  key: key,
+  path: path,
+  records: records,
+);
+
+/// Preview importing a template file or `builtin:NAME` (TUI import).
+Future<ModelImportPlanInfo> modelImportPreview({
+  required String source,
+  String? name,
+  required bool merge,
+  required bool draft,
+  required bool noRecords,
+}) => RustLib.instance.api.crateApiModelsModelImportPreview(
+  source: source,
+  name: name,
+  merge: merge,
+  draft: draft,
+  noRecords: noRecords,
+);
+
+/// Import a template file or `builtin:NAME` (TUI import / `mnnn model import`).
+Future<String> modelImportTemplate({
+  required String source,
+  String? name,
+  required bool merge,
+  required bool draft,
+  required bool noRecords,
+  required bool destructive,
+}) => RustLib.instance.api.crateApiModelsModelImportTemplate(
+  source: source,
+  name: name,
+  merge: merge,
+  draft: draft,
+  noRecords: noRecords,
+  destructive: destructive,
+);
+
+/// Create a record (`field=value …` / TUI `n`).
+Future<RecordInfo> modelRecordCreate({
+  required String model,
+  required String values,
+}) => RustLib.instance.api.crateApiModelsModelRecordCreate(
+  model: model,
+  values: values,
+);
+
+/// Update one record (`field=value …`; empty value clears it / TUI `e`).
+Future<RecordInfo> modelRecordUpdate({
+  required String model,
+  required String id,
+  required String values,
+}) => RustLib.instance.api.crateApiModelsModelRecordUpdate(
+  model: model,
+  id: id,
+  values: values,
+);
+
+/// Set fields on every record matching [text] (TUI `U`).
+Future<String> modelRecordUpdateMany({
+  required String model,
+  required String text,
+  required String values,
+}) => RustLib.instance.api.crateApiModelsModelRecordUpdateMany(
+  model: model,
+  text: text,
+  values: values,
+);
+
+/// Delete one record (TUI `d`).
+Future<String> modelRecordDelete({required String model, required String id}) =>
+    RustLib.instance.api.crateApiModelsModelRecordDelete(model: model, id: id);
+
+/// Run a model-owned rule on the last history action (TUI Rules Enter).
+Future<List<String>> modelRuleTry({required String rule}) =>
+    RustLib.instance.api.crateApiModelsModelRuleTry(rule: rule);
+
 class DesignFieldInfo {
   final String id;
   final String name;
@@ -209,6 +305,81 @@ class DesignFieldInfo {
           mark == other.mark &&
           dropped == other.dropped &&
           builtin == other.builtin;
+}
+
+class ModelImportPlanInfo {
+  final String templateName;
+  final String model;
+  final bool merge;
+  final bool clash;
+  final String suggestedName;
+  final PlatformInt64 from;
+  final PlatformInt64 to;
+  final int records;
+  final int rules;
+  final int lost;
+  final bool destructive;
+  final List<String> blocked;
+  final List<String> kept;
+  final List<String> lines;
+  final String summary;
+
+  const ModelImportPlanInfo({
+    required this.templateName,
+    required this.model,
+    required this.merge,
+    required this.clash,
+    required this.suggestedName,
+    required this.from,
+    required this.to,
+    required this.records,
+    required this.rules,
+    required this.lost,
+    required this.destructive,
+    required this.blocked,
+    required this.kept,
+    required this.lines,
+    required this.summary,
+  });
+
+  @override
+  int get hashCode =>
+      templateName.hashCode ^
+      model.hashCode ^
+      merge.hashCode ^
+      clash.hashCode ^
+      suggestedName.hashCode ^
+      from.hashCode ^
+      to.hashCode ^
+      records.hashCode ^
+      rules.hashCode ^
+      lost.hashCode ^
+      destructive.hashCode ^
+      blocked.hashCode ^
+      kept.hashCode ^
+      lines.hashCode ^
+      summary.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ModelImportPlanInfo &&
+          runtimeType == other.runtimeType &&
+          templateName == other.templateName &&
+          model == other.model &&
+          merge == other.merge &&
+          clash == other.clash &&
+          suggestedName == other.suggestedName &&
+          from == other.from &&
+          to == other.to &&
+          records == other.records &&
+          rules == other.rules &&
+          lost == other.lost &&
+          destructive == other.destructive &&
+          blocked == other.blocked &&
+          kept == other.kept &&
+          lines == other.lines &&
+          summary == other.summary;
 }
 
 class ModelInfo {
@@ -315,6 +486,45 @@ class ModelPlanInfo {
           destructive == other.destructive &&
           blocked == other.blocked &&
           lines == other.lines;
+}
+
+class ModelTemplateInfo {
+  final String name;
+  final String source;
+  final String description;
+  final int fieldCount;
+  final int ruleCount;
+  final int recordCount;
+
+  const ModelTemplateInfo({
+    required this.name,
+    required this.source,
+    required this.description,
+    required this.fieldCount,
+    required this.ruleCount,
+    required this.recordCount,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^
+      source.hashCode ^
+      description.hashCode ^
+      fieldCount.hashCode ^
+      ruleCount.hashCode ^
+      recordCount.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ModelTemplateInfo &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          source == other.source &&
+          description == other.description &&
+          fieldCount == other.fieldCount &&
+          ruleCount == other.ruleCount &&
+          recordCount == other.recordCount;
 }
 
 class ModelVersionInfo {

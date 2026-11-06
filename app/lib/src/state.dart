@@ -500,11 +500,15 @@ final modelsProvider = FutureProvider<List<ModelInfo>?>((ref) {
 
 final viewingModelIdProvider = StateProvider<String?>((ref) => null);
 final viewingRecordIdProvider = StateProvider<String?>((ref) => null);
+final modelRecordsQueryProvider = StateProvider<String>((ref) => '');
 
 final modelRecordsProvider = FutureProvider<List<RecordInfo>?>((ref) {
   final id = ref.watch(viewingModelIdProvider);
   if (id == null || !ref.watch(unlockedProvider)) return Future.value(null);
-  return ref.watch(apiProvider).modelRecords(id);
+  final text = ref.watch(modelRecordsQueryProvider).trim();
+  return ref
+      .watch(apiProvider)
+      .modelRecords(id, text: text.isEmpty ? null : text);
 });
 
 final recordDetailProvider = FutureProvider<RecordInfo?>((ref) {
