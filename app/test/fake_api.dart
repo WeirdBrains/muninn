@@ -99,6 +99,9 @@ class FakeApi implements MuninnApi {
   List<FoundRecordInfo> foundRecords = const [];
   List<ModelInfo> modelList = const [];
   List<RecordInfo> recordList = const [];
+  List<ModelVersionInfo> modelVersions = const [];
+  int _modelSeq = 0;
+  int _fieldSeq = 0;
   final Map<String, PipeFrameInfo> pipeFrames = {};
   String? liveLayoutJson;
 
@@ -691,12 +694,75 @@ class FakeApi implements MuninnApi {
     imageList.firstWhere((x) => x.id == id);
     // 1×1 opaque red PNG so widget tests can paint Image.memory.
     return Uint8List.fromList(const [
-      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-      0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-      0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xDE, 0x00, 0x00, 0x00,
-      0x0C, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
-      0x00, 0x00, 0x03, 0x00, 0x01, 0x18, 0xDD, 0x8D, 0xB0, 0x00, 0x00, 0x00,
-      0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+      0x89,
+      0x50,
+      0x4E,
+      0x47,
+      0x0D,
+      0x0A,
+      0x1A,
+      0x0A,
+      0x00,
+      0x00,
+      0x00,
+      0x0D,
+      0x49,
+      0x48,
+      0x44,
+      0x52,
+      0x00,
+      0x00,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00,
+      0x01,
+      0x08,
+      0x02,
+      0x00,
+      0x00,
+      0x00,
+      0x90,
+      0x77,
+      0x53,
+      0xDE,
+      0x00,
+      0x00,
+      0x00,
+      0x0C,
+      0x49,
+      0x44,
+      0x41,
+      0x54,
+      0x08,
+      0xD7,
+      0x63,
+      0xF8,
+      0xCF,
+      0xC0,
+      0x00,
+      0x00,
+      0x00,
+      0x03,
+      0x00,
+      0x01,
+      0x18,
+      0xDD,
+      0x8D,
+      0xB0,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x49,
+      0x45,
+      0x4E,
+      0x44,
+      0xAE,
+      0x42,
+      0x60,
+      0x82,
     ]);
   }
 
@@ -1006,6 +1072,345 @@ class FakeApi implements MuninnApi {
   Future<RecordInfo> modelRecord(String model, String id) async {
     extraCalls.add('model-record:$model:$id');
     return recordList.firstWhere((r) => r.modelId == model && r.id == id);
+  }
+
+  ModelInfo _findModel(String key) => modelList.firstWhere(
+    (m) => m.id == key || m.name == key || m.shortId == key,
+  );
+
+  DesignFieldInfo _parseSpec(String spec, {String? id, String mark = '+'}) {
+    final name = spec.split(RegExp(r'[:\s]')).first.trim();
+    final ty = spec.contains(':')
+        ? spec.split(':')[1].trim().split(RegExp(r'\s')).first
+        : 'text';
+    return DesignFieldInfo(
+      id: id ?? 'f${++_fieldSeq}',
+      name: name,
+      spec: spec,
+      ty: ty,
+      mark: mark,
+    );
+  }
+
+  void _putModel(ModelInfo m) {
+    modelList = [
+      for (final x in modelList)
+        if (x.id != m.id) x,
+      m,
+    ];
+  }
+
+  @override
+  Future<List<String>> modelFieldTypes() async => const [
+    'text',
+    'integer',
+    'real',
+    'bool',
+    'timestamp',
+    'json',
+    'ref:MODEL',
+  ];
+
+  @override
+  Future<ModelInfo> modelCreate(
+    String name, {
+    String description = '',
+    String fields = '',
+    bool draft = true,
+  }) async {
+    extraCalls.add('model-create:$name');
+    final specs = [
+      for (final p in fields.split(';'))
+        if (p.trim().isNotEmpty) _parseSpec(p.trim()),
+    ];
+    final id = 'm${++_modelSeq}';
+    final m = ModelInfo(
+      id: id,
+      shortId: id,
+      name: name,
+      description: description,
+      version: draft ? 0 : 1,
+      hasDraft: draft,
+      status: draft ? 'draft' : 'v1',
+      fields: [for (final f in specs) f.name],
+      designFields: draft
+          ? specs
+          : [for (final f in specs) _parseSpec(f.spec, id: f.id, mark: ' ')],
+    );
+    _putModel(m);
+    if (!draft) {
+      modelVersions = [
+        ...modelVersions,
+        ModelVersionInfo(version: 1, current: true, fieldCount: specs.length),
+      ];
+    }
+    return m;
+  }
+
+  @override
+  Future<ModelInfo> modelRename(
+    String key, {
+    String? name,
+    String? description,
+  }) async {
+    extraCalls.add('model-rename:$key');
+    final m = _findModel(key);
+    final n = ModelInfo(
+      id: m.id,
+      shortId: m.shortId,
+      name: name ?? m.name,
+      description: description ?? m.description,
+      builtin: m.builtin,
+      version: m.version,
+      isBars: m.isBars,
+      fields: m.fields,
+      recordCount: m.recordCount,
+      hasDraft: m.hasDraft,
+      status: m.status,
+      designFields: m.designFields,
+    );
+    _putModel(n);
+    return n;
+  }
+
+  @override
+  Future<ModelInfo> modelEdit(
+    String key, {
+    List<String> add = const [],
+    List<String> change = const [],
+    List<String> drop = const [],
+    List<String> rename = const [],
+    List<String> moves = const [],
+  }) async {
+    extraCalls.add('model-edit:$key');
+    final m = _findModel(key);
+    var fields = [...m.designFields];
+    for (final spec in add) {
+      fields.add(_parseSpec(spec));
+    }
+    for (final name in drop) {
+      fields = [
+        for (final f in fields)
+          if (f.name == name)
+            DesignFieldInfo(
+              id: f.id,
+              name: f.name,
+              spec: f.spec,
+              ty: f.ty,
+              mark: '-',
+              dropped: true,
+            )
+          else
+            f,
+      ];
+    }
+    for (final spec in change) {
+      final parsed = _parseSpec(spec);
+      fields = [
+        for (final f in fields)
+          if (f.name == parsed.name)
+            DesignFieldInfo(
+              id: f.id,
+              name: parsed.name,
+              spec: spec,
+              ty: parsed.ty,
+              mark: '~',
+            )
+          else
+            f,
+      ];
+    }
+    final n = ModelInfo(
+      id: m.id,
+      shortId: m.shortId,
+      name: m.name,
+      description: m.description,
+      builtin: m.builtin,
+      version: m.version,
+      isBars: m.isBars,
+      fields: [
+        for (final f in fields)
+          if (!f.dropped) f.name,
+      ],
+      recordCount: m.recordCount,
+      hasDraft: true,
+      status: 'draft',
+      designFields: fields,
+    );
+    _putModel(n);
+    return n;
+  }
+
+  @override
+  Future<ModelInfo> modelSetField(
+    String key,
+    String fieldId,
+    String spec,
+  ) async {
+    extraCalls.add('model-set-field:$key:$fieldId');
+    final m = _findModel(key);
+    final parsed = _parseSpec(spec, id: fieldId, mark: '~');
+    final fields = [
+      for (final f in m.designFields)
+        if (f.id == fieldId) parsed else f,
+    ];
+    final n = ModelInfo(
+      id: m.id,
+      shortId: m.shortId,
+      name: m.name,
+      description: m.description,
+      builtin: m.builtin,
+      version: m.version,
+      isBars: m.isBars,
+      fields: [
+        for (final f in fields)
+          if (!f.dropped) f.name,
+      ],
+      recordCount: m.recordCount,
+      hasDraft: true,
+      status: 'draft',
+      designFields: fields,
+    );
+    _putModel(n);
+    return n;
+  }
+
+  @override
+  Future<ModelPlanInfo?> modelPlan(String key) async {
+    extraCalls.add('model-plan:$key');
+    final m = _findModel(key);
+    if (!m.hasDraft) return null;
+    return ModelPlanInfo(
+      from: m.version,
+      to: m.version + 1,
+      lines: [
+        for (final f in m.designFields)
+          if (f.mark.trim().isNotEmpty) '${f.mark} ${f.name}',
+      ],
+    );
+  }
+
+  @override
+  Future<ModelPlanInfo> modelApply(
+    String key, {
+    bool destructive = false,
+  }) async {
+    extraCalls.add('model-apply:$key:$destructive');
+    final m = _findModel(key);
+    final kept = [
+      for (final f in m.designFields)
+        if (!f.dropped) _parseSpec(f.spec, id: f.id, mark: ' '),
+    ];
+    final n = ModelInfo(
+      id: m.id,
+      shortId: m.shortId,
+      name: m.name,
+      description: m.description,
+      builtin: m.builtin,
+      version: m.version + 1,
+      isBars: m.isBars,
+      fields: [for (final f in kept) f.name],
+      recordCount: m.recordCount,
+      hasDraft: false,
+      status: 'v${m.version + 1}',
+      designFields: kept,
+    );
+    _putModel(n);
+    modelVersions = [
+      for (final v in modelVersions)
+        ModelVersionInfo(
+          version: v.version,
+          createdAt: v.createdAt,
+          note: v.note,
+          author: v.author,
+          fieldCount: v.fieldCount,
+          current: false,
+          steps: v.steps,
+        ),
+      ModelVersionInfo(
+        version: n.version,
+        current: true,
+        fieldCount: kept.length,
+      ),
+    ];
+    return ModelPlanInfo(from: m.version, to: n.version, lines: ['applied']);
+  }
+
+  @override
+  Future<ModelInfo> modelDiscard(String key) async {
+    extraCalls.add('model-discard:$key');
+    final m = _findModel(key);
+    final fields = [
+      for (final f in m.designFields)
+        if (f.mark != '+')
+          DesignFieldInfo(
+            id: f.id,
+            name: f.name,
+            spec: f.spec,
+            ty: f.ty,
+            mark: ' ',
+            dropped: false,
+          ),
+    ];
+    final n = ModelInfo(
+      id: m.id,
+      shortId: m.shortId,
+      name: m.name,
+      description: m.description,
+      builtin: m.builtin,
+      version: m.version,
+      isBars: m.isBars,
+      fields: [for (final f in fields) f.name],
+      recordCount: m.recordCount,
+      hasDraft: false,
+      status: m.version == 0 ? '' : 'v${m.version}',
+      designFields: fields,
+    );
+    _putModel(n);
+    return n;
+  }
+
+  @override
+  Future<List<ModelVersionInfo>> modelHistory(String key) async {
+    extraCalls.add('model-history:$key');
+    return List.of(modelVersions);
+  }
+
+  @override
+  Future<ModelPlanInfo> modelRollbackPlan(String key, int version) async {
+    extraCalls.add('model-rollback-plan:$key:$version');
+    return ModelPlanInfo(from: _findModel(key).version, to: version + 1);
+  }
+
+  @override
+  Future<ModelPlanInfo> modelRollback(
+    String key,
+    int version, {
+    bool destructive = false,
+  }) async {
+    extraCalls.add('model-rollback:$key:$version:$destructive');
+    return modelApply(key, destructive: destructive);
+  }
+
+  @override
+  Future<String> modelRemove(String key, {bool destructive = false}) async {
+    extraCalls.add('model-remove:$key:$destructive');
+    final m = _findModel(key);
+    modelList = [
+      for (final x in modelList)
+        if (x.id != m.id) x,
+    ];
+    return 'removed model ${m.name} (0 record(s))';
+  }
+
+  @override
+  Future<List<String>> modelRuleIds(String key) async {
+    extraCalls.add('model-rule-ids:$key');
+    final m = _findModel(key);
+    return [
+      for (final r in ruleList)
+        if (r.home == 'model ${m.name}' || r.home == 'model:${m.name}') r.id,
+    ];
   }
 
   @override
@@ -1913,7 +2318,11 @@ class FakeApi implements MuninnApi {
       onText: on,
       whenText: when,
       thenText: then,
-      home: home.isEmpty ? 'standalone' : home,
+      home: home.isEmpty
+          ? 'standalone'
+          : home.contains(':')
+          ? home.replaceFirst(':', ' ')
+          : home,
       brief: '$on → $then',
       related: related,
       enabled: true,

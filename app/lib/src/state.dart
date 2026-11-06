@@ -516,6 +516,18 @@ final recordDetailProvider = FutureProvider<RecordInfo?>((ref) {
   return ref.watch(apiProvider).modelRecord(model, id);
 });
 
+final modelPlanProvider = FutureProvider<ModelPlanInfo?>((ref) {
+  final id = ref.watch(viewingModelIdProvider);
+  if (id == null || !ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).modelPlan(id);
+});
+
+final modelHistoryProvider = FutureProvider<List<ModelVersionInfo>?>((ref) {
+  final id = ref.watch(viewingModelIdProvider);
+  if (id == null || !ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).modelHistory(id);
+});
+
 final reportsProvider = FutureProvider<List<ReportInfo>?>((ref) {
   if (!ref.watch(unlockedProvider)) return Future.value(null);
   return ref.watch(apiProvider).reports();
@@ -578,6 +590,8 @@ void refreshProjectExtras(WidgetRef ref) {
   ref.invalidate(modelsProvider);
   ref.invalidate(modelRecordsProvider);
   ref.invalidate(recordDetailProvider);
+  ref.invalidate(modelPlanProvider);
+  ref.invalidate(modelHistoryProvider);
   ref.invalidate(reportsProvider);
   ref.invalidate(reportSectionsProvider);
   ref.invalidate(codeSpacesProvider);

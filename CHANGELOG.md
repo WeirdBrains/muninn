@@ -38,6 +38,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: model/record viewer so a found-records hit opens that model and record (schema edits stay in the TUI/CLI)
 - Flutter app: code-result workspace tiles (`code:SPACE`, TUI `T`); pipeline-view keys (`view:PIPELINE/NODE`) render the same way when present in a layout
 - Flutter app: live workspace tree written to `[tui.layout]` after unlock (shared with the TUI)
+- Flutter app: model designer can create and edit fields as a draft, preview and apply migrations, roll versions back, and attach model-owned rules (`mnnn model` / TUI `D`)
 
 ## [2.22.0] - 2026-11-05
 

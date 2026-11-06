@@ -7,7 +7,8 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `model_info`, `model_of`, `model_record_of`, `model_records_of`, `models_of`, `record_info`, `val_str`
+// These functions are ignored because they are not marked as `pub`: `design_fields`, `field_info`, `model_apply_of`, `model_create_of`, `model_discard_of`, `model_edit_of`, `model_history_of`, `model_info`, `model_of`, `model_plan_of`, `model_record_of`, `model_records_of`, `model_remove_of`, `model_rename_of`, `model_rollback_of`, `model_rollback_plan_of`, `model_rule_homes_of`, `model_set_field_of`, `models_of`, `note`, `parse_ops`, `plan_info`, `record_info`, `val_str`, `version_info`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`, `fmt`
 
 /// Models in the store (`mnnn model list` / TUI Data ▸ Model designer…).
 Future<List<ModelInfo>> models() => RustLib.instance.api.crateApiModelsModels();
@@ -31,6 +32,185 @@ Future<List<RecordInfo>> modelRecords({
 Future<RecordInfo> modelRecord({required String model, required String id}) =>
     RustLib.instance.api.crateApiModelsModelRecord(model: model, id: id);
 
+/// Field type names (`mnnn model types`).
+Future<List<String>> modelFieldTypes() =>
+    RustLib.instance.api.crateApiModelsModelFieldTypes();
+
+/// Create a model (`mnnn model create` / TUI `n`). [fields] is `name:type …; …`.
+/// When [draft] is true the design is not applied (TUI: `A` applies it as v1).
+Future<ModelInfo> modelCreate({
+  required String name,
+  required String description,
+  required String fields,
+  required bool draft,
+}) => RustLib.instance.api.crateApiModelsModelCreate(
+  name: name,
+  description: description,
+  fields: fields,
+  draft: draft,
+);
+
+/// Rename a model and/or set its description (TUI `N` / `i`).
+Future<ModelInfo> modelRename({
+  required String key,
+  String? name,
+  String? description,
+}) => RustLib.instance.api.crateApiModelsModelRename(
+  key: key,
+  name: name,
+  description: description,
+);
+
+/// Edit the draft (`mnnn model edit` / TUI `a` `x` `J` `K`). Specs use the designer field syntax.
+Future<ModelInfo> modelEdit({
+  required String key,
+  required List<String> add,
+  required List<String> change,
+  required List<String> drop,
+  required List<String> rename,
+  required List<String> moves,
+}) => RustLib.instance.api.crateApiModelsModelEdit(
+  key: key,
+  add: add,
+  change: change,
+  drop: drop,
+  rename: rename,
+  moves: moves,
+);
+
+/// Replace one draft field, keeping its id so a rename keeps the values (TUI `e`).
+Future<ModelInfo> modelSetField({
+  required String key,
+  required String fieldId,
+  required String spec,
+}) => RustLib.instance.api.crateApiModelsModelSetField(
+  key: key,
+  fieldId: fieldId,
+  spec: spec,
+);
+
+/// What applying the draft would do (`mnnn model plan` / TUI design screen).
+Future<ModelPlanInfo?> modelPlan({required String key}) =>
+    RustLib.instance.api.crateApiModelsModelPlan(key: key);
+
+/// Apply the draft as the next version (`mnnn model apply` / TUI `A`).
+/// A migration that throws values away needs [destructive] (the app asks first).
+Future<ModelPlanInfo> modelApply({
+  required String key,
+  required bool destructive,
+}) => RustLib.instance.api.crateApiModelsModelApply(
+  key: key,
+  destructive: destructive,
+);
+
+/// Throw away the draft (TUI `z`).
+Future<ModelInfo> modelDiscard({required String key}) =>
+    RustLib.instance.api.crateApiModelsModelDiscard(key: key);
+
+/// Applied versions (`mnnn model history` / TUI History).
+Future<List<ModelVersionInfo>> modelHistory({required String key}) =>
+    RustLib.instance.api.crateApiModelsModelHistory(key: key);
+
+/// What rolling back to [version] would do (`mnnn model rollback --dry-run`).
+Future<ModelPlanInfo> modelRollbackPlan({
+  required String key,
+  required PlatformInt64 version,
+}) => RustLib.instance.api.crateApiModelsModelRollbackPlan(
+  key: key,
+  version: version,
+);
+
+/// Roll back to an earlier design as the next version (TUI History `r`).
+Future<ModelPlanInfo> modelRollback({
+  required String key,
+  required PlatformInt64 version,
+  required bool destructive,
+}) => RustLib.instance.api.crateApiModelsModelRollback(
+  key: key,
+  version: version,
+  destructive: destructive,
+);
+
+/// Remove a model and its records (TUI `d`). Needs [destructive] when it has rows.
+Future<String> modelRemove({required String key, required bool destructive}) =>
+    RustLib.instance.api.crateApiModelsModelRemove(
+      key: key,
+      destructive: destructive,
+    );
+
+/// Ids of rules owned by this model (TUI Rules screen). Create them with `rule_create` and home `model:NAME`.
+Future<List<String>> modelRuleIds({required String key}) =>
+    RustLib.instance.api.crateApiModelsModelRuleIds(key: key);
+
+class DesignFieldInfo {
+  final String id;
+  final String name;
+  final String spec;
+  final String ty;
+  final bool required_;
+  final bool unique;
+  final bool indexed;
+  final String defaultValue;
+  final List<String> choices;
+  final String about;
+
+  /// `+` added in the draft, `~` changed, `-` dropped, space unchanged.
+  final String mark;
+  final bool dropped;
+  final bool builtin;
+
+  const DesignFieldInfo({
+    required this.id,
+    required this.name,
+    required this.spec,
+    required this.ty,
+    required this.required_,
+    required this.unique,
+    required this.indexed,
+    required this.defaultValue,
+    required this.choices,
+    required this.about,
+    required this.mark,
+    required this.dropped,
+    required this.builtin,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      spec.hashCode ^
+      ty.hashCode ^
+      required_.hashCode ^
+      unique.hashCode ^
+      indexed.hashCode ^
+      defaultValue.hashCode ^
+      choices.hashCode ^
+      about.hashCode ^
+      mark.hashCode ^
+      dropped.hashCode ^
+      builtin.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DesignFieldInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          spec == other.spec &&
+          ty == other.ty &&
+          required_ == other.required_ &&
+          unique == other.unique &&
+          indexed == other.indexed &&
+          defaultValue == other.defaultValue &&
+          choices == other.choices &&
+          about == other.about &&
+          mark == other.mark &&
+          dropped == other.dropped &&
+          builtin == other.builtin;
+}
+
 class ModelInfo {
   final String id;
   final String shortId;
@@ -41,6 +221,9 @@ class ModelInfo {
   final bool isBars;
   final List<String> fields;
   final int recordCount;
+  final bool hasDraft;
+  final String status;
+  final List<DesignFieldInfo> designFields;
 
   const ModelInfo({
     required this.id,
@@ -52,6 +235,9 @@ class ModelInfo {
     required this.isBars,
     required this.fields,
     required this.recordCount,
+    required this.hasDraft,
+    required this.status,
+    required this.designFields,
   });
 
   @override
@@ -64,7 +250,10 @@ class ModelInfo {
       version.hashCode ^
       isBars.hashCode ^
       fields.hashCode ^
-      recordCount.hashCode;
+      recordCount.hashCode ^
+      hasDraft.hashCode ^
+      status.hashCode ^
+      designFields.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -79,7 +268,96 @@ class ModelInfo {
           version == other.version &&
           isBars == other.isBars &&
           fields == other.fields &&
-          recordCount == other.recordCount;
+          recordCount == other.recordCount &&
+          hasDraft == other.hasDraft &&
+          status == other.status &&
+          designFields == other.designFields;
+}
+
+class ModelPlanInfo {
+  final PlatformInt64 from;
+  final PlatformInt64 to;
+  final int rows;
+  final int lost;
+  final bool destructive;
+  final List<String> blocked;
+  final List<String> lines;
+
+  const ModelPlanInfo({
+    required this.from,
+    required this.to,
+    required this.rows,
+    required this.lost,
+    required this.destructive,
+    required this.blocked,
+    required this.lines,
+  });
+
+  @override
+  int get hashCode =>
+      from.hashCode ^
+      to.hashCode ^
+      rows.hashCode ^
+      lost.hashCode ^
+      destructive.hashCode ^
+      blocked.hashCode ^
+      lines.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ModelPlanInfo &&
+          runtimeType == other.runtimeType &&
+          from == other.from &&
+          to == other.to &&
+          rows == other.rows &&
+          lost == other.lost &&
+          destructive == other.destructive &&
+          blocked == other.blocked &&
+          lines == other.lines;
+}
+
+class ModelVersionInfo {
+  final PlatformInt64 version;
+  final PlatformInt64 createdAt;
+  final String note;
+  final String author;
+  final int fieldCount;
+  final bool current;
+  final List<String> steps;
+
+  const ModelVersionInfo({
+    required this.version,
+    required this.createdAt,
+    required this.note,
+    required this.author,
+    required this.fieldCount,
+    required this.current,
+    required this.steps,
+  });
+
+  @override
+  int get hashCode =>
+      version.hashCode ^
+      createdAt.hashCode ^
+      note.hashCode ^
+      author.hashCode ^
+      fieldCount.hashCode ^
+      current.hashCode ^
+      steps.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ModelVersionInfo &&
+          runtimeType == other.runtimeType &&
+          version == other.version &&
+          createdAt == other.createdAt &&
+          note == other.note &&
+          author == other.author &&
+          fieldCount == other.fieldCount &&
+          current == other.current &&
+          steps == other.steps;
 }
 
 class RecordField {

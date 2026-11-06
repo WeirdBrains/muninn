@@ -80,6 +80,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IngestProgressSnap dco_decode_box_autoadd_ingest_progress_snap(dynamic raw);
 
   @protected
+  ModelPlanInfo dco_decode_box_autoadd_model_plan_info(dynamic raw);
+
+  @protected
   NetConfig dco_decode_box_autoadd_net_config(dynamic raw);
 
   @protected
@@ -111,6 +114,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DatasetSummary dco_decode_dataset_summary(dynamic raw);
+
+  @protected
+  DesignFieldInfo dco_decode_design_field_info(dynamic raw);
 
   @protected
   EntryInfo dco_decode_entry_info(dynamic raw);
@@ -191,6 +197,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<DatasetSummary> dco_decode_list_dataset_summary(dynamic raw);
 
   @protected
+  List<DesignFieldInfo> dco_decode_list_design_field_info(dynamic raw);
+
+  @protected
   List<EntryInfo> dco_decode_list_entry_info(dynamic raw);
 
   @protected
@@ -242,6 +251,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ModelInfo> dco_decode_list_model_info(dynamic raw);
+
+  @protected
+  List<ModelVersionInfo> dco_decode_list_model_version_info(dynamic raw);
 
   @protected
   List<NetConnNode> dco_decode_list_net_conn_node(dynamic raw);
@@ -417,6 +429,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ModelInfo dco_decode_model_info(dynamic raw);
 
   @protected
+  ModelPlanInfo dco_decode_model_plan_info(dynamic raw);
+
+  @protected
+  ModelVersionInfo dco_decode_model_version_info(dynamic raw);
+
+  @protected
   NetConfig dco_decode_net_config(dynamic raw);
 
   @protected
@@ -501,6 +519,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IngestProgressSnap? dco_decode_opt_box_autoadd_ingest_progress_snap(
     dynamic raw,
   );
+
+  @protected
+  ModelPlanInfo? dco_decode_opt_box_autoadd_model_plan_info(dynamic raw);
 
   @protected
   NetMeInfo? dco_decode_opt_box_autoadd_net_me_info(dynamic raw);
@@ -721,6 +742,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ModelPlanInfo sse_decode_box_autoadd_model_plan_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   NetConfig sse_decode_box_autoadd_net_config(SseDeserializer deserializer);
 
   @protected
@@ -756,6 +782,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DatasetSummary sse_decode_dataset_summary(SseDeserializer deserializer);
+
+  @protected
+  DesignFieldInfo sse_decode_design_field_info(SseDeserializer deserializer);
 
   @protected
   EntryInfo sse_decode_entry_info(SseDeserializer deserializer);
@@ -848,6 +877,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<DesignFieldInfo> sse_decode_list_design_field_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<EntryInfo> sse_decode_list_entry_info(SseDeserializer deserializer);
 
   @protected
@@ -915,6 +949,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ModelInfo> sse_decode_list_model_info(SseDeserializer deserializer);
+
+  @protected
+  List<ModelVersionInfo> sse_decode_list_model_version_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<NetConnNode> sse_decode_list_net_conn_node(SseDeserializer deserializer);
@@ -1148,6 +1187,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ModelInfo sse_decode_model_info(SseDeserializer deserializer);
 
   @protected
+  ModelPlanInfo sse_decode_model_plan_info(SseDeserializer deserializer);
+
+  @protected
+  ModelVersionInfo sse_decode_model_version_info(SseDeserializer deserializer);
+
+  @protected
   NetConfig sse_decode_net_config(SseDeserializer deserializer);
 
   @protected
@@ -1236,6 +1281,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   IngestProgressSnap? sse_decode_opt_box_autoadd_ingest_progress_snap(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ModelPlanInfo? sse_decode_opt_box_autoadd_model_plan_info(
     SseDeserializer deserializer,
   );
 
@@ -1482,6 +1532,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_model_plan_info(
+    ModelPlanInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_net_config(
     NetConfig self,
     SseSerializer serializer,
@@ -1532,6 +1588,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_dataset_summary(
     DatasetSummary self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_design_field_info(
+    DesignFieldInfo self,
     SseSerializer serializer,
   );
 
@@ -1647,6 +1709,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_design_field_info(
+    List<DesignFieldInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_entry_info(
     List<EntryInfo> self,
     SseSerializer serializer,
@@ -1745,6 +1813,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_model_info(
     List<ModelInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_model_version_info(
+    List<ModelVersionInfo> self,
     SseSerializer serializer,
   );
 
@@ -2067,6 +2141,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_model_info(ModelInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_model_plan_info(ModelPlanInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_model_version_info(
+    ModelVersionInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_net_config(NetConfig self, SseSerializer serializer);
 
   @protected
@@ -2180,6 +2263,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_ingest_progress_snap(
     IngestProgressSnap? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_model_plan_info(
+    ModelPlanInfo? self,
     SseSerializer serializer,
   );
 

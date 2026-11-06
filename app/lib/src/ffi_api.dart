@@ -811,7 +811,7 @@ class FfiMuninnApi implements MuninnApi {
       _foundRecord(e),
   ];
 
-    @override
+  @override
   Future<List<ModelInfo>> models() async => [
     for (final m in await r_models.models()) _model(m),
   ];
@@ -838,7 +838,114 @@ class FfiMuninnApi implements MuninnApi {
   Future<RecordInfo> modelRecord(String model, String id) async =>
       _record(await r_models.modelRecord(model: model, id: id));
 
-@override
+  @override
+  Future<List<String>> modelFieldTypes() => r_models.modelFieldTypes();
+
+  @override
+  Future<ModelInfo> modelCreate(
+    String name, {
+    String description = '',
+    String fields = '',
+    bool draft = true,
+  }) async => _model(
+    await r_models.modelCreate(
+      name: name,
+      description: description,
+      fields: fields,
+      draft: draft,
+    ),
+  );
+
+  @override
+  Future<ModelInfo> modelRename(
+    String key, {
+    String? name,
+    String? description,
+  }) async => _model(
+    await r_models.modelRename(key: key, name: name, description: description),
+  );
+
+  @override
+  Future<ModelInfo> modelEdit(
+    String key, {
+    List<String> add = const [],
+    List<String> change = const [],
+    List<String> drop = const [],
+    List<String> rename = const [],
+    List<String> moves = const [],
+  }) async => _model(
+    await r_models.modelEdit(
+      key: key,
+      add: add,
+      change: change,
+      drop: drop,
+      rename: rename,
+      moves: moves,
+    ),
+  );
+
+  @override
+  Future<ModelInfo> modelSetField(
+    String key,
+    String fieldId,
+    String spec,
+  ) async => _model(
+    await r_models.modelSetField(key: key, fieldId: fieldId, spec: spec),
+  );
+
+  @override
+  Future<ModelPlanInfo?> modelPlan(String key) async {
+    final p = await r_models.modelPlan(key: key);
+    return p == null ? null : _modelPlan(p);
+  }
+
+  @override
+  Future<ModelPlanInfo> modelApply(
+    String key, {
+    bool destructive = false,
+  }) async =>
+      _modelPlan(await r_models.modelApply(key: key, destructive: destructive));
+
+  @override
+  Future<ModelInfo> modelDiscard(String key) async =>
+      _model(await r_models.modelDiscard(key: key));
+
+  @override
+  Future<List<ModelVersionInfo>> modelHistory(String key) async => [
+    for (final v in await r_models.modelHistory(key: key)) _modelVersion(v),
+  ];
+
+  @override
+  Future<ModelPlanInfo> modelRollbackPlan(String key, int version) async =>
+      _modelPlan(
+        await r_models.modelRollbackPlan(
+          key: key,
+          version: PlatformInt64Util.from(version),
+        ),
+      );
+
+  @override
+  Future<ModelPlanInfo> modelRollback(
+    String key,
+    int version, {
+    bool destructive = false,
+  }) async => _modelPlan(
+    await r_models.modelRollback(
+      key: key,
+      version: PlatformInt64Util.from(version),
+      destructive: destructive,
+    ),
+  );
+
+  @override
+  Future<String> modelRemove(String key, {bool destructive = false}) =>
+      r_models.modelRemove(key: key, destructive: destructive);
+
+  @override
+  Future<List<String>> modelRuleIds(String key) =>
+      r_models.modelRuleIds(key: key);
+
+  @override
   Future<List<HistoryRowInfo>> historyTree() async => [
     for (final r in await r_history.historyTree()) _historyRow(r),
   ];
@@ -3076,6 +3183,42 @@ FoundRecordInfo _foundRecord(r_searches.FoundRecord e) => FoundRecordInfo(
   createdAt: e.createdAt.toInt(),
 );
 
+DesignFieldInfo _designField(r_models.DesignFieldInfo f) => DesignFieldInfo(
+  id: f.id,
+  name: f.name,
+  spec: f.spec,
+  ty: f.ty,
+  required: f.required_,
+  unique: f.unique,
+  indexed: f.indexed,
+  defaultValue: f.defaultValue,
+  choices: f.choices,
+  about: f.about,
+  mark: f.mark,
+  dropped: f.dropped,
+  builtin: f.builtin,
+);
+
+ModelPlanInfo _modelPlan(r_models.ModelPlanInfo p) => ModelPlanInfo(
+  from: p.from.toInt(),
+  to: p.to.toInt(),
+  rows: p.rows,
+  lost: p.lost,
+  destructive: p.destructive,
+  blocked: p.blocked,
+  lines: p.lines,
+);
+
+ModelVersionInfo _modelVersion(r_models.ModelVersionInfo v) => ModelVersionInfo(
+  version: v.version.toInt(),
+  createdAt: v.createdAt.toInt(),
+  note: v.note,
+  author: v.author,
+  fieldCount: v.fieldCount,
+  current: v.current,
+  steps: v.steps,
+);
+
 ModelInfo _model(r_models.ModelInfo m) => ModelInfo(
   id: m.id,
   shortId: m.shortId,
@@ -3086,6 +3229,9 @@ ModelInfo _model(r_models.ModelInfo m) => ModelInfo(
   isBars: m.isBars,
   fields: m.fields,
   recordCount: m.recordCount,
+  hasDraft: m.hasDraft,
+  status: m.status,
+  designFields: [for (final f in m.designFields) _designField(f)],
 );
 
 RecordInfo _record(r_models.RecordInfo r) => RecordInfo(

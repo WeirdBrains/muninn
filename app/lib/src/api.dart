@@ -365,6 +365,58 @@ class FoundRecordInfo {
   final int createdAt;
 }
 
+class DesignFieldInfo {
+  const DesignFieldInfo({
+    required this.id,
+    required this.name,
+    this.spec = '',
+    this.ty = '',
+    this.required = false,
+    this.unique = false,
+    this.indexed = false,
+    this.defaultValue = '',
+    this.choices = const [],
+    this.about = '',
+    this.mark = ' ',
+    this.dropped = false,
+    this.builtin = false,
+  });
+  final String id, name, spec, ty, defaultValue, about, mark;
+  final bool required, unique, indexed, dropped, builtin;
+  final List<String> choices;
+}
+
+class ModelPlanInfo {
+  const ModelPlanInfo({
+    this.from = 0,
+    this.to = 0,
+    this.rows = 0,
+    this.lost = 0,
+    this.destructive = false,
+    this.blocked = const [],
+    this.lines = const [],
+  });
+  final int from, to, rows, lost;
+  final bool destructive;
+  final List<String> blocked, lines;
+}
+
+class ModelVersionInfo {
+  const ModelVersionInfo({
+    required this.version,
+    this.createdAt = 0,
+    this.note = '',
+    this.author = '',
+    this.fieldCount = 0,
+    this.current = false,
+    this.steps = const [],
+  });
+  final int version, createdAt, fieldCount;
+  final String note, author;
+  final bool current;
+  final List<String> steps;
+}
+
 class ModelInfo {
   const ModelInfo({
     required this.id,
@@ -376,11 +428,15 @@ class ModelInfo {
     this.isBars = false,
     this.fields = const [],
     this.recordCount = 0,
+    this.hasDraft = false,
+    this.status = '',
+    this.designFields = const [],
   });
-  final String id, shortId, name, description;
-  final bool builtin, isBars;
+  final String id, shortId, name, description, status;
+  final bool builtin, isBars, hasDraft;
   final int version, recordCount;
   final List<String> fields;
+  final List<DesignFieldInfo> designFields;
 }
 
 class RecordField {
@@ -1723,6 +1779,7 @@ abstract class MuninnApi {
     String? name,
   });
   Future<String> saveJournalImage(String id, String out);
+
   /// Downscaled PNG preview. Empty when the attachment is not a decodable
   /// image. Original bytes stay in Rust.
   Future<Uint8List> journalImageThumbnail(String id, {int? maxPx});
@@ -1808,8 +1865,45 @@ abstract class MuninnApi {
   /// Models and records (`mnnn model` / TUI Data ▸ Model designer…).
   Future<List<ModelInfo>> models();
   Future<ModelInfo> model(String key);
-  Future<List<RecordInfo>> modelRecords(String model, {String? text, int? limit});
+  Future<List<RecordInfo>> modelRecords(
+    String model, {
+    String? text,
+    int? limit,
+  });
   Future<RecordInfo> modelRecord(String model, String id);
+  Future<List<String>> modelFieldTypes();
+  Future<ModelInfo> modelCreate(
+    String name, {
+    String description = '',
+    String fields = '',
+    bool draft = true,
+  });
+  Future<ModelInfo> modelRename(
+    String key, {
+    String? name,
+    String? description,
+  });
+  Future<ModelInfo> modelEdit(
+    String key, {
+    List<String> add = const [],
+    List<String> change = const [],
+    List<String> drop = const [],
+    List<String> rename = const [],
+    List<String> moves = const [],
+  });
+  Future<ModelInfo> modelSetField(String key, String fieldId, String spec);
+  Future<ModelPlanInfo?> modelPlan(String key);
+  Future<ModelPlanInfo> modelApply(String key, {bool destructive = false});
+  Future<ModelInfo> modelDiscard(String key);
+  Future<List<ModelVersionInfo>> modelHistory(String key);
+  Future<ModelPlanInfo> modelRollbackPlan(String key, int version);
+  Future<ModelPlanInfo> modelRollback(
+    String key,
+    int version, {
+    bool destructive = false,
+  });
+  Future<String> modelRemove(String key, {bool destructive = false});
+  Future<List<String>> modelRuleIds(String key);
 
   /// Action history (`View ▸ History`, TUI `Y` / `u` / `U`).
   Future<List<HistoryRowInfo>> historyTree();
@@ -1901,6 +1995,7 @@ abstract class MuninnApi {
   Future<List<String>> codeCheck(String space);
   Future<CodeRunResult> codeBuild(String space);
   Future<CodeRunResult> codeRun(String space);
+
   /// Latest `pipe.frame` for a data tile (`code:SPACE` or `view:PIPELINE/NODE`).
   Future<PipeFrameInfo?> latestPipeFrame(String key);
   Future<List<CodeParserInfo>> codeParsers();
