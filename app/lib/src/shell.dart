@@ -201,7 +201,10 @@ class MuninnMenuBar extends ConsumerWidget {
         item('Sources…', () => later('Sources', 'mnnn sources')),
         item('Symbols…', () => later('Symbols', 'mnnn symbols')),
       ]),
-      menu('Projects', [item('Projects…', () => go(Section.projects))]),
+      menu('Projects', [
+        item('Projects…', () => go(Section.projects)),
+        item('New project…', () => showNewProjectDialog(context, ref)),
+      ]),
       menu('Net', [item('Status…', () => go(Section.net))]),
       menu('Orgs', [item('Organizations…', () => go(Section.orgs))]),
       menu('Keys', [item('Status…', () => go(Section.keys))]),

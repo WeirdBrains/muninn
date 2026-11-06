@@ -4,7 +4,8 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
-read-only Projects, File ▸ Import… / Export… (CSV, Parquet, JSON), and File ▸ Preferences….
+Projects (create, rename, describe, delete, attach and detach series), File ▸ Import… /
+Export… (CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
 
@@ -29,7 +30,8 @@ Users never need Rust: release builds ship the compiled library.
 - **Header:** the raven (themed) and the big MUNINN wordmark, as on the website.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
-  File ▸ Import…, Export… and Preferences… are wired; Net, Orgs and Keys still point at the CLI.
+  File ▸ Import…, Export… and Preferences… are wired, as is Projects ▸ New project…;
+  Net, Orgs and Keys still point at the CLI.
 - **Phone layout** (narrower than 720 px): bottom navigation (Home, Data, Projects, Net,
   More), 48 px+ targets, safe areas, theme as a bottom sheet; nothing is hover-only.
 - **Themes:** every theme from `assets/themes/*.toml` plus your own in `<home>/themes/`,
@@ -38,8 +40,9 @@ Users never need Rust: release builds ship the compiled library.
   `mnnn theme set` / `mnnn theme mode`), so the TUI and the app follow each other.
 - **Unlock:** Home, Data and Projects ask for the Muninn password once per session. The
   key stays in Rust memory (never in Dart, never on disk); **File ▸ Lock** forgets it.
-  Dashboard reads open the store **read-only** (no migrations). **File ▸ Import…** and
-  **Export…** open it for writes after the same unlock.
+  Dashboard reads open the store **read-only** (no migrations). **File ▸ Import…**,
+  **Export…** and project writes (create, rename, describe, delete, attach or detach a
+  series) open it for writes after the same unlock.
 - **Home:** where the data lives, and the projects and datasets in it.
 - **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range;
   pick one to see it as a chart (candles when they fit, else a close line, volume
@@ -59,8 +62,14 @@ Users never need Rust: release builds ship the compiled library.
   after the next unlock. Reading never creates `preferences.toml`; the first change does.
 - **Chart readout:** hover over the chart (or touch / drag on a phone) to show that bar's
   time, open, high, low, close and volume above it; a guide line marks the bar.
-- **Projects:** pick a project to see the series saved in it (`mnnn project add`);
-  opening one shows it in Data with the project's saved time range. Read-only for now.
+- **Projects:** pick a project to see the series saved in it. **New project** (or
+  Projects ▸ New project…) creates one (`mnnn project create`); the project menu
+  renames, edits the description or deletes it (`mnnn project edit` / `remove` — journals
+  stay as standalone journals). **Add current dataset** attaches the dataset open in
+  Data, with the current time range (`a` in the TUI / `mnnn project add`); remove takes
+  a series out of the project without deleting it (`mnnn project drop`). Opening a
+  series shows it in Data with the project's saved time range. Journals, searches,
+  reports and import/export archives stay out of the app (use the TUI or CLI).
 - **Import** (File ▸ Import…): pick a file or folder (CSV, TSV, TXT, JSON, NDJSON, JSONL)
   and store each file as it is in a source, like `mnnn ingest path`. An optional source
   name overrides the folder's name (else `local`). Progress is byte-based; Cancel keeps

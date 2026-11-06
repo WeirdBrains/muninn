@@ -61,10 +61,23 @@ class FakeApi implements MuninnApi {
   @override
   void lock() => unlocked = false;
 
+  List<Project> projects = const [Project(id: 'p1', shortId: 'abc123', name: 'Alpha', description: 'test project')];
+  final Map<String, List<ProjectSeries>> seriesByProject = {
+    'p1': [const ProjectSeries(itemId: 1, source: 'coinbase', base: 'BTC', quote: 'USD', durationS: 300, from: 1704067200000)],
+  };
+  int nextProject = 2;
+  int nextItemId = 2;
+  final createdProjects = <String>[];
+  final updatedProjects = <({String id, String? name, String? description})>[];
+  final removedProjects = <String>[];
+  final addedSeries = <({String projectId, Dataset d, TimeRange range})>[];
+  final removedSeries = <int>[];
+  Object? projectError;
+
   @override
-  Future<Overview> overview() async => const Overview(
-        projects: [Project(id: 'p1', shortId: 'abc123', name: 'Alpha', description: 'test project')],
-        datasets: [
+  Future<Overview> overview() async => Overview(
+        projects: List<Project>.from(projects),
+        datasets: const [
           Dataset(source: 'coinbase', base: 'BTC', quote: 'USD', duration: '5m', durationS: 300, count: 288, first: 1704067200000, last: 1704153300000),
           Dataset(source: 'binance', base: 'ETH', quote: 'USDT', duration: '1h', durationS: 3600, count: 24, first: 1609459200000, last: 1609542000000),
         ],
@@ -72,7 +85,68 @@ class FakeApi implements MuninnApi {
 
   @override
   Future<List<ProjectSeries>> projectSeries(String projectId) async =>
-      const [ProjectSeries(source: 'coinbase', base: 'BTC', quote: 'USD', durationS: 300, from: 1704067200000)];
+      List<ProjectSeries>.from(seriesByProject[projectId] ?? const []);
+
+  @override
+  Future<Project> createProject(String name, {String description = ''}) async {
+    if (projectError != null) throw projectError!;
+    createdProjects.add(name);
+    final p = Project(id: 'p$nextProject', shortId: 'new$nextProject', name: name, description: description);
+    nextProject++;
+    projects = [...projects, p];
+    seriesByProject[p.id] = [];
+    return p;
+  }
+
+  @override
+  Future<Project> updateProject(String id, {String? name, String? description}) async {
+    if (projectError != null) throw projectError!;
+    updatedProjects.add((id: id, name: name, description: description));
+    final i = projects.indexWhere((p) => p.id == id);
+    if (i < 0) throw 'no such project';
+    final cur = projects[i];
+    final p = Project(id: cur.id, shortId: cur.shortId, name: name ?? cur.name, description: description ?? cur.description);
+    projects = [...projects]..[i] = p;
+    return p;
+  }
+
+  @override
+  Future<void> removeProject(String id) async {
+    if (projectError != null) throw projectError!;
+    removedProjects.add(id);
+    projects = projects.where((p) => p.id != id).toList();
+    seriesByProject.remove(id);
+  }
+
+  @override
+  Future<bool> addProjectSeries(String projectId, Dataset d, TimeRange range) async {
+    if (projectError != null) throw projectError!;
+    addedSeries.add((projectId: projectId, d: d, range: range));
+    final list = List<ProjectSeries>.from(seriesByProject[projectId] ?? const []);
+    if (list.any((s) => s.source == d.source && s.base == d.base && s.quote == d.quote && s.durationS == d.durationS)) {
+      return false;
+    }
+    list.add(ProjectSeries(
+      itemId: nextItemId++,
+      source: d.source,
+      base: d.base,
+      quote: d.quote,
+      durationS: d.durationS,
+      from: range.from,
+      to: range.to,
+    ));
+    seriesByProject[projectId] = list;
+    return true;
+  }
+
+  @override
+  Future<void> removeProjectSeries(int itemId) async {
+    if (projectError != null) throw projectError!;
+    removedSeries.add(itemId);
+    for (final id in seriesByProject.keys.toList()) {
+      seriesByProject[id] = seriesByProject[id]!.where((s) => s.itemId != itemId).toList();
+    }
+  }
 
   @override
   Future<List<BarPoint>> queryBars(Dataset d, TimeRange range, {int maxPoints = 600}) async {

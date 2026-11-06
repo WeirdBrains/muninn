@@ -9,6 +9,7 @@ import 'rust/api/data.dart' as r_data;
 import 'rust/api/info.dart' as r_info;
 import 'rust/api/io.dart' as r_io;
 import 'rust/api/prefs.dart' as r_prefs;
+import 'rust/api/projects.dart' as r_projects;
 import 'rust/api/themes.dart' as r_themes;
 
 class FfiMuninnApi implements MuninnApi {
@@ -106,6 +107,7 @@ class FfiMuninnApi implements MuninnApi {
   Future<List<ProjectSeries>> projectSeries(String projectId) async => [
         for (final s in await r_data.projectSeries(projectId: projectId))
           ProjectSeries(
+            itemId: s.itemId.toInt(),
             source: s.source,
             base: s.base,
             quote: s.quote,
@@ -187,4 +189,33 @@ class FfiMuninnApi implements MuninnApi {
     );
     return ExportResult(path: o.path, format: o.format, rows: o.rows.toInt());
   }
+
+  @override
+  Future<Project> createProject(String name, {String description = ''}) async {
+    final p = await r_projects.createProject(name: name, description: description);
+    return Project(id: p.id, shortId: p.shortId, name: p.name, description: p.description);
+  }
+
+  @override
+  Future<Project> updateProject(String id, {String? name, String? description}) async {
+    final p = await r_projects.updateProject(id: id, name: name, description: description);
+    return Project(id: p.id, shortId: p.shortId, name: p.name, description: p.description);
+  }
+
+  @override
+  Future<void> removeProject(String id) => r_projects.removeProject(id: id);
+
+  @override
+  Future<bool> addProjectSeries(String projectId, Dataset d, TimeRange range) => r_projects.addProjectSeries(
+        projectId: projectId,
+        source: d.source,
+        base: d.base,
+        quote: d.quote,
+        durationS: PlatformInt64Util.from(d.durationS),
+        from: range.from == null ? null : PlatformInt64Util.from(range.from!),
+        to: range.to == null ? null : PlatformInt64Util.from(range.to!),
+      );
+
+  @override
+  Future<void> removeProjectSeries(int itemId) => r_projects.removeProjectSeries(itemId: PlatformInt64Util.from(itemId));
 }

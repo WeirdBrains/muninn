@@ -77,9 +77,9 @@ class BarPoint {
 
 /// A series saved in a project, with the project's range.
 class ProjectSeries {
-  const ProjectSeries({required this.source, required this.base, required this.quote, required this.durationS, this.from, this.to});
+  const ProjectSeries({this.itemId = 0, required this.source, required this.base, required this.quote, required this.durationS, this.from, this.to});
+  final int itemId, durationS;
   final String source, base, quote;
-  final int durationS;
   final int? from, to;
   String get key => '$source:$base/$quote:$durationS';
 }
@@ -180,4 +180,14 @@ abstract class MuninnApi {
     String? from,
     String? to,
   });
+  /// `mnnn project create`. Opens the store for writes.
+  Future<Project> createProject(String name, {String description = ''});
+  /// `mnnn project edit` (rename and/or description).
+  Future<Project> updateProject(String id, {String? name, String? description});
+  /// `mnnn project remove`. Journals stay as standalone journals.
+  Future<void> removeProject(String id);
+  /// Add [d] (with [range]) as a project result (`a` in the TUI). `true` if newly added.
+  Future<bool> addProjectSeries(String projectId, Dataset d, TimeRange range);
+  /// Take a series result out of a project (`mnnn project drop`). The series stays.
+  Future<void> removeProjectSeries(int itemId);
 }
