@@ -14,6 +14,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: read-only Orgs list and detail (`mnnn org list` / `mnnn org show`); no keys or mirror snapshots leave Rust
 - Flutter app: read-only Keys status (`mnnn keys status`); master key, words, shards and wrapped keys stay in Rust
 - Flutter app: pinch-to-zoom and pan on the Data chart (inside the selected time range), with TUI-style layer toggles
+- Flutter app: TUI keybinding parity for Help, navigation, Data/Projects/Net/Orgs, chart layers and zoom (same keys; platform exceptions in docs/flutter-app.md)
 
 ## [2.22.0] - 2026-11-05
 

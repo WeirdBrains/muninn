@@ -123,6 +123,58 @@ class ChartLayers {
 
 final chartLayersProvider = StateProvider<ChartLayers>((ref) => const ChartLayers());
 
+/// Visible slice of the already-loaded bars (pinch, wheel, or `+`/`-` / `h`/`l`).
+class ChartViewport {
+  const ChartViewport({this.scale = 1, this.start = 0});
+  final double scale;
+  final int start;
+  static const maxScale = 24.0;
+
+  int visibleCount(int n) {
+    if (n <= 0) return 0;
+    if (scale <= 1.001) return n;
+    final c = (n / scale).round();
+    return c < 1 ? 1 : c;
+  }
+
+  int visibleStart(int n) {
+    if (n <= 0) return 0;
+    final maxStart = n - visibleCount(n);
+    if (start < 0 || maxStart < 0) return 0;
+    return start > maxStart ? maxStart : start;
+  }
+
+  bool zoomed(int n) => scale > 1.001 && visibleCount(n) < n;
+
+  ChartViewport clampTo(int n) => ChartViewport(scale: scale, start: visibleStart(n));
+
+  ChartViewport zoomAt(double newScale, {required int n, double frac = 0.5}) {
+    if (n <= 0) return this;
+    if (newScale < 1) newScale = 1;
+    if (newScale > maxScale) newScale = maxScale;
+    final oldCount = visibleCount(n);
+    final oldStart = visibleStart(n);
+    final clampedFrac = frac < 0 ? 0.0 : (frac > 1 ? 1.0 : frac);
+    final focalIndex = oldStart + clampedFrac * oldCount;
+    final next = ChartViewport(scale: newScale, start: start);
+    final newCount = next.visibleCount(n);
+    final newStart = (focalIndex - clampedFrac * newCount).round();
+    return ChartViewport(scale: newScale, start: newStart).clampTo(n);
+  }
+
+  ChartViewport panBy(int delta, int n) =>
+      ChartViewport(scale: scale, start: visibleStart(n) + delta).clampTo(n);
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChartViewport && other.scale == scale && other.start == start;
+
+  @override
+  int get hashCode => Object.hash(scale, start);
+}
+
+final chartViewportProvider = StateProvider<ChartViewport>((ref) => const ChartViewport());
+
 final selectedDatasetValueProvider = Provider<Dataset?>((ref) {
   final key = ref.watch(selectedDatasetProvider);
   final o = ref.watch(overviewProvider).value;

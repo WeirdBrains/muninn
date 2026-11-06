@@ -19,12 +19,12 @@ import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 
 /// Hovering (or touching / dragging on a phone) shows that bar's values in the header row.
-class BarChart extends StatefulWidget {
+class BarChart extends ConsumerStatefulWidget {
   const BarChart({super.key, required this.bars, this.layers = const ChartLayers()});
   final List<BarPoint> bars;
   final ChartLayers layers;
   @override
-  State<BarChart> createState() => _BarChartState();
+  ConsumerState<BarChart> createState() => _BarChartState();
 }
 
 /// The one-line value readout for a bar (also used by tests).
@@ -33,30 +33,19 @@ String barReadout(BarPoint b) {
   return '${fmtUtc(b.ts)} UTC  O ${n(b.open)}  H ${n(b.high)}  L ${n(b.low)}  C ${n(b.close)}  V ${n(b.volume)}';
 }
 
-class _BarChartState extends State<BarChart> {
-  static const _maxScale = 24.0;
+class _BarChartState extends ConsumerState<BarChart> {
   int? _hover;
-  double _scale = 1;
-  int _start = 0;
   double _baseScale = 1;
   int _baseStart = 0;
   Offset _baseFocal = Offset.zero;
 
   List<BarPoint> get _all => widget.bars;
 
-  int get _visibleCount {
-    final n = _all.length;
-    if (n == 0) return 0;
-    if (_scale <= 1.001) return n;
-    return math.max(1, (n / _scale).round());
-  }
+  ChartViewport get _view => ref.read(chartViewportProvider);
 
-  int get _visibleStart {
-    final n = _all.length;
-    final c = _visibleCount;
-    if (n == 0) return 0;
-    return _start.clamp(0, math.max(0, n - c));
-  }
+  int get _visibleCount => _view.visibleCount(_all.length);
+
+  int get _visibleStart => _view.visibleStart(_all.length);
 
   List<BarPoint> get _visible {
     final n = _all.length;
@@ -65,7 +54,7 @@ class _BarChartState extends State<BarChart> {
     return _all.sublist(start, math.min(n, start + _visibleCount));
   }
 
-  bool get _zoomed => _scale > 1.001 && _visibleCount < _all.length;
+  bool get _zoomed => _view.zoomed(_all.length);
 
   void _at(double dx, double width) {
     final bars = _visible;
@@ -78,33 +67,16 @@ class _BarChartState extends State<BarChart> {
     if (_hover != null) setState(() => _hover = null);
   }
 
-  void _clampStart() {
-    final n = _all.length;
-    _start = _start.clamp(0, math.max(0, n - _visibleCount));
-  }
-
   void _zoomTo(double newScale, double focalX, double width) {
     final n = _all.length;
     if (n == 0 || width <= 0) return;
-    newScale = newScale.clamp(1.0, _maxScale);
-    final oldCount = _visibleCount;
-    final oldStart = _visibleStart;
     final frac = (focalX / width).clamp(0.0, 1.0);
-    final focalIndex = oldStart + frac * oldCount;
-    setState(() {
-      _scale = newScale;
-      final newCount = _visibleCount;
-      _start = (focalIndex - frac * newCount).round();
-      _clampStart();
-    });
+    ref.read(chartViewportProvider.notifier).state = _view.zoomAt(newScale, n: n, frac: frac);
   }
 
   void _resetZoom() {
-    if (_scale == 1 && _start == 0) return;
-    setState(() {
-      _scale = 1;
-      _start = 0;
-    });
+    if (_view.scale == 1 && _view.start == 0) return;
+    ref.read(chartViewportProvider.notifier).state = const ChartViewport();
   }
 
   @override
@@ -112,13 +84,13 @@ class _BarChartState extends State<BarChart> {
     super.didUpdateWidget(old);
     if (!listEquals(old.bars, widget.bars)) {
       _hover = null;
-      _scale = 1;
-      _start = 0;
+      ref.read(chartViewportProvider.notifier).state = const ChartViewport();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(chartViewportProvider);
     final m = context.muninn;
     final layers = widget.layers;
     final all = _all;
@@ -162,13 +134,13 @@ class _BarChartState extends State<BarChart> {
                 onPointerSignal: (e) {
                   if (e is PointerScrollEvent && e.scrollDelta.dy != 0) {
                     final factor = e.scrollDelta.dy < 0 ? 1.15 : 1 / 1.15;
-                    _zoomTo(_scale * factor, e.localPosition.dx, box.maxWidth);
+                    _zoomTo(_view.scale * factor, e.localPosition.dx, box.maxWidth);
                   }
                 },
                 child: GestureDetector(
                   onDoubleTap: _resetZoom,
                   onScaleStart: (d) {
-                    _baseScale = _scale;
+                    _baseScale = _view.scale;
                     _baseStart = _visibleStart;
                     _baseFocal = d.localFocalPoint;
                     _at(d.localFocalPoint.dx, box.maxWidth);
@@ -177,12 +149,11 @@ class _BarChartState extends State<BarChart> {
                     final width = box.maxWidth;
                     if (d.pointerCount > 1 || (d.scale - 1).abs() > 0.02) {
                       _zoomTo(_baseScale * d.scale, d.localFocalPoint.dx, width);
-                    } else if (_scale > 1.001) {
+                    } else if (_view.scale > 1.001) {
                       final vis = math.max(1, (all.length / _baseScale).round());
-                      setState(() {
-                        _start = (_baseStart - ((d.localFocalPoint.dx - _baseFocal.dx) / width * vis)).round();
-                        _clampStart();
-                      });
+                      final newStart = (_baseStart - ((d.localFocalPoint.dx - _baseFocal.dx) / width * vis)).round();
+                      ref.read(chartViewportProvider.notifier).state =
+                          ChartViewport(scale: _view.scale, start: newStart).clampTo(all.length);
                     }
                     _at(d.localFocalPoint.dx, width);
                   },

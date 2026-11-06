@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'about_dialog.dart';
 import 'api.dart';
 import 'io_dialogs.dart';
+import 'shortcuts.dart';
 import 'logo.dart';
 import 'prefs_dialog.dart';
 import 'state.dart';
@@ -35,12 +36,12 @@ class AppShell extends ConsumerWidget {
     final section = ref.watch(sectionProvider);
     return LayoutBuilder(builder: (context, c) {
       final phone = c.maxWidth < phoneBreakpoint;
-      final body = _withShortcuts(context, ref, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      final body = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const RangeBar(),
         Expanded(child: sectionView(section)),
-      ]));
+      ]);
       if (phone) {
-        return Scaffold(
+        return MuninnShortcuts(child: Scaffold(
           appBar: AppBar(
             toolbarHeight: 64,
             title: const FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: _Brand(compact: true)),
@@ -87,9 +88,9 @@ class AppShell extends ConsumerWidget {
               NavigationDestination(icon: Icon(Icons.more_horiz), label: 'More'),
             ],
           ),
-        );
+        ));
       }
-      return Scaffold(
+      return MuninnShortcuts(child: Scaffold(
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -98,7 +99,7 @@ class AppShell extends ConsumerWidget {
             Expanded(child: body),
           ],
         ),
-      );
+      ));
     });
   }
 }
@@ -168,30 +169,49 @@ class _Brand extends ConsumerWidget {
 }
 
 /// The TUI's menu bar, item for item where the app has the view; the rest say where to go.
-class MuninnMenuBar extends ConsumerWidget {
+class MuninnMenuBar extends ConsumerStatefulWidget {
   const MuninnMenuBar({super.key});
+  @override
+  ConsumerState<MuninnMenuBar> createState() => _MuninnMenuBarState();
+}
+
+class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
+  final _fileMenu = MenuController();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    ref.listen<int>(menuBarRequestProvider, (previous, next) {
+      if (previous != next) _fileMenu.open();
+    });
     void go(Section s) => ref.read(sectionProvider.notifier).state = s;
     void later(String what, String cli) => showLater(context, what, cli);
-    MenuItemButton item(String label, VoidCallback onTap) => MenuItemButton(onPressed: onTap, child: Text(label));
-    SubmenuButton menu(String label, List<Widget> children) =>
-        SubmenuButton(menuChildren: children, child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)));
+    MenuItemButton item(String label, VoidCallback onTap, [MenuSerializableShortcut? shortcut]) =>
+        MenuItemButton(onPressed: onTap, shortcut: shortcut, child: Text(label));
+    SubmenuButton menu(String label, List<Widget> children, {MenuController? controller}) =>
+        SubmenuButton(
+          controller: controller,
+          menuChildren: children,
+          child: DefaultTextStyle.merge(
+            style: const TextStyle(fontWeight: FontWeight.w600),
+            child: MenuAcceleratorLabel('&$label'),
+          ),
+        );
     final names = ref.watch(themeNamesProvider).value ?? const <String>[];
     final sel = ref.watch(themeSelectionProvider);
     return MenuBar(children: [
       menu('File', [
         item('Home', () => go(Section.home)),
         item('Lock', () => lockStore(ref)),
-        item('Import…', () => showImportDialog(context, ref)),
+        item('Import…', () => showImportDialog(context, ref), const SingleActivator(LogicalKeyboardKey.keyI)),
         item('Export…', () => showExportDialog(context, ref)),
         item('Preferences…', () => showPreferencesDialog(context, ref)),
-      ]),
+        const Divider(),
+        item('Quit', () => SystemNavigator.pop(), const SingleActivator(LogicalKeyboardKey.keyQ)),
+      ], controller: _fileMenu),
       menu('View', [
         item('Change view (chart / list)', () => ref.read(dataAsChartProvider.notifier).state = !ref.read(dataAsChartProvider)),
-        item('Chart layers…', () => showChartLayersSheet(context, ref)),
-        item('Refresh', () { ref.invalidate(overviewProvider); ref.invalidate(netOverviewProvider); ref.invalidate(orgOverviewProvider); ref.invalidate(keysStatusProvider); }),
+        item('Chart layers…', () => showChartLayersSheet(context, ref), const SingleActivator(LogicalKeyboardKey.keyL, shift: true)),
+        item('Refresh', () => refreshMuninn(ref), const SingleActivator(LogicalKeyboardKey.f5)),
       ]),
       menu('Data', [
         item('Datasets', () => go(Section.data)),
@@ -201,20 +221,20 @@ class MuninnMenuBar extends ConsumerWidget {
             onPressed: () => showTimeRangePicker(context, ref),
             child: const Text('Time range…'),
           ),
-          item('Clear time range', () => ref.read(timeRangeProvider.notifier).state = TimeRange.all),
+          item('Clear time range', () => ref.read(timeRangeProvider.notifier).state = TimeRange.all, const SingleActivator(LogicalKeyboardKey.keyX, shift: true)),
         ], child: const Text('Filters')),
         item('Sources…', () => later('Sources', 'mnnn sources')),
         item('Symbols…', () => later('Symbols', 'mnnn symbols')),
       ]),
       menu('Projects', [
-        item('Projects…', () => go(Section.projects)),
+        item('Projects…', () => go(Section.projects), const SingleActivator(LogicalKeyboardKey.keyP, shift: true)),
         item('New project…', () => showNewProjectDialog(context, ref)),
       ]),
       menu('Net', [
-        item('Status…', () => go(Section.net)),
-        item('Peers…', () => go(Section.net)),
+        item('Status…', () => go(Section.net), const SingleActivator(LogicalKeyboardKey.keyK, shift: true)),
+        item('Peers…', () => go(Section.net), const SingleActivator(LogicalKeyboardKey.keyW, shift: true)),
       ]),
-      menu('Orgs', [item('Organizations…', () => go(Section.orgs))]),
+      menu('Orgs', [item('Organizations…', () => go(Section.orgs), const SingleActivator(LogicalKeyboardKey.keyG, shift: true))]),
       menu('Keys', [item('Status…', () => go(Section.keys))]),
       menu('Theme', [
         for (final n in names)
@@ -232,7 +252,7 @@ class MuninnMenuBar extends ConsumerWidget {
           ),
       ]),
       menu('Help', [
-        item('Topics…', () => go(Section.help)),
+        item('Topics…', () => go(Section.help), const SingleActivator(LogicalKeyboardKey.f1)),
         item('About Muninn', () => showMuninnAbout(context, ref)),
       ]),
     ]);
@@ -292,19 +312,3 @@ void lockStore(WidgetRef ref) {
   ref.read(selectedProjectProvider.notifier).state = null;
 }
 
-/// `T` (Shift+t) opens the time range picker anywhere (as in the TUI), except while typing.
-Widget _withShortcuts(BuildContext context, WidgetRef ref, Widget child) => Focus(
-      autofocus: true,
-      onKeyEvent: (node, e) {
-        if (e is! KeyDownEvent || e.logicalKey != LogicalKeyboardKey.keyT || !HardwareKeyboard.instance.isShiftPressed) {
-          return KeyEventResult.ignored;
-        }
-        final f = FocusManager.instance.primaryFocus?.context;
-        if (f != null && (f.widget is EditableText || f.findAncestorWidgetOfExactType<EditableText>() != null)) {
-          return KeyEventResult.ignored;
-        }
-        showTimeRangePicker(context, ref);
-        return KeyEventResult.handled;
-      },
-      child: child,
-    );

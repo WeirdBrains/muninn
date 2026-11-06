@@ -31,8 +31,10 @@ Users never need Rust: release builds ship the compiled library.
 - **Header:** the raven (themed) and the big MUNINN wordmark, as on the website.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
-  File ▸ Import…, Export… and Preferences… are wired, as is Projects ▸ New project…
+  File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project…
   and Net ▸ Status… / Peers…, Orgs ▸ Organizations… and Keys ▸ Status…. Help still points at the CLI.
+  Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
+  (see [Keybindings](#keybindings) below).
 - **Phone layout** (narrower than 720 px): bottom navigation (Home, Data, Projects, Net,
   More), 48 px+ targets, safe areas, theme as a bottom sheet; nothing is hover-only.
 - **Themes:** every theme from `assets/themes/*.toml` plus your own in `<home>/themes/`,
@@ -49,7 +51,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range;
   pick one to see it as a chart (candles when they fit, else a close line, volume
   underneath) or a list of bars, newest first. Switch with the Chart / List buttons or
-  **View ▸ Change view** (`Ctrl-w t` in the TUI). Rust downsamples to at most 600
+  **View ▸ Change view** (`Ctrl-w t`, the same chord as the TUI). Rust downsamples to at most 600
   buckets (open = first, close = last, high/low = extremes, volume = sum), so long
   ranges stay fast. Desktop shows the list and the chart side by side; on a phone the
   chart opens on its own page. Pinch, a trackpad or the mouse wheel zooms the chart
@@ -60,18 +62,19 @@ Users never need Rust: release builds ship the compiled library.
   show it (`from …` / `to …`, × removes an end); click **Time range**, press `T`, or use
   **Data ▸ Filters ▸ Time range…** to open the picker: a date and a time (UTC) for
   *from* and *to*, either end left open. **Clear** (or **Data ▸ Filters ▸ Clear time
-  range**) shows everything. Datasets with no bars in the range are hidden. The range is
+  range**, or `X`) shows everything. Datasets with no bars in the range are hidden. The range is
   saved as the TUI's sidebar filter (`[tui.sidebar.filters]` from/to), so it is shared.
 - **Saved state:** the theme, the time range and the dataset open in Data
   (`[app] dataset`) are restored on launch. Locking keeps the dataset; it shows again
   after the next unlock. Reading never creates `preferences.toml`; the first change does.
 - **Chart readout:** hover over the chart (or touch / drag on a phone) to show that bar's
   time, open, high, low, close and volume above it; a guide line marks the bar.
-- **Chart layers:** **View ▸ Chart layers…** (or the layers button next to Chart / List)
-  toggles the same kind of layers as the TUI (`L`): candles, OHLC bars, a close line,
-  area under the line, volume, grid, crosshair and the price / time axes. Defaults match
-  the TUI (candles, volume, grid, crosshair and both axes on). Moving averages, wick and
-  gap markers and the high/low envelope stay in the TUI.
+- **Chart layers:** **View ▸ Chart layers…** (or the layers button next to Chart / List,
+  or `L`) toggles the same kind of layers as the TUI: candles (`c`), OHLC bars (`b`), a
+  close line (`n`), area under the line (`a`), volume (`v`), grid (`#`), crosshair (`x`)
+  and the price (`y`) / time (`t`) axes. Defaults match the TUI (candles, volume, grid,
+  crosshair and both axes on). Moving averages, wick and gap markers and the high/low
+  envelope stay in the TUI (`e`, `m`, `w`, `g`, `z` are unbound here).
 - **Projects:** pick a project to see the series saved in it. **New project** (or
   Projects ▸ New project…) creates one (`mnnn project create`); the project menu
   renames, edits the description or deletes it (`mnnn project edit` / `remove` — journals
@@ -114,6 +117,71 @@ Users never need Rust: release builds ship the compiled library.
   and Data. TUI-only layout (header size, sidebar, history bar) stays in `mnnn tui`.
 - **About** (Help ▸ About Muninn): the same text as the TUI's About box, from
   `muninn_core::about`.
+
+## Keybindings
+
+The app uses the same keys as the [TUI](keybindings.md) for every action it already
+has. It does not invent different chords. Shortcuts are ignored while a text field
+is focused (you can type `T` or `i` into a password or path). On a phone they apply
+when a hardware keyboard is attached.
+
+### Everywhere
+
+| key | action |
+|-----|--------|
+| `T` | time range picker |
+| `X` | clear the time range (the TUI's "clear all" filters; the app's filter is the time range) |
+| F5 | refresh |
+| `?`, F1 | Help (the placeholder that points at `mnnn help`) |
+| `i` | File ▸ Import… |
+| `P` | Projects |
+| `K` | Net status |
+| `W` | Net peers (same page as `K`; the app has one Net view) |
+| `G` | Organizations |
+| `L` | Chart layers… |
+| `Ctrl-w t` | change view (chart ↔ list) |
+| F10 | open the File menu (stand-in for the TUI's "open the menu bar") |
+| `q` | quit (desktop only) |
+| Alt+letter | open that menu (File, View, Data, Projects, Net, Orgs, Keys, Theme, Help), matching each TUI menu mnemonic |
+
+### Data
+
+| key | action |
+|-----|--------|
+| `,` / `.` | previous / next dataset (the TUI's previous / next series) |
+| `t` | chart ↔ list when the list is showing (data tile `t`) |
+
+When the Data chart is showing:
+
+| key | action |
+|-----|--------|
+| `c` `b` `n` `a` `v` `#` `x` `y` `t` | toggle candles, OHLC bars, line, area, volume, grid, crosshair, price axis, time axis |
+| `+` / `-` | zoom in / out around the centre (inside the loaded bars, same as pinch) |
+| `h` `l`, PgUp PgDn | pan a quarter / a full screen |
+| Home / End, `0` | first bars / latest |
+
+### Projects
+
+| key | action |
+|-----|--------|
+| `n` | new project (when the Projects page is showing) |
+
+### Platform exceptions
+
+- **Ctrl-C** quits the TUI; in the app it stays the platform Copy shortcut.
+- **`q`** quits the desktop app (File ▸ Quit); on a phone the system back gesture leaves the app and `q` is ignored.
+- **F10** opens the File menu. Flutter's `MenuBar` has no TUI-style "menu bar focused" mode.
+- **Alt+letter** uses Flutter's `MenuAcceleratorLabel` (the same letters as the TUI, including Net `N` and Orgs `O`). On macOS the system menu bar may take precedence.
+- **Tiling** (`Ctrl-w` then `v`/`s`/`q`/`h`/`j`/`k`/`l`/… other than `t`): the app is not a tiled workspace, so those keys are unbound. `Ctrl-w t` still changes view.
+- **Ctrl-b** (toggle sidebar): the desktop Data list is always shown; phones use bottom navigation.
+- **Tab** / **Alt-1…9** tile focus: there are no tiles.
+- Chart layer keys **`e` `m` `w` `g` `z`** (envelope, moving averages, wick, gap, zero-volume) stay in the TUI; those layers are not drawn yet.
+- **← →** move the TUI chart crosshair; the app moves it by hover or touch.
+- **`[` `]` `{` `}` `@`** period start/end on a chart tile stay in the TUI (the app uses the global `T` picker).
+- Keys for windows the app does not have yet (`F` live searches, `J` journals, `E` pipelines, `A` authors, `Y` history, and so on) are left unbound — they are not remapped to something else.
+- In the TUI, `X` stops a node when the network window is focused; the app has no start/stop and `X` stays "clear the time range".
+- **`a`** toggles the area layer when the Data chart is showing (chart tile). Adding a series to a project is **Add current dataset** on the Projects page (the TUI's sidebar-focused `a`).
+- **Esc** closes dialogs through Flutter's usual dialog behaviour.
 
 ## Data
 
