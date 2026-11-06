@@ -4,6 +4,7 @@ pub mod about;
 pub mod data;
 pub mod info;
 pub mod io;
+pub mod net;
 pub mod prefs;
 pub mod projects;
 pub mod themes;

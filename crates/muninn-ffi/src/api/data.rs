@@ -67,7 +67,7 @@ pub fn is_unlocked() -> bool {
     SESSION.lock().unwrap_or_else(|e| e.into_inner()).is_some()
 }
 
-fn open() -> anyhow::Result<Store> {
+pub(crate) fn open() -> anyhow::Result<Store> {
     let g = SESSION.lock().unwrap_or_else(|e| e.into_inner());
     let (db, key) = g.as_ref().ok_or_else(|| anyhow::anyhow!("locked: unlock with the Muninn password first"))?;
     Ok(Store::open_readonly(db, Some(&key.0))?)

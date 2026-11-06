@@ -27,6 +27,15 @@ pub fn peer_id(store: &Store) -> Result<Option<PeerId>> {
     })
 }
 
+/// The fingerprint of the stored identity, if the node has one. Does not create a key.
+pub fn fingerprint_of(store: &Store) -> Result<Option<String>> {
+    let Some((bytes, _)) = store.node_identity()? else {
+        return Ok(None);
+    };
+    let kp = Keypair::from_protobuf_encoding(&bytes).map_err(|e| Error::Crypto(format!("node identity: {e}")))?;
+    Ok(Some(fingerprint(&kp.public())))
+}
+
 /// A short, readable fingerprint of a public key: `3f2a 9c1d 77e0 41b8 aa02`.
 pub fn fingerprint(key: &PublicKey) -> String {
     let h = sha2::Sha256::digest(key.encode_protobuf());
@@ -46,6 +55,7 @@ mod tests {
     fn identity_is_made_once_and_kept() {
         let s = Store::open_in_memory().unwrap();
         assert!(peer_id(&s).unwrap().is_none());
+        assert!(fingerprint_of(&s).unwrap().is_none());
         let a = load_or_create(&s).unwrap();
         let b = load_or_create(&s).unwrap();
         assert_eq!(a.public(), b.public());
@@ -53,5 +63,6 @@ mod tests {
         let f = fingerprint(&a.public());
         assert_eq!(f.len(), 24);
         assert_eq!(f, fingerprint(&b.public()));
+        assert_eq!(fingerprint_of(&s).unwrap().as_deref(), Some(f.as_str()));
     }
 }

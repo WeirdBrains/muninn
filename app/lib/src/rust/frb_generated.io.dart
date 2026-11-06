@@ -7,6 +7,7 @@ import 'api/about.dart';
 import 'api/data.dart';
 import 'api/info.dart';
 import 'api/io.dart';
+import 'api/net.dart';
 import 'api/prefs.dart';
 import 'api/projects.dart';
 import 'api/themes.dart';
@@ -88,6 +89,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<IngestFileReport> dco_decode_list_ingest_file_report(dynamic raw);
 
   @protected
+  List<NetPeerInfo> dco_decode_list_net_peer_info(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
@@ -98,6 +102,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ThemeRole> dco_decode_list_theme_role(dynamic raw);
+
+  @protected
+  NetOverview dco_decode_net_overview(dynamic raw);
+
+  @protected
+  NetPeerInfo dco_decode_net_peer_info(dynamic raw);
+
+  @protected
+  NetStatus dco_decode_net_status(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -212,6 +225,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<NetPeerInfo> sse_decode_list_net_peer_info(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
@@ -226,6 +242,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ThemeRole> sse_decode_list_theme_role(SseDeserializer deserializer);
+
+  @protected
+  NetOverview sse_decode_net_overview(SseDeserializer deserializer);
+
+  @protected
+  NetPeerInfo sse_decode_net_peer_info(SseDeserializer deserializer);
+
+  @protected
+  NetStatus sse_decode_net_status(SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -364,6 +389,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_net_peer_info(
+    List<NetPeerInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -386,6 +417,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     List<ThemeRole> self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_net_overview(NetOverview self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_net_peer_info(NetPeerInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_net_status(NetStatus self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
