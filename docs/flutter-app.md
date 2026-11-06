@@ -4,8 +4,7 @@ Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
 the TUI menu bar, a read-only Home, the Data view with charts and the time range,
-Projects (create, rename, describe, delete, attach and detach series), a read-only Net
-status and peers view, a read-only Orgs list, a read-only Keys status, File ▸ Import… / Export…
+Projects (create, rename, describe, delete, attach and detach series), Net status, peers, start/stop, connect, invites, relays and sharing, a read-only Orgs list, Keys status and writes, File ▸ Import… / Export…
 (CSV, Parquet, JSON), and File ▸ Preferences….
 
 ## Run it
@@ -32,7 +31,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project…
-  and Net ▸ Status… / Peers…, Orgs ▸ Organizations… and Keys ▸ Status… plus Initialize, Rotate,
+  and Net ▸ Status / Start / Stop / Invite or connect / Peers / Relays / Shared, Orgs ▸ Organizations… and Keys ▸ Status… plus Initialize, Rotate,
   Rekey, Export, Recover and Re-issue shards. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
@@ -45,7 +44,7 @@ Users never need Rust: release builds ship the compiled library.
   `mnnn theme set` / `mnnn theme mode`), so the TUI and the app follow each other.
 - **Unlock:** Home, Data, Projects, Net and Orgs ask for the Muninn password once per session. The
   key stays in Rust memory (never in Dart, never on disk); **File ▸ Lock** forgets it.
-  Dashboard reads, Net status and the Orgs list open the store **read-only** (no migrations).
+  Dashboard reads and the Orgs list open the store **read-only** (no migrations). Net status is read-only; start/stop, connect, invites, relays and sharing open it for writes after the same unlock.
   Keys status does not unlock the store (same as `mnnn keys status`).
   **File ▸ Import…**, **Export…** and project writes (create, rename, describe, delete,
   attach or detach a series) open it for writes after the same unlock.
@@ -85,12 +84,18 @@ Users never need Rust: release builds ship the compiled library.
   a series out of the project without deleting it (`mnnn project drop`). Opening a
   series shows it in Data with the project's saved time range. Journals, searches,
   reports and import/export archives stay out of the app (use the TUI or CLI).
-- **Net:** read-only status and peers, like `mnnn net status` and `mnnn net peers` (and
-  the TUI's Node / Peers pages). It shows whether a node is running (`MUNINN_HOME/net/node.json`,
-  no secrets), the peer id and identity fingerprint if the node already has one (the key
-  stays in Rust; an identity is not created just by opening this view), reachable
-  addresses, NAT / mDNS / relay, exchange and share counts, and known peers. Start, stop,
-  connect, invite, relays, sharing and dark shards stay in the TUI or CLI.
+- **Net:** status and peers like `mnnn net status` / `mnnn net peers`, plus the write
+  flows the TUI and CLI provide for the node itself: start and stop (the node runs in
+  this process, like the TUI; `mnnn net stop` can still ask it to stop), connect
+  (address, peer id, name or invite link; an optional hello-only pass), invites
+  (create a public link that holds no secret, list yours, accept or decline requests,
+  withdraw an invite), disconnect and forget, relay add/remove/serve (saved in
+  `preferences.toml`, picked up the next time the node starts, like the CLI), and
+  share / unshare (model, search, journal, project, report, code or pipeline). The
+  node identity and exchange keys stay in Rust. On a phone the node uses the same
+  platform-secure app sandbox the store already uses. Network settings, manual key
+  exchanges, listing or fetching what a peer shares, network search, broadcast and
+  dark shards stay in the TUI or CLI.
 - **Orgs:** read-only list and detail, like `mnnn org list` / `mnnn org show` (and the
   TUI's Organizations and Joined pages). It shows organizations this node owns (visibility,
   access, hosted, member count; expand for description, roles, members, resources, projects,
@@ -149,7 +154,7 @@ when a hardware keyboard is attached.
 | `i` | File ▸ Import… |
 | `P` | Projects |
 | `K` | Net status |
-| `W` | Net peers (same page as `K`; the app has one Net view) |
+| `W` | Net peers (the Peers page of the Net view) |
 | `G` | Organizations |
 | `L` | Chart layers… |
 | `Ctrl-w t` | change view (chart ↔ list) |

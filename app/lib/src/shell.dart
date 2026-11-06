@@ -24,6 +24,7 @@ import 'views/net.dart';
 import 'views/orgs.dart';
 import 'views/keys.dart';
 import 'views/keys_dialogs.dart';
+import 'views/net_dialogs.dart';
 import 'views/projects.dart';
 
 /// Widths below this use the phone layout.
@@ -232,8 +233,19 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
         item('New project…', () => showNewProjectDialog(context, ref)),
       ]),
       menu('Net', [
-        item('Status…', () => go(Section.net), const SingleActivator(LogicalKeyboardKey.keyK, shift: true)),
-        item('Peers…', () => go(Section.net), const SingleActivator(LogicalKeyboardKey.keyW, shift: true)),
+        item('Status…', () { ref.read(netPaneProvider.notifier).state = NetPane.node; go(Section.net); }, const SingleActivator(LogicalKeyboardKey.keyK, shift: true)),
+        item('Start node', () => netStartNode(context, ref)),
+        item('Stop node', () => netStopNode(context, ref)),
+        item('Settings…', () => later('Network settings', 'mnnn net config')),
+        item('Connections…', () => later('Connections', 'mnnn net (TUI Connections)')),
+        item('Invites…', () { ref.read(netPaneProvider.notifier).state = NetPane.invites; go(Section.net); }),
+        item('Invite or connect…', () => showNetInviteOrConnectDialog(context, ref)),
+        item('Nodes…', () => later('Key exchanges', 'mnnn net exchange')),
+        item('Peers…', () { ref.read(netPaneProvider.notifier).state = NetPane.peers; go(Section.net); }, const SingleActivator(LogicalKeyboardKey.keyW, shift: true)),
+        item('Relays…', () { ref.read(netPaneProvider.notifier).state = NetPane.relays; go(Section.net); }),
+        item('Shared data…', () { ref.read(netPaneProvider.notifier).state = NetPane.shared; go(Section.net); }),
+        item('Network search…', () => later('Network search', 'mnnn net search')),
+        item('Dark shards…', () => later('Dark shards', 'mnnn net shard')),
       ]),
       menu('Orgs', [item('Organizations…', () => go(Section.orgs), const SingleActivator(LogicalKeyboardKey.keyG, shift: true))]),
       menu('Keys', [

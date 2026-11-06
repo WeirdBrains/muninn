@@ -2,7 +2,12 @@
 library;
 
 class MuninnTheme {
-  const MuninnTheme({required this.name, required this.displayName, required this.variant, required this.roles});
+  const MuninnTheme({
+    required this.name,
+    required this.displayName,
+    required this.variant,
+    required this.roles,
+  });
   final String name, displayName, variant;
   final Map<String, String> roles;
 }
@@ -20,18 +25,36 @@ class About {
     required this.copyright,
     required this.credits,
   });
-  final String name, version, tagline, motto, publisher, homepage, repository, license, copyright;
+  final String name,
+      version,
+      tagline,
+      motto,
+      publisher,
+      homepage,
+      repository,
+      license,
+      copyright;
   final List<String> credits;
 }
 
 class DataDir {
-  const DataDir({required this.home, required this.database, required this.databaseExists, required this.keysInitialized});
+  const DataDir({
+    required this.home,
+    required this.database,
+    required this.databaseExists,
+    required this.keysInitialized,
+  });
   final String home, database;
   final bool databaseExists, keysInitialized;
 }
 
 class Project {
-  const Project({this.id = '', required this.shortId, required this.name, required this.description});
+  const Project({
+    this.id = '',
+    required this.shortId,
+    required this.name,
+    required this.description,
+  });
   final String id, shortId, name, description;
 }
 
@@ -52,7 +75,8 @@ class Dataset {
   String get key => '$source:$symbol:$durationS';
 
   /// Has bars inside [r] (open ends match everything), like the TUI sidebar.
-  bool overlaps(TimeRange r) => (r.from == null || last >= r.from!) && (r.to == null || first <= r.to!);
+  bool overlaps(TimeRange r) =>
+      (r.from == null || last >= r.from!) && (r.to == null || first <= r.to!);
 }
 
 /// The global time range (UTC ms, either end open), as `T` in the TUI.
@@ -64,20 +88,36 @@ class TimeRange {
   TimeRange withFrom(int? v) => TimeRange(from: v, to: to);
   TimeRange withTo(int? v) => TimeRange(from: from, to: v);
   @override
-  bool operator ==(Object other) => other is TimeRange && other.from == from && other.to == to;
+  bool operator ==(Object other) =>
+      other is TimeRange && other.from == from && other.to == to;
   @override
   int get hashCode => Object.hash(from, to);
 }
 
 class BarPoint {
-  const BarPoint({required this.ts, required this.open, required this.high, required this.low, required this.close, required this.volume});
+  const BarPoint({
+    required this.ts,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    required this.volume,
+  });
   final int ts;
   final double open, high, low, close, volume;
 }
 
 /// A series saved in a project, with the project's range.
 class ProjectSeries {
-  const ProjectSeries({this.itemId = 0, required this.source, required this.base, required this.quote, required this.durationS, this.from, this.to});
+  const ProjectSeries({
+    this.itemId = 0,
+    required this.source,
+    required this.base,
+    required this.quote,
+    required this.durationS,
+    this.from,
+    this.to,
+  });
   final int itemId, durationS;
   final String source, base, quote;
   final int? from, to;
@@ -133,6 +173,76 @@ class NetOverview {
   final List<NetPeerInfo> peers;
 }
 
+/// Result of connect / accept / hello. No keys.
+class NetLinkResult {
+  const NetLinkResult({
+    required this.status,
+    this.peer = '',
+    this.peerId,
+    this.detail = '',
+    this.warning,
+  });
+  final String status, peer, detail;
+  final String? peerId, warning;
+}
+
+/// An invite this node made. The link holds no secret.
+class NetInviteInfo {
+  const NetInviteInfo({
+    required this.id,
+    required this.shortId,
+    this.title = '',
+    this.purpose = '',
+    this.expiresAt,
+    this.createdAt = 0,
+    this.link = '',
+  });
+  final String id, shortId, title, purpose, link;
+  final int? expiresAt;
+  final int createdAt;
+}
+
+class NetRequestInfo {
+  const NetRequestInfo({
+    required this.id,
+    required this.shortId,
+    this.title = '',
+    this.purpose = '',
+    this.peerId,
+    this.createdAt = 0,
+  });
+  final String id, shortId, title, purpose;
+  final String? peerId;
+  final int createdAt;
+}
+
+class NetInvites {
+  const NetInvites({this.invites = const [], this.requests = const []});
+  final List<NetInviteInfo> invites;
+  final List<NetRequestInfo> requests;
+}
+
+class NetRelayInfo {
+  const NetRelayInfo({
+    this.configured = const [],
+    this.seen = const [],
+    this.serving = false,
+  });
+  final List<String> configured;
+  final List<NetPeerInfo> seen;
+  final bool serving;
+}
+
+class NetShareInfo {
+  const NetShareInfo({
+    required this.id,
+    required this.shortId,
+    required this.kind,
+    required this.name,
+    this.withWhom = '',
+  });
+  final String id, shortId, kind, name, withWhom;
+}
 
 class Overview {
   const Overview({required this.projects, required this.datasets});
@@ -142,12 +252,16 @@ class Overview {
 
 /// What the app restores on launch from preferences.toml (shared with the TUI).
 class SavedState {
-  const SavedState({this.theme = 'tokyo-night', this.mode = 'system', this.range = TimeRange.all, this.dataset});
+  const SavedState({
+    this.theme = 'tokyo-night',
+    this.mode = 'system',
+    this.range = TimeRange.all,
+    this.dataset,
+  });
   final String theme, mode;
   final TimeRange range;
   final String? dataset;
 }
-
 
 /// One file stored by Import (as it arrived; no bars are made).
 class IngestFileReport {
@@ -187,7 +301,11 @@ class IngestProgress {
 }
 
 class ExportResult {
-  const ExportResult({required this.path, required this.format, required this.rows});
+  const ExportResult({
+    required this.path,
+    required this.format,
+    required this.rows,
+  });
   final String path, format;
   final int rows;
 }
@@ -261,7 +379,12 @@ class OrgMemberInfo {
 }
 
 class OrgResourceInfo {
-  const OrgResourceInfo({required this.kind, required this.name, this.state = '', this.published = ''});
+  const OrgResourceInfo({
+    required this.kind,
+    required this.name,
+    this.state = '',
+    this.published = '',
+  });
   final String kind;
   final String name;
   final String state;
@@ -269,7 +392,12 @@ class OrgResourceInfo {
 }
 
 class OrgEndpointInfo {
-  const OrgEndpointInfo({required this.name, required this.kind, this.perm = '', this.anyone = false});
+  const OrgEndpointInfo({
+    required this.name,
+    required this.kind,
+    this.perm = '',
+    this.anyone = false,
+  });
   final String name;
   final String kind;
   final String perm;
@@ -302,7 +430,11 @@ class OrgMirror {
 }
 
 class OrgOverview {
-  const OrgOverview({this.mine = const [], this.joined = const [], this.mirrors = const []});
+  const OrgOverview({
+    this.mine = const [],
+    this.joined = const [],
+    this.mirrors = const [],
+  });
   final List<OrgInfo> mine;
   final List<OrgJoined> joined;
   final List<OrgMirror> mirrors;
@@ -336,28 +468,42 @@ abstract class MuninnApi {
   Future<MuninnTheme> loadTheme(String name, String variant);
   Future<({String name, String mode})> currentTheme();
   Future<DataDir> dataDir();
+
   /// The saved theme, mode, time range and dataset (read-only; never creates the file).
   Future<SavedState> savedState();
+
   /// Like `mnnn theme set` / `mnnn theme mode`: written to preferences.toml.
   Future<void> saveTheme(String name);
   Future<void> saveThemeMode(String mode);
+
   /// The TUI's saved time range (`[tui.sidebar.filters]`).
   Future<void> saveTimeRange(TimeRange range);
   Future<void> saveDataset(String? key);
+
   /// Unlock with the Muninn password; the key stays in Rust. Throws on a wrong password.
   Future<void> unlock(String password);
   void lock();
+
   /// Dashboard reads: the store is opened without migrations or writes.
   Future<Overview> overview();
   Future<List<ProjectSeries>> projectSeries(String projectId);
+
   /// Bars of one dataset in [range], downsampled in Rust to at most [maxPoints].
-  Future<List<BarPoint>> queryBars(Dataset d, TimeRange range, {int maxPoints = 600});
+  Future<List<BarPoint>> queryBars(
+    Dataset d,
+    TimeRange range, {
+    int maxPoints = 600,
+  });
+
   /// Store each data file at [path] (file or folder) byte for byte. Opens the store for writes.
   Future<IngestResult> ingestPath(String path, {String? source});
+
   /// Ask a running import to stop (finished files stay; the current file is rolled back).
   void cancelIngest();
+
   /// Snapshot of a running import, or null.
   IngestProgress? ingestProgress();
+
   /// Write matching bars to [path] as `csv`, `parquet` or `json`. Opens the store for writes.
   Future<ExportResult> exportBars({
     required String path,
@@ -368,20 +514,64 @@ abstract class MuninnApi {
     String? from,
     String? to,
   });
+
   /// `mnnn project create`. Opens the store for writes.
   Future<Project> createProject(String name, {String description = ''});
+
   /// `mnnn project edit` (rename and/or description).
   Future<Project> updateProject(String id, {String? name, String? description});
+
   /// `mnnn project remove`. Journals stay as standalone journals.
   Future<void> removeProject(String id);
+
   /// Add [d] (with [range]) as a project result (`a` in the TUI). `true` if newly added.
   Future<bool> addProjectSeries(String projectId, Dataset d, TimeRange range);
+
   /// Take a series result out of a project (`mnnn project drop`). The series stays.
   Future<void> removeProjectSeries(int itemId);
+
   /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
   Future<NetOverview> netOverview();
+
+  /// `mnnn net start`: run the node in this process. The node key stays in Rust.
+  Future<String> netStart();
+
+  /// `mnnn net stop`, or ask another process to stop.
+  Future<String> netStop();
+
+  /// `mnnn net connect` (address, peer id, name or invite link). [hello] only says hello.
+  Future<NetLinkResult> netConnect(
+    String target, {
+    String? label,
+    bool hello = false,
+  });
+
+  /// `mnnn net invite`: a public link (no secret).
+  Future<String> netInvite({String? label});
+  Future<NetInvites> netInvites();
+  Future<NetLinkResult> netAccept(String request);
+  Future<String> netDecline(String request);
+  Future<String> netDisconnect(String peer);
+  Future<String> netForget(String peer);
+  Future<NetRelayInfo> netRelays();
+  Future<String> netRelayAdd(String addr);
+  Future<String> netRelayRemove(String relay);
+  Future<String> netRelayServe(bool on);
+  Future<List<NetShareInfo>> netShared();
+  Future<String> netShare(
+    String kind,
+    String item, {
+    List<String> withPeers = const [],
+  });
+  Future<String> netUnshare(
+    String kind,
+    String item, {
+    List<String> withPeers = const [],
+  });
+
   /// `mnnn org list` and the fields `mnnn org show` prints for orgs this node owns.
   Future<OrgOverview> orgOverview();
+
   /// `mnnn keys status`: database id, path and service-key versions. No key material.
   Future<KeysStatus> keysStatus();
 
@@ -396,11 +586,48 @@ abstract class MuninnApi {
   Future<String> keysRevealWord(int id, int index);
   Future<String> keysRevealShard(int id, int index);
   Future<void> keysRevealDismiss(int id);
-  Future<int> keysRotate({required String password, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
-  Future<void> keysRekey({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
-  Future<List<String>> keysExport({required String out, required String exportPassword, List<String> only = const [], bool confirmCombined = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
-  Future<RevealHandle?> keysRecover({required String newPassword, bool printWords = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
-  Future<RevealHandle> keysReissueShards({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword});
+  Future<int> keysRotate({
+    required String password,
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
+  Future<void> keysRekey({
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
+  Future<List<String>> keysExport({
+    required String out,
+    required String exportPassword,
+    List<String> only = const [],
+    bool confirmCombined = false,
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
+  Future<RevealHandle?> keysRecover({
+    required String newPassword,
+    bool printWords = false,
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
+  Future<RevealHandle> keysReissueShards({
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
 }
 
 class HelpTopicInfo {
@@ -418,7 +645,13 @@ class HelpTopic {
 
 /// A one-time Rust-held reveal of recovery words and/or shards. No secrets in this handle.
 class RevealHandle {
-  const RevealHandle({required this.id, this.dbId = '', this.wordCount = 0, this.shardCount = 0, this.migratedPlainDb = false});
+  const RevealHandle({
+    required this.id,
+    this.dbId = '',
+    this.wordCount = 0,
+    this.shardCount = 0,
+    this.migratedPlainDb = false,
+  });
   final int id;
   final String dbId;
   final int wordCount;

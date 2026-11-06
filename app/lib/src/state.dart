@@ -8,19 +8,22 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'api.dart';
 
 /// Overridden in main() (FFI) and in tests (fake).
-final apiProvider = Provider<MuninnApi>((ref) => throw UnimplementedError('override apiProvider'));
+final apiProvider = Provider<MuninnApi>(
+  (ref) => throw UnimplementedError('override apiProvider'),
+);
 
 class ThemeSelection {
   const ThemeSelection(this.name, this.mode);
   final String name;
+
   /// `light`, `dark` or `system` (same as `mnnn theme mode`).
   final String mode;
 
   String variant(Brightness platform) => switch (mode) {
-        'light' => 'light',
-        'dark' => 'dark',
-        _ => platform == Brightness.light ? 'light' : 'dark',
-      };
+    'light' => 'light',
+    'dark' => 'dark',
+    _ => platform == Brightness.light ? 'light' : 'dark',
+  };
 }
 
 /// The theme in use. Restored from preferences.toml on launch and saved there on change
@@ -31,15 +34,24 @@ class ThemeSelectionNotifier extends Notifier<ThemeSelection> {
 
   void set(String name) => state = ThemeSelection(name, state.mode);
   void setMode(String mode) => state = ThemeSelection(state.name, mode);
-  void toggleMode(Brightness platform) =>
-      state = ThemeSelection(state.name, state.variant(platform) == 'dark' ? 'light' : 'dark');
+  void toggleMode(Brightness platform) => state = ThemeSelection(
+    state.name,
+    state.variant(platform) == 'dark' ? 'light' : 'dark',
+  );
 }
 
-final themeSelectionProvider = NotifierProvider<ThemeSelectionNotifier, ThemeSelection>(ThemeSelectionNotifier.new);
+final themeSelectionProvider =
+    NotifierProvider<ThemeSelectionNotifier, ThemeSelection>(
+      ThemeSelectionNotifier.new,
+    );
 
-final themeNamesProvider = FutureProvider<List<String>>((ref) => ref.watch(apiProvider).listThemes());
+final themeNamesProvider = FutureProvider<List<String>>(
+  (ref) => ref.watch(apiProvider).listThemes(),
+);
 
-final platformBrightnessProvider = StateProvider<Brightness>((ref) => Brightness.dark);
+final platformBrightnessProvider = StateProvider<Brightness>(
+  (ref) => Brightness.dark,
+);
 
 final resolvedThemeProvider = FutureProvider<MuninnTheme>((ref) {
   final sel = ref.watch(themeSelectionProvider);
@@ -47,7 +59,9 @@ final resolvedThemeProvider = FutureProvider<MuninnTheme>((ref) {
   return ref.watch(apiProvider).loadTheme(sel.name, sel.variant(b));
 });
 
-final dataDirProvider = FutureProvider<DataDir>((ref) => ref.watch(apiProvider).dataDir());
+final dataDirProvider = FutureProvider<DataDir>(
+  (ref) => ref.watch(apiProvider).dataDir(),
+);
 
 /// True once the store is unlocked this session (the key lives in Rust memory only).
 final unlockedProvider = StateProvider<bool>((ref) => false);
@@ -79,7 +93,15 @@ class ChartLayers {
     this.priceAxis = true,
     this.timeAxis = true,
   });
-  final bool candles, ohlc, line, area, volume, grid, crosshair, priceAxis, timeAxis;
+  final bool candles,
+      ohlc,
+      line,
+      area,
+      volume,
+      grid,
+      crosshair,
+      priceAxis,
+      timeAxis;
 
   ChartLayers copyWith({
     bool? candles,
@@ -91,18 +113,17 @@ class ChartLayers {
     bool? crosshair,
     bool? priceAxis,
     bool? timeAxis,
-  }) =>
-      ChartLayers(
-        candles: candles ?? this.candles,
-        ohlc: ohlc ?? this.ohlc,
-        line: line ?? this.line,
-        area: area ?? this.area,
-        volume: volume ?? this.volume,
-        grid: grid ?? this.grid,
-        crosshair: crosshair ?? this.crosshair,
-        priceAxis: priceAxis ?? this.priceAxis,
-        timeAxis: timeAxis ?? this.timeAxis,
-      );
+  }) => ChartLayers(
+    candles: candles ?? this.candles,
+    ohlc: ohlc ?? this.ohlc,
+    line: line ?? this.line,
+    area: area ?? this.area,
+    volume: volume ?? this.volume,
+    grid: grid ?? this.grid,
+    crosshair: crosshair ?? this.crosshair,
+    priceAxis: priceAxis ?? this.priceAxis,
+    timeAxis: timeAxis ?? this.timeAxis,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -118,10 +139,22 @@ class ChartLayers {
       other.timeAxis == timeAxis;
 
   @override
-  int get hashCode => Object.hash(candles, ohlc, line, area, volume, grid, crosshair, priceAxis, timeAxis);
+  int get hashCode => Object.hash(
+    candles,
+    ohlc,
+    line,
+    area,
+    volume,
+    grid,
+    crosshair,
+    priceAxis,
+    timeAxis,
+  );
 }
 
-final chartLayersProvider = StateProvider<ChartLayers>((ref) => const ChartLayers());
+final chartLayersProvider = StateProvider<ChartLayers>(
+  (ref) => const ChartLayers(),
+);
 
 /// Visible slice of the already-loaded bars (pinch, wheel, or `+`/`-` / `h`/`l`).
 class ChartViewport {
@@ -146,7 +179,8 @@ class ChartViewport {
 
   bool zoomed(int n) => scale > 1.001 && visibleCount(n) < n;
 
-  ChartViewport clampTo(int n) => ChartViewport(scale: scale, start: visibleStart(n));
+  ChartViewport clampTo(int n) =>
+      ChartViewport(scale: scale, start: visibleStart(n));
 
   ChartViewport zoomAt(double newScale, {required int n, double frac = 0.5}) {
     if (n <= 0) return this;
@@ -173,7 +207,9 @@ class ChartViewport {
   int get hashCode => Object.hash(scale, start);
 }
 
-final chartViewportProvider = StateProvider<ChartViewport>((ref) => const ChartViewport());
+final chartViewportProvider = StateProvider<ChartViewport>(
+  (ref) => const ChartViewport(),
+);
 
 final selectedDatasetValueProvider = Provider<Dataset?>((ref) {
   final key = ref.watch(selectedDatasetProvider);
@@ -204,6 +240,33 @@ final netOverviewProvider = FutureProvider<NetOverview?>((ref) {
   if (!ref.watch(unlockedProvider)) return Future.value(null);
   return ref.watch(apiProvider).netOverview();
 });
+
+/// Net window pages (TUI Node / Peers / Relays / Invites / Shared).
+enum NetPane { node, peers, relays, invites, shared }
+
+final netPaneProvider = StateProvider<NetPane>((ref) => NetPane.node);
+
+final netInvitesProvider = FutureProvider<NetInvites?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).netInvites();
+});
+
+final netRelaysProvider = FutureProvider<NetRelayInfo?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).netRelays();
+});
+
+final netSharedProvider = FutureProvider<List<NetShareInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).netShared();
+});
+
+void refreshNet(WidgetRef ref) {
+  ref.invalidate(netOverviewProvider);
+  ref.invalidate(netInvitesProvider);
+  ref.invalidate(netRelaysProvider);
+  ref.invalidate(netSharedProvider);
+}
 
 final orgOverviewProvider = FutureProvider<OrgOverview?>((ref) {
   if (!ref.watch(unlockedProvider)) return Future.value(null);

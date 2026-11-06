@@ -43,7 +43,11 @@ class FfiMuninnApi implements MuninnApi {
 
   @override
   Future<MuninnTheme> loadTheme(String name, String variant) async {
-    final t = await r_themes.loadTheme(home: home, name: name, variant: variant);
+    final t = await r_themes.loadTheme(
+      home: home,
+      name: name,
+      variant: variant,
+    );
     return MuninnTheme(
       name: t.name,
       displayName: t.displayName,
@@ -61,27 +65,44 @@ class FfiMuninnApi implements MuninnApi {
   @override
   Future<SavedState> savedState() async {
     final s = await r_prefs.savedState(home: home);
-    return SavedState(theme: s.theme, mode: s.mode, range: TimeRange(from: s.from?.toInt(), to: s.to?.toInt()), dataset: s.dataset);
+    return SavedState(
+      theme: s.theme,
+      mode: s.mode,
+      range: TimeRange(from: s.from?.toInt(), to: s.to?.toInt()),
+      dataset: s.dataset,
+    );
   }
 
   @override
-  Future<void> saveTheme(String name) => r_prefs.saveTheme(home: home, name: name);
+  Future<void> saveTheme(String name) =>
+      r_prefs.saveTheme(home: home, name: name);
   @override
-  Future<void> saveThemeMode(String mode) => r_prefs.saveThemeMode(home: home, mode: mode);
+  Future<void> saveThemeMode(String mode) =>
+      r_prefs.saveThemeMode(home: home, mode: mode);
   @override
   Future<void> saveTimeRange(TimeRange r) => r_prefs.saveTimeRange(
-      home: home, from: r.from == null ? null : PlatformInt64Util.from(r.from!), to: r.to == null ? null : PlatformInt64Util.from(r.to!));
+    home: home,
+    from: r.from == null ? null : PlatformInt64Util.from(r.from!),
+    to: r.to == null ? null : PlatformInt64Util.from(r.to!),
+  );
   @override
-  Future<void> saveDataset(String? key) => r_prefs.saveDataset(home: home, key: key);
+  Future<void> saveDataset(String? key) =>
+      r_prefs.saveDataset(home: home, key: key);
 
   @override
   Future<DataDir> dataDir() async {
     final d = await r_info.dataDirInfo(home: home);
-    return DataDir(home: d.home, database: d.database, databaseExists: d.databaseExists, keysInitialized: d.keysInitialized);
+    return DataDir(
+      home: d.home,
+      database: d.database,
+      databaseExists: d.databaseExists,
+      keysInitialized: d.keysInitialized,
+    );
   }
 
   @override
-  Future<void> unlock(String password) => r_data.unlock(home: home, password: password);
+  Future<void> unlock(String password) =>
+      r_data.unlock(home: home, password: password);
 
   @override
   void lock() => r_data.lock();
@@ -90,7 +111,15 @@ class FfiMuninnApi implements MuninnApi {
   Future<Overview> overview() async {
     final o = await r_data.overview();
     return Overview(
-      projects: [for (final p in o.projects) Project(id: p.id, shortId: p.shortId, name: p.name, description: p.description)],
+      projects: [
+        for (final p in o.projects)
+          Project(
+            id: p.id,
+            shortId: p.shortId,
+            name: p.name,
+            description: p.description,
+          ),
+      ],
       datasets: [
         for (final d in o.datasets)
           Dataset(
@@ -109,31 +138,42 @@ class FfiMuninnApi implements MuninnApi {
 
   @override
   Future<List<ProjectSeries>> projectSeries(String projectId) async => [
-        for (final s in await r_data.projectSeries(projectId: projectId))
-          ProjectSeries(
-            itemId: s.itemId.toInt(),
-            source: s.source,
-            base: s.base,
-            quote: s.quote,
-            durationS: s.durationS.toInt(),
-            from: s.from?.toInt(),
-            to: s.to?.toInt(),
-          ),
-      ];
+    for (final s in await r_data.projectSeries(projectId: projectId))
+      ProjectSeries(
+        itemId: s.itemId.toInt(),
+        source: s.source,
+        base: s.base,
+        quote: s.quote,
+        durationS: s.durationS.toInt(),
+        from: s.from?.toInt(),
+        to: s.to?.toInt(),
+      ),
+  ];
 
   @override
-  Future<List<BarPoint>> queryBars(Dataset d, TimeRange range, {int maxPoints = 600}) async => [
-        for (final b in await r_data.queryBars(
-          source: d.source,
-          base: d.base,
-          quote: d.quote,
-          durationS: PlatformInt64Util.from(d.durationS),
-          from: range.from == null ? null : PlatformInt64Util.from(range.from!),
-          to: range.to == null ? null : PlatformInt64Util.from(range.to!),
-          maxPoints: maxPoints,
-        ))
-          BarPoint(ts: b.ts.toInt(), open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume),
-      ];
+  Future<List<BarPoint>> queryBars(
+    Dataset d,
+    TimeRange range, {
+    int maxPoints = 600,
+  }) async => [
+    for (final b in await r_data.queryBars(
+      source: d.source,
+      base: d.base,
+      quote: d.quote,
+      durationS: PlatformInt64Util.from(d.durationS),
+      from: range.from == null ? null : PlatformInt64Util.from(range.from!),
+      to: range.to == null ? null : PlatformInt64Util.from(range.to!),
+      maxPoints: maxPoints,
+    ))
+      BarPoint(
+        ts: b.ts.toInt(),
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close,
+        volume: b.volume,
+      ),
+  ];
 
   @override
   Future<IngestResult> ingestPath(String path, {String? source}) async {
@@ -196,21 +236,43 @@ class FfiMuninnApi implements MuninnApi {
 
   @override
   Future<Project> createProject(String name, {String description = ''}) async {
-    final p = await r_projects.createProject(name: name, description: description);
-    return Project(id: p.id, shortId: p.shortId, name: p.name, description: p.description);
+    final p = await r_projects.createProject(
+      name: name,
+      description: description,
+    );
+    return Project(
+      id: p.id,
+      shortId: p.shortId,
+      name: p.name,
+      description: p.description,
+    );
   }
 
   @override
-  Future<Project> updateProject(String id, {String? name, String? description}) async {
-    final p = await r_projects.updateProject(id: id, name: name, description: description);
-    return Project(id: p.id, shortId: p.shortId, name: p.name, description: p.description);
+  Future<Project> updateProject(
+    String id, {
+    String? name,
+    String? description,
+  }) async {
+    final p = await r_projects.updateProject(
+      id: id,
+      name: name,
+      description: description,
+    );
+    return Project(
+      id: p.id,
+      shortId: p.shortId,
+      name: p.name,
+      description: p.description,
+    );
   }
 
   @override
   Future<void> removeProject(String id) => r_projects.removeProject(id: id);
 
   @override
-  Future<bool> addProjectSeries(String projectId, Dataset d, TimeRange range) => r_projects.addProjectSeries(
+  Future<bool> addProjectSeries(String projectId, Dataset d, TimeRange range) =>
+      r_projects.addProjectSeries(
         projectId: projectId,
         source: d.source,
         base: d.base,
@@ -221,7 +283,8 @@ class FfiMuninnApi implements MuninnApi {
       );
 
   @override
-  Future<void> removeProjectSeries(int itemId) => r_projects.removeProjectSeries(itemId: PlatformInt64Util.from(itemId));
+  Future<void> removeProjectSeries(int itemId) =>
+      r_projects.removeProjectSeries(itemId: PlatformInt64Util.from(itemId));
 
   @override
   Future<NetOverview> netOverview() async {
@@ -260,6 +323,143 @@ class FfiMuninnApi implements MuninnApi {
     );
   }
 
+  NetPeerInfo _netPeer(r_net.NetPeerInfo p) => NetPeerInfo(
+    peerId: p.peerId,
+    shortId: p.shortId,
+    label: p.label,
+    user: p.user,
+    caps: p.caps,
+    link: p.link,
+    source: p.source,
+    lastSeen: p.lastSeen.toInt(),
+  );
+
+  NetLinkResult _netLink(r_net.NetLinkResult r) => NetLinkResult(
+    status: r.status,
+    peer: r.peer,
+    peerId: r.peerId,
+    detail: r.detail,
+    warning: r.warning,
+  );
+
+  @override
+  Future<String> netStart() => r_net.netStart(home: home);
+
+  @override
+  Future<String> netStop() => r_net.netStop(home: home);
+
+  @override
+  Future<NetLinkResult> netConnect(
+    String target, {
+    String? label,
+    bool hello = false,
+  }) async => _netLink(
+    await r_net.netConnect(
+      home: home,
+      target: target,
+      label: label,
+      hello: hello,
+    ),
+  );
+
+  @override
+  Future<String> netInvite({String? label}) =>
+      r_net.netInvite(home: home, label: label);
+
+  @override
+  Future<NetInvites> netInvites() async {
+    final o = await r_net.netInvites(home: home);
+    return NetInvites(
+      invites: [
+        for (final x in o.invites)
+          NetInviteInfo(
+            id: x.id,
+            shortId: x.shortId,
+            title: x.title,
+            purpose: x.purpose,
+            expiresAt: x.expiresAt?.toInt(),
+            createdAt: x.createdAt.toInt(),
+            link: x.link,
+          ),
+      ],
+      requests: [
+        for (final x in o.requests)
+          NetRequestInfo(
+            id: x.id,
+            shortId: x.shortId,
+            title: x.title,
+            purpose: x.purpose,
+            peerId: x.peerId,
+            createdAt: x.createdAt.toInt(),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Future<NetLinkResult> netAccept(String request) async =>
+      _netLink(await r_net.netAccept(home: home, request: request));
+
+  @override
+  Future<String> netDecline(String request) =>
+      r_net.netDecline(home: home, request: request);
+
+  @override
+  Future<String> netDisconnect(String peer) =>
+      r_net.netDisconnect(home: home, peer: peer);
+
+  @override
+  Future<String> netForget(String peer) =>
+      r_net.netForget(home: home, peer: peer);
+
+  @override
+  Future<NetRelayInfo> netRelays() async {
+    final o = await r_net.netRelays(home: home);
+    return NetRelayInfo(
+      configured: o.configured,
+      seen: [for (final p in o.seen) _netPeer(p)],
+      serving: o.serving,
+    );
+  }
+
+  @override
+  Future<String> netRelayAdd(String addr) =>
+      r_net.netRelayAdd(home: home, addr: addr);
+
+  @override
+  Future<String> netRelayRemove(String relay) =>
+      r_net.netRelayRemove(home: home, relay: relay);
+
+  @override
+  Future<String> netRelayServe(bool on) =>
+      r_net.netRelayServe(home: home, on_: on);
+
+  @override
+  Future<List<NetShareInfo>> netShared() async => [
+    for (final s in await r_net.netShared(home: home))
+      NetShareInfo(
+        id: s.id,
+        shortId: s.shortId,
+        kind: s.kind,
+        name: s.name,
+        withWhom: s.with_,
+      ),
+  ];
+
+  @override
+  Future<String> netShare(
+    String kind,
+    String item, {
+    List<String> withPeers = const [],
+  }) => r_net.netShare(home: home, kind: kind, item: item, with_: withPeers);
+
+  @override
+  Future<String> netUnshare(
+    String kind,
+    String item, {
+    List<String> withPeers = const [],
+  }) => r_net.netUnshare(home: home, kind: kind, item: item, with_: withPeers);
+
   @override
   Future<OrgOverview> orgOverview() async {
     final o = await r_orgs.orgOverview();
@@ -281,25 +481,56 @@ class FfiMuninnApi implements MuninnApi {
             applyRole: x.applyRole,
             inviteRole: x.inviteRole,
             template: x.template,
-            roles: [for (final r in x.roles) OrgRoleInfo(name: r.name, rank: r.rank.toInt(), perms: r.perms)],
+            roles: [
+              for (final r in x.roles)
+                OrgRoleInfo(name: r.name, rank: r.rank.toInt(), perms: r.perms),
+            ],
             memberList: [
               for (final m in x.memberList)
-                OrgMemberInfo(shortId: m.shortId, title: m.title, role: m.role, status: m.status, note: m.note),
+                OrgMemberInfo(
+                  shortId: m.shortId,
+                  title: m.title,
+                  role: m.role,
+                  status: m.status,
+                  note: m.note,
+                ),
             ],
             resources: [
-              for (final r in x.resources) OrgResourceInfo(kind: r.kind, name: r.name, state: r.state, published: r.published),
+              for (final r in x.resources)
+                OrgResourceInfo(
+                  kind: r.kind,
+                  name: r.name,
+                  state: r.state,
+                  published: r.published,
+                ),
             ],
             projects: x.projects,
-            endpoints: [for (final e in x.endpoints) OrgEndpointInfo(name: e.name, kind: e.kind, perm: e.perm, anyone: e.anyone)],
+            endpoints: [
+              for (final e in x.endpoints)
+                OrgEndpointInfo(
+                  name: e.name,
+                  kind: e.kind,
+                  perm: e.perm,
+                  anyone: e.anyone,
+                ),
+            ],
             templates: x.templates,
           ),
       ],
       joined: [
         for (final j in o.joined)
-          OrgJoined(name: j.name, slug: j.slug, status: j.status, role: j.role, node: j.node, perms: j.perms),
+          OrgJoined(
+            name: j.name,
+            slug: j.slug,
+            status: j.status,
+            role: j.role,
+            node: j.node,
+            perms: j.perms,
+          ),
       ],
       mirrors: [
-        for (final m in o.mirrors) OrgMirror(slug: m.slug, fetchedAt: m.fetchedAt.toInt()),
+        for (final m in o.mirrors)
+          OrgMirror(slug: m.slug, fetchedAt: m.fetchedAt.toInt()),
       ],
     );
   }
@@ -312,13 +543,18 @@ class FfiMuninnApi implements MuninnApi {
       dbId: s.dbId,
       database: s.database,
       serviceVersion: s.serviceVersion.toInt(),
-      services: [for (final x in s.services) ServiceKeyInfo(version: x.version.toInt(), retired: x.retired)],
+      services: [
+        for (final x in s.services)
+          ServiceKeyInfo(version: x.version.toInt(), retired: x.retired),
+      ],
     );
   }
 
   @override
-  Future<List<HelpTopicInfo>> helpTopics() async =>
-      [for (final t in await r_help.helpTopics()) HelpTopicInfo(id: t.id, title: t.title)];
+  Future<List<HelpTopicInfo>> helpTopics() async => [
+    for (final t in await r_help.helpTopics())
+      HelpTopicInfo(id: t.id, title: t.title),
+  ];
 
   @override
   Future<HelpTopic> helpTopic(String id) async {
@@ -327,55 +563,142 @@ class FfiMuninnApi implements MuninnApi {
   }
 
   @override
-  Future<List<HelpTopicInfo>> helpSearch(String query) async =>
-      [for (final t in await r_help.helpSearch(query: query)) HelpTopicInfo(id: t.id, title: t.title)];
+  Future<List<HelpTopicInfo>> helpSearch(String query) async => [
+    for (final t in await r_help.helpSearch(query: query))
+      HelpTopicInfo(id: t.id, title: t.title),
+  ];
 
   @override
-  Future<String?> helpResolveHref(String from, String href) => r_help.helpResolveHref(from: from, href: href);
+  Future<String?> helpResolveHref(String from, String href) =>
+      r_help.helpResolveHref(from: from, href: href);
 
   RevealHandle _reveal(dynamic h) => RevealHandle(
-        id: h.id.toInt(),
-        dbId: h.dbId,
-        wordCount: h.wordCount.toInt(),
-        shardCount: h.shardCount.toInt(),
-        migratedPlainDb: h.migratedPlainDb,
-      );
+    id: h.id.toInt(),
+    dbId: h.dbId,
+    wordCount: h.wordCount.toInt(),
+    shardCount: h.shardCount.toInt(),
+    migratedPlainDb: h.migratedPlainDb,
+  );
 
   @override
-  Future<RevealHandle> keysInit(String password) async => _reveal(await r_keys.keysInit(home: home, password: password));
+  Future<RevealHandle> keysInit(String password) async =>
+      _reveal(await r_keys.keysInit(home: home, password: password));
 
   @override
-  Future<String> keysRevealWord(int id, int index) =>
-      r_keys.keysRevealWord(id: PlatformInt64Util.from(id), index: PlatformInt64Util.from(index));
+  Future<String> keysRevealWord(int id, int index) => r_keys.keysRevealWord(
+    id: PlatformInt64Util.from(id),
+    index: PlatformInt64Util.from(index),
+  );
 
   @override
-  Future<String> keysRevealShard(int id, int index) =>
-      r_keys.keysRevealShard(id: PlatformInt64Util.from(id), index: PlatformInt64Util.from(index));
+  Future<String> keysRevealShard(int id, int index) => r_keys.keysRevealShard(
+    id: PlatformInt64Util.from(id),
+    index: PlatformInt64Util.from(index),
+  );
 
   @override
-  Future<void> keysRevealDismiss(int id) => r_keys.keysRevealDismiss(id: PlatformInt64Util.from(id));
+  Future<void> keysRevealDismiss(int id) =>
+      r_keys.keysRevealDismiss(id: PlatformInt64Util.from(id));
 
   @override
-  Future<int> keysRotate({required String password, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async {
-    final v = await r_keys.keysRotate(home: home, password: password, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword);
+  Future<int> keysRotate({
+    required String password,
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) async {
+    final v = await r_keys.keysRotate(
+      home: home,
+      password: password,
+      words: words,
+      shards: shards,
+      wordsFile: wordsFile,
+      masterFile: masterFile,
+      filePassword: filePassword,
+    );
     return v.toInt();
   }
 
   @override
-  Future<void> keysRekey({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) =>
-      r_keys.keysRekey(home: home, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword);
+  Future<void> keysRekey({
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) => r_keys.keysRekey(
+    home: home,
+    words: words,
+    shards: shards,
+    wordsFile: wordsFile,
+    masterFile: masterFile,
+    filePassword: filePassword,
+  );
 
   @override
-  Future<List<String>> keysExport({required String out, required String exportPassword, List<String> only = const [], bool confirmCombined = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) =>
-      r_keys.keysExport(home: home, out: out, exportPassword: exportPassword, only: only, confirmCombined: confirmCombined, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword);
+  Future<List<String>> keysExport({
+    required String out,
+    required String exportPassword,
+    List<String> only = const [],
+    bool confirmCombined = false,
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) => r_keys.keysExport(
+    home: home,
+    out: out,
+    exportPassword: exportPassword,
+    only: only,
+    confirmCombined: confirmCombined,
+    words: words,
+    shards: shards,
+    wordsFile: wordsFile,
+    masterFile: masterFile,
+    filePassword: filePassword,
+  );
 
   @override
-  Future<RevealHandle?> keysRecover({required String newPassword, bool printWords = false, String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async {
-    final h = await r_keys.keysRecover(home: home, newPassword: newPassword, printWords: printWords, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword);
+  Future<RevealHandle?> keysRecover({
+    required String newPassword,
+    bool printWords = false,
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) async {
+    final h = await r_keys.keysRecover(
+      home: home,
+      newPassword: newPassword,
+      printWords: printWords,
+      words: words,
+      shards: shards,
+      wordsFile: wordsFile,
+      masterFile: masterFile,
+      filePassword: filePassword,
+    );
     return h == null ? null : _reveal(h);
   }
 
   @override
-  Future<RevealHandle> keysReissueShards({String? words, List<String> shards = const [], String? wordsFile, String? masterFile, String? filePassword}) async =>
-      _reveal(await r_keys.keysReissueShards(home: home, words: words, shards: shards, wordsFile: wordsFile, masterFile: masterFile, filePassword: filePassword));
+  Future<RevealHandle> keysReissueShards({
+    String? words,
+    List<String> shards = const [],
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) async => _reveal(
+    await r_keys.keysReissueShards(
+      home: home,
+      words: words,
+      shards: shards,
+      wordsFile: wordsFile,
+      masterFile: masterFile,
+      filePassword: filePassword,
+    ),
+  );
 }

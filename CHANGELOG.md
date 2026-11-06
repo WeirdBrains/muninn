@@ -17,6 +17,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: TUI keybinding parity for Help, navigation, Data/Projects/Net/Orgs, chart layers and zoom (same keys; platform exceptions in docs/flutter-app.md)
 - Flutter app: in-app Help from the same embedded docs as `mnnn help` and the TUI (`?` / F1, search, keybindings)
 - Flutter app: Keys init, rotate, rekey, export, recover and re-issue shards; recovery words and shards are shown from a Rust-held one-time session
+- Flutter app: Net start/stop, connect, invites, relays and sharing (`mnnn net`); the node identity stays in Rust
 
 ## [2.22.0] - 2026-11-05
 
