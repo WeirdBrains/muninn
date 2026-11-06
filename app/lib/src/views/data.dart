@@ -89,14 +89,22 @@ class SeriesPanel extends ConsumerWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, alignment: WrapAlignment.spaceBetween, children: [
           Text('${d.source} · ${d.symbol} · ${d.duration}', style: TextStyle(color: m.header, fontSize: 20, fontWeight: FontWeight.w800)),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: true, icon: Icon(Icons.show_chart), label: Text('Chart')),
-              ButtonSegment(value: false, icon: Icon(Icons.list), label: Text('List')),
-            ],
-            selected: {asChart},
-            onSelectionChanged: (s) => ref.read(dataAsChartProvider.notifier).state = s.first,
-          ),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            IconButton(
+              tooltip: 'Chart layers',
+              icon: const Icon(Icons.layers_outlined),
+              iconSize: 28,
+              onPressed: () => showChartLayersSheet(context, ref),
+            ),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, icon: Icon(Icons.show_chart), label: Text('Chart')),
+                ButtonSegment(value: false, icon: Icon(Icons.list), label: Text('List')),
+              ],
+              selected: {asChart},
+              onSelectionChanged: (s) => ref.read(dataAsChartProvider.notifier).state = s.first,
+            ),
+          ]),
         ]),
         Text(
           range.isAll ? '${fmtUtc(d.first)} → ${fmtUtc(d.last)} UTC' : 'Time range: ${range.from == null ? '…' : fmtUtc(range.from!)} → ${range.to == null ? '…' : fmtUtc(range.to!)} UTC',
@@ -107,7 +115,7 @@ class SeriesPanel extends ConsumerWidget {
           child: ref.watch(barsProvider).when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Text('$e', style: TextStyle(color: m.error)),
-                data: (bars) => bars == null ? const SizedBox.shrink() : (asChart ? BarChart(bars: bars) : BarTable(bars: bars)),
+                data: (bars) => bars == null ? const SizedBox.shrink() : (asChart ? BarChart(bars: bars, layers: ref.watch(chartLayersProvider)) : BarTable(bars: bars)),
               ),
         ),
       ]),

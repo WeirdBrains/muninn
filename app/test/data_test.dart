@@ -136,4 +136,52 @@ void main() {
     expect(find.byType(BackButton), findsOneWidget);
     expect(c.read(selectedDatasetProvider), 'coinbase:BTC/USD:300');
   });
+
+  testWidgets('pinch/scroll zoom stays inside the time range and can reset', (t) async {
+    final (api, c) = await pump(t, const Size(1280, 800));
+    c.read(sectionProvider.notifier).state = Section.data;
+    await t.pumpAndSettle();
+    await unlock(t);
+    await t.tap(find.text('BTC/USD · 5m'));
+    await t.pumpAndSettle();
+    expect(find.text('50 bars'), findsOneWidget);
+    expect(find.byKey(const ValueKey('chart-reset-zoom')), findsNothing);
+    final queries = api.queries.length;
+    final range = c.read(timeRangeProvider);
+    final box = t.getRect(find.byType(CustomPaint).last);
+    await t.sendEventToBinding(PointerScrollEvent(position: box.center, scrollDelta: const Offset(0, -480)));
+    await t.pumpAndSettle();
+    expect(find.textContaining('of 50 bars'), findsOneWidget);
+    expect(find.byKey(const ValueKey('chart-reset-zoom')), findsOneWidget);
+    expect(c.read(timeRangeProvider), range);
+    expect(api.queries.length, queries, reason: 'zoom must not re-query or change the picker');
+    await t.tap(find.byKey(const ValueKey('chart-reset-zoom')));
+    await t.pumpAndSettle();
+    expect(find.text('50 bars'), findsOneWidget);
+    expect(find.byKey(const ValueKey('chart-reset-zoom')), findsNothing);
+  });
+
+  testWidgets('Chart layers sheet toggles volume and the menu opens it', (t) async {
+    final (_, c) = await pump(t, const Size(1280, 800));
+    c.read(sectionProvider.notifier).state = Section.data;
+    await t.pumpAndSettle();
+    await unlock(t);
+    await t.tap(find.text('BTC/USD · 5m'));
+    await t.pumpAndSettle();
+    expect(c.read(chartLayersProvider).volume, isTrue);
+    await t.tap(find.text('View'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Chart layers…'));
+    await t.pumpAndSettle();
+    expect(find.text('Candles'), findsOneWidget);
+    expect(find.text('Volume'), findsOneWidget);
+    await t.tap(find.text('Volume'));
+    await t.pumpAndSettle();
+    expect(c.read(chartLayersProvider).volume, isFalse);
+    expect(c.read(chartLayersProvider).candles, isTrue);
+    await t.tap(find.text('Candles'));
+    await t.pumpAndSettle();
+    expect(c.read(chartLayersProvider).candles, isFalse);
+  });
 }
+

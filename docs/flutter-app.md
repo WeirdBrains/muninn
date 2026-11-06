@@ -52,7 +52,10 @@ Users never need Rust: release builds ship the compiled library.
   **View ▸ Change view** (`Ctrl-w t` in the TUI). Rust downsamples to at most 600
   buckets (open = first, close = last, high/low = extremes, volume = sum), so long
   ranges stay fast. Desktop shows the list and the chart side by side; on a phone the
-  chart opens on its own page.
+  chart opens on its own page. Pinch, a trackpad or the mouse wheel zooms the chart
+  *inside* the selected time range (the picker and chips stay as they are; zoom does not
+  re-query). Drag pans when zoomed; double-tap or **Reset zoom** shows the whole loaded
+  window again. Tighten the time range if you need more detail than the 600 buckets.
 - **Time range:** as in the TUI it applies to every view. The chips above every section
   show it (`from …` / `to …`, × removes an end); click **Time range**, press `T`, or use
   **Data ▸ Filters ▸ Time range…** to open the picker: a date and a time (UTC) for
@@ -64,6 +67,11 @@ Users never need Rust: release builds ship the compiled library.
   after the next unlock. Reading never creates `preferences.toml`; the first change does.
 - **Chart readout:** hover over the chart (or touch / drag on a phone) to show that bar's
   time, open, high, low, close and volume above it; a guide line marks the bar.
+- **Chart layers:** **View ▸ Chart layers…** (or the layers button next to Chart / List)
+  toggles the same kind of layers as the TUI (`L`): candles, OHLC bars, a close line,
+  area under the line, volume, grid, crosshair and the price / time axes. Defaults match
+  the TUI (candles, volume, grid, crosshair and both axes on). Moving averages, wick and
+  gap markers and the high/low envelope stay in the TUI.
 - **Projects:** pick a project to see the series saved in it. **New project** (or
   Projects ▸ New project…) creates one (`mnnn project create`); the project menu
   renames, edits the description or deletes it (`mnnn project edit` / `remove` — journals

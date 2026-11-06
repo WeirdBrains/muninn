@@ -66,6 +66,63 @@ final selectedDatasetProvider = StateProvider<String?>((ref) => null);
 /// Data view: chart or list (View ▸ Change view, like `Ctrl-w t`).
 final dataAsChartProvider = StateProvider<bool>((ref) => true);
 
+/// What the Data chart draws (TUI `L` / View ▸ Chart layers…). Defaults match the TUI.
+class ChartLayers {
+  const ChartLayers({
+    this.candles = true,
+    this.ohlc = false,
+    this.line = false,
+    this.area = false,
+    this.volume = true,
+    this.grid = true,
+    this.crosshair = true,
+    this.priceAxis = true,
+    this.timeAxis = true,
+  });
+  final bool candles, ohlc, line, area, volume, grid, crosshair, priceAxis, timeAxis;
+
+  ChartLayers copyWith({
+    bool? candles,
+    bool? ohlc,
+    bool? line,
+    bool? area,
+    bool? volume,
+    bool? grid,
+    bool? crosshair,
+    bool? priceAxis,
+    bool? timeAxis,
+  }) =>
+      ChartLayers(
+        candles: candles ?? this.candles,
+        ohlc: ohlc ?? this.ohlc,
+        line: line ?? this.line,
+        area: area ?? this.area,
+        volume: volume ?? this.volume,
+        grid: grid ?? this.grid,
+        crosshair: crosshair ?? this.crosshair,
+        priceAxis: priceAxis ?? this.priceAxis,
+        timeAxis: timeAxis ?? this.timeAxis,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChartLayers &&
+      other.candles == candles &&
+      other.ohlc == ohlc &&
+      other.line == line &&
+      other.area == area &&
+      other.volume == volume &&
+      other.grid == grid &&
+      other.crosshair == crosshair &&
+      other.priceAxis == priceAxis &&
+      other.timeAxis == timeAxis;
+
+  @override
+  int get hashCode => Object.hash(candles, ohlc, line, area, volume, grid, crosshair, priceAxis, timeAxis);
+}
+
+final chartLayersProvider = StateProvider<ChartLayers>((ref) => const ChartLayers());
+
 final selectedDatasetValueProvider = Provider<Dataset?>((ref) {
   final key = ref.watch(selectedDatasetProvider);
   final o = ref.watch(overviewProvider).value;

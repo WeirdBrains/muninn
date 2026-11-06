@@ -15,6 +15,7 @@ import 'prefs_dialog.dart';
 import 'state.dart';
 import 'theme/muninn_theme.dart';
 import 'time_range.dart';
+import 'views/chart.dart';
 import 'views/data.dart';
 import 'views/home.dart';
 import 'views/net.dart';
@@ -189,6 +190,7 @@ class MuninnMenuBar extends ConsumerWidget {
       ]),
       menu('View', [
         item('Change view (chart / list)', () => ref.read(dataAsChartProvider.notifier).state = !ref.read(dataAsChartProvider)),
+        item('Chart layers…', () => showChartLayersSheet(context, ref)),
         item('Refresh', () { ref.invalidate(overviewProvider); ref.invalidate(netOverviewProvider); ref.invalidate(orgOverviewProvider); ref.invalidate(keysStatusProvider); }),
       ]),
       menu('Data', [
