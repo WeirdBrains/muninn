@@ -401,12 +401,28 @@ See [architecture](architecture.md) for the crate layout.
 - Apple builds use Swift Package Manager (`flutter config --enable-swift-package-manager`),
   not CocoaPods.
 
-## Distribution (planned)
+## Distribution
 
-- Desktop: built-in installers (Windows setup, macOS .dmg), winget, Microsoft Store
-  (MSIX, publisher WeirdBrains), Homebrew, AUR, .deb and .rpm, for amd64 and arm64.
-- Mobile: TestFlight and Google Play testing tracks first, then the App Store and Play
-  Store. Builds are also attached to GitHub releases (APKs, TestFlight links).
+Linux desktop packages of the Flutter app are built with `scripts/flutter-dist.sh`.
+The package name is `muninn-app` so it does not clash with the TUI/CLI `muninn`
+packages (which install `/usr/bin/mnnn`). File bytes stay in the bundle; the
+script does not touch `~/.muninn` and does not publish a GitHub release.
+
+```
+DIST=/path/to/out CARGO_TARGET_DIR=/path/to/cargo-target scripts/flutter-dist.sh
+```
+
+On Linux amd64 that writes:
+
+- `$DIST/muninn-app-<ver>-x86_64-unknown-linux-gnu.tar.gz` — relocatable bundle; run `./muninn`
+- `$DIST/muninn-app_<ver>-1_amd64.deb` — installs to `/opt/muninn`, with a wrapper at `/usr/bin/muninn`
+
+Needs GTK 3 at runtime. `SKIP_BUILD=1` reuses `app/build/linux/<arch>/release/bundle`.
+
+Still planned: Windows setup / MSIX, macOS `.dmg`, Homebrew cask, `.rpm` for other
+arches, TestFlight, Google Play testing tracks, then store listings. Builds can
+later be attached to GitHub releases (APKs, TestFlight links) once those recipes
+exist; this script does not cut a tag.
 
 ## Icons
 
