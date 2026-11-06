@@ -1829,6 +1829,297 @@ class FfiMuninnApi implements MuninnApi {
   Future<String> orgHostAutostart(bool on) =>
       r_orgs.orgHostAutostart(home: home, on_: on);
 
+  OrgTemplateInfo _orgTemplate(r_orgs.OrgTemplateInfo t) => OrgTemplateInfo(
+    name: t.name,
+    inUse: t.inUse,
+    updatedAt: t.updatedAt,
+    assetNames: t.assetNames,
+    buildCmd: t.buildCmd,
+    buildSrc: t.buildSrc,
+    buildOut: t.buildOut,
+    buildApproved: t.buildApproved,
+    html: t.html,
+    css: t.css,
+  );
+
+  @override
+  Future<List<OrgTemplateInfo>> orgTemplates(String org) async => [
+    for (final t in await r_orgs.orgTemplates(org: org)) _orgTemplate(t),
+  ];
+
+  @override
+  Future<OrgTemplateInfo> orgTemplateShow(String org, String template) async =>
+      _orgTemplate(await r_orgs.orgTemplateShow(org: org, template: template));
+
+  @override
+  Future<OrgTemplateInfo> orgTemplateSave(
+    String org,
+    String name, {
+    String html = '',
+    String css = '',
+    bool useIt = false,
+  }) async => _orgTemplate(
+    await r_orgs.orgTemplateSave(
+      org: org,
+      name: name,
+      html: html,
+      css: css,
+      useIt: useIt,
+    ),
+  );
+
+  @override
+  Future<String> orgTemplateRemove(String org, String template) =>
+      r_orgs.orgTemplateRemove(org: org, template: template);
+
+  @override
+  Future<String> orgTemplateAddAsset(
+    String org,
+    String template,
+    String path, {
+    String? name,
+  }) => r_orgs.orgTemplateAddAsset(
+    org: org,
+    template: template,
+    path: path,
+    name: name,
+  );
+
+  @override
+  Future<String> orgTemplateRemoveAsset(
+    String org,
+    String template,
+    String name,
+  ) => r_orgs.orgTemplateRemoveAsset(org: org, template: template, name: name);
+
+  @override
+  Future<String> orgTemplateBuild(
+    String org,
+    String template, {
+    String? cmd,
+    String? src,
+    String? out,
+    bool clear = false,
+    bool noRun = false,
+    bool approve = false,
+  }) => r_orgs.orgTemplateBuild(
+    org: org,
+    template: template,
+    cmd: cmd,
+    src: src,
+    out: out,
+    clear: clear,
+    noRun: noRun,
+    approve: approve,
+  );
+
+  @override
+  Future<String> orgTemplatePreview(String org, String template) =>
+      r_orgs.orgTemplatePreview(home: home, org: org, template: template);
+
+  @override
+  Future<List<OrgDomainInfo>> orgDomains({String? org}) async => [
+    for (final d in await r_orgs.orgDomains(org: org))
+      OrgDomainInfo(org: d.org, domain: d.domain),
+  ];
+
+  @override
+  Future<String> orgDomainAdd(String org, String domain) =>
+      r_orgs.orgDomainAdd(org: org, domain: domain);
+
+  @override
+  Future<String> orgDomainRemove(String org, String domain) =>
+      r_orgs.orgDomainRemove(org: org, domain: domain);
+
+  OrgCertOverview _orgCerts(r_orgs.OrgCertOverview s) => OrgCertOverview(
+    node: OrgNodeCertInfo(
+      source: s.node.source,
+      names: s.node.names,
+      notAfter: s.node.notAfter,
+      issuer: s.node.issuer,
+      acmeEnabled: s.node.acmeEnabled,
+      acmeDomain: s.node.acmeDomain,
+      acmeEmail: s.node.acmeEmail,
+      acmeDirectory: s.node.acmeDirectory,
+      acmeProfile: s.node.acmeProfile,
+      acmeChallenge: s.node.acmeChallenge,
+      acmeHttpPort: s.node.acmeHttpPort.toInt(),
+      selfSignedDays: s.node.selfSignedDays.toInt(),
+    ),
+    orgs: [
+      for (final c in s.orgs)
+        OrgCertInfo(
+          org: c.org,
+          slug: c.slug,
+          domains: c.domains,
+          source: c.source,
+          names: c.names,
+          notAfter: c.notAfter,
+          issuer: c.issuer,
+          acmeEnabled: c.acmeEnabled,
+          acmeEmail: c.acmeEmail,
+          retryAttempts: c.retryAttempts.toInt(),
+          retryNext: c.retryNext,
+          retryError: c.retryError,
+        ),
+    ],
+  );
+
+  @override
+  Future<OrgCertOverview> orgCertStatus({String? org}) async =>
+      _orgCerts(await r_orgs.orgCertStatus(home: home, org: org));
+
+  @override
+  Future<String> orgCertSet(String org, String cert, String key) =>
+      r_orgs.orgCertSet(org: org, cert: cert, key: key);
+
+  @override
+  Future<String> orgCertClear(String org) => r_orgs.orgCertClear(org: org);
+
+  @override
+  Future<String> orgCertAcme({
+    String? org,
+    String? challenge,
+    String? email,
+    String? domain,
+    String? directory,
+    String? profile,
+    int? httpPort,
+    bool off = false,
+  }) => r_orgs.orgCertAcme(
+    home: home,
+    org: org,
+    challenge: challenge,
+    email: email,
+    domain: domain,
+    directory: directory,
+    profile: profile,
+    httpPort: httpPort == null ? null : PlatformInt64Util.from(httpPort),
+    off: off,
+  );
+
+  @override
+  Future<String> orgCertRenew({String? org}) =>
+      r_orgs.orgCertRenew(home: home, org: org);
+
+  @override
+  Future<List<OrgBrowseItem>> orgBrowse(String target, {String? org}) async => [
+    for (final c in await r_orgs.orgBrowse(
+      home: home,
+      target: target,
+      org: org,
+    ))
+      OrgBrowseItem(
+        name: c.name,
+        slug: c.slug,
+        visibility: c.visibility,
+        access: c.access,
+        members: c.members.toInt(),
+        description: c.description,
+      ),
+  ];
+
+  @override
+  Future<OrgFetchResult> orgFetch(
+    String org,
+    String resource, {
+    String? format,
+    String? out,
+  }) async {
+    final r = await r_orgs.orgFetch(
+      home: home,
+      org: org,
+      resource: resource,
+      format: format,
+      out: out,
+    );
+    return OrgFetchResult(
+      name: r.name,
+      format: r.format,
+      size: r.size.toInt(),
+      text: r.text,
+      written: r.written,
+    );
+  }
+
+  @override
+  Future<String> orgGive(String org, String kind, String name) =>
+      r_orgs.orgGive(home: home, org: org, kind: kind, name: name);
+
+  @override
+  Future<String> orgMirror(String org) =>
+      r_orgs.orgMirror(home: home, org: org);
+
+  @override
+  Future<List<OrgSyncCodeItem>> orgSyncCode(String org) async => [
+    for (final x in await r_orgs.orgSyncCode(home: home, org: org))
+      OrgSyncCodeItem(name: x.name, state: x.state),
+  ];
+
+  @override
+  Future<String> orgSignIn(String org, String site) =>
+      r_orgs.orgSignIn(org: org, site: site);
+
+  @override
+  Future<String> orgEndpointAdd(
+    String org,
+    String name,
+    String kind,
+    String target, {
+    String? perm,
+    bool anyone = false,
+  }) => r_orgs.orgEndpointAdd(
+    org: org,
+    name: name,
+    kind: kind,
+    target: target,
+    perm: perm,
+    anyone: anyone,
+  );
+
+  @override
+  Future<String> orgEndpointRemove(String org, String name) =>
+      r_orgs.orgEndpointRemove(org: org, name: name);
+
+  @override
+  Future<String> orgCall(String org, String endpoint, {String input = '{}'}) =>
+      r_orgs.orgCall(home: home, org: org, endpoint: endpoint, input: input);
+
+  @override
+  Future<String> orgProjectAdd(String org, String project) =>
+      r_orgs.orgProjectAdd(org: org, project: project);
+
+  @override
+  Future<String> orgProjectRemove(String org, String project) =>
+      r_orgs.orgProjectRemove(org: org, project: project);
+
+  @override
+  Future<String> orgProjectMember(
+    String org,
+    String project,
+    String member, {
+    String? role,
+  }) => r_orgs.orgProjectMember(
+    org: org,
+    project: project,
+    member: member,
+    role: role,
+  );
+
+  @override
+  Future<List<OrgCodeServedInfo>> orgCodeList(String org) async => [
+    for (final c in await r_orgs.orgCodeList(org: org))
+      OrgCodeServedInfo(name: c.name, lang: c.lang, shortId: c.shortId),
+  ];
+
+  @override
+  Future<String> orgCodeServe(String org, String space) =>
+      r_orgs.orgCodeServe(org: org, space: space);
+
+  @override
+  Future<String> orgCodeStop(String org, String space) =>
+      r_orgs.orgCodeStop(org: org, space: space);
+
   @override
   Future<KeysStatus> keysStatus() async {
     final s = await r_keys.keysStatus(home: home);

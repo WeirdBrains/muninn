@@ -7,8 +7,8 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `announcement`, `create_of`, `create_role_of`, `edit_of`, `edit_prefs`, `edit_role_of`, `invitation`, `joined_of`, `member_reject_of`, `member_role_of`, `mine_of`, `org_overview_of`, `ours_running`, `prefs_of`, `reap_site`, `remove_of`, `remove_role_of`, `resource_add_of`, `resource_archive_of`, `resource_publish_of`, `resource_release_of`, `role_info`, `role_named`, `site_status`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `HostedSite`
+// These functions are ignored because they are not marked as `pub`: `announcement`, `cert_acme_org_of`, `cert_clear_of`, `cert_info_of`, `cert_overview_of`, `cert_set_of`, `create_of`, `create_role_of`, `domain_add_of`, `domain_remove_of`, `domains_of`, `edit_of`, `edit_prefs`, `edit_role_of`, `endpoint_add_of`, `endpoint_remove_of`, `invitation`, `joined_of`, `member_reject_of`, `member_role_of`, `mine_of`, `node_cert_of`, `org_overview_of`, `ours_running`, `prefs_of`, `project_add_of`, `project_member_of`, `project_remove_of`, `reap_site`, `remove_of`, `remove_role_of`, `resource_add_of`, `resource_archive_of`, `resource_publish_of`, `resource_release_of`, `role_info`, `role_named`, `served_of`, `site_status`, `template_add_asset_of`, `template_build_of`, `template_info`, `template_preview_of`, `template_remove_asset_of`, `template_remove_of`, `template_save_of`, `template_show_of`, `templates_of`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `HostedSite`, `OrgTemplateAssetInfo`
 
 /// `mnnn org list` plus the fields `mnnn org show` prints for orgs this node owns.
 Future<OrgOverview> orgOverview() =>
@@ -219,6 +219,442 @@ Future<String> orgHostStop({String? home}) =>
 Future<String> orgHostAutostart({String? home, required bool on_}) =>
     RustLib.instance.api.crateApiOrgsOrgHostAutostart(home: home, on_: on_);
 
+/// `mnnn org template list`.
+Future<List<OrgTemplateInfo>> orgTemplates({required String org}) =>
+    RustLib.instance.api.crateApiOrgsOrgTemplates(org: org);
+
+/// `mnnn org template show`.
+Future<OrgTemplateInfo> orgTemplateShow({
+  required String org,
+  required String template,
+}) => RustLib.instance.api.crateApiOrgsOrgTemplateShow(
+  org: org,
+  template: template,
+);
+
+/// `mnnn org template save|edit`. Empty HTML+CSS on a new name starts from the built-in look.
+Future<OrgTemplateInfo> orgTemplateSave({
+  required String org,
+  required String name,
+  required String html,
+  required String css,
+  required bool useIt,
+}) => RustLib.instance.api.crateApiOrgsOrgTemplateSave(
+  org: org,
+  name: name,
+  html: html,
+  css: css,
+  useIt: useIt,
+);
+
+/// `mnnn org template remove`.
+Future<String> orgTemplateRemove({
+  required String org,
+  required String template,
+}) => RustLib.instance.api.crateApiOrgsOrgTemplateRemove(
+  org: org,
+  template: template,
+);
+
+/// `mnnn org template asset`. Rust reads the file; Dart only passes a path.
+Future<String> orgTemplateAddAsset({
+  required String org,
+  required String template,
+  required String path,
+  String? name,
+}) => RustLib.instance.api.crateApiOrgsOrgTemplateAddAsset(
+  org: org,
+  template: template,
+  path: path,
+  name: name,
+);
+
+/// `mnnn org template asset --remove`.
+Future<String> orgTemplateRemoveAsset({
+  required String org,
+  required String template,
+  required String name,
+}) => RustLib.instance.api.crateApiOrgsOrgTemplateRemoveAsset(
+  org: org,
+  template: template,
+  name: name,
+);
+
+/// `mnnn org template build`. A new or changed command needs `approve`.
+Future<String> orgTemplateBuild({
+  required String org,
+  required String template,
+  String? cmd,
+  String? src,
+  String? out,
+  required bool clear,
+  required bool noRun,
+  required bool approve,
+}) => RustLib.instance.api.crateApiOrgsOrgTemplateBuild(
+  org: org,
+  template: template,
+  cmd: cmd,
+  src: src,
+  out: out,
+  clear: clear,
+  noRun: noRun,
+  approve: approve,
+);
+
+/// `mnnn org template preview`.
+Future<String> orgTemplatePreview({
+  String? home,
+  required String org,
+  required String template,
+}) => RustLib.instance.api.crateApiOrgsOrgTemplatePreview(
+  home: home,
+  org: org,
+  template: template,
+);
+
+/// `mnnn org domain list`.
+Future<List<OrgDomainInfo>> orgDomains({String? org}) =>
+    RustLib.instance.api.crateApiOrgsOrgDomains(org: org);
+
+/// `mnnn org domain add`.
+Future<String> orgDomainAdd({required String org, required String domain}) =>
+    RustLib.instance.api.crateApiOrgsOrgDomainAdd(org: org, domain: domain);
+
+/// `mnnn org domain remove`.
+Future<String> orgDomainRemove({required String org, required String domain}) =>
+    RustLib.instance.api.crateApiOrgsOrgDomainRemove(org: org, domain: domain);
+
+/// `mnnn org cert status`. Metadata only; PEM and keys stay in the store.
+Future<OrgCertOverview> orgCertStatus({String? home, String? org}) =>
+    RustLib.instance.api.crateApiOrgsOrgCertStatus(home: home, org: org);
+
+/// `mnnn org cert set`. Paths only; Rust reads the PEM files and never returns them.
+Future<String> orgCertSet({
+  required String org,
+  required String cert,
+  required String key,
+}) =>
+    RustLib.instance.api.crateApiOrgsOrgCertSet(org: org, cert: cert, key: key);
+
+/// `mnnn org cert clear`.
+Future<String> orgCertClear({required String org}) =>
+    RustLib.instance.api.crateApiOrgsOrgCertClear(org: org);
+
+/// `mnnn org cert acme` for an org (`--email` / `--off`) or the node's settings.
+Future<String> orgCertAcme({
+  String? home,
+  String? org,
+  String? challenge,
+  String? email,
+  String? domain,
+  String? directory,
+  String? profile,
+  PlatformInt64? httpPort,
+  required bool off,
+}) => RustLib.instance.api.crateApiOrgsOrgCertAcme(
+  home: home,
+  org: org,
+  challenge: challenge,
+  email: email,
+  domain: domain,
+  directory: directory,
+  profile: profile,
+  httpPort: httpPort,
+  off: off,
+);
+
+/// `mnnn org cert renew`. Needs ACME set up and the challenge reachable.
+Future<String> orgCertRenew({String? home, String? org}) =>
+    RustLib.instance.api.crateApiOrgsOrgCertRenew(home: home, org: org);
+
+/// `mnnn org endpoint add`.
+Future<String> orgEndpointAdd({
+  required String org,
+  required String name,
+  required String kind,
+  required String target,
+  String? perm,
+  required bool anyone,
+}) => RustLib.instance.api.crateApiOrgsOrgEndpointAdd(
+  org: org,
+  name: name,
+  kind: kind,
+  target: target,
+  perm: perm,
+  anyone: anyone,
+);
+
+/// `mnnn org endpoint remove`.
+Future<String> orgEndpointRemove({required String org, required String name}) =>
+    RustLib.instance.api.crateApiOrgsOrgEndpointRemove(org: org, name: name);
+
+/// `mnnn org call` (your org locally; a joined org through its node).
+Future<String> orgCall({
+  String? home,
+  required String org,
+  required String endpoint,
+  required String input,
+}) => RustLib.instance.api.crateApiOrgsOrgCall(
+  home: home,
+  org: org,
+  endpoint: endpoint,
+  input: input,
+);
+
+/// `mnnn org project add`.
+Future<String> orgProjectAdd({required String org, required String project}) =>
+    RustLib.instance.api.crateApiOrgsOrgProjectAdd(org: org, project: project);
+
+/// `mnnn org project remove`.
+Future<String> orgProjectRemove({
+  required String org,
+  required String project,
+}) => RustLib.instance.api.crateApiOrgsOrgProjectRemove(
+  org: org,
+  project: project,
+);
+
+/// `mnnn org project member`.
+Future<String> orgProjectMember({
+  required String org,
+  required String project,
+  required String member,
+  String? role,
+}) => RustLib.instance.api.crateApiOrgsOrgProjectMember(
+  org: org,
+  project: project,
+  member: member,
+  role: role,
+);
+
+/// `mnnn org code list`.
+Future<List<OrgCodeServedInfo>> orgCodeList({required String org}) =>
+    RustLib.instance.api.crateApiOrgsOrgCodeList(org: org);
+
+/// `mnnn org code serve`.
+Future<String> orgCodeServe({required String org, required String space}) =>
+    RustLib.instance.api.crateApiOrgsOrgCodeServe(org: org, space: space);
+
+/// `mnnn org code stop`.
+Future<String> orgCodeStop({required String org, required String space}) =>
+    RustLib.instance.api.crateApiOrgsOrgCodeStop(org: org, space: space);
+
+/// `mnnn org browse`. Needs a running or ephemeral node and a reachable peer.
+Future<List<OrgBrowseItem>> orgBrowse({
+  String? home,
+  required String target,
+  String? org,
+}) => RustLib.instance.api.crateApiOrgsOrgBrowse(
+  home: home,
+  target: target,
+  org: org,
+);
+
+/// `mnnn org fetch`. Binary bytes are written to `out` in Rust, never returned.
+Future<OrgFetchResult> orgFetch({
+  String? home,
+  required String org,
+  required String resource,
+  String? format,
+  String? out,
+}) => RustLib.instance.api.crateApiOrgsOrgFetch(
+  home: home,
+  org: org,
+  resource: resource,
+  format: format,
+  out: out,
+);
+
+/// `mnnn org give`.
+Future<String> orgGive({
+  String? home,
+  required String org,
+  required String kind,
+  required String name,
+}) => RustLib.instance.api.crateApiOrgsOrgGive(
+  home: home,
+  org: org,
+  kind: kind,
+  name: name,
+);
+
+/// `mnnn org mirror`. Snapshot bytes stay in the store; Dart sees the slug only.
+Future<String> orgMirror({String? home, required String org}) =>
+    RustLib.instance.api.crateApiOrgsOrgMirror(home: home, org: org);
+
+/// `mnnn org sync-code`.
+Future<List<OrgSyncCodeItem>> orgSyncCode({
+  String? home,
+  required String org,
+}) => RustLib.instance.api.crateApiOrgsOrgSyncCode(home: home, org: org);
+
+/// `mnnn org sign-in`: a one-time browser link (valid five minutes). The signing key stays in Rust.
+Future<String> orgSignIn({required String org, required String site}) =>
+    RustLib.instance.api.crateApiOrgsOrgSignIn(org: org, site: site);
+
+class OrgBrowseItem {
+  final String name;
+  final String slug;
+  final String visibility;
+  final String access;
+  final PlatformInt64 members;
+  final String description;
+
+  const OrgBrowseItem({
+    required this.name,
+    required this.slug,
+    required this.visibility,
+    required this.access,
+    required this.members,
+    required this.description,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^
+      slug.hashCode ^
+      visibility.hashCode ^
+      access.hashCode ^
+      members.hashCode ^
+      description.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgBrowseItem &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          slug == other.slug &&
+          visibility == other.visibility &&
+          access == other.access &&
+          members == other.members &&
+          description == other.description;
+}
+
+/// Certificate metadata only. No PEM chain or private key.
+class OrgCertInfo {
+  final String org;
+  final String slug;
+  final List<String> domains;
+  final String source;
+  final List<String> names;
+  final String notAfter;
+  final String issuer;
+  final bool acmeEnabled;
+  final String acmeEmail;
+  final PlatformInt64 retryAttempts;
+  final String retryNext;
+  final String retryError;
+
+  const OrgCertInfo({
+    required this.org,
+    required this.slug,
+    required this.domains,
+    required this.source,
+    required this.names,
+    required this.notAfter,
+    required this.issuer,
+    required this.acmeEnabled,
+    required this.acmeEmail,
+    required this.retryAttempts,
+    required this.retryNext,
+    required this.retryError,
+  });
+
+  @override
+  int get hashCode =>
+      org.hashCode ^
+      slug.hashCode ^
+      domains.hashCode ^
+      source.hashCode ^
+      names.hashCode ^
+      notAfter.hashCode ^
+      issuer.hashCode ^
+      acmeEnabled.hashCode ^
+      acmeEmail.hashCode ^
+      retryAttempts.hashCode ^
+      retryNext.hashCode ^
+      retryError.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgCertInfo &&
+          runtimeType == other.runtimeType &&
+          org == other.org &&
+          slug == other.slug &&
+          domains == other.domains &&
+          source == other.source &&
+          names == other.names &&
+          notAfter == other.notAfter &&
+          issuer == other.issuer &&
+          acmeEnabled == other.acmeEnabled &&
+          acmeEmail == other.acmeEmail &&
+          retryAttempts == other.retryAttempts &&
+          retryNext == other.retryNext &&
+          retryError == other.retryError;
+}
+
+class OrgCertOverview {
+  final OrgNodeCertInfo node;
+  final List<OrgCertInfo> orgs;
+
+  const OrgCertOverview({required this.node, required this.orgs});
+
+  @override
+  int get hashCode => node.hashCode ^ orgs.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgCertOverview &&
+          runtimeType == other.runtimeType &&
+          node == other.node &&
+          orgs == other.orgs;
+}
+
+class OrgCodeServedInfo {
+  final String name;
+  final String lang;
+  final String shortId;
+
+  const OrgCodeServedInfo({
+    required this.name,
+    required this.lang,
+    required this.shortId,
+  });
+
+  @override
+  int get hashCode => name.hashCode ^ lang.hashCode ^ shortId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgCodeServedInfo &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          lang == other.lang &&
+          shortId == other.shortId;
+}
+
+class OrgDomainInfo {
+  final String org;
+  final String domain;
+
+  const OrgDomainInfo({required this.org, required this.domain});
+
+  @override
+  int get hashCode => org.hashCode ^ domain.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgDomainInfo &&
+          runtimeType == other.runtimeType &&
+          org == other.org &&
+          domain == other.domain;
+}
+
 class OrgEndpointInfo {
   final String name;
   final String kind;
@@ -245,6 +681,42 @@ class OrgEndpointInfo {
           kind == other.kind &&
           perm == other.perm &&
           anyone == other.anyone;
+}
+
+/// A fetched resource. Binary bytes stay in Rust (written to `out` when given).
+class OrgFetchResult {
+  final String name;
+  final String format;
+  final PlatformInt64 size;
+  final String? text;
+  final String written;
+
+  const OrgFetchResult({
+    required this.name,
+    required this.format,
+    required this.size,
+    this.text,
+    required this.written,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^
+      format.hashCode ^
+      size.hashCode ^
+      text.hashCode ^
+      written.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgFetchResult &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          format == other.format &&
+          size == other.size &&
+          text == other.text &&
+          written == other.written;
 }
 
 /// What `mnnn org host status` shows (no certificate private key).
@@ -495,6 +967,70 @@ class OrgMirror {
           fetchedAt == other.fetchedAt;
 }
 
+/// The node's site certificate and ACME settings (no key material).
+class OrgNodeCertInfo {
+  final String source;
+  final List<String> names;
+  final String notAfter;
+  final String issuer;
+  final bool acmeEnabled;
+  final String acmeDomain;
+  final String acmeEmail;
+  final String acmeDirectory;
+  final String acmeProfile;
+  final String acmeChallenge;
+  final PlatformInt64 acmeHttpPort;
+  final PlatformInt64 selfSignedDays;
+
+  const OrgNodeCertInfo({
+    required this.source,
+    required this.names,
+    required this.notAfter,
+    required this.issuer,
+    required this.acmeEnabled,
+    required this.acmeDomain,
+    required this.acmeEmail,
+    required this.acmeDirectory,
+    required this.acmeProfile,
+    required this.acmeChallenge,
+    required this.acmeHttpPort,
+    required this.selfSignedDays,
+  });
+
+  @override
+  int get hashCode =>
+      source.hashCode ^
+      names.hashCode ^
+      notAfter.hashCode ^
+      issuer.hashCode ^
+      acmeEnabled.hashCode ^
+      acmeDomain.hashCode ^
+      acmeEmail.hashCode ^
+      acmeDirectory.hashCode ^
+      acmeProfile.hashCode ^
+      acmeChallenge.hashCode ^
+      acmeHttpPort.hashCode ^
+      selfSignedDays.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgNodeCertInfo &&
+          runtimeType == other.runtimeType &&
+          source == other.source &&
+          names == other.names &&
+          notAfter == other.notAfter &&
+          issuer == other.issuer &&
+          acmeEnabled == other.acmeEnabled &&
+          acmeDomain == other.acmeDomain &&
+          acmeEmail == other.acmeEmail &&
+          acmeDirectory == other.acmeDirectory &&
+          acmeProfile == other.acmeProfile &&
+          acmeChallenge == other.acmeChallenge &&
+          acmeHttpPort == other.acmeHttpPort &&
+          selfSignedDays == other.selfSignedDays;
+}
+
 class OrgOverview {
   final List<OrgInfo> mine;
   final List<OrgJoined> joined;
@@ -569,4 +1105,78 @@ class OrgRoleInfo {
           name == other.name &&
           rank == other.rank &&
           perms == other.perms;
+}
+
+class OrgSyncCodeItem {
+  final String name;
+  final String state;
+
+  const OrgSyncCodeItem({required this.name, required this.state});
+
+  @override
+  int get hashCode => name.hashCode ^ state.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgSyncCodeItem &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          state == other.state;
+}
+
+/// A site template (`mnnn org template show`); HTML/CSS are the user's own markup, not secrets.
+class OrgTemplateInfo {
+  final String name;
+  final bool inUse;
+  final String updatedAt;
+  final List<String> assetNames;
+  final String buildCmd;
+  final String buildSrc;
+  final String buildOut;
+  final bool buildApproved;
+  final String html;
+  final String css;
+
+  const OrgTemplateInfo({
+    required this.name,
+    required this.inUse,
+    required this.updatedAt,
+    required this.assetNames,
+    required this.buildCmd,
+    required this.buildSrc,
+    required this.buildOut,
+    required this.buildApproved,
+    required this.html,
+    required this.css,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^
+      inUse.hashCode ^
+      updatedAt.hashCode ^
+      assetNames.hashCode ^
+      buildCmd.hashCode ^
+      buildSrc.hashCode ^
+      buildOut.hashCode ^
+      buildApproved.hashCode ^
+      html.hashCode ^
+      css.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrgTemplateInfo &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          inUse == other.inUse &&
+          updatedAt == other.updatedAt &&
+          assetNames == other.assetNames &&
+          buildCmd == other.buildCmd &&
+          buildSrc == other.buildSrc &&
+          buildOut == other.buildOut &&
+          buildApproved == other.buildApproved &&
+          html == other.html &&
+          css == other.css;
 }

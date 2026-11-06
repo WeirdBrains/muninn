@@ -1063,6 +1063,155 @@ class OrgHostStatus {
   final bool autostart;
 }
 
+/// A site template (`mnnn org template`). HTML/CSS are the user's markup.
+class OrgTemplateInfo {
+  const OrgTemplateInfo({
+    required this.name,
+    this.inUse = false,
+    this.updatedAt = '',
+    this.assetNames = const [],
+    this.buildCmd = '',
+    this.buildSrc = '',
+    this.buildOut = '',
+    this.buildApproved = false,
+    this.html = '',
+    this.css = '',
+  });
+  final String name;
+  final bool inUse;
+  final String updatedAt;
+  final List<String> assetNames;
+  final String buildCmd;
+  final String buildSrc;
+  final String buildOut;
+  final bool buildApproved;
+  final String html;
+  final String css;
+}
+
+class OrgDomainInfo {
+  const OrgDomainInfo({required this.org, required this.domain});
+  final String org;
+  final String domain;
+}
+
+/// Certificate metadata only. No PEM chain or private key.
+class OrgCertInfo {
+  const OrgCertInfo({
+    required this.org,
+    required this.slug,
+    this.domains = const [],
+    this.source = '',
+    this.names = const [],
+    this.notAfter = '',
+    this.issuer = '',
+    this.acmeEnabled = false,
+    this.acmeEmail = '',
+    this.retryAttempts = 0,
+    this.retryNext = '',
+    this.retryError = '',
+  });
+  final String org;
+  final String slug;
+  final List<String> domains;
+  final String source;
+  final List<String> names;
+  final String notAfter;
+  final String issuer;
+  final bool acmeEnabled;
+  final String acmeEmail;
+  final int retryAttempts;
+  final String retryNext;
+  final String retryError;
+}
+
+class OrgNodeCertInfo {
+  const OrgNodeCertInfo({
+    this.source = '',
+    this.names = const [],
+    this.notAfter = '',
+    this.issuer = '',
+    this.acmeEnabled = false,
+    this.acmeDomain = '',
+    this.acmeEmail = '',
+    this.acmeDirectory = '',
+    this.acmeProfile = '',
+    this.acmeChallenge = '',
+    this.acmeHttpPort = 0,
+    this.selfSignedDays = 0,
+  });
+  final String source;
+  final List<String> names;
+  final String notAfter;
+  final String issuer;
+  final bool acmeEnabled;
+  final String acmeDomain;
+  final String acmeEmail;
+  final String acmeDirectory;
+  final String acmeProfile;
+  final String acmeChallenge;
+  final int acmeHttpPort;
+  final int selfSignedDays;
+}
+
+class OrgCertOverview {
+  const OrgCertOverview({
+    this.node = const OrgNodeCertInfo(),
+    this.orgs = const [],
+  });
+  final OrgNodeCertInfo node;
+  final List<OrgCertInfo> orgs;
+}
+
+class OrgBrowseItem {
+  const OrgBrowseItem({
+    required this.name,
+    required this.slug,
+    this.visibility = '',
+    this.access = '',
+    this.members = 0,
+    this.description = '',
+  });
+  final String name;
+  final String slug;
+  final String visibility;
+  final String access;
+  final int members;
+  final String description;
+}
+
+class OrgFetchResult {
+  const OrgFetchResult({
+    required this.name,
+    this.format = '',
+    this.size = 0,
+    this.text,
+    this.written = '',
+  });
+  final String name;
+  final String format;
+  final int size;
+  final String? text;
+  final String written;
+}
+
+class OrgSyncCodeItem {
+  const OrgSyncCodeItem({required this.name, this.state = ''});
+  final String name;
+  final String state;
+}
+
+class OrgCodeServedInfo {
+  const OrgCodeServedInfo({
+    required this.name,
+    this.lang = '',
+    this.shortId = '',
+  });
+  final String name;
+  final String lang;
+  final String shortId;
+}
+
 /// What `mnnn keys status` prints. No master key, words, shards or wrapped keys.
 class ServiceKeyInfo {
   const ServiceKeyInfo({required this.version, this.retired = false});
@@ -1620,6 +1769,94 @@ abstract class MuninnApi {
   Future<OrgHostStatus> orgHostStart();
   Future<String> orgHostStop();
   Future<String> orgHostAutostart(bool on);
+
+  Future<List<OrgTemplateInfo>> orgTemplates(String org);
+  Future<OrgTemplateInfo> orgTemplateShow(String org, String template);
+  Future<OrgTemplateInfo> orgTemplateSave(
+    String org,
+    String name, {
+    String html = '',
+    String css = '',
+    bool useIt = false,
+  });
+  Future<String> orgTemplateRemove(String org, String template);
+  Future<String> orgTemplateAddAsset(
+    String org,
+    String template,
+    String path, {
+    String? name,
+  });
+  Future<String> orgTemplateRemoveAsset(
+    String org,
+    String template,
+    String name,
+  );
+  Future<String> orgTemplateBuild(
+    String org,
+    String template, {
+    String? cmd,
+    String? src,
+    String? out,
+    bool clear = false,
+    bool noRun = false,
+    bool approve = false,
+  });
+  Future<String> orgTemplatePreview(String org, String template);
+
+  Future<List<OrgDomainInfo>> orgDomains({String? org});
+  Future<String> orgDomainAdd(String org, String domain);
+  Future<String> orgDomainRemove(String org, String domain);
+
+  Future<OrgCertOverview> orgCertStatus({String? org});
+  Future<String> orgCertSet(String org, String cert, String key);
+  Future<String> orgCertClear(String org);
+  Future<String> orgCertAcme({
+    String? org,
+    String? challenge,
+    String? email,
+    String? domain,
+    String? directory,
+    String? profile,
+    int? httpPort,
+    bool off = false,
+  });
+  Future<String> orgCertRenew({String? org});
+
+  Future<List<OrgBrowseItem>> orgBrowse(String target, {String? org});
+  Future<OrgFetchResult> orgFetch(
+    String org,
+    String resource, {
+    String? format,
+    String? out,
+  });
+  Future<String> orgGive(String org, String kind, String name);
+  Future<String> orgMirror(String org);
+  Future<List<OrgSyncCodeItem>> orgSyncCode(String org);
+  Future<String> orgSignIn(String org, String site);
+
+  Future<String> orgEndpointAdd(
+    String org,
+    String name,
+    String kind,
+    String target, {
+    String? perm,
+    bool anyone = false,
+  });
+  Future<String> orgEndpointRemove(String org, String name);
+  Future<String> orgCall(String org, String endpoint, {String input = '{}'});
+
+  Future<String> orgProjectAdd(String org, String project);
+  Future<String> orgProjectRemove(String org, String project);
+  Future<String> orgProjectMember(
+    String org,
+    String project,
+    String member, {
+    String? role,
+  });
+
+  Future<List<OrgCodeServedInfo>> orgCodeList(String org);
+  Future<String> orgCodeServe(String org, String space);
+  Future<String> orgCodeStop(String org, String space);
 
   /// `mnnn keys status`: database id, path and service-key versions. No key material.
   Future<KeysStatus> keysStatus();

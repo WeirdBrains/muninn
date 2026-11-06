@@ -13,6 +13,7 @@ import '../state.dart';
 import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 import 'orgs_dialogs.dart';
+import 'orgs_rest.dart';
 import 'unlock.dart';
 
 final _selectedOrg = StateProvider<String?>((ref) => null);
@@ -37,6 +38,7 @@ class OrgsView extends ConsumerWidget {
               final empty =
                   o.mine.isEmpty && o.joined.isEmpty && o.mirrors.isEmpty;
               return ListView(
+                key: const ValueKey('orgs-list'),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
                   Wrap(
@@ -512,34 +514,7 @@ class _MineDetail extends ConsumerWidget {
             'Add resource',
             () => showOrgAddResourceDialog(context, ref, org),
           ),
-          if (org.projects.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Projects',
-              style: TextStyle(color: m.header, fontWeight: FontWeight.w700),
-            ),
-            for (final n in org.projects)
-              Text('  $n', style: TextStyle(color: m.fg)),
-          ],
-          if (org.endpoints.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Endpoints',
-              style: TextStyle(color: m.header, fontWeight: FontWeight.w700),
-            ),
-            for (final e in org.endpoints)
-              Text(
-                '  ${e.name}  ${e.kind}  needs ${e.perm}${e.anyone ? ' (or anyone)' : ''}',
-                style: TextStyle(color: m.fg),
-              ),
-          ],
-          if (org.templates.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Templates: ${org.templates.join(', ')}',
-              style: TextStyle(color: m.muted),
-            ),
-          ],
+          OrgMineRest(org),
         ],
       ),
     );
@@ -580,6 +555,7 @@ class _JoinedTile extends ConsumerWidget {
                 'Leave',
                 () => confirmOrgLeave(context, ref, j),
               ),
+              OrgJoinedRest(j),
             ],
           ),
         ),

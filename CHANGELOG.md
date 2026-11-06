@@ -25,6 +25,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Flutter app: Net leftovers — settings (`mnnn net config`), connections (trust/remove), key exchanges (verify/label/revoke, list and fetch what a peer shares), network search, broadcast and dark shards; exchange tokens, shard blobs and the master key stay in Rust
 - Flutter app: Projects windows for code spaces, live pipes and pipelines (`mnnn code` / `pipe` / `pipeline`); compiled plugin output stays in Rust, the source the user wrote is editable in the app
 - Flutter app: Projects windows for rules, reviews and notifications (`mnnn rule` / `review` / `notify`); review invite links are public like net invites, and exchange tokens stay in Rust
+- Flutter app: Orgs rest — templates, domains, certificates/ACME, browse, fetch/give/mirror, sync-code, endpoints, org projects, code serve and member sign-in (`mnnn org`); certificate PEM and private keys stay in Rust
 
 ## [2.22.0] - 2026-11-05
 

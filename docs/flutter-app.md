@@ -31,7 +31,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
-  Live searches… / Journals… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Rules… / Reviews… / Notifications… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
+  Live searches… / Journals… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Rules… / Reviews… / Notifications… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
   Rekey, Export, Recover and Re-issue shards, and Data ▸ Sources… / Symbols…. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
@@ -172,9 +172,25 @@ Users never need Rust: release builds ship the compiled library.
   it to stop. When hosting autostart is on, starting the node also starts the site
   (TUI / `mnnn net start`). Invite tokens are shown so the other node can join, matching
   the TUI; host certificates and private keys stay in Rust. On a phone the site and
-  store use the same platform-secure app sandbox. Templates (HTML/CSS, assets, build),
-  domains, certificates, ACME, browse, fetch/give/mirror, endpoints, org projects and
-  code serve stay in the TUI or CLI.
+  store use the same platform-secure app sandbox. **Templates** list, create (from
+  the built-in look), edit HTML/CSS, add or remove assets (Rust reads the file),
+  set a build step and run it, preview (a local host path, good for an hour) and
+  remove (`mnnn org template` / TUI Templates). **Domains** add, list and remove
+  (`mnnn org domain`). **Certificates** show public status (source, names, expiry,
+  ACME) for the node and each org, set or clear your own certificate from PEM
+  paths, turn ACME / Let's Encrypt on or off (an org needs a domain first; the
+  node's directory, profile, challenge and port apply to orgs) and ask to renew
+  (`mnnn org cert`). Renew needs the challenge reachable. Certificate PEM and
+  private keys stay in Rust. **Browse** lists the public organizations of a peer
+  (`mnnn org browse` / TUI Joined `b`). **Fetch, give and mirror** a joined org's
+  resources or public site (`mnnn org fetch|give|mirror`); fetched binary bytes
+  are written to a path in Rust. **Sync code** copies a joined org's code spaces
+  here (`mnnn org sync-code`). **Endpoints** add, remove and call (`mnnn org endpoint`
+  / `mnnn org call`). **Org projects** attach, detach and add a member
+  (`mnnn org project`). **Code serve** lists spaces this node runs for the org and
+  can start or stop one (`mnnn org code`). **Sign in** mints a one-time browser
+  link to a joined org's site (`mnnn org sign-in`, valid five minutes). Announcing
+  sites and listing announced `sites` stay in the TUI or CLI.
 - **Keys:** status like `mnnn keys status`, plus the write flows the CLI provides
   (Initialize, Rotate, Rekey, Export, Recover from words or shards, Re-issue shards).
   It uses the same data dir as the store (on a phone, the platform-secure app sandbox;
@@ -296,7 +312,7 @@ comes in a later phase (see [sync](sync.md)).
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars, ingest and bar export, sources and symbols, code spaces, live pipes and pipelines, rules, reviews and notifications, net status, peers, settings, connections, exchanges, search, broadcast and dark shards, org list and writes, keys status and writes, help topics), exposed with
+  projects and datasets, downsampled bars, ingest and bar export, sources and symbols, code spaces, live pipes and pipelines, rules, reviews and notifications, net status, peers, settings, connections, exchanges, search, broadcast and dark shards, org list and writes (including templates, domains, certificates/ACME, browse, fetch/give/mirror, endpoints, org projects, code serve and sign-in), keys status and writes, help topics), exposed with
   flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.

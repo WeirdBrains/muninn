@@ -2591,6 +2591,375 @@ class FakeApi implements MuninnApi {
         : 'the site starts only when asked';
   }
 
+  final List<OrgDomainInfo> domainList = [];
+  final Map<String, OrgTemplateInfo> templates = {};
+  OrgCertOverview certs = const OrgCertOverview(
+    node: OrgNodeCertInfo(source: 'self-signed', selfSignedDays: 7),
+  );
+
+  OrgInfo _org(String key) => orgs.mine.firstWhere(
+    (o) => o.id == key || o.slug == key || o.name == key,
+    orElse: () => throw 'no organization `$key`',
+  );
+
+  void _putOrg(OrgInfo next) {
+    orgs = OrgOverview(
+      mine: [
+        for (final o in orgs.mine)
+          if (o.id == next.id) next else o,
+      ],
+      joined: orgs.joined,
+      mirrors: orgs.mirrors,
+    );
+  }
+
+  OrgInfo _copyOrg(
+    OrgInfo o, {
+    List<String>? templates,
+    String? template,
+    List<OrgEndpointInfo>? endpoints,
+    List<String>? projects,
+  }) => OrgInfo(
+    id: o.id,
+    shortId: o.shortId,
+    name: o.name,
+    slug: o.slug,
+    description: o.description,
+    visibility: o.visibility,
+    access: o.access,
+    hosted: o.hosted,
+    memberAuth: o.memberAuth,
+    gated: o.gated,
+    members: o.members,
+    applyRole: o.applyRole,
+    inviteRole: o.inviteRole,
+    template: template ?? o.template,
+    roles: o.roles,
+    memberList: o.memberList,
+    resources: o.resources,
+    projects: projects ?? o.projects,
+    endpoints: endpoints ?? o.endpoints,
+    templates: templates ?? o.templates,
+  );
+
+  @override
+  Future<List<OrgTemplateInfo>> orgTemplates(String org) async => [
+    for (final n in _org(org).templates)
+      templates[n] ?? OrgTemplateInfo(name: n),
+  ];
+
+  @override
+  Future<OrgTemplateInfo> orgTemplateShow(String org, String template) async {
+    orgCalls.add('template-show:$org:$template');
+    return templates[template] ??
+        OrgTemplateInfo(name: template, html: '<h1>{{title}}</h1>');
+  }
+
+  @override
+  Future<OrgTemplateInfo> orgTemplateSave(
+    String org,
+    String name, {
+    String html = '',
+    String css = '',
+    bool useIt = false,
+  }) async {
+    orgCalls.add('template-save:$org:$name');
+    final t = OrgTemplateInfo(
+      name: name,
+      inUse: useIt,
+      html: html.isEmpty ? '<h1>{{title}}</h1>' : html,
+      css: css,
+    );
+    templates[name] = t;
+    final o = _org(org);
+    final names = [...o.templates.where((n) => n != name), name];
+    _putOrg(_copyOrg(o, templates: names, template: useIt ? name : o.template));
+    return t;
+  }
+
+  @override
+  Future<String> orgTemplateRemove(String org, String template) async {
+    orgCalls.add('template-remove:$org:$template');
+    templates.remove(template);
+    final o = _org(org);
+    _putOrg(
+      _copyOrg(
+        o,
+        templates: [
+          for (final n in o.templates)
+            if (n != template) n,
+        ],
+        template: o.template == template ? 'default' : o.template,
+      ),
+    );
+    return 'template $template removed';
+  }
+
+  @override
+  Future<String> orgTemplateAddAsset(
+    String org,
+    String template,
+    String path, {
+    String? name,
+  }) async {
+    orgCalls.add('template-asset:$org:$template:$path');
+    return 'asset ${name ?? path} (0 bytes) at /assets/';
+  }
+
+  @override
+  Future<String> orgTemplateRemoveAsset(
+    String org,
+    String template,
+    String name,
+  ) async {
+    orgCalls.add('template-asset-rm:$org:$template:$name');
+    return 'asset $name removed from $template';
+  }
+
+  @override
+  Future<String> orgTemplateBuild(
+    String org,
+    String template, {
+    String? cmd,
+    String? src,
+    String? out,
+    bool clear = false,
+    bool noRun = false,
+    bool approve = false,
+  }) async {
+    orgCalls.add('template-build:$org:$template');
+    return clear
+        ? 'build step of $template removed'
+        : 'built $template: index.html';
+  }
+
+  @override
+  Future<String> orgTemplatePreview(String org, String template) async {
+    orgCalls.add('template-preview:$org:$template');
+    return '/o/$org/preview/$template (the site is not running here; start it to serve this preview for an hour)';
+  }
+
+  @override
+  Future<List<OrgDomainInfo>> orgDomains({String? org}) async => [
+    for (final d in domainList)
+      if (org == null || d.org == org) d,
+  ];
+
+  @override
+  Future<String> orgDomainAdd(String org, String domain) async {
+    orgCalls.add('domain-add:$org:$domain');
+    domainList.add(OrgDomainInfo(org: org, domain: domain));
+    return '$org is served at $domain';
+  }
+
+  @override
+  Future<String> orgDomainRemove(String org, String domain) async {
+    orgCalls.add('domain-rm:$org:$domain');
+    domainList.removeWhere((d) => d.org == org && d.domain == domain);
+    return '$org is no longer served at $domain';
+  }
+
+  @override
+  Future<OrgCertOverview> orgCertStatus({String? org}) async => certs;
+
+  @override
+  Future<String> orgCertSet(String org, String cert, String key) async {
+    orgCalls.add('cert-set:$org:$cert');
+    return '$org: your certificate set';
+  }
+
+  @override
+  Future<String> orgCertClear(String org) async {
+    orgCalls.add('cert-clear:$org');
+    return '$org: back to a self-signed certificate';
+  }
+
+  @override
+  Future<String> orgCertAcme({
+    String? org,
+    String? challenge,
+    String? email,
+    String? domain,
+    String? directory,
+    String? profile,
+    int? httpPort,
+    bool off = false,
+  }) async {
+    orgCalls.add('cert-acme:${org ?? 'node'}:${off ? 'off' : 'on'}');
+    return off ? 'ACME off' : 'ACME on for ${org ?? domain ?? 'node'}';
+  }
+
+  @override
+  Future<String> orgCertRenew({String? org}) async {
+    orgCalls.add('cert-renew:${org ?? 'node'}');
+    return 'nothing to renew';
+  }
+
+  @override
+  Future<List<OrgBrowseItem>> orgBrowse(String target, {String? org}) async {
+    orgCalls.add('browse:$target:${org ?? ''}');
+    if (target.trim().isEmpty) {
+      throw 'browse a node (…/p2p/ID or a known peer)';
+    }
+    return const [
+      OrgBrowseItem(
+        name: 'Peer Lab',
+        slug: 'peer-lab',
+        visibility: 'public',
+        access: 'open',
+        members: 3,
+        description: 'elsewhere',
+      ),
+    ];
+  }
+
+  @override
+  Future<OrgFetchResult> orgFetch(
+    String org,
+    String resource, {
+    String? format,
+    String? out,
+  }) async {
+    orgCalls.add('fetch:$org:$resource');
+    return OrgFetchResult(
+      name: resource,
+      format: format ?? 'json',
+      size: 2,
+      text: '{}',
+    );
+  }
+
+  @override
+  Future<String> orgGive(String org, String kind, String name) async {
+    orgCalls.add('give:$org:$kind:$name');
+    return 'gave $kind $name to $org (yours stays as it is)';
+  }
+
+  @override
+  Future<String> orgMirror(String org) async {
+    orgCalls.add('mirror:$org');
+    return 'mirrored $org (0 bytes); start the site to serve it at /o/$org/';
+  }
+
+  @override
+  Future<List<OrgSyncCodeItem>> orgSyncCode(String org) async {
+    orgCalls.add('sync-code:$org');
+    return const [OrgSyncCodeItem(name: 'parser', state: 'same')];
+  }
+
+  @override
+  Future<String> orgSignIn(String org, String site) async {
+    orgCalls.add('sign-in:$org:$site');
+    if (site.trim().isEmpty) {
+      throw "give the site's address, e.g. https://lab.example.org:4743";
+    }
+    return '$site/o/$org/sign-in?auth=demo';
+  }
+
+  @override
+  Future<String> orgEndpointAdd(
+    String org,
+    String name,
+    String kind,
+    String target, {
+    String? perm,
+    bool anyone = false,
+  }) async {
+    orgCalls.add('endpoint-add:$org:$name:$kind:$target');
+    final o = _org(org);
+    _putOrg(
+      _copyOrg(
+        o,
+        endpoints: [
+          ...o.endpoints,
+          OrgEndpointInfo(
+            name: name,
+            kind: kind,
+            perm: perm ?? 'call',
+            anyone: anyone,
+          ),
+        ],
+      ),
+    );
+    return 'endpoint $name ($kind, needs ${perm ?? 'call'})';
+  }
+
+  @override
+  Future<String> orgEndpointRemove(String org, String name) async {
+    orgCalls.add('endpoint-rm:$org:$name');
+    final o = _org(org);
+    _putOrg(
+      _copyOrg(
+        o,
+        endpoints: [
+          for (final e in o.endpoints)
+            if (e.name != name) e,
+        ],
+      ),
+    );
+    return 'removed endpoint $name';
+  }
+
+  @override
+  Future<String> orgCall(
+    String org,
+    String endpoint, {
+    String input = '{}',
+  }) async {
+    orgCalls.add('call:$org:$endpoint');
+    return '{ "ok": true }';
+  }
+
+  @override
+  Future<String> orgProjectAdd(String org, String project) async {
+    orgCalls.add('project-add:$org:$project');
+    final o = _org(org);
+    _putOrg(_copyOrg(o, projects: [...o.projects, project]));
+    return '$project is a project of ${o.name}';
+  }
+
+  @override
+  Future<String> orgProjectRemove(String org, String project) async {
+    orgCalls.add('project-rm:$org:$project');
+    final o = _org(org);
+    _putOrg(
+      _copyOrg(
+        o,
+        projects: [
+          for (final n in o.projects)
+            if (n != project) n,
+        ],
+      ),
+    );
+    return '$project is no longer a project of ${o.name} (the project stays here)';
+  }
+
+  @override
+  Future<String> orgProjectMember(
+    String org,
+    String project,
+    String member, {
+    String? role,
+  }) async {
+    orgCalls.add('project-member:$org:$project:$member');
+    return '$member is on $project';
+  }
+
+  @override
+  Future<List<OrgCodeServedInfo>> orgCodeList(String org) async => const [];
+
+  @override
+  Future<String> orgCodeServe(String org, String space) async {
+    orgCalls.add('code-serve:$org:$space');
+    return 'this node serves $space for $org';
+  }
+
+  @override
+  Future<String> orgCodeStop(String org, String space) async {
+    orgCalls.add('code-stop:$org:$space');
+    return 'this node no longer serves $space for $org';
+  }
+
   KeysStatus keys = const KeysStatus(
     initialized: true,
     dbId: 'db-aaaa-bbbb',

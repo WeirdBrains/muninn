@@ -211,6 +211,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<OrgBrowseItem> dco_decode_list_org_browse_item(dynamic raw);
+
+  @protected
+  List<OrgCertInfo> dco_decode_list_org_cert_info(dynamic raw);
+
+  @protected
+  List<OrgCodeServedInfo> dco_decode_list_org_code_served_info(dynamic raw);
+
+  @protected
+  List<OrgDomainInfo> dco_decode_list_org_domain_info(dynamic raw);
+
+  @protected
   List<OrgEndpointInfo> dco_decode_list_org_endpoint_info(dynamic raw);
 
   @protected
@@ -230,6 +242,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<OrgRoleInfo> dco_decode_list_org_role_info(dynamic raw);
+
+  @protected
+  List<OrgSyncCodeItem> dco_decode_list_org_sync_code_item(dynamic raw);
+
+  @protected
+  List<OrgTemplateInfo> dco_decode_list_org_template_info(dynamic raw);
 
   @protected
   List<PipelineInfo> dco_decode_list_pipeline_info(dynamic raw);
@@ -387,7 +405,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String>? dco_decode_opt_list_String(dynamic raw);
 
   @protected
+  OrgBrowseItem dco_decode_org_browse_item(dynamic raw);
+
+  @protected
+  OrgCertInfo dco_decode_org_cert_info(dynamic raw);
+
+  @protected
+  OrgCertOverview dco_decode_org_cert_overview(dynamic raw);
+
+  @protected
+  OrgCodeServedInfo dco_decode_org_code_served_info(dynamic raw);
+
+  @protected
+  OrgDomainInfo dco_decode_org_domain_info(dynamic raw);
+
+  @protected
   OrgEndpointInfo dco_decode_org_endpoint_info(dynamic raw);
+
+  @protected
+  OrgFetchResult dco_decode_org_fetch_result(dynamic raw);
 
   @protected
   OrgHostStatus dco_decode_org_host_status(dynamic raw);
@@ -405,6 +441,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   OrgMirror dco_decode_org_mirror(dynamic raw);
 
   @protected
+  OrgNodeCertInfo dco_decode_org_node_cert_info(dynamic raw);
+
+  @protected
   OrgOverview dco_decode_org_overview(dynamic raw);
 
   @protected
@@ -412,6 +451,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   OrgRoleInfo dco_decode_org_role_info(dynamic raw);
+
+  @protected
+  OrgSyncCodeItem dco_decode_org_sync_code_item(dynamic raw);
+
+  @protected
+  OrgTemplateInfo dco_decode_org_template_info(dynamic raw);
 
   @protected
   Overview dco_decode_overview(dynamic raw);
@@ -712,6 +757,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<OrgBrowseItem> sse_decode_list_org_browse_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<OrgCertInfo> sse_decode_list_org_cert_info(SseDeserializer deserializer);
+
+  @protected
+  List<OrgCodeServedInfo> sse_decode_list_org_code_served_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<OrgDomainInfo> sse_decode_list_org_domain_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<OrgEndpointInfo> sse_decode_list_org_endpoint_info(
     SseDeserializer deserializer,
   );
@@ -737,6 +800,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<OrgRoleInfo> sse_decode_list_org_role_info(SseDeserializer deserializer);
+
+  @protected
+  List<OrgSyncCodeItem> sse_decode_list_org_sync_code_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<OrgTemplateInfo> sse_decode_list_org_template_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<PipelineInfo> sse_decode_list_pipeline_info(
@@ -924,7 +997,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String>? sse_decode_opt_list_String(SseDeserializer deserializer);
 
   @protected
+  OrgBrowseItem sse_decode_org_browse_item(SseDeserializer deserializer);
+
+  @protected
+  OrgCertInfo sse_decode_org_cert_info(SseDeserializer deserializer);
+
+  @protected
+  OrgCertOverview sse_decode_org_cert_overview(SseDeserializer deserializer);
+
+  @protected
+  OrgCodeServedInfo sse_decode_org_code_served_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  OrgDomainInfo sse_decode_org_domain_info(SseDeserializer deserializer);
+
+  @protected
   OrgEndpointInfo sse_decode_org_endpoint_info(SseDeserializer deserializer);
+
+  @protected
+  OrgFetchResult sse_decode_org_fetch_result(SseDeserializer deserializer);
 
   @protected
   OrgHostStatus sse_decode_org_host_status(SseDeserializer deserializer);
@@ -942,6 +1035,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   OrgMirror sse_decode_org_mirror(SseDeserializer deserializer);
 
   @protected
+  OrgNodeCertInfo sse_decode_org_node_cert_info(SseDeserializer deserializer);
+
+  @protected
   OrgOverview sse_decode_org_overview(SseDeserializer deserializer);
 
   @protected
@@ -949,6 +1045,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   OrgRoleInfo sse_decode_org_role_info(SseDeserializer deserializer);
+
+  @protected
+  OrgSyncCodeItem sse_decode_org_sync_code_item(SseDeserializer deserializer);
+
+  @protected
+  OrgTemplateInfo sse_decode_org_template_info(SseDeserializer deserializer);
 
   @protected
   Overview sse_decode_overview(SseDeserializer deserializer);
@@ -1322,6 +1424,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_org_browse_item(
+    List<OrgBrowseItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_org_cert_info(
+    List<OrgCertInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_org_code_served_info(
+    List<OrgCodeServedInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_org_domain_info(
+    List<OrgDomainInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_org_endpoint_info(
     List<OrgEndpointInfo> self,
     SseSerializer serializer,
@@ -1357,6 +1483,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_org_role_info(
     List<OrgRoleInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_org_sync_code_item(
+    List<OrgSyncCodeItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_org_template_info(
+    List<OrgTemplateInfo> self,
     SseSerializer serializer,
   );
 
@@ -1607,8 +1745,35 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_list_String(List<String>? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_org_browse_item(OrgBrowseItem self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_org_cert_info(OrgCertInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_org_cert_overview(
+    OrgCertOverview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_org_code_served_info(
+    OrgCodeServedInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_org_domain_info(OrgDomainInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_org_endpoint_info(
     OrgEndpointInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_org_fetch_result(
+    OrgFetchResult self,
     SseSerializer serializer,
   );
 
@@ -1628,6 +1793,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_org_mirror(OrgMirror self, SseSerializer serializer);
 
   @protected
+  void sse_encode_org_node_cert_info(
+    OrgNodeCertInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_org_overview(OrgOverview self, SseSerializer serializer);
 
   @protected
@@ -1638,6 +1809,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_org_role_info(OrgRoleInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_org_sync_code_item(
+    OrgSyncCodeItem self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_org_template_info(
+    OrgTemplateInfo self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_overview(Overview self, SseSerializer serializer);

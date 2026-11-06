@@ -26,6 +26,7 @@ import 'views/home.dart';
 import 'views/net.dart';
 import 'views/orgs.dart';
 import 'views/orgs_dialogs.dart';
+import 'views/orgs_rest.dart';
 import 'views/keys.dart';
 import 'views/keys_dialogs.dart';
 import 'views/net_dialogs.dart';
@@ -442,6 +443,9 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           item('New organization…', () => showOrgCreateDialog(context, ref)),
           item('Join…', () => showOrgJoinDialog(context, ref)),
           item('Apply…', () => showOrgApplyDialog(context, ref)),
+          item('Browse…', () => showOrgBrowseDialog(context, ref)),
+          item('Certificates…', () => showOrgCertsDialog(context, ref)),
+          item('Let\'s Encrypt…', () => showOrgNodeAcmeDialog(context, ref)),
           item('Start site', () => orgHostStart(context, ref)),
           item('Stop site', () => orgHostStop(context, ref)),
         ]),
