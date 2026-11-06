@@ -1,5 +1,6 @@
-//! Read-only views of the store: projects, datasets (series) and downsampled bars.
-//! The store is opened read-only (no migrations, no writes); unlocking needs the Muninn password.
+//! Views of the store: projects, datasets (series) and downsampled bars.
+//! Unlocking needs the Muninn password; the key stays in Rust. Dashboard reads open
+//! the store read-only (no migrations). Import and export open it for writes.
 use super::info::paths;
 use muninn_core::crypto::Key32;
 use muninn_core::model::{Duration, Symbol};
@@ -70,6 +71,13 @@ fn open() -> anyhow::Result<Store> {
     let g = SESSION.lock().unwrap_or_else(|e| e.into_inner());
     let (db, key) = g.as_ref().ok_or_else(|| anyhow::anyhow!("locked: unlock with the Muninn password first"))?;
     Ok(Store::open_readonly(db, Some(&key.0))?)
+}
+
+/// Open the unlocked store for writes (migrations may run). The key never leaves Rust.
+pub(crate) fn open_write() -> anyhow::Result<Store> {
+    let g = SESSION.lock().unwrap_or_else(|e| e.into_inner());
+    let (db, key) = g.as_ref().ok_or_else(|| anyhow::anyhow!("locked: unlock with the Muninn password first"))?;
+    Ok(Store::open(db, Some(&key.0))?)
 }
 
 /// Projects and datasets, read-only (after [`unlock`]).

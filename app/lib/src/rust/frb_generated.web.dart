@@ -9,6 +9,7 @@
 import 'api/about.dart';
 import 'api/data.dart';
 import 'api/info.dart';
+import 'api/io.dart';
 import 'api/prefs.dart';
 import 'api/themes.dart';
 
@@ -46,6 +47,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
   @protected
+  IngestProgressSnap dco_decode_box_autoadd_ingest_progress_snap(dynamic raw);
+
+  @protected
   ThemeData dco_decode_box_autoadd_theme_data(dynamic raw);
 
   @protected
@@ -55,10 +59,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DatasetSummary dco_decode_dataset_summary(dynamic raw);
 
   @protected
+  ExportOutcome dco_decode_export_outcome(dynamic raw);
+
+  @protected
   double dco_decode_f_64(dynamic raw);
 
   @protected
   PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
+  IngestFileReport dco_decode_ingest_file_report(dynamic raw);
+
+  @protected
+  IngestOutcome dco_decode_ingest_outcome(dynamic raw);
+
+  @protected
+  IngestProgressSnap dco_decode_ingest_progress_snap(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
@@ -68,6 +84,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<DatasetSummary> dco_decode_list_dataset_summary(dynamic raw);
+
+  @protected
+  List<IngestFileReport> dco_decode_list_ingest_file_report(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -86,6 +105,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
+
+  @protected
+  IngestProgressSnap? dco_decode_opt_box_autoadd_ingest_progress_snap(
+    dynamic raw,
+  );
 
   @protected
   ThemeData? dco_decode_opt_box_autoadd_theme_data(dynamic raw);
@@ -139,6 +163,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
+  IngestProgressSnap sse_decode_box_autoadd_ingest_progress_snap(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ThemeData sse_decode_box_autoadd_theme_data(SseDeserializer deserializer);
 
   @protected
@@ -148,10 +177,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DatasetSummary sse_decode_dataset_summary(SseDeserializer deserializer);
 
   @protected
+  ExportOutcome sse_decode_export_outcome(SseDeserializer deserializer);
+
+  @protected
   double sse_decode_f_64(SseDeserializer deserializer);
 
   @protected
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
+  IngestFileReport sse_decode_ingest_file_report(SseDeserializer deserializer);
+
+  @protected
+  IngestOutcome sse_decode_ingest_outcome(SseDeserializer deserializer);
+
+  @protected
+  IngestProgressSnap sse_decode_ingest_progress_snap(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
@@ -161,6 +204,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<DatasetSummary> sse_decode_list_dataset_summary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<IngestFileReport> sse_decode_list_ingest_file_report(
     SseDeserializer deserializer,
   );
 
@@ -185,6 +233,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
+  IngestProgressSnap? sse_decode_opt_box_autoadd_ingest_progress_snap(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ThemeData? sse_decode_opt_box_autoadd_theme_data(
@@ -249,6 +302,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_ingest_progress_snap(
+    IngestProgressSnap self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_theme_data(
     ThemeData self,
     SseSerializer serializer,
@@ -264,10 +323,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_export_outcome(ExportOutcome self, SseSerializer serializer);
+
+  @protected
   void sse_encode_f_64(double self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ingest_file_report(
+    IngestFileReport self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ingest_outcome(IngestOutcome self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ingest_progress_snap(
+    IngestProgressSnap self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
@@ -278,6 +355,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_dataset_summary(
     List<DatasetSummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_ingest_file_report(
+    List<IngestFileReport> self,
     SseSerializer serializer,
   );
 
@@ -311,6 +394,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_i_64(
     PlatformInt64? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_ingest_progress_snap(
+    IngestProgressSnap? self,
     SseSerializer serializer,
   );
 
