@@ -2,6 +2,7 @@
 //! Thin wrappers over `muninn-core`; no logic beyond shaping data for Dart.
 pub mod about;
 pub mod data;
+pub mod help;
 pub mod info;
 pub mod io;
 pub mod keys;

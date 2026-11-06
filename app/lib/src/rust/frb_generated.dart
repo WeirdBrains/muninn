@@ -5,6 +5,7 @@
 
 import 'api/about.dart';
 import 'api/data.dart';
+import 'api/help.dart';
 import 'api/info.dart';
 import 'api/io.dart';
 import 'api/keys.dart';
@@ -78,7 +79,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 71200161;
+  int get rustContentHash => -1623500119;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -128,6 +129,17 @@ abstract class RustLibApi extends BaseApi {
     String? to,
   });
 
+  Future<String?> crateApiHelpHelpResolveHref({
+    required String from,
+    required String href,
+  });
+
+  Future<List<HelpTopicInfo>> crateApiHelpHelpSearch({required String query});
+
+  Future<HelpTopic> crateApiHelpHelpTopic({required String id});
+
+  Future<List<HelpTopicInfo>> crateApiHelpHelpTopics();
+
   Future<IngestOutcome> crateApiIoIngestPath({
     required String path,
     String? source,
@@ -138,6 +150,75 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiInitApp();
 
   bool crateApiDataIsUnlocked();
+
+  Future<List<String>> crateApiKeysKeysExport({
+    String? home,
+    required String out,
+    required String exportPassword,
+    required List<String> only,
+    required bool confirmCombined,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
+
+  Future<RevealHandle> crateApiKeysKeysInit({
+    String? home,
+    required String password,
+  });
+
+  Future<RevealHandle?> crateApiKeysKeysRecover({
+    String? home,
+    required String newPassword,
+    required bool printWords,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
+
+  Future<RevealHandle> crateApiKeysKeysReissueShards({
+    String? home,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
+
+  Future<void> crateApiKeysKeysRekey({
+    String? home,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
+
+  Future<void> crateApiKeysKeysRevealDismiss({required PlatformInt64 id});
+
+  Future<String> crateApiKeysKeysRevealShard({
+    required PlatformInt64 id,
+    required PlatformInt64 index,
+  });
+
+  Future<String> crateApiKeysKeysRevealWord({
+    required PlatformInt64 id,
+    required PlatformInt64 index,
+  });
+
+  Future<PlatformInt64> crateApiKeysKeysRotate({
+    String? home,
+    required String password,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  });
 
   Future<KeysStatus> crateApiKeysKeysStatus({String? home});
 
@@ -472,6 +553,124 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<String?> crateApiHelpHelpResolveHref({
+    required String from,
+    required String href,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(from, serializer);
+          sse_encode_String(href, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiHelpHelpResolveHrefConstMeta,
+        argValues: [from, href],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHelpHelpResolveHrefConstMeta =>
+      const TaskConstMeta(
+        debugName: "help_resolve_href",
+        argNames: ["from", "href"],
+      );
+
+  @override
+  Future<List<HelpTopicInfo>> crateApiHelpHelpSearch({required String query}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(query, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_help_topic_info,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiHelpHelpSearchConstMeta,
+        argValues: [query],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHelpHelpSearchConstMeta =>
+      const TaskConstMeta(debugName: "help_search", argNames: ["query"]);
+
+  @override
+  Future<HelpTopic> crateApiHelpHelpTopic({required String id}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 11,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_help_topic,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiHelpHelpTopicConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHelpHelpTopicConstMeta =>
+      const TaskConstMeta(debugName: "help_topic", argNames: ["id"]);
+
+  @override
+  Future<List<HelpTopicInfo>> crateApiHelpHelpTopics() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 12,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_help_topic_info,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiHelpHelpTopicsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHelpHelpTopicsConstMeta =>
+      const TaskConstMeta(debugName: "help_topics", argNames: []);
+
+  @override
   Future<IngestOutcome> crateApiIoIngestPath({
     required String path,
     String? source,
@@ -485,7 +684,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 13,
             port: port_,
           );
         },
@@ -511,7 +710,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_opt_box_autoadd_ingest_progress_snap,
@@ -536,7 +735,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 15,
             port: port_,
           );
         },
@@ -560,7 +759,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_bool,
@@ -577,6 +776,432 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "is_unlocked", argNames: []);
 
   @override
+  Future<List<String>> crateApiKeysKeysExport({
+    String? home,
+    required String out,
+    required String exportPassword,
+    required List<String> only,
+    required bool confirmCombined,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(out, serializer);
+          sse_encode_String(exportPassword, serializer);
+          sse_encode_list_String(only, serializer);
+          sse_encode_bool(confirmCombined, serializer);
+          sse_encode_opt_String(words, serializer);
+          sse_encode_list_String(shards, serializer);
+          sse_encode_opt_String(wordsFile, serializer);
+          sse_encode_opt_String(masterFile, serializer);
+          sse_encode_opt_String(filePassword, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiKeysKeysExportConstMeta,
+        argValues: [
+          home,
+          out,
+          exportPassword,
+          only,
+          confirmCombined,
+          words,
+          shards,
+          wordsFile,
+          masterFile,
+          filePassword,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKeysKeysExportConstMeta => const TaskConstMeta(
+    debugName: "keys_export",
+    argNames: [
+      "home",
+      "out",
+      "exportPassword",
+      "only",
+      "confirmCombined",
+      "words",
+      "shards",
+      "wordsFile",
+      "masterFile",
+      "filePassword",
+    ],
+  );
+
+  @override
+  Future<RevealHandle> crateApiKeysKeysInit({
+    String? home,
+    required String password,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(password, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 18,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_reveal_handle,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiKeysKeysInitConstMeta,
+        argValues: [home, password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKeysKeysInitConstMeta => const TaskConstMeta(
+    debugName: "keys_init",
+    argNames: ["home", "password"],
+  );
+
+  @override
+  Future<RevealHandle?> crateApiKeysKeysRecover({
+    String? home,
+    required String newPassword,
+    required bool printWords,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(newPassword, serializer);
+          sse_encode_bool(printWords, serializer);
+          sse_encode_opt_String(words, serializer);
+          sse_encode_list_String(shards, serializer);
+          sse_encode_opt_String(wordsFile, serializer);
+          sse_encode_opt_String(masterFile, serializer);
+          sse_encode_opt_String(filePassword, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 19,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_reveal_handle,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiKeysKeysRecoverConstMeta,
+        argValues: [
+          home,
+          newPassword,
+          printWords,
+          words,
+          shards,
+          wordsFile,
+          masterFile,
+          filePassword,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKeysKeysRecoverConstMeta => const TaskConstMeta(
+    debugName: "keys_recover",
+    argNames: [
+      "home",
+      "newPassword",
+      "printWords",
+      "words",
+      "shards",
+      "wordsFile",
+      "masterFile",
+      "filePassword",
+    ],
+  );
+
+  @override
+  Future<RevealHandle> crateApiKeysKeysReissueShards({
+    String? home,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_opt_String(words, serializer);
+          sse_encode_list_String(shards, serializer);
+          sse_encode_opt_String(wordsFile, serializer);
+          sse_encode_opt_String(masterFile, serializer);
+          sse_encode_opt_String(filePassword, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 20,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_reveal_handle,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiKeysKeysReissueShardsConstMeta,
+        argValues: [home, words, shards, wordsFile, masterFile, filePassword],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKeysKeysReissueShardsConstMeta =>
+      const TaskConstMeta(
+        debugName: "keys_reissue_shards",
+        argNames: [
+          "home",
+          "words",
+          "shards",
+          "wordsFile",
+          "masterFile",
+          "filePassword",
+        ],
+      );
+
+  @override
+  Future<void> crateApiKeysKeysRekey({
+    String? home,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_opt_String(words, serializer);
+          sse_encode_list_String(shards, serializer);
+          sse_encode_opt_String(wordsFile, serializer);
+          sse_encode_opt_String(masterFile, serializer);
+          sse_encode_opt_String(filePassword, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiKeysKeysRekeyConstMeta,
+        argValues: [home, words, shards, wordsFile, masterFile, filePassword],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKeysKeysRekeyConstMeta => const TaskConstMeta(
+    debugName: "keys_rekey",
+    argNames: [
+      "home",
+      "words",
+      "shards",
+      "wordsFile",
+      "masterFile",
+      "filePassword",
+    ],
+  );
+
+  @override
+  Future<void> crateApiKeysKeysRevealDismiss({required PlatformInt64 id}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_i_64(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 22,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiKeysKeysRevealDismissConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKeysKeysRevealDismissConstMeta =>
+      const TaskConstMeta(debugName: "keys_reveal_dismiss", argNames: ["id"]);
+
+  @override
+  Future<String> crateApiKeysKeysRevealShard({
+    required PlatformInt64 id,
+    required PlatformInt64 index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_i_64(id, serializer);
+          sse_encode_i_64(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 23,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiKeysKeysRevealShardConstMeta,
+        argValues: [id, index],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKeysKeysRevealShardConstMeta =>
+      const TaskConstMeta(
+        debugName: "keys_reveal_shard",
+        argNames: ["id", "index"],
+      );
+
+  @override
+  Future<String> crateApiKeysKeysRevealWord({
+    required PlatformInt64 id,
+    required PlatformInt64 index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_i_64(id, serializer);
+          sse_encode_i_64(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 24,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiKeysKeysRevealWordConstMeta,
+        argValues: [id, index],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKeysKeysRevealWordConstMeta => const TaskConstMeta(
+    debugName: "keys_reveal_word",
+    argNames: ["id", "index"],
+  );
+
+  @override
+  Future<PlatformInt64> crateApiKeysKeysRotate({
+    String? home,
+    required String password,
+    String? words,
+    required List<String> shards,
+    String? wordsFile,
+    String? masterFile,
+    String? filePassword,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(home, serializer);
+          sse_encode_String(password, serializer);
+          sse_encode_opt_String(words, serializer);
+          sse_encode_list_String(shards, serializer);
+          sse_encode_opt_String(wordsFile, serializer);
+          sse_encode_opt_String(masterFile, serializer);
+          sse_encode_opt_String(filePassword, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_i_64,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiKeysKeysRotateConstMeta,
+        argValues: [
+          home,
+          password,
+          words,
+          shards,
+          wordsFile,
+          masterFile,
+          filePassword,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKeysKeysRotateConstMeta => const TaskConstMeta(
+    debugName: "keys_rotate",
+    argNames: [
+      "home",
+      "password",
+      "words",
+      "shards",
+      "wordsFile",
+      "masterFile",
+      "filePassword",
+    ],
+  );
+
+  @override
   Future<KeysStatus> crateApiKeysKeysStatus({String? home}) {
     return handler.executeNormal(
       NormalTask(
@@ -586,7 +1211,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 26,
             port: port_,
           );
         },
@@ -614,7 +1239,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 27,
             port: port_,
           );
         },
@@ -648,7 +1273,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 28,
             port: port_,
           );
         },
@@ -674,7 +1299,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -700,7 +1325,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 30,
             port: port_,
           );
         },
@@ -727,7 +1352,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 31,
             port: port_,
           );
         },
@@ -754,7 +1379,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 32,
             port: port_,
           );
         },
@@ -784,7 +1409,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 33,
             port: port_,
           );
         },
@@ -826,7 +1451,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 34,
             port: port_,
           );
         },
@@ -864,7 +1489,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 35,
             port: port_,
           );
         },
@@ -894,7 +1519,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 36,
             port: port_,
           );
         },
@@ -926,7 +1551,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 37,
             port: port_,
           );
         },
@@ -955,7 +1580,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 38,
             port: port_,
           );
         },
@@ -987,7 +1612,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1023,7 +1648,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1053,7 +1678,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1082,7 +1707,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1116,7 +1741,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1143,7 +1768,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 44)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1226,6 +1851,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RevealHandle dco_decode_box_autoadd_reveal_handle(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_reveal_handle(raw);
+  }
+
+  @protected
   ThemeData dco_decode_box_autoadd_theme_data(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_theme_data(raw);
@@ -1281,6 +1912,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   double dco_decode_f_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as double;
+  }
+
+  @protected
+  HelpTopic dco_decode_help_topic(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return HelpTopic(
+      id: dco_decode_String(arr[0]),
+      title: dco_decode_String(arr[1]),
+      body: dco_decode_String(arr[2]),
+    );
+  }
+
+  @protected
+  HelpTopicInfo dco_decode_help_topic_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return HelpTopicInfo(
+      id: dco_decode_String(arr[0]),
+      title: dco_decode_String(arr[1]),
+    );
   }
 
   @protected
@@ -1365,6 +2021,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<DatasetSummary> dco_decode_list_dataset_summary(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_dataset_summary).toList();
+  }
+
+  @protected
+  List<HelpTopicInfo> dco_decode_list_help_topic_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_help_topic_info).toList();
   }
 
   @protected
@@ -1526,6 +2188,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return raw == null
         ? null
         : dco_decode_box_autoadd_ingest_progress_snap(raw);
+  }
+
+  @protected
+  RevealHandle? dco_decode_opt_box_autoadd_reveal_handle(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_reveal_handle(raw);
   }
 
   @protected
@@ -1706,6 +2374,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RevealHandle dco_decode_reveal_handle(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return RevealHandle(
+      id: dco_decode_i_64(arr[0]),
+      dbId: dco_decode_String(arr[1]),
+      wordCount: dco_decode_i_64(arr[2]),
+      shardCount: dco_decode_i_64(arr[3]),
+      migratedPlainDb: dco_decode_bool(arr[4]),
+    );
+  }
+
+  @protected
   SavedState dco_decode_saved_state(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1869,6 +2552,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RevealHandle sse_decode_box_autoadd_reveal_handle(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_reveal_handle(deserializer));
+  }
+
+  @protected
   ThemeData sse_decode_box_autoadd_theme_data(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_theme_data(deserializer));
@@ -1927,6 +2618,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   double sse_decode_f_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getFloat64();
+  }
+
+  @protected
+  HelpTopic sse_decode_help_topic(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_body = sse_decode_String(deserializer);
+    return HelpTopic(id: var_id, title: var_title, body: var_body);
+  }
+
+  @protected
+  HelpTopicInfo sse_decode_help_topic_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    return HelpTopicInfo(id: var_id, title: var_title);
   }
 
   @protected
@@ -2036,6 +2744,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <DatasetSummary>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_dataset_summary(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HelpTopicInfo> sse_decode_list_help_topic_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HelpTopicInfo>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_help_topic_info(deserializer));
     }
     return ans_;
   }
@@ -2325,6 +3047,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RevealHandle? sse_decode_opt_box_autoadd_reveal_handle(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_reveal_handle(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   ThemeData? sse_decode_opt_box_autoadd_theme_data(
     SseDeserializer deserializer,
   ) {
@@ -2527,6 +3262,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RevealHandle sse_decode_reveal_handle(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_i_64(deserializer);
+    var var_dbId = sse_decode_String(deserializer);
+    var var_wordCount = sse_decode_i_64(deserializer);
+    var var_shardCount = sse_decode_i_64(deserializer);
+    var var_migratedPlainDb = sse_decode_bool(deserializer);
+    return RevealHandle(
+      id: var_id,
+      dbId: var_dbId,
+      wordCount: var_wordCount,
+      shardCount: var_shardCount,
+      migratedPlainDb: var_migratedPlainDb,
+    );
+  }
+
+  @protected
   SavedState sse_decode_saved_state(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_theme = sse_decode_String(deserializer);
@@ -2671,6 +3423,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_reveal_handle(
+    RevealHandle self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_reveal_handle(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_theme_data(
     ThemeData self,
     SseSerializer serializer,
@@ -2717,6 +3478,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_f_64(double self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putFloat64(self);
+  }
+
+  @protected
+  void sse_encode_help_topic(HelpTopic self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.body, serializer);
+  }
+
+  @protected
+  void sse_encode_help_topic_info(
+    HelpTopicInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.title, serializer);
   }
 
   @protected
@@ -2801,6 +3580,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_dataset_summary(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_help_topic_info(
+    List<HelpTopicInfo> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_help_topic_info(item, serializer);
     }
   }
 
@@ -3044,6 +3835,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_reveal_handle(
+    RevealHandle? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_reveal_handle(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_theme_data(
     ThemeData? self,
     SseSerializer serializer,
@@ -3182,6 +3986,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.name, serializer);
     sse_encode_String(self.description, serializer);
     sse_encode_i_64(self.updatedAt, serializer);
+  }
+
+  @protected
+  void sse_encode_reveal_handle(RevealHandle self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self.id, serializer);
+    sse_encode_String(self.dbId, serializer);
+    sse_encode_i_64(self.wordCount, serializer);
+    sse_encode_i_64(self.shardCount, serializer);
+    sse_encode_bool(self.migratedPlainDb, serializer);
   }
 
   @protected

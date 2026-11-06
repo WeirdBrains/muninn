@@ -7,12 +7,132 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `keys_status_of`
+// These functions are ignored because they are not marked as `pub`: `expire`, `keys_status_of`, `master_from`, `put_reveal`, `reveals`, `split_words`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Reveal`
 
 /// `mnnn keys status`. Reads the envelope and service-key files; does not unlock the store
 /// and does not create a data directory.
 Future<KeysStatus> keysStatus({String? home}) =>
     RustLib.instance.api.crateApiKeysKeysStatus(home: home);
+
+/// `mnnn keys init`. Secrets stay in a reveal session; only counts and the database id cross immediately.
+Future<RevealHandle> keysInit({String? home, required String password}) =>
+    RustLib.instance.api.crateApiKeysKeysInit(home: home, password: password);
+
+/// One recovery word (1-based). Empty if the session has no words (shards-only).
+Future<String> keysRevealWord({
+  required PlatformInt64 id,
+  required PlatformInt64 index,
+}) => RustLib.instance.api.crateApiKeysKeysRevealWord(id: id, index: index);
+
+/// One dark shard (1-based).
+Future<String> keysRevealShard({
+  required PlatformInt64 id,
+  required PlatformInt64 index,
+}) => RustLib.instance.api.crateApiKeysKeysRevealShard(id: id, index: index);
+
+/// Forget a reveal session (the TUI Reveal/Hide hide path). Safe to call twice.
+Future<void> keysRevealDismiss({required PlatformInt64 id}) =>
+    RustLib.instance.api.crateApiKeysKeysRevealDismiss(id: id);
+
+/// `mnnn keys rotate`. Returns the new service-key version. No key material is returned.
+Future<PlatformInt64> keysRotate({
+  String? home,
+  required String password,
+  String? words,
+  required List<String> shards,
+  String? wordsFile,
+  String? masterFile,
+  String? filePassword,
+}) => RustLib.instance.api.crateApiKeysKeysRotate(
+  home: home,
+  password: password,
+  words: words,
+  shards: shards,
+  wordsFile: wordsFile,
+  masterFile: masterFile,
+  filePassword: filePassword,
+);
+
+/// `mnnn keys rekey`. Locks any open session first (the TUI refuses to rekey while open).
+Future<void> keysRekey({
+  String? home,
+  String? words,
+  required List<String> shards,
+  String? wordsFile,
+  String? masterFile,
+  String? filePassword,
+}) => RustLib.instance.api.crateApiKeysKeysRekey(
+  home: home,
+  words: words,
+  shards: shards,
+  wordsFile: wordsFile,
+  masterFile: masterFile,
+  filePassword: filePassword,
+);
+
+/// `mnnn keys export`. Writes age-encrypted files and returns their paths. No secrets come back.
+Future<List<String>> keysExport({
+  String? home,
+  required String out,
+  required String exportPassword,
+  required List<String> only,
+  required bool confirmCombined,
+  String? words,
+  required List<String> shards,
+  String? wordsFile,
+  String? masterFile,
+  String? filePassword,
+}) => RustLib.instance.api.crateApiKeysKeysExport(
+  home: home,
+  out: out,
+  exportPassword: exportPassword,
+  only: only,
+  confirmCombined: confirmCombined,
+  words: words,
+  shards: shards,
+  wordsFile: wordsFile,
+  masterFile: masterFile,
+  filePassword: filePassword,
+);
+
+/// `mnnn keys recover`. Re-wraps the service key with a new password. Optionally opens a words reveal (`--print-words`).
+Future<RevealHandle?> keysRecover({
+  String? home,
+  required String newPassword,
+  required bool printWords,
+  String? words,
+  required List<String> shards,
+  String? wordsFile,
+  String? masterFile,
+  String? filePassword,
+}) => RustLib.instance.api.crateApiKeysKeysRecover(
+  home: home,
+  newPassword: newPassword,
+  printWords: printWords,
+  words: words,
+  shards: shards,
+  wordsFile: wordsFile,
+  masterFile: masterFile,
+  filePassword: filePassword,
+);
+
+/// `mnnn keys shards` without `--out`: new shards in a reveal session. Old shards cannot be mixed in.
+Future<RevealHandle> keysReissueShards({
+  String? home,
+  String? words,
+  required List<String> shards,
+  String? wordsFile,
+  String? masterFile,
+  String? filePassword,
+}) => RustLib.instance.api.crateApiKeysKeysReissueShards(
+  home: home,
+  words: words,
+  shards: shards,
+  wordsFile: wordsFile,
+  masterFile: masterFile,
+  filePassword: filePassword,
+);
 
 /// What `mnnn keys status` prints. No secrets.
 class KeysStatus {
@@ -48,6 +168,43 @@ class KeysStatus {
           database == other.database &&
           serviceVersion == other.serviceVersion &&
           services == other.services;
+}
+
+/// A one-time reveal of recovery words and/or shards. The secrets stay in Rust;
+/// Dart fetches one line at a time and must call [`keys_reveal_dismiss`] afterwards.
+class RevealHandle {
+  final PlatformInt64 id;
+  final String dbId;
+  final PlatformInt64 wordCount;
+  final PlatformInt64 shardCount;
+  final bool migratedPlainDb;
+
+  const RevealHandle({
+    required this.id,
+    required this.dbId,
+    required this.wordCount,
+    required this.shardCount,
+    required this.migratedPlainDb,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      dbId.hashCode ^
+      wordCount.hashCode ^
+      shardCount.hashCode ^
+      migratedPlainDb.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RevealHandle &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          dbId == other.dbId &&
+          wordCount == other.wordCount &&
+          shardCount == other.shardCount &&
+          migratedPlainDb == other.migratedPlainDb;
 }
 
 /// One on-disk service key file: version and whether it has been retired. No wrapped key.

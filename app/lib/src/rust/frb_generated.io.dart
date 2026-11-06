@@ -5,6 +5,7 @@
 
 import 'api/about.dart';
 import 'api/data.dart';
+import 'api/help.dart';
 import 'api/info.dart';
 import 'api/io.dart';
 import 'api/keys.dart';
@@ -52,6 +53,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   IngestProgressSnap dco_decode_box_autoadd_ingest_progress_snap(dynamic raw);
 
   @protected
+  RevealHandle dco_decode_box_autoadd_reveal_handle(dynamic raw);
+
+  @protected
   ThemeData dco_decode_box_autoadd_theme_data(dynamic raw);
 
   @protected
@@ -65,6 +69,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   double dco_decode_f_64(dynamic raw);
+
+  @protected
+  HelpTopic dco_decode_help_topic(dynamic raw);
+
+  @protected
+  HelpTopicInfo dco_decode_help_topic_info(dynamic raw);
 
   @protected
   PlatformInt64 dco_decode_i_64(dynamic raw);
@@ -89,6 +99,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<DatasetSummary> dco_decode_list_dataset_summary(dynamic raw);
+
+  @protected
+  List<HelpTopicInfo> dco_decode_list_help_topic_info(dynamic raw);
 
   @protected
   List<IngestFileReport> dco_decode_list_ingest_file_report(dynamic raw);
@@ -153,6 +166,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RevealHandle? dco_decode_opt_box_autoadd_reveal_handle(dynamic raw);
+
+  @protected
   ThemeData? dco_decode_opt_box_autoadd_theme_data(dynamic raw);
 
   @protected
@@ -187,6 +203,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProjectSummary dco_decode_project_summary(dynamic raw);
+
+  @protected
+  RevealHandle dco_decode_reveal_handle(dynamic raw);
 
   @protected
   SavedState dco_decode_saved_state(dynamic raw);
@@ -236,6 +255,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RevealHandle sse_decode_box_autoadd_reveal_handle(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ThemeData sse_decode_box_autoadd_theme_data(SseDeserializer deserializer);
 
   @protected
@@ -249,6 +273,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   double sse_decode_f_64(SseDeserializer deserializer);
+
+  @protected
+  HelpTopic sse_decode_help_topic(SseDeserializer deserializer);
+
+  @protected
+  HelpTopicInfo sse_decode_help_topic_info(SseDeserializer deserializer);
 
   @protected
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
@@ -275,6 +305,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<DatasetSummary> sse_decode_list_dataset_summary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HelpTopicInfo> sse_decode_list_help_topic_info(
     SseDeserializer deserializer,
   );
 
@@ -355,6 +390,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RevealHandle? sse_decode_opt_box_autoadd_reveal_handle(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ThemeData? sse_decode_opt_box_autoadd_theme_data(
     SseDeserializer deserializer,
   );
@@ -391,6 +431,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProjectSummary sse_decode_project_summary(SseDeserializer deserializer);
+
+  @protected
+  RevealHandle sse_decode_reveal_handle(SseDeserializer deserializer);
 
   @protected
   SavedState sse_decode_saved_state(SseDeserializer deserializer);
@@ -450,6 +493,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_reveal_handle(
+    RevealHandle self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_theme_data(
     ThemeData self,
     SseSerializer serializer,
@@ -469,6 +518,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_f_64(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_help_topic(HelpTopic self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_help_topic_info(HelpTopicInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
@@ -500,6 +555,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_dataset_summary(
     List<DatasetSummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_help_topic_info(
+    List<HelpTopicInfo> self,
     SseSerializer serializer,
   );
 
@@ -609,6 +670,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_reveal_handle(
+    RevealHandle? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_theme_data(
     ThemeData? self,
     SseSerializer serializer,
@@ -655,6 +722,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     ProjectSummary self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_reveal_handle(RevealHandle self, SseSerializer serializer);
 
   @protected
   void sse_encode_saved_state(SavedState self, SseSerializer serializer);
