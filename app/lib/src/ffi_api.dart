@@ -179,6 +179,85 @@ class FfiMuninnApi implements MuninnApi {
   ];
 
   @override
+  Future<List<SourceInfo>> listSources() async => [
+    for (final s in await r_data.listSources())
+      SourceInfo(
+        id: s.id,
+        name: s.name,
+        kind: s.kind,
+        locator: s.locator,
+        createdAt: s.createdAt.toInt(),
+        items: s.items.toInt(),
+        bytes: s.bytes.toInt(),
+      ),
+  ];
+
+  @override
+  Future<SourceInfo> addSource(
+    String name, {
+    String kind = 'file',
+    String? locator,
+  }) async {
+    final s = await r_data.addSource(name: name, kind: kind, locator: locator);
+    return SourceInfo(
+      id: s.id,
+      name: s.name,
+      kind: s.kind,
+      locator: s.locator,
+      createdAt: s.createdAt.toInt(),
+      items: s.items.toInt(),
+      bytes: s.bytes.toInt(),
+    );
+  }
+
+  @override
+  Future<int> renameSource(String from, String to) async =>
+      (await r_data.renameSource(from: from, to: to)).toInt();
+
+  @override
+  Future<int> removeSource(String name) async =>
+      (await r_data.removeSource(name: name)).toInt();
+
+  @override
+  Future<List<SourceDataItem>> listSourceData(String name) async => [
+    for (final i in await r_data.listSourceData(name: name))
+      SourceDataItem(
+        id: i.id,
+        name: i.name,
+        format: i.format,
+        locator: i.locator,
+        size: i.size.toInt(),
+        contentHash: i.contentHash,
+        receivedAt: i.receivedAt.toInt(),
+      ),
+  ];
+
+  @override
+  Future<int> exportSourceData(String name, String item, String path) async =>
+      (await r_data.exportSourceData(name: name, item: item, path: path)).toInt();
+
+  @override
+  Future<List<SymbolInfo>> listSymbols() async => [
+    for (final s in await r_data.listSymbols())
+      SymbolInfo(symbol: s.symbol, base: s.base, quote: s.quote),
+  ];
+
+  @override
+  Future<List<AliasInfo>> listAliases() async => [
+    for (final a in await r_data.listAliases())
+      AliasInfo(alias: a.alias, canonical: a.canonical),
+  ];
+
+  @override
+  Future<SymbolInfo> addSymbol(
+    String symbol, {
+    List<String> aliases = const [],
+  }) async {
+    final s = await r_data.addSymbol(symbol: symbol, aliases: aliases);
+    return SymbolInfo(symbol: s.symbol, base: s.base, quote: s.quote);
+  }
+
+  @override
   Future<IngestResult> ingestPath(String path, {String? source}) async {
     final o = await r_io.ingestPath(path: path, source: source);
     return IngestResult(

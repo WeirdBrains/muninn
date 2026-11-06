@@ -107,6 +107,54 @@ class BarPoint {
   final double open, high, low, close, volume;
 }
 
+
+/// An ingest source (`mnnn sources list` / TUI Data ▸ Sources…).
+class SourceInfo {
+  const SourceInfo({
+    required this.id,
+    required this.name,
+    required this.kind,
+    this.locator,
+    this.createdAt = 0,
+    this.items = 0,
+    this.bytes = 0,
+  });
+  final String id, name, kind;
+  final String? locator;
+  final int createdAt, items, bytes;
+}
+
+/// One stored item under a source (`mnnn sources data`), without its bytes.
+class SourceDataItem {
+  const SourceDataItem({
+    required this.id,
+    required this.name,
+    this.format = '',
+    this.locator = '',
+    this.size = 0,
+    this.contentHash = '',
+    this.receivedAt = 0,
+  });
+  final String id, name, format, locator, contentHash;
+  final int size, receivedAt;
+}
+
+/// A known pair (`mnnn symbols list` / TUI Data ▸ Symbols…).
+class SymbolInfo {
+  const SymbolInfo({
+    required this.symbol,
+    required this.base,
+    required this.quote,
+  });
+  final String symbol, base, quote;
+}
+
+/// `alias A -> C` from `mnnn symbols list`.
+class AliasInfo {
+  const AliasInfo({required this.alias, required this.canonical});
+  final String alias, canonical;
+}
+
 /// Any item saved in a project (`mnnn project show`).
 class ProjectItemInfo {
   const ProjectItemInfo({
@@ -626,6 +674,34 @@ abstract class MuninnApi {
     TimeRange range, {
     int maxPoints = 600,
   });
+
+
+  /// `mnnn sources list`. The store is opened read-only.
+  Future<List<SourceInfo>> listSources();
+
+  /// `mnnn sources add`. [kind] defaults to `file` when empty.
+  Future<SourceInfo> addSource(String name, {String kind = 'file', String? locator});
+
+  /// `mnnn sources rename`. Returns how many bar ids were recomputed.
+  Future<int> renameSource(String from, String to);
+
+  /// `mnnn sources remove`. Deletes the source, its bars and its stored items.
+  Future<int> removeSource(String name);
+
+  /// `mnnn sources data NAME`. Metadata only; bytes stay in Rust.
+  Future<List<SourceDataItem>> listSourceData(String name);
+
+  /// `mnnn sources cat NAME ITEM` written to [path]. The blob never enters Dart.
+  Future<int> exportSourceData(String name, String item, String path);
+
+  /// `mnnn symbols list` (the pairs).
+  Future<List<SymbolInfo>> listSymbols();
+
+  /// `alias A -> C` lines from `mnnn symbols list`.
+  Future<List<AliasInfo>> listAliases();
+
+  /// `mnnn symbols add`. [aliases] apply to the base asset.
+  Future<SymbolInfo> addSymbol(String symbol, {List<String> aliases = const []});
 
   /// Store each data file at [path] (file or folder) byte for byte. Opens the store for writes.
   Future<IngestResult> ingestPath(String path, {String? source});

@@ -199,6 +199,30 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
     }
 
     if (_chartShowing) {
+      if (ch == '{' ||
+          key == LogicalKeyboardKey.braceLeft ||
+          (key == LogicalKeyboardKey.bracketLeft && shift)) {
+        _pickChartPeriod(context, start: true, typed: true);
+        return KeyEventResult.handled;
+      }
+      if (ch == '}' ||
+          key == LogicalKeyboardKey.braceRight ||
+          (key == LogicalKeyboardKey.bracketRight && shift)) {
+        _pickChartPeriod(context, start: false, typed: true);
+        return KeyEventResult.handled;
+      }
+      if (ch == '[' || key == LogicalKeyboardKey.bracketLeft) {
+        _pickChartPeriod(context, start: true, typed: false);
+        return KeyEventResult.handled;
+      }
+      if (ch == ']' || key == LogicalKeyboardKey.bracketRight) {
+        _pickChartPeriod(context, start: false, typed: false);
+        return KeyEventResult.handled;
+      }
+      if (ch == '@' || key == LogicalKeyboardKey.at) {
+        _jumpChartDate(context);
+        return KeyEventResult.handled;
+      }
       if (ch == 'M' || (key == LogicalKeyboardKey.keyM && shift)) {
         showMovingAveragesDialog(context, ref);
         return KeyEventResult.handled;
@@ -305,6 +329,41 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
       return true;
     }
     return false;
+  }
+
+  Future<void> _pickChartPeriod(
+    BuildContext context, {
+    required bool start,
+    required bool typed,
+  }) async {
+    final bars = ref.read(barsProvider).value;
+    if (bars == null || bars.isEmpty) return;
+    final ts = typed
+        ? await showUtcDatePrompt(
+            context,
+            title: start
+                ? 'Period start (YYYY-MM-DD [HH:MM])'
+                : 'Period end (YYYY-MM-DD [HH:MM])',
+          )
+        : await pickUtcMs(context, null);
+    if (ts == null || !context.mounted) return;
+    final i = nearestBarIndex(bars, ts);
+    final v = ref.read(chartViewportProvider);
+    ref.read(chartViewportProvider.notifier).state =
+        start ? v.periodStart(i, bars.length) : v.periodEnd(i, bars.length);
+  }
+
+  Future<void> _jumpChartDate(BuildContext context) async {
+    final bars = ref.read(barsProvider).value;
+    if (bars == null || bars.isEmpty) return;
+    final ts = await showUtcDatePrompt(
+      context,
+      title: 'Jump to date (YYYY-MM-DD [HH:MM])',
+    );
+    if (ts == null || !context.mounted) return;
+    final i = nearestBarIndex(bars, ts);
+    final v = ref.read(chartViewportProvider);
+    ref.read(chartViewportProvider.notifier).state = v.jumpTo(i, bars.length);
   }
 
   void _zoom(double factor) {

@@ -31,8 +31,8 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
-  Live searches… / Journals… / Reports… / Import archive… and Net ▸ Status / Start / Stop / Invite or connect / Peers / Relays / Shared, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site and Keys ▸ Status… plus Initialize, Rotate,
-  Rekey, Export, Recover and Re-issue shards. Help ▸ Topics / Search / Keybindings open the
+  Live searches… / Journals… / Reports… / Import archive… and Net ▸ Status / Start / Stop / Invite or connect / Peers / Relays / Shared, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
+  Rekey, Export, Recover and Re-issue shards, and Data ▸ Sources… / Symbols…. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
   (see [Keybindings](#keybindings) below).
@@ -48,11 +48,20 @@ Users never need Rust: release builds ship the compiled library.
   Keys status does not unlock the store (same as `mnnn keys status`).
   **File ▸ Import…**, **Export…** and project writes (create, rename, describe, delete,
   attach or detach a series, journals, live searches, reports, import/export archives)
+  and Data ▸ Sources… / Symbols… writes (add, rename, remove, add symbol)
   open it for writes after the same unlock.
 - **Home:** where the data lives, and the projects and datasets in it.
 - **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range;
   pick one to see it as a chart (candles when they fit, else a close line, volume
-  underneath) or a list of bars, newest first. Switch with the Chart / List buttons or
+  underneath) or a list of bars, newest first. **Data ▸ Sources…** lists ingest
+  sources (`mnnn sources list`) with kind, locator and stored-item totals; you can
+  add, rename or remove a source (remove asks the same confirmation as the CLI and
+  deletes its bars and stored items) and inspect stored items (`mnnn sources data`),
+  saving one to a file (`mnnn sources cat`) without the bytes entering Dart.
+  **Data ▸ Symbols…** lists known pairs and aliases (`mnnn symbols list`) and can
+  add a pair with optional base aliases (`mnnn symbols add`). The TUI Sources /
+  Symbols windows are read-only lists; writes match the CLI. These are not the
+  sidebar Source / Symbol *filters*. Switch with the Chart / List buttons or
   **View ▸ Change view** (`Ctrl-w t`, the same chord as the TUI). Rust downsamples to at most 600
   buckets (open = first, close = last, high/low = extremes, volume = sum), so long
   ranges stay fast. Desktop shows the list and the chart side by side; on a phone the
@@ -209,6 +218,9 @@ When the Data chart is showing:
 | `+` / `-` | zoom in / out around the centre (inside the loaded bars, same as pinch) |
 | `h` `l`, PgUp PgDn | pan a quarter / a full screen |
 | Home / End, `0` | first bars / latest |
+| `[` / `]` | calendar pick for the visible window's start / end (among loaded bars) |
+| `{` / `}` | type a date (`YYYY-MM-DD [HH:MM]`) for the visible window's start / end |
+| `@` | jump the visible window to a typed date (a no-op when the chart is not zoomed) |
 
 ### Projects
 
@@ -227,7 +239,7 @@ When the Data chart is showing:
 - **Tab** / **Alt-1…9** tile focus: there are no tiles.
 - Chart layer keys **`e` `m` `w` `g` `z`** match the TUI (envelope, moving averages, wick, gap, zero-volume). The averages use the loaded bars (including those off-screen when zoomed) the same way the TUI uses warmup history; they do not fetch extra bars beyond `queryBars`.
 - **← →** move the TUI chart crosshair; the app moves it by hover or touch.
-- **`[` `]` `{` `}` `@`** period start/end on a chart tile stay in the TUI (the app uses the global `T` picker).
+- **`[` `]` `{` `}` `@`** set the chart's visible window among already-loaded bars (the same start/end/jump idea as a TUI chart tile). They do not change the global `T` time-range filter, and they do not invent a separate bucket or query. `{` `}` `@` type a date; `[` `]` open the same calendar+time pickers the time-range dialog uses. At scale 1 (every loaded bar visible) `@` has nothing to pan.
 - Keys for windows the app does not have yet (`F` live searches, `J` journals, `E` pipelines, `A` authors, `Y` history, and so on) are left unbound — they are not remapped to something else.
 - In the TUI, `X` stops a node when the network window is focused; the app has no start/stop and `X` stays "clear the time range".
 - **`a`** toggles the area layer when the Data chart is showing (chart tile). Adding a series to a project is **Add current dataset** on the Projects page (the TUI's sidebar-focused `a`).
@@ -245,7 +257,7 @@ comes in a later phase (see [sync](sync.md)).
 
 - `crates/muninn-core`: all of Muninn (the library `mnnn` is built on).
 - `crates/muninn-ffi`: the small API the app calls (version, about, data dir, themes,
-  projects and datasets, downsampled bars, ingest and bar export, net status and peers, org list and writes, keys status and writes, help topics), exposed with
+  projects and datasets, downsampled bars, ingest and bar export, sources and symbols, net status and peers, org list and writes, keys status and writes, help topics), exposed with
   flutter_rust_bridge 2.
 - `app/lib/src/rust/`: generated Dart bindings. Regenerate after changing the API:
   `cd app && flutter_rust_bridge_codegen generate`.

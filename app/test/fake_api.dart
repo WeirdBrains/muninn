@@ -733,6 +733,147 @@ class FakeApi implements MuninnApi {
     ];
   }
 
+  List<SourceInfo> sources = [
+    const SourceInfo(id: 's-cb', name: 'coinbase', kind: 'csv', createdAt: 1),
+    const SourceInfo(id: 's-bn', name: 'binance', kind: 'csv', createdAt: 2),
+  ];
+  final sourceData = <String, List<SourceDataItem>>{};
+  List<SymbolInfo> symbols = [
+    const SymbolInfo(symbol: 'BTC/USD', base: 'BTC', quote: 'USD'),
+    const SymbolInfo(symbol: 'ETH/USDT', base: 'ETH', quote: 'USDT'),
+  ];
+  List<AliasInfo> aliases = [];
+  int _nextSource = 3;
+  final catalogCalls = <String>[];
+
+  @override
+  Future<List<SourceInfo>> listSources() async => List<SourceInfo>.from(sources);
+
+  @override
+  Future<SourceInfo> addSource(
+    String name, {
+    String kind = 'file',
+    String? locator,
+  }) async {
+    catalogCalls.add('addSource $name $kind ${locator ?? ''}');
+    if (name.trim().isEmpty || name.contains('|')) {
+      throw 'source name `$name` (must be non-empty, no `|`)';
+    }
+    if (sources.any((s) => s.name == name)) {
+      throw 'source name `$name` already exists';
+    }
+    final k = kind.trim().isEmpty ? 'file' : kind.trim();
+    final s = SourceInfo(
+      id: 's-$_nextSource',
+      name: name.trim(),
+      kind: k,
+      locator: locator,
+      createdAt: _nextSource,
+    );
+    _nextSource++;
+    sources = [...sources, s];
+    return s;
+  }
+
+  @override
+  Future<int> renameSource(String from, String to) async {
+    catalogCalls.add('renameSource $from $to');
+    final i = sources.indexWhere((s) => s.name == from);
+    if (i < 0) throw 'source `$from` not found';
+    if (to.trim().isEmpty || to.contains('|')) {
+      throw 'source name `$to`';
+    }
+    if (sources.any((s) => s.name == to)) {
+      throw 'source name `$to` already exists';
+    }
+    final cur = sources[i];
+    sources = [
+      ...sources.sublist(0, i),
+      SourceInfo(
+        id: cur.id,
+        name: to.trim(),
+        kind: cur.kind,
+        locator: cur.locator,
+        createdAt: cur.createdAt,
+        items: cur.items,
+        bytes: cur.bytes,
+      ),
+      ...sources.sublist(i + 1),
+    ];
+    final data = sourceData.remove(from);
+    if (data != null) sourceData[to.trim()] = data;
+    return 0;
+  }
+
+  @override
+  Future<int> removeSource(String name) async {
+    catalogCalls.add('removeSource $name');
+    final i = sources.indexWhere((s) => s.name == name);
+    if (i < 0) throw 'source `$name` not found';
+    sources = [...sources.sublist(0, i), ...sources.sublist(i + 1)];
+    sourceData.remove(name);
+    return 0;
+  }
+
+  @override
+  Future<List<SourceDataItem>> listSourceData(String name) async {
+    if (!sources.any((s) => s.name == name)) throw 'no source `$name`';
+    return List<SourceDataItem>.from(sourceData[name] ?? const []);
+  }
+
+  @override
+  Future<int> exportSourceData(String name, String item, String path) async {
+    catalogCalls.add('exportSourceData $name $item $path');
+    final items = await listSourceData(name);
+    final found = items.where((i) => i.id.startsWith(item)).toList();
+    if (found.isEmpty) throw 'no item `$item` in $name';
+    if (found.length > 1) throw '`$item` matches ${found.length} items';
+    return found.first.size;
+  }
+
+  @override
+  Future<List<SymbolInfo>> listSymbols() async => List<SymbolInfo>.from(symbols);
+
+  @override
+  Future<List<AliasInfo>> listAliases() async => List<AliasInfo>.from(aliases);
+
+  @override
+  Future<SymbolInfo> addSymbol(
+    String symbol, {
+    List<String> aliases = const [],
+  }) async {
+    catalogCalls.add('addSymbol $symbol ${aliases.join(",")}');
+    final t = symbol.trim().toUpperCase();
+    String? base;
+    String? quote;
+    for (final sep in ['/', '-', '_', ':']) {
+      if (t.contains(sep)) {
+        final parts = t.split(sep);
+        if (parts.length == 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+          base = parts[0];
+          quote = parts[1];
+          break;
+        }
+      }
+    }
+    if (base == null || quote == null) {
+      throw 'symbol `$symbol` (expected BASE/QUOTE)';
+    }
+    final info = SymbolInfo(symbol: '$base/$quote', base: base, quote: quote);
+    if (!symbols.any((s) => s.symbol == info.symbol)) {
+      symbols = [...symbols, info];
+    }
+    for (final a in aliases) {
+      final alias = a.trim().toUpperCase();
+      if (alias.isEmpty) continue;
+      this.aliases = [
+        ...this.aliases.where((x) => x.alias != alias),
+        AliasInfo(alias: alias, canonical: info.base),
+      ];
+    }
+    return info;
+  }
+
   final ingests = <({String path, String? source})>[];
   final exports =
       <

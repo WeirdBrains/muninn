@@ -166,4 +166,29 @@ void main() {
     await shiftLetter(t, LogicalKeyboardKey.keyT);
     expect(find.text('Time range'), findsWidgets);
   });
+
+  testWidgets('{ sets chart period start from a typed date', (t) async {
+    final (_, c) = await pump(t, const Size(1280, 800));
+    c.read(sectionProvider.notifier).state = Section.data;
+    await t.pumpAndSettle();
+    await unlock(t);
+    await t.tap(find.text('BTC/USD · 5m'));
+    await t.pumpAndSettle();
+    expect(find.byType(BarChart), findsOneWidget);
+
+    await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await t.sendKeyEvent(LogicalKeyboardKey.bracketLeft);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await t.pumpAndSettle();
+    expect(find.text('Period start (YYYY-MM-DD [HH:MM])'), findsOneWidget);
+    await t.enterText(
+      find.byKey(const ValueKey<String>('utc-date-input')),
+      '2024-01-01 01:00',
+    );
+    await t.tap(find.byKey(const ValueKey<String>('utc-date-apply')));
+    await t.pumpAndSettle();
+    final v = c.read(chartViewportProvider);
+    expect(v.start, 12);
+    expect(v.visibleCount(50), 38);
+  });
 }

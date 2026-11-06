@@ -319,6 +319,36 @@ class ChartViewport {
   ChartViewport panBy(int delta, int n) =>
       ChartViewport(scale: scale, start: visibleStart(n) + delta).clampTo(n);
 
+  /// Crop the visible window so it starts at [index], keeping the current end
+  /// (TUI `[` `{` / `chart_set_start`). No-op when [index] is not before the end.
+  ChartViewport periodStart(int index, int n) {
+    if (n <= 0) return this;
+    final end = (visibleStart(n) + visibleCount(n) - 1).clamp(0, n - 1);
+    if (index < 0 || index >= end) return this;
+    final vis = end - index + 1;
+    final newScale = (n / vis).clamp(1.0, maxScale);
+    return ChartViewport(scale: newScale, start: index).clampTo(n);
+  }
+
+  /// Crop the visible window so it ends at [index], keeping the current start
+  /// (TUI `]` `}` / `chart_set_end`).
+  ChartViewport periodEnd(int index, int n) {
+    if (n <= 0) return this;
+    final start = visibleStart(n);
+    if (index <= start || index >= n) return this;
+    final vis = index - start + 1;
+    final newScale = (n / vis).clamp(1.0, maxScale);
+    return ChartViewport(scale: newScale, start: start).clampTo(n);
+  }
+
+  /// Centre the current window on [index] (TUI `@` / jump to date). At scale 1
+  /// the window already shows every loaded bar, so this is a no-op.
+  ChartViewport jumpTo(int index, int n) {
+    if (n <= 0) return this;
+    final vis = visibleCount(n);
+    return ChartViewport(scale: scale, start: index - vis ~/ 2).clampTo(n);
+  }
+
   @override
   bool operator ==(Object other) =>
       other is ChartViewport && other.scale == scale && other.start == start;
@@ -330,6 +360,21 @@ class ChartViewport {
 final chartViewportProvider = StateProvider<ChartViewport>(
   (ref) => const ChartViewport(),
 );
+
+/// Index of the loaded bar whose timestamp is closest to [ts].
+int nearestBarIndex(List<BarPoint> bars, int ts) {
+  if (bars.isEmpty) return 0;
+  var best = 0;
+  var bestAbs = (bars[0].ts - ts).abs();
+  for (var i = 1; i < bars.length; i++) {
+    final d = (bars[i].ts - ts).abs();
+    if (d < bestAbs) {
+      best = i;
+      bestAbs = d;
+    }
+  }
+  return best;
+}
 
 final selectedDatasetValueProvider = Provider<Dataset?>((ref) {
   final key = ref.watch(selectedDatasetProvider);

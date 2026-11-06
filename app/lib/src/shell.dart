@@ -16,6 +16,7 @@ import 'prefs_dialog.dart';
 import 'state.dart';
 import 'theme/muninn_theme.dart';
 import 'time_range.dart';
+import 'views/catalog.dart';
 import 'views/chart.dart';
 import 'views/data.dart';
 import 'views/help.dart';
@@ -227,8 +228,8 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           ),
           item('Clear time range', () => ref.read(timeRangeProvider.notifier).state = TimeRange.all, const SingleActivator(LogicalKeyboardKey.keyX, shift: true)),
         ], child: const Text('Filters')),
-        item('Sources…', () => later('Sources', 'mnnn sources')),
-        item('Symbols…', () => later('Symbols', 'mnnn symbols')),
+        item('Sources…', () => showSourcesDialog(context, ref)),
+        item('Symbols…', () => showSymbolsDialog(context, ref)),
       ]),
       menu('Projects', [
         item('Projects…', () { ref.read(projectPaneProvider.notifier).state = ProjectPane.projects; go(Section.projects); }, const SingleActivator(LogicalKeyboardKey.keyP, shift: true)),
