@@ -164,4 +164,4 @@ exclude = ["vendor/python-ast"]
 python-ast = { path = "vendor/python-ast" }
 
 [workspace.package]
-version = "2.22.0"
+version = "2.22.3"

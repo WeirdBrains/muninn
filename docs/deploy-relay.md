@@ -37,7 +37,7 @@ Use the release `.pkg.tar.zst` (prebuilt, no Rust needed; see [install](install.
 against `SHA256SUMS`:
 
 ```sh
-ver=2.22.0
+ver=2.22.3
 base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
 curl -LO $base/muninn-bin-${ver}-1_x86_64.pkg.tar.zst -LO $base/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS
@@ -51,7 +51,7 @@ Use the release `.deb` (prebuilt, no Rust needed; see [install](install.md)), ch
 against `SHA256SUMS`:
 
 ```sh
-ver=2.22.0
+ver=2.22.3
 base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
 curl -LO $base/muninn_${ver}-1_amd64.deb -LO $base/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS
@@ -65,7 +65,7 @@ Use the release `.rpm` (prebuilt, no Rust needed; see [install](install.md)), ch
 against `SHA256SUMS`:
 
 ```sh
-ver=2.22.0
+ver=2.22.3
 base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
 curl -LO $base/muninn-${ver}-1_x86_64.rpm -LO $base/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS
@@ -176,7 +176,7 @@ For the hostname above, the saved value should be
 `/dns4/<domain>/tcp/4741` and
 `/dns4/<domain>/udp/4741/quic-v1`. Changing saved settings leaves
 the already-running node's addresses unchanged until restart; this was tested on
-2.22.0. Verify the actual server version rather than assuming an older binary has
+2.22.3. Verify the actual server version rather than assuming an older binary has
 the same behavior.
 
 On a fresh client connected to the relay, use `mnnn net peers --json` to inspect
@@ -303,7 +303,7 @@ firewalls/routes merely to make a test appear relay-only.
 
 ### Dated probe evidence (November 6, 2026, EST)
 
-Two isolated 2.22.0 clients on the same alien-blue computer authenticated the public
+Two isolated 2.22.3 clients on the same alien-blue computer authenticated the public
 relay, obtained reservations, and discovered one another before explicit pairing.
 The relay identified itself as 2.20.0 and advertised addresses that differed from
 DNS, including private/loopback addresses. Clients logged repeated

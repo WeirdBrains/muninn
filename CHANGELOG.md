@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.22.3] - 2026-11-07
+
+### Fixed
+- Deploy documentation - separated install by platforms
+
 ### Changed
 - Windows winget PackageIdentifier for the TUI/CLI is now `WeirdBrains.muninn.tui` (was `WeirdBrains.Muninn`, reserved for the Flutter app MSIX/Store identity). Existing winget users: `winget uninstall WeirdBrains.Muninn` then `winget install WeirdBrains.muninn.tui`.
 
@@ -597,7 +602,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.22.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.22.3...HEAD
+[2.22.3]: https://github.com/WeirdBrains/muninn/compare/v2.22.0...v2.22.3
 [2.22.0]: https://github.com/WeirdBrains/muninn/compare/v2.21.0...v2.22.0
 [2.21.0]: https://github.com/WeirdBrains/muninn/compare/v2.20.1...v2.21.0
 [2.20.1]: https://github.com/WeirdBrains/muninn/compare/v2.20.0...v2.20.1

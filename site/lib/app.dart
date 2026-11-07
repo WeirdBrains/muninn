@@ -39,7 +39,7 @@ Component pair((String, Shot, Shot) p, {bool lazy = true}) {
 }
 
 /// The released version (scripts/release.sh bumps it; tests/site.rs checks it).
-const version = '2.22.0';
+const version = '2.22.3';
 
 /// The whole site: one page, no client-side code.
 class App extends StatelessComponent {
@@ -198,19 +198,19 @@ const features = [
 const installs = [
   (
     'Windows (setup.exe)',
-    'Download muninn-2.22.0-x86_64-windows-setup.exe from the release and run it.\nThe installer is unsigned, so SmartScreen may warn: More info, then Run anyway. Firewall prompt: Allow for peer-to-peer.\nOr: winget install WeirdBrains.muninn.tui (it can seem to hang at "Starting package install" while SmartScreen checks the unsigned installer)',
+    'Download muninn-2.22.3-x86_64-windows-setup.exe from the release and run it.\nThe installer is unsigned, so SmartScreen may warn: More info, then Run anyway. Firewall prompt: Allow for peer-to-peer.\nOr: winget install WeirdBrains.muninn.tui (it can seem to hang at "Starting package install" while SmartScreen checks the unsigned installer)',
   ),
   (
     'macOS (dmg)',
-    'Download muninn-2.22.0-macos.dmg, drag Muninn to Applications,\nthen right-click Muninn and choose Open the first time.',
+    'Download muninn-2.22.3-macos.dmg, drag Muninn to Applications,\nthen right-click Muninn and choose Open the first time.',
   ),
   ('Homebrew (macOS, Linux)', 'brew install weirdbrains/tap/muninn'),
-  ('Debian / Ubuntu', 'sudo apt install ./muninn_2.22.0-1_amd64.deb'),
-  ('Fedora', 'sudo dnf install ./muninn-2.22.0-1.x86_64.rpm'),
-  ('Arch Linux', 'sudo pacman -U muninn-bin-2.22.0-1-x86_64.pkg.tar.zst'),
+  ('Debian / Ubuntu', 'sudo apt install ./muninn_2.22.3-1_amd64.deb'),
+  ('Fedora', 'sudo dnf install ./muninn-2.22.3-1.x86_64.rpm'),
+  ('Arch Linux', 'sudo pacman -U muninn-bin-2.22.3-1-x86_64.pkg.tar.zst'),
   (
     'Release tarball (Linux, macOS)',
-    'tar -xzf muninn-2.22.0-x86_64-unknown-linux-gnu.tar.gz\nmkdir -p ~/.local/bin\ninstall -m755 muninn-2.22.0-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn',
+    'tar -xzf muninn-2.22.3-x86_64-unknown-linux-gnu.tar.gz\nmkdir -p ~/.local/bin\ninstall -m755 muninn-2.22.3-x86_64-unknown-linux-gnu/mnnn ~/.local/bin/mnnn',
   ),
 ];
 

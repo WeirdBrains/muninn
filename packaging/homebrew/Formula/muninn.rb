@@ -4,7 +4,7 @@
 class Muninn < Formula
   desc "Local, encrypted workbench for market data with peer-to-peer data workflows"
   homepage "https://github.com/WeirdBrains/muninn"
-  version "2.22.0"
+  version "2.22.3"
   license "BSD-3-Clause"
 
   base = "https://github.com/WeirdBrains/muninn/releases/download/v#{version}"
