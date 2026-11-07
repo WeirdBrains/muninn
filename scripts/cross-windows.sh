@@ -10,6 +10,8 @@ cd "$(dirname "$0")/.."
 : "${LLVM_MINGW:?set LLVM_MINGW to an llvm-mingw toolchain directory}"
 export PATH="$LLVM_MINGW/bin:$HOME/.cargo/bin:$PATH"   # rustup cargo has the windows targets
 td="${CARGO_TARGET_DIR:-target}"
+# Absolute, so --prefix and OPENSSL_DIR still resolve after the OpenSSL build cd's away.
+mkdir -p "$td"; td="$(cd "$td" && pwd)"
 for arch in "${@:-x86_64 aarch64}"; do
   for a in $arch; do
     t="$a-pc-windows-gnullvm"; T="$(echo "$t" | tr a-z- A-Z_)"; u="${t//-/_}"

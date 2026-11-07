@@ -23,7 +23,24 @@ env:
   TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
+  # Fail fast when the tag and the version in Cargo.toml disagree (e.g. v1.22.2 vs 2.22.0):
+  # packaging names files from scripts/version.sh, the arch job and release notes from the tag.
+  version:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Tag matches Cargo.toml version
+        run: |
+          ver="$(scripts/version.sh)"
+          if [ "${TAG#v}" != "$ver" ]; then
+            echo "::error::tag $TAG does not match Cargo.toml version $ver"; exit 1
+          fi
+          echo "tag $TAG matches version $ver"
+
   unix:
+    needs: version
     name: ${{ matrix.target }}
     strategy:
       fail-fast: false
@@ -64,6 +81,7 @@ jobs:
 
   windows:
     name: windows (x86_64, aarch64)
+    needs: version
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v5
