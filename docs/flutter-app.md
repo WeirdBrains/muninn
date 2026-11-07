@@ -428,6 +428,26 @@ Needs GTK 3 at runtime (`gtk3` and `glib2` on the RPM). `SKIP_BUILD=1` reuses
 `app/build/linux/<arch>/release/bundle`. The script skips the `.rpm` if `rpmbuild`
 is not on `PATH`.
 
+### Arch Linux: pacman installer
+
+Build a real `muninn-app` package from the existing Linux tarball (no rebuild,
+no root needed). Requires Arch `makepkg` and its normal base-devel tools:
+
+```sh
+cd packaging/arch/muninn-app
+MUNINN_APP_ARCHIVE=/absolute/path/muninn-app-2.22.0-x86_64-unknown-linux-gnu.tar.gz \
+  PKGDEST=/absolute/path/to/out makepkg
+sudo pacman -U /absolute/path/to/out/muninn-app-2.22.0-1-x86_64.pkg.tar.zst
+```
+
+This installs the GUI under `/opt/muninn-app`, `/usr/bin/muninn`, a menu entry,
+and the approved raven icon. Runtime dependencies: GTK 3, GLib, glibc >= 2.39,
+and GCC runtime libraries. The separate TUI package owns `mnnn`, so both can be
+installed together. Remove the GUI cleanly with `sudo pacman -R muninn-app`;
+user data is untouched. Any earlier `~/.local/bin/muninn` wrapper can shadow
+`/usr/bin/muninn`, and `~/.local/share/applications/muninn-app.desktop` can
+shadow the menu entry; review those manually (packaging does not delete them).
+
 On macOS (Swift Package Manager, not CocoaPods) the same script writes:
 
 - `$DIST/muninn-app-<ver>-universal-apple-darwin.dmg` — `Muninn.app` plus an Applications

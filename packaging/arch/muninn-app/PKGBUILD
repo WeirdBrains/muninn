@@ -1,0 +1,33 @@
+# Local prebuilt Flutter bundle; no Flutter/Rust build or download during packaging.
+# MUNINN_APP_ARCHIVE=/absolute/path/muninn-app-2.22.0-x86_64-unknown-linux-gnu.tar.gz makepkg
+pkgname=muninn-app
+pkgver=2.22.0
+pkgrel=1
+pkgdesc='Muninn graphical workbench for market data (Flutter desktop)'
+arch=('x86_64' 'aarch64')
+url='https://muninn.weirdbrains.com'
+license=('BSD-3-Clause')
+depends=('gtk3' 'glib2' 'glibc>=2.39' 'gcc-libs')
+options=('!strip' '!debug')
+# An absolute local archive is required, deliberately not fetched from a release.
+: "${MUNINN_APP_ARCHIVE:?Set MUNINN_APP_ARCHIVE to an absolute built Flutter tar.gz}"
+source=("file://$MUNINN_APP_ARCHIVE")
+sha256sums=('SKIP')
+
+package() {
+  local bundle="$srcdir/muninn-app-$pkgver-$CARCH-unknown-linux-gnu"
+  test -x "$bundle/muninn"
+  test -d "$bundle/lib"
+  test -d "$bundle/data"
+  install -d "$pkgdir/opt/muninn-app" "$pkgdir/usr/bin"
+  cp -a "$bundle/muninn" "$bundle/lib" "$bundle/data" "$pkgdir/opt/muninn-app/"
+  printf '%s\n' '#!/bin/sh' 'exec /opt/muninn-app/muninn "$@"' > "$pkgdir/usr/bin/muninn"
+  chmod 755 "$pkgdir/usr/bin/muninn"
+  install -Dm644 "$bundle/com.weirdbrains.muninn.desktop" \
+    "$pkgdir/usr/share/applications/muninn-app.desktop"
+  # This icon is included by flutter-dist.sh in the approved bundle assets.
+  install -Dm644 "$bundle/data/flutter_assets/assets/icon/muninn-256.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/com.weirdbrains.muninn.png"
+  install -Dm644 "$bundle/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 -t "$pkgdir/usr/share/doc/$pkgname" "$bundle/README.md" "$bundle/CHANGELOG.md"
+}
