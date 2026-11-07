@@ -2,7 +2,7 @@
 
 How the public Muninn relay node is set up on a DigitalOcean droplet. Nodes behind NAT
 reserve a slot on it and are reached through it (see [network](network.md#behind-nat)).
-The relay's name is `relay.muninn.weirdbrains.com`; its DNS record has to point at the
+The relay's name is `<domain>`; its DNS record has to point at the
 droplet before anything else works. The same steps set up a relay of your own.
 
 | what | value |
@@ -25,11 +25,27 @@ useradd --system --home-dir /var/lib/muninn --create-home --shell /usr/sbin/nolo
 
 ## 2. DNS
 
-`relay.muninn.weirdbrains.com` must point at the droplet: add `A relay.muninn.weirdbrains.com → <reserved IPv4>` (and `AAAA` if the droplet has IPv6) at the
-domain's DNS host. Check with `dig +short relay.muninn.weirdbrains.com` before asking for a
+`<domain>` must point at the droplet: add `A <domain> → <reserved IPv4>` (and `AAAA` if the droplet has IPv6) at the
+domain's DNS host. Check with `dig +short <domain>` before asking for a
 certificate.
 
 ## 3. Install Muninn
+
+### 3.1. For Arch based distros
+
+Use the release `.pkg.tar.zst` (prebuilt, no Rust needed; see [install](install.md)), checking it
+against `SHA256SUMS`:
+
+```sh
+ver=2.22.0
+base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
+curl -LO $base/muninn-bin-${ver}-1_x86_64.pkg.tar.zst -LO $base/SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+pacman -U ./muninn-bin-${ver}-1_x86_64.pkg.tar.zst
+mnnn --version
+```
+
+### 3.2. For Debian based distros
 
 Use the release `.deb` (prebuilt, no Rust needed; see [install](install.md)), checking it
 against `SHA256SUMS`:
@@ -40,6 +56,20 @@ base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
 curl -LO $base/muninn_${ver}-1_amd64.deb -LO $base/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS
 apt install ./muninn_${ver}-1_amd64.deb
+mnnn --version
+```
+
+### 3.3. For Redhat based distros
+
+Use the release `.rpm` (prebuilt, no Rust needed; see [install](install.md)), checking it
+against `SHA256SUMS`:
+
+```sh
+ver=2.22.0
+base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
+curl -LO $base/muninn-${ver}-1_x86_64.rpm -LO $base/SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+dnf install ./muninn-${ver}-1_x86_64.rpm
 mnnn --version
 ```
 
@@ -58,18 +88,24 @@ This generates a random 64-character password. Save it in a password manager
 or other safe place as well: it unlocks the relay's keys, and without it (or the
 24 words from `keys init`) a restored `/var/lib/muninn` can't be opened.
 
-Then, as the service user (`sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) …`
+Then, as the service user (`sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn <sub commands...>`
 for each command):
 
 ```sh
-mnnn keys init --non-interactive          # prints the 24 words and shards: keep them offline
-mnnn net config --label relay --external relay.muninn.weirdbrains.com:4741 --mdns off --autostart off
-mnnn net relay serve on                   # relay traffic for other nodes
-mnnn org cert acme --domain relay.muninn.weirdbrains.com --email you@example.com   # Let's Encrypt, HTTP-01 on port 80
-mnnn org host autostart on                # the site (and its ACME renewals) runs with the node
+# Initialize the database
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn keys init --non-interactive          # prints the 24 words and shards: keep them offline
+
+# Set some safe configs
+# Note: changing the label to your domain for the relay would help you identify it later on other nodes
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net config --label relay --external <domain>:4741 --mdns off --autostart off
+
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net relay serve on                   # relay traffic for other nodes, etc
+
+# Let's Encrypt, HTTP-01 on port 80
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn org host autostart on                # the site (and its ACME renewals) runs with the node
 ```
 
-`--external` puts `/dns4/relay.muninn.weirdbrains.com/tcp/4741` and `…/udp/4741/quic-v1` first in
+`--external` puts `/dns4/<domain>/tcp/4741` and `…/udp/4741/quic-v1` first in
 invites and announces them to peers. In `/var/lib/muninn/preferences.toml`, set
 `[hosting] bind = "0.0.0.0"` so Let's Encrypt (port 80) and the site can reach it. The
 certificate is renewed by the running site when a third of its life is left
@@ -99,8 +135,8 @@ wants; there is no separate daemon.
 
 ### Set or correct the advertised public address
 
-Before starting the relay, run this as its service account, with the **same
-`MUNINN_HOME` and password environment as the service** (see section 4). For the
+Before starting the relay, run this as its service account, with the **same**
+`MUNINN_HOME` **and password environment as the service** (see section 4). For the
 shipped unit this means user/group `muninn`, `MUNINN_HOME=/var/lib/muninn`, and the
 password environment loaded from `/etc/muninn/relay.env`. Do not print the password
 or pass it as a command-line argument. Running the command as your login user
@@ -108,7 +144,7 @@ without the service's home override changes a different store; restarting the
 service does not transfer those settings:
 
 ```sh
-mnnn net config --clear-external --external relay.muninn.weirdbrains.com:4741
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net config --clear-external --external <domain>:4741
 ```
 
 `--external` belongs to `net config`, not `net start`. The service's
@@ -129,16 +165,16 @@ After restarting, run this in the **same service account, home, and password
 environment**, not your login user's default home:
 
 ```sh
-mnnn net status --json
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net status --json
 ```
 
 A successful restart alone does not confirm that the intended settings are active.
 Check that the node is running, then compare `settings.external_addresses` (saved
 configuration) with `status.external` (the running node's external multiaddrs).
 For the hostname above, the saved value should be
-`relay.muninn.weirdbrains.com:4741`; the active addresses should include
-`/dns4/relay.muninn.weirdbrains.com/tcp/4741` and
-`/dns4/relay.muninn.weirdbrains.com/udp/4741/quic-v1`. Changing saved settings leaves
+`<domain>:4741`; the active addresses should include
+`/dns4/<domain>/tcp/4741` and
+`/dns4/<domain>/udp/4741/quic-v1`. Changing saved settings leaves
 the already-running node's addresses unchanged until restart; this was tested on
 2.22.0. Verify the actual server version rather than assuming an older binary has
 the same behavior.
@@ -174,14 +210,7 @@ Print the relay's address and add it on other nodes:
 
 ```sh
 sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net status
-mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/<PEER ID>   # on each client node
-```
-
-The public relay `relay.muninn.weirdbrains.com` has peer ID
-`12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz`, so on any node:
-
-```sh
-mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz
+mnnn net relay add /dns4/<domain>/tcp/4741/p2p/<PEER ID>   # on each client node
 ```
 
 With `--external` set, a relay announces only those addresses. Without it, it announces
@@ -222,9 +251,9 @@ On each client, using its own intended home, inspect:
 
 ```sh
 mnnn --version
-mnnn net status --json
-mnnn net relay list --json
-mnnn net peers --json
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net status --json
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net relay list --json
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net peers --json
 ```
 
 A configured relay alone is not evidence of a live reservation. Check the running
