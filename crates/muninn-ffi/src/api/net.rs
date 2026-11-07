@@ -4,7 +4,7 @@
 //! never leave this crate. Invite links hold no secret.
 use super::data::{open, open_write};
 use super::info::paths;
-use muninn_core::net::{self, auto, client, identity, local, Node};
+use muninn_core::net::{self, Node, auto, client, identity, local};
 use muninn_core::prefs::Preferences;
 use muninn_core::store::{Exchange, ExchangeStatus, ShareKind, Store};
 use secrecy::SecretString;

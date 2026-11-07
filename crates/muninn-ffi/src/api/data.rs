@@ -263,7 +263,9 @@ pub(crate) fn add_source_of(s: &Store, name: &str, kind: &str, locator: Option<&
 pub fn add_source(name: String, kind: String, locator: Option<String>) -> anyhow::Result<SourceInfo> {
     let s = open_write()?;
     let info = add_source_of(&s, &name, &kind, locator.as_deref())?;
-    s.note_action(&NewAction::new("source.add", "app", format!("add source {}", info.name)).params(json!({ "source": info.name, "kind": info.kind })));
+    s.note_action(
+        &NewAction::new("source.add", "app", format!("add source {}", info.name)).params(json!({ "source": info.name, "kind": info.kind })),
+    );
     Ok(info)
 }
 
@@ -289,9 +291,7 @@ pub(crate) fn remove_source_of(s: &Store, name: &str) -> anyhow::Result<i64> {
 pub fn remove_source(name: String) -> anyhow::Result<i64> {
     let s = open_write()?;
     let n = remove_source_of(&s, &name)?;
-    s.note_action(
-        &NewAction::new("source.remove", "app", format!("remove source {name} ({n} bars)")).params(json!({ "source": name, "bars": n })),
-    );
+    s.note_action(&NewAction::new("source.remove", "app", format!("remove source {name} ({n} bars)")).params(json!({ "source": name, "bars": n })));
     Ok(n)
 }
 
@@ -338,10 +338,7 @@ pub fn export_source_data(name: String, item: String, path: String) -> anyhow::R
 }
 
 pub(crate) fn list_symbols_of(s: &Store) -> anyhow::Result<Vec<SymbolInfo>> {
-    Ok(s.symbols()?
-        .into_iter()
-        .map(|sym| SymbolInfo { symbol: sym.display(), base: sym.base, quote: sym.quote })
-        .collect())
+    Ok(s.symbols()?.into_iter().map(|sym| SymbolInfo { symbol: sym.display(), base: sym.base, quote: sym.quote }).collect())
 }
 
 /// `mnnn symbols list` (the pairs). Aliases are [`list_aliases`].
@@ -369,12 +366,10 @@ pub fn add_symbol(symbol: String, aliases: Vec<String>) -> anyhow::Result<Symbol
     let s = open_write()?;
     let info = add_symbol_of(&s, &symbol, &aliases)?;
     s.note_action(
-        &NewAction::new("symbol.add", "app", format!("add symbol {}", info.symbol))
-            .params(json!({ "symbol": info.symbol, "aliases": aliases })),
+        &NewAction::new("symbol.add", "app", format!("add symbol {}", info.symbol)).params(json!({ "symbol": info.symbol, "aliases": aliases })),
     );
     Ok(info)
 }
-
 
 #[cfg(test)]
 mod tests {

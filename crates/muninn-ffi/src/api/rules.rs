@@ -331,11 +331,7 @@ pub fn rule_tick() -> anyhow::Result<String> {
         store.set_host_running(muninn_core::org::host::running(&p.home).is_some());
     }
     let ran = rules::tick(&store, muninn_core::store::now_ms())?;
-    if ran.is_empty() {
-        Ok("no scheduled rules are due".into())
-    } else {
-        Ok(format!("ran {}", ran.join(", ")))
-    }
+    if ran.is_empty() { Ok("no scheduled rules are due".into()) } else { Ok(format!("ran {}", ran.join(", "))) }
 }
 
 /// `mnnn rule events`.

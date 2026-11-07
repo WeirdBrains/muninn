@@ -103,7 +103,6 @@ pub fn remove_project_series(item_id: i64) -> anyhow::Result<()> {
     remove_project_series_of(&open_write()?, item_id)
 }
 
-
 /// One item in a project (`mnnn project show`), any kind the store already has.
 pub struct ProjectItemInfo {
     pub item_id: i64,

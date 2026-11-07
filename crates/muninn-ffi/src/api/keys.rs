@@ -9,14 +9,17 @@
 //! app already resolved. On desktop that is `MUNINN_HOME` or `~/.muninn`; on a phone
 //! it is the platform-secure app sandbox, not a desktop-style `~/.muninn`.
 use super::info::paths;
-use muninn_core::crypto::{self, keyring::{self, Envelope, ExportItem}};
+use muninn_core::crypto::{
+    self,
+    keyring::{self, Envelope, ExportItem},
+};
 use muninn_core::paths::Paths;
 use secrecy::{ExposeSecret, SecretString};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{
-    atomic::{AtomicI64, Ordering},
     LazyLock, Mutex,
+    atomic::{AtomicI64, Ordering},
 };
 use std::time::{Duration, Instant};
 
@@ -50,7 +53,6 @@ pub(crate) fn keys_status_of(paths: &Paths) -> anyhow::Result<KeysStatus> {
 pub fn keys_status(home: Option<String>) -> anyhow::Result<KeysStatus> {
     keys_status_of(&paths(home)?)
 }
-
 
 /// A one-time reveal of recovery words and/or shards. The secrets stay in Rust;
 /// Dart fetches one line at a time and must call [`keys_reveal_dismiss`] afterwards.
@@ -110,11 +112,7 @@ fn master_from(
 ) -> anyhow::Result<crypto::Key32> {
     let file_pw = || {
         let p = file_password.clone().unwrap_or_default();
-        if p.is_empty() {
-            Err(muninn_core::Error::invalid("password", "needed to open an encrypted key file"))
-        } else {
-            Ok(SecretString::from(p))
-        }
+        if p.is_empty() { Err(muninn_core::Error::invalid("password", "needed to open an encrypted key file")) } else { Ok(SecretString::from(p)) }
     };
     let key = if let Some(w) = words.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
         crypto::from_words(&w)?
@@ -142,7 +140,12 @@ pub fn keys_init(home: Option<String>, password: String) -> anyhow::Result<Revea
     }
     let paths = paths(home)?;
     let out = keyring::init(&paths, &SecretString::from(password))?;
-    Ok(put_reveal(out.db_id, out.migrated_plain_db, split_words(out.words.as_str()), out.shards.into_iter().map(|s| SecretString::from(s.to_string())).collect()))
+    Ok(put_reveal(
+        out.db_id,
+        out.migrated_plain_db,
+        split_words(out.words.as_str()),
+        out.shards.into_iter().map(|s| SecretString::from(s.to_string())).collect(),
+    ))
 }
 
 /// One recovery word (1-based). Empty if the session has no words (shards-only).
@@ -226,9 +229,7 @@ pub fn keys_export(
     };
     let has_master = items.contains(&ExportItem::Master) || items.contains(&ExportItem::Words);
     if has_master && items.contains(&ExportItem::Shards) && !confirm_combined {
-        return Err(anyhow::anyhow!(
-            "writing the master key/words and shards to one directory defeats the vault/shard split; confirm to continue"
-        ));
+        return Err(anyhow::anyhow!("writing the master key/words and shards to one directory defeats the vault/shard split; confirm to continue"));
     }
     let paths = paths(home)?;
     let master = master_from(&paths, words, shards, words_file, master_file, file_password)?;
@@ -401,20 +402,10 @@ mod tests {
         keys_reveal_dismiss(h.id);
         let phrase = words.join(" ");
         let out = tempfile::tempdir().unwrap();
-        let err = keys_export(
-            Some(root),
-            out.path().display().to_string(),
-            "export-pw".into(),
-            vec![],
-            false,
-            Some(phrase),
-            vec![],
-            None,
-            None,
-            None,
-        )
-        .unwrap_err()
-        .to_string();
+        let err =
+            keys_export(Some(root), out.path().display().to_string(), "export-pw".into(), vec![], false, Some(phrase), vec![], None, None, None)
+                .unwrap_err()
+                .to_string();
         assert!(err.contains("vault/shard split"), "{err}");
     }
 }
