@@ -22,20 +22,20 @@
 <nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a class="current" aria-current="page" href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li><li><a href="/docs/flutter-app/">Flutter app (desktop and mobile)</a></li><li><a href="/docs/architecture/">Architecture</a></li></ul></nav>
 <main class="doc">
 <h1 id="import">Import</h1>
-<p><strong>File ▸ Import…</strong> (or <code>i</code>) opens the import popup: a file browser, per-file guesses
-and a background import with a live progress bar. The same pipeline as
-<a href="/docs/ingest-csv/"><code>muninn ingest csv|json</code></a> runs underneath (<a href="/docs/ingest-json/">JSON</a>).</p>
+<p><strong>File ▸ Import…</strong> (or <code>i</code>) opens the import popup: a file browser and a background
+import with a live progress bar. Like <a href="/docs/ingest-csv/"><code>mnnn ingest csv|json</code></a>, it stores
+each file as it is, byte for byte, in a source; it asks nothing about symbols or bar
+lengths and makes no bars. Turn stored files into bars (or anything else) with a
+<a href="/docs/pipes/">pipe or pipeline</a> from <code>source:NAME</code>.</p>
 <pre><code>┌ Import ─────────────────────────────────────────────────────────────┐
 │ path /data/binance/                                                  │
 │ filter         hidden off   2 selected                               │
 │┌Places──────┐┌Files──────────────┐┌Preview─────────────────────────┐│
-││1 home      ││▸ ..               ││symbol BTC/USDT                 ││
-││2 raw/data  ││● BTCUSDT_5m.csv   ││period 5m                       ││
+││1 home      ││▸ ..               ││source binance (the folder)     ││
+││2 raw/data  ││● BTCUSDT_5m.csv   ││stored as is; pipelines read it ││
 ││3 cwd       ││○ ETHUSDT_1h.csv   ││timestamp,open,high,...         ││
 │└────────────┘└───────────────────┘└────────────────────────────────┘│
-│ source   from file name, else local (s)                              │
-│ symbol   derive from name / data                                     │
-│ duration derive from name / data                                     │
+│ source   the folder's name (s)                                       │
 └──────────────────────────────────────────────────────────────────────┘
 </code></pre>
 <h2 id="browsing">Browsing</h2>
@@ -97,8 +97,8 @@ and a background import with a live progress bar. The same pipeline as
 <td>bookmark the current folder (again: remove the bookmark)</td>
 </tr>
 <tr>
-<td><code>s</code> <code>y</code> <code>d</code></td>
-<td>edit source, symbol, duration</td>
+<td><code>s</code></td>
+<td>edit the source</td>
 </tr>
 <tr>
 <td><code>i</code></td>
@@ -110,12 +110,8 @@ and a background import with a live progress bar. The same pipeline as
 </tr>
 </tbody>
 </table>
-<p>The preview shows the guessed symbol and duration (from the file name) and the first
-10 lines of the highlighted file parsed as bars with the same parser as the import
-(column mapping, timestamps, validation): <code>time SYMBOL o h l c v [zero-vol]</code>. Invalid
-lines are shown in red with the reason and the raw line. It reads at most 64 KiB, so
-it is instant on huge files. A large JSON array cannot be parsed from its start, so
-its preview shows raw lines; NDJSON previews parse.</p>
+<p>The preview shows the source the file will be stored in and its first 10 lines as they
+are, unparsed. It reads at most 64 KiB, so it is instant on huge files.</p>
 <h2 id="path-completion">Path completion</h2>
 <p>In the path input, Tab works like zsh or Neovim:</p>
 <ol>
@@ -129,12 +125,10 @@ back what you had typed.</li>
 </ol>
 <p>Hidden names are offered only when hidden files are shown (<code>.</code>) or you type the dot.</p>
 <h2 id="resolution">Resolution</h2>
-<p><strong>Source</strong> records where the data originally came from (also when the files were
-copied or uploaded from elsewhere): press <code>s</code> (or click the source line) and type it to
-use it for every file in the run. Left empty, each file's source is the exchange in its
-name (the preview shows <code>source kraken (from name)</code>), else <code>local</code>. Symbol and duration are derived from each file name and,
-for the duration, from the data; type a value to override it for every file in the
-run. Recently used folders are saved in <a href="/docs/preferences/">preferences</a>
+<p><strong>Source</strong> is where the files are kept: press <code>s</code> (or click the source line) and type
+it to use it for every file in the run. Left empty, each file goes to the source named
+for its folder (the preview shows <code>source kraken (the folder)</code>), else <code>local</code>. Nothing
+else is asked. Recently used folders are saved in <a href="/docs/preferences/">preferences</a>
 (<code>tui.import_recent</code>).</p>
 <h2 id="progress-and-cancel">Progress and cancel</h2>
 <p>The import runs in a background thread on its own connection, so the TUI stays
@@ -143,28 +137,21 @@ responsive. Progress is byte-based:</p>
 <li><strong>file</strong> gauge: the current file's estimated completion;</li>
 <li><strong>all</strong> gauge: bytes done / total bytes of every file in the run, with an ETA from
 the rate so far;</li>
-<li>bars stored / to store and elapsed time as a secondary line, plus a log of each
-file's result.</li>
+<li>bytes stored and elapsed time as a secondary line, plus a log of each file's result.</li>
 </ul>
 <p>Bytes are counted as the file is read (published every 64 KiB), so the bar moves from
-the first read. Reading is fast compared with storing, so each file's bytes are split
-into phases: reading 10 %, parsing and validating 5 %, storing 85 % (scaled by bars
-stored, reported every 4096 rows). The estimate is therefore linear in bytes across
-files and roughly linear in time within a file. The summary lists inserted, duplicate, rejected rows and gaps per
-series; identical files already imported are skipped. Rows failing validation are
-dropped (see the CLI <code>--rejects</code> option to keep a report).</p>
+the first read. The summary lists each file's size and source and how to read it with a
+pipeline; files whose bytes are already in the source are skipped.</p>
 <h2 id="cancelling">Cancelling</h2>
 <p>The progress popup has a <strong>[Cancel]</strong> button; <code>Esc</code>, <code>c</code> and the popup's <strong>[X]</strong> do the
 same. Cancelling always asks first (<strong>[Yes, cancel]</strong> / <strong>[No, continue]</strong>, or <code>y</code> /
 <code>n</code>). After yes the popup shows <em>Cancelling…</em>: the background import stops at its next
-read (every 64 KiB) or row batch (every 4096 rows), usually within a fraction of a
-second.</p>
+read (every 64 KiB), usually within a fraction of a second.</p>
 <p>What stays and what goes:</p>
 <ul>
 <li><strong>Files that finished</strong> before the cancel stay imported.</li>
 <li><strong>The file being imported</strong> is rolled back entirely: each file is imported in one
-all-or-nothing transaction, so none of its bars, its series totals or its import
-record remain. Importing it again later works normally (it is not skipped as
+all-or-nothing transaction, so nothing of it remains. Importing it again later works normally (it is not skipped as
 &quot;already imported&quot;).</li>
 <li><strong>Files not started</strong> are not touched.</li>
 </ul>
@@ -176,9 +163,8 @@ and <strong>Ctrl-C</strong> in <code>mnnn ingest csv|json</code> cancels the sam
 <code>completed</code>, <code>failed</code> or <code>cancelled</code>. A cancel is noted when it happens: the time it
 was asked for, by whom (<code>tui</code> or <code>cli</code>), the file and the phase (<code>read</code>, <code>parse</code>,
 <code>store</code>).</p>
-<p>Each run keeps a ledger of what it created: new <strong>source</strong> rows, new <strong>series</strong>,
-<strong>bars</strong> (per series, with the count inserted), the <strong>ingest record</strong> used to skip
-identical files, and the <strong>recent</strong> folder entry. Artifacts of finished files are
+<p>Each run keeps a ledger of what it created: new <strong>source</strong> rows, the stored items
+(<strong>source_data</strong>), and the <strong>recent</strong> folder entry. Artifacts of finished files are
 <code>kept</code>. Those of the cancelled or failed file are rolled back and listed as
 <code>rolled_back</code>. After the run, anything the run created that ended up empty (for
 example a new source whose only file was cancelled) is deleted and listed as
@@ -204,47 +190,12 @@ recent entry (built-ins stay). Bookmarks and recents are saved in
 <a href="/docs/preferences/">preferences</a> (<code>tui.import_bookmarks</code>, <code>tui.import_recent</code>). The
 popup opens in the most recent folder.</p>
 <h2 id="after-an-import">After an import</h2>
-<p>When the import finishes and no tile shows a series yet, the focused tile loads the
-first series that was imported (the status line says <code>loaded the import: …</code>). If any
-tile already shows data, the view is left as it is; pick the new series in the sidebar.</p>
-<h2 id="when-the-symbol-cant-be-guessed">When the symbol can't be guessed</h2>
-<p>If a file's name doesn't tell its symbol (for example <code>export_5m.csv</code>) and the symbol
-field is empty, a <strong>Symbol needed</strong> popup asks for it before the import starts, one
-file at a time. The popup shows the file name on its own line (<code>file</code>, wrapped if
-very long, never cut) and its folder below it (<code>in</code>, shortened from the left with <code>…</code>
-so the end of the path stays visible). When several files need a symbol, as in a
-folder import (<code>A</code>), the title counts them: <code>Symbol needed · file 3 of 12</code>.</p>
-<table>
-<thead>
-<tr>
-<th>key / button</th>
-<th>action</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>type, Enter / <code>[Enter OK]</code></td>
-<td>use this symbol (BASE/QUOTE, e.g. <code>BTC/USDT</code>) for this file</td>
-</tr>
-<tr>
-<td>Ctrl-a / <code>[Ctrl-a OK for all]</code></td>
-<td>use it for this and every remaining file</td>
-</tr>
-<tr>
-<td>Tab / <code>[Tab skip file]</code></td>
-<td>leave this file out</td>
-</tr>
-<tr>
-<td>Esc / <code>[Esc cancel]</code> / <code>[X]</code></td>
-<td>cancel the import (nothing is imported)</td>
-</tr>
-</tbody>
-</table>
-<p>An invalid symbol shows an error and keeps the popup open. Filling the symbol field
-(<code>y</code>) beforehand skips the question.</p>
+<p>The view is left as it is: stored files are not series. The summary shows how to read
+them, e.g. <code>source:binance → code:parse-csv → code:to-bars?symbol=BTC/USDT → model:bars</code>;
+once a pipeline has made bars, they appear in the sidebar like any series.</p>
 <h2 id="mouse">Mouse</h2>
 <p>Click a file or folder to highlight it and click it again to open the folder or import
-the file. Click the path, filter or source/symbol/duration line to type there, a Places
+the file. Click the path, filter or source line to type there, a Places
 entry to go there, a completion candidate to pick it. The bottom row is a bar of key
 buttons (<code>[Enter open]</code>, <code>[Space select]</code>, <code>[A import folder]</code>, <code>[i import]</code>, ...) that
 act like the keys; <code>[Close]</code> ends the finished-import view.</p>

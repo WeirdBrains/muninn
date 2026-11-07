@@ -42,6 +42,10 @@ mnnn pipe journal:Notes search:alphas --to model:picks
 </thead>
 <tbody>
 <tr>
+<td><code>source:NAME</code></td>
+<td>what <a href="/docs/ingest-csv/"><code>mnnn ingest</code></a> stored in that source, as it arrived: one row per file, page or query result, columns <code>text name format locator received_at item source</code> (<code>mnnn sources data NAME</code> lists them)</td>
+</tr>
+<tr>
 <td><code>none</code></td>
 <td>no data</td>
 </tr>
@@ -73,6 +77,10 @@ mnnn pipe journal:Notes search:alphas --to model:picks
 frame: a table's columns, a chart's x and lines, text as a <code>text</code> column (tiles: the
 first table or chart). Each run is approved like any run and recorded as <code>code.run</code>
 with where its input came from.</li>
+<li>Options ride on a code step after <code>?</code>, <code>&amp;</code> between them, values URL-encoded when
+they hold <code>&amp;</code> or <code>=</code>: <code>code:to-bars?symbol=BTC/USDT&amp;duration=5m</code>. The code space reads
+them with <code>host.option(&quot;symbol&quot;)</code> (SDK); stored <a href="/docs/pipelines/">pipelines</a> keep them on
+the node. Nothing in Muninn interprets them.</li>
 <li><code>search:NAME</code>: keeps the rows matching the search's text (over the row's values) and,
 for a records search, its conditions.</li>
 <li><code>project:NAME[/JOURNAL]</code>, <code>org:ORG[/JOURNAL]</code>, <code>net[:EXCHANGE|all][/JOURNAL]</code>: saves the
@@ -101,11 +109,11 @@ templates (Rust, through the SDK), not as code in Muninn:</p>
 <tbody>
 <tr>
 <td><code>parse-csv</code></td>
-<td>raw text → rows: CSV with a header line, quotes as usual, numbers as numbers</td>
+<td>raw text → rows: CSV with a header line, quotes as usual, numbers as numbers; options <code>delimiter</code>, <code>quote</code>, <code>header=false</code>, <code>skip_rows</code></td>
 </tr>
 <tr>
 <td><code>parse-json</code></td>
-<td>raw text → rows: a JSON array of objects (or one object)</td>
+<td>raw text → rows: a JSON array of objects (or one object, or arrays as <code>column_N</code>); option <code>records=data.items</code></td>
 </tr>
 <tr>
 <td><code>parse-ndjson</code></td>
@@ -113,10 +121,19 @@ templates (Rust, through the SDK), not as code in Muninn:</p>
 </tr>
 <tr>
 <td><code>to-bars</code></td>
-<td>rows → price bars (<code>timestamp open high low close volume</code>) by column names</td>
+<td>rows → price bars (<code>source symbol period timestamp open high low close volume flags</code>), checked; options <code>symbol</code>, <code>source</code>, <code>duration</code>, <code>map</code>, <code>rejects=fail</code>, <code>drop_zero_volume</code>, <code>check=false</code>; rejected rows are a second <code>Rejected</code> table</td>
 </tr>
 </tbody>
 </table>
+<p>Each stored item (<code>source:NAME</code>) is parsed on its own, and rows keep <code>_name</code> and
+<code>_source</code> (which file, which source). A <code>model:bars</code> save takes to-bars' rows and adds
+only bars that are not there yet (&quot;N new bars, M already there&quot;), so running a pipe again
+after more data arrives is safe. Bars are only ever made this way: by a pipe or pipeline
+you set up, never by ingest.</p>
+<pre><code>mnnn ingest csv --path ~/raw/binance/BTCUSDT_5m.csv          # source &quot;binance&quot;
+mnnn code parsers --install
+mnnn pipe source:binance code:parse-csv 'code:to-bars?symbol=BTC/USDT&amp;duration=5m' --to model:bars -y
+</code></pre>
 <p><code>mnnn code parsers</code> lists them, <code>--install</code> makes them code spaces, <code>--show NAME</code> prints
 one; <code>mnnn code create mine --from parse-csv</code> starts your own from a copy. Installed, they
 are ordinary code spaces: view, edit, share them; like any code they run once approved.</p>

@@ -101,10 +101,18 @@ mnnn sources add binance --kind file --locator ~/Projects/kommandosaldat/raw/dat
 mnnn sources rename binance binance-spot
 mnnn sources remove binance-spot      # asks for confirmation, -y to skip
 </code></pre>
+<h2 id="source-data">Source data</h2>
+<p><code>source_data(id, source_id, locator, name, format, content_hash, size, data, received_at, run_id)</code>: what <code>mnnn ingest</code> stored, byte for byte, one row per file, HTTP
+page or service read. <code>format</code> is only a hint (<code>csv</code>, <code>json</code>, <code>ndjson</code>). Nothing reads
+it but pipelines (<code>source:NAME</code>); removing a source removes its data.</p>
+<pre><code>mnnn sources data binance             # items: id, received, format, size, name, locator
+mnnn sources cat binance 3f2a1c9e     # one item's bytes, unchanged
+</code></pre>
 <h2 id="symbols-and-aliases">Symbols and aliases</h2>
 <p>The known symbol list seeds common base assets (BTC, ETH, SOL, ...) and quote
 currencies (USDT, USDC, USD, EUR, ...), plus aliases such as <code>XBT -&gt; BTC</code>. It is
-used to derive a symbol from a file name (see <a href="/docs/ingest-csv/">CSV ingest</a>).</p>
+used to read symbols written as <code>BTCUSDT</code> or <code>XBT-USD</code> (for example by the to-bars code
+space); ingest itself never derives or asks for one (<a href="/docs/ingest-csv/">CSV ingest</a>).</p>
 <pre><code>mnnn symbols list
 mnnn symbols add FOO/USD --alias FO
 </code></pre>

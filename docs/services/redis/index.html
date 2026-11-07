@@ -26,7 +26,7 @@
      [--port 6379] [--username USER] [--password P | --password-env VAR | --password-stdin]
      [--db-index 0] [--tls] [--type auto|stream|list|zset|hash|string]
      [--value-format json|csv|fields] [--from ID|SCORE] [--to ID|SCORE] [--batch 1000]
-     [--timeout 30] [--source NAME] [--symbol PAIR] [--duration 5m] [--map COL=FIELD]...
+     [--timeout 30] [--source NAME] [--force]
 </code></pre>
 <table>
 <thead>
@@ -60,7 +60,7 @@
 <tr>
 <td><code>--key</code> / <code>--pattern</code></td>
 <td>one required</td>
-<td><code>--pattern</code> uses <code>SCAN MATCH</code>; each key is ingested separately and its name is used to derive the symbol and duration</td>
+<td><code>--pattern</code> uses <code>SCAN MATCH</code>; each key is read separately</td>
 </tr>
 <tr>
 <td><code>--type</code></td>
@@ -121,6 +121,12 @@
 </tr>
 </tbody>
 </table>
+<h2 id="what-is-stored">What is stored</h2>
+<p>Ingest stores what the service returns as it is, in a source, and makes no bars:
+the values read, as NDJSON (one object a record, with the key it came from), one item per read. <code>mnnn sources data NAME</code> lists the items. Make bars (or anything else) with a pipe:
+<code>mnnn pipe source:NAME code:parse-ndjson 'code:to-bars?symbol=BTC/USDT&amp;duration=5m' --to model:bars</code>
+(<a href="/docs/pipes/">pipes</a>). <code>--symbol</code>, <code>--duration</code> and <code>--map</code> are still accepted but only
+warn: they are options of the to-bars code space now.</p>
 <h2 id="example">Example</h2>
 <pre><code>mnnn ingest service redis --uri localhost --pattern 'bars:binance:*_5m' --type stream \
   --value-format fields --source binance --password-env REDIS_PASSWORD

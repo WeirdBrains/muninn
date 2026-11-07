@@ -77,10 +77,10 @@ with <code>sha256sum -c SHA256SUMS</code>, the entry counts and the <code>LICENS
 <code>gh release create vX.Y.Z --verify-tag --title &quot;Muninn vX.Y.Z&quot; --notes-file &lt;(scripts/release-notes.sh X.Y.Z) dist/*</code>.
 Only the highest version is marked <strong>Latest</strong>: an older tag published later gets
 <code>--latest=false</code>. Assets can't change once a release is published.</li>
-<li>Publish the package managers from <code>dist/packaging</code>: copy <code>homebrew/Formula/muninn.rb</code>
-and <code>homebrew/Casks/muninn.rb</code> into
+<li>Publish the package managers from <code>dist/packaging</code>: copy <code>homebrew/Formula/muninn.rb</code>,
+<code>homebrew/Casks/muninn.rb</code> and <code>homebrew/Casks/muninn-app.rb</code> into
 <a href="https://github.com/WeirdBrains/homebrew-tap">WeirdBrains/homebrew-tap</a> and push; copy
-<code>winget/manifests/w/WeirdBrains/Muninn/X.Y.Z</code> into a fork of microsoft/winget-pkgs,
+<code>winget/manifests/w/WeirdBrains/muninn/tui/X.Y.Z</code> into a fork of microsoft/winget-pkgs,
 run <code>winget validate --manifest</code> on Windows, and open a PR.</li>
 </ol>
 <p>The release is named <code>Muninn vX.Y.Z</code> and its notes are the version's <code>CHANGELOG.md</code>

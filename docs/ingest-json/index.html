@@ -22,39 +22,40 @@
 <nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a href="/docs/ingest-csv/">CSV ingest</a></li><li><a class="current" aria-current="page" href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li><li><a href="/docs/flutter-app/">Flutter app (desktop and mobile)</a></li><li><a href="/docs/architecture/">Architecture</a></li></ul></nav>
 <main class="doc">
 <h1 id="json-ingest">JSON ingest</h1>
-<pre><code>mnnn ingest json --path &lt;FILE|DIR&gt; [--records PATH] [--source NAME] [--symbol PAIR]
-                 [--duration 5m] [--map COL=FIELD]... [--rejects FILE] [--force]
+<pre><code>mnnn ingest json --path &lt;FILE|DIR&gt; [--source NAME] [--force] [--no-recursive]
+                 [--progress | --no-progress]
 </code></pre>
-<p>Reads <code>.json</code>, <code>.ndjson</code> and <code>.jsonl</code> files (a directory ingests all of them, recursively; <code>--no-recursive</code> for the top level only). After
-reading, the pipeline is the same as <a href="/docs/ingest-csv/">CSV ingest</a>: source, symbol,
-duration derivation, validation, idempotent upsert and the report.</p>
-<h2 id="shapes">Shapes</h2>
-<ul>
-<li><strong>Array of objects</strong>: keys become columns and are matched by the usual aliases
-(<code>timestamp</code>/<code>time</code>/<code>t</code>, <code>open</code>/<code>o</code>, ...). Override with <code>--map</code>.</li>
-<li><strong>Array of arrays</strong> (e.g. Binance klines <code>[openTime, open, high, low, close, volume, ...]</code>):
-the first six positions are timestamp, open, high, low, close, volume.</li>
-<li><strong>NDJSON</strong> (<code>.ndjson</code>/<code>.jsonl</code>): one object (or array) per line.</li>
-<li><strong>Nested</strong>: point <code>--records</code> at the array: a dotted path <code>data.bars</code>, a JSON pointer
-<code>/data/bars</code>, or <code>$.data.bars</code>.</li>
-</ul>
-<p>Numbers and numeric strings are both accepted; timestamps may be epoch s/ms/us/ns or
-date strings.</p>
-<h2 id="example">Example</h2>
-<pre><code>cat &gt; /tmp/BTCUSDT_5m.json &lt;&lt;'J'
+<p>Stores <code>.json</code>, <code>.ndjson</code> and <code>.jsonl</code> files (a directory stores all of them,
+recursively; <code>--no-recursive</code> for the top level only) exactly as they are, the same way
+as <a href="/docs/ingest-csv/">CSV ingest</a>: one item per file in a source (<code>--source</code>, else the
+folder's name), skipped when the same bytes are already there unless <code>--force</code>. Nothing
+is parsed and no bars are made; the format (<code>json</code>, <code>ndjson</code>) is only a hint from the
+file name.</p>
+<h2 id="reading-it">Reading it</h2>
+<p>The built-in <code>parse-json</code> and <code>parse-ndjson</code> code spaces turn the stored text into
+rows; <code>to-bars</code> turns rows into bars:</p>
+<pre><code>cat &gt; /tmp/feed/BTCUSDT_5m.json &lt;&lt;'J'
 {&quot;data&quot;: {&quot;bars&quot;: [
   {&quot;t&quot;: &quot;2017-08-17 04:00:00&quot;, &quot;o&quot;: 4261.48, &quot;h&quot;: 4280.56, &quot;l&quot;: 4261.48, &quot;c&quot;: 4261.48, &quot;v&quot;: 2.189061}
 ]}}
 J
-mnnn ingest json --path /tmp/BTCUSDT_5m.json --records data.bars --source demo
+mnnn ingest json --path /tmp/feed/BTCUSDT_5m.json          # source &quot;feed&quot;
+mnnn code parsers --install
+mnnn pipe source:feed 'code:parse-json?records=data.bars' \
+  'code:to-bars?symbol=BTC/USDT&amp;duration=5m&amp;map=t:timestamp,o:open,h:high,l:low,c:close,v:volume' \
+  --to model:bars -y
 </code></pre>
-<h2 id="failure-modes">Failure modes</h2>
 <ul>
-<li><code>--records</code> path not found or not an array: an error naming the segment.</li>
-<li>Mixed objects and arrays: &quot;records must all be objects or all be arrays&quot;.</li>
-<li>Bad NDJSON line: the line number is reported.</li>
+<li><strong>Array of objects</strong>: keys become columns, in the order they first appear.</li>
+<li><strong>Array of arrays</strong> (e.g. Binance klines <code>[openTime, open, high, low, close, …]</code>):
+columns <code>column_1</code>, <code>column_2</code>, …; map them in to-bars
+(<code>map=column_1:timestamp,column_2:open,…</code>).</li>
+<li><strong>Nested</strong>: <code>parse-json?records=data.bars</code> (a dotted path or a JSON pointer <code>/data/bars</code>).</li>
+<li><strong>NDJSON</strong>: <code>code:parse-ndjson</code>, one object a line.</li>
 </ul>
-<p>See also <a href="/docs/services/http/">HTTP service</a>, which uses the same JSON handling.</p>
+<p><code>--records</code> on <code>ingest json</code> is still accepted but only warns: it is now the
+<code>records</code> option of parse-json.</p>
+<p>See also <a href="/docs/pipes/">pipes</a>, <a href="/docs/services/http/">HTTP service</a>.</p>
 <p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/ingest-json.md">Edit this page on GitHub</a></p>
 </main>
 </div>

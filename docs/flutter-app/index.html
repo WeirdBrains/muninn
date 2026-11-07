@@ -24,41 +24,556 @@
 <h1 id="flutter-app-desktop-and-mobile">Flutter app (desktop and mobile)</h1>
 <p>Muninn's graphical app, in <code>app/</code>. It runs the same Rust code as <code>mnnn</code> (through
 <code>crates/muninn-ffi</code>), uses the same themes and follows the TUI's menus and views. On
-phones it switches to a phone layout. Status: early (2.21): theme switcher, header with
-the raven, the TUI menu bar, and a read-only Home view of projects and datasets.</p>
+phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
+the TUI menu bar, a read-only Home, the Data view with charts and the time range,
+Projects (create, rename, describe, delete, attach and detach series, journals, live searches, reports, code spaces, live pipes, pipelines, rules, reviews, notifications, import/export archives), Net status, peers, start/stop, connect, invites, relays, sharing, settings, connections, key exchanges, search, broadcast, dark shards, MCP, and stored peer messages and live sessions, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
+(CSV, Parquet, JSON), and File ▸ Preferences….</p>
 <h2 id="run-it">Run it</h2>
 <pre><code>cd app
 flutter pub get
 flutter run -d linux                          # desktop, uses MUNINN_HOME or ~/.muninn
 MUNINN_HOME=/tmp/mnnn-demo flutter run -d linux   # a scratch data dir
 </code></pre>
-<p>The first build compiles <code>crates/muninn-ffi</code> with cargo (cargokit, in
-<code>app/rust_builder/</code>). Users never need Rust: release builds ship the compiled library.</p>
+<p>The first build compiles <code>crates/muninn-ffi</code> with cargo through Dart <strong>Native Assets</strong>:
+<code>app/hook/build.dart</code> (flutter_rust_bridge_hooks) builds the crate for the target
+platform and Flutter bundles the library, on every platform, with no cargokit and no
+CocoaPods (iOS/macOS use Swift Package Manager). The Rust version and the targets come
+from <code>crates/muninn-ffi/rust-toolchain.toml</code> (pinned; rustup installs it on first use;
+it applies only inside that directory, so the workspace keeps its own toolchain). The
+build output lives in <code>app/.dart_tool/hooks_runner/</code> (delete it to reclaim space).
+Users never need Rust: release builds ship the compiled library.</p>
 <h2 id="what-it-does">What it does</h2>
 <ul>
 <li><strong>Header:</strong> the raven (themed) and the big MUNINN wordmark, as on the website.</li>
 <li><strong>Desktop menus:</strong> File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
-Items the app doesn't have yet open a dialog naming the <code>mnnn</code> command or TUI menu.</li>
+Items the app doesn't have yet open a dialog naming the <code>mnnn</code> command or TUI menu.
+File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
+Live searches… / Journals… / New journal… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Rules… / Reviews… / Notifications… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Peers, messages &amp; live / MCP / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
+Rekey, Export, Recover and Re-issue shards, and Data ▸ Sources… / Symbols…. Help ▸ Topics / Search / Keybindings open the
+same embedded docs as <code>mnnn help</code> and the TUI.
+Keyboard shortcuts match the <a href="/docs/keybindings/">TUI</a> for every action the app has
+(see <a href="#keybindings">Keybindings</a> below).</li>
 <li><strong>Phone layout</strong> (narrower than 720 px): bottom navigation (Home, Data, Projects, Net,
 More), 48 px+ targets, safe areas, theme as a bottom sheet; nothing is hover-only.</li>
 <li><strong>Themes:</strong> every theme from <code>assets/themes/*.toml</code> plus your own in <code>&lt;home&gt;/themes/</code>,
 light, dark or system (Theme menu, or the palette button on phones). The app starts on
-the theme in <code>preferences.toml</code>; switching in the app lasts for the session.</li>
-<li><strong>Home:</strong> where the data lives; enter the Muninn password to list projects and
-datasets. The store is opened <strong>read-only</strong> (no migrations, no writes) and the password
-is kept in memory only.</li>
+the theme in <code>preferences.toml</code> and saves your choice there (<code>[theme]</code>, the same as
+<code>mnnn theme set</code> / <code>mnnn theme mode</code>), so the TUI and the app follow each other.</li>
+<li><strong>Unlock:</strong> Home, Data, Projects, Net and Orgs ask for the Muninn password once per session. The
+key stays in Rust memory (never in Dart, never on disk); <strong>File ▸ Lock</strong> forgets it.
+Dashboard reads open the store <strong>read-only</strong> (no migrations). Net and Orgs overviews are read-only; Net writes and Orgs writes (create, edit, join, members, roles, resources, hosting) open the store for writes after the same unlock.
+Keys status does not unlock the store (same as <code>mnnn keys status</code>).
+<strong>File ▸ Import…</strong>, <strong>Export…</strong> and project writes (create, rename, describe, delete,
+attach or detach a series, journals, live searches, reports, import/export archives)
+and Data ▸ Sources… / Symbols… writes (add, rename, remove, add symbol)
+open it for writes after the same unlock.</li>
+<li><strong>Home:</strong> where the data lives, and the projects and datasets in it.</li>
+<li><strong>Data:</strong> the datasets, like the TUI <a href="/docs/sidebar/">sidebar</a>, scoped by the time range.
+On a wide window the sidebar sits next to a tiling workspace of chart and list
+tiles, matching the TUI <a href="/docs/tiling/">tiling</a> model (binary tree, split / close /
+focus / resize / zoom / link / tabbed and stacked containers, and the 2-up,
+3-column, Main + stack and 2×2 presets). A session starts with one chart tile
+(the app's existing Data default; the TUI starts with a list tile) and the layout
+is written to <code>[tui.layout]</code> after unlock (shared with the TUI). Pick a dataset to see it as a
+chart (candles when they fit, else a close line, volume
+underneath) or a list of bars, newest first. <strong>Data ▸ Sources…</strong> lists ingest
+sources (<code>mnnn sources list</code>) with kind, locator and stored-item totals; you can
+add, rename or remove a source (remove asks the same confirmation as the CLI and
+deletes its bars and stored items) and inspect stored items (<code>mnnn sources data</code>),
+saving one to a file (<code>mnnn sources cat</code>) without the bytes entering Dart.
+<strong>Data ▸ Symbols…</strong> lists known pairs and aliases (<code>mnnn symbols list</code>) and can
+add a pair with optional base aliases (<code>mnnn symbols add</code>). The TUI Sources /
+Symbols windows are read-only lists; writes match the CLI. These are not the
+sidebar Source / Symbol <em>filters</em>. Switch with the Chart / List buttons or
+<strong>View ▸ Change view</strong> (<code>Ctrl-w t</code>, the same chord as the TUI). The other
+<strong>View</strong> tile actions and <code>Ctrl-w</code> chords match the TUI (see Keybindings). Rust downsamples to at most 600
+buckets (open = first, close = last, high/low = extremes, volume = sum), so long
+ranges stay fast. On a phone the dataset list is the page and the chart opens on
+its own route — there is no tiling. Pinch, a trackpad or the mouse wheel zooms the chart
+<em>inside</em> the selected time range (the picker and chips stay as they are; zoom does not
+re-query). Drag pans when zoomed; double-tap or <strong>Reset zoom</strong> shows the whole loaded
+window again. Tighten the time range if you need more detail than the 600 buckets.</li>
+<li><strong>Time range:</strong> as in the TUI it applies to every view. The chips above every section
+show it (<code>from …</code> / <code>to …</code>, × removes an end); click <strong>Time range</strong>, press <code>T</code>, or use
+<strong>Data ▸ Filters ▸ Time range…</strong> to open the picker: a date and a time (UTC) for
+<em>from</em> and <em>to</em>, either end left open. <strong>Clear</strong> (or <strong>Data ▸ Filters ▸ Clear time
+range</strong>, or <code>X</code>) shows everything. Datasets with no bars in the range are hidden. The range is
+saved as the TUI's sidebar filter (<code>[tui.sidebar.filters]</code> from/to), so it is shared.</li>
+<li><strong>Saved state:</strong> the theme, the time range and the dataset open in Data
+(<code>[app] dataset</code>) are restored on launch. Locking keeps the dataset; it shows again
+after the next unlock. Reading never creates <code>preferences.toml</code>; the first change does.</li>
+<li><strong>Chart readout:</strong> hover over the chart (or touch / drag on a phone) to show that bar's
+time, open, high, low, close and volume above it; a guide line marks the bar.</li>
+<li><strong>Chart layers:</strong> <strong>View ▸ Chart layers…</strong> (or the layers button next to Chart / List,
+or <code>L</code>) toggles the same layers as the TUI: candles (<code>c</code>), OHLC bars (<code>b</code>), a line
+(<code>n</code>), area under the line (<code>a</code>), high/low envelope (<code>e</code>, 20-bar highest high / lowest
+low), volume (<code>v</code>), moving averages (<code>m</code>; default <code>sma20,sma50</code>, edit with <code>M</code> or the
+sheet), wick markers (<code>w</code>, including a ▼ on shooting stars), gap markers (<code>g</code>, on by
+default), zero-volume markers (<code>z</code>, a circle where volume is 0), grid (<code>#</code>), crosshair
+(<code>x</code>) and the price (<code>y</code>) / time (<code>t</code>) axes. Defaults match the TUI (candles, volume,
+gaps, grid, crosshair and both axes on). <code>N</code> cycles the line metric (close, typical,
+median, …) the same way a TUI chart tile does. Themes colour envelope, averages and
+markers from <code>context.muninn</code> (<code>chart_*</code>, <code>warning</code>).</li>
+<li><strong>Projects:</strong> pages for Projects, Journals, Searches and Reports, like the TUI
+Projects window. Pick a project to see the series and other items saved in it.
+<strong>New project</strong> (or Projects ▸ New project…) creates one (<code>mnnn project create</code>);
+the project menu renames, edits the description or deletes it (<code>mnnn project edit</code> /
+<code>remove</code> — journals stay as standalone journals), exports an archive (<code>.mnnp</code> or
+JSON; <code>mnnn project export</code>), starts a journal in the project, or adds an existing
+journal, search, report, rule, model or code space (<code>mnnn project add</code>). <strong>Add
+current dataset</strong> attaches the dataset open in Data, with the current time range
+(<code>a</code> in the TUI / <code>mnnn project add</code>); remove takes a series or other item out of
+the project without deleting it (<code>mnnn project drop</code>). Opening a series shows it
+in Data with the project's saved time range. <strong>Import archive</strong>
+(Projects ▸ Import archive…) reads a <code>.mnnp</code> or JSON pack (<code>mnnn project import</code>);
+Dart only passes the path, and archive bytes stay in Rust. <strong>Journals</strong> list,
+create (optionally in a project), rename, change format, fork and delete journals,
+and write, edit or remove entries plus journal-level notes (<code>mnnn journal</code>).
+<strong>Highlights</strong> mark selected words of an entry (optional comment; TUI <code>m</code> /
+<code>mnnn journal highlight</code>); the entry view has a TUI-style word cursor so you
+can tap (and shift-tap) words to prefill the highlight. <strong>Notes on words</strong> attach a note to an entry or a
+span (<code>mnnn journal note --entry</code>). <strong>Images</strong> attach from a file path (Rust
+reads the bytes) and save an attached image to a path (<code>mnnn journal attach</code> /
+<code>image</code>); the entry view shows a downscaled PNG thumbnail, and Dart never sees
+the original bytes. <strong>Copy</strong> adds selected entries (with their
+notes, highlights and images) to another journal or a new one (<code>mnnn journal copy</code>). <strong>Export</strong> writes PDF, Word, HTML, LaTeX, text or JSON to a path
+(<code>mnnn journal export</code>); <strong>Import journal</strong> reads a JSON export (<code>mnnn journal import</code>); <strong>Print</strong> saves a PDF and can send it to <code>lp</code>/<code>lpr</code> (<code>mnnn journal print</code> / TUI <code>P</code>). File bytes stay in Rust. <strong>Searches</strong> save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (<code>mnnn search save|edit</code>, TUI <code>w</code>), apply a series search to Data (TUI Enter), and rename, fork or delete it (<code>mnnn search fork|remove</code>). Shift+F opens Live searches, matching the TUI's <code>F</code>. Applying a journals or records search opens a found-views list (TUI Enter on those targets); a series search still applies to Data. Tapping a found record opens the Models pane on that model and record (TUI Data ▸ Model designer… / <code>D</code>). The Models pane creates designs, adds, edits, drops and reorders fields as a draft, restores a dropped field with the same id (TUI <code>u</code>), imports and exports templates (<code>builtin:bars</code> or a <code>.template.json</code> file), creates, edits, deletes and bulk-updates records, previews and applies migrations (with confirmation when values would be lost), discards a draft, shows version history and rollback, and attaches, tests, dry-runs or runs model-owned rules on the last history action (<code>mnnn model</code> / <code>mnnn rule create --model</code>). <strong>Reports</strong> create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI <code>v</code> / <code>mnnn report preview</code>) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI <code>E</code> / <code>mnnn report export</code>). File bytes stay in Rust. <strong>Code spaces</strong> list, create
+(from a language template, another space or a built-in parser), edit source and
+input, approve, check, build, run and remove (<code>mnnn code</code> / TUI Code, <code>C</code>).
+Built-in parsers can be listed and installed (<code>mnnn code parsers --install</code>).
+<strong>Give to org…</strong> (the TUI Code window <code>g</code>) assigns a space to an organization
+you own (<code>mnnn org resource add</code>); members pull it with Sync code. Piping a
+prior step into a space (<code>&gt;</code>) and writing the plugin SDK stay
+in the TUI or CLI. <strong>Result tile…</strong> (TUI <code>T</code>) opens a Data workspace tile (<code>code:SPACE</code>) with the space’s latest run as a table. <strong>Pipes</strong> show live
+and recent runs from history (the TUI Pipes window) and run a pipe
+(<code>mnnn pipe SOURCE STEP… [--to TARGET]</code>). Source <code>-</code> is standard input: paste
+the text or choose a file (Rust reads the bytes), with the CLI's <code>--format</code>
+(csv, json or ndjson), <code>--chunk</code> and <code>--keep-header</code>. <strong>Pipelines</strong> list, create
+and edit a graph (nodes <code>ID=KIND</code>, edges <code>FROM&gt;TO</code>), run (including <code>mnnn pipeline run NAME -</code> with pasted or file stdin), approve a draft, remove, and
+export or import a pipeline file (<code>mnnn pipeline</code> / TUI Pipelines, <code>E</code>); file
+bytes stay in Rust. Tee… (TUI <code>t</code>) saves a selected node's output to
+<code>journal:NAME</code> or <code>model:NAME</code> as it flows on; End in model… (TUI <code>M</code>) ends a
+branch in a model table, making the model when it is new; Monitor… shows the
+same per-node status, rows and landed data as a TUI <code>monitor:PIPELINE</code> tile
+in the Data workspace (shared layout key <code>monitor:PIPELINE</code>). <strong>Rules</strong> list, create, edit, enable or disable, test,
+dry-run, tick due scheduled rules, list event kinds and remove (<code>mnnn rule</code> /
+TUI Rules, <code>R</code>). <strong>Reviews</strong> list yours and ones you joined, request a review,
+show the thread and the thing under review, comment, suggest, highlight, vote,
+invite (a public link; the exchange token stays in Rust), join, sync, accept or
+reject suggestions, merge, close, reopen, leave, drop a reviewer and remove
+(<code>mnnn review</code> / TUI Reviews, <code>V</code>). Sending an invite only works when the peer
+is reachable; otherwise the link is shown to copy. Syncing a joined review
+needs a running node. <strong>Notifications</strong> list (optionally unread only), open
+(marks read), mark read or unread, mark all read, send one, and mute or unmute
+built-in kinds (<code>mnnn notify</code> / TUI Notifications, <code>!</code>).</li>
+<li><strong>Net:</strong> status and peers like <code>mnnn net status</code> / <code>mnnn net peers</code>, plus the write
+flows the TUI and CLI provide for the node itself: start and stop (the node runs in
+this process, like the TUI; <code>mnnn net stop</code> can still ask it to stop), connect
+(address, peer id, name or invite link; an optional hello-only pass), invites
+(create a public link that holds no secret, list yours, accept or decline requests,
+withdraw an invite), disconnect and forget, relay add/remove/serve (saved in
+<code>preferences.toml</code>, picked up the next time the node starts, like the CLI), and
+share / unshare (model, search, journal, project, report, code or pipeline),
+network settings (<code>mnnn net config</code> / TUI Settings: label, port, listen, mDNS,
+relay-for-others, autostart, host autostart, who to accept, bootstrap, plus the
+CLI extras for external addresses and collab transport — relays stay on the Relays
+page), connections (<code>mnnn connection</code> / TUI Connections: list, trust, remove; no
+user keys leave Rust), key exchanges (<code>mnnn net exchange</code> / TUI Nodes: list,
+verify, label, revoke, list what a peer shares and fetch it — import or write a
+path; bytes stay in Rust), network search (run a saved live search here and on
+peers, optionally <code>--only</code> a subset of exchanges), broadcast (<code>mnnn net broadcast</code>,
+including <code>org:SLUG</code>), export or restore a password-sealed exchange backup
+(<code>mnnn net exchange export|restore</code>; bytes and keys stay in Rust), dark shards (list entrusted and held,
+entrust from a key file, check that gathered shards restore this database's key,
+drop a held shard), MCP servers and clients (<code>mnnn mcp</code> / TUI Net ▸ MCP…: list
+servers and clients, show a server's tools, approve or withdraw a tool, change a
+client's role, revoke, restore or remove; tokens and credential values stay in
+Rust, and adding a server or client stays <code>mnnn mcp add</code> / <code>mnnn mcp client add</code>),
+and Peers, messages &amp; live (TUI <code>W</code>: list stored conversations and live sessions,
+mark messages read). Sending a message or hosting/joining a live session needs the
+node worker and stays in the TUI. The node identity, exchange offer/answer tokens, shard blobs
+and the master key stay in Rust. Short codes and fingerprints are meant to be read
+aloud, as in the TUI. On a phone the node uses the same platform-secure app sandbox
+the store already uses. Creating or accepting a raw exchange token
+(the hidden CLI; the TUI and app use invite links instead), and restoring a key
+from shards or a backup when this database cannot open (<code>mnnn net shard</code> /
+<code>mnnn keys recover</code>) stay in the CLI.</li>
+<li><strong>Orgs:</strong> list and detail like <code>mnnn org list</code> / <code>mnnn org show</code> (and the TUI's
+Organizations and Joined pages), plus the write flows those surfaces already have:
+create (<code>mnnn org create</code> / New organization), edit (name, slug, description,
+visibility, access, hosted, member sign-in, gated, template, apply/invite defaults),
+remove, join with an invitation token or link, apply to an org on another node, sync
+and leave, member invite / approve / reject / role / kick, role create / edit
+permissions / remove, resource add / publish cycle / archive-restore / release, and
+hosting start / stop / autostart (<code>mnnn org host</code>). Start site serves hosted orgs
+in-process, the same way the TUI does; if another process is serving, Stop site asks
+it to stop. When hosting autostart is on, starting the node also starts the site
+(TUI / <code>mnnn net start</code>). Invite tokens are shown so the other node can join, matching
+the TUI; host certificates and private keys stay in Rust. On a phone the site and
+store use the same platform-secure app sandbox. <strong>Templates</strong> list, create (from
+the built-in look), edit HTML/CSS, add or remove assets (Rust reads the file),
+set a build step and run it, preview (a local host path, good for an hour) and
+remove (<code>mnnn org template</code> / TUI Templates). <strong>Domains</strong> add, list and remove
+(<code>mnnn org domain</code>). <strong>Certificates</strong> show public status (source, names, expiry,
+ACME) for the node and each org, set or clear your own certificate from PEM
+paths, turn ACME / Let's Encrypt on or off (an org needs a domain first; the
+node's directory, profile, challenge and port apply to orgs) and ask to renew
+(<code>mnnn org cert</code>). Renew needs the challenge reachable. Certificate PEM and
+private keys stay in Rust. <strong>Browse</strong> lists the public organizations of a peer
+(<code>mnnn org browse</code> / TUI Joined <code>b</code>). <strong>Fetch, give and mirror</strong> a joined org's
+resources or public site (<code>mnnn org fetch|give|mirror</code>); fetched binary bytes
+are written to a path in Rust. <strong>Sync code</strong> copies a joined org's code spaces
+here (<code>mnnn org sync-code</code>). <strong>Endpoints</strong> add, remove and call (<code>mnnn org endpoint</code>
+/ <code>mnnn org call</code>). <strong>Org projects</strong> attach, detach and add a member
+(<code>mnnn org project</code>). <strong>Code serve</strong> lists spaces this node runs for the org and
+can start or stop one (<code>mnnn org code</code>). <strong>Sign in</strong> mints a one-time browser
+link to a joined org's site (<code>mnnn org sign-in</code>, valid five minutes). Announcing
+sites and listing announced <code>sites</code> stay in the TUI or CLI.</li>
+<li><strong>Keys:</strong> status like <code>mnnn keys status</code>, plus the write flows the CLI provides
+(Initialize, Rotate, Rekey, Export, Recover from words or shards, Re-issue shards).
+It uses the same data dir as the store (on a phone, the platform-secure app sandbox;
+on desktop, the TUI home). Status shows whether keys are initialized, the database id,
+the database path, the current service-key version, and each on-disk service key as
+active or retired. The master key, recovery words, shards, passphrases, wrapped keys
+and raw key bytes stay in Rust. After init, recover <code>--print-words</code>, or re-issue
+shards, a one-time sheet fetches <strong>one line at a time</strong> from a Rust-held session and
+dismisses (wipes) that session when you close it. Rekey locks the app session first
+(the TUI refuses to rekey while open). Export writes age-encrypted files to a directory
+you pick and returns only those paths. Typed recovery words in a rotate/recover form
+are the same pattern as the TUI Keys form (obscured fields, not stored).</li>
+<li><strong>Import</strong> (File ▸ Import…): pick a file or folder (CSV, TSV, TXT, JSON, NDJSON, JSONL)
+and store each file as it is in a source, like <code>mnnn ingest path</code>. An optional source
+name overrides the folder's name (else <code>local</code>). Progress is byte-based; Cancel keeps
+finished files and rolls back the file in progress. Stored files are not series —
+turn them into bars with a <a href="/docs/pipes/">pipe or pipeline</a>.</li>
+<li><strong>Export</strong> (File ▸ Export…): write stored bars as CSV, Parquet or JSON, like
+<code>mnnn export</code>. The selected dataset and the time range pre-fill the filters; leave
+them empty to export everything. No matching bars writes an empty file (CSV header or <code>[]</code>).</li>
+<li><strong>Preferences</strong> (File ▸ Preferences…): the theme, light/dark/system mode, time range
+and the dataset open in Data — the same values already saved in <code>preferences.toml</code>
+(<code>[theme]</code>, <code>[tui.sidebar.filters]</code> from/to, <code>[app] dataset</code>) and shared with the TUI.
+Changing them here uses the same save path as the Theme menu, the time range picker
+and Data. Header size stays in <code>mnnn tui</code>. Named layouts write <code>[tui.layouts]</code>
+(shared with the TUI); the live tile tree is written to <code>[tui.layout]</code> after unlock, like the TUI. The history bar (<code>Y</code> / <code>u</code> / <code>U</code>) stores
+<code>[tui.history_open]</code> the same way the TUI does.</li>
+<li><strong>Help</strong> (Help ▸ Topics… / Search help… / Keybindings, or <code>?</code> / F1): the same
+embedded <code>docs/</code> topics as <code>mnnn help</code> and the TUI. <code>?</code> and F1 open the topic
+for the current section (Data chart → <a href="/docs/charts/">charts</a>, Keys → <a href="/docs/keys/">keys</a>,
+Home → <a href="/docs/flutter-app/">this page</a>, and so on). Search matches titles and bodies;
+internal links follow other topics; Help ▸ Keybindings opens <a href="/docs/keybindings/">keybindings</a>.
+The Flutter-specific shortcut notes on this page are part of that same help tree.</li>
 <li><strong>About</strong> (Help ▸ About Muninn): the same text as the TUI's About box, from
 <code>muninn_core::about</code>.</li>
 </ul>
-<h2 id="data">Data</h2>
-<p>Desktop shares the TUI's data dir: <code>MUNINN_HOME</code>, else <code>~/.muninn</code>. Mobile keeps its
-own data in the app sandbox and will sync with a desktop node over the existing
-network and sync (see <a href="/docs/sync/">sync</a>); that comes in a later phase.</p>
+<h2 id="keybindings">Keybindings</h2>
+<p>The app uses the same keys as the <a href="/docs/keybindings/">TUI</a> for every action it already
+has. It does not invent different chords. Shortcuts are ignored while a text field
+is focused (you can type <code>T</code> or <code>i</code> into a password or path). On a phone they apply
+when a hardware keyboard is attached.</p>
+<h3 id="everywhere">Everywhere</h3>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>T</code></td>
+<td>time range picker</td>
+</tr>
+<tr>
+<td><code>X</code></td>
+<td>clear the time range (the TUI's &quot;clear all&quot; filters; the app's filter is the time range)</td>
+</tr>
+<tr>
+<td>F5</td>
+<td>refresh</td>
+</tr>
+<tr>
+<td><code>?</code>, F1</td>
+<td>Help for the current section (the embedded docs)</td>
+</tr>
+<tr>
+<td><code>i</code></td>
+<td>File ▸ Import…</td>
+</tr>
+<tr>
+<td><code>P</code></td>
+<td>Projects</td>
+</tr>
+<tr>
+<td><code>K</code></td>
+<td>Net status</td>
+</tr>
+<tr>
+<td><code>W</code></td>
+<td>Peers, messages &amp; live (stored messages and sessions; sending and joining stay in the TUI)</td>
+</tr>
+<tr>
+<td><code>G</code></td>
+<td>Organizations</td>
+</tr>
+<tr>
+<td><code>C</code></td>
+<td>Code spaces (Shift+C; lowercase <code>c</code> on the chart still toggles candles)</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td>Pipelines (Shift+E; lowercase <code>e</code> on the chart still toggles the envelope)</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>Rules (Shift+R)</td>
+</tr>
+<tr>
+<td><code>V</code></td>
+<td>Reviews (Shift+V; lowercase <code>v</code> on the chart still toggles volume)</td>
+</tr>
+<tr>
+<td><code>F</code></td>
+<td>Live searches (Shift+F)</td>
+</tr>
+<tr>
+<td><code>J</code></td>
+<td>Journals (Shift+J, the TUI's <code>J</code>)</td>
+</tr>
+<tr>
+<td><code>!</code></td>
+<td>Notifications</td>
+</tr>
+<tr>
+<td><code>L</code></td>
+<td>Chart layers…</td>
+</tr>
+<tr>
+<td><code>A</code></td>
+<td>Authors… (Shift+A; lowercase <code>a</code> on the chart still toggles area)</td>
+</tr>
+<tr>
+<td><code>Y</code></td>
+<td>toggle the history bar (Shift+Y; lowercase <code>y</code> on the chart still toggles the price axis)</td>
+</tr>
+<tr>
+<td><code>u</code> / <code>U</code></td>
+<td>history step back / forward</td>
+</tr>
+<tr>
+<td><code>Ctrl-w t</code></td>
+<td>change view (chart ↔ list) of the focused tile</td>
+</tr>
+<tr>
+<td><code>Ctrl-w v</code> / <code>s</code></td>
+<td>split the focused tile right / below</td>
+</tr>
+<tr>
+<td><code>Ctrl-w q</code> / <code>c</code></td>
+<td>close the focused tile (the last tile cannot close)</td>
+</tr>
+<tr>
+<td><code>Ctrl-w h</code> <code>j</code> <code>k</code> <code>l</code> or arrows</td>
+<td>focus the tile in that direction</td>
+</tr>
+<tr>
+<td><code>Ctrl-w Tab</code> / <code>w</code></td>
+<td>next tile</td>
+</tr>
+<tr>
+<td><code>Ctrl-w Shift-Tab</code> / <code>W</code> / <code>p</code></td>
+<td>previous tile</td>
+</tr>
+<tr>
+<td><code>Ctrl-w &gt;</code> <code>&lt;</code></td>
+<td>grow / shrink the tile horizontally</td>
+</tr>
+<tr>
+<td><code>Ctrl-w +</code> <code>-</code></td>
+<td>grow / shrink the tile vertically</td>
+</tr>
+<tr>
+<td><code>Ctrl-w =</code></td>
+<td>equalize split ratios</td>
+</tr>
+<tr>
+<td><code>Ctrl-w x</code></td>
+<td>swap with the next tile</td>
+</tr>
+<tr>
+<td><code>Ctrl-w z</code></td>
+<td>zoom (maximize) the focused tile</td>
+</tr>
+<tr>
+<td><code>Ctrl-w e</code></td>
+<td>toggle the direction used by View ▸ New tile</td>
+</tr>
+<tr>
+<td><code>Ctrl-w y</code></td>
+<td>link the focused tile to the next one, then unlink (title shows ⛓id)</td>
+</tr>
+<tr>
+<td><code>Ctrl-b</code></td>
+<td>toggle the Data sidebar (wide windows)</td>
+</tr>
+<tr>
+<td><code>/</code></td>
+<td>show the Data sidebar and focus it</td>
+</tr>
+<tr>
+<td>Tab / Shift-Tab</td>
+<td>next / previous tile (when the sidebar is not focused)</td>
+</tr>
+<tr>
+<td><code>Alt-1</code>…<code>Alt-9</code></td>
+<td>focus the tile with that id</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>unfocus the sidebar</td>
+</tr>
+<tr>
+<td>F10</td>
+<td>open the File menu (stand-in for the TUI's &quot;open the menu bar&quot;)</td>
+</tr>
+<tr>
+<td><code>q</code></td>
+<td>quit (desktop only)</td>
+</tr>
+<tr>
+<td>Alt+letter</td>
+<td>open that menu (File, View, Data, Projects, Net, Orgs, Keys, Theme, Help), matching each TUI menu mnemonic</td>
+</tr>
+</tbody>
+</table>
+<h3 id="data">Data</h3>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>,</code> / <code>.</code></td>
+<td>previous / next dataset (the TUI's previous / next series)</td>
+</tr>
+<tr>
+<td><code>t</code></td>
+<td>chart ↔ list when the list is showing (data tile <code>t</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>When the Data chart is showing:</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>c</code> <code>b</code> <code>n</code> <code>a</code> <code>e</code> <code>v</code> <code>m</code> <code>w</code> <code>g</code> <code>z</code> <code>#</code> <code>x</code> <code>y</code> <code>t</code></td>
+<td>toggle candles, OHLC bars, line, area, envelope, volume, moving averages, wick markers, gap markers, zero-volume markers, grid, crosshair, price axis, time axis</td>
+</tr>
+<tr>
+<td><code>N</code></td>
+<td>cycle the line metric (open → high → low → close → typical → median → ohlc avg → vwap)</td>
+</tr>
+<tr>
+<td><code>M</code></td>
+<td>edit moving averages (<code>sma20, ema50</code>, period 2..1000)</td>
+</tr>
+<tr>
+<td><code>+</code> / <code>-</code></td>
+<td>zoom in / out around the centre (inside the loaded bars, same as pinch)</td>
+</tr>
+<tr>
+<td><code>h</code> <code>l</code>, PgUp PgDn</td>
+<td>pan a quarter / a full screen</td>
+</tr>
+<tr>
+<td>Home / End, <code>0</code></td>
+<td>first bars / latest</td>
+</tr>
+<tr>
+<td><code>[</code> / <code>]</code></td>
+<td>calendar pick for the visible window's start / end (among loaded bars)</td>
+</tr>
+<tr>
+<td><code>{</code> / <code>}</code></td>
+<td>type a date (<code>YYYY-MM-DD [HH:MM]</code>) for the visible window's start / end</td>
+</tr>
+<tr>
+<td><code>@</code></td>
+<td>jump the visible window to a typed date (a no-op when the chart is not zoomed)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="projects">Projects</h3>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>n</code></td>
+<td>new project (when the Projects page is showing)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="platform-exceptions">Platform exceptions</h3>
+<ul>
+<li><strong>Ctrl-C</strong> quits the TUI; in the app it stays the platform Copy shortcut.</li>
+<li><strong><code>q</code></strong> quits the desktop app (File ▸ Quit); on a phone the system back gesture leaves the app and <code>q</code> is ignored.</li>
+<li><strong>F10</strong> opens the File menu. Flutter's <code>MenuBar</code> has no TUI-style &quot;menu bar focused&quot; mode.</li>
+<li><strong>Alt+letter</strong> uses Flutter's <code>MenuAcceleratorLabel</code> (the same letters as the TUI, including Net <code>N</code> and Orgs <code>O</code>). On macOS the system menu bar may take precedence.</li>
+<li><strong>Tiling</strong> follows the TUI's i3-style binary tree on a wide window (width ≥ 720).
+<code>Ctrl-w</code> is a prefix (the same as the TUI): it is not registered as <code>Ctrl+V</code> /
+<code>Ctrl+S</code> / <code>Ctrl+Q</code>, so paste, save and quit stay with the platform. Minimum tile
+size is 200×96 pixels (a stand-in for the TUI's 20×6 cells). Chart, list, pipeline-monitor (<code>monitor:PIPELINE</code>) and data-frame tiles (<code>code:SPACE</code> from Code ▸ Result tile… / TUI <code>T</code>, and <code>view:PIPELINE/NODE</code> when a saved layout includes them).
+The TUI has no embedded PTY/terminal tile type — it is itself a terminal UI — so the app does not invent a terminal emulator.
+The live layout is written to <code>[tui.layout]</code> after unlock (shared with the TUI). A fresh session without a saved layout is one
+chart tile so existing Data behaviour stays; the TUI starts with a list tile.
+Chart layers and the visible window are stored on each tile (like the TUI). Linking records
+a pairing and shows ⛓id in the title; selecting a row in a linked list centres the paired
+chart, and panning a linked chart updates the list cursor.
+View ▸ Layouts has 2-up, 3-column, Main + stack and 2×2, plus Save current… / Saved…
+written to <code>[tui.layouts]</code> (shared with the TUI).</li>
+<li><strong>Ctrl-b</strong> toggles the Data sidebar on a wide window. On a phone the dataset list
+<em>is</em> the page, so <code>Ctrl-b</code> is unused.</li>
+<li><strong>Tab</strong> / <strong>Shift-Tab</strong> and <strong>Alt-1…9</strong> focus tiles on a wide window. <code>/</code> shows
+and focuses the sidebar (highlights it) but does not invent the TUI's type-ahead
+sidebar search. Esc or Tab leaves the sidebar. On a phone those keys do not
+manage tiles.</li>
+<li><strong>macOS:</strong> the system menu bar may take Alt/Option letter accelerators, and
+Option+1…9 may produce special characters instead of focusing a tile. Use the
+View menu or Tab in that case.</li>
+<li>Chart layer keys <strong><code>e</code> <code>m</code> <code>w</code> <code>g</code> <code>z</code></strong> match the TUI (envelope, moving averages, wick, gap, zero-volume). The averages use the loaded bars (including those off-screen when zoomed) the same way the TUI uses warmup history; they do not fetch extra bars beyond <code>queryBars</code>.</li>
+<li><strong>← →</strong> move the TUI chart crosshair; the app moves it by hover or touch.</li>
+<li><strong><code>[</code> <code>]</code> <code>{</code> <code>}</code> <code>@</code></strong> set the chart's visible window among already-loaded bars (the same start/end/jump idea as a TUI chart tile). They do not change the global <code>T</code> time-range filter, and they do not invent a separate bucket or query. <code>{</code> <code>}</code> <code>@</code> type a date; <code>[</code> <code>]</code> open the same calendar+time pickers the time-range dialog uses. At scale 1 (every loaded bar visible) <code>@</code> has nothing to pan.</li>
+<li><strong><code>A</code></strong> opens File ▸ Authors… (the TUI's authors window). Lowercase <code>a</code> on a chart still toggles the area layer.</li>
+<li><strong><code>Y</code></strong> toggles the history bar; <strong><code>u</code></strong> / <strong><code>U</code></strong> step back / forward (the TUI's history keys). Lowercase <code>y</code> on a chart still toggles the price axis. Journals use Shift+J (the TUI's <code>J</code>). Live searches use Shift+F (the TUI's <code>F</code>); pipelines use Shift+E.</li>
+<li>In the TUI, <code>X</code> stops a node when the network window is focused; the app has no start/stop and <code>X</code> stays &quot;clear the time range&quot;.</li>
+<li><strong><code>a</code></strong> toggles the area layer when the Data chart is showing (chart tile). Adding a series to a project is <strong>Add current dataset</strong> on the Projects page (the TUI's sidebar-focused <code>a</code>).</li>
+<li><strong>Esc</strong> closes dialogs through Flutter's usual dialog behaviour.</li>
+</ul>
+<h2 id="data-2">Data</h2>
+<p>Desktop shares the TUI's data dir: <code>MUNINN_HOME</code>, else <code>~/.muninn</code>. On a phone the
+database, keys (the envelope and service keys), preferences and themes live in the
+platform-secure app sandbox — the same data dir the store already uses — not a
+desktop-style <code>~/.muninn</code>. Sync with a desktop node over the existing network
+comes in a later phase (see <a href="/docs/sync/">sync</a>).</p>
 <h2 id="how-it-fits-together">How it fits together</h2>
 <ul>
 <li><code>crates/muninn-core</code>: all of Muninn (the library <code>mnnn</code> is built on).</li>
 <li><code>crates/muninn-ffi</code>: the small API the app calls (version, about, data dir, themes,
-projects and datasets, downsampled bars), exposed with flutter_rust_bridge 2.</li>
+projects and datasets, downsampled bars, ingest and bar export, sources and symbols, code spaces, live pipes and pipelines, rules, reviews and notifications, net status, peers, settings, connections, exchanges, search, broadcast and dark shards, org list and writes (including templates, domains, certificates/ACME, browse, fetch/give/mirror, endpoints, org projects, code serve and sign-in), journal extras (highlights, images, copy, export/import and print), keys status and writes, help topics), exposed with
+flutter_rust_bridge 2.</li>
 <li><code>app/lib/src/rust/</code>: generated Dart bindings. Regenerate after changing the API:
 <code>cd app &amp;&amp; flutter_rust_bridge_codegen generate</code>.</li>
 <li>State is Riverpod. Themes are resolved to hex roles in Rust and mapped to Flutter's
@@ -73,27 +588,165 @@ buckets).</li>
 <ul>
 <li>Publisher <strong>WeirdBrains</strong>; homepage and support: <a href="https://muninn.weirdbrains.com">https://muninn.weirdbrains.com</a></li>
 <li>Bundle / application id: <code>com.weirdbrains.muninn</code> (Android, iOS, macOS); Linux
-application id <code>com.weirdbrains.muninn</code>; Windows company name WeirdBrains.</li>
+application id <code>com.weirdbrains.muninn</code>; Windows company name WeirdBrains.
+Windows MSIX/Store identity: <code>WeirdBrains.Muninn</code>. The TUI winget package is
+<code>WeirdBrains.muninn.tui</code> (not this id).</li>
 <li>Apple builds use Swift Package Manager (<code>flutter config --enable-swift-package-manager</code>),
 not CocoaPods.</li>
 </ul>
-<h2 id="distribution-planned">Distribution (planned)</h2>
+<h2 id="distribution">Distribution</h2>
+<p>Desktop packages of the Flutter app are built with <code>scripts/flutter-dist.sh</code>
+(Linux, macOS, and Windows via Git Bash or <code>scripts/flutter-dist.ps1</code>).
+The package name is <code>muninn-app</code> so it does not clash with the TUI/CLI <code>muninn</code>
+packages (which install <code>/usr/bin/mnnn</code> or <code>muninn-*-windows-setup.exe</code>). File
+bytes stay in the bundle; the script does not touch <code>~/.muninn</code> /
+<code>%USERPROFILE%\.muninn</code> and does not publish a GitHub release.</p>
+<pre><code>DIST=/path/to/out CARGO_TARGET_DIR=/path/to/cargo-target scripts/flutter-dist.sh
+</code></pre>
+<p>On Linux amd64 that writes:</p>
 <ul>
-<li>Desktop: built-in installers (Windows setup, macOS .dmg), winget, Microsoft Store
-(MSIX, publisher WeirdBrains), Homebrew, AUR, .deb and .rpm, for amd64 and arm64.</li>
-<li>Mobile: TestFlight and Google Play testing tracks first, then the App Store and Play
-Store. Builds are also attached to GitHub releases (APKs, TestFlight links).</li>
+<li><code>$DIST/muninn-app-&lt;ver&gt;-x86_64-unknown-linux-gnu.tar.gz</code> — relocatable bundle; run <code>./muninn</code></li>
+<li><code>$DIST/muninn-app_&lt;ver&gt;-1_amd64.deb</code> — installs to <code>/opt/muninn</code>, with a wrapper at <code>/usr/bin/muninn</code></li>
+<li><code>$DIST/muninn-app-&lt;ver&gt;-1.x86_64.rpm</code> — same layout as the <code>.deb</code>. Needs <code>rpmbuild</code>
+(<code>rpm-tools</code> / <code>rpm-build</code>). A relocated <code>rpmbuild</code> should set <code>RPM_CONFIGDIR</code> to
+its <code>usr/lib/rpm</code> directory. On aarch64 the filename uses <code>aarch64</code>.</li>
+</ul>
+<p>Needs GTK 3 at runtime (<code>gtk3</code> and <code>glib2</code> on the RPM). <code>SKIP_BUILD=1</code> reuses
+<code>app/build/linux/&lt;arch&gt;/release/bundle</code>. The script skips the <code>.rpm</code> if <code>rpmbuild</code>
+is not on <code>PATH</code>.</p>
+<h3 id="arch-linux-pacman-installer">Arch Linux: pacman installer</h3>
+<p>Build a real <code>muninn-app</code> package from the existing Linux tarball (no rebuild,
+no root needed). Requires Arch <code>makepkg</code> and its normal base-devel tools:</p>
+<pre><code class="language-sh">cd packaging/arch/muninn-app
+MUNINN_APP_ARCHIVE=/absolute/path/muninn-app-2.22.0-x86_64-unknown-linux-gnu.tar.gz \
+  PKGDEST=/absolute/path/to/out makepkg
+sudo pacman -U /absolute/path/to/out/muninn-app-2.22.0-1-x86_64.pkg.tar.zst
+</code></pre>
+<p>This installs the GUI under <code>/opt/muninn-app</code>, <code>/usr/bin/muninn</code>, a menu entry,
+and the approved raven icon. Runtime dependencies: GTK 3, GLib, glibc &gt;= 2.39,
+and GCC runtime libraries. The separate TUI package owns <code>mnnn</code>, so both can be
+installed together. Remove the GUI cleanly with <code>sudo pacman -R muninn-app</code>;
+user data is untouched. Any earlier <code>~/.local/bin/muninn</code> wrapper can shadow
+<code>/usr/bin/muninn</code>, and <code>~/.local/share/applications/muninn-app.desktop</code> can
+shadow the menu entry; review those manually (packaging does not delete them).</p>
+<p>On macOS (Swift Package Manager, not CocoaPods) the same script writes:</p>
+<ul>
+<li><code>$DIST/muninn-app-&lt;ver&gt;-universal-apple-darwin.dmg</code> — <code>Muninn.app</code> plus an Applications
+shortcut, LICENSE and changelog (<code>universal</code> when <code>flutter build macos --release</code>
+produces a fat arm64+x86_64 binary; otherwise <code>aarch64-apple-darwin</code> or
+<code>x86_64-apple-darwin</code>). <code>SKIP_BUILD=1</code> reuses <code>app/build/macos/Build/Products/Release/*.app</code>.</li>
+</ul>
+<p>The image is not notarized. Drag Muninn into Applications, or open the <code>.app</code> from
+the disk image. The data directory is still <code>MUNINN_HOME</code> or <code>~/.muninn</code>.</p>
+<p>A Homebrew cask lives at <code>packaging/homebrew/Casks/muninn-app.rb</code> (token <code>muninn-app</code>,
+tap <a href="https://github.com/WeirdBrains/homebrew-tap">weirdbrains/tap</a>). It installs the
+Flutter <code>Muninn.app</code> and conflicts with the TUI cask <code>muninn</code> (both use that name).
+It does not install <code>mnnn</code>; use the <code>muninn</code> formula for the CLI. <code>scripts/fill-sums.py</code>
+fills the sha256 when <code>muninn-app-&lt;ver&gt;-universal-apple-darwin.dmg</code> is listed in
+<code>SHA256SUMS</code>. Until a release publishes that asset (this script does not cut a tag), Homebrew 7+
+will not install a raw <code>.rb</code> path. Copy the cask into a local tap and point it at
+the built image:</p>
+<pre><code class="language-sh">brew tap-new --no-git &quot;$USER/muninn-local&quot;   # once
+cask=&quot;$(brew --repo &quot;$USER/muninn-local&quot;)/Casks/muninn-app.rb&quot;
+cp packaging/homebrew/Casks/muninn-app.rb &quot;$cask&quot;
+dmg=/absolute/path/to/muninn-app-&lt;ver&gt;-universal-apple-darwin.dmg
+sha=$(shasum -a 256 &quot;$dmg&quot; | awk '{print $1}')
+# In that copy only (do not commit it): url &quot;file://$dmg&quot; and sha256 &quot;$sha&quot;
+brew install --cask --appdir=&quot;${HOME}/Applications&quot; &quot;$USER/muninn-local/muninn-app&quot;
+</code></pre>
+<p><code>--appdir</code> keeps the TUI <code>Muninn.app</code> in <code>/Applications</code> untouched if it is already
+there. After a release that includes the Flutter <code>.dmg</code> and the filled cask is
+copied into the tap:</p>
+<pre><code class="language-sh">brew install --cask weirdbrains/tap/muninn-app
+</code></pre>
+<p>On Windows (Git Bash / MINGW, or <code>scripts/flutter-dist.ps1</code> from PowerShell) the
+same script writes:</p>
+<ul>
+<li><code>$DIST/muninn-app-&lt;ver&gt;-x86_64-pc-windows-msvc.zip</code> — portable Flutter release
+runner folder (<code>muninn.exe</code>, DLLs, <code>data/</code>); run <code>muninn.exe</code></li>
+<li><code>$DIST/muninn-app-&lt;ver&gt;-x86_64-windows-setup.exe</code> — Inno Setup 6.3+ installer
+from <code>packaging/windows/muninn-app.iss</code> (AppId and <code>{localappdata}\Programs\MuninnApp</code>
+are separate from the TUI <code>muninn.iss</code> / <code>{userpf}\Muninn</code>). Adds a Start Menu
+entry and optionally the install folder to the user PATH for <code>muninn.exe</code></li>
+<li><code>$DIST/muninn-app-&lt;ver&gt;-x86_64.msix</code> — <code>dart run msix:create</code> (<code>store: false</code>,
+test-certificate signed with <code>install_certificate: false</code> so packaging stays
+non-interactive; skipped if the <code>msix</code> package is missing). To install the
+eyeball package: enable Developer Mode, or install the test certificate once
+(<code>certutil -user -addstore Root test_certificate.pfx</code> after exporting / using
+the cert the <code>msix</code> package generates under the app directory), then
+<code>Add-AppxPackage .\muninn-app-&lt;ver&gt;-x86_64.msix</code>.</li>
+</ul>
+<p>The Flutter MSIX/Store <code>identity_name</code> is <code>WeirdBrains.Muninn</code> (<code>app/pubspec.yaml</code>).
+The TUI/CLI winget id is <code>WeirdBrains.muninn.tui</code> (see <code>packaging/winget/</code>).</p>
+<p>Needs Visual Studio Build Tools with the Windows desktop C++ workload, Flutter
+Windows desktop enabled (<code>flutter config --enable-windows-desktop</code>), and Inno
+Setup (<code>winget install --id JRSoftware.InnoSetup -e</code>) for the setup.exe. Set
+<code>CARGO_TARGET_DIR</code> to a scratch directory under the user profile so Native Assets
+Rust output does not fill the clone. <code>SKIP_BUILD=1</code> reuses
+<code>app/build/windows/x64/runner/Release</code>. The script does not touch
+<code>%USERPROFILE%\.muninn</code>.</p>
+<p>PowerShell:</p>
+<pre><code class="language-powershell">$env:DIST = 'C:\path\to\out'
+$env:CARGO_TARGET_DIR = 'C:\Users\...\.cache\muninn-flutter-windows-cargo'
+.\scripts\flutter-dist.ps1
+</code></pre>
+<p>Still planned: Apple notarization, iOS / TestFlight, a signed Play upload /
+testing track, Windows code-signing / Store listing, then store listings. An
+arm64 release APK can be built locally (see below). Builds can later be attached
+to GitHub releases once those recipes exist; this script does not cut a tag.</p>
+<h2 id="icons">Icons</h2>
+<p>The launcher icons come from the approved raven tile, <code>app/assets/logo/muninn-raven.svg</code>
+(the same file as the installers' <code>assets/icons/muninn.svg</code>, which stays the packaging
+source; a test checks they match). <code>app/assets/icon/</code> holds the renders:
+<code>muninn-1024.png</code> (the tile), <code>muninn-mark-1024.png</code> (the raven alone, Android's adaptive
+foreground on <code class="gfm-color_chip">#1a1b26<span style="background-color:#1a1b26;"></span></code>) and <code>muninn-256.png</code> (the Linux window icon, loaded from the
+bundle by <code>linux/runner/my_application.cc</code>). <code>flutter_launcher_icons</code> (config in
+<code>app/pubspec.yaml</code>) writes Android mipmaps and adaptive icon, the iOS and macOS
+AppIcon sets (iOS without alpha) and <code>windows/runner/resources/app_icon.ico</code>.
+After a logo change:</p>
+<pre><code>cd app
+rsvg-convert -w 1024 -h 1024 assets/logo/muninn-raven.svg -o assets/icon/muninn-1024.png
+rsvg-convert -w 1024 -h 1024 assets/logo/muninn-raven-mark.svg -o assets/icon/muninn-mark-1024.png
+rsvg-convert -w 256 -h 256 assets/logo/muninn-raven.svg -o assets/icon/muninn-256.png
+dart run flutter_launcher_icons
+git checkout ios/Runner.xcodeproj/project.pbxproj   # the tool rewrites a setting it shouldn't
+</code></pre>
+<h2 id="apple-and-android-builds-status">Apple and Android builds (status)</h2>
+<ul>
+<li><strong>Swift Package Manager:</strong> the Rust library is a native asset, so there is no plugin
+needing a <code>Package.swift</code> or podspec; the old cargokit <code>rust_builder/</code> is gone.</li>
+<li><strong>Disk:</strong> a debug macOS build of <code>muninn_ffi</code> needs about 10 GB of Rust build output;
+free at least 25 GB before building macOS, iOS and Android on one Mac.</li>
+<li><strong>Flutter version:</strong> the app needs Flutter 3.47.9 (Dart 3.13.7) or newer.</li>
+<li><strong>Android SDK on Linux:</strong> if <code>flutter doctor</code> reports &quot;Unable to locate Android SDK&quot;,
+install the command-line tools, then
+<code>sdkmanager &quot;platform-tools&quot; &quot;platforms;android-36&quot; &quot;build-tools;36.0.0&quot; &quot;ndk;28.2.13676358&quot;</code>,
+<code>flutter config --android-sdk ~/Android/Sdk</code>, <code>flutter doctor --android-licenses</code>, and
+<code>rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android</code>.</li>
+<li><strong>Android SDK on macOS:</strong> Flutter can use Android Studio's bundled JBR even when
+<code>/usr/libexec/java_home</code> fails and <code>/usr/bin/java</code> is only a stub. Set <code>JAVA_HOME</code>
+to that JBR (for example <code>$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home</code>)
+so <code>sdkmanager</code> runs. Pending licenses can be accepted non-interactively with
+<code>yes | sdkmanager --sdk_root=&quot;$ANDROID_HOME&quot; --licenses</code>. Then:
+<code>cd app &amp;&amp; flutter build apk --release --target-platform android-arm64</code>
+writes <code>app/build/app/outputs/flutter-apk/app-release.apk</code>. Native Assets compile
+into <code>app/.dart_tool/hooks_runner</code> (clear that and <code>app/build</code> after copying the
+APK). This is an eyeball artifact, not a Play upload.</li>
 </ul>
 <h2 id="tests">Tests</h2>
 <pre><code>cd app &amp;&amp; flutter analyze &amp;&amp; flutter test
 cargo test -p muninn_ffi
 </code></pre>
+<p>CI (<code>.github/workflows/ci.yml</code>, job <code>flutter</code>) runs <code>flutter analyze</code> and <code>flutter test</code> in
+<code>app/</code> on every push to main and every pull request, with Flutter 3.47.9; the tests use a
+fake API; the Native Assets hook builds the Rust library first, so the job installs the pinned toolchain.</p>
 <h2 id="failure-modes">Failure modes</h2>
 <ul>
 <li><em>Wrong key or not a muninn database</em>: the password is wrong.</li>
-<li><em>No store yet</em>: run <code>mnnn keys init</code> first (in a scratch <code>MUNINN_HOME</code> to try it out).</li>
-<li>Building needs cargo the first time; a missing toolchain stops <code>flutter run</code> with a
-cargokit error.</li>
+<li><em>No store yet</em>: <strong>Keys ▸ Initialize…</strong> (or <code>mnnn keys init</code> in a scratch <code>MUNINN_HOME</code>).</li>
+<li>Building needs rustup the first time; a missing toolchain or target stops
+<code>flutter run</code> with &quot;Building native assets failed&quot; (details in
+<code>app/.dart_tool/hooks_runner/muninn/*/stderr.txt</code>).</li>
 </ul>
 <p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/flutter-app.md">Edit this page on GitHub</a></p>
 </main>

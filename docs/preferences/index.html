@@ -102,6 +102,11 @@ autostart = false
 <td><a href="/docs/sidebar/">sidebar</a> sort (<code>sort</code>, <code>desc</code>) and <code>filters</code> (sources, durations, years, price metric/min/max)</td>
 </tr>
 <tr>
+<td><code>app.dataset</code></td>
+<td>unset</td>
+<td>the dataset open in the <a href="/docs/flutter-app/">Flutter app</a>'s Data view, <code>source:BASE/QUOTE:seconds</code>; written only when set. The app also saves <code>theme.*</code> and the time range in <code>tui.sidebar.filters</code> (<code>from</code>, <code>to</code>), shared with the TUI</td>
+</tr>
+<tr>
 <td><code>tui.import_recent</code></td>
 <td><code>[]</code></td>
 <td>recently imported folders (<a href="/docs/import/">import</a>)</td>
@@ -234,6 +239,9 @@ autostart = false
 </tbody>
 </table>
 <p><code>mnnn theme set &lt;name&gt;</code>, <code>mnnn theme mode &lt;mode&gt;</code> and <strong>File ▸ Preferences…</strong> in the TUI edit the file for you.
+The Flutter app's <strong>File ▸ Preferences…</strong> edits <code>theme.name</code>, <code>theme.mode</code>, the time range
+in <code>tui.sidebar.filters</code>, and <code>app.dataset</code> (the same values the Theme menu, time-range
+picker and Data view save).
 Preferences are part of every backup (<a href="/docs/backup-recovery/">backup and recovery</a>).</p>
 <p>Failure modes: invalid TOML makes every command fail with a <code>toml:</code> error naming
 the problem; fix or delete the file (it is recreated with defaults).</p>

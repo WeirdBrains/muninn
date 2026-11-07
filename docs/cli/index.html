@@ -198,13 +198,14 @@ man mnnn-ingest-csv
 </code></pre>
 <p>See also <a href="/docs/tui/">TUI</a>, <a href="/docs/help/">in-app help</a>.</p>
 <h2 id="importing-a-whole-path">Importing a whole path</h2>
-<pre><code class="language-sh">mnnn ingest path ~/Projects/kommandosaldat/raw/data -y              # source from each name (binance_…, coinbase_…)
-mnnn ingest path ~/Downloads/export --source coinbase -y           # set it explicitly
-mnnn ingest path ./exports --no-recursive --records data.bars
+<pre><code class="language-sh">mnnn ingest path ~/Projects/kommandosaldat/raw/data                 # source &quot;data&quot;: the folder's name
+mnnn ingest path ~/Downloads/export --source coinbase              # set it explicitly
+mnnn ingest path ./exports --no-recursive
 </code></pre>
-<p><code>mnnn ingest path &lt;PATH&gt;</code> (or <code>--path</code>) ingests every CSV-like (<code>.csv .tsv .txt</code>) and
-JSON-like (<code>.json .ndjson .jsonl</code>) file under a directory, recursively; hidden entries
-are skipped. CSV options: <code>--delimiter</code>, <code>--no-header</code>; JSON: <code>--records</code>. Each file
+<p><code>mnnn ingest path &lt;PATH&gt;</code> (or <code>--path</code>) stores every CSV-like (<code>.csv .tsv .txt</code>) and
+JSON-like (<code>.json .ndjson .jsonl</code>) file under a directory, recursively, as it is; hidden
+entries are skipped. Nothing is parsed or asked; parsing options (<code>delimiter</code>,
+<code>header</code>, <code>records</code>) belong to the parser code spaces in a <a href="/docs/pipes/">pipe</a>. Each file
 prints <code>[i/n] relative/path</code> on stderr, and on a terminal a live <code>file % · overall %</code>
 line. Each file is its own transaction; Ctrl-C keeps finished files, rolls back the
 current one and is recorded in the run ledger (<code>mnnn ingest runs</code>). <code>ingest csv</code> and

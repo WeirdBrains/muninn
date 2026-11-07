@@ -103,7 +103,9 @@ help (<code>?</code> or F1 in the TUI, <code>mnnn help &lt;topic&gt;</code> on t
 <h2 id="quick-start">Quick start</h2>
 <pre><code>export MUNINN_HOME=/tmp/mnnn-demo          # never touches ~/.muninn
 mnnn keys init                             # write down the words and shards
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data --source binance -y
+mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance
+mnnn code parsers --install                # parse-csv, to-bars, … as code spaces
+mnnn pipe source:binance code:parse-csv 'code:to-bars?symbol=BTC/USDT&amp;duration=5m' --to model:bars -y
 mnnn export --format parquet --out /tmp/btc.parquet --symbol BTC/USDT
 mnnn search save &quot;btc 5m&quot; --symbol BTC/USDT --period 5m
 mnnn project create Research &amp;&amp; mnnn project add Research --search &quot;btc 5m&quot;

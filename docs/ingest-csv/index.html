@@ -22,111 +22,147 @@
 <nav class="docs-nav" aria-label="Documentation"><a class="doc-home" href="/docs/">Documentation</a><h4>Using Muninn</h4><ul><li><a href="/docs/install/">Install</a></li><li><a href="/docs/announcement-2.0/">Muninn 2.0: decentralized data workflows</a></li><li><a href="/docs/release/">Releasing</a></li><li><a href="/docs/website/">Website</a></li><li><a href="/docs/cli/">Command line</a></li><li><a href="/docs/tui/">Terminal UI</a></li><li><a href="/docs/menus/">Menus</a></li><li><a href="/docs/keybindings/">Keybindings</a></li><li><a href="/docs/tiling/">Tiling layout</a></li><li><a href="/docs/charts/">Charts</a></li><li><a href="/docs/sidebar/">Sidebar</a></li><li><a href="/docs/import/">Import</a></li><li><a href="/docs/help/">In-app help</a></li><li><a href="/docs/authors/">Authors</a></li><li><a href="/docs/history/">Action history</a></li></ul><h4>Research</h4><ul><li><a href="/docs/live-searches/">Live searches</a></li><li><a href="/docs/projects/">Projects</a></li><li><a href="/docs/journals/">Journals</a></li><li><a href="/docs/reports/">Reports</a></li><li><a href="/docs/rules/">Rules</a></li><li><a href="/docs/models/">Models</a></li><li><a href="/docs/model-templates/">Model design templates</a></li><li><a href="/docs/code-spaces/">Code spaces</a></li><li><a href="/docs/export-formats/">Export formats</a></li></ul><h4>Network</h4><ul><li><a href="/docs/network/">Network</a></li><li><a href="/docs/users/">Users and connections</a></li><li><a href="/docs/sync/">Linked-node sync</a></li><li><a href="/docs/key-exchanges/">Key exchanges</a></li><li><a href="/docs/dark-shards/">Dark shards</a></li><li><a href="/docs/organizations/">Organizations</a></li><li><a href="/docs/pipes/">Pipes</a></li><li><a href="/docs/pipelines/">Pipelines</a></li><li><a href="/docs/share/">Share</a></li><li><a href="/docs/reviews/">Reviews</a></li><li><a href="/docs/deploy-relay/">Deploying a public relay</a></li><li><a href="/docs/org-hosting/">Org hosting</a></li><li><a href="/docs/notifications/">Notifications</a></li><li><a href="/docs/collaboration/">Live collaboration and peers</a></li><li><a href="/docs/mcp/">MCP</a></li><li><a href="/docs/mcp-proxy/">MCP behind nginx</a></li><li><a href="/docs/org-templates/">Org site templates (2.17)</a></li></ul><h4>Getting data in and out</h4><ul><li><a class="current" aria-current="page" href="/docs/ingest-csv/">CSV ingest</a></li><li><a href="/docs/ingest-json/">JSON ingest</a></li><li><a href="/docs/services/http/">HTTP service</a></li><li><a href="/docs/services/redis/">Redis service</a></li><li><a href="/docs/services/sqlite/">SQLite service</a></li><li><a href="/docs/services/postgres/">Postgres service</a></li><li><a href="/docs/export/">Export</a></li></ul><h4>Data and storage</h4><ul><li><a href="/docs/data-model/">Data model</a></li><li><a href="/docs/storage-layout/">Storage layout</a></li><li><a href="/docs/preferences/">Preferences</a></li></ul><h4>Security</h4><ul><li><a href="/docs/keys/">Keys</a></li><li><a href="/docs/encryption/">Encryption at rest</a></li><li><a href="/docs/backup-recovery/">Backup and recovery</a></li></ul><h4>Look and feel</h4><ul><li><a href="/docs/themes/">Themes</a></li><li><a href="/docs/flutter-app/">Flutter app (desktop and mobile)</a></li><li><a href="/docs/architecture/">Architecture</a></li></ul></nav>
 <main class="doc">
 <h1 id="csv-ingest">CSV ingest</h1>
-<pre><code>mnnn ingest csv --path &lt;FILE|DIR&gt; [--source NAME] [--symbol PAIR] [--duration 5m]
-                [--delimiter ,] [--quote '&quot;'] [--escape C] [--no-header] [--skip-rows 0]
-                [--map COL=FIELD]... [--rejects FILE] [--force]
+<pre><code>mnnn ingest csv --path &lt;FILE|DIR&gt; [--source NAME] [--force] [--no-recursive]
+                [--progress | --no-progress]
 </code></pre>
-<p>Every row becomes a bar (see <a href="/docs/data-model/">data model</a>). A directory (searched recursively; <code>--no-recursive</code> for the top level only, hidden entries skipped) ingests every
+<p>Ingest stores data as it arrives. Each file is kept byte for byte in a <strong>source</strong>
+(the <code>source_data</code> table); nothing is parsed, guessed or validated, and no bars are
+made. What the data is, and what becomes of it, is decided by
+<a href="/docs/pipelines/">pipelines</a> and their code spaces. A directory (searched recursively;
+<code>--no-recursive</code> for the top level only, hidden entries skipped) stores every
 <code>.csv</code>/<code>.tsv</code>/<code>.txt</code> file in it, sorted by name, as one run.</p>
 <h2 id="example-with-the-raw-data">Example with the raw data</h2>
-<pre><code>mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance -y
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data --source binance -y
+<pre><code>mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance
+mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data        # source: &quot;data&quot;, the folder
 </code></pre>
-<p>The file name gives the symbol (<code>BTCUSDT</code> -&gt; <code>BTC/USDT</code>) and the duration (<code>_5m</code>).</p>
-<h2 id="pipeline">Pipeline</h2>
+<p>Then make bars from it with a pipe (or a stored pipeline):</p>
+<pre><code>mnnn code parsers --install
+mnnn pipe source:binance code:parse-csv 'code:to-bars?symbol=BTC/USDT&amp;duration=5m' --to model:bars -y
+</code></pre>
+<h2 id="what-ingest-does">What ingest does</h2>
 <ol>
-<li><strong>Read</strong> with Polars. All columns are read as text, then parsed.</li>
-<li><strong>Columns</strong> are matched by name, case-insensitively, against aliases:
-<code>timestamp_utc</code>, <code>timestamp</code>, <code>open_time</code>, <code>time</code>, <code>date</code>, <code>datetime</code>, <code>ts</code> ...;
-<code>open</code>/<code>o</code>, <code>high</code>/<code>h</code>, <code>low</code>/<code>l</code>, <code>close</code>/<code>c</code>, <code>volume</code>/<code>vol</code>/<code>v</code>. Override with
-<code>--map &lt;col&gt;=&lt;field&gt;</code>, e.g. <code>--map ts=timestamp</code>. With <code>--no-header</code>, columns are
-taken in the order timestamp, open, high, low, close, volume.</li>
-<li><strong>Source</strong> (where the data originally came from, even for uploaded copies):
-<code>--source NAME</code> (created if unknown) on <code>ingest csv</code>, <code>ingest json</code> and <code>ingest path</code>;
-else an exchange named in the file name (<code>coinbase_BTC-USD_5m.csv</code> → <code>coinbase</code>;
-binance, coinbase/gdax, kraken, bitstamp, bitfinex, bybit, okx, kucoin, gemini, …),
-per file, so a folder of mixed exchanges lands in the right sources; else a source
-whose locator equals the path, else a prompt.</li>
-<li><strong>Symbol</strong>: <code>--symbol</code> (<code>BTC/USDT</code>, <code>BTC-USD</code> or <code>BTCUSDT</code>), else parsed from the file
-name against the known symbol list (longest quote suffix wins, aliases like <code>XBT</code>
-applied), else a prompt. A prompted answer is reused for the rest of the run.</li>
-<li><strong>Timestamp</strong>: epoch seconds / ms / us / ns (detected by magnitude), RFC 3339 or
-<code>YYYY-MM-DD HH:MM:SS</code>. UTC unless an offset is present. Stored as epoch ms.</li>
-<li><strong>Duration</strong>: <code>--duration</code>, else a file-name token (<code>5m</code>, <code>1h</code>, <code>15min</code>), else the
-<strong>mode</strong> of consecutive timestamp differences across the whole file, so gaps don't
-matter. A warning is printed when the mode covers less than 90% of the differences.</li>
-<li><strong>Validate</strong>: <code>high &gt;= max(open, close)</code>, <code>low &lt;= min(open, close)</code>, <code>volume &gt;= 0</code>,
-no missing / non-numeric values, timestamp aligned to the duration (for durations up
-to 1d). Rejected rows never reach the database. Zero-volume bars are kept and flagged
-unless <code>ingest.drop_zero_volume</code> is set (<a href="/docs/preferences/">preferences</a>).</li>
-<li><strong>Upsert</strong> in batched transactions on the bar id. Re-ingesting is a no-op; an
-identical file (same BLAKE3 content hash, source and series) is skipped outright
-unless <code>--force</code>.</li>
-<li><strong>Report</strong>: rows, inserted, duplicate, rejected, zero-volume, gaps and missing bars,
-coverage range.</li>
+<li><strong>Source</strong>: <code>--source NAME</code> (created if unknown); else the source already holding
+this path; else the folder's name (<code>~/raw/kraken/x.csv</code> → <code>kraken</code>). Only a path with
+no folder name to use would ask, and never about anything else. The only other
+question ingest can ask is the database password.</li>
+<li><strong>Store</strong>: the file's bytes, its name, a format hint from the extension (<code>csv</code>), its
+path, size and BLAKE3 hash, and when it arrived. All or nothing per file.</li>
+<li><strong>Skip</strong>: the same bytes already in the source are skipped unless <code>--force</code>.</li>
+<li><strong>Report</strong>: <code>stored N bytes (csv) in source S as ID</code>. <code>mnnn sources data S</code> lists
+what a source holds; <code>mnnn sources cat S ID</code> writes one item back out, unchanged.</li>
 </ol>
-<h2 id="flags-and-defaults">Flags and defaults</h2>
+<h2 id="reading-it-parse-csv-and-to-bars">Reading it: parse-csv and to-bars</h2>
+<p><code>source:NAME</code> in a pipe or pipeline gives one row per stored item (columns <code>text</code>,
+<code>name</code>, <code>format</code>, <code>locator</code>, <code>received_at</code>, <code>item</code>, <code>source</code>). The built-in code spaces
+(<code>mnnn code parsers --install</code>) take it from there; options ride on the node:</p>
 <table>
 <thead>
 <tr>
-<th>flag</th>
+<th>code space</th>
+<th>option</th>
 <th>default</th>
 <th>notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>--path</code>, <code>-p</code></td>
-<td>required</td>
-<td>file or directory</td>
-</tr>
-<tr>
-<td><code>--delimiter</code></td>
+<td>parse-csv</td>
+<td><code>delimiter</code></td>
 <td><code>,</code></td>
-<td>single ASCII character</td>
+<td>one character, or <code>tab</code></td>
 </tr>
 <tr>
-<td><code>--quote</code></td>
+<td></td>
+<td><code>quote</code></td>
 <td><code>&quot;</code></td>
+<td>quotes are escaped by doubling (RFC 4180)</td>
+</tr>
+<tr>
 <td></td>
+<td><code>header</code></td>
+<td><code>true</code></td>
+<td><code>false</code>: columns are <code>column_1</code>, <code>column_2</code>, …</td>
 </tr>
 <tr>
-<td><code>--escape</code></td>
-<td>none</td>
-<td>only RFC 4180 doubling (the quote character) is supported</td>
-</tr>
-<tr>
-<td><code>--no-header</code></td>
-<td>header on</td>
 <td></td>
-</tr>
-<tr>
-<td><code>--skip-rows</code></td>
+<td><code>skip_rows</code></td>
 <td><code>0</code></td>
 <td>lines skipped before the header</td>
 </tr>
 <tr>
-<td><code>--rejects FILE</code></td>
-<td></td>
-<td>CSV of rejected rows: input, row, timestamp, reason</td>
+<td>to-bars</td>
+<td><code>symbol</code></td>
+<td>a <code>symbol</code> (or <code>base</code>+<code>quote</code>) column</td>
+<td><code>BTC/USDT</code>, the pair for every row</td>
 </tr>
 <tr>
-<td><code>--force</code></td>
-<td>off</td>
-<td>re-process an identical input</td>
+<td></td>
+<td><code>source</code></td>
+<td>a <code>source</code>/<code>_source</code> column, else <code>pipeline</code></td>
+<td>the bars' source</td>
+</tr>
+<tr>
+<td></td>
+<td><code>duration</code></td>
+<td>a <code>period</code> column, else the most common step</td>
+<td><code>5m</code>, <code>1h</code>, <code>1d</code> or seconds</td>
+</tr>
+<tr>
+<td></td>
+<td><code>map</code></td>
+<td>by column name</td>
+<td><code>map=ts:timestamp,px:close</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>rejects</code></td>
+<td>pass the good rows</td>
+<td><code>fail</code>: stop when any row is rejected</td>
+</tr>
+<tr>
+<td></td>
+<td><code>drop_zero_volume</code></td>
+<td>keep and flag</td>
+<td><code>true</code>: reject volume-0 bars</td>
+</tr>
+<tr>
+<td></td>
+<td><code>check</code></td>
+<td><code>true</code></td>
+<td><code>false</code>: no checks</td>
 </tr>
 </tbody>
 </table>
+<p>to-bars finds columns by name (<code>timestamp</code>/<code>ts</code>/<code>time</code>/<code>date</code>/<code>open_time</code>, <code>open</code>,
+<code>high</code>, <code>low</code>, <code>close</code>, <code>volume</code>/<code>vol</code>), reads epoch s/ms/µs/ns or date text (UTC unless
+an offset is given) and checks <code>high &gt;= max(open, close)</code>, <code>low &lt;= min(open, close)</code>,
+<code>volume &gt;= 0</code> and alignment to the duration. Rejected rows are its second output table,
+<code>Rejected</code> (row, reason); they never reach the bars. The <code>model:bars</code> leaf adds only bars
+not there yet, so a pipeline can run again after more data arrives.</p>
+<h2 id="old-flags">Old flags</h2>
+<p><code>--symbol</code>, <code>--duration</code>, <code>--map</code>, <code>--rejects</code>, <code>--delimiter</code>, <code>--quote</code>, <code>--escape</code>,
+<code>--no-header</code> and <code>--skip-rows</code> are still accepted so scripts keep running, but each
+only prints a one-line warning naming its new home, e.g.</p>
+<pre><code>warning: --symbol is ignored: ingest stores data as it arrives; it is now an option of the to-bars code space (code:to-bars?symbol=BTC/USDT), see docs/pipes.md
+</code></pre>
+<h2 id="progress">Progress</h2>
+<p>Large ingests show progress on stderr (stdout is untouched). On a terminal it is on by
+default and redraws one line per running file, then prints a summary line:</p>
+<pre><code>[1/3] BTC_5m_combined_part1.csv   42% · 180.2 MiB/429.0 MiB · 18.0 MiB/s · ETA 0:12 · overall 14%
+done BTC_5m_combined_part1.csv: 429.0 MiB stored in 21.1s (20.3 MiB/s)
+</code></pre>
+<p><code>--progress</code> forces it on when stderr is not a terminal (logs, CI): then it prints a
+<code>[i/n] file (size)</code> line when each file starts, a plain line every 5 seconds and the
+summary line. <code>--no-progress</code> (or <code>-q</code>) turns it off. The same flags work on
+<code>ingest json</code> and <code>ingest path</code>.</p>
 <h2 id="failure-modes">Failure modes</h2>
 <ul>
-<li>Missing source / symbol / duration with <code>--non-interactive</code> or no TTY: error naming
-the flag to pass. Nothing is written.</li>
-<li>Rows fail validation: a confirmation asks whether to drop them. Without a TTY this is
-an error unless <code>-y/--yes</code> is given.</li>
-<li>A required column cannot be found: error listing the columns present and a <code>--map</code> hint.</li>
+<li>No source and no folder name to use, with <code>--non-interactive</code> or no TTY: an error
+naming <code>--source</code>. Nothing is written.</li>
+<li>Unreadable file: an error; earlier files of the run stay stored.</li>
 <li>Locked or unreadable database: see <a href="/docs/encryption/">encryption</a>.</li>
 </ul>
-<p>See also <a href="/docs/ingest-json/">JSON ingest</a>, <a href="/docs/services/http/">services</a>, <a href="/docs/cli/">CLI</a>.</p>
+<p>See also <a href="/docs/ingest-json/">JSON ingest</a>, <a href="/docs/pipes/">pipes</a>, <a href="/docs/services/http/">services</a>, <a href="/docs/cli/">CLI</a>.</p>
 <p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/ingest-csv.md">Edit this page on GitHub</a></p>
 </main>
 </div>

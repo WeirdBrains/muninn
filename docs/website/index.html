@@ -24,8 +24,8 @@
 <h1 id="website">Website</h1>
 <p>The Muninn website is a static front page, built with <a href="https://jaspr.site">Jaspr</a> (Dart) in
 <code>site/</code>, plus these docs as pages under <code>/docs/</code>. It uses the app's default theme (Tokyo Night: its colours, dark and light) and
-the MUNINN header art, shows a hero screenshot under the header and a Screenshots section
-(one captioned shot per feature, lazy-loaded), and links the releases, the docs and the install steps.</p>
+the MUNINN header art, shows matched screenshot pairs (the same view, data and theme in the Flutter app and the
+terminal UI, labelled) under the header and in a Screenshots section, and links the releases, the docs and the install steps.</p>
 <p>Every <code>docs/**/*.md</code> except <code>docs/historical</code> is published at <code>/docs/&lt;slug&gt;/</code> (<code>docs/README.md</code>
 is <code>/docs/</code>, <code>services/redis.md</code> is <code>/docs/services/redis/</code>), with a sidebar grouped like
 <code>docs/README.md</code> and an &quot;Edit this page on GitHub&quot; link. Links between docs point at those
@@ -44,12 +44,20 @@ The pages are generated from <code>docs/</code> on every build, so they never dr
 <td>the page: header art, hero shot, features, screenshots, install steps, docs links</td>
 </tr>
 <tr>
+<td><code>site/lib/pairs.dart</code></td>
+<td>the matched Flutter app / terminal UI screenshot pairs shown on the page (the first is the hero)</td>
+</tr>
+<tr>
 <td><code>site/lib/shots.dart</code></td>
-<td>the hero and screenshot list (written by <code>scripts/screenshots.sh</code>)</td>
+<td>the TUI feature screenshot list written by <code>scripts/screenshots.sh</code> (README only; not on the page)</td>
 </tr>
 <tr>
 <td><code>site/web/screenshots/</code></td>
-<td>the screenshots (PNG, 1464x890)</td>
+<td>the TUI feature screenshots used by the README and docs (PNG, 1464x890)</td>
+</tr>
+<tr>
+<td><code>site/web/screenshots/pairs/</code></td>
+<td>the matched pairs (<code>app-*.png</code>, <code>tui-*.png</code>, 1464x890), captured from the running apps</td>
 </tr>
 <tr>
 <td><code>site/lib/main.server.dart</code></td>
@@ -98,8 +106,10 @@ tool/check.sh
 <code>~/.muninn</code>), which drives the TUI through each feature, some mid-action, and renders each
 screen to HTML; headless Chromium turns those into PNGs and ImageMagick shrinks them into
 <code>site/web/screenshots/</code>. It then rewrites <code>site/lib/shots.dart</code> and the README's screenshot
-block. <code>HERO=name</code> picks the hero (default <code>pipeline-live</code>). It needs <code>chromium</code> and
-<code>magick</code>. Run it when a view changes, then rebuild the site.</p>
+block. It needs <code>chromium</code> and <code>magick</code>. Run it when a view changes.</p>
+<p>The front page shows only <code>site/web/screenshots/pairs/</code>: each view captured from the
+running Flutter app and the running TUI on the same data, theme (Tokyo Night, dark) and
+size, with any data-dir path in the header covered. Retake both halves of a pair together.</p>
 <h2 id="checks">Checks</h2>
 <p>CI (<code>.github/workflows/ci.yml</code>, job <code>site</code>) installs Dart in the runner, checks the
 formatting, builds the site and its docs pages, analyzes it, runs <code>tool/check.sh</code> and keeps the built page

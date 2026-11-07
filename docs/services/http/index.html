@@ -27,7 +27,7 @@
      [--paginate none|cursor|time] [--cursor-path next] [--cursor-param cursor]
      [--start-param startTime] [--from T] [--to T] [--max-pages 1000]
      [--rate-limit REQ_PER_S] [--retries 3] [--insecure] [--timeout 30]
-     [--source NAME] [--symbol PAIR] [--duration 5m] [--map COL=FIELD]...
+     [--source NAME] [--force]
 </code></pre>
 <table>
 <thead>
@@ -71,7 +71,7 @@
 <tr>
 <td><code>--records</code></td>
 <td>root</td>
-<td>where the array of bars lives (see <a href="/docs/ingest-json/">JSON ingest</a>)</td>
+<td>where the rows are in each page, for <code>--paginate time</code> (the last timestamp) and cursors; the page itself is stored whole</td>
 </tr>
 <tr>
 <td><code>--paginate</code></td>
@@ -100,13 +100,21 @@
 Accept: application/json, text/csv;q=0.9
 </code></pre>
 <p>The source defaults to the URL's host when <code>--source</code> is not given and nothing is
-known for the URL; the symbol and duration must come from flags (or prompts) unless
-the URL path carries them (e.g. <code>.../BTCUSDT_5m.json</code>).</p>
+known for the URL. Nothing is asked about symbols or durations.</p>
+<h2 id="what-is-stored">What is stored</h2>
+<p>Ingest stores what the service returns as it is, in a source, and makes no bars:
+each page's body, unchanged (one item per page, its locator ending in <code>#page=N</code> when there are several). <code>mnnn sources data NAME</code> lists the items. Make bars (or anything else) with a pipe:
+<code>mnnn pipe source:NAME code:parse-json?records=result 'code:to-bars?symbol=BTC/USDT&amp;duration=5m' --to model:bars</code>
+(<a href="/docs/pipes/">pipes</a>). <code>--symbol</code>, <code>--duration</code> and <code>--map</code> are still accepted but only
+warn: they are options of the to-bars code space now.</p>
 <h2 id="example">Example</h2>
 <pre><code>mnnn ingest service http --url https://data-api.binance.vision/api/v3/klines \
   --param symbol=BTCUSDT --param interval=5m --param limit=1000 \
   --paginate time --start-param startTime --from 2024-01-01 --to 2024-01-02 \
-  --source binance --symbol BTC/USDT --duration 5m
+  --source binance
+mnnn pipe source:binance code:parse-json \
+  'code:to-bars?symbol=BTC/USDT&amp;duration=5m&amp;map=column_1:timestamp,column_2:open,column_3:high,column_4:low,column_5:close,column_6:volume' \
+  --to model:bars -y
 </code></pre>
 <h2 id="failure-modes">Failure modes</h2>
 <ul>

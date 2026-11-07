@@ -35,9 +35,11 @@ cat trades.csv | mnnn pipeline run feed - --chunk 500 --keep-header   # feed: in
 mnnn pipeline export flow --out flow.json
 mnnn pipeline import flow.json --dry-run      # the plan; then without --dry-run
 </code></pre>
-<p>Nodes are <code>ID=KIND</code>: <code>search:NAME</code>, <code>journal:NAME</code>, <code>source:QUERY</code> or <code>-</code> (stdin, raw
+<p>Nodes are <code>ID=KIND</code>: <code>source:NAME</code> (what <a href="/docs/ingest-csv/">ingest</a> stored there, as it
+arrived), <code>search:NAME</code>, <code>journal:NAME</code>, <code>source:QUERY</code> or <code>-</code> (stdin, raw
 text: follow it with a parser node such as <code>code:parse-csv</code>, see <a href="/docs/pipes/#parsers">pipes</a>) as
 sources; <code>code:SPACE</code>; <code>view:table|chart[:col,col]</code>; <code>filter:SEARCH</code>; <code>model:NAME</code>.
+Code nodes take options: <code>b=code:to-bars?symbol=BTC/USDT&amp;duration=5m</code>.
 Saves along the way: <code>raw=code:fast+journal:Raw</code>. Edges are <code>FROM&gt;TO[:NAME]</code> and chain
 (<code>a&gt;b&gt;c</code>); a code space with several inputs reads <code>host.input()</code> (the first) or
 <code>host.input_named(&quot;NAME&quot;)</code> and <code>host.inputs()</code> (the names); a math space writes
@@ -141,6 +143,16 @@ next run or chunk.</li>
 <li>Pipelines over Share and <code>net share</code>/<code>net fetch</code> (peer pipelines as drafts) (done).</li>
 <li>Saves to projects, orgs and the network.</li>
 </ol>
+<h2 id="bars-from-ingested-files">Bars from ingested files</h2>
+<p>Ingest never makes bars; a pipeline you set up does:</p>
+<pre><code>mnnn ingest csv --path ~/raw/binance/BTCUSDT_5m.csv          # stored as is, source &quot;binance&quot;
+mnnn code parsers --install
+mnnn pipeline create btc --node src=source:binance --node p=code:parse-csv \
+  --node 'b=code:to-bars?symbol=BTC/USDT&amp;duration=5m' --node m=model:bars --edge 'src&gt;p&gt;b&gt;m'
+mnnn pipeline run btc -y
+</code></pre>
+<p>Run it again after more files arrive: the <code>model:bars</code> leaf adds only bars that are not
+there yet.</p>
 <p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/pipelines.md">Edit this page on GitHub</a></p>
 </main>
 </div>
