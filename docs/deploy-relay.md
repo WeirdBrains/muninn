@@ -97,6 +97,29 @@ systemctl enable --now muninn-relay
 `mnnn net start` runs the node in the foreground until stopped, which is what systemd
 wants; there is no separate daemon.
 
+### Set or correct the advertised public address
+
+Before starting the relay, run this as its service account, with the **same
+`MUNINN_HOME` and password environment as the service** (see section 4):
+
+```sh
+mnnn net config --clear-external --external relay.muninn.weirdbrains.com:4741
+```
+
+`--external` belongs to `net config`, not `net start`. The service's
+`mnnn net start --relay-server --no-mdns` uses the saved settings. If it is already
+running, restart it after changing the settings: `systemctl restart muninn-relay`.
+`--clear-external` removes stale advertised addresses; omit it when deliberately
+retaining other valid ones. Repeat `--external` to advertise multiple addresses.
+A DNS `host:port` expands to TCP and QUIC multiaddrs; explicit IP or DNS multiaddrs
+are also accepted. No peer ID is needed in this setting.
+
+Listening/binding on `0.0.0.0` accepts traffic on local interfaces; it does not name
+the public address peers should dial. Advertising a public address does not create
+DNS records, forward ports, or open firewalls. Check DNS and allow the relevant
+TCP/UDP 4741 traffic separately. Confirm the server's `mnnn --version` and
+`mnnn net config --help` before applying instructions from a newer release.
+
 ## 6. Firewall
 
 Allow only SSH, the node and relay port, and port 80 for ACME (8443 only if the site
@@ -163,3 +186,74 @@ systemctl status muninn-relay
 
 For more detail add `Environment=MUNINN_LOG=debug` (or `libp2p=info,debug`) to the unit
 and restart.
+
+## 10. Verify discovery and actual delivery
+
+On each client, using its own intended home, inspect:
+
+```sh
+mnnn --version
+mnnn net status --json
+mnnn net relay list --json
+mnnn net peers --json
+```
+
+A configured relay alone is not evidence of a live reservation. Check the running
+node's active relay connection, `reservations`, and externally usable circuit
+addresses ending in `/p2p/<RELAY_ID>/p2p-circuit/p2p/<CLIENT_ID>`. Compare the relay's
+current public peer ID from its status with the client configuration. Compare DNS
+A/AAAA answers with advertised addresses; stale/private/loopback relay addresses
+are not usable by arbitrary internet clients. Do not expose passwords or recovery
+words while collecting diagnostics.
+
+Record discovery **before** generating invites: do the two fresh client identities
+appear in each other's peer inventory and active connection list? Automatic peer
+discovery was observed through the public relay in the November 6, 2026 test; do
+not assume that sharing a relay either guarantees discovery or cannot discover
+peers. An active transport connection is also distinct from an approved key
+exchange, and a saved connected/exchange label does not prove message delivery.
+
+To distinguish discovery from connection approval and delivery, test only between
+identities you control:
+
+```sh
+# A, with its node running:
+mnnn net invite
+# B, with its node running:
+mnnn net connect '<A invite link>'
+# A, if approval is pending:
+mnnn net requests
+mnnn net accept '<request ID or node name>'
+# A:
+mnnn msg send '<B peer ID>' 'A-to-B relay test' --json
+# B:
+mnnn msg send '<A peer ID>' 'B-to-A relay test' --json
+# Both:
+mnnn msg list --json
+```
+
+Invites contain no secret and expire after seven days, but include node identity
+and addresses; share them only with the intended tester. Match each sent message
+ID to an incoming record on its recipient, not just a successful command or a
+persisted peer label. Capture exact errors and transport logs for either direction.
+
+For a cross-network claim, use separate networks and verify the active circuit
+transport rather than a direct LAN/VPN/loopback connection. Even an explicit
+circuit-target dial can coexist with a direct connection after hole punching;
+inspect the actual transport during message delivery. Do not change production
+firewalls/routes merely to make a test appear relay-only.
+
+### Dated probe evidence (November 6, 2026, EST)
+
+Two isolated 2.22.0 clients on the same alien-blue computer authenticated the public
+relay, obtained reservations, and discovered one another before explicit pairing.
+The relay identified itself as 2.20.0 and advertised addresses that differed from
+DNS, including private/loopback addresses. Clients logged repeated
+`Dropping in-flight connect request because we are at capacity` warnings. These are
+investigation leads, not proven causes of cross-network delivery failure; do not
+copy the observed transient IP addresses into deployment defaults.
+
+Explicit pairing and messages in both directions succeeded with recipient records,
+but direct loopback sockets were present. This test therefore does **not** prove
+relay-only or separate-network delivery. Check installed versions, advertised
+addresses, circuit selection, and actual bidirectional receipts when reproducing.
