@@ -2,8 +2,8 @@
 
 The Muninn website is a static front page, built with [Jaspr](https://jaspr.site) (Dart) in
 `site/`, plus these docs as pages under `/docs/`. It uses the app's default theme (Tokyo Night: its colours, dark and light) and
-the MUNINN header art, shows a hero screenshot under the header and a Screenshots section
-(one captioned shot per feature, lazy-loaded), and links the releases, the docs and the install steps.
+the MUNINN header art, shows matched screenshot pairs (the same view, data and theme in the Flutter app and the
+terminal UI, labelled) under the header and in a Screenshots section, and links the releases, the docs and the install steps.
 
 Every `docs/**/*.md` except `docs/historical` is published at `/docs/<slug>/` (`docs/README.md`
 is `/docs/`, `services/redis.md` is `/docs/services/redis/`), with a sidebar grouped like
@@ -14,8 +14,10 @@ The pages are generated from `docs/` on every build, so they never drift.
 | file | what |
 |------|------|
 | `site/lib/app.dart` | the page: header art, hero shot, features, screenshots, install steps, docs links |
-| `site/lib/shots.dart` | the hero and screenshot list (written by `scripts/screenshots.sh`) |
-| `site/web/screenshots/` | the screenshots (PNG, 1464x890) |
+| `site/lib/pairs.dart` | the matched Flutter app / terminal UI screenshot pairs shown on the page (the first is the hero) |
+| `site/lib/shots.dart` | the TUI feature screenshot list written by `scripts/screenshots.sh` (README only; not on the page) |
+| `site/web/screenshots/` | the TUI feature screenshots used by the README and docs (PNG, 1464x890) |
+| `site/web/screenshots/pairs/` | the matched pairs (`app-*.png`, `tui-*.png`, 1464x890), captured from the running apps |
 | `site/lib/main.server.dart` | the entry point: the document and its stylesheet |
 | `site/web/styles.css` | the theme colours as CSS variables (including the logo's `--muninn-header`, `--muninn-accent`, `--muninn-bg`), and the layout |
 | `site/web/logo/` | the Muninn raven (by Matematik): `muninn-raven.svg` (tile), `-mark` (bare raven), `-small` (16–32 px); used exactly as delivered |
@@ -46,8 +48,11 @@ tool/check.sh
 `~/.muninn`), which drives the TUI through each feature, some mid-action, and renders each
 screen to HTML; headless Chromium turns those into PNGs and ImageMagick shrinks them into
 `site/web/screenshots/`. It then rewrites `site/lib/shots.dart` and the README's screenshot
-block. `HERO=name` picks the hero (default `pipeline-live`). It needs `chromium` and
-`magick`. Run it when a view changes, then rebuild the site.
+block. It needs `chromium` and `magick`. Run it when a view changes.
+
+The front page shows only `site/web/screenshots/pairs/`: each view captured from the
+running Flutter app and the running TUI on the same data, theme (Tokyo Night, dark) and
+size, with any data-dir path in the header covered. Retake both halves of a pair together.
 
 ## Checks
 

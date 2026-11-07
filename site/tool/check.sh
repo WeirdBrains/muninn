@@ -28,7 +28,8 @@ srcs=$(grep -oE 'src="screenshots/[^"]+\.png"' "$html" | sed 's/^src="//;s/"$//'
 [ -n "$srcs" ] || { echo "index.html shows no screenshots" >&2; exit 1; }
 for f in $srcs; do test -f "$out/$f" || { echo "missing image: $out/$f" >&2; exit 1; }; done
 if tr '\n' ' ' <"$html" | grep -oE '<img [^>]*>' | grep -v 'alt="[^"]' >/dev/null; then echo "an img has no alt text" >&2; exit 1; fi
-hero=$(tr '\n' ' ' <"$html" | grep -oE 'class="hero-shot">[[:space:]]*<img [^>]*src="[^"]+"' | grep -oE 'screenshots/[^"]+' | head -1 || true)
+hero=$(tr '\n' ' ' <"$html" | grep -oE 'class="hero-shot">.{0,400}<img [^>]*src="[^"]+"' | grep -oE 'screenshots/[^"]+' | head -1 || true)
+for label in 'Flutter app' 'Terminal UI'; do grep -qF "<figcaption>$label</figcaption>" "$html" || { echo "no $label label on the screenshot pairs" >&2; exit 1; }; done
 [ -n "$hero" ] || { echo "no hero image under the header" >&2; exit 1; }
 pages=$(find "$out" -maxdepth 1 -name '*.html' | wc -l)
 [ "$pages" -eq 1 ] || { echo "expected one front page, found $pages" >&2; exit 1; }

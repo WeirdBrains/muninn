@@ -117,46 +117,34 @@ fn shot_refs(text: &str) -> Vec<String> {
 }
 
 #[test]
-fn the_site_shows_a_hero_and_a_screenshot_per_feature() {
+fn the_site_shows_matched_app_and_tui_screenshot_pairs() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let app = read("site/lib/app.dart");
     for want in [
-        "import 'shots.dart'",
+        "import 'pairs.dart'",
         "'hero-shot'",
-        "heroShot.$1",
+        "pairs.first",
         "id: 'screenshots'",
         "href: '#screenshots'",
         "Component.text('Screenshots')",
         "MediaLoading.lazy",
-        "alt: caption",
+        "alt: s.$2",
         "figcaption",
+        "'Flutter app'",
+        "'Terminal UI'",
     ] {
         assert!(app.contains(want), "site/lib/app.dart lacks {want}");
     }
-    let shots = read("site/lib/shots.dart");
-    let hero = shots.split("heroShot").nth(1).and_then(|h| shot_refs(h).into_iter().next()).expect("shots.dart has no heroShot");
-    let all = shot_refs(&shots);
-    assert!(all.len() >= 20, "only {} screenshots", all.len());
-    for f in all.iter().chain([&hero]) {
-        assert!(root.join("site/web").join(f).exists(), "site shows {f}, which is missing");
+    assert!(!app.contains("shots.dart"), "the old screenshot gallery is still on the page");
+    let pairs = read("site/lib/pairs.dart");
+    let all = shot_refs(&pairs);
+    assert!(all.len() >= 4 && all.len() % 2 == 0, "{} screenshots is not a set of pairs", all.len());
+    for p in all.chunks(2) {
+        assert!(p[0].contains("/app-") && p[1].contains("/tui-"), "{p:?} is not an app/TUI pair");
+        assert_eq!(p[0].replace("/app-", "/"), p[1].replace("/tui-", "/"), "unmatched pair {p:?}");
     }
-    for feature in [
-        "home",
-        "live-searches",
-        "journals",
-        "reports",
-        "rule-scheduled",
-        "model-template-import",
-        "code-chart",
-        "pipeline-designer",
-        "pipeline-live",
-        "pipes",
-        "org-domain",
-        "reviews",
-        "peers",
-        "share-picker",
-    ] {
-        assert!(all.iter().any(|f| f == &format!("screenshots/{feature}.png")), "no {feature} screenshot");
+    for f in &all {
+        assert!(root.join("site/web").join(f).exists(), "site shows {f}, which is missing");
     }
 }
 

@@ -2,7 +2,7 @@ import 'package:jaspr/jaspr.dart';
 import 'package:jaspr/dom.dart';
 
 import 'logo.dart';
-import 'shots.dart';
+import 'pairs.dart';
 
 const repo = 'https://github.com/WeirdBrains/muninn';
 const releases = '$repo/releases';
@@ -11,6 +11,32 @@ const shotWidth = 1464;
 const shotHeight = 890;
 const installDoc = '/docs/install/';
 const homepage = 'https://muninn.weirdbrains.com';
+
+typedef Shot = (String, String);
+
+/// One matched pair: the Flutter app and the terminal UI side by side, labelled.
+Component pair((String, Shot, Shot) p, {bool lazy = true}) {
+  final (title, app, tui) = p;
+  Component side(String label, Shot s) => figure(classes: 'pair-side', [
+    a(href: s.$1, [
+      img(
+        src: s.$1,
+        alt: s.$2,
+        width: shotWidth,
+        height: shotHeight,
+        loading: lazy ? MediaLoading.lazy : null,
+      ),
+    ]),
+    figcaption([Component.text(label)]),
+  ]);
+  return div(classes: 'pair', [
+    h3([Component.text(title)]),
+    div(classes: 'pair-shots', [
+      side('Flutter app', app),
+      side('Terminal UI', tui),
+    ]),
+  ]);
+}
 
 /// The released version (scripts/release.sh bumps it; tests/site.rs checks it).
 const version = '2.22.0';
@@ -29,15 +55,7 @@ class App extends StatelessComponent {
           [RawText(ravenTile)],
         ),
         h1(classes: 'sr-only', [Component.text('Muninn')]),
-        figure(classes: 'hero-shot', [
-          img(
-            src: heroShot.$1,
-            alt: heroShot.$2,
-            width: shotWidth,
-            height: shotHeight,
-          ),
-          figcaption([Component.text(heroShot.$2)]),
-        ]),
+        div(classes: 'hero-shot', [pair(pairs.first, lazy: false)]),
         p(classes: 'tagline', [
           Component.text(
             'A local, encrypted workbench for market data: ingest, search, journal, model and share, in a terminal UI and a CLI.',
@@ -66,24 +84,10 @@ class App extends StatelessComponent {
         h2([Component.text('Screenshots')]),
         p(classes: 'muted', [
           Component.text(
-            'Every view in the TUI, rendered from the app itself by scripts/screenshots.sh.',
+            'The same view, data and theme in the Flutter app and the terminal UI.',
           ),
         ]),
-        div(classes: 'shots', [
-          for (final (file, caption) in shots)
-            figure([
-              a(href: file, [
-                img(
-                  src: file,
-                  alt: caption,
-                  width: shotWidth,
-                  height: shotHeight,
-                  loading: MediaLoading.lazy,
-                ),
-              ]),
-              figcaption([Component.text(caption)]),
-            ]),
-        ]),
+        for (final p in pairs.skip(1)) pair(p),
       ]),
       section(id: 'install', classes: 'install', [
         h2([Component.text('Install')]),
