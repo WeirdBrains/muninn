@@ -100,7 +100,12 @@ wants; there is no separate daemon.
 ### Set or correct the advertised public address
 
 Before starting the relay, run this as its service account, with the **same
-`MUNINN_HOME` and password environment as the service** (see section 4):
+`MUNINN_HOME` and password environment as the service** (see section 4). For the
+shipped unit this means user/group `muninn`, `MUNINN_HOME=/var/lib/muninn`, and the
+password environment loaded from `/etc/muninn/relay.env`. Do not print the password
+or pass it as a command-line argument. Running the command as your login user
+without the service's home override changes a different store; restarting the
+service does not transfer those settings:
 
 ```sh
 mnnn net config --clear-external --external relay.muninn.weirdbrains.com:4741
@@ -119,6 +124,30 @@ the public address peers should dial. Advertising a public address does not crea
 DNS records, forward ports, or open firewalls. Check DNS and allow the relevant
 TCP/UDP 4741 traffic separately. Confirm the server's `mnnn --version` and
 `mnnn net config --help` before applying instructions from a newer release.
+
+After restarting, run this in the **same service account, home, and password
+environment**, not your login user's default home:
+
+```sh
+mnnn net status --json
+```
+
+A successful restart alone does not confirm that the intended settings are active.
+Check that the node is running, then compare `settings.external_addresses` (saved
+configuration) with `status.external` (the running node's external multiaddrs).
+For the hostname above, the saved value should be
+`relay.muninn.weirdbrains.com:4741`; the active addresses should include
+`/dns4/relay.muninn.weirdbrains.com/tcp/4741` and
+`/dns4/relay.muninn.weirdbrains.com/udp/4741/quic-v1`. Changing saved settings leaves
+the already-running node's addresses unchanged until restart; this was tested on
+2.22.0. Verify the actual server version rather than assuming an older binary has
+the same behavior.
+
+On a fresh client connected to the relay, use `mnnn net peers --json` to inspect
+what it actually learns about the relay. Compare those addresses with the intended
+public name and current DNS A/AAAA records, and confirm the current relay peer ID.
+Saved configuration, active external addresses, and peer-observed advertisements
+are separate checks; investigate discrepancies before declaring the setup fixed.
 
 ## 6. Firewall
 
