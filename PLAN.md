@@ -4,23 +4,294 @@ Muninn 2.0 is complete (v2.0.0 through v2.20.0). Its full plan, announcement and
 changelog are archived in [`docs/historical/2.0/`](docs/historical/2.0/), and 1.0's in
 [`docs/historical/1.0/`](docs/historical/1.0/).
 
+
 ## Phases
 
 | Phase | Feature set | Version | Status |
 | ----- | ----------- | ------- | ------ |
-| 1 | [Ingest Connector Plugins + Scheduler](#ingest-connector-plugins--scheduler): scheduled ingest plugins that store raw data, pipe it to a model and call a rule set; a system scheduler with `schedules` and `schedule_runs` | v2.23.0 | 📝 Planned (open questions below) |
+| 1 | [Plugins](#plugins): a required `kind` in every plugin manifest, `mnnn plugins` with `migrate`, a Plugins menu per kind; and [Code Spaces](#code-spaces-menu-and-cli) as a main menu and CLI entry | v2.23.0 | 📝 Planned |
+| 2 | [Rule Sets + Scheduler](#rule-sets--scheduler): a first-class `rulesets` table, the system scheduler with `schedules` and `schedule_runs`, scheduled rules moved onto it, `rule tick` deprecated | v2.24.0 | 📝 Planned |
+| 3 | [Ingest Connector Plugins](#ingest-connector-plugins): plugins of kind `ingest-connector`, managed under Plugins ▸ Ingest connectors, run on a schedule; they store raw data, call a pipeline and a rule set | v2.25.0 | 📝 Planned |
+| 4 | [Shares: Create Then Share](#shares-create-then-share): wherever a share can be added, the thing can be created there too | v2.26.0 | 📝 Planned |
+
+**Order:** phase 1 comes first because connectors are a plugin kind and need `kind` and `migrate`. Code spaces get their main menu at the same time, because both reshape the menus. Phase 2 (rule sets and the scheduler) is the engine connectors run on; it also moves today's scheduled rules. Phase 3 then needs little more than the plugin kind and host methods. Phase 4 is independent and can move earlier if Michael wants. Each phase is a minor release. App work in every phase (the Flutter app, `app/`) is **Matematik's area**: here it is planned only as surfaces matching the TUI, through `muninn-ffi`.
 
 ## Next phase
 
-To be planned with Michael.
+Phase 1, [Plugins](#plugins), once Michael confirms the open questions.
 
 ---
 
-## Ingest Connector Plugins + Scheduler
+## Plugins
 
-> **Phase 1 · v2.23.0 · 📝 Planned: open questions first**
+> **Phase 1 · v2.23.0 · 📝 Planned**
 
-An ingest connector plugin fetches data on a schedule, pipes it into a model, then runs a rule set. A system scheduler service runs every schedule.
+### Michael's words
+
+"Put the ability to manage ingestion plugins in a new menu category: plugins -> ingest connectors.
+- All plugins can be managed from plugins -> <plugin kind>
+- All plugins must now have a kind field in their manifest
+- A plugins subcommands should be added to the CLI
+  - It should include a migrate subcommand to migrate old plugins"
+
+### Today
+
+- There is no manifest file. A plugin is a code space (`code_spaces` row: `lang`, `source`, approval hash) built into a native library. Its only self-description is `muninn_plugin_info()`, static JSON `{"sdk": "1.0.0", "lang": "rust"}`. A prebuilt plugin (`--lang plugin`) is a library made elsewhere with `mnnn code sdk`.
+- Kinds exist only by convention:
+  - the built-in **parsers** `parse-csv`, `parse-json`, `parse-ndjson` (`mnnn code parsers`)
+  - the **transform** `to-bars`, used as `code:NAME` steps in pipes and pipelines
+  - everything else: **analysis** code spaces run for a table/chart view (`mnnn code run`, `@view`)
+- They are managed as code spaces: `mnnn code …` (alias `codes`), the TUI's **Projects ▸ Code spaces…**, and the app's Projects windows.
+
+### The manifest and `kind`
+
+- **Manifest** = the plugin's info JSON, extended. The SDK adds `"kind"` (and `name`, `version`, `description`), read from a `@kind` header in the source or set at build time: `{"sdk": "1.1.0", "lang": "rust", "kind": "parser", "name": "parse-csv", "version": "1"}`. The `code_spaces` table gets `kind TEXT` to match, so lists don't load libraries.
+- **Kinds (v1):** `parser` (raw bytes → rows), `transform` (frame → frame, a pipe step), `analysis` (runs for a view), `ingest-connector` (phase 3).
+- **Validation:**
+  - `kind` is required: lowercase, one of the known kinds, and the same in the library and its `code_spaces` row.
+  - An unknown kind is rejected and the error lists the known ones.
+  - The kind also decides where a plugin may be used. A parser or transform can be a `code:` pipe step; an `ingest-connector` only runs from a schedule; `analysis` runs on its own or over a share.
+- **Without a kind:** loading, running, building or approving a plugin with no kind is **rejected**: "plugin NAME has no kind; run `mnnn plugins migrate` (or `mnnn plugins migrate NAME --kind KIND`)". Nothing runs half-migrated. Until then, the TUI and app show a "needs migrating" badge with a Migrate button.
+- **SDK:** the SDK goes to 1.1.0 with `plugin!(run, kind = "parser")`. ABI version 1 is unchanged: only the info JSON gains fields.
+
+### `mnnn plugins`
+
+```
+mnnn plugins list [--kind K] [--json]            # name, kind, lang, approved, enabled, source of truth
+mnnn plugins info NAME [--json]                  # the manifest, approval, where used (pipes, pipelines, schedules)
+mnnn plugins install PATH|SPACE --kind K [--name N]   # a prebuilt library, or a code space as a plugin
+mnnn plugins remove NAME                         # asks; -y skips; refuses while a schedule uses it unless --force
+mnnn plugins enable|disable NAME                 # disabled plugins don't run (pipes, pipelines and schedules fail clearly)
+mnnn plugins migrate [NAME…] [--kind K] [--dry-run] [--yes] [--no-backup]
+```
+
+`migrate`:
+- **Infers the kind** for each plugin without one:
+  - the built-in parsers → `parser`
+  - `to-bars`, and any plugin used only as `code:` steps → `transform`
+  - one with an `@view` or run on its own → `analysis`
+  - Anything ambiguous is asked about, unless `--kind`; with `--yes`, unclear ones are skipped and listed.
+- **Rewrites:**
+  - sets `code_spaces.kind`
+  - adds `@kind` to the source of source-built plugins
+  - rebuilds them; the approval stays when only the header changed (Q-P3)
+  - prebuilt libraries can't be rewritten: their kind is recorded on the row, and `info` says to rebuild with SDK 1.1.0
+- **Backups:** writes `MUNINN_HOME/backups/plugins-migrate-<UTC timestamp>.tar.zst` first (rows and sources), unless `--no-backup`.
+- **`--dry-run`:** prints each plugin, the kind it would get and why, and changes nothing.
+- **History:** a `plugins.migrate` action is recorded.
+- The first start of 2.23 offers to migrate once.
+
+### Menus
+
+- **TUI:** a new **Plugins** main menu, with one entry per kind: **Parsers…**, **Transforms…**, **Analysis…**, **Ingest connectors…** (phase 3), plus **All plugins…** and **Migrate…**. Each opens a Plugins window filtered to the kind, with `n` new or install, Enter info, `e` edit (opens the code space), Space enable or disable, `d` remove and `m` migrate.
+  - The bar becomes File, View, Data, Projects, **Code**, **Plugins**, Net, Orgs, Keys, Theme, Help: eleven categories, which no longer fit in 80 columns. Q-P1 asks how to handle that.
+- **App** (Matematik): a **Plugins** destination with the same per-kind sub-entries, under "More" on phones.
+
+### Docs and tests
+
+- **Docs:** `docs/plugins.md` (kinds, the manifest, `mnnn plugins`, migrate); `docs/code-spaces.md` (SDK 1.1, `@kind`); `docs/menus.md`; `docs/keybindings.md`; man pages.
+- **Tests:**
+  - kind validation, including rejecting a plugin without a kind with the migrate hint
+  - inference for each built-in and for usage patterns
+  - migrate `--dry-run` changes nothing, the backup round-trips, and running migrate twice changes nothing
+  - a disabled plugin fails pipes clearly
+  - TUI menu, window and key tests; FFI and app tests against the fake API
+
+## Code Spaces Menu and CLI
+
+> **Phase 1 · v2.23.0 · 📝 Planned**
+
+### Michael's words
+
+"There should be a main menu category for code spaces in the TUI and App, and a subcommand in the CLI."
+
+### Today and plan
+
+- **CLI:** `mnnn code` already exists (alias `mnnn codes`) with list, create, edit, show, approve, build, run, check, remove, sdk and parsers. The plan keeps `mnnn code` and adds `mnnn code-spaces` as a second alias, rather than renaming (Q-C1).
+- **TUI:** code spaces move from **Projects ▸ Code spaces…** to a main **Code** menu, Alt+C, with:
+  - Code spaces…
+  - New code space…
+  - New from a parser ▸
+  - Run…
+  - Build…
+  - Check toolchains
+  - Live pipes…
+  - Pipelines…
+  - Plugin SDK…
+
+  Pipes and pipelines move with it (Q-C2). Projects ▸ Code spaces… stays one release as a pointer.
+- **App** (Matematik): a **Code spaces** main destination with the same items.
+- **Code spaces and Plugins:** a code space is the source you write; a plugin is what it builds, plus prebuilt libraries. Code ▸ manages sources, and Plugins ▸ manages kinds and installs. Both open the same item.
+- **Tests:** menu and keybinding tests, and the alias in the CLI tests. Help topics and the docs (`menus.md`, `code-spaces.md`) are updated.
+
+## Rule Sets + Scheduler
+
+> **Phase 2 · v2.24.0 · 📝 Planned (Michael answered Q1, Q2 and Q5)**
+
+### Rule sets as a table (Michael: "add a first-class `rulesets` table")
+
+```sql
+CREATE TABLE rulesets (
+    id TEXT PRIMARY KEY,                        -- uuid
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    description TEXT NOT NULL DEFAULT '',
+    owner_kind TEXT NOT NULL DEFAULT 'standalone'
+        CHECK (owner_kind IN ('standalone','project','journal','search','model','org')),
+    owner_id TEXT,                              -- NULL when standalone
+    enabled INTEGER NOT NULL DEFAULT 1,
+    author_id TEXT,
+    created_at INTEGER NOT NULL,                -- epoch ms, UTC
+    updated_at INTEGER NOT NULL
+);
+CREATE TABLE ruleset_rules (
+    ruleset_id TEXT NOT NULL REFERENCES rulesets(id) ON DELETE CASCADE,
+    rule_id TEXT NOT NULL REFERENCES rules(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,                  -- run order
+    PRIMARY KEY (ruleset_id, rule_id)
+);
+CREATE INDEX ruleset_rules_rule ON ruleset_rules(rule_id);
+```
+
+- A rule can be in any number of rule sets, and a rule set runs its enabled rules in `position` order.
+- **Running a rule set** on an action means each rule's `--if` is checked against it, then its `then` actions run. This is today's rule engine, scoped to the set's members.
+- Event-triggered rules (`--on import`, …) still react to every action, whatever sets they are in.
+- **Migration from project rule sets:** each project's rules (`project_items` of kind rule) become a rule set owned by that project, named after it, keeping the order they were added in. Projects keep showing "Rules" as before, now from their rule set. This runs once and is recorded as a `ruleset.migrate` action.
+- Rule sets are shareable and an org resource kind, like rules (phase 4 adds create-then-share).
+
+**CLI:**
+
+```
+mnnn ruleset list|show|create|edit|remove NAME
+mnnn ruleset add|drop NAME RULE [--position N]
+mnnn ruleset run NAME [--action ID] [--dry-run]
+```
+
+`mnnn rulesets` is an alias, and `mnnn rule create --ruleset NAME` adds the new rule to a set.
+
+**Menus:**
+- **TUI:** Projects ▸ **Rule sets…** sits next to Rules…. Its window has `n` new, `a` add rule, `x` drop rule, `J`/`K` reorder, `r` run (dry-run first) and `s` schedule.
+- **App** (Matematik): the same window.
+
+### Schedules (Michael: scheduled rules move onto the new table; cron supported; a schedule targets a connector or a rule set)
+
+```sql
+CREATE TABLE schedules (
+    id TEXT PRIMARY KEY,                       -- uuid
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    target_kind TEXT NOT NULL CHECK (target_kind IN ('connector','ruleset')),
+    plugin_id TEXT REFERENCES code_spaces(id) ON DELETE CASCADE,      -- the "ingest plugin name" (connector schedules)
+    ruleset_id TEXT REFERENCES rulesets(id) ON DELETE SET NULL,        -- the "ruleset id"
+    source_id TEXT REFERENCES sources(id) ON DELETE CASCADE,           -- connector: where raw items land
+    pipeline_id TEXT REFERENCES pipelines(id) ON DELETE SET NULL,      -- connector: turns them into model records
+    options TEXT NOT NULL DEFAULT '{}',        -- JSON for host.option()
+    run_every TEXT,                            -- as written: "500ms", "30s", "15m", "6h", "1d", "1M"
+    every_ms INTEGER,                          -- parsed ms/s/m/h/d; NULL for months or cron
+    every_months INTEGER,                      -- parsed M; NULL otherwise
+    cron TEXT,                                 -- five fields, as scheduled rules use today
+    enabled INTEGER NOT NULL DEFAULT 1,
+    overlap TEXT NOT NULL DEFAULT 'skip' CHECK (overlap IN ('skip','queue')),
+    catch_up TEXT NOT NULL DEFAULT 'once' CHECK (catch_up IN ('once','all','none')),
+    max_attempts INTEGER NOT NULL DEFAULT 3,
+    next_run_at INTEGER NOT NULL,              -- epoch ms, UTC
+    author_id TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    CHECK ((run_every IS NULL) <> (cron IS NULL)),
+    CHECK (target_kind <> 'connector' OR (plugin_id IS NOT NULL AND source_id IS NOT NULL)),
+    CHECK (target_kind <> 'ruleset' OR ruleset_id IS NOT NULL)
+);
+CREATE INDEX schedules_due ON schedules(enabled, next_run_at);
+
+CREATE TABLE schedule_runs (
+    id INTEGER PRIMARY KEY,
+    schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending','running','success','failed')),
+    timestamp INTEGER NOT NULL,                -- the spec's "timestamp (in UTC)": when the run was due, epoch ms
+    attempt INTEGER NOT NULL DEFAULT 1,
+    claimed_by TEXT,
+    heartbeat_at INTEGER,
+    started_at INTEGER,
+    finished_at INTEGER,
+    stored INTEGER NOT NULL DEFAULT 0,         -- raw items stored (connector)
+    bytes INTEGER NOT NULL DEFAULT 0,
+    inserted INTEGER NOT NULL DEFAULT 0,       -- model records added by host.pipe
+    piped INTEGER NOT NULL DEFAULT 0,          -- host.pipe calls that succeeded
+    ruleset_ran INTEGER NOT NULL DEFAULT 0,    -- host.run_ruleset calls that succeeded
+    warnings TEXT NOT NULL DEFAULT '[]',       -- JSON: failed host calls the plugin carried on past
+    error TEXT,
+    action_id INTEGER REFERENCES actions(id)
+);
+CREATE INDEX schedule_runs_schedule ON schedule_runs(schedule_id, timestamp);
+CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pending','running');
+```
+
+### run_every (Michael: case-sensitive `ms`, `s`, `m`, `h`, `d`, `M`)
+
+- `N` followed by a unit: **`ms`** milliseconds, **`s`** seconds, **`m`** minutes, **`h`** hours, **`d`** days, capital **`M`** months. N is a positive integer.
+- Units are case-sensitive: `1m` is a minute and `1M` is a month. `MS`, `S`, `H`, `D` and `mo` are rejected with a hint that lists the units.
+- `ms`–`d` become `every_ms`. `M` becomes `every_months`, stepped by calendar month in UTC and clamped to the month's last day, keeping the original day of month (Jan 31 → Feb 28/29 → Mar 31).
+- `next_run_at` advances from the due time, not the finish time, so it doesn't drift.
+- **Floor (default accepted pending objection):** the scheduler ticks every second, so anything under 1 s runs at most once per tick.
+- **Old scheduled rules** also allow `w` (week). It is kept as an alias that is stored as `7d`, and the old one-minute minimum goes away.
+- **cron:** the same five-field syntax, in local time, as scheduled rules have now (Q-S1 asks about UTC).
+
+### The scheduler service
+
+- **Where it runs (default accepted pending objection):** inside the running node (the TUI or `mnnn net start`, which also hosts the network and the org site). Headless, it runs as `mnnn scheduler run [--for SECS]`, and `mnnn scheduler tick` runs what is due once (cron or systemd). One active scheduler per database takes a lease (`scheduler_lease`, refreshed every tick) and the others stand by.
+- **Claiming:** a single `BEGIN IMMEDIATE` transaction selects due schedules, inserts `pending` runs and advances `next_run_at`. A schedule is never claimed twice.
+- **Transitions:** `pending → running` (sets `started_at`, `claimed_by`, `heartbeat_at`) → `success` or `failed` (sets `finished_at`, `error`). There are no other edges. All times are epoch ms, UTC.
+- **Retries (default accepted pending objection):** a failed attempt with `attempt < max_attempts` gets a new `pending` row (`attempt + 1`, same `timestamp`), with backoff of 30 s doubling up to 1 h.
+- **Crash recovery:** a `running` run whose heartbeat is more than 2 minutes old becomes `failed` (`error = "abandoned"`) and is retried.
+- **Missed runs and overlap (default accepted pending objection):**
+  - `catch_up = once` runs one run for the latest missed slot; `all` runs each missed slot, oldest first, capped at 100; `none` skips ahead.
+  - `overlap = skip` skips a slot while the previous run of the same schedule is open; `queue` keeps one pending run behind it.
+  - At most 4 schedules run at once (`scheduler.workers`).
+- **Rule-set target:** a `schedule` action naming the schedule is recorded, then the rule set runs on it (each rule's `--if` sees `schedule` and `name`). The run is `success` when the set ran; a then-action error makes it `failed`.
+
+### Moving scheduled rules onto it (Michael: Q5)
+
+- **Migration (once, on opening a 2.24 database):** each rule whose `spec.schedule` is set (`--every` or `--cron`) becomes:
+  - a rule set `NAME (scheduled)` containing just that rule, plus a schedule targeting it with the same interval or cron
+  - `next_run_at` taken from the rule's `last_run_at` and interval, so nothing runs early or twice
+  - the `schedule` field removed from the rule's spec
+- The built-in **cert-expiry-watch** moves the same way: rule set `cert-expiry-watch`, a schedule every 6 hours. It is still made the first time an org gets a domain.
+- The migration is recorded as a `schedule.migrate` action and covered by the database backup taken before migrations.
+- **Compatibility:** `mnnn rule create|edit --every/--cron` keeps working for one release. It creates or edits the rule set and schedule for you, and prints a one-line deprecation note pointing to `mnnn schedule add`. The TUI's "on: every 6h" field does the same.
+- **`rule tick` deprecation:** in 2.24 `mnnn rule tick` runs `mnnn scheduler tick` and warns "deprecated: use `mnnn scheduler tick`". It is removed in 3.0. The docs change cron and systemd examples to `scheduler tick`. The TUI and org host stop checking rules themselves and run the scheduler instead.
+
+### Surfaces
+
+- **CLI:**
+  - `mnnn schedule add NAME (--plugin P --source S [--pipeline PL] | --ruleset R) (--every N[ms|s|m|h|d|M] | --cron "…") [--ruleset R] [--option k=v]… [--overlap skip|queue] [--catch-up once|all|none] [--max-attempts N]`
+  - `mnnn schedule list|show|edit|enable|disable|remove|run-now NAME`
+  - `mnnn schedule runs NAME [--status S] [--json]`
+  - `mnnn scheduler run|tick|status`
+- **TUI:** Projects ▸ **Schedules…** (a schedule window: `n`, `e`, Space, `r` run now, Enter runs), with the scheduler's state in the status bar.
+- **App** (Matematik): the same.
+
+### Tests
+
+- The migration of project rule sets and of scheduled rules, on a 2.22 database:
+  - the same next runs
+  - nothing runs twice
+  - the cert watcher keeps working
+- run_every parsing, including case sensitivity (`1m` vs `1M`, rejecting `1MS` and `1mo`) and month clamping. cron stepping (existing tests move).
+- Scheduler, with a fake clock:
+  - lease and claim-once under two schedulers
+  - each status edge
+  - retries with backoff
+  - abandonment
+  - catch_up
+  - overlap
+  - the worker cap
+- `rule tick` deprecation warning. CLI, TUI, FFI and app tests.
+
+## Ingest Connector Plugins
+
+> **Phase 3 · v2.25.0 · 📝 Planned (Michael answered Q1–Q5)**
+
+An ingest connector plugin fetches data on a schedule, stores it raw, pipes it into a model with a pipeline and calls a rule set. Connectors are managed under **Plugins ▸ Ingest connectors** (Michael).
 
 ### Michael's spec (verbatim)
 
@@ -44,146 +315,130 @@ A system scheduler service needs to be created to support this.
 - **Who runs scheduled work today:** the TUI (about once a minute), a running org host (`mnnn org host start`), or `mnnn rule tick` called from cron or a systemd timer. Muninn has no separate daemon: the TUI or `mnnn net start` is the node. `mcp serve` is a stdio server per client and is not a host for this.
 - **Schema conventions:** ordered `MIGRATIONS` in `store/mod.rs`, with `SCHEMA_VERSION = MIGRATIONS.len()`. Entity ids are TEXT uuid; append-only logs (`actions`) use INTEGER PRIMARY KEY. Times are INTEGER epoch milliseconds, which are UTC by definition, named `*_at`. Enums are TEXT with a CHECK. Child rows use `REFERENCES … ON DELETE CASCADE`. Everything that changes data records an action (author, origin) in the history.
 
+
 ### Mapping the spec onto Muninn
 
 | Spec | Muninn |
 |------|--------|
-| ingest connection | a **connector**: an approved code space of a new kind `connector` (any language, or a prebuilt plugin), plus its options and a target `source` |
-| ingest plugin name | the connector code space's name (stored by id, shown by name) |
-| it gathers data | the plugin calls new host methods to fetch and to **store raw items** into its source's `source_data`, tagged with the run id |
-| pipes it to a model | the raw items of this run flow through a saved **pipeline** (or a pipe spec) whose leaves are model sinks, for example `source:NAME > code:parse-json > code:to-bars > model:bars` |
-| ruleset id, calls the rule set | after the model step succeeds, the scheduler runs that rule set (see Q2), with a `connector.run` action as the trigger, so rules can `--if "inserted > 0"` |
-| system scheduler service | a scheduler inside the running node (TUI or `mnnn net start`), with a headless `mnnn scheduler run` and `mnnn scheduler tick` for servers, cron and systemd |
+| ingest connection | a **connector**: a plugin of kind `ingest-connector` (any language, or prebuilt), managed under **Plugins ▸ Ingest connectors** |
+| it gets a schedule | a `schedules` row with `target_kind = 'connector'` (phase 2), plus `source_id` and `pipeline_id` (Michael: keep both) |
+| ingest plugin name | `schedules.plugin_id` (shown by name) |
+| ruleset id passed to it | `schedules.ruleset_id` → `rulesets` (phase 2), given to the plugin in `host.context()` |
+| it gathers data | `host.store_raw(...)`: raw items in `source_data` with `run_id`, never parsed (Michael: Q4) |
+| pipes it to a model | the plugin calls `host.pipe()`, which runs the schedule's pipeline over this run's items (Michael: Q3) |
+| then calls the rule set | the plugin calls `host.run_ruleset(ruleset_id)` (Michael: Q3) |
 
 ### Flow of one run
 
-1. **Due:** for each enabled schedule, the scheduler finds `next_run_at <= now`.
-2. **Claim:** in one transaction it inserts a `schedule_runs` row (`pending`) and advances `next_run_at`.
-3. **Start:** `pending → running`, setting `started_at`. It records a `connector.run.start` action.
-4. **Gather:** it loads the approved connector plugin and calls it with the run context (`schedule_id`, `run_id`, `ruleset_id`, options, source, `last_success_at`). The plugin fetches and calls `host.store_raw(name, format, bytes)` per item. Items land in `source_data` with `run_id` set, unchanged.
-5. **Pipe:** the run's items go through the schedule's pipeline into its model sinks. Only this run's items are used: `source:NAME?run=ID`.
-6. **Rule set:** it records `connector.run` (params `schedule`, `connector`, `run`, `stored`, `bytes`, `inserted`, `status`), then runs the rule set on it.
-7. **Finish:** `running → success` (or `failed`, with `error`), setting `finished_at`.
+1. The scheduler claims the due schedule (`pending`), then sets it `running`, and records `connector.run.start`.
+2. It loads the approved, enabled connector and calls it with the run context.
+3. The plugin gathers data. For each item it calls `host.store_raw(name, format, bytes)`, which writes `source_data` (`run_id` = the run).
+4. The plugin calls `host.pipe()`. The schedule's pipeline runs over `source:NAME?run=ID` (only this run's items) into its model sinks, and the call returns `{inserted, sinks}`.
+5. The plugin calls `host.run_ruleset(ruleset_id)`. A `connector.run` action is recorded (params `schedule`, `connector`, `run`, `stored`, `bytes`, `inserted`) and the rule set runs on it, so rules can `--if "inserted > 0"`. The call returns what ran and any error.
+6. The plugin returns. The run becomes `success` or `failed` (see below).
 
-The ruleset id is passed to the plugin as context: the spec says so, and it lets a plugin read the rule set. Muninn still calls the rule set itself after the pipe, so a plugin can't skip or reorder that step (see Q3).
-
-### Tables
-
-```sql
-CREATE TABLE schedules (
-    id TEXT PRIMARY KEY,                       -- uuid
-    name TEXT NOT NULL UNIQUE COLLATE NOCASE,  -- for the CLI/TUI
-    plugin_id TEXT NOT NULL REFERENCES code_spaces(id) ON DELETE CASCADE,  -- "ingest plugin name" (by id, shown by name)
-    ruleset_id TEXT,                           -- "ruleset id": the project whose rules run (Q2); NULL = none
-    source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,      -- where raw data lands
-    pipeline_id TEXT REFERENCES pipelines(id) ON DELETE SET NULL,          -- how it reaches a model (Q4)
-    options TEXT NOT NULL DEFAULT '{}',        -- JSON, read by the plugin with host.option()
-    run_every TEXT NOT NULL,                   -- as written, e.g. "15m", "1mo"
-    every_ms INTEGER,                          -- parsed fixed interval; NULL for calendar months
-    every_months INTEGER,                      -- parsed months; NULL otherwise
-    enabled INTEGER NOT NULL DEFAULT 1,
-    overlap TEXT NOT NULL DEFAULT 'skip' CHECK (overlap IN ('skip','queue')),
-    catch_up TEXT NOT NULL DEFAULT 'once' CHECK (catch_up IN ('once','all','none')),
-    max_attempts INTEGER NOT NULL DEFAULT 3,
-    next_run_at INTEGER NOT NULL,              -- epoch ms, UTC
-    author_id TEXT,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-);
-CREATE INDEX schedules_due ON schedules(enabled, next_run_at);
-
-CREATE TABLE schedule_runs (
-    id INTEGER PRIMARY KEY,                    -- an append-only log, like actions
-    schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-    status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending','running','success','failed')),
-    timestamp INTEGER NOT NULL,                -- the spec's "timestamp (in UTC)": when the run was due, epoch ms
-    attempt INTEGER NOT NULL DEFAULT 1,
-    claimed_by TEXT,                           -- node/process id holding the run
-    heartbeat_at INTEGER,                      -- epoch ms, refreshed while running
-    started_at INTEGER,
-    finished_at INTEGER,
-    stored INTEGER NOT NULL DEFAULT 0,         -- raw items stored
-    bytes INTEGER NOT NULL DEFAULT 0,
-    inserted INTEGER NOT NULL DEFAULT 0,       -- model records added
-    error TEXT,
-    action_id INTEGER REFERENCES actions(id)   -- the connector.run action
-);
-CREATE INDEX schedule_runs_schedule ON schedule_runs(schedule_id, timestamp);
-CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pending','running');
-```
-
-`source_data.run_id` (already present) holds `schedule_runs.id` for connector items. This is one new migration, appended to `MIGRATIONS`. Timestamps are stored as epoch ms (UTC) and shown in UTC with `Z` in the CLI and JSON, and in local time in the TUI if Michael wants (Q8).
-
-### run_every
-
-`N` followed by a unit: `ms`, `s`, `m` (minutes), `h`, `d`, and months (`mo` proposed, Q1). N is a positive integer.
-
-- Fixed units become `every_ms`. Months become `every_months` and step by calendar month in UTC, clamped to the month's last day (Jan 31 → Feb 28/29 → Mar 31 keeps the original day-of-month).
-- A floor guards against busy loops: `ms` and `s` are allowed, but anything under the scheduler's tick (proposed 1 s) runs at most once per tick (Q6).
-- `next_run_at` advances from the **due time**, not the finish time, so a schedule doesn't drift.
-
-### The scheduler service
-
-- **Where it runs:** a scheduler task in the running node, the TUI or `mnnn net start`, which hosts the network and the org host today. A new headless command, `mnnn scheduler run [--for SECS]`, gives servers the same loop without a TUI. `mnnn scheduler tick` runs what is due once, for cron or systemd. Only one scheduler is active per database. Like org hosting, the first one to take a lease wins and the others stand by (`scheduler_lease` in the store's settings, refreshed every tick).
-- **Tick:** every second it wakes for the earliest `next_run_at` (or on a nudge when a schedule changes).
-- **Claiming:** a single `BEGIN IMMEDIATE` transaction selects due schedules, inserts `pending` runs and advances `next_run_at`. A schedule is never claimed twice.
-- **Transitions:** `pending → running` (sets `started_at`, `claimed_by`, `heartbeat_at`) → `success` or `failed` (sets `finished_at`, `error`). There are no other edges. All times are epoch ms (UTC).
-- **Retries:** a failed attempt with `attempt < max_attempts` inserts a new `pending` run (`attempt + 1`, same `timestamp`) after backoff of 30 s, doubling up to 1 h. Rules see only the final outcome (Q5).
-- **Crash recovery:** a `running` run whose heartbeat is older than 2 minutes is marked `failed` (`error = "abandoned"`) and retried like any failure. `pending` runs left by a dead scheduler are picked up as-is.
-- **Missed runs** (nothing was running): `catch_up = once` (default, matching today's scheduled rules) runs one run for the latest missed time. `all` runs each missed slot, oldest first, capped at 100. `none` skips to the next future slot.
-- **Overlap:** if the previous run of the same schedule is still `pending` or `running`, `skip` (default) records nothing and moves on, and `queue` leaves one pending run behind it. Different schedules run concurrently, with a cap of 4 workers (`scheduler.workers`).
-- **Safety:** a connector runs only while its code space is approved. A changed, unapproved connector fails the run with "approve it first" and notifies. Every run is in the action history.
-
-### Plugin interface (ABI v1, new host methods; the ABI version doesn't change)
+### Plugin interface (host methods; ABI version 1 is unchanged, SDK 1.1+)
 
 | host method | does |
 |-------------|------|
-| `host.context()` | `{schedule_id, run_id, ruleset_id, source, last_success_at, options}` |
+| `host.context()` | `{schedule_id, run_id, ruleset_id, source, pipeline, last_success_at, options}` |
 | `host.option(name)` | (exists) the schedule's options |
-| `host.store_raw(name, format, bytes)` | stores one raw item in the run's source: `source_data` with `run_id`; never parsed |
-| `host.fetch(request)` | HTTP with the service ingest's defaults (user agent, retries, rate limit), so connectors don't need their own TLS stack (Q7) |
+| `host.store_raw(name, format, bytes)` | one raw item into the run's source; returns its id |
+| `host.pipe([pipeline])` | runs the schedule's pipeline (or one named, if allowed, Q-I1) over this run's raw items; returns `{inserted, sinks}` or an error |
+| `host.run_ruleset([ruleset_id])` | records `connector.run` and runs the rule set (default: the schedule's); returns `{rules_run, errors}` or an error |
+| `host.fetch(request)` | HTTP with Muninn's client (user agent, retries, rate limit). **Default accepted pending objection.** |
 | `host.state_get/state_set(key, value)` | a small per-schedule cursor (for example the last timestamp) |
 
-A connector's `run` returns OK or an error. It doesn't write models itself: the pipe step does. This keeps the raw-data rule (ingest assumes nothing) and lets the same raw data be re-piped later. The ruleset id is passed for information. Muninn calls the rule set after the pipe (Q3).
+### How the status is recorded (Michael: the plugin calls the pipeline and the rule set)
+
+- Muninn does **not** pipe or run the rule set after the plugin returns. The run's status is the plugin's result: `Ok` means `success`, and `Err` or a panic means `failed` with the error.
+- Every host call is counted on the run: `stored` and `bytes` (store_raw), `inserted` and `piped` (pipe), `ruleset_ran` (run_ruleset).
+- **The plugin skips `pipe` or `run_ruleset`:** the run can still be `success`, and its `piped = 0` / `ruleset_ran = 0` show that. `mnnn schedule runs` and the TUI flag it: "stored 12 items, not piped". Q-I2 asks whether a schedule with a pipeline or rule set should make a skipped call a failure instead.
+- **A host call fails:** the error is returned to the plugin. If the plugin returns it, the run is `failed` with that error, and rules don't run unless the plugin already called them. If the plugin carries on, the run can end `success`, with the failed call in `warnings` (JSON list: method, error, UTC time).
+- `connector.run` is always recorded, even when `run_ruleset` was never called, so history and notifications see every run. Rules only run through `run_ruleset`.
+
+### Safety
+
+- A connector runs only while it is approved and enabled. A changed connector fails with "approve it first" and notifies.
+- Without the `ingest-connector` kind it can't be scheduled. A connector can't be used as a pipe step.
 
 ### Surfaces
 
-- **CLI:**
-  - `mnnn connector list|show|create NAME --lang … [--file F]` (a code space of kind connector)
-  - `mnnn schedule add NAME --plugin P --every 15m [--ruleset PROJECT] [--source S] [--pipeline PL] [--option k=v]… [--overlap skip|queue] [--catch-up once|all|none]`
-  - `mnnn schedule list|show|edit|enable|disable|remove|run-now NAME`
-  - `mnnn schedule runs NAME [--status S] [--json]`
-  - `mnnn scheduler run|tick|status`
-- **TUI:** a Projects ▸ Schedules… window, with `n` new, `e` edit, Space on/off, `r` run now, and Enter for the runs, each run's status, times, stored, inserted and error. The scheduler's state shows in the status bar.
-- **Flutter app:** the same window through `muninn-ffi` (Matematik's area). The keys and other secrets for a connector stay in Rust.
-- **Help, docs, man pages:** `docs/connectors.md`, `docs/scheduler.md`, with updates to `docs/rules.md` and `docs/code-spaces.md`.
+- **CLI:** `mnnn plugins list --kind ingest-connector`, `mnnn plugins install … --kind ingest-connector`, and `mnnn code create NAME --lang … --kind ingest-connector` (template with `store_raw`, `pipe`, `run_ruleset`). Scheduling is `mnnn schedule add NAME --plugin P --source S --pipeline PL --ruleset R --every 15m`.
+- **TUI:** **Plugins ▸ Ingest connectors…** lists connectors, each with its schedules, last run and status. `n` new connector, `s` schedule it, `r` run now, Enter shows its runs.
+- **App** (Matematik): the same under Plugins.
 
 ### Tests
 
-- Store: the migration on a 2.22 database, CHECKs, cascades, and the due index.
-- run_every: parsing, printing and stepping, including month-end clamping, the minute/month suffix, and rejects such as `0m`, `-1h`, `5x`.
-- Scheduler, with a fake clock:
-  - claims once under two concurrent schedulers (lease)
-  - each status edge
-  - retries with backoff
-  - heartbeat abandonment
-  - catch_up once/all/none
-  - overlap skip/queue
-  - the worker cap
-- End to end: a test connector stores two raw items, then the pipeline makes bars, then the rule set runs on `connector.run` with `inserted > 0`, then the run ends `success`. A failing connector ends `failed` and runs no rules. An unapproved connector doesn't run.
-- CLI and TUI tests for each command and the window; FFI and app tests against the fake API.
+- A test connector stores two items, calls `pipe` (bars appear) and calls `run_ruleset` (a rule on `inserted > 0` fires); the run ends `success` with counts.
+- It skips `pipe` and gets `success` with `piped = 0`, flagged. `pipe` errors and the plugin returns it: `failed`, no rules. `pipe` errors and the plugin ignores it: `success` with a warning.
+- A panic means `failed`. An unapproved or disabled connector doesn't run. A connector can't be a `code:` step.
+- `source_data` items carry the run id, and `source:NAME?run=ID` sees only them.
 
-### Open questions for Michael
+## Shares: Create Then Share
 
-1. **Months vs minutes.** `run_every` lists `m` for both minutes and months. Proposal: `m` = minutes, `mo` = months (and accept `min` as an alias for minutes). Is that right?
-2. **What is a "ruleset id"?** Muninn has no rule-set table: a project's rules are its rule set, and single rules can be scheduled. Should `ruleset_id` be a project id (run the project's rules), a single rule id, or should we add a first-class `rulesets` table?
-3. **Who calls the rule set?** The spec says the plugin "pipes it to a model, then calls the rule set". Proposal: Muninn does the pipe and the rule-set call after the plugin returns, so a plugin can't skip them; the plugin still receives the ruleset id. Or should the plugin call them through host methods?
-4. **Should the ingest plugin's raw data still land in `source_data`?** His raw-data rule says ingest never assumes anything about the data. Proposal: yes. Connectors only store raw items, and a pipeline (chosen per schedule) turns them into model records. This means each schedule also needs a source and a pipeline, which the spec's table doesn't list. Is that OK, or should a connector write straight to a model?
-5. **Retries:** should a failed run retry automatically (proposed: 3 attempts, 30 s backoff doubling to 1 h), and does each retry get its own `schedule_runs` row (proposed) or reuse one?
-6. **Smallest interval:** `ms` is in the spec. Is a 1 s floor OK, so a sub-second schedule runs at most once per tick?
-7. **Network access for connectors:** should connectors get `host.fetch` (Muninn's HTTP client), or open their own connections? Plugins today can't reach the network through the host.
-8. **The existing scheduled rules** (`--every`/`--cron`, run by the TUI, org host and `rule tick`): should they move onto the new `schedules` table and scheduler, or stay separate? Should `schedules` also accept `cron`?
-9. **Where the scheduler runs headless:** is a new `mnnn scheduler run` the right home, or should it only run inside `mnnn net start` / the org host, as scheduled rules do today?
-10. **Missed runs and overlap defaults:** are `catch_up = once` and `overlap = skip` right?
-11. **Version:** is this v2.23.0 (a minor release, new feature), and does it ship whole, or do the scheduler and tables come first and connectors after?
+> **Phase 4 · v2.26.0 · 📝 Planned**
+
+### Michael's words
+
+"Everywhere that a share can be added to something, you should be able to create that thing too.
+Example: Organizations -> code spaces - a code space should be able to be created then shared from the shares section."
+
+### Every place a share can be added today, and the create flow planned there
+
+| Where | Adds / shares | Today | Create inline (planned) |
+|-------|---------------|-------|-------------------------|
+| Share action (`mnnn share`, `S` in Models, Code spaces, Journals, Live searches, Reports, Projects windows) | model, search, code, journal, report, project, pipeline → project / journal / code / net | pick an existing item and an existing target | the item picker and the target picker each start with **+ New KIND…**: it opens that kind's create dialog, then continues the share with the new one |
+| Orgs ▸ Resources… (`mnnn org resource add ORG KIND NAME`) | journal, project, report, model, search, code space (and rule set, phase 2) | `a` takes an existing "kind name" | `n` **new KIND…**: create it (for a code space: name, language, template or parser, editor), then add it to the org in one step. CLI `mnnn org resource add ORG KIND NAME --create [create flags]` |
+| Orgs ▸ give to a joined org (`mnnn org give`) | a copy of a resource | existing only | **+ New…** creates then gives |
+| Org projects (`mnnn org project add ORG PROJECT`) | a project into an org | existing only | `--create`, and **+ New project…** |
+| Project items (`project add --rule/--search/…`, Add to project…) | rules, searches, journals, reports, code, pipelines, series | existing only | **+ New KIND…** in the picker; CLI `mnnn project add P --create KIND NAME …` |
+| Net ▸ Shared data… (`mnnn net share`) | items to exchanges | existing only | **+ New KIND…** |
+| Reviews ▸ Ask for a review… | an item for review | existing only | **+ New KIND…** |
+| Org code (`code give-to-org`, org code serve) | code spaces | existing only | **+ New code space…** (Michael's example) |
+
+The inventory is checked against the code before implementing; any share point found later gets the same flow.
+
+### Rules
+
+- **Create inline:** the create dialog is the same one used everywhere else for that kind (no second copy). Finishing it returns to the share with the new item selected. Cancelling returns to the picker with nothing created.
+- **History:** the create action and the share action are both recorded, in that order, with the same author.
+- **Permissions:** in an org, creating needs the role that adding needs (for example `resources.manage`, or `code.manage` for code spaces).
+- **App** (Matematik): the same "+ New…" first entry in every share and add picker.
+
+### Tests
+
+- At each share point, creating then sharing makes one item and one share with both actions in history.
+- Cancelling creates nothing; missing permissions refuse before creating.
+- CLI `--create` paths; TUI picker tests; FFI and app tests.
+
+## Open Questions
+
+### Answered by Michael (Nov 8, 2026)
+
+1. **Months vs minutes:** **Resolved.** `m` = minutes, capital `M` = months, case-sensitive (`ms`, `s`, `m`, `h`, `d`, `M`). The `mo` proposal is dropped.
+2. **What is a "ruleset id"?** **Resolved.** A first-class `rulesets` table (designed in phase 2); `ruleset_id` references it.
+3. **Who calls the rule set?** **Resolved.** The plugin calls the pipeline and the rule set through host methods (`host.pipe(…)`, `host.run_ruleset(ruleset_id)`); Muninn doesn't do it after the plugin returns. Status recording is covered in phase 3.
+4. **Raw data in `source_data`?** **Resolved.** Yes: connectors store raw items in `source_data`, and a pipeline per schedule turns them into model records. Schedules keep `source_id` and `pipeline_id`.
+5. **Retries:** proposed 3 attempts, 30 s backoff doubling to 1 h, a row per attempt. **Default accepted pending objection.**
+6. **Smallest interval:** a 1 s floor, so sub-second schedules run at most once per tick. **Default accepted pending objection.**
+7. **Network access for connectors:** `host.fetch` with Muninn's HTTP client. **Default accepted pending objection.**
+8. **The existing scheduled rules:** **Resolved.** They move onto the new `schedules` table and scheduler, which supports cron too. A schedule targets a connector plugin or a rule set. Their migration and the deprecation of `rule tick` are planned in phase 2.
+9. **Where the scheduler runs headless:** inside the running node, plus `mnnn scheduler run` and `mnnn scheduler tick`. **Default accepted pending objection.**
+10. **Missed runs and overlap defaults:** `catch_up = once`, `overlap = skip`. **Default accepted pending objection.**
+11. **Version:** the scheduler, rule sets and tables first (v2.24.0), connectors after (v2.25.0), following phase 1 (v2.23.0). **Default accepted pending objection.**
+
+### New
+
+- **Q-P1 Menu width:** with Code and Plugins the TUI bar has eleven categories and no longer fits 80 columns. Shorten labels, put Theme under View, or let the bar scroll?
+- **Q-P2 Kinds:** are `parser`, `transform`, `analysis` and `ingest-connector` the right first set, and should a plugin be able to have more than one kind (for example a parser that also works as a transform)?
+- **Q-P3 Approval on migrate:** may `migrate` keep a code space's approval when only the `@kind` header was added, or must every migrated plugin be approved again?
+- **Q-P4 Prebuilt libraries without a kind:** after `migrate` records the kind on the row, should they run as-is, or be required to be rebuilt with SDK 1.1 so the library itself declares it?
+- **Q-P5 `install`:** should `mnnn plugins install` also take URLs or org/peer plugins (shared code spaces), or only local libraries and code spaces for now?
+- **Q-C1 CLI name:** keep `mnnn code` (with `codes`) and add `code-spaces` as an alias, or rename to `code-spaces` and keep `code` as the alias?
+- **Q-C2 Pipes and pipelines:** do Live pipes and Pipelines move into the new Code menu, or stay under Projects?
+- **Q-S1 cron time zone:** keep cron in local time (today's behaviour) or switch schedules to UTC, with an optional time zone column?
+- **Q-S2 Project rule sets:** is turning each project's rules into a project-owned rule set the right migration, or should projects reference rule sets instead of holding rules?
+- **Q-I1 `host.pipe` target:** may a connector call pipelines other than its schedule's, or only that one?
+- **Q-I2 Skipped calls:** if a schedule has a pipeline or rule set and the plugin never calls `pipe` or `run_ruleset`, should the run be `success` with a flag (proposed) or `failed`?
+- **Q-SH1 Scope of create-then-share:** does it include creating the *target* too (for example a new project or journal while sharing into one), as planned, or only the item being shared?
