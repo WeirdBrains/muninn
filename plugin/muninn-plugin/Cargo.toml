@@ -1,6 +1,6 @@
 [package]
 name = "muninn-plugin"
-version = "1.0.0"
+version = "1.2.0"
 edition = "2021"
 rust-version = "1.82"
 description = "SDK for Muninn code space plugins: the stable C ABI (v1), the host API, frames and result views."

@@ -25,6 +25,7 @@ pub mod rules;
 pub mod runs;
 pub mod searches;
 pub mod source_data;
+pub mod spaces;
 pub mod sync;
 pub mod templates;
 pub mod users;
@@ -53,6 +54,7 @@ pub use rules::{Condition, ItemRef, NewRule, Op, OwnerKind, Rule, RuleChange, Ru
 pub use runs::{Artifact, ImportRun};
 pub use searches::{LiveSearch, SearchSpec, SearchTarget};
 pub use source_data::{NewSourceData, SourceData};
+pub use spaces::{Space, SpaceKind, SpaceMember};
 
 /// Schema version after all migrations (1.x databases are at 3 and migrate on open).
 pub const SCHEMA_VERSION: i64 = MIGRATIONS.len() as i64;
@@ -174,6 +176,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     mcp::MIGRATION,
     // 2.22: data as it arrived (ingest no longer shapes it)
     source_data::MIGRATION,
+    // 2.23: code spaces become `code`; spaces are collections of code
+    spaces::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
@@ -862,7 +866,7 @@ mod tests {
 
     #[test]
     fn a_2_2_database_migrates_and_gains_rules() {
-        let upto = MIGRATIONS.len() - 13;
+        let upto = MIGRATIONS.len() - 14;
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join("v22.database");
         let key = [3u8; 32];
@@ -899,7 +903,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 13).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 14).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
             old_bars(&s, &src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0)]);
             let spec = RuleSpec { on: vec!["*".into()], then: vec![Then::Status { text: "x".into() }], ..Default::default() };
@@ -928,7 +932,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 12).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 13).unwrap();
             s.create_model("trades", "", Design { fields: vec![Field::new("note", FieldType::Text)], ..Default::default() }, true).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -951,8 +955,8 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 11).unwrap();
-            s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 12).unwrap();
+            old_code(&s);
         }
         let s = Store::open(&db, Some(&key)).unwrap();
         assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
@@ -977,7 +981,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 11).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 12).unwrap();
             s.set_node_identity(b"kp", "12D3KooWx").unwrap();
             s.create_project("p", "").unwrap();
         }
@@ -1010,7 +1014,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 10).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 11).unwrap();
             old_org(&s, "o-lab");
             let j = s.create_journal("Lab book", None, EntryFormat::Markdown).unwrap();
             s.add_entry(&j.id, "Day 1", "teh result", None).unwrap();
@@ -1038,7 +1042,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 8).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 9).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
             let sym = Symbol::new("BTC", "USDT");
             old_bars(&s, &src, &sym, Duration(300), &[bar(0), bar(300_000), bar(600_000)]);
@@ -1070,6 +1074,14 @@ mod tests {
         assert!(rs.iter().filter(|r| r.id != note_id).all(|r| r.values["note"].is_null() && r.created_at == 0));
         assert_eq!(s.count_bars().unwrap(), 3);
         assert_eq!(s.query_bars(&BarFilter::default()).unwrap()[1].bar, bar(300_000));
+    }
+
+    /// Code as databases before 2.23 kept it (the `code_spaces` table).
+    fn old_code(s: &Store) -> crate::store::CodeSpace {
+        s.conn.execute_batch("ALTER TABLE code_spaces RENAME TO code;").unwrap();
+        let c = s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
+        s.conn.execute_batch("ALTER TABLE code RENAME TO code_spaces;").unwrap();
+        c
     }
 
     /// Bars as databases before 2.16 kept them (the `bars` table).
@@ -1112,9 +1124,9 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 10).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 11).unwrap();
             old_org(&s, "o-lab");
-            let c = s.create_code_space("c", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
+            let c = old_code(&s);
             s.save_endpoint("o-lab", "calc", EndpointKind::Code, &c.id, "call", false).unwrap();
             ("o-lab".to_string(), c.id)
         };
@@ -1132,7 +1144,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 9).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 10).unwrap();
             s.conn
                 .execute(
                     "INSERT INTO reviewing(review_id, title, node_peer, status, created_at, updated_at) VALUES ('r1', 'Notes', '12D3', 'joined', 1, 1)",

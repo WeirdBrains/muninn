@@ -25,6 +25,7 @@ pub mod abi;
 pub mod bars;
 pub mod host;
 pub mod math;
+pub mod migrate;
 pub mod parsers;
 pub mod pipe;
 pub mod pipeline;
@@ -32,6 +33,7 @@ pub mod png;
 pub mod polars;
 pub mod pyconv;
 pub mod python;
+pub mod spaces;
 pub mod view;
 
 use crate::error::{Error, Result};
@@ -44,7 +46,7 @@ use std::sync::{Mutex, OnceLock};
 /// Bumped when generated code changes (invalidates cached builds).
 pub const CODEGEN: u32 = 1;
 /// The SDK version plugins are built against.
-pub const SDK_VERSION: &str = "1.0.0";
+pub const SDK_VERSION: &str = "1.2.0";
 
 /// The SDK crate, embedded so code spaces build without the Muninn sources.
 pub const SDK_FILES: &[(&str, &str)] = &[
@@ -393,10 +395,11 @@ thread_local! {
     static RUNNING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-struct Guard;
+/// Restores the running flag as it was (a space's main calling code runs nested).
+struct Guard(bool);
 impl Drop for Guard {
     fn drop(&mut self) {
-        RUNNING.with(|r| r.set(false));
+        RUNNING.with(|r| r.set(self.0));
     }
 }
 
@@ -542,6 +545,14 @@ pub fn split_options(spec: &str) -> (String, serde_json::Map<String, serde_json:
     (name.trim().to_string(), m)
 }
 
+/// Run `f` with named inputs handed to the code it runs (`host.input_named`).
+pub fn with_named<T>(inputs: Vec<(String, serde_json::Value)>, f: impl FnOnce() -> T) -> T {
+    NAMED.with(|n| *n.borrow_mut() = inputs);
+    let r = f();
+    NAMED.with(|n| n.borrow_mut().clear());
+    r
+}
+
 /// Run `f` with `options` handed to the code space it runs (`host.option`).
 pub fn with_options<T>(options: serde_json::Map<String, serde_json::Value>, f: impl FnOnce() -> T) -> T {
     OPTIONS.with(|o| *o.borrow_mut() = options);
@@ -561,16 +572,47 @@ pub fn run_on(
     from: &str,
     log: &mut dyn FnMut(&str),
 ) -> Result<RunInfo> {
-    if !approved(space) {
+    run_inner(store, env, origin, space, input, from, log, false)
+}
+
+/// Run code as part of a code space: the space's approval covers its line-up, so the
+/// code's own approval isn't needed (edits run at once; they are flagged unreviewed), and
+/// a main may call its members and other spaces while it runs (see [`spaces`]).
+pub(crate) fn run_in_space(
+    store: &Store,
+    env: &CodeEnv,
+    origin: &str,
+    code: &CodeSpace,
+    input: Option<serde_json::Value>,
+    from: &str,
+    log: &mut dyn FnMut(&str),
+) -> Result<RunInfo> {
+    run_inner(store, env, origin, code, input, from, log, true)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_inner(
+    store: &Store,
+    env: &CodeEnv,
+    origin: &str,
+    space: &CodeSpace,
+    input: Option<serde_json::Value>,
+    from: &str,
+    log: &mut dyn FnMut(&str),
+    in_space: bool,
+) -> Result<RunInfo> {
+    if !in_space && !approved(space) {
         return Err(need_approval(space));
     }
-    if RUNNING.with(|r| r.replace(true)) {
+    let was = RUNNING.with(|r| r.replace(true));
+    if was && !(in_space && spaces::nested_ok()) {
+        RUNNING.with(|r| r.set(was));
         return Err(Error::invalid(
             "code space",
-            format!("{} was started while another code space runs (code spaces do not start each other)", space.name),
+            format!("{} was started while another code space runs (code doesn't start code, except a space's main calling)", space.name),
         ));
     }
-    let guard = Guard;
+    let guard = Guard(was);
     let built = build_space(store, env, origin, space, log)?;
     let plugin = load(&built.path)?;
     // recorded now (the plugin's writes follow it in history); rules on `code.run` fire

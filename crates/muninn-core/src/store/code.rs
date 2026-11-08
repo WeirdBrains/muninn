@@ -250,12 +250,12 @@ fn check_space_name(n: &str) -> Result<String> {
 impl Store {
     /// All code spaces, by name.
     pub fn code_spaces(&self) -> Result<Vec<CodeSpace>> {
-        let mut st = self.conn.prepare(&format!("SELECT {COLS} FROM code_spaces ORDER BY name COLLATE NOCASE"))?;
+        let mut st = self.conn.prepare(&format!("SELECT {COLS} FROM code ORDER BY name COLLATE NOCASE"))?;
         Ok(st.query_map([], row)?.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
     pub fn code_space(&self, id: &str) -> Result<Option<CodeSpace>> {
-        Ok(self.conn.query_row(&format!("SELECT {COLS} FROM code_spaces WHERE id = ?1"), [id], row).optional()?)
+        Ok(self.conn.query_row(&format!("SELECT {COLS} FROM code WHERE id = ?1"), [id], row).optional()?)
     }
 
     /// By id, id prefix or name.
@@ -289,7 +289,7 @@ impl Store {
 
     pub(crate) fn insert_code_space(&self, c: &CodeSpace) -> Result<()> {
         self.conn.execute(
-            &format!("INSERT INTO code_spaces({COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"),
+            &format!("INSERT INTO code({COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"),
             params![
                 c.id,
                 c.name,
@@ -332,7 +332,7 @@ impl Store {
         }
         c.updated_at = now_ms();
         self.conn.execute(
-            "UPDATE code_spaces SET name = ?2, description = ?3, lang = ?4, source = ?5, input = ?6, updated_at = ?7 WHERE id = ?1",
+            "UPDATE code SET name = ?2, description = ?3, lang = ?4, source = ?5, input = ?6, updated_at = ?7 WHERE id = ?1",
             params![c.id, c.name, c.description, c.lang.as_str(), c.source, serde_json::to_string(&c.input)?, c.updated_at],
         )?;
         Ok(c)
@@ -340,12 +340,12 @@ impl Store {
 
     /// Record the owner's approval of a trust hash (`None` withdraws it).
     pub fn approve_code_space(&self, id: &str, hash: Option<&str>) -> Result<()> {
-        self.conn.execute("UPDATE code_spaces SET approved_hash = ?2 WHERE id = ?1", params![id, hash])?;
+        self.conn.execute("UPDATE code SET approved_hash = ?2 WHERE id = ?1", params![id, hash])?;
         Ok(())
     }
 
     pub fn set_code_run(&self, id: &str, run: &RunInfo) -> Result<()> {
-        self.conn.execute("UPDATE code_spaces SET last_run = ?2 WHERE id = ?1", params![id, serde_json::to_string(run)?])?;
+        self.conn.execute("UPDATE code SET last_run = ?2 WHERE id = ?1", params![id, serde_json::to_string(run)?])?;
         Ok(())
     }
 
@@ -367,8 +367,19 @@ impl Store {
     /// Remove a code space; it leaves projects and reports point at nothing.
     pub fn remove_code_space(&self, id: &str) -> Result<CodeSpace> {
         let c = self.code_space(id)?.ok_or_else(|| Error::invalid("code space", format!("`{id}` not found")))?;
+        let used = self.spaces_of_code(&c.id)?;
+        if !used.is_empty() {
+            return Err(Error::invalid(
+                "code",
+                format!(
+                    "{} is in code space(s) {}; remove it from them first",
+                    c.name,
+                    used.iter().map(|s| s.name.as_str()).collect::<Vec<_>>().join(", ")
+                ),
+            ));
+        }
         self.conn.execute("DELETE FROM project_items WHERE kind = 'code' AND ref_id = ?1", [&c.id])?;
-        self.conn.execute("DELETE FROM code_spaces WHERE id = ?1", [&c.id])?;
+        self.conn.execute("DELETE FROM code WHERE id = ?1", [&c.id])?;
         Ok(c)
     }
 }

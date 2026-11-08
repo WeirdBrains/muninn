@@ -25,6 +25,8 @@ pub const BEFORE_KEPT: usize = 10_000;
 /// The methods of this host (ABI v1).
 pub const METHODS: &[&str] = &[
     "methods",
+    "call",
+    "call_space",
     "input",
     "input_request",
     "inputs",
@@ -90,6 +92,8 @@ impl<'a> Run<'a> {
         let s = self.store;
         match method {
             "methods" => Ok(json!(METHODS)),
+            "call" => super::spaces::host_call(s, &req),
+            "call_space" => super::spaces::host_call_space(s, &req),
             "input_request" => Ok(serde_json::to_value(&self.space.input)?),
             "inputs" => Ok(json!(self.named.iter().map(|(n, _)| n).collect::<Vec<_>>())),
             "options" => Ok(Value::Object(self.options.clone())),

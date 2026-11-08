@@ -115,6 +115,32 @@ impl Host {
         Frame::from_json(&self.call("input", &Json::Null)?)
     }
 
+    /// The input as the host sent it (a frame's JSON), to hand on to [`Host::call_code`].
+    pub fn input_json(&self) -> Result<Json> {
+        self.call("input", &Json::Null)
+    }
+
+    /// SDK 1.2: a code space's main calls a member by its alias (declared in an
+    /// `@imports alias` header) over `input` (a frame's JSON; `None`: the member's own default
+    /// input). Returns the member's output frame. Only main may call.
+    pub fn call_code(&self, alias: &str, input: Option<&Json>) -> Result<Frame> {
+        let mut req = Json::obj().with("alias", alias);
+        if let Some(i) = input {
+            req = req.with("input", i.clone());
+        }
+        Frame::from_json(&self.call("call", &req)?)
+    }
+
+    /// SDK 1.2: a code space's main runs another space (its main), declared as
+    /// `@imports space:NAME`. Returns its output frame. Spaces nest at most 8 deep, no loops.
+    pub fn call_space(&self, name: &str, input: Option<&Json>) -> Result<Frame> {
+        let mut req = Json::obj().with("name", name);
+        if let Some(i) = input {
+            req = req.with("input", i.clone());
+        }
+        Frame::from_json(&self.call("call_space", &req)?)
+    }
+
     /// The names of the inputs, when several feed this run (a pipeline's fan-in).
     pub fn inputs(&self) -> Result<Vec<String>> {
         Ok(self.call("inputs", &Json::Null)?.as_array().unwrap_or(&[]).iter().filter_map(|m| m.as_str().map(str::to_string)).collect())
@@ -509,7 +535,7 @@ macro_rules! plugin {
         }
         #[no_mangle]
         pub extern "C" fn muninn_plugin_info() -> $crate::abi::MnStr {
-            const INFO: &str = concat!("{\"sdk\":\"1.0.0\",\"lang\":\"", $lang, "\"}");
+            const INFO: &str = concat!("{\"sdk\":\"1.2.0\",\"lang\":\"", $lang, "\"}");
             $crate::abi::MnStr::new(INFO)
         }
         /// # Safety

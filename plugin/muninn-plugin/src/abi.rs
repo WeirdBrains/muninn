@@ -5,7 +5,7 @@
 //! | symbol | signature | meaning |
 //! |--------|-----------|---------|
 //! | `muninn_plugin_abi` | `extern "C" fn() -> u32` | the ABI version it was built for ([`ABI_VERSION`]) |
-//! | `muninn_plugin_info` | `extern "C" fn() -> MnStr` | static UTF-8 JSON: `{"sdk": "1.0.0", "lang": "rust"}` |
+//! | `muninn_plugin_info` | `extern "C" fn() -> MnStr` | static UTF-8 JSON: `{"sdk": "1.2.0", "lang": "rust"}` |
 //! | `muninn_plugin_run` | `unsafe extern "C" fn(*const MnHost) -> i32` | run once; [`RUN_OK`] or an error code |
 //!
 //! Everything else goes through the host table [`MnHost`]: `call(ctx, method, request, out)`
