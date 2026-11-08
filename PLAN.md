@@ -94,25 +94,6 @@ CREATE TABLE code_space_members (
 );
 ```
 
-3. **Approved versions (Michael: Q-CS11).** A new table, so that editing never breaks a running space:
-
-```sql
-CREATE TABLE code_versions (
-    code_id TEXT NOT NULL REFERENCES code(id) ON DELETE CASCADE,
-    hash TEXT NOT NULL,              -- the trust hash approved
-    lang TEXT NOT NULL,
-    source TEXT NOT NULL,            -- the approved source (for prebuilt: the path of the kept copy, below)
-    approved_at INTEGER NOT NULL,
-    approved_by TEXT,
-    PRIMARY KEY (code_id, hash)
-);
-```
-
-   - The `code` row stays the **current draft** (`source`, `lang`). `code.approved_hash` now means "the latest approved version" and points at a `code_versions` row. Approving inserts the row, or does nothing if it already exists, and moves `approved_hash`.
-   - **Builds:** none are stored in the database. Builds are content-addressed (`build_key(lang, source)`), so the approved version's library is the cached build of its source, rebuilt from `code_versions.source` if the cache was cleared.
-   - **Prebuilt libraries:** their trust hash covers the library bytes, which could change on disk. On approval Muninn copies the library to `MUNINN_HOME/code/approved/<hash>.<ext>`, and the version's `source` points at that copy.
-   - **Pruning:** a version is kept while it is the code's latest approved one or any member's `pin_hash`. Others are pruned on approve, unpin and remove-member. `mnnn code show --versions` lists what's kept.
-   - Why a table rather than `approved_source` columns: pins can refer to a version older than the latest approved one, so more than one approved version must be resolvable. One table covers both the latest and the pinned versions.
    - Main is always a member, at position 0. A trigger, or the store's insert path, adds the row, and removing main from the members is refused: set another main first.
    - Deleting code that is a member of any space is refused with the list of spaces ("remove it from spaces A, B first"), hence `ON DELETE RESTRICT`.
    - `code_space_scopes` mirrors `code_scopes` so spaces can be user, org or global. Org resources gain the kind `space` next to `code`.
@@ -132,9 +113,9 @@ CREATE TABLE code_versions (
   - At run time a call stack of space ids enforces the same rule (re-entry is an error), plus a **depth limit of 8** nested spaces, for edits that race the check.
   - Member calls add no depth, since members can't call.
 - **Following and pinning (Q-CS5, resolved):**
-  - Members follow the **latest approved version** of their code by default (`pin_hash` NULL). They resolve to `code_versions[code.approved_hash]`, not to the draft.
-  - `--pin` (`mnnn spaces add SPACE CODE --pin`, `mnnn spaces pin SPACE CODE`) records the latest approved hash, and the member resolves to `code_versions[pin_hash]` from then on, even after newer versions are approved. `pin`/`unpin` change it.
-  - Pinning a never-approved code is refused.
+  - Members follow the **latest approved version** of their code by default (`pin_hash` NULL).
+  - Following means the member runs the code's **current** source, including unreviewed edits (Michael: Q-CS11).
+  - `--pin` (`mnnn spaces add SPACE CODE --pin`, `mnnn spaces pin SPACE CODE`) records the code's current trust hash. A pinned member runs only while the code's current hash equals the pin; otherwise calls fail with "X changed since pinned: `mnnn spaces pin SPACE X` to accept". `pin`/`unpin` change it. No old versions are stored.
   - There are no version numbers: the trust hash is the version.
 - **Approval (Q-CS3, resolved; reconciled with following):** a space approval covers **the membership, not the sources**. Sources are already covered by each code's own approval.
   - `approved_hash` = blake3 over:
@@ -143,15 +124,14 @@ CREATE TABLE code_versions (
     - the sorted `(alias, code id, pin_hash)` of every member
     - the sorted `space:` names main imports
   - Adding or removing a member, changing an alias, a pin, the main, the kind or main's `@imports` needs the space approved again.
-  - Editing a member's source does **not**. **The space keeps running the last approved version** (Michael: Q-CS11) until the edit is approved; then the new version is used, and the space approval stays. Editing never breaks a running space.
-  - `spaces show` and the TUI mark such a member "draft pending approval".
-  - Main is code too, and works the same way: an edited main keeps running its last approved version until approved. Its `@imports` are read from the version that runs, so a draft that changes imports takes effect only once main is approved **and** the space is approved again for the new imports. Until then, the old version runs.
-  - Code that has never been approved has no version, and a space using it can't run ("X was never approved").
+  - Editing a member's source does **not**, and **an edited member runs its edited code immediately**, with no approval wait (Michael: Q-CS11, reversed at 9:55 AM). Unpinned members always run the current source.
+  - Main follows the same rule. If main's edit changes its `@imports`, that changes the line-up, so the space must be approved again before it runs.
+  - **Security implication:** approval governs only the space's line-up. Code edits inside an approved space run unreviewed. Every edit is logged in history (`code.edit` with the new trust hash), and the CLI, TUI and app flag such members as "edited since the space was approved (unreviewed)" until someone approves the code. Pinning is the opt-in for a reviewed, frozen member.
+  - Running code **alone** (`mnnn code run`, `code:` steps) still requires that code's own approval, as today.
   - Approving a space in the CLI or TUI shows main, every member and the called spaces in one review, and offers to approve any of them that are unapproved in the same step (each recorded in history).
 - **Running a space** therefore checks that:
   - the space is enabled and approved for its current membership
-  - main has an approved version (that version runs)
-  - each member called resolves to a version: its pin, or else its latest approved one
+  - each member called (main included) matches its pin, if pinned; unpinned members run their current source, approved or not
   - each called space passes the same checks, recursively, within depth 8
 - **Kinds of called spaces:** a called space must be `parser`, `transform` or `analysis`. Calling an `ingest-connector` space is refused: connectors run only from schedules.
 
@@ -178,7 +158,6 @@ It does three things in order, with one combined report:
    - If `NAME-migration` is also taken, it **skips** that code.
    - If `NAME-migration` would exceed the 80-character name limit, it skips and reports "name too long" (Q-CS10, default accepted pending objection).
    - If the code was approved, the new space is approved for its one-member membership, so nothing that ran before stops running.
-   - The schema migration seeds `code_versions`: each code whose `approved_hash` equals its current trust hash gets one version row (its current source), and prebuilt libraries are copied to `code/approved/`. Code whose approved hash no longer matches its source has no recoverable approved source. It keeps its draft, has no version, and the report lists it as "needs approving" (today it couldn't run either).
 2. **Kinds for the new spaces.** It infers each kind:
    - the built-in parsers → `parser`
    - `to-bars`, or code used only as a pipeline step → `transform`
@@ -222,15 +201,7 @@ mnnn spaces remove-code SPACE CODE|set-main SPACE CODE|pin|unpin SPACE CODE|appr
   - member code can't be deleted
   - aliases are unique per space
 - **Imports:** `host.call` of a member returns its frame; an undeclared or non-member alias fails; a member calling is refused; cross-language calls work (a Python main calling a Rust parser).
-- **Approval:** the space hash covers the membership; approving a space can approve its members.
-- **Versions:**
-  - an edited member or main keeps running its last approved version until the edit is approved, then switches without re-approving the space
-  - pinned members resolve to their pin after newer approvals
-  - an import change in a draft main only takes effect after main and the space are approved
-  - prebuilt copies survive the original file changing
-  - pruning keeps the latest and pinned versions
-  - the migration seeds versions, and mismatched ones are reported
-  - running code alone (`mnnn code run`) still needs its draft approved, as today
+- **Approval:** the space hash covers the line-up; an edited unpinned member or main runs its edit at once without re-approval, is flagged unreviewed, and has a `code.edit` history entry; an edited pinned member fails until re-pinned; an `@imports` change needs the space approved again; running code alone still needs the code approved.
 - **Pipelines:** `space:` steps and sources run main; `code:` still runs alone, with a deprecation note.
 - **Migrate:**
   - one space per non-member code, named as the code
@@ -818,7 +789,7 @@ The inventory is checked against the code before implementing; any share point f
 
 - **Q-CS1 Import scope:** **Resolved.** Main imports code (members) **and whole other spaces** (`host.call_space`, which runs their main). Cross-space cycles are refused by a DFS when the space is edited or approved and by a call stack at run time, with a depth limit of 8. A called space is checked like a run: enabled, approved for its membership, main and called members approved, pins matched.
 - **Q-CS2 Who may call:** **Resolved.** Only main calls, inside the space and across spaces.
-- **Q-CS3 Approval model:** **Resolved.** A space has its own approval. Reconciled with Q-CS5, it covers the **membership** (main, members, aliases, pins, kind, imported spaces); sources are covered by each code's own approval. A member's new version is used once that code is approved, without re-approving the space.
+- **Q-CS3 Approval model:** **Resolved.** A space has its own approval, covering the **line-up** (main, members, aliases, pins, kind, imported spaces). Member and main edits run immediately without re-approval (Q-CS11) and are flagged as unreviewed.
 - **Q-CS4 `code:` steps:** **Resolved.** Kept one release, deprecated; `mnnn migrate` rewrites pipelines to `space:`.
 - **Q-CS5 Pinning:** **Resolved.** Members follow the latest approved version by default (`pin_hash` NULL); `--pin` is opt-in.
 - **Q-CS6 CLI naming:** **Resolved.** `mnnn code` = single code; `mnnn spaces` (aliases `code-spaces`, `space`) = collections.
@@ -828,7 +799,7 @@ The inventory is checked against the code before implementing; any share point f
 - **Q-CS10 Name too long:** default accepted pending objection (skip and report).
 - **Q-C1:** **Resolved by Q-CS6.** The `code-spaces` alias moves from `mnnn code` to `mnnn spaces`.
 
-- **Q-CS11 Unapproved member edit:** **Resolved.** Spaces keep running the last approved version until the edit is approved. Approved versions are kept in `code_versions` (latest approved and pinned), and builds are rebuilt from them by content hash.
+- **Q-CS11 Unapproved member edit:** **Resolved (reversed by Michael at 9:55 AM).** An edited member runs the edited code immediately, without waiting for approval. No old versions are kept. Space approval governs the line-up, and edits are logged and flagged as unreviewed. Pinned members still fail on change until re-pinned.
 
 ### Answered by Michael (Nov 8, 2026)
 
