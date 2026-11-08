@@ -207,7 +207,8 @@ CREATE TABLE schedules (
     updated_at INTEGER NOT NULL,
     CHECK ((run_every IS NULL) <> (cron IS NULL)),                 -- exactly one: run_every (incl. 'once') or cron
     CHECK (run_every IS NOT 'once' OR (start_at IS NOT NULL AND cron IS NULL
-           AND every_ms IS NULL AND every_months IS NULL AND ends_at IS NULL)),  -- 'once' needs start_at, nothing else
+           AND every_ms IS NULL AND every_months IS NULL
+           AND ends_at IS NOT NULL)),                                -- 'once': start_at, an autofilled ends_at, nothing else
     CHECK (ends_at IS NULL OR start_at IS NULL OR ends_at > start_at),          -- an end after the start
     CHECK (target_kind <> 'connector' OR (plugin_id IS NOT NULL AND source_id IS NOT NULL)),
     CHECK (target_kind <> 'ruleset' OR ruleset_id IS NOT NULL)
@@ -271,7 +272,14 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - `w` (week), allowed by today's scheduled rules, is kept as a short code for `1 week`.
 - **Not allowed in an interval:** `ago`, signs, `next`, `last`, `tomorrow`, weekdays and dates (these are points in time, not intervals) are rejected with "that is a time, use --start-at". Zero and negative totals are rejected.
 - **`once` (Michael, 9:22 AM):** `run_every` also accepts the literal `once`, a run at `start_at` and nothing more.
+  - `once` is valid **only** as a `run_every` value (Michael, 9:30 AM). It isn't accepted by `--for`, `--ends-at`, `--start-at` or cron.
   - A schedule given `start_at` without `--every` or `--cron` is stored with `run_every = 'once'` automatically; `--every once` is accepted explicitly too.
+  - **Muninn autofills `ends_at = start_at + 1 ms`** for `once`, with `ends_at_input = "auto (once)"`.
+    - 1 ms is the storage's smallest step (epoch milliseconds), so `[start_at, ends_at)` holds exactly one due time, `start_at`, and no other time can be due inside it.
+    - A larger epsilon such as 1 s would add nothing and would read as a real window.
+    - `ends_at` only limits when a run *starts*, so a run started at `start_at` can take as long as it needs.
+    - When `start_at` is corrected, the autofilled `ends_at` moves with it.
+  - **The scheduler has no `once`-specific logic.** The single run is due at `start_at`, and the next due time is past `ends_at`, so the generic `ends_at` rule disables the schedule and keeps the history.
   - `every_ms` and `every_months` are NULL for it.
   - **`once` requires `start_at`:** `--every once` without `--start-at` is an error ("once needs --start-at; to run now, use `mnnn schedule run-now NAME`"). Running something once right now is what `run-now` is for, so `once` never means "now".
   - `once` can't be mixed with other units (`once 5 minutes` is refused).
@@ -298,7 +306,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - An `ends_at` in the past, or not after `start_at`, is reported in the past-`start_at` style: the parsed time in local and UTC, how long ago it was (or that it is before `start_at`), then the only choice, **correct `ends_at`** (re-enter it). There is no "next interval" for an end.
   - Non-interactive use (`-y`, no TTY, scripts, MCP) fails with that message. There is no flag to accept a past end.
   - Editing a schedule, or re-enabling one whose `ends_at` has passed, is checked the same way. Re-enabling asks for a new `ends_at`, or `--no-end` to clear it.
-- **With `once`: refused** ("a once schedule runs a single time at start_at; ends_at has no effect"), because it means nothing. Plain `start_at` + `ends_at` without `--every` or `--cron` is also refused: there is no repeat to end.
+- **With `once`: a user-supplied `--ends-at` or `--for` is refused** ("a once schedule runs a single time at start_at; its end is set for you"), not ignored with a warning, so nobody believes a window is in force. Muninn fills `ends_at` itself (see `once` above). Plain `start_at` + `ends_at` without `--every` or `--cron` is also refused: there is no repeat to end.
 - **Works with** `run_every` (fixed and months) and `cron`.
 
 **`cron`:** the same five-field syntax as scheduled rules today, evaluated **in UTC**, or in the schedule's `tz` when set (Michael: Q-S1). `--tz ZONE` on `schedule add|edit`; `schedule show` gives both the zone's and UTC times. **Migration exception:** scheduled rules migrated from 2.23 (local-time `--cron` and `--every` today) are the one case where `tz` is set without `--tz`. They get the node's local zone, so they keep firing at the same wall-clock times instead of shifting with DST. New schedules never get `tz` automatically (Q-T2).
@@ -307,7 +315,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 
 | fields | runs |
 |--------|------|
-| `start_at` only = `run_every = 'once'` (set automatically, or `--every once`) | once, at `start_at`; afterwards the schedule is disabled and keeps its run history (Michael: Q-T4); `schedule show` says "ran once". If missed while nothing was running, it is skipped, not caught up (Q-T6, below) |
+| `start_at` only = `run_every = 'once'` (set automatically, or `--every once`) | `ends_at` is autofilled to `start_at + 1 ms` (`auto (once)`). It runs once at `start_at`; the next due time is at or after `ends_at`, so the generic `ends_at` rule disables it and keeps its run history (Michael: Q-T4, 9:30 AM). If missed while nothing was running, the generic ended-while-missed rule records one `failed` "missed" row and disables it (Q-T6) |
 | `start_at` + `run_every` | first at `start_at`, then every interval after it |
 | `run_every` only | **immediately** on creation, then every interval; re-enabling a schedule also runs it at once (Michael: Q-T1, matching today's scheduled rules) |
 | `cron` only | at the next cron time |
@@ -316,7 +324,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 | `once` without `start_at` | refused: "once needs --start-at" (use `schedule run-now` to run now) |
 | `once` + `cron` | refused |
 | `run_every` or `cron` + `ends_at` (or `--for`) | as above, but no run starts at or after `ends_at`; when the next due time would be at or after it, the schedule is disabled and keeps its history |
-| `once` + `ends_at`, or `start_at` + `ends_at` with no repeat | refused (nothing to end) |
+| `once` + a user `--ends-at`/`--for`, or `start_at` + `ends_at` with no repeat | refused (`once` gets its end automatically; a plain start has nothing to end) |
 | `ends_at` in the past, or not after `start_at` | the user is told (local, UTC, how long ago) and corrects `ends_at`; non-interactive fails |
 | `start_at` in the past | the user is told and chooses: next interval (repeating schedules only; never for `once`) or correct `start_at`; see "In the past" above |
 
@@ -335,8 +343,9 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 - **Crash recovery:** a `running` run whose heartbeat is more than 2 minutes old becomes `failed` (`error = "abandoned"`) and is retried.
 - **Missed runs and overlap (default accepted pending objection):**
   - `catch_up = once` runs one run for the latest missed slot; `all` runs each missed slot, oldest first, capped at 100; `none` skips ahead.
-  - Catch-up never starts a run at or after `ends_at`: missed slots are only caught up while it is still before `ends_at`. If the node comes back after `ends_at`, nothing runs, and the schedule is disabled as ended, with no rows made for the missed slots.
-  - **One-off schedules (`run_every = 'once'`) are never caught up (Michael: Q-T6),** whatever `catch_up` says. When the scheduler finds a one-off whose `start_at` passed while nothing was running, it doesn't run it. The skip has to fit the status enum (`pending|running|success|failed`), which has no "skipped", so it is recorded as a **`failed`** row with `timestamp = start_at`, `started_at = NULL`, `finished_at` = now and `error = "missed: one-off skipped (nothing was running at start_at)"`, plus a `schedule.missed` action (rules and notifications can react). The schedule is then disabled. No retry is made.
+  - Catch-up never starts a run at or after `ends_at`: missed slots are only caught up while it is still before `ends_at`.
+  - **Ended while missed (generic, every schedule):** when the scheduler finds a schedule whose `next_run_at` < `ends_at` <= now (it ended while nothing was running, so slots before the end never started), it doesn't run them. It records **one** `failed` row for the latest such slot (`timestamp` = that slot, `started_at = NULL`, `finished_at` = now, `error = "missed: ended at <ends_at> before it could run"`), plus a `schedule.missed` action, and then disables the schedule, keeping its history. The status enum has no "skipped", so `failed` is used.
+  - **One-off schedules (`run_every = 'once'`)** need no rule of their own (Michael: Q-T6, 9:30 AM). Their window is `[start_at, start_at + 1 ms)`. If the node was off at `start_at`, by the time anything checks, `ends_at` <= now. So the generic "ended while missed" rule applies: one `failed` "missed" row for `start_at`, a `schedule.missed` action, then disabled, with no retry, whatever `catch_up` says.
   - `overlap = skip` skips a slot while the previous run of the same schedule is open; `queue` keeps one pending run behind it.
   - At most 4 schedules run at once (`scheduler.workers`).
 - **Rule-set target:** a `schedule` action naming the schedule is recorded, then the rule set runs on it (each rule's `--if` sees `schedule` and `name`). The run is `success` when the set ran; a then-action error makes it `failed`.
@@ -374,7 +383,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 - **TUI:** Projects ▸ **Schedules…** (a schedule window: `n`, `e`, Space, `r` run now, Enter runs), with the scheduler's state in the status bar.
   - **The new/edit form** has the fields Name · Target (connector or rule set) · Start at · Repeat (every / cron / once).
   - Start at takes `date` input, with the parsed time shown under the field in local and UTC as you type (red with the error when it doesn't parse).
-  - An **Ends at** field (optional; `date` input, or `for 2 weeks`) shows the parsed time and the runs remaining. It is disabled for once, and a past or too-early end shows an inline warning with **Correct ends at**.
+  - An **Ends at** field (optional; `date` input, or `for 2 weeks`) shows the parsed time and the runs remaining. For once it shows `auto (once)` read-only, and a past or too-early end shows an inline warning with **Correct ends at**.
   - Repeat offers **once** (the default when Start at is filled and Repeat is empty; it needs Start at, and the form says so), **every** (`date` intervals or short codes) or **cron**. Every takes `date` intervals or short codes, shown back in the long form, with the next three run times listed before you save.
 - **App** (Matematik): the same.
 
@@ -406,7 +415,9 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - `start_at` alone is stored as `run_every = 'once'` with `every_ms` and `every_months` NULL; `--every once` is the same
   - `once` without `start_at` fails pointing to `run-now`; `once` + cron and `once 5 minutes` fail
   - the CHECK constraints reject `once` rows without `start_at` or with cron or interval values
-  - after its run the schedule is disabled and its `schedule_runs` history kept
+  - `ends_at` is autofilled to `start_at + 1 ms` with `ends_at_input = "auto (once)"`, and moves when `start_at` is corrected; a user `--ends-at`/`--for` with `once` is refused; `once` given anywhere but `--every` is refused
+  - the CHECK rejects a `once` row without `ends_at`
+  - after its run the schedule is disabled with its `schedule_runs` history kept, **through the generic `ends_at` path**: the scheduler code has no `once` branch (a test asserts the same behaviour for a repeating schedule whose `ends_at` falls just after one run)
 - `ends_at`:
   - absolute and relative input (`in 2 weeks`), with `tz` and local time, and the confirmation text
   - `--for` from `start_at` and from the creation time (calendar months), and refused together with `--ends-at`
@@ -417,7 +428,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - re-enabling after the end asks for a new one or `--no-end`
   - the CHECK constraints
   - `schedule parse` runs-remaining counts (finite, none, cron capped at 10,000)
-- Combinations: `start_at` alone (`once`: one run, then disabled with history kept), `start_at` + `run_every`, `run_every` alone (runs immediately, and again on re-enable), `cron` with `start_at` (not before), `run_every` + `cron` refused. A missed one-off produces one `failed` "missed" row and a `schedule.missed` action, doesn't run, and is disabled, even with `catch_up = all`. cron stepping (existing tests move).
+- Combinations: `start_at` alone (`once`: one run, then disabled with history kept), `start_at` + `run_every`, `run_every` alone (runs immediately, and again on re-enable), `cron` with `start_at` (not before), `run_every` + `cron` refused. A missed one-off produces one `failed` "missed" row and a `schedule.missed` action, doesn't run, and is disabled, even with `catch_up = all`, through the generic ended-while-missed rule. A repeating schedule that ended while the node was off gets the same single row and is disabled. cron stepping (existing tests move).
 - The migration writes the long forms and the same `every_ms`.
 - Scheduler, with a fake clock:
   - lease and claim-once under two schedulers
@@ -590,13 +601,13 @@ The inventory is checked against the code before implementing; any share point f
 - **Q-T1 `run_every` without `start_at`:** **Resolved.** It runs immediately on creation and on re-enable, matching today's scheduled rules.
 - **Q-T2 Filling `tz`:** **Resolved.** Steps happen in UTC even if the local time shifts. `tz` is never filled in automatically; it stays NULL unless `--tz` is given. The one exception is migrated local-time scheduled rules, which get the node's zone so they don't shift.
 - **Q-T3 Dependencies:** **Resolved.** Add `parse_datetime` for `start_at`. Approved for the plan; it goes into `Cargo.toml` when phase 2 is implemented.
-- **Q-T4 One-off schedules after they run:** **Resolved.** Disabled after the run, keeping its run history. A one-off is stored as `run_every = 'once'` (Michael, 9:22 AM); `once` requires `start_at`.
+- **Q-T4 One-off schedules after they run:** **Resolved.** Disabled after the run, keeping its run history. A one-off is stored as `run_every = 'once'` (Michael, 9:22 AM). `once` requires `start_at`, and Muninn autofills `ends_at = start_at + 1 ms`, so the generic `ends_at` rule does the disabling (9:30 AM).
 - **Q-T5 `start_at` in the past:** **Resolved, revised 9:17 AM.** Tell the user (local, UTC, how long ago) and ask: start at the next interval (shown), or correct `start_at`. A one-off can only be corrected. Non-interactive use needs `--past next-interval`, otherwise it fails naming both choices. `--allow-past` is removed.
-- **Q-T6 Missed one-off:** **Resolved.** Skipped, not caught up. It is recorded as a `failed` run with a "missed" error (the status enum has no "skipped"), then the schedule is disabled.
+- **Q-T6 Missed one-off:** **Resolved.** Skipped, not caught up. It is recorded as a `failed` run with a "missed" error (the status enum has no "skipped"), then the schedule is disabled. Since 9:30 AM this comes from the generic "ended while missed" rule, not one-off code.
 
 ### Added by Michael (Nov 8, 2026, 9:22 and 9:23 AM)
 
-- **`once`:** a schedule with `start_at` and no repeat is stored as `run_every = 'once'`; it runs once, then is disabled and keeps its history. `once` requires `start_at` (to run now, use `run-now`).
+- **`once`:** **Resolved.** `once` is valid only as a `run_every` value. A schedule with `start_at` and no repeat is stored as `run_every = 'once'`, Muninn autofills `ends_at = start_at + 1 ms` (`auto (once)`), and the generic `ends_at` logic runs it once, then disables it and keeps its history. There is no `once` logic in the scheduler. `once` requires `start_at` (to run now, use `run-now`). A user `ends_at` with `once` is refused.
 - **`ends_at`:** **Resolved.** Schedules get `ends_at` (and `ends_at_input`), in the same `date -d` formats, stored in UTC. No run, retry or catch-up starts at or after it. A run in progress finishes. When the next due time reaches it, the schedule is disabled and keeps its history. `--for DURATION` is sugar for start + duration. `ends_at` with `once` (or with no repeat) is refused as meaningless. A past end is reported and corrected, like a past `start_at`, with no "next interval" choice.
 
 ### Still open
