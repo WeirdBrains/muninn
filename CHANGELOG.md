@@ -9,6 +9,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ### Added
 - Code spaces are now collections of code: a kind, a main and members (`mnnn spaces`, aliases `code-spaces`, `space`). Main calls members and other spaces (`host.call`, `host.call_space`; SDK 1.2.0) with cycle and depth-8 checks; one approval covers the line-up; edited members run at once and show as unreviewed; pins are opt-in
 - `space:NAME` pipeline steps and sources
+- `pipe - --format csv|json|ndjson` runs the built-in parser as a code space (made on first use, or the one `mnnn migrate` made)
+- Code spaces as project items (`mnnn project add --space`); project packs and pipeline files carry spaces with their members' code (imported unapproved, pins kept)
+- `mnnn status`: home, database, counts, and a reminder when code still needs `mnnn migrate`
 - `mnnn migrate`: one space per code, kinds inferred, pipelines rewritten; dry run, backup, safe to rerun; offered once after upgrade
 - TUI: Code menu (Code spaces, Code, Migrate, Live pipes, Pipelines) and a Code spaces window
 

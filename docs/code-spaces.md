@@ -26,6 +26,11 @@ mnnn spaces pin both dbl
 code itself. In the TUI: **Code ▸ Code spaces…** (Enter members, `r` run, `a` approve,
 Space on/off, `M` migrate; in members `e` edit, `m` make main, `P` pin).
 
+Spaces can be project items (`mnnn project add Lab --space NAME`). Project packs and
+pipeline files (`mnnn pipeline export`) carry the spaces they use, those their mains import,
+and every member's code; they arrive unapproved, a clash lands as `NAME-imported`.
+`mnnn pipe - --format json` runs the built-in parser's space (`parse-json`).
+
 ## Migrating
 
 `code:NAME` pipeline steps still work for 2.23 with a deprecation note. `mnnn migrate`
@@ -33,7 +38,7 @@ Space on/off, `M` migrate; in members `e` edit, `m` make main, `P` pin).
 makes one space per code: named as the code, else `NAME-migration`, else skipped; the kind
 is inferred (`--kind` or a prompt when unclear); stored pipelines get `code:` rewritten to
 `space:`. `--dry-run` shows the report, a JSON backup goes to `<home>/backups/`, and it is
-safe to run again.
+safe to run again. `mnnn status` reminds you while code is in no space.
 
 ## Code
 
