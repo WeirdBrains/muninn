@@ -10,6 +10,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - `cargo clippy --workspace --all-targets` is clean (tests/site.rs, muninn-ffi; no behavior change)
 
 ### Added
+- Plugins (phase 2): `mnnn plugins list|info|install|enable|disable|remove` over code spaces by kind; a Plug menu (Alt+L) with Parsers, Transforms, Analysis, Ingest connectors and All plugins; a prebuilt main's declared kind must match its space's ([docs/plugins.md](docs/plugins.md))
 - Plugin SDK 1.3 (`muninn-plugin`, now publishable to crates.io): typed ingest-connector host methods `context()`, `store_raw(name, format, bytes)`, `pipe()`, `run_ruleset(Option<id>)`, `fetch(&Request)`, `state_get`/`state_set`, and `plugin!(run, kind = "…")` declaring a kind in the plugin's info. Outside a connector run they say where they work (the v2.26 scheduler or a dry run)
 - `mnnn spaces run NAME --connector-dry-run` (`--source`, `--pipeline`, `--ruleset`, `--option`, `--state`): runs an ingest-connector space with an in-memory context that records store_raw, pipe and run_ruleset instead of doing them; `fetch` is real
 - `mnnn code create NAME --template ingest-connector` and [docs/connectors.md](docs/connectors.md)
@@ -28,6 +29,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - TUI: Code menu (Code spaces, Code, Migrate, Live pipes, Pipelines) and a Code spaces window
 
 ### Changed
+- TUI menu bar: File · View · Data · Proj · Code · Plug · Net · Orgs · Keys · Theme · Help (the long `Alt+letter` hint shows from about 100 columns)
 - The code table is now `code` (ids kept); menu bar labels shortened (File View Data Proj Code Net Orgs Keys Theme Help)
 
 ### Deprecated

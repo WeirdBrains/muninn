@@ -230,7 +230,25 @@ pub fn check_runnable(store: &Store, s: &Space) -> Result<()> {
     if !approved(store, s) {
         return Err(need_approval(s));
     }
-    check(store, s)
+    check(store, s)?;
+    check_declared_kind(store, s)
+}
+
+/// A prebuilt main's SDK 1.1+ `kind` (in its info), if it declares one, must be the space's.
+/// Read only once the space is approved (loading a library runs its code).
+pub fn check_declared_kind(store: &Store, s: &Space) -> Result<()> {
+    let main = main_of(store, s)?;
+    if main.lang != crate::store::Lang::Plugin {
+        return Ok(());
+    }
+    let Some(k) = super::declared_kind(&main) else { return Ok(()) };
+    if k != s.kind.as_str() {
+        return Err(Error::invalid(
+            "space",
+            format!("{}: its main {} is a prebuilt `{k}` plugin, but the space is {}; `mnnn spaces kind {} {k}`", s.name, main.name, s.kind, s.name),
+        ));
+    }
+    Ok(())
 }
 
 /// Everything a top-level run checks before building: [`check_runnable`] and main's pin.

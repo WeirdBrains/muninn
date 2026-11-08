@@ -32,6 +32,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Models](models.md): design record tables, migrate them with previews and roll back; records
 - [Model design templates](model-templates.md): export, import and share model designs; built-in templates
 - [Code spaces](code-spaces.md): math, Polars, Rust or Python compiled to native plugins over your data
+- [Plugins](plugins.md): code spaces by kind (`mnnn plugins`, the Plug menu)
 - [Ingest connectors](connectors.md): code spaces that fetch data, store it raw, pipe it and run a rule set (SDK 1.3)
 - [Export formats](export-formats.md): PDF, HTML, Word, LaTeX, JSON, CSV; printing; project archives and import
 

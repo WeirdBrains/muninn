@@ -10,7 +10,7 @@ changelog are archived in [`docs/historical/2.0/`](docs/historical/2.0/), and 1.
 | Phase | Feature set | Version | Status |
 | ----- | ----------- | ------- | ------ |
 | 1 | [Code Spaces as Collections of Code](#code-spaces-as-collections-of-code): today's code spaces become **code** (single units). A new **code space** is a collection of code with a required **main**, which can import and call other code. Pipelines run spaces (`space:NAME`), and an offered `mnnn code migrate` turns each code into a space | v2.23.0 | 📝 Planned (reworked Nov 8, 9:43 AM) |
-| 2 | [Plugins](#plugins): a required `kind` on every **code**, `mnnn plugins` with kind migration, a Plugins menu per kind; and the [Code spaces + Code menus and CLI](#code-spaces-menu-and-cli) | v2.24.0 | 📝 Planned (implementation paused, see below) |
+| 2 | [Plugins](#plugins): a required `kind` on every **code**, `mnnn plugins` with kind migration, a Plugins menu per kind; and the [Code spaces + Code menus and CLI](#code-spaces-menu-and-cli) | v2.24.0 | ✅ Done (Nov 8, on main; no tag) |
 | 3 | [Rule Sets + Scheduler](#rule-sets--scheduler): a first-class `rulesets` table, the system scheduler with `schedules` and `schedule_runs`, scheduled rules moved onto it, `rule tick` deprecated | v2.25.0 | 📝 Planned |
 | 4 | [Ingest Connector Plugins](#ingest-connector-plugins): code spaces whose main is of kind `ingest-connector`, managed under Plugins ▸ Ingest connectors, run on a schedule; they store raw data, call a pipeline and a rule set | v2.26.0 | 📝 Planned |
 | 5 | [Shares: Create Then Share](#shares-create-then-share): wherever a share can be added, the thing can be created there too (code and code spaces both) | v2.27.0 | 📝 Planned |
@@ -221,7 +221,7 @@ mnnn spaces remove-code SPACE CODE|set-main SPACE CODE|pin|unpin SPACE CODE|appr
 
 ## Plugins
 
-> **Phase 2 · v2.24.0 · 📝 Planned (after code spaces became collections)**
+> **Phase 2 · v2.24.0 · ✅ Done (Nov 8).** Shipped as reworked: `mnnn plugins` over spaces, the Plug menu, the prebuilt declared-kind check. Choices: no `n`/`d` keys in the Plugins window (install and remove are CLI; the window keeps the code spaces keys); `remove` refusing while a schedule uses it comes with phase 3; ffi gains `plugins_list(kind)` and `plugin_set_enabled(name, on)` (frb bindings not regenerated: Michael's app work).
 
 **Reworked for phase 1 (Michael: Q-CS7, Q-CS8, resolved):**
 - **The space carries the kind; code has none.** This is the simplest coherent option: one place to look, and code can be shared by spaces of different kinds.

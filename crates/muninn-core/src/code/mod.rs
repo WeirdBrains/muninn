@@ -407,6 +407,17 @@ impl Drop for Guard {
     }
 }
 
+/// The `kind` a prebuilt plugin declares in its info (SDK 1.3 `plugin!(run, kind = …)`);
+/// None for source code, a library that can't load, or one that declares none.
+pub fn declared_kind(c: &CodeSpace) -> Option<String> {
+    if c.lang != Lang::Plugin {
+        return None;
+    }
+    let l = load(Path::new(c.source.trim())).ok()?;
+    let v: Value = serde_json::from_str(l.info).ok()?;
+    v.get("kind").and_then(Value::as_str).map(str::to_string)
+}
+
 /// Whether a code space can run as it is (approved for its current source).
 pub fn approved(space: &CodeSpace) -> bool {
     trust_hash(space).ok().is_some_and(|h| space.approved_hash.as_deref() == Some(h.as_str()))

@@ -7,7 +7,7 @@ Every key runs the same named action as its [menu](menus.md) item.
 | key | action |
 |-----|--------|
 | F10 | open the menu bar |
-| Alt+F/V/D/P/K/T/H | open File / View / Data / Projects / Keys / Theme / Help |
+| Alt+F/V/D/P/C/L/N/O/K/T/H | open File / View / Data / Projects / Code / Plugins / Net / Orgs / Keys / Theme / Help |
 | `?`, F1 | help for the current context ([in-app help](help.md)) |
 | F5 | refresh data |
 | Tab / Shift-Tab | focus the next / previous tile |

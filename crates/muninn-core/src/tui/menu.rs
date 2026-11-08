@@ -180,6 +180,18 @@ pub fn menus() -> Vec<Menu> {
             ],
         },
         Menu {
+            title: "Plug",
+            mnemonic: 'l',
+            items: vec![
+                a("Parsers…", 'p', "", Plugins(Some(crate::store::SpaceKind::Parser))),
+                a("Transforms…", 't', "", Plugins(Some(crate::store::SpaceKind::Transform))),
+                a("Analysis…", 'a', "", Plugins(Some(crate::store::SpaceKind::Analysis))),
+                a("Ingest connectors…", 'i', "", Plugins(Some(crate::store::SpaceKind::IngestConnector))),
+                sep(),
+                a("All plugins…", 'l', "", Plugins(None)),
+            ],
+        },
+        Menu {
             title: "Net",
             mnemonic: 'n',
             items: vec![

@@ -464,6 +464,7 @@ impl App {
             }
             Code => code::open(self),
             Spaces => spaces::open(self),
+            Plugins(k) => spaces::open_kind(self, k),
             Migrate => spaces::open_migrate(self),
             Pipes => pipes::open(self),
             Pipelines => designer::open(self),

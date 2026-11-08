@@ -109,6 +109,10 @@ pub enum Command {
     /// run spaces (`space:NAME`); main can call its members and other spaces.
     #[command(subcommand, visible_alias = "code-spaces", alias = "space", after_long_help = SPACES_NOTES)]
     Spaces(SpacesCommand),
+    /// Plugins: code spaces by kind (parser, transform, analysis, ingest-connector). List,
+    /// inspect, install a prebuilt library or a code as one, enable, disable, remove.
+    #[command(subcommand, alias = "plugin")]
+    Plugins(PluginsCommand),
     /// Move code from before 2.23 into code spaces: one space per code (named as the code;
     /// taken: NAME-migration; both taken: skipped), its kind inferred, and stored pipelines'
     /// code: steps rewritten to space:. Offered, never automatic; safe to run again.
@@ -2778,6 +2782,46 @@ impl KindArg {
             KindArg::IngestConnector => K::IngestConnector,
         }
     }
+}
+
+#[derive(Debug, Subcommand)]
+pub enum PluginsCommand {
+    /// Plugins (code spaces) with their kind, main's language, approval and state.
+    List {
+        #[arg(long, value_enum)]
+        kind: Option<KindArg>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// A plugin: its manifest (the space: kind, main, members; a prebuilt library's
+    /// declared kind), approval, and where it is used (pipelines, rules, other mains).
+    Info {
+        name: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Install a prebuilt library (a path) or an existing code (a name) as a plugin: the
+    /// code plus a one-member space of --kind. Lands unapproved.
+    Install {
+        /// A `.so`/`.dylib`/`.dll` path, or the name of a code.
+        what: String,
+        #[arg(long, value_enum)]
+        kind: KindArg,
+        /// The plugin's (space's) name (default: the file stem or the code's name).
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Remove a plugin (the space; its code stays). Asks; -y skips.
+    Remove {
+        name: String,
+    },
+    Enable {
+        name: String,
+    },
+    /// Disabled plugins don't run: pipes, pipelines and rules using them fail clearly.
+    Disable {
+        name: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]

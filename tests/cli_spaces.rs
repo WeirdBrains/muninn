@@ -348,3 +348,27 @@ fn project_packs_carry_a_rules_space_and_rewrite_renamed_imports() {
     assert!(src.contains("@imports space:inner-imported as inner"), "{src}");
     assert!(!c.ok(&["spaces", "show", "top"]).contains("changed since pinned"));
 }
+
+#[test]
+fn plugins_list_info_install_enable_and_remove() {
+    let e = Env::new();
+    math(&e, "shape", "y = 2\n");
+    assert!(e.ok(&["plugins", "list"]).contains("no plugins yet"));
+    e.ok(&["plugins", "install", "shape", "--kind", "transform"]);
+    let l = e.ok(&["plugins", "list", "--kind", "transform"]);
+    assert!(l.contains("shape\ttransform\tmath\tnot approved\tenabled"), "{l}");
+    assert!(e.ok(&["plugins", "list", "--kind", "parser"]).contains("no parser plugins"));
+    e.ok(&["pipeline", "create", "flow", "--node", "src=model:bars", "--node", "d=space:shape", "--node", "out=model:bars", "--edge", "src>d>out"]);
+    e.ok(&["rule", "create", "R", "--on", "import", "--then", "run-space shape"]);
+    let i = e.ok(&["plugins", "info", "shape"]);
+    assert!(i.contains("kind:      transform") && i.contains("rule R") && i.contains("pipeline flow"), "{i}");
+    let j = json(&e.ok(&["plugins", "info", "shape", "--json"]));
+    assert_eq!(j["lang"], "math");
+    e.ok(&["plugins", "disable", "shape"]);
+    assert!(e.ok(&["plugins", "list"]).contains("disabled"));
+    e.ok(&["plugins", "enable", "shape"]);
+    // a missing library path is refused
+    assert!(!e.run(&["plugins", "install", "/nope/libx.so", "--kind", "parser"]).status.success());
+    e.ok(&["-y", "plugins", "remove", "shape"]);
+    assert!(e.ok(&["plugins", "list"]).contains("no plugins yet"));
+}

@@ -80,3 +80,33 @@ fn g_gives_a_space_to_an_org() {
     let rs = a.store.resources(&o.id).unwrap();
     assert!(rs.iter().any(|r| r.kind == crate::store::ShareKind::Space && r.ref_id == s.id), "{rs:?}");
 }
+
+#[test]
+fn the_plugins_menu_lists_spaces_by_kind() {
+    let (_t, mut a) = app();
+    let c = a.store.create_code_space("p1", "", Lang::Math, "y = 2", CodeInput::default()).unwrap();
+    let d = a.store.create_code_space("t1", "", Lang::Math, "y = 3", CodeInput::default()).unwrap();
+    crate::code::spaces::create(&a.store, "test", "csvish", "", SpaceKind::Parser, &c).unwrap();
+    crate::code::spaces::create(&a.store, "test", "shaper", "", SpaceKind::Transform, &d).unwrap();
+    // the bar has Plug, with an entry per kind and All plugins
+    let m = super::menu::menus();
+    let plug = m.iter().find(|m| m.title == "Plug").expect("a Plug menu");
+    assert_eq!(plug.mnemonic, 'l');
+    let labels: Vec<&str> = plug.items.iter().map(|i| i.label).filter(|l| !l.is_empty()).collect();
+    assert_eq!(labels, ["Parsers…", "Transforms…", "Analysis…", "Ingest connectors…", "All plugins…"]);
+    a.dispatch(super::action::Action::Plugins(Some(SpaceKind::Parser)));
+    assert!(matches!(a.modal, Some(Modal::Spaces)));
+    let text = screen_text(&mut a);
+    assert!(text.contains("Plugins ▸ Parsers") && text.contains("csvish") && !text.contains("shaper"), "{text}");
+    a.dispatch(super::action::Action::Plugins(Some(SpaceKind::IngestConnector)));
+    assert!(screen_text(&mut a).contains("plugins install PATH|CODE --kind ingest-connector"));
+    a.dispatch(super::action::Action::Plugins(None));
+    let text = screen_text(&mut a);
+    assert!(text.contains("All plugins") && text.contains("csvish") && text.contains("shaper"), "{text}");
+    // Space disables from here too
+    a.on_key(key(KeyCode::Char(' ')));
+    assert!(a.store.spaces().unwrap().iter().any(|s| !s.enabled));
+    // the Code menu's window is unfiltered again
+    spaces::open(&mut a);
+    assert!(!screen_text(&mut a).contains("Plugins ▸"));
+}

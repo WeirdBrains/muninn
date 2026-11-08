@@ -1018,11 +1018,70 @@ pub fn space_import(path: String, name: Option<String>) -> anyhow::Result<String
     Ok(format!("imported code space {}; approve it before it runs", s.name))
 }
 
+/// A plugin: a code space by kind (Plugins ▸ KIND).
+#[derive(Debug, Clone)]
+pub struct PluginInfo {
+    pub name: String,
+    pub kind: String,
+    /// main's language
+    pub lang: String,
+    pub main: String,
+    pub approved: bool,
+    pub enabled: bool,
+}
+
+fn plugins_of(store: &muninn_core::store::Store, kind: Option<&str>) -> anyhow::Result<Vec<PluginInfo>> {
+    let want = match kind.map(str::trim).filter(|k| !k.is_empty()) {
+        Some(k) => Some(
+            muninn_core::store::SpaceKind::parse(k).ok_or_else(|| anyhow::anyhow!("kind `{k}` (parser, transform, analysis, ingest-connector)"))?,
+        ),
+        None => None,
+    };
+    let mut v = vec![];
+    for s in store.spaces()?.into_iter().filter(|s| want.is_none_or(|k| s.kind == k)) {
+        let main = store.code_space(&s.main_code_id)?;
+        v.push(PluginInfo {
+            name: s.name.clone(),
+            kind: s.kind.as_str().into(),
+            lang: main.as_ref().map(|c| c.lang.as_str().to_string()).unwrap_or_default(),
+            main: main.map(|c| c.name).unwrap_or_default(),
+            approved: code::spaces::approved(store, &s),
+            enabled: s.enabled,
+        });
+    }
+    Ok(v)
+}
+
+/// `mnnn plugins list [--kind K]`.
+pub fn plugins_list(kind: Option<String>) -> anyhow::Result<Vec<PluginInfo>> {
+    plugins_of(&open()?, kind.as_deref())
+}
+
+/// `mnnn plugins enable|disable NAME`.
+pub fn plugin_set_enabled(name: String, enabled: bool) -> anyhow::Result<String> {
+    let store = open_write()?;
+    let s = store.find_space(name.trim())?;
+    store.set_space_enabled(&s.id, enabled)?;
+    code::spaces::note(&store, ORIGIN, &s, if enabled { "enabled" } else { "disabled" }, json!({ "enabled": enabled }));
+    Ok(format!("{} plugin {}", if enabled { "enabled" } else { "disabled" }, s.name))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use muninn_core::store::Store;
     use serde_json::json;
+
+    #[test]
+    fn plugins_list_by_kind() {
+        let s = Store::open_in_memory().unwrap();
+        let c = s.create_code_space("p", "", muninn_core::store::Lang::Math, "y = 1", Default::default()).unwrap();
+        code::spaces::create(&s, "test", "pp", "", muninn_core::store::SpaceKind::Parser, &c).unwrap();
+        assert_eq!(plugins_of(&s, Some("parser")).unwrap()[0].name, "pp");
+        assert!(plugins_of(&s, Some("analysis")).unwrap().is_empty());
+        assert_eq!(plugins_of(&s, None).unwrap()[0].lang, "math");
+        assert!(plugins_of(&s, Some("nope")).is_err());
+    }
 
     #[test]
     fn latest_pipe_frame_reads_the_last_code_result() {

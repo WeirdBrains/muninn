@@ -62,6 +62,8 @@ pub enum Action {
     Rules,
     Code,
     Spaces,
+    /// Plugins ▸ a kind (None: All plugins): the code spaces window, filtered.
+    Plugins(Option<crate::store::SpaceKind>),
     Migrate,
     Pipes,
     Pipelines,
@@ -184,6 +186,10 @@ impl Action {
             Rules => "rules".into(),
             Code => "code".into(),
             Spaces => "spaces".into(),
+            Plugins(k) => match k {
+                Some(k) => format!("plugins.{k}"),
+                None => "plugins".into(),
+            },
             Migrate => "migrate".into(),
             Pipes => "pipes".into(),
             Pipelines => "pipelines".into(),

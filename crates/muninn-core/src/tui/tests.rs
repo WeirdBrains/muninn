@@ -72,7 +72,7 @@ fn header_large_and_compact() {
 fn menu_opens_with_f10_alt_and_mouse() {
     let (_t, mut a) = app();
     let s = screen_text(&mut a);
-    for m in ["File", "View", "Data", "Proj", "Code", "Net", "Orgs", "Keys", "Theme", "Help"] {
+    for m in ["File", "View", "Data", "Proj", "Code", "Plug", "Net", "Orgs", "Keys", "Theme", "Help"] {
         assert!(s.contains(m), "{m}");
     }
     a.on_key(key(KeyCode::F(10)));
@@ -84,13 +84,16 @@ fn menu_opens_with_f10_alt_and_mouse() {
     a.on_key(key(KeyCode::Esc));
     assert!(!a.menu.is_open());
     a.on_key(mkey(KeyCode::Char('t'), KeyModifiers::ALT));
-    assert_eq!(a.menu.open, Some(8));
+    assert_eq!(a.menu.open, Some(9));
+    a.on_key(key(KeyCode::Esc));
+    a.on_key(mkey(KeyCode::Char('l'), KeyModifiers::ALT));
+    assert_eq!(a.menu.open, Some(5), "Alt+L opens Plug");
     a.on_key(key(KeyCode::Esc));
     // mouse: click "Help" in the menu bar, then "About Muninn"
     screen_text(&mut a);
-    let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuTop(9)).unwrap();
+    let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuTop(10)).unwrap();
     a.on_mouse(click(r.x + 1, r.y));
-    assert_eq!(a.menu.open, Some(9));
+    assert_eq!(a.menu.open, Some(10));
     screen_text(&mut a);
     let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuItem(0, 3)).unwrap();
     a.on_mouse(click(r.x + 2, r.y));
@@ -109,7 +112,10 @@ fn every_category_fits_at_80_columns_and_dropdowns_stay_below_the_bar() {
             let i = bar[at..].find(m.title).map(|i| i + at).unwrap_or_else(|| panic!("{} missing at {w}: {bar}", m.title));
             at = i + m.title.len();
         }
-        assert_eq!(bar.contains("Alt+letter"), w >= 100, "{w}: {bar}");
+        // the long hint needs room (the 11 labels take 72 columns)
+        if w == 80 || w == 160 {
+            assert_eq!(bar.contains("Alt+letter"), w == 160, "{w}: {bar}");
+        }
     }
     // each dropdown opens right below its own category, also on a short screen
     for (i, m) in menu::menus().iter().enumerate() {

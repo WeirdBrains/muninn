@@ -233,6 +233,9 @@ Code spaces: math, Polars, Rust or Python (or a prebuilt plugin) compiled into a
 mnnn\-spaces(1)
 Code spaces: collections of code with a kind and a main (the entry point). Pipelines run spaces (`space:NAME`); main can call its members and other spaces
 .TP
+mnnn\-plugins(1)
+Plugins: code spaces by kind (parser, transform, analysis, ingest\-connector). List, inspect, install a prebuilt library or a code as one, enable, disable, remove
+.TP
 mnnn\-migrate(1)
 Move code from before 2.23 into code spaces: one space per code (named as the code; taken: NAME\-migration; both taken: skipped), its kind inferred, and stored pipelines\*(Aq code: steps rewritten to space:. Offered, never automatic; safe to run again
 .TP

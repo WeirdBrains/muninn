@@ -449,3 +449,133 @@ pub fn migrate(ctx: &Ctx, a: MigrateArgs) -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+/// Where a space is used: pipelines that run it, rules that run it, mains that import it.
+pub fn used_by(store: &Store, s: &Space) -> anyhow::Result<Vec<String>> {
+    let mut v = vec![];
+    for p in store.pipelines()? {
+        if p.graph.spaces().iter().any(|n| n.eq_ignore_ascii_case(&s.name) || *n == s.id) {
+            v.push(format!("pipeline {}", p.name));
+        }
+    }
+    for r in store.rules()? {
+        if r.spec.then.iter().any(|t| matches!(t, crate::store::Then::RunSpace { space, .. } if *space == s.id)) {
+            v.push(format!("rule {}", r.name));
+        }
+    }
+    for o in store.spaces()? {
+        if o.id == s.id {
+            continue;
+        }
+        if let Some(m) = store.code_space(&o.main_code_id)?
+            && spaces::imports(&m.source).spaces.iter().any(|n| n.eq_ignore_ascii_case(&s.name))
+        {
+            v.push(format!("space {} (its main imports it)", o.name));
+        }
+    }
+    Ok(v)
+}
+
+/// `mnnn plugins`: code spaces seen by kind (docs/plugins.md).
+pub fn plugins(ctx: &Ctx, cmd: super::PluginsCommand) -> anyhow::Result<()> {
+    use super::PluginsCommand as P;
+    let store = ctx.open_store()?;
+    match cmd {
+        P::List { kind, json: as_json } => {
+            let want = kind.map(|k| k.kind());
+            let v: Vec<Space> = store.spaces()?.into_iter().filter(|s| want.is_none_or(|k| s.kind == k)).collect();
+            if as_json {
+                let rows: Vec<serde_json::Value> = v
+                    .iter()
+                    .map(|s| {
+                        let mut r = row(&store, s);
+                        r["lang"] = json!(store.code_space(&s.main_code_id).ok().flatten().map(|c| c.lang.as_str().to_string()));
+                        r
+                    })
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&rows)?);
+            } else if v.is_empty() {
+                ctx.io.info(match want {
+                    Some(k) => format!("no {k} plugins; `mnnn plugins install PATH|CODE --kind {k}`"),
+                    None => "no plugins yet; `mnnn plugins install PATH|CODE --kind K`, or `mnnn migrate` to make them from your code".into(),
+                });
+            } else {
+                for s in &v {
+                    let main = store.code_space(&s.main_code_id)?;
+                    println!(
+                        "{}\t{}\t{}\t{}\t{}\t{}",
+                        s.name,
+                        s.kind,
+                        main.as_ref().map(|c| c.lang.as_str()).unwrap_or("?"),
+                        if spaces::approved(&store, s) { "approved" } else { "not approved" },
+                        if s.enabled { "enabled" } else { "disabled" },
+                        flags(&store, s)
+                    );
+                }
+            }
+        }
+        P::Info { name, json: as_json } => {
+            let s = store.find_space(&name)?;
+            let main = store.code_space(&s.main_code_id)?.ok_or_else(|| anyhow!("{}: no main", s.name))?;
+            let approved = spaces::approved(&store, &s);
+            // a library is loaded (its code runs) only once the plugin is approved
+            let declared = if approved { code::declared_kind(&main) } else { None };
+            let used = used_by(&store, &s)?;
+            if as_json {
+                let mut r = row(&store, &s);
+                r["lang"] = json!(main.lang.as_str());
+                r["declared_kind"] = json!(declared);
+                r["used_by"] = json!(used);
+                r["problem"] = json!(spaces::check(&store, &s).err().map(|e| e.to_string()));
+                println!("{}", serde_json::to_string_pretty(&r)?);
+                return Ok(());
+            }
+            println!("name:      {}", s.name);
+            println!("kind:      {}", s.kind);
+            println!("main:      {} ({})", main.name, main.lang.as_str());
+            if main.lang == crate::store::Lang::Plugin {
+                println!("library:   {}", main.source.trim());
+                println!(
+                    "declares:  {}",
+                    match (&declared, approved) {
+                        (Some(k), _) => k.clone(),
+                        (None, true) => "no kind (built before SDK 1.3; rebuild with `plugin!(run, kind = …)`)".into(),
+                        (None, false) => "read once approved".into(),
+                    }
+                );
+            }
+            println!("members:   {}", store.space_members(&s.id)?.len());
+            println!("approved:  {}", if approved { "yes" } else { "no: `mnnn spaces approve`" });
+            println!("enabled:   {}", if s.enabled { "yes" } else { "no" });
+            println!("used by:   {}", if used.is_empty() { "nothing yet".to_string() } else { used.join(", ") });
+            if let Err(e) = spaces::check(&store, &s).and_then(|_| if approved { spaces::check_declared_kind(&store, &s) } else { Ok(()) }) {
+                println!("problem:   {e}");
+            }
+        }
+        P::Install { what, kind, name } => {
+            let path = std::path::Path::new(&what);
+            let c = if path.is_file() || what.contains(std::path::MAIN_SEPARATOR) {
+                let abs = std::fs::canonicalize(path).map_err(|e| anyhow!("{what}: {e}"))?;
+                let stem = abs.file_stem().and_then(|s| s.to_str()).unwrap_or("plugin").trim_start_matches("lib").to_string();
+                let cname = name.clone().unwrap_or(stem);
+                code::create(&store, "cli", &cname, "", crate::store::Lang::Plugin, &abs.to_string_lossy(), Default::default())?
+            } else {
+                store.find_code_space(&what)?
+            };
+            let sname = name.unwrap_or_else(|| c.name.clone());
+            let s = spaces::create(&store, "cli", &sname, "", kind.kind(), &c)?;
+            store.note_action(
+                &crate::store::NewAction::new("plugins.install", "cli", format!("install plugin {} ({})", s.name, s.kind))
+                    .params(json!({ "space": s.id, "code": c.id, "kind": s.kind })),
+            );
+            ctx.io.info(format!(
+                "installed plugin {} ({}, main {}); review and approve it with `mnnn spaces approve {}`",
+                s.name, s.kind, c.name, s.name
+            ));
+        }
+        P::Remove { name } => run(ctx, SpacesCommand::Remove { space: name })?,
+        P::Enable { name } => toggle(ctx, &store, &name, true)?,
+        P::Disable { name } => toggle(ctx, &store, &name, false)?,
+    }
+    Ok(())
+}

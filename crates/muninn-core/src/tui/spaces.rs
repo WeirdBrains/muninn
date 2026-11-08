@@ -35,10 +35,14 @@ pub struct SpacesState {
     /// The last run's text lines.
     pub result: Vec<String>,
     pub report: Option<migrate::Report>,
+    /// Plugins ▸ KIND: only spaces of this kind; `plugins` is set for any Plugins entry.
+    pub kind: Option<crate::store::SpaceKind>,
+    pub plugins: bool,
 }
 
 fn reload(app: &mut App) {
-    app.spaces.list = app.store.spaces().unwrap_or_default();
+    let want = app.spaces.kind;
+    app.spaces.list = app.store.spaces().unwrap_or_default().into_iter().filter(|s| want.is_none_or(|k| s.kind == k)).collect();
     app.spaces.sel = app.spaces.sel.min(app.spaces.list.len().saturating_sub(1));
     if let Some(o) = &app.spaces.open {
         app.spaces.open = app.store.space(&o.id).ok().flatten();
@@ -46,6 +50,20 @@ fn reload(app: &mut App) {
 }
 
 pub fn open(app: &mut App) {
+    app.spaces.kind = None;
+    app.spaces.plugins = false;
+    show(app);
+}
+
+/// Plugins ▸ Parsers… (a kind) or All plugins… (None).
+pub fn open_kind(app: &mut App, kind: Option<crate::store::SpaceKind>) {
+    app.spaces.kind = kind;
+    app.spaces.plugins = true;
+    app.spaces.sel = 0;
+    show(app);
+}
+
+fn show(app: &mut App) {
     let st = &mut app.spaces;
     st.screen = Screen::List;
     st.confirm = false;
@@ -364,7 +382,17 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
             v.keys = vec![("y migrate", KeyCode::Char('y')), ("Esc cancel", KeyCode::Esc)];
         }
         Screen::List => {
-            v = View::new("Code spaces · collections of code; the main runs");
+            v = View::new(&match (st.plugins, st.kind) {
+                (true, Some(k)) => format!("Plugins ▸ {} · {k} code spaces", kind_label(k)),
+                (true, None) => "Plugins ▸ All plugins · every code space, by kind".to_string(),
+                _ => "Code spaces · collections of code; the main runs".to_string(),
+            });
+            if st.list.is_empty() && st.plugins {
+                v.head.push(muted(
+                    &t,
+                    format!(" none yet: `mnnn plugins install PATH|CODE --kind {}`", st.kind.map(|k| k.as_str()).unwrap_or("KIND")),
+                ));
+            }
             for (i, s) in st.list.iter().enumerate() {
                 let ok = spaces::approved(&app.store, s);
                 let ms = spaces::members(&app.store, s).unwrap_or_default();
@@ -460,4 +488,15 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
     v.msg = st.msg.clone();
     super::share::add_key(app, &mut v.keys);
     draw_view(f, r, v, &t, hits);
+}
+
+/// A kind as its Plugins menu entry names it.
+pub fn kind_label(k: crate::store::SpaceKind) -> &'static str {
+    use crate::store::SpaceKind::*;
+    match k {
+        Parser => "Parsers",
+        Transform => "Transforms",
+        Analysis => "Analysis",
+        IngestConnector => "Ingest connectors",
+    }
 }

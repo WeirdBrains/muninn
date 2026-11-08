@@ -190,6 +190,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Model(c) => models::run(&ctx, c),
         Command::Code(c) => code::run(&ctx, c),
         Command::Spaces(c) => spaces::run(&ctx, c),
+        Command::Plugins(c) => spaces::plugins(&ctx, c),
         Command::Migrate(a) => spaces::migrate(&ctx, a),
         Command::Status { json } => spaces::status(&ctx, json),
         Command::Net(c) => net::run(&ctx, c),
