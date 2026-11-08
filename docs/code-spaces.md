@@ -1,5 +1,42 @@
 # Code spaces
 
+Since 2.23 a **code space** is a collection of [code](#code) with a **kind** (parser,
+transform, analysis or ingest-connector) and a **main** code, its entry point. Pipelines
+run spaces (`space:NAME`); a plain code is no longer run on its own by a pipeline.
+
+- **Main calls, members don't.** Main lists what it uses in an `@imports` header
+  (`// @imports dbl, space:tenx`) and calls a member with `host.call("dbl", args)` and
+  another space with `host.call_space("tenx", args)` (Rust SDK 1.2:
+  `Host::call_code` / `Host::call_space`). Cycles and depth over 8 are refused.
+- **Approval covers the line-up.** `mnnn spaces approve NAME` approves main, the kind, the
+  members and the imports at once. Adding, removing or changing main asks again.
+- **Members follow their code.** Editing a member runs the edited code at once; the space
+  shows it as *unreviewed* until approved again. `mnnn spaces pin NAME CODE` pins a member:
+  once its code changes the space fails until you pin again.
+- Code in a space can't be removed (`mnnn spaces remove-code` first).
+
+```
+mnnn spaces create both --kind analysis --main mainc --add dbl
+mnnn spaces approve both
+mnnn pipe - --format json space:both < in.json
+mnnn spaces pin both dbl
+```
+
+`mnnn spaces` (aliases `code-spaces`, `space`) manages spaces; `mnnn code` manages the
+code itself. In the TUI: **Code ▸ Code spaces…** (Enter members, `r` run, `a` approve,
+Space on/off, `M` migrate; in members `e` edit, `m` make main, `P` pin).
+
+## Migrating
+
+`code:NAME` pipeline steps still work for 2.23 with a deprecation note. `mnnn migrate`
+(also **Code ▸ Migrate code to spaces…**, offered once after upgrade, never automatic)
+makes one space per code: named as the code, else `NAME-migration`, else skipped; the kind
+is inferred (`--kind` or a prompt when unclear); stored pipelines get `code:` rewritten to
+`space:`. `--dry-run` shows the report, a JSON backup goes to `<home>/backups/`, and it is
+safe to run again.
+
+## Code
+
 A code space is a program kept in your Muninn database. It reads records (bars or any
 [model](models.md)), can change and create records and models, and returns a **result**:
 a table, a chart, text, or tiles of these. Code spaces are written in one of four

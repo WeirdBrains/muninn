@@ -6,6 +6,18 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+- Code spaces are now collections of code: a kind, a main and members (`mnnn spaces`, aliases `code-spaces`, `space`). Main calls members and other spaces (`host.call`, `host.call_space`; SDK 1.2.0) with cycle and depth-8 checks; one approval covers the line-up; edited members run at once and show as unreviewed; pins are opt-in
+- `space:NAME` pipeline steps and sources
+- `mnnn migrate`: one space per code, kinds inferred, pipelines rewritten; dry run, backup, safe to rerun; offered once after upgrade
+- TUI: Code menu (Code spaces, Code, Migrate, Live pipes, Pipelines) and a Code spaces window
+
+### Changed
+- The code table is now `code` (ids kept); menu bar labels shortened (File View Data Proj Code Net Orgs Keys Theme Help)
+
+### Deprecated
+- `code:NAME` pipeline steps (one release; `mnnn migrate` rewrites them)
+
 ### Changed
 - New tagline: "data goes in, your magic transforms it" (README, About, the app, the website and package descriptions)
 

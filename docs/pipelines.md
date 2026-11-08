@@ -64,7 +64,8 @@ spaces still need their own approval when it first runs.
 Pipeline { id, name, version, nodes: [Node], edges: [Edge], author, times }
 Node  { id, kind, config, tees: [Tee] }
 kind  = source(stdin | search:NAME | model query | journal:NAME | net:…)
-      | code(SPACE)               # a transform
+      | space(NAME)               # a code space: runs its main (`space:NAME`)
+      | code(CODE)                # deprecated in 2.23: one code (`mnnn migrate` rewrites it)
       | view(chart | table, columns, x)   # shows what passes, passes it on
       | filter(search:NAME)       # keeps the rows a search matches
       | sink(model:NAME)          # a leaf: rows land in this model table
