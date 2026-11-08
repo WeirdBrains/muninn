@@ -24,8 +24,11 @@ pub enum Source {
     Search(String),
     /// A journal's entries.
     Journal(String),
-    /// Another code space's output (run on its own default input).
+    /// Another code space's output (run on its own default input). Deprecated in 2.23:
+    /// a single code; use `space:`.
     Code(String),
+    /// A code space's output: its main, run on main's default input.
+    Space(String),
     /// Data given as is: a frame (`{model, fields, ids, columns, groups}`).
     Frame(Value),
     /// A source's stored data (`source:NAME`), as it arrived: one row per stored item
@@ -54,6 +57,7 @@ impl Source {
             "search" => Source::Search(need("search")?),
             "journal" => Source::Journal(need("journal")?),
             "code" => Source::Code(need("code")?),
+            "space" => Source::Space(need("space")?),
             "source" if !rest.is_empty() && !rest.contains([':', ' ']) => Source::Data(rest.to_string()),
             "source" => Source::parse(rest)?,
             "model" => Source::of(super::parse_input(rest)?),
@@ -85,6 +89,7 @@ impl Source {
             Source::Search(n) => format!("search:{n}"),
             Source::Journal(n) => format!("journal:{n}"),
             Source::Code(n) => format!("code:{n}"),
+            Source::Space(n) => format!("space:{n}"),
             Source::Data(n) => format!("source:{n}"),
             Source::Frame(f) => format!("data:{}", f.get("model").and_then(Value::as_str).unwrap_or("shared")),
             Source::Stdin => "-".into(),
@@ -117,7 +122,15 @@ pub fn frame(store: &Store, env: &CodeEnv, origin: &str, src: &Source, log: &mut
             let j = store.find_journal(n)?;
             entries_frame(&format!("journal:{}", j.name), store.entries(&j.id)?.into_iter().map(|e| (j.name.clone(), e)).collect())
         }
+        Source::Space(n) => {
+            let s = store.find_space(n)?;
+            let main = store.code_space(&s.main_code_id)?.ok_or_else(|| Error::invalid("space", format!("{}: no main", s.name)))?;
+            let input = frame(store, env, origin, &Source::of(main.input.clone()), log)?;
+            let info = super::spaces::run(store, env, origin, &s, input, &main.input.text(), log)?;
+            output(&main, &info)?
+        }
         Source::Code(n) => {
+            log(&format!("note: code:{n} is deprecated (it runs one code); use space:NAME (`mnnn migrate` makes spaces)"));
             let c = store.find_code_space(n)?;
             if RESOLVING.with(|r| r.borrow().contains(&c.id)) {
                 let chain = RESOLVING.with(|r| r.borrow().len());
@@ -331,7 +344,10 @@ pub fn search_filter(f: &Value, spec: &SearchSpec) -> Value {
 /// One step of a pipe.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Step {
+    /// Deprecated in 2.23 (one code); use `space:`.
     Code(String),
+    /// A code space (its main runs).
+    Space(String),
     Search(String),
     /// Save the data here and pass it on unchanged (a side branch, like `tee`).
     Save(Sink),
@@ -345,6 +361,7 @@ impl Step {
         match s.trim().split_once(':') {
             Some((k, n)) if k.eq_ignore_ascii_case("search") && !n.trim().is_empty() => Ok(Step::Search(n.trim().into())),
             Some((k, n)) if k.eq_ignore_ascii_case("code") && !n.trim().is_empty() => Ok(Step::Code(n.trim().into())),
+            Some((k, n)) if k.eq_ignore_ascii_case("space") && !n.trim().is_empty() => Ok(Step::Space(n.trim().into())),
             Some((k, _)) if ["journal", "model", "project", "org", "net"].contains(&k.trim().to_ascii_lowercase().as_str()) => {
                 Ok(Step::Save(Sink::parse(s)?))
             }
@@ -358,6 +375,7 @@ impl Step {
     pub fn text(&self) -> String {
         match self {
             Step::Code(n) => format!("code:{n}"),
+            Step::Space(n) => format!("space:{n}"),
             Step::Search(n) => format!("search:{n}"),
             Step::Save(k) => format!("tee {}", k.text()),
         }
@@ -522,6 +540,9 @@ fn run_hops(
     if let Source::Code(n) = src {
         seen.push(store.find_code_space(n)?.id);
     }
+    if let Source::Space(n) = src {
+        seen.push(store.find_space(n)?.id);
+    }
     let t = std::time::Instant::now();
     let mut cur = frame(store, env, origin, src, log)?;
     hop(0, &src.text(), &cur, None, t);
@@ -541,8 +562,27 @@ fn run_hops(
                 let made = deliver(store, origin, k, f, last.as_ref(), &out.hops.join(" | "))?;
                 out.saved.push(format!("{} → {made}", k.text()));
             }
+            Step::Space(spec) => {
+                let (n, options) = super::split_options(spec);
+                let s = store.find_space(&n)?;
+                if seen.contains(&s.id) {
+                    return Err(Error::invalid("pipe", format!("code space {} is in this pipe twice: a cycle", s.name)));
+                }
+                seen.push(s.id.clone());
+                let main = store.code_space(&s.main_code_id)?.ok_or_else(|| Error::invalid("space", format!("{}: no main", s.name)))?;
+                let from = out.hops[out.hops.len() - 2].clone();
+                let input = cur.take();
+                let info = super::with_options(options, || super::spaces::run(store, env, origin, &s, input, &from, log))?;
+                cur = Some(output(&main, &info)?);
+                if let Some(f) = &cur {
+                    note_frame(store, origin, &format!("space:{}", s.name), f);
+                }
+                out.runs.push((main.clone(), info.clone()));
+                last = Some((main, info));
+            }
             Step::Code(spec) => {
                 let (n, options) = super::split_options(spec);
+                log(&format!("note: code:{n} is deprecated (it runs one code); use space:NAME (`mnnn migrate` makes spaces)"));
                 let c = store.find_code_space(&n)?;
                 if seen.contains(&c.id) {
                     return Err(Error::invalid("pipe", format!("code space {} is in this pipe twice: a cycle", c.name)));

@@ -17,8 +17,10 @@ use std::collections::HashMap;
 pub enum NodeKind {
     /// Data in: `search:NAME`, `journal:NAME`, `code:SPACE`, a model query, or `-` (stdin).
     Source { source: String },
-    /// A code space run over its inputs.
+    /// One code run over its inputs (deprecated in 2.23; use `space:`).
     Code { space: String },
+    /// A code space (its main) run over its inputs.
+    Space { name: String },
     /// Shows what passes (a table or a chart of these columns) and passes it on.
     View {
         view: String,
@@ -79,6 +81,7 @@ impl NodeKind {
                 _ => NodeKind::Source { source: need("source")? },
             },
             "code" => NodeKind::Code { space: need("code")? },
+            "space" => NodeKind::Space { name: need("space")? },
             "view" => {
                 let v = need("view")?;
                 let (view, cols) = v.split_once(':').map(|(a, b)| (a.to_string(), b.to_string())).unwrap_or((v, String::new()));
@@ -89,7 +92,12 @@ impl NodeKind {
             }
             "filter" => NodeKind::Filter { search: need("filter")? },
             "model" | "sink" => NodeKind::Sink { model: need("model")? },
-            _ => return Err(Error::invalid("pipeline", format!("`{s}`: a node is search:/journal:/source:…/- , code:, view:, filter: or model:"))),
+            _ => {
+                return Err(Error::invalid(
+                    "pipeline",
+                    format!("`{s}`: a node is search:/journal:/source:…/- , space:, code:, view:, filter: or model:"),
+                ));
+            }
         })
     }
 
@@ -102,6 +110,7 @@ impl NodeKind {
             }
             NodeKind::Source { source } => format!("source:{source}"),
             NodeKind::Code { space } => format!("code:{space}"),
+            NodeKind::Space { name } => format!("space:{name}"),
             NodeKind::View { view, columns } if columns.is_empty() => format!("view:{view}"),
             NodeKind::View { view, columns } => format!("view:{view}:{}", columns.join(",")),
             NodeKind::Filter { search } => format!("filter:{search}"),
@@ -251,12 +260,14 @@ impl Graph {
             if let Some(s) = store {
                 let missing = match &n.kind {
                     NodeKind::Code { space } => s.find_code_space(&super::split_options(space).0).err(),
+                    NodeKind::Space { name } => s.find_space(&super::split_options(name).0).err(),
                     NodeKind::Filter { search } => s.find_live_search(search).err(),
                     NodeKind::Sink { model } => s.find_model(model).err(),
                     NodeKind::Source { source } if source != "-" => match Source::parse(source) {
                         Ok(Source::Search(x)) => s.find_live_search(&x).err(),
                         Ok(Source::Journal(x)) => s.find_journal(&x).err(),
                         Ok(Source::Code(x)) => s.find_code_space(&x).err(),
+                        Ok(Source::Space(x)) => s.find_space(&x).err(),
                         Ok(Source::Data(x)) if s.source_by_name(&x).ok().flatten().is_none() && s.find_model(&x).is_err() => {
                             Some(Error::invalid("source", format!("no source `{x}`")))
                         }
@@ -399,6 +410,7 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, p: &Pipeline, stdin: Opti
                     }
                     match &n.kind {
                         NodeKind::Code { space } => pipe::note_frame(store, origin, &format!("code:{}", super::split_options(space).0), &f),
+                        NodeKind::Space { name } => pipe::note_frame(store, origin, &format!("space:{}", super::split_options(name).0), &f),
                         NodeKind::View { .. } => pipe::note_frame(store, origin, &format!("view:{}/{id}", p.name), &f),
                         _ => {}
                     }
@@ -408,7 +420,13 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, p: &Pipeline, stdin: Opti
                 }
                 Err(e) => {
                     let m = e.to_string();
-                    let unapproved = matches!(&n.kind, NodeKind::Code { space } if store.find_code_space(&super::split_options(space).0).is_ok_and(|c| !super::approved(&c)));
+                    let unapproved = match &n.kind {
+                        NodeKind::Code { space } => store.find_code_space(&super::split_options(space).0).is_ok_and(|c| !super::approved(&c)),
+                        NodeKind::Space { name } => {
+                            store.find_space(&super::split_options(name).0).is_ok_and(|s| !super::spaces::approved(store, &s))
+                        }
+                        _ => false,
+                    };
                     nr.status = if unapproved { "waiting approval".into() } else { "error".into() };
                     nr.error = Some(m);
                 }
@@ -454,8 +472,20 @@ fn node_out(
             .ok_or_else(|| Error::invalid("pipeline", format!("`{}` reads standard input: pipe data in (`… | mnnn pipeline run NAME -`)", n.id))),
         NodeKind::Source { source } => pipe::frame(store, env, origin, &Source::parse(source)?, log)?
             .ok_or_else(|| Error::invalid("pipeline", format!("`{}` gives no data", n.id))),
+        NodeKind::Space { name } => {
+            let (name, options) = super::split_options(name);
+            let s = store.find_space(&name)?;
+            let main = store.code_space(&s.main_code_id)?.ok_or_else(|| Error::invalid("space", format!("{}: no main", s.name)))?;
+            let from = ups.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>().join(", ");
+            let first = ups.first().map(|x| x.1.clone());
+            let info = super::with_options(options, || {
+                super::with_named(ups.to_vec(), || super::spaces::run(store, env, origin, &s, first, &format!("pipeline {pipeline}: {from}"), log))
+            })?;
+            pipe::output(&main, &info)
+        }
         NodeKind::Code { space } => {
             let (name, options) = super::split_options(space);
+            log(&format!("note: code:{name} is deprecated (it runs one code); use space:NAME (`mnnn migrate` makes spaces)"));
             let c = store.find_code_space(&name)?;
             let from = ups.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>().join(", ");
             let info = super::with_options(options, || {
