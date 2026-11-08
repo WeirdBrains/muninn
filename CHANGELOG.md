@@ -11,6 +11,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - `space:NAME` pipeline steps and sources
 - `pipe - --format csv|json|ndjson` runs the built-in parser as a code space (made on first use, or the one `mnnn migrate` made)
 - Code spaces as project items (`mnnn project add --space`); project packs and pipeline files carry spaces with their members' code (imported unapproved, pins kept)
+- Code spaces share everywhere code does: `mnnn share space …` (project, journal, space, net), data shared *into* a space (`share KIND X space NAME`), `mnnn spaces export|import` (the `muninn-space` file), the network (peers receive the line-up and member code), org resources, `org give`, `--kind space` endpoints, `org code serve|stop --space`, and org code sync. Imports arrive unapproved with pins kept; a clash lands as `NAME-imported`
+- TUI Code spaces window: `S` share (and the ⇪ Share button), `p` add to project, `g` give to an org; the share picker offers `space · NAME` targets
+- `mnnn code parsers --install` also makes the built-in parsers' code spaces
 - `mnnn status`: home, database, counts, and a reminder when code still needs `mnnn migrate`
 - `mnnn migrate`: one space per code, kinds inferred, pipelines rewritten; dry run, backup, safe to rerun; offered once after upgrade
 - TUI: Code menu (Code spaces, Code, Migrate, Live pipes, Pipelines) and a Code spaces window

@@ -748,7 +748,7 @@ A system scheduler service needs to be created to support this.
 
 > **Phase 5 · v2.27.0 · 📝 Planned**
 
-**Reworked for phase 1:** every share point that takes a code space now takes both **code** and **code spaces**, and each gets its own **+ New code…** / **+ New code space…** (a new space asks for its main: pick existing code or write a new one). Sharing a space carries its members and pins.
+**Reworked for phase 1:** every share point that takes a code space now takes both **code** and **code spaces** (Michael, Nov 8 11:50: "all the share options need to be on codespaces"; 2.23 ships the sharing itself, this phase adds creating inline), and each gets its own **+ New code…** / **+ New code space…** (a new space asks for its main: pick existing code or write a new one). Sharing a space carries its members and pins.
 
 ### Michael's words
 
@@ -766,7 +766,8 @@ Example: Organizations -> code spaces - a code space should be able to be create
 | Project items (`project add --rule/--search/…`, Add to project…) | rules, searches, journals, reports, code, pipelines, series | existing only | **+ New KIND…** in the picker; CLI `mnnn project add P --create KIND NAME …` |
 | Net ▸ Shared data… (`mnnn net share`) | items to exchanges | existing only | **+ New KIND…** |
 | Reviews ▸ Ask for a review… | an item for review | existing only | **+ New KIND…** |
-| Org code (`code give-to-org`, org code serve) | code spaces | existing only | **+ New code space…** (Michael's example) |
+| Org code (`code give-to-org`, org code serve) | code and code spaces | existing only | **+ New code…** / **+ New code space…** (Michael's example) |
+| Code spaces (shipped in 2.23: share, `p` project, `g` give, files, net, org resources, endpoints, serve, sync; data shared into a space) | code spaces (main + members + imported spaces) | existing only | **+ New code space…** wherever a space is picked as an item or as a target; a new space asks for its main |
 
 The inventory is checked against the code before implementing; any share point found later gets the same flow.
 

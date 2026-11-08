@@ -31,6 +31,26 @@ pipeline files (`mnnn pipeline export`) carry the spaces they use, those their m
 and every member's code; they arrive unapproved, a clash lands as `NAME-imported`.
 `mnnn pipe - --format json` runs the built-in parser's space (`parse-json`).
 
+## Sharing a code space
+
+A code space goes everywhere code goes, and takes what code takes. What moves is always the
+space file (`muninn-space`): the space, the spaces its main imports and every member's code
+by trust hash. It lands **unapproved**, **pins kept**; the same line-up is reused, a
+different space of that name lands as `NAME-imported`.
+
+| Path | CLI | TUI |
+|------|-----|-----|
+| Project item | `mnnn project add P --space NAME`, `mnnn share space NAME project P` | `p` in Code spaces, or `S` |
+| Journal entry about it | `mnnn share space NAME journal J` | `S` |
+| Data into it (its main runs over it) | `mnnn share journal|search|model|code|space X space NAME` | `S` on the data ▸ `space · NAME` |
+| The network | `mnnn share space NAME net`, `mnnn net share space NAME` | `S` ▸ `net` |
+| Files | `mnnn spaces export NAME --out F`, `mnnn spaces import F [--name] [--dry-run]` | |
+| An org's resource | `mnnn org resource add ORG space NAME`, `mnnn org give ORG space NAME` | `g` in Code spaces |
+| An org endpoint | `mnnn org endpoint add ORG E --kind space --target NAME` | |
+| Served for an org here | `mnnn org code serve|stop ORG NAME --space` | |
+| Synced to an org's nodes | `mnnn org sync-code` (copies follow the org's member code) | |
+| Project packs, pipeline files | carried with the project / pipeline | |
+
 ## Migrating
 
 `code:NAME` pipeline steps still work for 2.23 with a deprecation note. `mnnn migrate`
