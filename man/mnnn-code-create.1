@@ -8,7 +8,7 @@ mnnn\-code\-create \- Create a code space (not approved to run yet)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn code create\fR [\fB\-\-home\fR] [\fB\-\-lang\fR] [\fB\-\-db\fR] [\fB\-\-from\fR] [\fB\-f\fR|\fB\-\-file\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-source\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-editor\fR] [\fB\-\-log\-file\fR] [\fB\-\-input\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-model\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-where\fR] [\fB\-\-matching\fR] [\fB\-\-transport\fR] [\fB\-\-group\fR] [\fB\-\-sort\fR] [\fB\-\-limit\fR] [\fB\-\-description\fR] [\fB\-\-project\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
+\fBmnnn code create\fR [\fB\-\-home\fR] [\fB\-\-lang\fR] [\fB\-\-db\fR] [\fB\-\-from\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-template\fR] [\fB\-f\fR|\fB\-\-file\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-source\fR] [\fB\-\-editor\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-input\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-model\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-\-where\fR] [\fB\-\-matching\fR] [\fB\-\-group\fR] [\fB\-\-sort\fR] [\fB\-\-limit\fR] [\fB\-\-description\fR] [\fB\-\-project\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -49,23 +49,28 @@ May also be specified with the \fBMUNINN_DB\fR environment variable.
 \fB\-\-from\fR \fI<FROM>\fR
 Start from a copy of a code space or a built\-in parser (`mnnn code parsers`)
 .TP
-\fB\-f\fR, \fB\-\-file\fR \fI<FILE>\fR
-Read the source from a file (`\-` reads standard input)
-.TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
 .RS
 May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
 .RE
 .TP
-\fB\-\-source\fR \fI<SOURCE>\fR
-The source itself
+\fB\-\-template\fR \fI<TEMPLATE>\fR
+Start from a template: `ingest\-connector` (Rust, SDK 1.3)
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+ingest\-connector
+.RE
+.TP
+\fB\-f\fR, \fB\-\-file\fR \fI<FILE>\fR
+Read the source from a file (`\-` reads standard input)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
-.TP
-\fB\-\-editor\fR
-Write the source in $VISUAL or $EDITOR
 .TP
 \fB\-\-log\-file\fR \fI<PATH>\fR
 Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
@@ -73,8 +78,11 @@ Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.l
 May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
 .RE
 .TP
-\fB\-\-input\fR \fI<INPUT>\fR
-Default input from another source: `search:NAME` (any live search), `journal:NAME`, `code:SPACE` (its output) or a model query (`bars where … limit N`). A convenience: whatever is piped in (`mnnn pipe`, share) is what a run works on
+\fB\-\-source\fR \fI<SOURCE>\fR
+The source itself
+.TP
+\fB\-\-editor\fR
+Write the source in $VISUAL or $EDITOR
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -82,14 +90,17 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-model\fR \fI<MODEL>\fR
-Model to read (`bars` or a designed model)
+\fB\-\-input\fR \fI<INPUT>\fR
+Default input from another source: `search:NAME` (any live search), `journal:NAME`, `code:SPACE` (its output) or a model query (`bars where … limit N`). A convenience: whatever is piped in (`mnnn pipe`, share) is what a run works on
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR
+Model to read (`bars` or a designed model)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -109,14 +120,14 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
 \fB\-\-where\fR \fI<FILTER>\fR
 Condition FIELD OP VALUE (repeatable; `;` separates several)
 .TP
 \fB\-\-matching\fR \fI<MATCHING>\fR
 Records whose text fields contain this
-.TP
-\fB\-\-transport\fR \fI<stream|poll>\fR
-How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-\-group\fR \fI<GROUP>\fR
 Group by these fields (math computes per group; repeatable or comma\-separated)

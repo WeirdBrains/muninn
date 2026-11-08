@@ -7,6 +7,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ## [Unreleased]
 
 ### Added
+- Plugin SDK 1.3 (`muninn-plugin`, now publishable to crates.io): typed ingest-connector host methods `context()`, `store_raw(name, format, bytes)`, `pipe()`, `run_ruleset(Option<id>)`, `fetch(&Request)`, `state_get`/`state_set`, and `plugin!(run, kind = "…")` declaring a kind in the plugin's info. Outside a connector run they say where they work (the v2.26 scheduler or a dry run)
+- `mnnn spaces run NAME --connector-dry-run` (`--source`, `--pipeline`, `--ruleset`, `--option`, `--state`): runs an ingest-connector space with an in-memory context that records store_raw, pipe and run_ruleset instead of doing them; `fetch` is real
+- `mnnn code create NAME --template ingest-connector` and [docs/connectors.md](docs/connectors.md)
 - Code spaces are now collections of code: a kind, a main and members (`mnnn spaces`, aliases `code-spaces`, `space`). Main calls members and other spaces (`host.call`, `host.call_space`; SDK 1.2.0) with cycle and depth-8 checks; one approval covers the line-up; edited members run at once and show as unreviewed; pins are opt-in
 - `space:NAME` pipeline steps and sources
 - Rules: a `run-space SPACE` action (CLI, TUI rule editor, ffi) runs a code space with every check `spaces run` makes; project packs carry the space

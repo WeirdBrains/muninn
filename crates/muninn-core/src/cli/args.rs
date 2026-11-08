@@ -2871,6 +2871,8 @@ pub enum SpacesCommand {
         json: bool,
         #[arg(long, default_value_t = 20)]
         rows: usize,
+        #[command(flatten)]
+        connector: ConnectorDryRunArgs,
     },
     /// Rename a space.
     Rename {
@@ -2940,6 +2942,30 @@ impl CodeLang {
     }
 }
 
+/// `mnnn spaces run --connector-dry-run`: try an ingest connector with an in-memory context.
+#[derive(Debug, Clone, Default, Args)]
+pub struct ConnectorDryRunArgs {
+    /// Run an ingest-connector space with a made-up context: store_raw, pipe and
+    /// run_ruleset are recorded and listed, not done (fetch is real).
+    #[arg(long)]
+    pub connector_dry_run: bool,
+    /// The context's source name (default: the space's name).
+    #[arg(long, requires = "connector_dry_run")]
+    pub source: Option<String>,
+    /// The context's pipeline name.
+    #[arg(long, requires = "connector_dry_run")]
+    pub pipeline: Option<String>,
+    /// The context's rule set id.
+    #[arg(long, requires = "connector_dry_run")]
+    pub ruleset: Option<String>,
+    /// A schedule option KEY=VALUE (repeatable).
+    #[arg(long = "option", requires = "connector_dry_run")]
+    pub options: Vec<String>,
+    /// A starting state value KEY=JSON (repeatable; non-JSON is text).
+    #[arg(long = "state", requires = "connector_dry_run")]
+    pub state: Vec<String>,
+}
+
 /// Where a code space's source comes from (none: a starting template, or the editor with --editor).
 #[derive(Debug, Clone, Default, Args)]
 pub struct CodeSourceArgs {
@@ -2988,11 +3014,14 @@ pub enum CodeCommand {
     #[command(alias = "new")]
     Create {
         name: String,
-        #[arg(long, value_enum, required_unless_present = "from")]
+        #[arg(long, value_enum, required_unless_present_any = ["from", "template"])]
         lang: Option<CodeLang>,
         /// Start from a copy of a code space or a built-in parser (`mnnn code parsers`).
         #[arg(long)]
         from: Option<String>,
+        /// Start from a template: `ingest-connector` (Rust, SDK 1.3).
+        #[arg(long, value_parser = ["ingest-connector"], conflicts_with = "from")]
+        template: Option<String>,
         #[command(flatten)]
         source: CodeSourceArgs,
         #[command(flatten)]

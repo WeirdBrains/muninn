@@ -23,6 +23,7 @@
 #[path = "../../../../plugin/muninn-plugin/src/abi.rs"]
 pub mod abi;
 pub mod bars;
+pub mod connector;
 pub mod host;
 pub mod math;
 pub mod migrate;
@@ -47,7 +48,7 @@ use std::sync::{Mutex, OnceLock};
 /// Bumped when generated code changes (invalidates cached builds).
 pub const CODEGEN: u32 = 1;
 /// The SDK version plugins are built against.
-pub const SDK_VERSION: &str = "1.2.0";
+pub const SDK_VERSION: &str = "1.3.0";
 
 /// The SDK crate, embedded so code spaces build without the Muninn sources.
 pub const SDK_FILES: &[(&str, &str)] = &[
@@ -57,6 +58,8 @@ pub const SDK_FILES: &[(&str, &str)] = &[
     ("src/json.rs", include_str!("../../../../plugin/muninn-plugin/src/json.rs")),
     ("src/series.rs", include_str!("../../../../plugin/muninn-plugin/src/series.rs")),
     ("src/columns.rs", include_str!("../../../../plugin/muninn-plugin/src/columns.rs")),
+    ("src/connector.rs", include_str!("../../../../plugin/muninn-plugin/src/connector.rs")),
+    ("README.md", include_str!("../../../../plugin/muninn-plugin/README.md")),
 ];
 
 fn hex16(h: blake3::Hash) -> String {
@@ -730,6 +733,9 @@ pub fn parse_input(s: &str) -> Result<CodeInput> {
 pub fn run_view(info: &RunInfo) -> Option<view::ResultView> {
     info.view.clone().and_then(|v| serde_json::from_value(v).ok())
 }
+
+/// `mnnn code create NAME --template ingest-connector`: an SDK 1.3 connector main.
+pub const CONNECTOR_TEMPLATE: &str = include_str!("connector_template.rs.txt");
 
 /// A starting source for a new code space.
 pub fn template(lang: Lang) -> &'static str {

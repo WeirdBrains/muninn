@@ -188,8 +188,10 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
                 println!("{:<14} {:<60} {state}", b.name, b.about);
             }
         }
-        CodeCommand::Create { name, lang, from, source, input, description, project } => {
+        CodeCommand::Create { name, lang, from, template, source, input, description, project } => {
+            let from = from.or(template.map(|t| format!("template:{t}")));
             let base = match &from {
+                Some(f) if f == "template:ingest-connector" => Some((crate::store::Lang::Rust, code::CONNECTOR_TEMPLATE.to_string())),
                 Some(f) => Some(match store.find_code_space(f) {
                     Ok(c) => (c.lang, c.source),
                     Err(_) => {

@@ -43,6 +43,14 @@ pub const METHODS: &[&str] = &[
     "log",
     "result",
     "error",
+    // SDK 1.3, ingest connectors (see `super::connector`)
+    "context",
+    "store_raw",
+    "pipe",
+    "run_ruleset",
+    "fetch",
+    "state_get",
+    "state_set",
 ];
 
 /// The state of one run, behind the `ctx` pointer.
@@ -94,9 +102,17 @@ impl<'a> Run<'a> {
             "methods" => Ok(json!(METHODS)),
             "call" => super::spaces::host_call(s, &req),
             "call_space" => super::spaces::host_call_space(s, &req),
+            m if super::connector::METHODS.contains(&m) => super::connector::call(m, &req),
             "input_request" => Ok(serde_json::to_value(&self.space.input)?),
             "inputs" => Ok(json!(self.named.iter().map(|(n, _)| n).collect::<Vec<_>>())),
-            "options" => Ok(Value::Object(self.options.clone())),
+            // a connector run's options are its schedule's (a step's own come first)
+            "options" => Ok(Value::Object(match super::connector::options() {
+                Some(mut o) if self.options.is_empty() || o.is_empty() => {
+                    o.extend(self.options.clone());
+                    o
+                }
+                _ => self.options.clone(),
+            })),
             "input_named" => {
                 let n = str_of(&req, "name")?;
                 self.named.iter().find(|(k, _)| *k == n).map(|(_, f)| f.clone()).ok_or_else(|| {

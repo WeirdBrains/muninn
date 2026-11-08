@@ -310,3 +310,59 @@ fn inputs_read_back_what_they_print() {
         assert!(parse_input(bad).is_err(), "{bad}");
     }
 }
+
+/// A one-shot HTTP server on localhost answering every request with `body` (and an
+/// `x-next-since` header); gives its base URL.
+fn serve(body: &'static str) -> String {
+    use std::io::{Read, Write};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = l.local_addr().unwrap();
+    std::thread::spawn(move || {
+        for s in l.incoming().take(4) {
+            let mut s = s.unwrap();
+            let mut buf = [0u8; 4096];
+            let _ = s.read(&mut buf);
+            let _ = write!(
+                s,
+                "HTTP/1.1 200 OK\r\ncontent-type: text/csv\r\nx-next-since: 77\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+        }
+    });
+    format!("http://{addr}/data.csv")
+}
+
+#[test]
+fn the_connector_template_runs_in_a_dry_run() {
+    if !have_cargo() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let env = CodeEnv::new(dir.path());
+    let s = store();
+    let c = create(&s, "cli", "feed", "", Lang::Rust, CONNECTOR_TEMPLATE, CodeInput::default()).unwrap();
+    approve(&s, "cli", &c).unwrap();
+    let c = s.code_space(&c.id).unwrap().unwrap();
+    // outside a connector run the methods say where they work
+    let info = run(&s, &env, "cli", &c, &mut |_| {}).unwrap();
+    assert_eq!(info.status, "error");
+    let url = serve("ts,price\n1,2\n");
+    let mut opts = serde_json::Map::new();
+    opts.insert("url".into(), json!(url));
+    // the context's options are what `host.option` reads in a connector run
+    let d = connector::DryRun::new("feed", None, Some("feed-pipe".into()), Some("rs1".into()), opts);
+    let (info, d) = connector::dry_run(d, || run(&s, &env, "cli", &c, &mut |_| {}));
+    let info = info.unwrap();
+    assert_eq!(info.status, "ok", "{info:?}");
+    let m: Vec<&str> = d.calls.iter().map(|c| c.method.as_str()).collect();
+    assert_eq!(m, ["fetch", "store_raw", "pipe", "run_ruleset", "state_set"], "{:?}", d.calls);
+    assert_eq!(d.calls[0].params["status"], 200);
+    assert_eq!((d.stored, d.bytes), (1, 13));
+    assert_eq!(d.calls[1].params["preview"], "ts,price\n1,2\n");
+    assert_eq!(d.calls[3].params["ruleset_id"], "rs1");
+    assert_eq!(d.state["since"].as_f64(), Some(77.0));
+    let (_, rows) = run_view(&info).unwrap().leaves()[0].as_table();
+    assert_eq!(rows[0], vec!["dry-1", "13", "0", "0", "true"]);
+    // nothing was stored
+    assert!(s.sources().unwrap().iter().all(|x| x.name != "feed"));
+}

@@ -217,7 +217,51 @@ pub fn run(ctx: &Ctx, cmd: SpacesCommand) -> anyhow::Result<()> {
                 ctx.io.info(format!("approved code space {}", s.name));
             }
         }
-        SpacesCommand::Run { space, input, json, rows } => {
+        SpacesCommand::Run { space, input, json, rows, connector } if connector.connector_dry_run => {
+            let s = store.find_space(&space)?;
+            if s.kind != crate::store::SpaceKind::IngestConnector {
+                anyhow::bail!(
+                    "{} is a {} space; --connector-dry-run is for ingest-connector spaces (`mnnn spaces kind {} ingest-connector`)",
+                    s.name,
+                    s.kind,
+                    s.name
+                );
+            }
+            let kv = |v: &str| -> anyhow::Result<(String, String)> {
+                v.split_once('=').map(|(k, v)| (k.trim().to_string(), v.to_string())).ok_or_else(|| anyhow::anyhow!("`{v}`: give KEY=VALUE"))
+            };
+            let mut opts = serde_json::Map::new();
+            for o in &connector.options {
+                let (k, v) = kv(o)?;
+                opts.insert(k, json!(v));
+            }
+            let mut d = code::connector::DryRun::new(&s.name, connector.source.clone(), connector.pipeline.clone(), connector.ruleset.clone(), opts);
+            for o in &connector.state {
+                let (k, v) = kv(o)?;
+                d.state.insert(k, serde_json::from_str(&v).unwrap_or(json!(v)));
+            }
+            let src = match &input {
+                Some(i) => code::pipe::Source::parse(i)?,
+                None => code::pipe::Source::Space(s.name.clone()),
+            };
+            let steps = if input.is_some() { vec![code::pipe::Step::Space(s.name.clone())] } else { vec![] };
+            let (out, d) = code::connector::dry_run(d, || super::code::run_pipe(ctx, &store, &src, &steps, &[], json, rows));
+            if json {
+                println!("{}", serde_json::to_string(&json!({ "connector_dry_run": d }))?);
+            } else {
+                ctx.io.info(format!(
+                    "connector dry run: {} call(s), {} item(s), {} byte(s) — nothing stored, piped or run",
+                    d.calls.len(),
+                    d.stored,
+                    d.bytes
+                ));
+                for l in d.summary() {
+                    ctx.io.info(format!("  {l}"));
+                }
+            }
+            out?
+        }
+        SpacesCommand::Run { space, input, json, rows, .. } => {
             let s = store.find_space(&space)?;
             match input {
                 Some(src) => super::code::run_pipe(

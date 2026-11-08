@@ -313,6 +313,7 @@ Through the SDK's `Host` (and in ABI terms, a method name and a JSON request):
 | `log` | `host.log(text)` | a line in the run's log |
 | `result` / `error` | returned by `run` | the view, or the error |
 | `methods` | `host.methods()` | the methods this host knows |
+| `context`, `store_raw`, `pipe`, `run_ruleset`, `fetch`, `state_get`, `state_set` | SDK 1.3 | [ingest connectors](connectors.md) only |
 
 A `Frame` holds records as columns: `len()`, `f64(name)`, `text(name)`, `column(name)`,
 `get(row, name)`, `ids`, `groups()`, `slice`, `take`. `series::` has the rolling and
@@ -327,7 +328,7 @@ A plugin is a shared library exporting three C symbols; this is **ABI version 1*
 | symbol | signature | |
 |--------|-----------|-|
 | `muninn_plugin_abi` | `extern "C" fn() -> u32` | the ABI version it was built for |
-| `muninn_plugin_info` | `extern "C" fn() -> MnStr` | static JSON: `{"sdk": "1.0.0", "lang": "rust"}` |
+| `muninn_plugin_info` | `extern "C" fn() -> MnStr` | static JSON: `{"sdk": "1.3.0", "lang": "rust"}` (plus `"kind"` from `plugin!(run, kind = "…")`) |
 | `muninn_plugin_run` | `unsafe extern "C" fn(*const MnHost) -> i32` | run once: 0 ok, 1 error, 2 panic |
 
 Everything else goes through the `MnHost` table: `call(ctx, method, request, out)` takes
@@ -340,9 +341,11 @@ writes the three symbols and catches panics.
 
 ## The SDK
 
-The `muninn-plugin` crate (version 1.0.0) is embedded in Muninn: it is written next to
-every build, and `mnnn code sdk --out DIR` writes a copy to build prebuilt plugins with
-(`crate-type = ["cdylib"]`, depend on it by path, end with `muninn_plugin::plugin!(run);`).
+The `muninn-plugin` crate (version 1.3.0, also on crates.io as `muninn-plugin`) is
+embedded in Muninn: it is written next to every build, and `mnnn code sdk --out DIR`
+writes a copy to build prebuilt plugins with (`crate-type = ["cdylib"]`, depend on it by
+path or `muninn-plugin = "1.3"`, end with `muninn_plugin::plugin!(run);`, or
+`plugin!(run, kind = "ingest-connector")` to declare a kind).
 
 ## Command line
 

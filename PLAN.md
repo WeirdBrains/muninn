@@ -658,6 +658,8 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 
 > **Phase 4 · v2.26.0 · 📝 Planned (Michael answered Q1–Q5)**
 
+**SDK shipped early (Nov 8, Michael):** SDK 1.3's typed connector methods, `plugin!(run, kind = …)`, the `ingest-connector` template and `spaces run --connector-dry-run` are on main ahead of this phase; the host methods answer only in a dry run until the scheduler lands here. Bytes cross the ABI as base64.
+
 **Reworked for phase 1:** an ingest connector is a **code space of kind `ingest-connector`** (Q-CS7). Main can import parser or transform members to shape what it fetches before `host.pipe(...)`. Schedules reference the space. Plugins ▸ Ingest connectors lists those spaces. The host methods (`host.pipe`, `host.run_ruleset`, `host.fetch`) are available to main only.
 
 An ingest connector plugin fetches data on a schedule, stores it raw, pipes it into a model with a pipeline and calls a rule set. Connectors are managed under **Plugins ▸ Ingest connectors** (Michael).

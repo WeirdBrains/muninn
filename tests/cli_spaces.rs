@@ -262,3 +262,16 @@ fn rules_run_a_code_space() {
     let r = json(&e.ok(&["rule", "show", "Crunch", "--json"]));
     assert!(r.to_string().contains("run-space"), "{r}");
 }
+
+#[test]
+fn connector_template_and_dry_run_flags() {
+    let e = Env::new();
+    e.ok(&["code", "create", "feed", "--template", "ingest-connector"]);
+    let src = e.ok(&["code", "show", "feed"]);
+    assert!(src.contains("store_raw") && src.contains("run_ruleset"), "{src}");
+    e.ok(&["spaces", "create", "feedsp", "--kind", "analysis", "--main", "feed"]);
+    let o = e.run(&["spaces", "run", "feedsp", "--connector-dry-run"]);
+    assert!(!o.status.success() && err(&o).contains("ingest-connector"), "{}", err(&o));
+    // the context flags need --connector-dry-run
+    assert!(!e.run(&["spaces", "run", "feedsp", "--pipeline", "p"]).status.success());
+}

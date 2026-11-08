@@ -22,6 +22,7 @@
 //! copy for plugins built elsewhere). See `docs/code-spaces.md`.
 pub mod abi;
 pub mod columns;
+pub mod connector;
 pub mod json;
 pub mod series;
 
@@ -32,6 +33,7 @@ use std::fmt;
 pub const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod prelude {
+    pub use crate::connector::{Context, Piped, Request, Response, RulesetRun};
     pub use crate::series;
     pub use crate::{Error, Frame, Host, Json, Load, Result, View};
 }
@@ -156,11 +158,7 @@ impl Host {
     /// host is older than options).
     pub fn options(&self) -> Vec<(String, String)> {
         let o = self.call("options", &Json::Null).unwrap_or(Json::Null);
-        o.as_object()
-            .unwrap_or(&[])
-            .iter()
-            .map(|(k, v)| (k.clone(), v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())))
-            .collect()
+        o.as_object().unwrap_or(&[]).iter().map(|(k, v)| (k.clone(), v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))).collect()
     }
 
     /// One option by name (see [`Host::options`]).
@@ -528,14 +526,23 @@ macro_rules! plugin {
     ($run:path) => {
         $crate::plugin!($run, "rust");
     };
+    ($run:path, kind = $kind:literal) => {
+        $crate::plugin!(@export $run, concat!("{\"sdk\":\"1.3.0\",\"lang\":\"rust\",\"kind\":\"", $kind, "\"}"));
+    };
+    ($run:path, $lang:literal, kind = $kind:literal) => {
+        $crate::plugin!(@export $run, concat!("{\"sdk\":\"1.3.0\",\"lang\":\"", $lang, "\",\"kind\":\"", $kind, "\"}"));
+    };
     ($run:path, $lang:literal) => {
+        $crate::plugin!(@export $run, concat!("{\"sdk\":\"1.3.0\",\"lang\":\"", $lang, "\"}"));
+    };
+    (@export $run:path, $info:expr) => {
         #[no_mangle]
         pub extern "C" fn muninn_plugin_abi() -> u32 {
             $crate::abi::ABI_VERSION
         }
         #[no_mangle]
         pub extern "C" fn muninn_plugin_info() -> $crate::abi::MnStr {
-            const INFO: &str = concat!("{\"sdk\":\"1.2.0\",\"lang\":\"", $lang, "\"}");
+            const INFO: &str = $info;
             $crate::abi::MnStr::new(INFO)
         }
         /// # Safety

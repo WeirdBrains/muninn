@@ -1,11 +1,16 @@
 [package]
 name = "muninn-plugin"
-version = "1.2.0"
+version = "1.3.0"
 edition = "2021"
 rust-version = "1.82"
 description = "SDK for Muninn code space plugins: the stable C ABI (v1), the host API, frames and result views."
 license = "BSD-3-Clause"
-publish = false
+repository = "https://github.com/WeirdBrains/muninn"
+homepage = "https://github.com/WeirdBrains/muninn"
+documentation = "https://docs.rs/muninn-plugin"
+readme = "README.md"
+keywords = ["muninn", "plugin", "sdk", "ffi", "connector"]
+categories = ["development-tools::ffi", "api-bindings"]
 
 # No dependencies on purpose: code spaces build offline and fast, and the ABI stays
 # plain `extern "C"` with UTF-8 JSON messages (see docs/code-spaces.md).
