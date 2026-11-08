@@ -260,7 +260,7 @@ mnnn spaces remove-code SPACE CODE|set-main SPACE CODE|pin|unpin SPACE CODE|appr
   - `kind` is required: lowercase, one of the known kinds, and the same in the library and its `code_spaces` row.
   - An unknown kind is rejected and the error lists the known ones.
   - The kind also decides where a plugin may be used. A parser or transform can be a `code:` pipe step; an `ingest-connector` only runs from a schedule; `analysis` runs on its own or over a share.
-- **Without a kind:** loading, running, building or approving a plugin with no kind is **rejected**: "plugin NAME has no kind; run `mnnn plugins migrate` (or `mnnn plugins migrate NAME --kind KIND`)". Nothing runs half-migrated. Until then, the TUI and app show a "needs migrating" badge with a Migrate button.
+- **Without a kind:** loading, running, building or approving a plugin with no kind is **rejected**: "NAME has no kind; run `mnnn migrate` (or `mnnn migrate NAME --kind KIND`)" *(superseded by Q-CS7/Q-CS8: spaces always have a kind; unmigrated code runs alone until `mnnn migrate`)*. Nothing runs half-migrated. Until then, the TUI and app show a "needs migrating" badge with a Migrate button.
 - **SDK:** the SDK goes to 1.1.0 with `plugin!(run, kind = "parser")`. ABI version 1 is unchanged: only the info JSON gains fields.
 
 ### `mnnn plugins`
@@ -271,7 +271,7 @@ mnnn plugins info NAME [--json]                  # the manifest, approval, where
 mnnn plugins install PATH|SPACE --kind K [--name N]   # a prebuilt library, or a code space as a plugin
 mnnn plugins remove NAME                         # asks; -y skips; refuses while a schedule uses it unless --force
 mnnn plugins enable|disable NAME                 # disabled plugins don't run (pipes, pipelines and schedules fail clearly)
-mnnn plugins migrate [NAME…] [--kind K] [--dry-run] [--yes] [--no-backup]
+# migrate: removed (Q-CS8); see `mnnn migrate` in phase 1
 ```
 
 `migrate`:
