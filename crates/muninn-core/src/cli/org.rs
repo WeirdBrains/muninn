@@ -793,8 +793,14 @@ fn served(ctx: &Ctx, cmd: OrgCodeCommand) -> anyhow::Result<()> {
                 Target::Joined(j) => (j.org_id, j.name),
             };
             let cs: Vec<_> = s.served_code(&id)?.into_iter().filter_map(|c| s.code_space(&c).ok().flatten()).collect();
+            let sps = org::served_spaces(s, &id)?;
             if json {
-                return pretty(&cs.iter().map(|c| serde_json::json!({ "id": c.id, "name": c.name, "lang": c.lang })).collect::<Vec<_>>());
+                let mut v: Vec<_> = cs.iter().map(|c| serde_json::json!({ "id": c.id, "name": c.name, "lang": c.lang })).collect();
+                v.extend(sps.iter().map(|x| serde_json::json!({ "id": x.id, "name": x.name, "space": true, "kind": x.kind })));
+                return pretty(&v);
+            }
+            for x in &sps {
+                println!("{}\tcode space ({})", x.name, x.kind);
             }
             if cs.is_empty() {
                 ctx.io.info(format!("this node serves no code for {name}"));
@@ -804,7 +810,17 @@ fn served(ctx: &Ctx, cmd: OrgCodeCommand) -> anyhow::Result<()> {
             }
             Ok(())
         }
-        OrgCodeCommand::Serve { org: key, space } => {
+        OrgCodeCommand::Serve { org: key, space, is_space: true } => {
+            let (sp, name) = match target(s, &key)? {
+                Target::Mine(o) => (org::serve_space(s, ORIGIN, &OWNER, Ok(&o), None, &space, true)?, o.name),
+                Target::Joined(j) => {
+                    (org::serve_space(s, ORIGIN, &OWNER, Err(crate::Error::invalid("org", "joined")), Some(&j), &space, true)?, j.name)
+                }
+            };
+            ctx.io.info(format!("this node serves code space {} for {name}", sp.name));
+            Ok(())
+        }
+        OrgCodeCommand::Serve { org: key, space, is_space: false } => {
             let (c, name) = match target(s, &key)? {
                 Target::Mine(o) => (org::serve_code(s, ORIGIN, &OWNER, &o, &space)?, o.name),
                 Target::Joined(j) => (org::serve_joined_code(s, ORIGIN, &j, &space, true)?, j.name),
@@ -812,7 +828,17 @@ fn served(ctx: &Ctx, cmd: OrgCodeCommand) -> anyhow::Result<()> {
             ctx.io.info(format!("this node serves {} for {name}", c.name));
             Ok(())
         }
-        OrgCodeCommand::Stop { org: key, space } => {
+        OrgCodeCommand::Stop { org: key, space, is_space: true } => {
+            let (sp, name) = match target(s, &key)? {
+                Target::Mine(o) => (org::serve_space(s, ORIGIN, &OWNER, Ok(&o), None, &space, false)?, o.name),
+                Target::Joined(j) => {
+                    (org::serve_space(s, ORIGIN, &OWNER, Err(crate::Error::invalid("org", "joined")), Some(&j), &space, false)?, j.name)
+                }
+            };
+            ctx.io.info(format!("this node no longer serves code space {} for {name}", sp.name));
+            Ok(())
+        }
+        OrgCodeCommand::Stop { org: key, space, is_space: false } => {
             let (c, name) = match target(s, &key)? {
                 Target::Mine(o) => (org::unserve_code(s, ORIGIN, &OWNER, &o, &space)?, o.name),
                 Target::Joined(j) => (org::serve_joined_code(s, ORIGIN, &j, &space, false)?, j.name),

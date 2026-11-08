@@ -61,7 +61,7 @@ impl<'a> Net<'a> {
 }
 
 pub(super) fn kind(k: &str) -> anyhow::Result<ShareKind> {
-    ShareKind::parse(k).ok_or_else(|| anyhow!("`{k}`: share a model, search, journal, project, report or code"))
+    ShareKind::parse(k).ok_or_else(|| anyhow!("`{k}`: share a model, search, journal, project, report, code, space or pipeline"))
 }
 
 pub(super) fn read_token(input: &str) -> anyhow::Result<String> {

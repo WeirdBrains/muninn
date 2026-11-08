@@ -319,3 +319,41 @@ fn tests_member(s: &Store, o: &Org) -> (Org, Member) {
     let m = s.upsert_member(&o.id, "12D3KooWviewerviewer", "vic", Some(&r.id), MemberStatus::Member, None, "", Some("owner")).unwrap();
     (o.clone(), m)
 }
+
+#[test]
+fn orgs_carry_serve_and_sync_code_spaces() {
+    use crate::store::{Lang, SpaceKind};
+    let s = Store::open_in_memory().unwrap();
+    let (o, ben) = org_with_member(&s, "user");
+    let main = s.create_code_space("mainc", "", Lang::Math, "// @imports dbl\nx = 1", Default::default()).unwrap();
+    let dbl = s.create_code_space("dbl", "", Lang::Math, "y = 2", Default::default()).unwrap();
+    let sp = crate::code::spaces::create(&s, "test", "both", "", SpaceKind::Analysis, &main).unwrap();
+    s.add_space_member(&sp.id, &dbl, None, None).unwrap();
+    // a resource of the org, seen like code (code.view)
+    transfer(&s, "cli", &Actor::Owner, &o, ShareKind::Space, "both", None).unwrap();
+    // an endpoint serves it here; stopping and serving again
+    add_endpoint(&s, "cli", &Actor::Owner, &o, "both", EndpointKind::Space, "both", None, false).unwrap();
+    assert_eq!(served_spaces(&s, &o.id).unwrap().len(), 1, "exposing a space serves it here");
+    let user = actor_for(&s, &ben).unwrap();
+    assert!(serve_space(&s, "cli", &user, Ok(&o), None, "both", false).is_err(), "serving needs code.manage");
+    serve_space(&s, "cli", &Actor::Owner, Ok(&o), None, "both", false).unwrap();
+    let err = call(&s, "cli", &Actor::Owner, &o, "both", &serde_json::json!({})).unwrap_err().to_string();
+    assert!(err.contains("does not serve"), "{err}");
+    serve_space(&s, "cli", &Actor::Owner, Ok(&o), None, "both", true).unwrap();
+    let err = call(&s, "cli", &Actor::Owner, &o, "both", &serde_json::json!({})).unwrap_err().to_string();
+    assert!(err.contains("approve"), "an unapproved line-up does not run: {err}");
+    // what its nodes get: the space file; a node makes its own unapproved copy
+    let list = spaces_of(&s, &o).unwrap();
+    assert_eq!(list.len(), 1);
+    let n = Store::open_in_memory().unwrap();
+    let done = apply_spaces(&n, &o.id, &list).unwrap();
+    assert_eq!(done[0].state, "new");
+    let copy = n.find_space("both").unwrap();
+    assert!(!crate::code::spaces::approved(&n, &copy));
+    assert_eq!(apply_spaces(&n, &o.id, &list).unwrap()[0].state, "same");
+    // the org changes a member: the copy's member follows (and shows unreviewed)
+    s.update_code_space(&dbl.id, &crate::store::CodeChange { source: Some("y = 3".into()), ..Default::default() }).unwrap();
+    let list = spaces_of(&s, &o).unwrap();
+    assert_eq!(apply_spaces(&n, &o.id, &list).unwrap()[0].state, "changed");
+    assert_eq!(n.find_code_space("dbl").unwrap().source, "y = 3");
+}

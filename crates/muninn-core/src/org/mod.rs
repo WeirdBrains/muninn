@@ -504,7 +504,7 @@ pub fn visible(s: &Store, org: &Org, a: &Actor, r: &Resource) -> bool {
             Published::Public => org.visibility == Visibility::Public || org.access == Access::Open,
             Published::Members => org.access == Access::Open,
         },
-        _ if r.kind == ShareKind::Code => can(s, org, a, "read") && can(s, org, a, "code.view"),
+        _ if matches!(r.kind, ShareKind::Code | ShareKind::Space) => can(s, org, a, "read") && can(s, org, a, "code.view"),
         _ => can(s, org, a, "read"),
     }
 }
@@ -600,6 +600,7 @@ pub fn add_endpoint(
     let ref_id = match kind {
         EndpointKind::Rule => s.find_rule(target)?.id,
         EndpointKind::Code => s.find_code_space(target)?.id,
+        EndpointKind::Space => s.find_space(target)?.id,
         EndpointKind::Records => s.find_model(target)?.id,
     };
     let perm = check_perm(perm.unwrap_or(match kind {
@@ -607,7 +608,7 @@ pub fn add_endpoint(
         _ => "call",
     }))?;
     let e = s.save_endpoint(&org.id, name, kind, &ref_id, &perm, anyone)?;
-    if kind == EndpointKind::Code {
+    if matches!(kind, EndpointKind::Code | EndpointKind::Space) {
         // exposing code here means this node runs it
         s.serve_code(&org.id, &ref_id)?;
     }
@@ -745,6 +746,31 @@ pub fn call(s: &Store, origin: &str, a: &Actor, org: &Org, endpoint: &str, input
             );
             crate::code::run_json(&info)
         }
+        EndpointKind::Space => {
+            may_call(s, org, a, &e, "code.run")?;
+            let space = s.space(&e.ref_id)?.ok_or_else(|| Error::invalid("endpoint", "its code space is gone"))?;
+            if !s.serves_code(&org.id, &space.id)? {
+                return Err(Error::invalid("endpoint", format!("this node does not serve code space {} for {}", space.name, org.name)));
+            }
+            if !crate::code::spaces::approved(s, &space) {
+                return Err(Error::invalid(
+                    "endpoint",
+                    format!("code space {}'s line-up changed since it was approved; approve it on this node first", space.name),
+                ));
+            }
+            let env = crate::code::CodeEnv::for_store(s)?;
+            let main = s.code_space(&space.main_code_id)?.ok_or_else(|| Error::invalid("endpoint", "its main code is gone"))?;
+            let frame = crate::code::pipe::frame(s, &env, origin, &crate::code::pipe::Source::of(main.input.clone()), &mut |_| {})?;
+            let info = crate::code::spaces::run(s, &env, origin, &space, frame, &format!("org {}", org.name), &mut |_| {})?;
+            record(
+                s,
+                origin,
+                "org.call",
+                format!("{} ran {} in {}", a.who(), e.name, org.name),
+                serde_json::json!({ "org": org.id, "endpoint": e.id, "by": a.who() }),
+            );
+            crate::code::run_json(&info)
+        }
     };
     Ok(out)
 }
@@ -816,6 +842,53 @@ pub fn unserve_code(s: &Store, origin: &str, a: &Actor, org: &Org, code: &str) -
     Ok(c)
 }
 
+/// Serve (or stop serving) a code space for an org on this node: `org` is one of mine (needs
+/// `code.manage` there) or a joined one (needs that role there).
+pub fn serve_space(
+    s: &Store,
+    origin: &str,
+    a: &Actor,
+    org: Result<&Org>,
+    joined: Option<&crate::store::Joined>,
+    key: &str,
+    on: bool,
+) -> Result<crate::store::Space> {
+    let (org_id, org_name) = match (org, joined) {
+        (Ok(o), _) => {
+            require(s, o, a, "code.manage")?;
+            (o.id.clone(), o.name.clone())
+        }
+        (Err(_), Some(j)) => {
+            if !joined_can(j, "code.manage") {
+                return Err(Error::invalid("permission", format!("your role in {} may not code.manage", j.name)));
+            }
+            (j.org_id.clone(), j.name.clone())
+        }
+        (Err(e), None) => return Err(e),
+    };
+    let sp = s.find_space(key)?;
+    let changed = if on { s.serve_code(&org_id, &sp.id)? } else { s.unserve_code(&org_id, &sp.id)? };
+    if !on && !changed {
+        return Err(Error::invalid("space", format!("{} is not served for {org_name}", sp.name)));
+    }
+    if changed {
+        let verb = if on { "serves" } else { "stopped serving" };
+        record(
+            s,
+            origin,
+            if on { "org.code.serve" } else { "org.code.unserve" },
+            format!("this node {verb} code space {} for {org_name}", sp.name),
+            serde_json::json!({ "org": org_id, "space": sp.id }),
+        );
+    }
+    Ok(sp)
+}
+
+/// The code spaces this node serves for an org.
+pub fn served_spaces(s: &Store, org_id: &str) -> Result<Vec<crate::store::Space>> {
+    Ok(s.served_code(org_id)?.into_iter().filter_map(|id| s.space(&id).ok().flatten()).collect())
+}
+
 // ---------- syncing code to org nodes ----------
 
 /// One of an org's code spaces, as sent to its nodes (approval and runs stripped).
@@ -823,6 +896,61 @@ pub fn unserve_code(s: &Store, origin: &str, a: &Actor, org: &Org, code: &str) -
 pub struct OrgCode {
     pub resource: String,
     pub space: crate::store::CodeSpace,
+}
+
+/// One of an org's code spaces, as sent to its nodes: the space file (unapproved).
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct OrgSpace {
+    pub resource: String,
+    pub bundle: crate::code::space_share::Bundle,
+}
+
+/// The org's active code space resources.
+pub fn spaces_of(s: &Store, org: &Org) -> Result<Vec<OrgSpace>> {
+    let mut v = vec![];
+    for r in s.resources(&org.id)?.into_iter().filter(|r| r.kind == ShareKind::Space && r.state == ResourceState::Active) {
+        if s.space(&r.ref_id)?.is_some() {
+            v.push(OrgSpace { resource: r.id, bundle: crate::code::space_share::export(s, &r.ref_id)? });
+        }
+    }
+    Ok(v)
+}
+
+/// Apply an org's code spaces to this node's copies: new ones imported (unapproved, pins
+/// kept, a clash `NAME-imported`); a copy's members get the org's changed code, so they show
+/// unreviewed (and pinned ones broken) until approved or re-pinned here.
+pub fn apply_spaces(s: &Store, org_id: &str, list: &[OrgSpace]) -> Result<Vec<Synced>> {
+    let mut out = vec![];
+    for os in list {
+        let b = &os.bundle;
+        let existing = s.code_copy(org_id, &os.resource)?.and_then(|id| s.space(&id).ok().flatten());
+        let (sp, state) = match existing {
+            Some(mine) => {
+                let root = b.spaces.iter().find(|x| x.name == b.name);
+                let mut changed = false;
+                for m in s.space_members(&mine.id)? {
+                    let want = root
+                        .and_then(|r| r.members.iter().find(|x| x.alias.eq_ignore_ascii_case(&m.alias)))
+                        .and_then(|x| b.code.iter().find(|c| c.name == x.code));
+                    if let (Some(w), Some(c)) = (want, s.code_space(&m.code_id)?)
+                        && (w.source != c.source || w.lang != c.lang)
+                    {
+                        let ch = crate::store::CodeChange { lang: Some(w.lang), source: Some(w.source.clone()), ..Default::default() };
+                        s.update_code_space(&c.id, &ch)?;
+                        changed = true;
+                    }
+                }
+                (mine, if changed { "changed" } else { "same" })
+            }
+            None => {
+                let p = crate::code::space_share::plan(s, b, None)?;
+                (crate::code::space_share::import(s, b, &p)?, "new")
+            }
+        };
+        s.save_code_copy(org_id, &os.resource, &sp.id)?;
+        out.push(Synced { name: sp.name, code_id: sp.id, state });
+    }
+    Ok(out)
 }
 
 /// What syncing did with one code space.

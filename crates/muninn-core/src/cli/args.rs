@@ -2515,9 +2515,9 @@ pub enum NetCommand {
     /// Advanced: key exchanges by hand (tokens, short codes). `connect` does this for you.
     #[command(subcommand, alias = "x", hide = true)]
     Exchange(NetExchangeCommand),
-    /// Share an item: model, search, journal, project, report, code or pipeline.
+    /// Share an item: model, search, journal, project, report, code, space or pipeline.
     Share {
-        /// model, search, journal, project, report, code or pipeline.
+        /// model, search, journal, project, report, code, space or pipeline.
         kind: String,
         /// Id, id prefix or name.
         item: String,
@@ -2780,6 +2780,24 @@ impl KindArg {
 
 #[derive(Debug, Subcommand)]
 pub enum SpacesCommand {
+    /// Write a code space file: the space, the spaces its main imports and every member's
+    /// code (by trust hash). `-` or no --out: standard output.
+    Export {
+        space: String,
+        #[arg(long, value_name = "FILE")]
+        out: Option<std::path::PathBuf>,
+    },
+    /// Import a code space file: shows the plan, then asks. Code and spaces land
+    /// unapproved, pins kept; the same line-up is reused, a clash lands as NAME-imported.
+    Import {
+        file: std::path::PathBuf,
+        /// Land the shared space under this name.
+        #[arg(long)]
+        name: Option<String>,
+        /// Show the plan only.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// List code spaces: name, kind, main, members, approved, flags.
     #[command(alias = "ls")]
     List {
@@ -3477,7 +3495,7 @@ pub enum OrgCommand {
     /// Give one of your things to a joined org (a copy, owned by the org).
     Give {
         org: String,
-        /// model, search, journal, project, report or code.
+        /// model, search, journal, project, report, code or space.
         kind: String,
         name: String,
     },
@@ -3633,7 +3651,7 @@ pub enum OrgResourceCommand {
     /// Give the org one of your things here (the original stays as it is).
     Add {
         org: String,
-        /// model, search, journal, project, report or code.
+        /// model, search, journal, project, report, code or space.
         kind: String,
         name: String,
     },
@@ -3676,14 +3694,14 @@ pub enum OrgEndpointCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Expose a model's records, a rule or a code space as a callable endpoint.
+    /// Expose a model's records, a rule, a code or a code space as a callable endpoint.
     Add {
         org: String,
         name: String,
-        /// records, rule or code.
+        /// records, rule, code or space.
         #[arg(long)]
         kind: String,
-        /// The model, rule or code space.
+        /// The model, rule, code or code space.
         #[arg(long)]
         target: String,
         /// The permission callers need (default: records.read for records, else call).
@@ -3705,10 +3723,21 @@ pub enum OrgCodeCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Serve a code space for the org on this node.
-    Serve { org: String, space: String },
+    /// Serve a code (or with --space a code space) for the org on this node.
+    Serve {
+        org: String,
+        space: String,
+        /// It is a code space (`mnnn spaces`), not a code.
+        #[arg(long = "space")]
+        is_space: bool,
+    },
     /// Stop serving it here (its endpoints then refuse calls on this node).
-    Stop { org: String, space: String },
+    Stop {
+        org: String,
+        space: String,
+        #[arg(long = "space")]
+        is_space: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -4196,15 +4225,15 @@ pub struct PipeArgs {
 
 #[derive(Debug, Args)]
 pub struct ShareArgs {
-    /// What to share: model, search, journal, project, report, code or pipeline.
+    /// What to share: model, search, journal, project, report, code, space or pipeline.
     pub kind: String,
     /// The item (id or name).
     #[arg(required_unless_present = "targets")]
     pub item: Option<String>,
-    /// Where: project, journal, code or net.
+    /// Where: project, journal, code, space or net.
     #[arg(required_unless_present = "targets")]
     pub target: Option<String>,
-    /// The project, journal or code space (id or name); for net, exchanges (none: all).
+    /// The project, journal, code or code space (id or name); for net, exchanges (none: all).
     pub to: Vec<String>,
     /// A note for a journal entry.
     #[arg(long, default_value = "")]

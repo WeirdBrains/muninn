@@ -123,8 +123,8 @@ pub fn man(out: &Path) -> anyhow::Result<()> {
 pub fn share(ctx: &Ctx, a: super::args::ShareArgs) -> anyhow::Result<()> {
     use crate::share::{TargetKind, share, targets_for};
     use crate::store::ShareKind;
-    let kind =
-        ShareKind::parse(&a.kind).ok_or_else(|| anyhow::anyhow!("unknown kind {:?} (model, search, journal, project, report, code)", a.kind))?;
+    let kind = ShareKind::parse(&a.kind)
+        .ok_or_else(|| anyhow::anyhow!("unknown kind {:?} (model, search, journal, project, report, code, space, pipeline)", a.kind))?;
     if a.targets {
         let ts = targets_for(kind);
         if a.json {
@@ -137,7 +137,7 @@ pub fn share(ctx: &Ctx, a: super::args::ShareArgs) -> anyhow::Result<()> {
         return Ok(());
     }
     let (item, target) = (a.item.unwrap_or_default(), a.target.unwrap_or_default());
-    let t = TargetKind::parse(&target).ok_or_else(|| anyhow::anyhow!("unknown target {target:?} (project, journal, code, net)"))?;
+    let t = TargetKind::parse(&target).ok_or_else(|| anyhow::anyhow!("unknown target {target:?} (project, journal, code, space, net)"))?;
     let store = ctx.open_store()?;
     let out = share(&store, kind, &item, t, &a.to, &a.note, "cli")?;
     if t == TargetKind::Code {
@@ -145,6 +145,12 @@ pub fn share(ctx: &Ctx, a: super::args::ShareArgs) -> anyhow::Result<()> {
         let src = crate::share::source_for(kind, &out.item, &out.name)?;
         ctx.io.note(out.summary());
         return super::code::run_pipe(ctx, &store, &src, &[crate::code::pipe::Step::Code(out.made.clone())], &[], a.json, 30);
+    }
+    if t == TargetKind::Space {
+        // data into a code space: run its main over the data (its line-up approved first)
+        let src = crate::share::source_for(kind, &out.item, &out.name)?;
+        ctx.io.note(out.summary());
+        return super::code::run_pipe(ctx, &store, &src, &[crate::code::pipe::Step::Space(out.to.clone())], &[], a.json, 30);
     }
     if a.json {
         println!("{}", serde_json::to_string_pretty(&out)?);

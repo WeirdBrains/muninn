@@ -577,6 +577,10 @@ pub fn find_item(s: &Store, kind: ShareKind, key: &str) -> Result<(String, Strin
             let c = s.find_code_space(key)?;
             (c.id, c.name)
         }
+        ShareKind::Space => {
+            let sp = s.find_space(key)?;
+            (sp.id, sp.name)
+        }
         ShareKind::Pipeline => {
             let p = s.find_pipeline(key)?;
             (p.id, p.name)
@@ -900,6 +904,12 @@ pub fn import_item_as(s: &mut Store, it: &Item, from: &str, origin: &str) -> Res
             let made = s.create_code_space(&name, &c.description, c.lang, &c.source, c.input.clone())?;
             made_id = (made.id.clone(), made.name.clone());
             format!("code space {} (review and approve it before it runs)", made.name)
+        }
+        (ShareKind::Space, "json") => {
+            // the line-up and every member's code: unapproved, pins kept, a clash `NAME-imported`
+            let (sp, _) = crate::code::space_share::receive(s, &it.data)?;
+            made_id = (sp.id.clone(), sp.name.clone());
+            format!("code space {} (review its code and approve it with `mnnn spaces approve {}` before it runs)", sp.name, sp.name)
         }
         (ShareKind::Pipeline, "json") => {
             let e = crate::code::pipeline::Export::parse(&it.data)?;

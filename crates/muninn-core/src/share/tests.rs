@@ -76,10 +76,40 @@ fn pipelines_share_to_projects_journals_and_net_but_not_code() {
     let g = crate::code::pipeline::Graph::parse(&st(&["src=journal:Notes", "v=view:table"]), &st(&["src>v"])).unwrap();
     s.create_pipeline("flow", "", &g).unwrap();
     assert_eq!(targets_for(ShareKind::Pipeline), vec![TargetKind::Project, TargetKind::Journal, TargetKind::Net]);
+    assert!(share(&s, ShareKind::Pipeline, "flow", TargetKind::Space, &["x".into()], "", "test").is_err());
     let r = share(&s, ShareKind::Pipeline, "flow", TargetKind::Project, &["Alpha".into()], "", "test").unwrap();
     assert!(r.summary().contains("added pipeline flow to project Alpha"), "{}", r.summary());
     let p = s.find_project("Alpha").unwrap();
     assert!(s.project_items(&p.id).unwrap().iter().any(|i| i.kind == crate::store::ItemKind::Pipeline));
     share(&s, ShareKind::Pipeline, "flow", TargetKind::Journal, &["Notes".into()], "see", "test").unwrap();
     assert!(share(&s, ShareKind::Pipeline, "flow", TargetKind::Code, &["x".into()], "", "test").is_err());
+}
+
+#[test]
+fn code_spaces_share_everywhere_code_does_and_take_data_like_code() {
+    use crate::store::SpaceKind;
+    let s = Store::open_in_memory().unwrap();
+    s.create_project("Alpha", "").unwrap();
+    s.create_journal("Notes", None, EntryFormat::Markdown).unwrap();
+    let c = s.create_code_space("calc", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
+    crate::code::spaces::create(&s, "test", "pair", "", SpaceKind::Analysis, &c).unwrap();
+    // from: a space goes wherever code goes
+    assert_eq!(targets_for(ShareKind::Space), targets_for(ShareKind::Code));
+    let r = share(&s, ShareKind::Space, "pair", TargetKind::Project, &v("Alpha"), "", "test").unwrap();
+    assert!(r.summary().contains("added code space pair to project Alpha"), "{}", r.summary());
+    let p = s.find_project("Alpha").unwrap();
+    assert!(s.project_items(&p.id).unwrap().iter().any(|i| i.kind == ItemKind::Space));
+    let e = share(&s, ShareKind::Space, "pair", TargetKind::Journal, &v("Notes"), "worth a look", "test").unwrap();
+    assert!(e.summary().contains("code space pair"), "{}", e.summary());
+    // into: everything that can go into code can go into a space
+    for k in ShareKind::ALL {
+        assert_eq!(TargetKind::Space.accepts(k), TargetKind::Code.accepts(k), "{k:?}");
+    }
+    let r = share(&s, ShareKind::Journal, "Notes", TargetKind::Space, &v("pair"), "", "test").unwrap();
+    assert_eq!(r.to, "pair");
+    assert!(r.summary().contains("into code space pair"), "{}", r.summary());
+    assert!(share(&s, ShareKind::Space, "pair", TargetKind::Space, &v("pair"), "", "test").is_err(), "not into itself");
+    assert_eq!(source_for(ShareKind::Space, "id", "pair").unwrap(), Source::Space("pair".into()));
+    assert_eq!(TargetKind::parse("space"), Some(TargetKind::Space));
+    assert_eq!(ShareKind::parse("code-space"), Some(ShareKind::Space));
 }

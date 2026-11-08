@@ -113,7 +113,7 @@ fn migrate_dry_runs_applies_names_skips_and_reruns_safely() {
 
     // unclear kinds without --kind (and no terminal) are skipped, not guessed
     let r = json(&e.ok(&["migrate", "--dry-run", "--json"]));
-    assert!(r["skipped"].as_array().unwrap().len() >= 1, "{r}");
+    assert!(!r["skipped"].as_array().unwrap().is_empty(), "{r}");
 
     // apply: a backup, the spaces, the report
     let out = e.ok(&["-y", "migrate", "--kind", "analysis"]);
@@ -168,4 +168,83 @@ fn a_pipeline_file_carries_its_spaces_and_their_members() {
     c.ok(&["-y", "pipeline", "import", f]);
     assert!(c.ok(&["spaces", "list"]).contains("both-imported"));
     assert!(c.ok(&["pipeline", "show", "flow"]).contains("space:both-imported"));
+}
+
+/// The deprecated path (2.23 keeps it for one release): `code:NAME` steps still run, with
+/// a note pointing at `space:` and `mnnn migrate`. Builds code (skipped without cargo).
+#[test]
+fn deprecated_code_steps_still_run_with_a_note() {
+    let e = Env::new();
+    if std::process::Command::new("cargo").arg("--version").output().map(|o| !o.status.success()).unwrap_or(true) {
+        eprintln!("skipped: no cargo");
+        return;
+    }
+    let f = fixture("ETHUSDT_5m.csv");
+    e.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", "old-ETHUSDT_5m"]);
+    e.ok(&["-y", "code", "parsers", "--install"]);
+    let o = e.run(&[
+        "-y",
+        "pipe",
+        "source:old-ETHUSDT_5m",
+        "code:parse-csv",
+        "code:to-bars?symbol=ETH/USDT&duration=5m&source=old",
+        "--to",
+        "model:bars",
+        "--rows",
+        "1",
+    ]);
+    assert!(o.status.success(), "{}", err(&o));
+    let note = err(&o);
+    assert!(note.contains("code:parse-csv") && note.matches("is deprecated").count() >= 2 && note.contains("mnnn migrate"), "{note}");
+    assert!(json(&e.ok(&["status", "--json"]))["bars"].as_i64().unwrap() > 0);
+}
+
+#[test]
+fn space_files_and_the_share_command_carry_spaces() {
+    let a = Env::new();
+    math(&a, "mainc", "// @imports dbl\nx = 1\n");
+    math(&a, "dbl", "y = 2\n");
+    a.ok(&["spaces", "create", "both", "--kind", "analysis", "--main", "mainc", "--add", "dbl"]);
+    a.ok(&["spaces", "pin", "both", "dbl"]);
+    let file = a.home().join("both.json");
+    let f = file.to_str().unwrap();
+    a.ok(&["spaces", "export", "both", "--out", f]);
+    let x = json(&std::fs::read_to_string(&file).unwrap());
+    assert_eq!(x["format"], "muninn-space");
+    assert_eq!(x["spaces"][0]["name"], "both");
+    // the share command: projects, journals, and where a space can go
+    a.ok(&["project", "create", "Lab"]);
+    a.ok(&["journal", "new", "Notes"]);
+    a.ok(&["share", "space", "both", "project", "Lab"]);
+    assert!(a.ok(&["project", "show", "Lab"]).contains("both"));
+    a.ok(&["share", "space", "both", "journal", "Notes", "--note", "see"]);
+    let t = a.ok(&["share", "space", "--targets"]);
+    assert!(t.contains("project") && t.contains("journal") && t.contains("space") && t.contains("net"), "{t}");
+    assert!(a.ok(&["share", "journal", "--targets"]).contains("space"), "data goes into spaces");
+    // an org takes it as a resource, and can serve it from an endpoint
+    a.ok(&["org", "create", "Guild"]);
+    a.ok(&["org", "resource", "add", "Guild", "space", "both"]);
+    assert!(a.ok(&["org", "resource", "list", "Guild"]).contains("both"));
+    a.ok(&["org", "endpoint", "add", "Guild", "both", "--kind", "space", "--target", "both"]);
+    assert!(a.ok(&["org", "code", "list", "Guild"]).contains("both\tcode space"));
+    a.ok(&["org", "code", "stop", "Guild", "both", "--space"]);
+    a.ok(&["org", "code", "serve", "Guild", "both", "--space"]);
+
+    let b = Env::new();
+    let plan = b.ok(&["spaces", "import", f, "--dry-run"]);
+    assert!(plan.contains("space both") && plan.contains("needs approval"), "{plan}");
+    assert!(!b.ok(&["spaces", "list"]).contains("both"), "a dry run imports nothing");
+    b.ok(&["-y", "spaces", "import", f]);
+    let s = json(&b.ok(&["spaces", "show", "both", "--json"]));
+    assert_eq!(s["approved"], false, "{s}");
+    assert!(s["members"].as_array().unwrap().iter().any(|m| m["code"] == "dbl" && !m["pin"].is_null()), "{s}");
+    // a different space of that name: NAME-imported
+    let c = Env::new();
+    math(&c, "z", "z = 1\n");
+    c.ok(&["spaces", "create", "both", "--kind", "analysis", "--main", "z"]);
+    c.ok(&["-y", "spaces", "import", f]);
+    assert!(c.ok(&["spaces", "list"]).contains("both-imported"));
+    // --name lands it under another name
+    c.ok(&["-y", "spaces", "import", f, "--name", "copy"]);
+    assert!(c.ok(&["spaces", "list"]).contains("copy"));
 }

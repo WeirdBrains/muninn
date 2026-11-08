@@ -347,6 +347,8 @@ pub fn item_of(s: &Store, kind: ShareKind, ref_id: &str, name: &str, format: Opt
             c.last_run = None;
             json(&serde_json::to_value(c)?)
         }
+        // the space file: line-up, every member's code by trust hash
+        ShareKind::Space => json(&serde_json::to_value(crate::code::space_share::export(s, &sh.ref_id)?)?),
         // the pipeline file: graph, code by trust hash, sink model templates
         ShareKind::Pipeline => json(&serde_json::to_value(crate::code::pipeline::export(s, &sh.ref_id, true)?)?),
     }

@@ -226,15 +226,25 @@ pub enum ShareKind {
     Journal,
     Project,
     Report,
-    /// A code space's source.
+    /// A code's source.
     Code,
+    /// A code space: its line-up and every member's code (a [`crate::code::space_share::Bundle`]).
+    Space,
     /// A pipeline: its graph, code and sink model templates (peers get a draft).
     Pipeline,
 }
 
 impl ShareKind {
-    pub const ALL: [ShareKind; 7] =
-        [ShareKind::Model, ShareKind::LiveSearch, ShareKind::Journal, ShareKind::Project, ShareKind::Report, ShareKind::Code, ShareKind::Pipeline];
+    pub const ALL: [ShareKind; 8] = [
+        ShareKind::Model,
+        ShareKind::LiveSearch,
+        ShareKind::Journal,
+        ShareKind::Project,
+        ShareKind::Report,
+        ShareKind::Code,
+        ShareKind::Space,
+        ShareKind::Pipeline,
+    ];
     pub fn as_str(self) -> &'static str {
         match self {
             ShareKind::Model => "model",
@@ -243,6 +253,7 @@ impl ShareKind {
             ShareKind::Project => "project",
             ShareKind::Report => "report",
             ShareKind::Code => "code",
+            ShareKind::Space => "space",
             ShareKind::Pipeline => "pipeline",
         }
     }
@@ -253,7 +264,8 @@ impl ShareKind {
             "journal" | "journals" => ShareKind::Journal,
             "project" | "projects" => ShareKind::Project,
             "report" | "reports" => ShareKind::Report,
-            "code" | "code_space" | "code_spaces" => ShareKind::Code,
+            "code" => ShareKind::Code,
+            "space" | "spaces" | "code_space" | "code_spaces" => ShareKind::Space,
             "pipeline" | "pipelines" => ShareKind::Pipeline,
             _ => return None,
         })
@@ -265,7 +277,8 @@ impl ShareKind {
             ShareKind::Journal => "journal",
             ShareKind::Project => "project",
             ShareKind::Report => "report",
-            ShareKind::Code => "code space",
+            ShareKind::Code => "code",
+            ShareKind::Space => "code space",
             ShareKind::Pipeline => "pipeline",
         }
     }

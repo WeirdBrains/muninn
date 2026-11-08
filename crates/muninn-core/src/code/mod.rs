@@ -33,6 +33,7 @@ pub mod png;
 pub mod polars;
 pub mod pyconv;
 pub mod python;
+pub mod space_share;
 pub mod spaces;
 pub mod view;
 

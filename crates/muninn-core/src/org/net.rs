@@ -439,7 +439,7 @@ pub fn serve(s: &mut Store, x: &Exchange, from: &PeerId, org_key: &str, req: Org
         OrgReq::Code => {
             super::require(s, &org, &a, "host")?;
             super::require(s, &org, &a, "code.view")?;
-            body(json!({ "code": super::code_of(s, &org)? }))
+            body(json!({ "code": super::code_of(s, &org)?, "spaces": super::spaces_of(s, &org)? }))
         }
         OrgReq::Leave => {
             let m = s.set_member(&m.id, Some(MemberStatus::Left), None, None)?;
@@ -704,7 +704,13 @@ pub fn leave(s: &Store, node: Option<&Node>, j: &Joined, relays: &[String], orig
 pub fn sync_code(s: &Store, node: &Node, j: &Joined, relays: &[String], origin: &str) -> Result<Vec<super::Synced>> {
     let body = request(s, node, j, OrgReq::Code, relays)?;
     let list: Vec<super::OrgCode> = serde_json::from_value(body["code"].clone()).map_err(|e| Error::Other(format!("peer: bad code list: {e}")))?;
-    let out = super::apply_code(s, &j.org_id, &j.name, &list)?;
+    let mut out = super::apply_code(s, &j.org_id, &j.name, &list)?;
+    // code spaces (2.23+; an older org node sends none)
+    let spaces: Vec<super::OrgSpace> = match body.get("spaces") {
+        Some(v) if !v.is_null() => serde_json::from_value(v.clone()).map_err(|e| Error::Other(format!("peer: bad code space list: {e}")))?,
+        _ => vec![],
+    };
+    out.extend(super::apply_spaces(s, &j.org_id, &spaces)?);
     record(s, origin, "org.code.sync", format!("synced {} code spaces of {}", out.len(), j.name), json!({ "org": j.org_id, "spaces": out.len() }));
     Ok(out)
 }

@@ -13,16 +13,19 @@ pub enum TargetKind {
     Project,
     Journal,
     Code,
+    /// A code space (2.23+): its main runs over the data.
+    Space,
     Net,
 }
 
 impl TargetKind {
-    pub const ALL: [TargetKind; 4] = [TargetKind::Project, TargetKind::Journal, TargetKind::Code, TargetKind::Net];
+    pub const ALL: [TargetKind; 5] = [TargetKind::Project, TargetKind::Journal, TargetKind::Code, TargetKind::Space, TargetKind::Net];
     pub fn as_str(self) -> &'static str {
         match self {
             TargetKind::Project => "project",
             TargetKind::Journal => "journal",
             TargetKind::Code => "code",
+            TargetKind::Space => "space",
             TargetKind::Net => "net",
         }
     }
@@ -31,7 +34,8 @@ impl TargetKind {
         match self {
             TargetKind::Project => "add it to a project",
             TargetKind::Journal => "write a new journal entry about it",
-            TargetKind::Code => "run a code space over it (the space keeps no data)",
+            TargetKind::Code => "run a code over it (the code keeps no data)",
+            TargetKind::Space => "run a code space over it (the space keeps no data)",
             TargetKind::Net => "share it with your exchanges",
         }
     }
@@ -39,7 +43,8 @@ impl TargetKind {
         Some(match s.trim().to_ascii_lowercase().as_str() {
             "project" | "projects" => TargetKind::Project,
             "journal" | "journals" | "entry" => TargetKind::Journal,
-            "code" | "code_space" | "code-space" => TargetKind::Code,
+            "code" => TargetKind::Code,
+            "space" | "spaces" | "code_space" | "code-space" => TargetKind::Space,
             "net" | "network" | "exchange" | "exchanges" => TargetKind::Net,
             _ => return None,
         })
@@ -50,7 +55,9 @@ impl TargetKind {
             TargetKind::Project => kind != ShareKind::Project,
             TargetKind::Journal | TargetKind::Net => true,
             // data: a model, any live search, a journal's entries, a code space's output
-            TargetKind::Code => matches!(kind, ShareKind::Model | ShareKind::LiveSearch | ShareKind::Journal | ShareKind::Code),
+            TargetKind::Code | TargetKind::Space => {
+                matches!(kind, ShareKind::Model | ShareKind::LiveSearch | ShareKind::Journal | ShareKind::Code | ShareKind::Space)
+            }
         }
     }
     /// Whether a target of this kind is named (`net` takes exchanges, or none for all).
@@ -86,7 +93,8 @@ impl Shared {
             TargetKind::Project if !self.new => format!("{what} is already in project {}", self.to),
             TargetKind::Project => format!("added {what} to project {}", self.to),
             TargetKind::Journal => format!("wrote an entry about {what} in journal {}", self.to),
-            TargetKind::Code => format!("piped {what} into code space {}", self.to),
+            TargetKind::Code => format!("piped {what} into code {}", self.to),
+            TargetKind::Space => format!("piped {what} into code space {}", self.to),
             TargetKind::Net => format!("shared {what} with {}", self.to),
         }
     }
@@ -99,6 +107,7 @@ fn item_kind(k: ShareKind) -> Option<ItemKind> {
         ShareKind::Journal => ItemKind::Journal,
         ShareKind::Report => ItemKind::Report,
         ShareKind::Code => ItemKind::Code,
+        ShareKind::Space => ItemKind::Space,
         ShareKind::Pipeline => ItemKind::Pipeline,
         ShareKind::Project => return None,
     })
@@ -123,6 +132,7 @@ pub fn source_for(kind: ShareKind, id: &str, name: &str) -> Result<Source> {
         ShareKind::LiveSearch => Source::Search(id.to_string()),
         ShareKind::Journal => Source::Journal(id.to_string()),
         ShareKind::Code => Source::Code(id.to_string()),
+        ShareKind::Space => Source::Space(name.to_string()),
         _ => return Err(Error::invalid("share", format!("a {} is not data for a code space", kind.label()))),
     })
 }
@@ -141,6 +151,22 @@ pub fn to_code(
     let out = share(s, kind, key, TargetKind::Code, &[space.to_string()], "", origin)?;
     let src = source_for(kind, &out.item, &out.name)?;
     let p = crate::code::pipe::run(s, env, origin, &src, &[crate::code::pipe::Step::Code(out.made.clone())], &[], log)?;
+    Ok((out, p))
+}
+
+/// Share data into a code space: run its main over it (the space is not changed).
+pub fn to_space(
+    s: &Store,
+    env: &crate::code::CodeEnv,
+    kind: ShareKind,
+    key: &str,
+    space: &str,
+    origin: &str,
+    log: &mut dyn FnMut(&str),
+) -> Result<(Shared, crate::code::pipe::Piped)> {
+    let out = share(s, kind, key, TargetKind::Space, &[space.to_string()], "", origin)?;
+    let src = source_for(kind, &out.item, &out.name)?;
+    let p = crate::code::pipe::run(s, env, origin, &src, &[crate::code::pipe::Step::Space(out.to.clone())], &[], log)?;
     Ok((out, p))
 }
 
@@ -186,10 +212,19 @@ pub fn share(s: &Store, kind: ShareKind, key: &str, target: TargetKind, to: &[St
             // checked here; the run is `to_code` (it needs the code environment)
             let c = s.find_code_space(one()?)?;
             if kind == ShareKind::Code && c.id == id {
-                return Err(Error::invalid("share", "a code space can't be piped into itself"));
+                return Err(Error::invalid("share", "a code can't be piped into itself"));
             }
             source_for(kind, &id, &name)?;
             (out.to, out.made, out.new) = (c.name, c.id, false);
+        }
+        TargetKind::Space => {
+            // checked here; the run is `to_space` (it needs the code environment)
+            let sp = s.find_space(one()?)?;
+            if kind == ShareKind::Space && sp.id == id {
+                return Err(Error::invalid("share", "a code space can't be piped into itself"));
+            }
+            source_for(kind, &id, &name)?;
+            (out.to, out.made, out.new) = (sp.name, sp.id, false);
         }
         TargetKind::Net => {
             let made = crate::net::client::share(s, kind, &id, to, origin)?;

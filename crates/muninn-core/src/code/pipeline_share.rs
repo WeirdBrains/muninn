@@ -94,13 +94,13 @@ impl Export {
     }
 }
 
-fn code_entry(c: &CodeSpace) -> Result<CodeEntry> {
+pub(crate) fn code_entry(c: &CodeSpace) -> Result<CodeEntry> {
     Ok(CodeEntry { hash: trust_hash(c)?, name: c.name.clone(), description: c.description.clone(), lang: c.lang, source: c.source.clone() })
 }
 
 /// The spaces a graph runs and the spaces their mains import, with every member's code.
-fn bundle_spaces(store: &Store, g: &Graph, code: &mut Vec<CodeEntry>) -> Result<Vec<SpaceEntry>> {
-    let mut todo = g.spaces();
+pub(crate) fn bundle_spaces(store: &Store, roots: Vec<String>, code: &mut Vec<CodeEntry>) -> Result<Vec<SpaceEntry>> {
+    let mut todo = roots;
     let mut out: Vec<SpaceEntry> = vec![];
     while let Some(name) = todo.pop() {
         if out.iter().any(|s| s.name.eq_ignore_ascii_case(&name)) {
@@ -133,7 +133,7 @@ pub fn export(store: &Store, key: &str, templates: bool) -> Result<Export> {
     for n in p.graph.code_spaces() {
         code.push(code_entry(&store.find_code_space(&n)?)?);
     }
-    let spaces = bundle_spaces(store, &p.graph, &mut code)?;
+    let spaces = bundle_spaces(store, p.graph.spaces(), &mut code)?;
     let mut models = vec![];
     for m in p.graph.sinks() {
         let template = if templates { Some(store.export_template(&m, false)?) } else { None };
@@ -203,42 +203,8 @@ pub fn plan_import(store: &Store, e: &Export, name: Option<&str>, merge: bool) -
         ));
     }
     let mut plan = ImportPlan { name, merge: exists, ..Default::default() };
-    for c in &e.code {
-        let (to, what) = match store.find_code_space(&c.name) {
-            Ok(have) if trust_hash(&have)? == c.hash => (c.name.clone(), "the same code is here already: used as is".to_string()),
-            Ok(_) => (free_name(store, &c.name), "different code of that name is here: created alongside, needs approval".to_string()),
-            Err(_) => (c.name.clone(), "created; needs approval before it runs".to_string()),
-        };
-        plan.code.push((c.name.clone(), to, what));
-    }
-    for s in &e.spaces {
-        let landed = |c: &str| plan.code.iter().find(|(a, _, _)| a == c).map(|(_, b, _)| b.clone()).unwrap_or_else(|| c.to_string());
-        let same = match store.find_space(&s.name) {
-            Ok(have) => {
-                let want: Vec<(String, String)> = s.members.iter().map(|m| (m.alias.to_lowercase(), landed(&m.code))).collect();
-                let mut got = vec![];
-                for m in store.space_members(&have.id)? {
-                    if let Some(c) = store.code_space(&m.code_id)? {
-                        got.push((m.alias.to_lowercase(), c.name));
-                    }
-                }
-                let main = store.code_space(&have.main_code_id)?.map(|c| c.name);
-                let (mut a, mut b) = (want, got);
-                a.sort();
-                b.sort();
-                Some(a == b && main.as_deref() == Some(landed(&s.main).as_str()) && have.kind == s.kind)
-            }
-            Err(_) => None,
-        };
-        let (to, what) = match same {
-            Some(true) => (s.name.clone(), "the same line-up is here already: used as is".to_string()),
-            Some(false) => {
-                (free_space_name(store, &s.name)?, "a different space of that name is here: created alongside, needs approval".to_string())
-            }
-            None => (s.name.clone(), "created; needs approval before it runs".to_string()),
-        };
-        plan.spaces.push((s.name.clone(), to, what));
-    }
+    plan.code = plan_code(store, &e.code)?;
+    plan.spaces = plan_spaces(store, &e.spaces, &plan.code)?;
     for m in &e.models {
         let what = if store.find_model(&m.name).is_ok() {
             "exists: rows land in it".to_string()
@@ -270,10 +236,8 @@ pub fn plan_import(store: &Store, e: &Export, name: Option<&str>, merge: bool) -
 /// Import: code spaces created unapproved, missing models from their templates, then the pipeline.
 pub fn import(store: &Store, e: &Export, plan: &ImportPlan) -> Result<Pipeline> {
     let mut g = e.graph.clone();
-    for (c, (from, to, _)) in e.code.iter().zip(&plan.code) {
-        if store.find_code_space(to).is_err() {
-            store.create_code_space(to, &c.description, c.lang, &c.source, Default::default())?;
-        }
+    land_code(store, &e.code, &plan.code)?;
+    for (from, to, _) in &plan.code {
         if from != to {
             for n in &mut g.nodes {
                 if let NodeKind::Code { space } = &mut n.kind
@@ -287,26 +251,8 @@ pub fn import(store: &Store, e: &Export, plan: &ImportPlan) -> Result<Pipeline> 
             }
         }
     }
-    for (s, (from, to, _)) in e.spaces.iter().zip(&plan.spaces) {
-        if !store.space_name_taken(to)? {
-            let landed = |c: &str| -> Result<CodeSpace> {
-                let n = plan.code.iter().find(|(a, _, _)| a == c).map(|(_, b, _)| b.as_str()).unwrap_or(c);
-                store.find_code_space(n)
-            };
-            let main = landed(&s.main)?;
-            let sp = store.create_space(to, &s.description, s.kind, &main)?;
-            for m in &s.members {
-                let c = landed(&m.code)?;
-                let pin = if m.pinned { Some(trust_hash(&c)?) } else { None };
-                if c.id == main.id {
-                    if let Some(h) = pin {
-                        store.set_member_pin(&sp.id, &c.id, Some(&h))?;
-                    }
-                } else {
-                    store.add_space_member(&sp.id, &c, Some(&m.alias), pin.as_deref())?;
-                }
-            }
-        }
+    land_spaces(store, &e.spaces, &plan.code, &plan.spaces)?;
+    for (from, to, _) in &plan.spaces {
         if from != to {
             for n in &mut g.nodes {
                 match &mut n.kind {
@@ -343,4 +289,88 @@ pub fn import(store: &Store, e: &Export, plan: &ImportPlan) -> Result<Pipeline> 
         p.draft = true;
     }
     Ok(p)
+}
+
+/// What landing code does: (name in the file, name it lands as, what happens).
+pub(crate) fn plan_code(store: &Store, entries: &[CodeEntry]) -> Result<Vec<(String, String, String)>> {
+    let mut out = vec![];
+    for c in entries {
+        let (to, what) = match store.find_code_space(&c.name) {
+            Ok(have) if trust_hash(&have)? == c.hash => (c.name.clone(), "the same code is here already: used as is".to_string()),
+            Ok(_) => (free_name(store, &c.name), "different code of that name is here: created alongside, needs approval".to_string()),
+            Err(_) => (c.name.clone(), "created; needs approval before it runs".to_string()),
+        };
+        out.push((c.name.clone(), to, what));
+    }
+    Ok(out)
+}
+
+/// What landing spaces does: the same line-up is reused, a clash lands as `NAME-imported`.
+pub(crate) fn plan_spaces(store: &Store, spaces: &[SpaceEntry], code: &[(String, String, String)]) -> Result<Vec<(String, String, String)>> {
+    let mut out = vec![];
+    for s in spaces {
+        let landed = |c: &str| code.iter().find(|(a, _, _)| a == c).map(|(_, b, _)| b.clone()).unwrap_or_else(|| c.to_string());
+        let same = match store.find_space(&s.name) {
+            Ok(have) => {
+                let want: Vec<(String, String)> = s.members.iter().map(|m| (m.alias.to_lowercase(), landed(&m.code))).collect();
+                let mut got = vec![];
+                for m in store.space_members(&have.id)? {
+                    if let Some(c) = store.code_space(&m.code_id)? {
+                        got.push((m.alias.to_lowercase(), c.name));
+                    }
+                }
+                let main = store.code_space(&have.main_code_id)?.map(|c| c.name);
+                let (mut a, mut b) = (want, got);
+                a.sort();
+                b.sort();
+                Some(a == b && main.as_deref() == Some(landed(&s.main).as_str()) && have.kind == s.kind)
+            }
+            Err(_) => None,
+        };
+        let (to, what) = match same {
+            Some(true) => (s.name.clone(), "the same line-up is here already: used as is".to_string()),
+            Some(false) => {
+                (free_space_name(store, &s.name)?, "a different space of that name is here: created alongside, needs approval".to_string())
+            }
+            None => (s.name.clone(), "created; needs approval before it runs".to_string()),
+        };
+        out.push((s.name.clone(), to, what));
+    }
+    Ok(out)
+}
+
+/// Create the code that isn't here (unapproved).
+pub(crate) fn land_code(store: &Store, entries: &[CodeEntry], plan: &[(String, String, String)]) -> Result<()> {
+    for (c, (_, to, _)) in entries.iter().zip(plan) {
+        if store.find_code_space(to).is_err() {
+            store.create_code_space(to, &c.description, c.lang, &c.source, Default::default())?;
+        }
+    }
+    Ok(())
+}
+
+/// Create the spaces that aren't here: unapproved, members by their landed code, pins kept.
+pub(crate) fn land_spaces(store: &Store, spaces: &[SpaceEntry], code: &[(String, String, String)], plan: &[(String, String, String)]) -> Result<()> {
+    for (s, (_, to, _)) in spaces.iter().zip(plan) {
+        if !store.space_name_taken(to)? {
+            let landed = |c: &str| -> Result<CodeSpace> {
+                let n = code.iter().find(|(a, _, _)| a == c).map(|(_, b, _)| b.as_str()).unwrap_or(c);
+                store.find_code_space(n)
+            };
+            let main = landed(&s.main)?;
+            let sp = store.create_space(to, &s.description, s.kind, &main)?;
+            for m in &s.members {
+                let c = landed(&m.code)?;
+                let pin = if m.pinned { Some(trust_hash(&c)?) } else { None };
+                if c.id == main.id {
+                    if let Some(h) = pin {
+                        store.set_member_pin(&sp.id, &c.id, Some(&h))?;
+                    }
+                } else {
+                    store.add_space_member(&sp.id, &c, Some(&m.alias), pin.as_deref())?;
+                }
+            }
+        }
+    }
+    Ok(())
 }

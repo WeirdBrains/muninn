@@ -490,8 +490,10 @@ pub struct TemplateAsset {
 pub enum EndpointKind {
     /// A rule's then-actions, with the request as the action's fields.
     Rule,
-    /// A code space (a service plugin on this node) over a model.
+    /// A code (a service plugin on this node) over a model.
     Code,
+    /// A code space (2.23+): its main runs, calling its members, on this node.
+    Space,
     /// A model's records: query, and create/update with `records.write`.
     Records,
 }
@@ -501,6 +503,7 @@ impl EndpointKind {
         match self {
             EndpointKind::Rule => "rule",
             EndpointKind::Code => "code",
+            EndpointKind::Space => "space",
             EndpointKind::Records => "records",
         }
     }
@@ -508,8 +511,9 @@ impl EndpointKind {
         match s.trim().to_ascii_lowercase().as_str() {
             "rule" => Ok(EndpointKind::Rule),
             "code" => Ok(EndpointKind::Code),
+            "space" | "code_space" | "code-space" => Ok(EndpointKind::Space),
             "records" | "model" => Ok(EndpointKind::Records),
-            o => Err(Error::invalid("endpoint", format!("`{o}`: rule, code or records"))),
+            o => Err(Error::invalid("endpoint", format!("`{o}`: rule, code, space or records"))),
         }
     }
 }

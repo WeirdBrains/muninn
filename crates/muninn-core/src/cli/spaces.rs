@@ -246,6 +246,39 @@ pub fn run(ctx: &Ctx, cmd: SpacesCommand) -> anyhow::Result<()> {
         }
         SpacesCommand::Enable { space } => toggle(ctx, &store, &space, true)?,
         SpacesCommand::Disable { space } => toggle(ctx, &store, &space, false)?,
+        SpacesCommand::Export { space, out } => {
+            let b = crate::code::space_share::export(&store, &space)?;
+            let bytes = serde_json::to_vec_pretty(&b)?;
+            match out.as_deref().filter(|p| p.as_os_str() != "-") {
+                Some(p) => {
+                    std::fs::write(p, &bytes)?;
+                    ctx.io.info(format!("wrote {} ({} code space(s), {} code)", p.display(), b.spaces.len(), b.code.len()));
+                }
+                None => println!("{}", String::from_utf8_lossy(&bytes)),
+            }
+            store.note_action(
+                &crate::store::NewAction::new("space.export", "cli", format!("code space {} exported", b.name)).params(json!({ "space": b.name })),
+            );
+        }
+        SpacesCommand::Import { file, name, dry_run } => {
+            let b = crate::code::space_share::Bundle::parse(&std::fs::read(&file)?)?;
+            let plan = crate::code::space_share::plan(&store, &b, name.as_deref())?;
+            for l in plan.lines() {
+                println!("{l}");
+            }
+            if dry_run {
+                return Ok(());
+            }
+            if !ctx.io.confirm("import it?")? {
+                return Err(crate::Error::Aborted.into());
+            }
+            let s = crate::code::space_share::import(&store, &b, &plan)?;
+            store.note_action(
+                &crate::store::NewAction::new("space.import", "cli", format!("code space {} imported", s.name))
+                    .params(json!({ "space": s.id, "plan": plan })),
+            );
+            ctx.io.info(format!("imported code space {}; review and approve it (`mnnn spaces approve {}`) before it runs", s.name, s.name));
+        }
         SpacesCommand::Remove { space } => {
             let s = store.find_space(&space)?;
             if !ctx.io.confirm(&format!("remove code space `{}`? (its code stays)", s.name))? {

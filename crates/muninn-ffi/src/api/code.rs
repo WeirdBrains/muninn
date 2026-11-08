@@ -986,6 +986,36 @@ pub fn pipeline_import(path: String, name: Option<String>, merge: bool) -> anyho
     Ok(format!("imported pipeline {} v{}; approve its code before it runs", p.name, p.version))
 }
 
+/// `mnnn spaces export`: a code space file (main, members, imported spaces, their code).
+pub fn space_export(space: String, path: String) -> anyhow::Result<String> {
+    let store = open()?;
+    let b = code::space_share::export(&store, space.trim())?;
+    std::fs::write(&path, serde_json::to_vec_pretty(&b)?)?;
+    store.note_action(
+        &NewAction::new("space.export", ORIGIN, format!("code space {} exported", b.name)).params(json!({ "space": b.name, "file": path })),
+    );
+    Ok(format!("wrote {path} ({} code space(s), {} code)", b.spaces.len(), b.code.len()))
+}
+
+/// `mnnn spaces import --dry-run`: what importing would do.
+pub fn space_import_plan(path: String, name: Option<String>) -> anyhow::Result<Vec<String>> {
+    let store = open()?;
+    let b = code::space_share::Bundle::parse(&std::fs::read(&path)?)?;
+    Ok(code::space_share::plan(&store, &b, name.as_deref())?.lines())
+}
+
+/// `mnnn spaces import`: lands unapproved (pins kept; a clash is NAME-imported).
+pub fn space_import(path: String, name: Option<String>) -> anyhow::Result<String> {
+    let store = open_write()?;
+    let b = code::space_share::Bundle::parse(&std::fs::read(&path)?)?;
+    let plan = code::space_share::plan(&store, &b, name.as_deref())?;
+    let s = code::space_share::import(&store, &b, &plan)?;
+    store.note_action(
+        &NewAction::new("space.import", ORIGIN, format!("code space {} imported", s.name)).params(json!({ "space": s.id, "file": path })),
+    );
+    Ok(format!("imported code space {}; approve it before it runs", s.name))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

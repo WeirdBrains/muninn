@@ -917,3 +917,40 @@ fn routable_drops_private_and_loopback_addresses() {
         assert!(!ok(a), "{a}");
     }
 }
+
+#[test]
+fn shared_code_spaces_arrive_with_their_members_unapproved_and_pinned() {
+    use crate::store::{Lang, SpaceKind};
+    let a = Store::open_in_memory().unwrap();
+    let main = a.create_code_space("mainc", "", Lang::Math, "// @imports dbl, space:tenx\nx = 1", Default::default()).unwrap();
+    let dbl = a.create_code_space("dbl", "", Lang::Math, "y = 2", Default::default()).unwrap();
+    let ten = a.create_code_space("ten", "", Lang::Math, "z = 10", Default::default()).unwrap();
+    crate::code::spaces::create(&a, "test", "tenx", "", SpaceKind::Transform, &ten).unwrap();
+    let s = crate::code::spaces::create(&a, "test", "both", "", SpaceKind::Analysis, &main).unwrap();
+    a.add_space_member(&s.id, &dbl, None, Some(&crate::code::trust_hash(&dbl).unwrap())).unwrap();
+    crate::code::spaces::approve(&a, "test", &s, true).unwrap();
+    let (sh, _) = client::share(&a, ShareKind::Space, "both", &[], "test").unwrap().remove(0);
+    assert_eq!(sh.kind, ShareKind::Space);
+    let it = super::service::item_of(&a, ShareKind::Space, &s.id, "both", None).unwrap();
+    assert_eq!(it.format, "json");
+    let mut b = Store::open_in_memory().unwrap();
+    let (id, name, made) = client::import_item_as(&mut b, &it, "ada", "test").unwrap();
+    assert_eq!(name, "both");
+    assert!(made.contains("mnnn spaces approve"), "{made}");
+    let got = b.space(&id).unwrap().unwrap();
+    assert!(!crate::code::spaces::approved(&b, &got), "the peer's space waits for approval");
+    let ms = b.space_members(&got.id).unwrap();
+    assert_eq!(ms.len(), 2);
+    assert!(ms.iter().any(|m| m.pin_hash.is_some()), "pins come along");
+    assert!(b.find_space("tenx").is_ok(), "the space its main imports comes too");
+    assert!(!crate::code::approved(&b.find_code_space("dbl").unwrap()));
+    // again: the same line-up is used as is; a different one of that name lands as NAME-imported
+    let (id2, _, _) = client::import_item_as(&mut b, &it, "ada", "test").unwrap();
+    assert_eq!(id2, id);
+    let c = Store::open_in_memory().unwrap();
+    let z = c.create_code_space("z", "", Lang::Math, "z = 1", Default::default()).unwrap();
+    crate::code::spaces::create(&c, "test", "both", "", SpaceKind::Analysis, &z).unwrap();
+    let mut c = c;
+    let (_, name, _) = client::import_item_as(&mut c, &it, "ada", "test").unwrap();
+    assert_eq!(name, "both-imported");
+}
