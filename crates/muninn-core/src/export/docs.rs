@@ -868,8 +868,20 @@ pub fn project(store: &Store, id: &str, rows: usize) -> Result<Doc> {
             }
             ItemKind::Code => {
                 if let Some(c) = store.code_space(&it.ref_id)? {
-                    blocks.push(Block::Heading(1, vec![t(format!("Code space: {}", c.name))]));
+                    blocks.push(Block::Heading(1, vec![t(format!("Code: {}", c.name))]));
                     blocks.extend(b.code_blocks(&c)?);
+                }
+            }
+            ItemKind::Space => {
+                if let Some(s) = store.space(&it.ref_id)? {
+                    blocks.push(Block::Heading(1, vec![t(format!("Code space: {} ({})", s.name, s.kind))]));
+                    for m in store.space_members(&s.id)? {
+                        if let Some(c) = store.code_space(&m.code_id)? {
+                            let main = if c.id == s.main_code_id { " (main)" } else { "" };
+                            blocks.push(Block::Heading(2, vec![t(format!("{}{main}", m.alias))]));
+                            blocks.extend(b.code_blocks(&c)?);
+                        }
+                    }
                 }
             }
             ItemKind::Pipeline => {

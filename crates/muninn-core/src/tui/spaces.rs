@@ -54,6 +54,17 @@ pub fn open(app: &mut App) {
     app.modal = Some(super::modal::Modal::Spaces);
 }
 
+/// One space's members (from a project item).
+pub fn open_space(app: &mut App, id: &str) {
+    open(app);
+    if let Some(i) = app.spaces.list.iter().position(|s| s.id == id) {
+        app.spaces.sel = i;
+        app.spaces.open = app.spaces.list.get(i).cloned();
+        app.spaces.msel = 0;
+        app.spaces.screen = Screen::Members;
+    }
+}
+
 /// Code ▸ Migrate…: the dry-run report first.
 pub fn open_migrate(app: &mut App) {
     open(app);

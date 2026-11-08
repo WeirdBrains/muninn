@@ -92,6 +92,16 @@ pub struct ProjectPack {
     /// Code spaces it uses (2.5+): source only, never built plugins, approvals or results.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub code: Vec<super::code::CodeSpace>,
+    /// Code spaces it uses (2.23+): line-ups only; their members' code is in `code`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spaces: Vec<SpacePack>,
+}
+
+/// A code space in a project pack: the space (unapproved) and its members.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpacePack {
+    pub space: super::Space,
+    pub members: Vec<super::SpaceMember>,
 }
 
 /// A model in a project pack. For the built-in bars model: its design (importing adds the
@@ -130,8 +140,10 @@ pub struct Restored {
     pub rules: usize,
     pub models: usize,
     pub records: usize,
-    /// Code spaces brought in (each needs approving before it runs).
+    /// Code brought in (each needs approving before it runs).
     pub code: usize,
+    /// Code spaces brought in (their line-ups need approving).
+    pub spaces: usize,
     pub bars: u64,
     pub authors_added: usize,
 }
@@ -159,7 +171,10 @@ impl Restored {
                 v.push(n(self.records as u64, "record", "records"));
             }
             if self.code > 0 {
-                v.push(n(self.code as u64, "code space (to approve)", "code spaces (to approve)"));
+                v.push(n(self.code as u64, "code (to approve)", "code (to approve)"));
+            }
+            if self.spaces > 0 {
+                v.push(n(self.spaces as u64, "code space (to approve)", "code spaces (to approve)"));
             }
             v.push(n(self.bars, "new bar", "new bars"));
         }
@@ -421,6 +436,26 @@ impl Store {
             Then::RunCode { space } => Some(space.clone()),
             _ => None,
         }));
+        // code spaces it uses (items, and the spaces their mains import): line-ups and code
+        let mut space_todo: Vec<String> = items.iter().filter(|i| i.kind == ItemKind::Space).map(|i| i.ref_id.clone()).collect();
+        let mut spaces: Vec<SpacePack> = vec![];
+        while let Some(id) = space_todo.pop() {
+            if spaces.iter().any(|s| s.space.id == id) {
+                continue;
+            }
+            let Some(mut s) = self.space(&id)? else { continue };
+            let members = self.space_members(&s.id)?;
+            code_ids.extend(members.iter().map(|m| m.code_id.clone()));
+            if let Some(main) = self.code_space(&s.main_code_id)? {
+                for n in crate::code::spaces::imports(&main.source).spaces {
+                    if let Ok(x) = self.find_space(&n) {
+                        space_todo.push(x.id);
+                    }
+                }
+            }
+            s.approved_hash = None;
+            spaces.push(SpacePack { space: s, members });
+        }
         let mut code = vec![];
         let mut seen_code = std::collections::BTreeSet::new();
         for id in code_ids {
@@ -477,6 +512,7 @@ impl Store {
             data: vec![],
             models: model_packs,
             code,
+            spaces,
         };
         if with_data {
             for r in data_refs(self, &pack)? {
@@ -707,6 +743,29 @@ impl Store {
             self.insert_code_space(&nc)?;
             ids.insert(c.id.clone(), nc.id);
             out.code += 1;
+        }
+        for sp in &p.spaces {
+            let Some(main) = ids.get(&sp.space.main_code_id).and_then(|id| self.code_space(id).ok().flatten()) else { continue };
+            let mut name = sp.space.name.clone();
+            let mut i = 2;
+            while self.space_name_taken(&name)? {
+                name = if i == 2 { format!("{}-imported", sp.space.name) } else { format!("{}-imported-{}", sp.space.name, i - 1) };
+                i += 1;
+            }
+            // an imported space runs only after its new owner approves its line-up
+            let ns = self.create_space(&name, &sp.space.description, sp.space.kind, &main)?;
+            for m in &sp.members {
+                let Some(c) = ids.get(&m.code_id).and_then(|id| self.code_space(id).ok().flatten()) else { continue };
+                if c.id == main.id {
+                    if m.pin_hash.is_some() {
+                        self.set_member_pin(&ns.id, &c.id, m.pin_hash.as_deref())?;
+                    }
+                } else {
+                    self.add_space_member(&ns.id, &c, Some(&m.alias), m.pin_hash.as_deref())?;
+                }
+            }
+            ids.insert(sp.space.id.clone(), ns.id);
+            out.spaces += 1;
         }
         for s in &p.live_searches {
             let nid = super::new_id();

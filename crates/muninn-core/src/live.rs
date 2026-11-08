@@ -228,6 +228,14 @@ pub fn describe_item(store: &Store, it: &crate::store::ProjectItem) -> (String, 
                 };
                 (c.name.clone(), format!("{} · {run}", c.lang.as_str()))
             }
+            None => ("(removed code)".into(), String::new()),
+        },
+        crate::store::ItemKind::Space => match store.space(&it.ref_id).ok().flatten() {
+            Some(s) => {
+                let n = store.space_members(&s.id).map(|m| m.len()).unwrap_or(0);
+                let ok = if crate::code::spaces::approved(store, &s) { "approved" } else { "not approved" };
+                (s.name.clone(), format!("{} · {n} code · {ok}", s.kind))
+            }
             None => ("(removed code space)".into(), String::new()),
         },
         crate::store::ItemKind::Pipeline => match store.pipeline(&it.ref_id).ok().flatten() {

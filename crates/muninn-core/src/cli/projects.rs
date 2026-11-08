@@ -91,9 +91,17 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
                 }
                 println!("author:      {}", crate::history::author_label(&store, p.author_id.as_deref()));
                 println!("created:     {}", fmt_ts(p.created_at));
-                for k in
-                    [ItemKind::LiveSearch, ItemKind::Result, ItemKind::Journal, ItemKind::Report, ItemKind::RuleSet, ItemKind::Model, ItemKind::Code]
-                {
+                for k in [
+                    ItemKind::LiveSearch,
+                    ItemKind::Result,
+                    ItemKind::Journal,
+                    ItemKind::Report,
+                    ItemKind::RuleSet,
+                    ItemKind::Model,
+                    ItemKind::Code,
+                    ItemKind::Space,
+                    ItemKind::Pipeline,
+                ] {
                     let v: Vec<&ProjectItem> = items.iter().filter(|i| i.kind == k).collect();
                     if v.is_empty() {
                         continue;
@@ -124,7 +132,7 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
             record(&store, "project.remove", format!("remove project {}", p.name), params(&p));
             ctx.io.info(format!("removed project {}", p.name));
         }
-        ProjectCommand::Add { project, search, rule, journal, report, model, code, result, from, to } => {
+        ProjectCommand::Add { project, search, rule, journal, report, model, code, space, result, from, to } => {
             if result.is_none() && (from.is_some() || to.is_some()) {
                 return Err(anyhow!("--from and --to belong to --result"));
             }
@@ -144,6 +152,9 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
             } else if let Some(c) = code {
                 let c = store.find_code_space(&c)?;
                 store.add_project_item(&p.id, ItemKind::Code, &c.id, serde_json::json!({}))?
+            } else if let Some(s) = space {
+                let s = store.find_space(&s)?;
+                store.add_project_item(&p.id, ItemKind::Space, &s.id, serde_json::json!({}))?
             } else if let Some(r) = rule {
                 let r = store.find_rule(&r)?;
                 store.add_project_item(&p.id, ItemKind::RuleSet, &r.id, serde_json::json!({}))?

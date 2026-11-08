@@ -4,7 +4,7 @@ use super::{Graph, NodeKind};
 use crate::code::{trust_hash, trust_hash_of};
 use crate::error::{Error, Result};
 use crate::store::templates::{ImportOpts, Template};
-use crate::store::{Lang, Store, pipelines::Pipeline};
+use crate::store::{CodeSpace, Lang, SpaceKind, Store, pipelines::Pipeline};
 use serde::{Deserialize, Serialize};
 
 pub const FORMAT: &str = "muninn-pipeline";
@@ -19,6 +19,29 @@ pub struct CodeEntry {
     pub source: String,
     /// The trust hash of lang + source: what an importer approves.
     pub hash: String,
+}
+
+/// A code space the pipeline runs (or one main calls): its line-up, by code name.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpaceEntry {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    pub kind: SpaceKind,
+    /// The main's code name (in `code`).
+    pub main: String,
+    #[serde(default)]
+    pub members: Vec<MemberEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MemberEntry {
+    pub alias: String,
+    /// The code name (in `code`).
+    pub code: String,
+    /// Pinned (to the code as it is in this file).
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,6 +62,9 @@ pub struct Export {
     pub graph: Graph,
     #[serde(default)]
     pub code: Vec<CodeEntry>,
+    /// Code spaces (2.23+), their members' code in `code`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spaces: Vec<SpaceEntry>,
     #[serde(default)]
     pub models: Vec<ModelEntry>,
 }
@@ -57,8 +83,47 @@ impl Export {
                 return Err(Error::invalid("pipeline", format!("code space {}: its source does not match its hash", c.name)));
             }
         }
+        for s in &e.spaces {
+            for c in std::iter::once(&s.main).chain(s.members.iter().map(|m| &m.code)) {
+                if !e.code.iter().any(|x| &x.name == c) {
+                    return Err(Error::invalid("pipeline", format!("code space {}: its code {c} is not in the file", s.name)));
+                }
+            }
+        }
         Ok(e)
     }
+}
+
+fn code_entry(c: &CodeSpace) -> Result<CodeEntry> {
+    Ok(CodeEntry { hash: trust_hash(c)?, name: c.name.clone(), description: c.description.clone(), lang: c.lang, source: c.source.clone() })
+}
+
+/// The spaces a graph runs and the spaces their mains import, with every member's code.
+fn bundle_spaces(store: &Store, g: &Graph, code: &mut Vec<CodeEntry>) -> Result<Vec<SpaceEntry>> {
+    let mut todo = g.spaces();
+    let mut out: Vec<SpaceEntry> = vec![];
+    while let Some(name) = todo.pop() {
+        if out.iter().any(|s| s.name.eq_ignore_ascii_case(&name)) {
+            continue;
+        }
+        let s = store.find_space(&name)?;
+        let mut members = vec![];
+        let mut main = String::new();
+        for m in store.space_members(&s.id)? {
+            let c = store.code_space(&m.code_id)?.ok_or_else(|| Error::invalid("space", format!("{}: a member's code is missing", s.name)))?;
+            if !code.iter().any(|x| x.name == c.name) {
+                code.push(code_entry(&c)?);
+            }
+            if c.id == s.main_code_id {
+                main = c.name.clone();
+                todo.extend(crate::code::spaces::imports(&c.source).spaces);
+            }
+            members.push(MemberEntry { alias: m.alias, code: c.name, pinned: m.pin_hash.is_some() });
+        }
+        out.push(SpaceEntry { name: s.name, description: s.description, kind: s.kind, main, members });
+    }
+    out.reverse();
+    Ok(out)
 }
 
 /// Export a pipeline; `templates` embeds the sink models' designs.
@@ -66,15 +131,15 @@ pub fn export(store: &Store, key: &str, templates: bool) -> Result<Export> {
     let p = store.find_pipeline(key)?;
     let mut code = vec![];
     for n in p.graph.code_spaces() {
-        let c = store.find_code_space(&n)?;
-        code.push(CodeEntry { hash: trust_hash(&c)?, name: c.name, description: c.description, lang: c.lang, source: c.source });
+        code.push(code_entry(&store.find_code_space(&n)?)?);
     }
+    let spaces = bundle_spaces(store, &p.graph, &mut code)?;
     let mut models = vec![];
     for m in p.graph.sinks() {
         let template = if templates { Some(store.export_template(&m, false)?) } else { None };
         models.push(ModelEntry { name: m, template });
     }
-    Ok(Export { format: FORMAT.into(), version: VERSION, name: p.name, description: p.description, graph: p.graph, code, models })
+    Ok(Export { format: FORMAT.into(), version: VERSION, name: p.name, description: p.description, graph: p.graph, code, spaces, models })
 }
 
 /// What importing would do.
@@ -85,6 +150,9 @@ pub struct ImportPlan {
     pub merge: bool,
     /// (space in the file, space it lands as, what happens)
     pub code: Vec<(String, String, String)>,
+    /// (space in the file, space it lands as, what happens)
+    #[serde(default)]
+    pub spaces: Vec<(String, String, String)>,
     /// (model, what happens)
     pub models: Vec<(String, String)>,
     /// What will still be wrong (missing searches, models without templates…).
@@ -97,10 +165,21 @@ impl ImportPlan {
     pub fn lines(&self) -> Vec<String> {
         let mut v = vec![format!("pipeline {}: {}", self.name, if self.merge { "a new version of the existing one" } else { "new" })];
         v.extend(self.code.iter().map(|(a, b, w)| if a == b { format!("  code {a}: {w}") } else { format!("  code {a} → {b}: {w}") }));
+        v.extend(self.spaces.iter().map(|(a, b, w)| if a == b { format!("  space {a}: {w}") } else { format!("  space {a} → {b}: {w}") }));
         v.extend(self.models.iter().map(|(m, w)| format!("  model {m}: {w}")));
         v.extend(self.problems.iter().map(|p| format!("  ! {p}")));
         v
     }
+}
+
+fn free_space_name(store: &Store, base: &str) -> Result<String> {
+    let mut name = format!("{base}-imported");
+    let mut i = 2;
+    while store.space_name_taken(&name)? {
+        name = format!("{base}-imported-{i}");
+        i += 1;
+    }
+    Ok(name)
 }
 
 fn free_name(store: &Store, base: &str) -> String {
@@ -131,6 +210,34 @@ pub fn plan_import(store: &Store, e: &Export, name: Option<&str>, merge: bool) -
             Err(_) => (c.name.clone(), "created; needs approval before it runs".to_string()),
         };
         plan.code.push((c.name.clone(), to, what));
+    }
+    for s in &e.spaces {
+        let landed = |c: &str| plan.code.iter().find(|(a, _, _)| a == c).map(|(_, b, _)| b.clone()).unwrap_or_else(|| c.to_string());
+        let same = match store.find_space(&s.name) {
+            Ok(have) => {
+                let want: Vec<(String, String)> = s.members.iter().map(|m| (m.alias.to_lowercase(), landed(&m.code))).collect();
+                let mut got = vec![];
+                for m in store.space_members(&have.id)? {
+                    if let Some(c) = store.code_space(&m.code_id)? {
+                        got.push((m.alias.to_lowercase(), c.name));
+                    }
+                }
+                let main = store.code_space(&have.main_code_id)?.map(|c| c.name);
+                let (mut a, mut b) = (want, got);
+                a.sort();
+                b.sort();
+                Some(a == b && main.as_deref() == Some(landed(&s.main).as_str()) && have.kind == s.kind)
+            }
+            Err(_) => None,
+        };
+        let (to, what) = match same {
+            Some(true) => (s.name.clone(), "the same line-up is here already: used as is".to_string()),
+            Some(false) => {
+                (free_space_name(store, &s.name)?, "a different space of that name is here: created alongside, needs approval".to_string())
+            }
+            None => (s.name.clone(), "created; needs approval before it runs".to_string()),
+        };
+        plan.spaces.push((s.name.clone(), to, what));
     }
     for m in &e.models {
         let what = if store.find_model(&m.name).is_ok() {
@@ -176,6 +283,46 @@ pub fn import(store: &Store, e: &Export, plan: &ImportPlan) -> Result<Pipeline> 
                         Some((_, q)) => format!("{to}?{q}"),
                         None => to.clone(),
                     };
+                }
+            }
+        }
+    }
+    for (s, (from, to, _)) in e.spaces.iter().zip(&plan.spaces) {
+        if !store.space_name_taken(to)? {
+            let landed = |c: &str| -> Result<CodeSpace> {
+                let n = plan.code.iter().find(|(a, _, _)| a == c).map(|(_, b, _)| b.as_str()).unwrap_or(c);
+                store.find_code_space(n)
+            };
+            let main = landed(&s.main)?;
+            let sp = store.create_space(to, &s.description, s.kind, &main)?;
+            for m in &s.members {
+                let c = landed(&m.code)?;
+                let pin = if m.pinned { Some(trust_hash(&c)?) } else { None };
+                if c.id == main.id {
+                    if let Some(h) = pin {
+                        store.set_member_pin(&sp.id, &c.id, Some(&h))?;
+                    }
+                } else {
+                    store.add_space_member(&sp.id, &c, Some(&m.alias), pin.as_deref())?;
+                }
+            }
+        }
+        if from != to {
+            for n in &mut g.nodes {
+                match &mut n.kind {
+                    NodeKind::Space { name } if super::super::split_options(name).0 == *from => {
+                        *name = match name.split_once('?') {
+                            Some((_, q)) => format!("{to}?{q}"),
+                            None => to.clone(),
+                        };
+                    }
+                    NodeKind::Source { source } if source.strip_prefix("space:").is_some_and(|x| super::super::split_options(x).0 == *from) => {
+                        *source = match source.split_once('?') {
+                            Some((_, q)) => format!("space:{to}?{q}"),
+                            None => format!("space:{to}"),
+                        };
+                    }
+                    _ => {}
                 }
             }
         }

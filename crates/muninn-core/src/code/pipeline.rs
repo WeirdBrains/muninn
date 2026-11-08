@@ -285,6 +285,24 @@ impl Graph {
     }
 
     /// The code spaces it runs.
+    /// The code spaces (`space:NAME` nodes and sources) the graph runs, in order.
+    pub fn spaces(&self) -> Vec<String> {
+        let mut v = vec![];
+        for n in &self.nodes {
+            let name = match &n.kind {
+                NodeKind::Space { name } => Some(super::split_options(name).0),
+                NodeKind::Source { source } => source.strip_prefix("space:").map(|s| super::split_options(s).0),
+                _ => None,
+            };
+            if let Some(x) = name
+                && !v.contains(&x)
+            {
+                v.push(x);
+            }
+        }
+        v
+    }
+
     pub fn code_spaces(&self) -> Vec<String> {
         let mut v = vec![];
         for n in &self.nodes {

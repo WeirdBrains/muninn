@@ -84,7 +84,7 @@ fn code_spaces_are_managed_reported_and_carried_in_archives() {
     let pack = e.home().join("lab.mnnp");
     e.ok(&["project", "export", "Lab", "--out", pack.to_str().unwrap()]);
     let msg = e.ok(&["project", "import", pack.to_str().unwrap(), "--name", "Copy"]);
-    assert!(msg.contains("2 code spaces (to approve)"), "{msg}");
+    assert!(msg.contains("2 code (to approve)"), "{msg}");
     let list = e.ok(&["code", "list"]);
     assert!(list.contains("fast (imported)\tmath\tuser\tnot approved"), "{list}");
     let pre = e.ok(&["report", "preview", "Weekly (imported)"]);

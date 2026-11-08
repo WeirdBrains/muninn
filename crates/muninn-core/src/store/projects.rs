@@ -46,8 +46,10 @@ pub enum ItemKind {
     Report,
     /// A designed model (`mnnn model`): its design, versions and records.
     Model,
-    /// A code space (`mnnn code`): its source and last result.
+    /// A code (`mnnn code`): its source and last result.
     Code,
+    /// A code space (`mnnn spaces`): its kind, main and members.
+    Space,
     /// A pipeline (`mnnn pipeline`).
     Pipeline,
 }
@@ -62,6 +64,7 @@ impl ItemKind {
             ItemKind::Report => "report",
             ItemKind::Model => "model",
             ItemKind::Code => "code",
+            ItemKind::Space => "space",
             ItemKind::Pipeline => "pipeline",
         }
     }
@@ -74,6 +77,7 @@ impl ItemKind {
             "report" => ItemKind::Report,
             "model" => ItemKind::Model,
             "code" => ItemKind::Code,
+            "space" => ItemKind::Space,
             "pipeline" => ItemKind::Pipeline,
             _ => return None,
         })
@@ -86,7 +90,8 @@ impl ItemKind {
             ItemKind::RuleSet => "rule",
             ItemKind::Report => "report",
             ItemKind::Model => "model",
-            ItemKind::Code => "code space",
+            ItemKind::Code => "code",
+            ItemKind::Space => "code space",
             ItemKind::Pipeline => "pipeline",
         }
     }
@@ -98,7 +103,8 @@ impl ItemKind {
             ItemKind::RuleSet => "rules",
             ItemKind::Report => "reports",
             ItemKind::Model => "models",
-            ItemKind::Code => "code spaces",
+            ItemKind::Code => "code",
+            ItemKind::Space => "code spaces",
             ItemKind::Pipeline => "pipelines",
         }
     }
@@ -303,6 +309,7 @@ impl Store {
             ItemKind::RuleSet => self.rule(ref_id)?.is_some(),
             ItemKind::Model => self.model(ref_id)?.is_some(),
             ItemKind::Code => self.code_space(ref_id)?.is_some(),
+            ItemKind::Space => self.space(ref_id)?.is_some(),
             ItemKind::Pipeline => self.pipeline(ref_id)?.is_some(),
         };
         if !exists {

@@ -153,7 +153,8 @@ fn parse_kind(kind: &str) -> anyhow::Result<ItemKind> {
         "rule" | "rule_set" => Ok(ItemKind::RuleSet),
         "model" => Ok(ItemKind::Model),
         "code" => Ok(ItemKind::Code),
-        other => Err(anyhow::anyhow!("`{other}`: add a journal, search, report, rule, model or code (or a series with add_project_series)")),
+        "space" | "code_space" => Ok(ItemKind::Space),
+        other => Err(anyhow::anyhow!("`{other}`: add a journal, search, report, rule, model, code or space (or a series with add_project_series)")),
     }
 }
 
@@ -183,6 +184,10 @@ pub(crate) fn add_project_item_of(store: &Store, project: &str, kind: ItemKind, 
         ItemKind::Code => {
             let c = store.find_code_space(key)?;
             store.add_project_item(&p.id, kind, &c.id, serde_json::json!({}))?
+        }
+        ItemKind::Space => {
+            let s = store.find_space(key)?;
+            store.add_project_item(&p.id, kind, &s.id, serde_json::json!({}))?
         }
         ItemKind::Result | ItemKind::Pipeline => {
             return Err(anyhow::anyhow!("add a series with add_project_series"));

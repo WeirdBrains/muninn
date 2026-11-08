@@ -727,6 +727,7 @@ fn name_of(store: &Store, kind: ItemKind, id: &str) -> String {
         ItemKind::RuleSet => store.rule(id).ok().flatten().map(|r| r.name),
         ItemKind::Model => store.model(id).ok().flatten().map(|m| m.name),
         ItemKind::Code => store.code_space(id).ok().flatten().map(|c| c.name),
+        ItemKind::Space => store.space(id).ok().flatten().map(|s| s.name),
         ItemKind::Pipeline => store.pipeline(id).ok().flatten().map(|p| p.name),
         ItemKind::Result => None,
     };
