@@ -543,6 +543,7 @@ fn pipe_result(
     Ok(PipeRunResult { hops: p.hops, saved: p.saved, lines })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn pipe_run_of(
     store: &Store,
     source: &str,
@@ -586,6 +587,7 @@ fn pipe_run_of(
 
 /// `mnnn pipe SOURCE STEP… [--to TARGET] [--format csv|json|ndjson] [--chunk N]`.
 /// Source `-` is standard input: paste text or pass a file path (Rust reads the bytes).
+#[allow(clippy::too_many_arguments)]
 pub fn pipe_run(
     source: String,
     steps: Vec<String>,

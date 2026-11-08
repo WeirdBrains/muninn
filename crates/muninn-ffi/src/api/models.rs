@@ -793,7 +793,7 @@ mod tests {
         let m = model_of(&s, &m.id).unwrap();
         assert!(!m.has_draft);
         assert_eq!(m.version, 1);
-        assert_eq!(m.status.contains('1') || m.version == 1, true);
+        assert!(m.status.contains('1') || m.version == 1);
 
         let m = model_edit_of(&s, &m.id, &["note:text".into()], &[], &[], &[], &[]).unwrap();
         assert!(m.has_draft);

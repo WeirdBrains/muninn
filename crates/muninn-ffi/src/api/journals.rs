@@ -341,6 +341,7 @@ pub fn add_entry_note(
     add_entry_note_of(&open_write()?, &entry, &body, words.as_deref(), nth, start, end)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn add_highlight_of(
     store: &Store,
     entry: &str,
@@ -702,7 +703,7 @@ mod tests {
         assert!(thumb.starts_with(b"\x89PNG"), "preview is a PNG, got {} bytes", thumb.len());
         assert!(!thumb.is_empty());
         let dest = create_journal_of(&s, "Other", None, "markdown").unwrap();
-        let copied = copy_entries_of(&s, &[e.id.clone()], Some(&dest.id), None, None).unwrap();
+        let copied = copy_entries_of(&s, std::slice::from_ref(&e.id), Some(&dest.id), None, None).unwrap();
         assert_eq!(copied.len(), 1);
         assert_eq!(copied[0].journal_id, dest.id);
         assert_eq!(entries_of(&s, &dest.id).unwrap().len(), 1);

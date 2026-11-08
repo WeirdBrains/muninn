@@ -207,6 +207,7 @@ pub fn keys_rekey(
 }
 
 /// `mnnn keys export`. Writes age-encrypted files and returns their paths. No secrets come back.
+#[allow(clippy::too_many_arguments)]
 pub fn keys_export(
     home: Option<String>,
     out: String,
@@ -238,6 +239,7 @@ pub fn keys_export(
 }
 
 /// `mnnn keys recover`. Re-wraps the service key with a new password. Optionally opens a words reveal (`--print-words`).
+#[allow(clippy::too_many_arguments)]
 pub fn keys_recover(
     home: Option<String>,
     new_password: String,

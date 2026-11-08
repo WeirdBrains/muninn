@@ -138,7 +138,7 @@ fn the_site_shows_matched_app_and_tui_screenshot_pairs() {
     assert!(!app.contains("shots.dart"), "the old screenshot gallery is still on the page");
     let pairs = read("site/lib/pairs.dart");
     let all = shot_refs(&pairs);
-    assert!(all.len() >= 4 && all.len() % 2 == 0, "{} screenshots is not a set of pairs", all.len());
+    assert!(all.len() >= 4 && all.len().is_multiple_of(2), "{} screenshots is not a set of pairs", all.len());
     for p in all.chunks(2) {
         assert!(p[0].contains("/app-") && p[1].contains("/tui-"), "{p:?} is not an app/TUI pair");
         assert_eq!(p[0].replace("/app-", "/"), p[1].replace("/tui-", "/"), "unmatched pair {p:?}");
