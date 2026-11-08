@@ -9,22 +9,201 @@ changelog are archived in [`docs/historical/2.0/`](docs/historical/2.0/), and 1.
 
 | Phase | Feature set | Version | Status |
 | ----- | ----------- | ------- | ------ |
-| 1 | [Plugins](#plugins): a required `kind` in every plugin manifest, `mnnn plugins` with `migrate`, a Plugins menu per kind; and [Code Spaces](#code-spaces-menu-and-cli) as a main menu and CLI entry | v2.23.0 | 📝 Planned |
-| 2 | [Rule Sets + Scheduler](#rule-sets--scheduler): a first-class `rulesets` table, the system scheduler with `schedules` and `schedule_runs`, scheduled rules moved onto it, `rule tick` deprecated | v2.24.0 | 📝 Planned |
-| 3 | [Ingest Connector Plugins](#ingest-connector-plugins): plugins of kind `ingest-connector`, managed under Plugins ▸ Ingest connectors, run on a schedule; they store raw data, call a pipeline and a rule set | v2.25.0 | 📝 Planned |
-| 4 | [Shares: Create Then Share](#shares-create-then-share): wherever a share can be added, the thing can be created there too | v2.26.0 | 📝 Planned |
+| 1 | [Code Spaces as Collections of Code](#code-spaces-as-collections-of-code): today's code spaces become **code** (single units). A new **code space** is a collection of code with a required **main**, which can import and call other code. Pipelines run spaces (`space:NAME`), and an offered `mnnn code migrate` turns each code into a space | v2.23.0 | 📝 Planned (reworked Nov 8, 9:43 AM) |
+| 2 | [Plugins](#plugins): a required `kind` on every **code**, `mnnn plugins` with kind migration, a Plugins menu per kind; and the [Code spaces + Code menus and CLI](#code-spaces-menu-and-cli) | v2.24.0 | 📝 Planned (implementation paused, see below) |
+| 3 | [Rule Sets + Scheduler](#rule-sets--scheduler): a first-class `rulesets` table, the system scheduler with `schedules` and `schedule_runs`, scheduled rules moved onto it, `rule tick` deprecated | v2.25.0 | 📝 Planned |
+| 4 | [Ingest Connector Plugins](#ingest-connector-plugins): code spaces whose main is of kind `ingest-connector`, managed under Plugins ▸ Ingest connectors, run on a schedule; they store raw data, call a pipeline and a rule set | v2.26.0 | 📝 Planned |
+| 5 | [Shares: Create Then Share](#shares-create-then-share): wherever a share can be added, the thing can be created there too (code and code spaces both) | v2.27.0 | 📝 Planned |
 
-**Order:** phase 1 comes first because connectors are a plugin kind and need `kind` and `migrate`. Code spaces get their main menu at the same time, because both reshape the menus. Phase 2 (rule sets and the scheduler) is the engine connectors run on; it also moves today's scheduled rules. Phase 3 then needs little more than the plugin kind and host methods. Phase 4 is independent and can move earlier if Michael wants. Each phase is a minor release. App work in every phase (the Flutter app, `app/`) is **Matematik's area**: here it is planned only as surfaces matching the TUI, through `muninn-ffi`.
+**Order:** phase 1 now comes first, because it renames the table every later phase builds on (`code_spaces` → `code`) and changes what a pipeline step runs. Kinds (phase 2) attach to **code** after the rename, so the paused kind work is rebased onto the `code` table rather than shipped against `code_spaces` and moved a release later. The scheduler (3) and connectors (4) follow as before, and shares (5) stay independent. Each phase is a minor release. App work in every phase (the Flutter app, `app/`) is **Matematik's area**: here it is planned only as surfaces matching the TUI, through `muninn-ffi`.
+
+**Paused implementation:** the phase-2 kind work started on Nov 8 (`kind`/`enabled` columns on `code_spaces`, SDK 1.1.0 `plugin!(run, kind = "…")`, `mnnn plugins` with migrate, the `code-spaces` alias) is on a local branch, unpushed. It gets rebased onto the `code` table after phase 1. The `code-spaces` alias on `mnnn code` is dropped (see Q-C1, revised).
 
 ## Next phase
 
-Phase 1, [Plugins](#plugins), once Michael confirms the open questions.
+Phase 1, [Code Spaces as Collections of Code](#code-spaces-as-collections-of-code), once Michael answers its open questions (Q-CS1 to Q-CS8).
+
+---
+
+## Code Spaces as Collections of Code
+
+> **Phase 1 · v2.23.0 · 📝 Planned**
+
+### Michael's words (Nov 8, 9:38 and 9:43 AM)
+
+"## Code spaces
+Code spaces should be a collection of code.
+- the current code spaces should be changed to code
+  - a main code must be created
+    - it can import and execute code that's already been created
+    - it can also just be code
+    - it is the entry point for a code space to run
+  - the database needs to change to accommodate
+  - pipelines need to change to accommodate this
+  - pipelines now run code spaces, but the main code is triggered.
+- a code space can be created that has a collection of code."
+
+"Also, a migrate option should be open to migrate current code to a code space.
+- a code space is created and named as the code
+- the code is migrated to become the main of the code space
+- name collisions in the code spaces should be handled by adding a -migration postfix to the code space name
+- if there is already a code space with a -migration postfix, the code should be skipped in the migration"
+
+### Terms
+
+- **Code:** one unit, which is what a "code space" is today. It has a source (math, Polars, Rust, Python, or a prebuilt library path), a language, a kind (phase 2), an approval hash and a cached built library. It can run on its own as before (`mnnn code run`).
+- **Code space:** a named collection of code, with exactly one **main**. Running a space means running its main. A piece of code can belong to several spaces, because membership doesn't copy it.
+- **Main:** the space's entry point. It can be plain code that imports nothing (the common case, and what migrate makes), or it can import other members and call them.
+
+### Schema (one migration, ids kept)
+
+1. `ALTER TABLE code_spaces RENAME TO code;`
+   - Every id stays the same, so references by id keep working unchanged:
+     - project items (`ItemKind::Code`, `ref_id`)
+     - `code_scopes` (global/user/org)
+     - org resources and org code syncs
+     - shares
+     - the approval hash, which is a column on the row
+     - history params (`code.*` actions keep `"id"`)
+     - pipelines, which refer to code by **name** in `code:NAME` and are unaffected by the rename
+   - `code_scopes` keeps its name and now means code. Peer and org wire formats keep sending the same JSON (`CodeSpace`, renamed `Code` in Rust with a serde alias), so 2.22 peers interoperate.
+2. New tables, following the repo's conventions (TEXT uuid ids, epoch ms UTC):
+
+```sql
+CREATE TABLE code_spaces (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    description TEXT NOT NULL DEFAULT '',
+    main_code_id TEXT NOT NULL REFERENCES code(id) ON DELETE RESTRICT,   -- a space always has a main
+    enabled INTEGER NOT NULL DEFAULT 1,
+    approved_hash TEXT,              -- the space's approval: main + pinned members (below)
+    author_id TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+CREATE TABLE code_space_members (
+    space_id TEXT NOT NULL REFERENCES code_spaces(id) ON DELETE CASCADE,
+    code_id TEXT NOT NULL REFERENCES code(id) ON DELETE RESTRICT,
+    alias TEXT NOT NULL COLLATE NOCASE,   -- the name main imports it by (default: the code's name)
+    position INTEGER NOT NULL,            -- display order; main is position 0
+    pin_hash TEXT,                        -- the code's trust hash when added/re-pinned (NULL: follow latest)
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (space_id, code_id),
+    UNIQUE (space_id, alias)
+);
+```
+
+   - Main is always a member, at position 0. A trigger, or the store's insert path, adds the row, and removing main from the members is refused: set another main first.
+   - Deleting code that is a member of any space is refused with the list of spaces ("remove it from spaces A, B first"), hence `ON DELETE RESTRICT`.
+   - `code_space_scopes` mirrors `code_scopes` so spaces can be user, org or global. Org resources gain the kind `space` next to `code`.
+
+### Main, imports and calling code
+
+- **Import scope (proposed):** main can import **members of its own space only**. To use code that already exists, add it to the space; nothing is linked from outside. This keeps one place to review what a space runs. See Q-CS1.
+- **Mechanism (proposed): a runtime host call, not a build-time link.**
+  - SDK: `host.call(alias, input: Frame) -> Result<Frame>` and `host.call_view(alias, input) -> Result<View>`. In Python, `call("alias", frame)`; in math and Polars, a `call(alias)` step function.
+  - The host runs the member as its own plugin, in process, with the same store and options, and returns its output frame. Each member stays a separately built, cached library, so this works across languages (a Python main calls a Rust parser) with no codegen linking.
+  - Declared imports: main lists what it calls in an `@imports a, b` header, and the build checks each alias is a member. A `host.call` of an undeclared alias fails, so reviewers see the dependency list up front.
+  - ABI version 1 is unchanged: `call` is one more host-table method name through the existing JSON `host.call(name, args)` channel, so the SDK goes to 1.2.0 (1.1.0 is the paused kind work).
+- **Depth and cycles:** in v1, only **main** may call members, and members can't call (their `host.call` fails with "only a space's main calls code"). The call graph is then a star with depth 1, so there are no cycles by construction. The existing "code spaces do not start each other" guard becomes "code doesn't start code, except main calling its members, one level". If members calling members is allowed later (Q-CS2), the build does a DFS over the `@imports` headers and refuses a cycle, naming it (`a → b → a`), plus a runtime depth limit of 8.
+- **Pinning (proposed):** `pin_hash` records the member's trust hash when it was added or re-pinned.
+  - If a member's source changes, the space shows **"member X changed since pinned"** and won't run until the change is reviewed: `mnnn spaces repin SPACE X`, or the TUI's Review changes, which shows the diff.
+  - A NULL pin (`--follow`) tracks the latest approved version of the code.
+  - There are no version numbers. The trust hash is the version, the same as approvals today.
+- **Approval (proposed):** a space's `approved_hash` = blake3 over main's trust hash plus the sorted `(alias, pin_hash)` of every member.
+  - Approving a space is one review that lists main and every member (with their sources). It approves the space as it is. Members that weren't approved individually become approved as part of it, and the history records each.
+  - Approving main alone does **not** cover its imports. Running a space needs the space approval.
+  - Running a piece of code on its own still needs only that code's approval.
+  - See Q-CS3.
+
+### Pipelines
+
+- **New step and source:** `space:NAME` runs the space, which triggers its main, with the step's input frame as `host.input()` and `?options` as today. Pipelines (graph JSON) gain `NodeKind::Space { space }`, and `pipe` accepts `space:NAME`.
+- **`code:NAME` (compatibility, proposed):** it keeps working for one release and runs that code alone, as today, with a deprecation note in `pipeline check`/`show` and in the TUI. After that it is an error pointing to `space:`. Stored pipelines are **not** silently changed by the schema migration.
+- **Rewrite through migrate (proposed):** `mnnn code migrate` offers to rewrite stored pipelines' `code:NAME` steps to `space:<the space made for NAME>`, keeping options.
+  - It is on by default when migrating interactively, with `--no-rewrite-pipelines` to skip.
+  - Each rewritten pipeline gets a new version, so the old graph stays in pipeline history, plus a `pipeline.edit` action.
+  - Code that was skipped (both names taken) keeps its `code:` steps.
+  - See Q-CS4.
+- `Graph::code_spaces()` is split into `codes()` and `spaces()`. Pipeline shares (`pipeline_share.rs`) bundle the spaces, their members and pins.
+
+### `mnnn code migrate`: code → code spaces (Michael, 9:43 AM)
+
+The schema rename is automatic. This migrate is a separate step, **offered, not forced** ("a migrate option should be open").
+
+```
+mnnn code migrate [CODE…] [--dry-run] [--no-rewrite-pipelines] [--json]
+```
+
+- **Which code:** every code that is **not a member of any space** (or only those named).
+- **For each one:**
+  1. Create a code space named as the code, with the code as its main (and only member, pin = its current trust hash).
+  2. If a space of that name exists (case-insensitive, as names are unique NOCASE), name it `NAME-migration`.
+  3. If `NAME-migration` is also taken, **skip** that code and report it.
+  - It also checks that the new name is within the 80-character name limit. If `-migration` would exceed it, that code is skipped and reported as "name too long".
+- **Approval carries over:** if the code was approved, the new space is approved for exactly that code (one member, same hash), so nothing that ran before stops running.
+- **Report:** three lists, **created** (`NAME`), **renamed** (`NAME` → `NAME-migration`) and **skipped** (`NAME`: why), plus the pipelines rewritten. `--json` gives the same.
+- **`--dry-run`:** prints the same report and changes nothing.
+- **Idempotent:** code that is a member of a space isn't picked again, so running migrate twice creates nothing the second time.
+- **Backup:** a JSON backup (`MUNINN_HOME/backups/code-migrate-<UTC>.json`) of affected pipelines' graphs is written first, and a `code.migrate` action is recorded.
+- **How users are offered it (not run automatically):**
+  - CLI: after upgrading, the first `mnnn` command that touches code (code, spaces, pipe, pipeline, plugins) prints once: "N code items aren't in a code space yet; `mnnn code migrate --dry-run` shows what migrating would do". The notice is recorded in prefs so it isn't repeated, and `mnnn status` keeps a one-line reminder while unmigrated code exists.
+  - TUI: a one-time dialog on start, **Migrate now… / Later / Don't ask again**. Migrate now shows the dry-run report, then a confirmation. The action stays in **Code ▸ Migrate code to spaces…**.
+  - App (Matematik): the same one-time banner and a Settings ▸ Migrate entry.
+  - Unmigrated code keeps working: `code:` steps and `mnnn code run` still run it alone.
+
+### Surfaces
+
+- **CLI:** `mnnn code` = single code units (create, edit, show, approve, build, run, check, remove, sdk, parsers, migrate). New **`mnnn spaces`** (alias `code-spaces`, `space`) = collections:
+
+```
+mnnn spaces list|show|create NAME --main CODE [--add CODE[=ALIAS]…]|add SPACE CODE [--as ALIAS] [--follow]
+mnnn spaces remove-code SPACE CODE|set-main SPACE CODE|repin SPACE [CODE…]|approve SPACE|run SPACE [--input SRC]|remove SPACE
+```
+
+  - `create` without `--main` asks (or `--new-main LANG` writes a fresh main from a template, which imports nothing).
+  - Q-C1 is revised accordingly (see Open Questions).
+- **TUI:** a **Code** main menu (Alt+C) with **Code spaces…** (collections: members list, main marked ★, `a` add code, `M` set main, `r` run, `R` repin/review, approve) and **Code…** (single units, today's window), plus New code space…, New code…, Migrate code to spaces…, Live pipes…, Pipelines…, Plugin SDK…. Projects ▸ Code spaces… stays one release as a pointer.
+- **App** (Matematik): Code spaces and Code destinations with the same items; the migrate banner.
+- **MCP:** the tools gain `space_run`/`space_list`, and `code_*` tools keep their names.
+- **Docs:** `docs/code-spaces.md` is split into `docs/code.md` (units, SDK) and `docs/code-spaces.md` (collections, main, imports, approval, migrate). Plus `docs/pipelines.md` (`space:`), menus, keybindings, help topics and man pages.
+
+### Tests
+
+- **Schema:** the rename keeps ids and every reference (project items, scopes, org resources, shares, history lookups, approvals). A 2.22 database with code, pipelines and org shares opens on 2.23 and everything still runs.
+- **Spaces:**
+  - main is required and always a member
+  - main can't be removed while it is main
+  - member code can't be deleted
+  - aliases are unique per space
+- **Imports:** `host.call` of a member returns its frame; an undeclared or non-member alias fails; a member calling is refused; cross-language calls work (a Python main calling a Rust parser).
+- **Approval:** the space hash covers main + pins; a changed member blocks the space until repinned; approving a space approves its members; running code alone is unaffected.
+- **Pipelines:** `space:` steps and sources run main; `code:` still runs alone, with a deprecation note.
+- **Migrate:**
+  - one space per non-member code, named as the code
+  - NAME taken → `NAME-migration`
+  - both taken → skipped and reported
+  - the name-length limit
+  - `--dry-run` changes nothing
+  - a second run creates nothing
+  - approvals carry over
+  - pipelines are rewritten with a version bump, and `--no-rewrite-pipelines` leaves them
+  - the one-time notice and dialog are shown once
+- **Peers and orgs:** 2.22 peers still exchange code, and spaces share with their members.
+
+---
 
 ---
 
 ## Plugins
 
-> **Phase 1 · v2.23.0 · 📝 Planned**
+> **Phase 2 · v2.24.0 · 📝 Planned (after code spaces became collections)**
+
+**Reworked for phase 1:**
+- `kind` lives on **code** (the unit that is built and loaded), not on the space. A space's kind is its main's kind, shown in lists and used to place it: a space whose main is a parser is listed under Plugins ▸ Parsers.
+- Members of a space may be parser, transform or analysis. An `ingest-connector` is only ever a main.
+- `mnnn plugins migrate` (kinds) and `mnnn code migrate` (spaces) are separate steps. A proposed umbrella `mnnn migrate` runs both in order, kinds first, since a space's approval and placement need its main's kind (Q-CS8).
+- The `code-spaces` alias on `mnnn code` is dropped: `code-spaces` now names `mnnn spaces`.
 
 ### Michael's words
 
@@ -103,7 +282,9 @@ mnnn plugins migrate [NAME…] [--kind K] [--dry-run] [--yes] [--no-backup]
 
 ## Code Spaces Menu and CLI
 
-> **Phase 1 · v2.23.0 · 📝 Planned**
+> **Phase 2 · v2.24.0 · 📝 Planned (menus land with phase 1's Code menu; see below)**
+
+**Reworked for phase 1:** the Code menu, holding **Code spaces…** (collections) and **Code…** (units), now ships in phase 1, because the split needs it. `mnnn code` is the units and `mnnn spaces` (alias `code-spaces`) is the collections. That replaces Q-C1's "`code-spaces` as an alias of `code`" (see Q-C1, revised). The items below stand, with "code spaces" meaning collections wherever a space is run or shared.
 
 ### Michael's words
 
@@ -130,7 +311,9 @@ mnnn plugins migrate [NAME…] [--kind K] [--dry-run] [--yes] [--no-backup]
 
 ## Rule Sets + Scheduler
 
-> **Phase 2 · v2.24.0 · 📝 Planned (Michael answered Q1, Q2 and Q5)**
+> **Phase 3 · v2.25.0 · 📝 Planned (Michael answered Q1, Q2 and Q5)**
+
+**Reworked for phase 1:** unchanged, except that a schedule's plugin target is a **code space** (`space_id`), and Muninn triggers its main.
 
 ### Rule sets as a table (Michael: "add a first-class `rulesets` table")
 
@@ -442,7 +625,9 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 
 ## Ingest Connector Plugins
 
-> **Phase 3 · v2.25.0 · 📝 Planned (Michael answered Q1–Q5)**
+> **Phase 4 · v2.26.0 · 📝 Planned (Michael answered Q1–Q5)**
+
+**Reworked for phase 1:** an ingest connector is a **code space whose main is code of kind `ingest-connector`**. Main can import parser or transform members to shape what it fetches before `host.pipe(...)`. Schedules reference the space. Plugins ▸ Ingest connectors lists those spaces. The host methods (`host.pipe`, `host.run_ruleset`, `host.fetch`) are available to main only.
 
 An ingest connector plugin fetches data on a schedule, stores it raw, pipes it into a model with a pipeline and calls a rule set. Connectors are managed under **Plugins ▸ Ingest connectors** (Michael).
 
@@ -530,7 +715,9 @@ A system scheduler service needs to be created to support this.
 
 ## Shares: Create Then Share
 
-> **Phase 4 · v2.26.0 · 📝 Planned**
+> **Phase 5 · v2.27.0 · 📝 Planned**
+
+**Reworked for phase 1:** every share point that takes a code space now takes both **code** and **code spaces**, and each gets its own **+ New code…** / **+ New code space…** (a new space asks for its main: pick existing code or write a new one). Sharing a space carries its members and pins.
 
 ### Michael's words
 
@@ -566,6 +753,22 @@ The inventory is checked against the code before implementing; any share point f
 - CLI `--create` paths; TUI picker tests; FFI and app tests.
 
 ## Open Questions
+
+### Code spaces as collections (new, Nov 8, 9:43 AM; open)
+
+- **Q-CS1 Import scope:** proposed: main imports only **members of its own space** (add code to the space to use it). Alternatives: (a) import any code you can run, by name, with the space recording it automatically as a member; (b) also import whole other spaces (calling their main). Which?
+- **Q-CS2 Who may call:** proposed: only **main** calls members (one level, so no cycles possible in v1). Should members be able to call other members (then the build checks `@imports` for cycles and there's a depth limit of 8)?
+- **Q-CS3 Approval model:** proposed: a space has its own approval over main + every member's pinned hash; approving a space approves its members; approving main alone does not cover its imports; a changed member blocks the space until repinned. Or should approving each code individually be enough (no space-level approval)?
+- **Q-CS4 `code:` step compatibility:** proposed: `code:NAME` keeps running that code alone for one release (deprecated), then errors pointing to `space:`; `mnnn code migrate` rewrites stored pipelines' `code:` steps to `space:` by default (new pipeline version, `--no-rewrite-pipelines` to skip). Or keep `code:` permanently as "run one unit", or rewrite in the automatic schema migration?
+- **Q-CS5 Pinning:** proposed: members are pinned to their trust hash when added (repin to accept changes), `--follow` tracks the latest approved version. Pin by default, or follow by default?
+- **Q-CS6 CLI naming:** proposed: `mnnn code` = single units, `mnnn spaces` (aliases `code-spaces`, `space`) = collections; this revises Q-C1 (`code-spaces` is no longer an alias of `code`). OK, or `mnnn code-spaces` as the main name?
+- **Q-CS7 Where kind lives:** proposed: on **code**; a space's kind is its main's kind (connectors are spaces with an ingest-connector main; members may be parser/transform/analysis). Or should the space carry its own kind?
+- **Q-CS8 One migrate or two:** proposed: keep `mnnn plugins migrate` (kinds) and `mnnn code migrate` (spaces), plus an umbrella `mnnn migrate` that runs both in order (kinds first), with one combined dry-run report and the same one-time offer. Or a single command only?
+- **Q-CS9 Offer on upgrade:** proposed: a one-time CLI notice, a TUI dialog (Migrate now / Later / Don't ask again) and an app banner; never automatic. OK?
+- **Q-CS10 Migrate name edge:** if `NAME-migration` would exceed the 80-character name limit, skip and report "name too long" (proposed), or truncate NAME?
+
+**Q-C1 (revised by the code-space rework):** Michael chose "keep `mnnn code` (alias `codes`) + a `code-spaces` alias". Since code spaces are now collections and different from code, the proposal is Q-CS6. Pending his answer.
+
 
 ### Answered by Michael (Nov 8, 2026)
 
