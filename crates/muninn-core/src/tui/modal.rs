@@ -49,6 +49,8 @@ pub enum Modal {
     Rules,
     /// Projects ▸ Code spaces…
     Code,
+    /// Code ▸ Code spaces… (collections) and Code ▸ Migrate…
+    Spaces,
     /// Projects ▸ Pipes (live)…
     Pipes,
     /// Projects ▸ Pipelines… (the Pipeline Designer)
@@ -136,6 +138,7 @@ impl Modal {
             Modal::Peers => "collaboration",
             Modal::Mcp => "mcp",
             Modal::Code => "code-spaces",
+            Modal::Spaces => "code-spaces",
             Modal::Pipes => "pipes",
             Modal::Pipelines => "pipelines",
             Modal::Models => "models",
@@ -284,6 +287,7 @@ pub fn on_click(app: &mut App, h: super::Hit) {
             Some(Modal::Journals) => super::journals::on_click(app, i),
             Some(Modal::Reports) => super::reports::on_click(app, i),
             Some(Modal::Rules) => super::rules::on_click(app, i),
+            Some(Modal::Spaces) => super::spaces::on_click(app, i),
             Some(Modal::Network) => super::network::on_click(app, i),
             Some(Modal::Orgs) => super::orgs::on_click(app, i),
             Some(Modal::Reviews) => super::reviews::on_click(app, i),
@@ -376,6 +380,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         Modal::Peers => super::peers::on_key(app, k),
         Modal::Mcp => super::mcp::on_key(app, k),
         Modal::Code => super::code::on_key(app, k),
+        Modal::Spaces => super::spaces::on_key(app, k),
         Modal::Pipes => super::pipes::on_key(app, k),
         Modal::Pipelines => super::designer::on_key(app, k),
         Modal::Models => super::models::on_key(app, k),
@@ -710,6 +715,7 @@ pub fn draw(app: &mut App, f: &mut Frame, area: Rect) {
         Modal::Peers => super::peers::draw(app, f, r, &mut extra),
         Modal::Mcp => super::mcp::draw(app, f, r, &mut extra),
         Modal::Code => super::code::draw(app, f, r, &mut extra),
+        Modal::Spaces => super::spaces::draw(app, f, r, &mut extra),
         Modal::Pipes => super::pipes::draw(app, f, r, &mut extra),
         Modal::Pipelines => super::designer::draw(app, f, r, &mut extra),
         Modal::Models => super::models::draw(app, f, r, &mut extra),

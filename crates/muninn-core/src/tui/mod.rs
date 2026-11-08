@@ -35,6 +35,7 @@ pub mod rules;
 pub mod searches;
 mod share;
 pub mod sidebar;
+pub mod spaces;
 pub mod themes;
 pub mod tiles;
 pub mod widgets;
@@ -167,6 +168,7 @@ pub struct App {
     pub mcp: mcp::McpState,
     pub code: code::CodeState,
     pub pipes: pipes::PipesState,
+    pub spaces: spaces::SpacesState,
     pub frames: frametile::FramesState,
     pub designer: designer::DesignerState,
     pub models: models::ModelsState,
@@ -222,6 +224,7 @@ impl App {
             mcp: Default::default(),
             code: Default::default(),
             pipes: Default::default(),
+            spaces: Default::default(),
             frames: Default::default(),
             designer: Default::default(),
             models: Default::default(),
@@ -253,6 +256,7 @@ impl App {
         };
         app.refresh_rows();
         rules::poll(&mut app);
+        spaces::offer(&mut app);
         Ok(app)
     }
 
@@ -459,6 +463,8 @@ impl App {
                 orgs::open(self, orgs::Tab::Site);
             }
             Code => code::open(self),
+            Spaces => spaces::open(self),
+            Migrate => spaces::open_migrate(self),
             Pipes => pipes::open(self),
             Pipelines => designer::open(self),
             Models => models::open(self),

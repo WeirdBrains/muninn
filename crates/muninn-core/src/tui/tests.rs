@@ -72,7 +72,7 @@ fn header_large_and_compact() {
 fn menu_opens_with_f10_alt_and_mouse() {
     let (_t, mut a) = app();
     let s = screen_text(&mut a);
-    for m in ["File", "View", "Data", "Projects", "Net", "Orgs", "Keys", "Theme", "Help"] {
+    for m in ["File", "View", "Data", "Proj", "Code", "Net", "Orgs", "Keys", "Theme", "Help"] {
         assert!(s.contains(m), "{m}");
     }
     a.on_key(key(KeyCode::F(10)));
@@ -84,13 +84,13 @@ fn menu_opens_with_f10_alt_and_mouse() {
     a.on_key(key(KeyCode::Esc));
     assert!(!a.menu.is_open());
     a.on_key(mkey(KeyCode::Char('t'), KeyModifiers::ALT));
-    assert_eq!(a.menu.open, Some(7));
+    assert_eq!(a.menu.open, Some(8));
     a.on_key(key(KeyCode::Esc));
     // mouse: click "Help" in the menu bar, then "About Muninn"
     screen_text(&mut a);
-    let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuTop(8)).unwrap();
+    let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuTop(9)).unwrap();
     a.on_mouse(click(r.x + 1, r.y));
-    assert_eq!(a.menu.open, Some(8));
+    assert_eq!(a.menu.open, Some(9));
     screen_text(&mut a);
     let (r, _) = *a.hits.iter().find(|(_, h)| *h == Hit::MenuItem(0, 3)).unwrap();
     a.on_mouse(click(r.x + 2, r.y));

@@ -92,7 +92,7 @@ fn projects_create_add_open_and_drop() {
     let (_t, mut a) = app();
     // the Projects menu reaches every workspace window
     let titles: Vec<_> = menu::menus().iter().map(|m| m.title).collect();
-    assert!(titles.contains(&"Projects"));
+    assert!(titles.contains(&"Proj") && titles.contains(&"Code"));
     a.on_key(key(KeyCode::Char('P')));
     assert!(matches!(a.modal, Some(Modal::Projects)));
     assert!(screen_text(&mut a).contains("Projects"));

@@ -135,7 +135,7 @@ pub fn menus() -> Vec<Menu> {
             ],
         },
         Menu {
-            title: "Projects",
+            title: "Proj",
             mnemonic: 'p',
             items: vec![
                 a("Projects…", 'p', "P", Projects),
@@ -163,11 +163,20 @@ pub fn menus() -> Vec<Menu> {
                 sep(),
                 a("Notifications…", 'n', "!", Notifications),
                 a("Rules…", 'u', "R", Rules),
-                a("Code spaces…", 'c', "C", Code),
-                a("Pipes (live)…", 'e', "", Pipes),
-                a("Pipelines…", 'i', "E", Pipelines),
                 sep(),
                 a("Add selected series to project…", 'a', "a", AddToProject),
+            ],
+        },
+        Menu {
+            title: "Code",
+            mnemonic: 'c',
+            items: vec![
+                a("Code spaces…", 's', "", Spaces),
+                a("Code…", 'c', "C", Code),
+                a("Migrate code to spaces…", 'm', "", Migrate),
+                sep(),
+                a("Live pipes…", 'l', "", Pipes),
+                a("Pipelines…", 'p', "E", Pipelines),
             ],
         },
         Menu {

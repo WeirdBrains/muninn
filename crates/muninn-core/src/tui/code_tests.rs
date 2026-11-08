@@ -45,7 +45,7 @@ fn code_window_creates_edits_and_approves_before_running() {
     assert!(matches!(a.modal, Some(Modal::Code)));
     assert_eq!(a.help_topic(), "code-spaces");
     assert!(screen_text(&mut a).contains("no code spaces yet"));
-    assert!(menu::menus().iter().any(|m| m.items.iter().any(|i| i.label == "Code spaces…" && i.shortcut == "C")));
+    assert!(menu::menus().iter().any(|m| m.items.iter().any(|i| i.label == "Code…" && i.shortcut == "C")));
 
     // n asks for a name and a language; a bad language stays on that step
     a.on_key(key(KeyCode::Char('n')));
