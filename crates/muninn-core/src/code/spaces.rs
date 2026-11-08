@@ -18,24 +18,76 @@ pub const MAX_DEPTH: usize = 8;
 pub struct Imports {
     /// Member aliases.
     pub code: Vec<String>,
-    /// Space names (`space:NAME`).
+    /// Space names (`space:NAME`, or the NAME of `space:NAME as ALIAS`).
     pub spaces: Vec<String>,
+    /// (the name main calls it by, the space): `space:NAME` calls NAME, and
+    /// `space:NAME as ALIAS` calls ALIAS (what a renamed import keeps main calling).
+    pub space_aliases: Vec<(String, String)>,
 }
 
-/// Read `@imports a, b, space:NAME` (any line, any comment style).
+/// One `@imports` part: `space:NAME [as ALIAS]` as (NAME, ALIAS).
+fn space_part(part: &str) -> Option<(String, Option<String>)> {
+    let (k, n) = part.split_once(':')?;
+    if !k.trim().eq_ignore_ascii_case("space") || n.trim().is_empty() {
+        return None;
+    }
+    let n = n.trim();
+    match n.split_once(" as ") {
+        Some((t, a)) if !t.trim().is_empty() && !a.trim().is_empty() => Some((t.trim().to_string(), Some(a.trim().to_string()))),
+        _ => Some((n.to_string(), None)),
+    }
+}
+
+fn header(line: &str) -> Option<(usize, usize)> {
+    let i = line.find("@imports")?;
+    let start = i + "@imports".len();
+    let rest = &line[start..];
+    let trimmed = rest.trim_end();
+    let body = trimmed.trim_end_matches("*/").trim_end_matches("-->").trim_end();
+    Some((start, start + body.len()))
+}
+
+/// Read main's `@imports` header lines (`// @imports a, b, space:other`).
 pub fn imports(source: &str) -> Imports {
     let mut out = Imports::default();
     for line in source.lines() {
-        let Some(i) = line.find("@imports") else { continue };
-        let rest = line[i + "@imports".len()..].trim().trim_end_matches("*/").trim_end_matches("-->").trim();
-        for part in rest.split(',').map(str::trim).filter(|p| !p.is_empty()) {
-            match part.split_once(':') {
-                Some((k, n)) if k.trim().eq_ignore_ascii_case("space") && !n.trim().is_empty() => out.spaces.push(n.trim().to_string()),
-                _ => out.code.push(part.to_string()),
+        let Some((a, b)) = header(line) else { continue };
+        for part in line[a..b].split(',').map(str::trim).filter(|p| !p.is_empty()) {
+            match space_part(part) {
+                Some((n, alias)) => {
+                    out.space_aliases.push((alias.unwrap_or_else(|| n.clone()), n.clone()));
+                    out.spaces.push(n);
+                }
+                None => out.code.push(part.to_string()),
             }
         }
     }
     out
+}
+
+/// `source` with space `from` imported as `to` instead (`space:from` becomes
+/// `space:to as from`, so main still calls it `from`); None when it doesn't import it.
+pub fn rename_space_import(source: &str, from: &str, to: &str) -> Option<String> {
+    let mut changed = false;
+    let lines: Vec<String> = source
+        .split_inclusive('\n')
+        .map(|line| {
+            let Some((a, b)) = header(line) else { return line.to_string() };
+            let parts: Vec<String> = line[a..b]
+                .split(',')
+                .map(|part| match space_part(part.trim()) {
+                    Some((n, alias)) if n.eq_ignore_ascii_case(from) => {
+                        changed = true;
+                        let alias = alias.unwrap_or(n);
+                        if alias.eq_ignore_ascii_case(to) { format!(" space:{to}") } else { format!(" space:{to} as {alias}") }
+                    }
+                    _ => part.to_string(),
+                })
+                .collect();
+            format!("{}{}{}", &line[..a], parts.join(","), &line[b..])
+        })
+        .collect();
+    changed.then(|| lines.concat())
 }
 
 fn main_of(store: &Store, s: &Space) -> Result<CodeSpace> {
@@ -323,10 +375,10 @@ pub fn host_call_space(store: &Store, req: &Value) -> Result<Value> {
     let s = top_may_call()?;
     let name = req.get("name").and_then(Value::as_str).ok_or_else(|| Error::invalid("call_space", "give the space's name"))?;
     let main = main_of(store, &s)?;
-    if !imports(&main.source).spaces.iter().any(|a| a.eq_ignore_ascii_case(name)) {
+    let Some((_, target)) = imports(&main.source).space_aliases.into_iter().find(|(a, _)| a.eq_ignore_ascii_case(name)) else {
         return Err(Error::invalid("call_space", format!("space:{name} is not in main's @imports (declare it: `@imports space:{name}`)")));
-    }
-    let t = store.find_space(name)?;
+    };
+    let t = store.find_space(&target)?;
     if t.kind == SpaceKind::IngestConnector {
         return Err(Error::invalid("call_space", format!("{} is an ingest connector; connectors run only from a schedule", t.name)));
     }
@@ -435,5 +487,26 @@ mod tests {
             last = Some(sp);
         }
         assert!(check_cycles(&s, &last.unwrap()).unwrap_err().to_string().contains("deep"));
+    }
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::*;
+
+    #[test]
+    fn space_imports_take_aliases_and_follow_renames() {
+        let i = imports("// @imports dbl, space:a, space:b as bee\nx = 1\n");
+        assert_eq!(i.code, ["dbl"]);
+        assert_eq!(i.spaces, ["a", "b"]);
+        assert_eq!(i.space_aliases, [("a".to_string(), "a".to_string()), ("bee".to_string(), "b".to_string())]);
+        let src = "/* @imports space:a, dbl */\nx = 1\n";
+        let r = rename_space_import(src, "a", "a-imported").unwrap();
+        assert_eq!(r, "/* @imports space:a-imported as a, dbl */\nx = 1\n");
+        assert_eq!(imports(&r).space_aliases, [("a".to_string(), "a-imported".to_string())]);
+        // an alias is kept; renaming back to the alias drops it; others are untouched
+        assert_eq!(rename_space_import("// @imports space:b as bee", "b", "b2").unwrap(), "// @imports space:b2 as bee");
+        assert_eq!(rename_space_import("// @imports space:b as bee", "b", "bee").unwrap(), "// @imports space:bee");
+        assert!(rename_space_import(src, "zzz", "y").is_none());
     }
 }

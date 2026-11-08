@@ -8,6 +8,7 @@ run spaces (`space:NAME`); a plain code is no longer run on its own by a pipelin
   (`// @imports dbl, space:tenx`) and calls a member with `host.call("dbl", args)` and
   another space with `host.call_space("tenx", args)` (Rust SDK 1.2:
   `Host::call_code` / `Host::call_space`). Cycles and depth over 8 are refused.
+  `space:NAME as ALIAS` imports space NAME under the name main calls it by.
 - **Approval covers the line-up.** `mnnn spaces approve NAME` approves main, the kind, the
   members and the imports at once. Adding, removing or changing main asks again.
 - **Members follow their code.** Editing a member runs the edited code at once; the space
@@ -36,7 +37,10 @@ and every member's code; they arrive unapproved, a clash lands as `NAME-imported
 A code space goes everywhere code goes, and takes what code takes. What moves is always the
 space file (`muninn-space`): the space, the spaces its main imports and every member's code
 by trust hash. It lands **unapproved**, **pins kept**; the same line-up is reused, a
-different space of that name lands as `NAME-imported`.
+different space of that name lands as `NAME-imported`, and the file's (or pack's) mains
+that import it are rewritten to follow it: `space:NAME` becomes `space:NAME-imported as
+NAME`, so their calls don't change (a main pinned as shared stays pinned). The dry run
+lists each rewrite.
 
 | Path | CLI | TUI |
 |------|-----|-----|

@@ -101,22 +101,65 @@ pub fn plan(store: &Store, b: &Bundle, name: Option<&str>) -> Result<Plan> {
         }
     }
     let mut problems = vec![];
-    for (from, to, _) in &spaces {
-        if from != to
-            && b.spaces.iter().any(|s| {
-                s.name != *from && b.code.iter().any(|c| c.name == s.main && crate::code::spaces::imports(&c.source).spaces.iter().any(|x| x == from))
-            })
+    let mut code = code;
+    // a rewritten main changes its space's line-up, which may rename that space too
+    for _ in 0..crate::code::spaces::MAX_DEPTH {
+        let Some(r) = rewritten(b, &spaces)? else { break };
+        code = plan_code(store, &r.0.code)?;
+        let mut again = plan_spaces(store, &r.0.spaces, &code)?;
+        // keep the name the shared space was given
+        if let (Some(x), Some(given)) = (again.iter_mut().find(|(x, _, _)| *x == b.name), spaces.iter().find(|(x, _, _)| *x == b.name))
+            && name.is_some()
         {
-            problems.push(format!("space {from} lands as {to}, but a main imports it as {from}: edit that main's @imports"));
+            *x = given.clone();
         }
+        if again == spaces {
+            problems.extend(r.1.iter().map(|(main, imports)| format!("main {main}: @imports rewritten ({})", imports.join(", "))));
+            break;
+        }
+        spaces = again;
     }
     Ok(Plan { code, spaces, problems })
 }
 
+/// Per main code, what its `@imports` rewrite changed.
+pub type Rewrites = Vec<(String, Vec<String>)>;
+
+/// The bundle with its mains' `@imports` following spaces that land under another name
+/// (`space:A` → `space:A-imported as A`, so main's calls are unchanged; pinned members
+/// pin the rewritten code), and per main what changed. None when nothing is renamed.
+pub fn rewritten(b: &Bundle, spaces: &[(String, String, String)]) -> Result<Option<(Bundle, Rewrites)>> {
+    let renames: Vec<(&String, &String)> = spaces.iter().filter(|(a, t, _)| a != t).map(|(a, t, _)| (a, t)).collect();
+    if renames.is_empty() {
+        return Ok(None);
+    }
+    let mut out = b.clone();
+    let mut notes: Vec<(String, Vec<String>)> = vec![];
+    let mains: std::collections::BTreeSet<String> = b.spaces.iter().map(|s| s.main.clone()).collect();
+    for c in out.code.iter_mut().filter(|c| mains.contains(&c.name)) {
+        let mut src = c.source.clone();
+        let mut what = vec![];
+        for (from, to) in &renames {
+            if let Some(s) = crate::code::spaces::rename_space_import(&src, from, to) {
+                src = s;
+                what.push(format!("space:{from} → space:{to} as {from}"));
+            }
+        }
+        if !what.is_empty() {
+            c.hash = trust_hash_of(c.lang, &src)?;
+            c.source = src;
+            notes.push((c.name.clone(), what));
+        }
+    }
+    Ok(if notes.is_empty() { None } else { Some((out, notes)) })
+}
+
 /// Import: code and spaces created unapproved (pins kept); returns the shared space.
 pub fn import(store: &Store, b: &Bundle, plan: &Plan) -> Result<Space> {
-    land_code(store, &b.code, &plan.code)?;
-    land_spaces(store, &b.spaces, &plan.code, &plan.spaces)?;
+    let r = rewritten(b, &plan.spaces)?;
+    let b2 = r.as_ref().map(|r| &r.0).unwrap_or(b);
+    land_code(store, &b2.code, &plan.code)?;
+    land_spaces(store, &b2.spaces, &plan.code, &plan.spaces)?;
     store.find_space(&plan.landed(b))
 }
 

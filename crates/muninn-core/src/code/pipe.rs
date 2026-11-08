@@ -181,6 +181,35 @@ fn col_frame(name: &str, cols: Vec<(&str, &str, Vec<Value>)>, ids: Vec<String>, 
     json!({ "model": name, "fields": fields, "ids": ids, "columns": columns, "groups": groups })
 }
 
+/// A rule's triggering action as a one-row frame: `action`, `id`, `summary`, then each
+/// top-level param (non-scalars as JSON text).
+pub fn action_frame(a: &crate::store::ActionRecord) -> Value {
+    let ty = |v: &Value| match v {
+        Value::Number(n) if n.is_i64() => "integer",
+        Value::Number(_) => "real",
+        Value::Bool(_) => "boolean",
+        _ => "text",
+    };
+    let mut cols: Vec<(String, &str, Vec<Value>)> = vec![
+        ("action".into(), "text", vec![json!(a.kind)]),
+        ("id".into(), "integer", vec![json!(a.id)]),
+        ("summary".into(), "text", vec![json!(a.summary)]),
+    ];
+    if let Some(m) = a.params.as_object() {
+        for (k, v) in m {
+            if cols.iter().any(|(n, _, _)| n == k) {
+                continue;
+            }
+            let v = match v {
+                Value::Array(_) | Value::Object(_) => json!(v.to_string()),
+                v => v.clone(),
+            };
+            cols.push((k.clone(), ty(&v), vec![v]));
+        }
+    }
+    col_frame(&format!("action:{}", a.kind), cols.iter().map(|(n, t, v)| (n.as_str(), *t, v.clone())).collect(), vec![a.id.to_string()], vec![])
+}
+
 fn entries_frame(name: &str, es: Vec<(String, crate::store::Entry)>) -> Value {
     let c = |f: &dyn Fn(&(String, crate::store::Entry)) -> Value| es.iter().map(f).collect::<Vec<_>>();
     col_frame(

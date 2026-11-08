@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Fixed
+- `cargo clippy --workspace --all-targets` is clean (tests/site.rs, muninn-ffi; no behavior change)
+
 ### Added
 - Plugin SDK 1.3 (`muninn-plugin`, now publishable to crates.io): typed ingest-connector host methods `context()`, `store_raw(name, format, bytes)`, `pipe()`, `run_ruleset(Option<id>)`, `fetch(&Request)`, `state_get`/`state_set`, and `plugin!(run, kind = "…")` declaring a kind in the plugin's info. Outside a connector run they say where they work (the v2.26 scheduler or a dry run)
 - `mnnn spaces run NAME --connector-dry-run` (`--source`, `--pipeline`, `--ruleset`, `--option`, `--state`): runs an ingest-connector space with an in-memory context that records store_raw, pipe and run_ruleset instead of doing them; `fetch` is real
@@ -13,6 +16,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Code spaces are now collections of code: a kind, a main and members (`mnnn spaces`, aliases `code-spaces`, `space`). Main calls members and other spaces (`host.call`, `host.call_space`; SDK 1.2.0) with cycle and depth-8 checks; one approval covers the line-up; edited members run at once and show as unreviewed; pins are opt-in
 - `space:NAME` pipeline steps and sources
 - Rules: a `run-space SPACE` action (CLI, TUI rule editor, ffi) runs a code space with every check `spaces run` makes; project packs carry the space
+- `@imports space:NAME as ALIAS`; a space imported as `NAME-imported` (space files, network/org shares, project packs) rewrites the importing mains in the same file or pack to `space:NAME-imported as NAME` instead of only warning
+- `run-space SPACE input=action|SOURCE`: pass the triggering action (a one-row frame) or any pipeline source (templates filled) to the space; dry runs name the input
 - `pipe - --format csv|json|ndjson` runs the built-in parser as a code space (made on first use, or the one `mnnn migrate` made)
 - Code spaces as project items (`mnnn project add --space`); project packs and pipeline files carry spaces with their members' code (imported unapproved, pins kept)
 - Code spaces share everywhere code does: `mnnn share space …` (project, journal, space, net), data shared *into* a space (`share KIND X space NAME`), `mnnn spaces export|import` (the `muninn-space` file), the network (peers receive the line-up and member code), org resources, `org give`, `--kind space` endpoints, `org code serve|stop --space`, and org code sync. Imports arrive unapproved with pins kept; a clash lands as `NAME-imported`

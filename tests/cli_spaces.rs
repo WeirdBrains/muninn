@@ -275,3 +275,76 @@ fn connector_template_and_dry_run_flags() {
     // the context flags need --connector-dry-run
     assert!(!e.run(&["spaces", "run", "feedsp", "--pipeline", "p"]).status.success());
 }
+
+/// `top`'s main imports space `inner`; where `inner` already exists (a different one), it
+/// lands as `inner-imported` and `top`'s main follows it.
+fn top_and_inner(e: &Env) {
+    math(e, "innerc", "y = 2\n");
+    math(e, "topc", "// @imports space:inner\nx = 1\n");
+    e.ok(&["spaces", "create", "inner", "--kind", "analysis", "--main", "innerc"]);
+    e.ok(&["spaces", "create", "top", "--kind", "analysis", "--main", "topc"]);
+    e.ok(&["spaces", "pin", "top", "topc"]);
+}
+
+fn clashing() -> Env {
+    let c = Env::new();
+    math(&c, "z", "z = 1\n");
+    c.ok(&["spaces", "create", "inner", "--kind", "analysis", "--main", "z"]);
+    c
+}
+
+#[test]
+fn renamed_imports_are_rewritten_in_the_mains_that_import_them() {
+    let a = Env::new();
+    top_and_inner(&a);
+    let file = a.home().join("top.json");
+    let f = file.to_str().unwrap();
+    a.ok(&["spaces", "export", "top", "--out", f]);
+
+    let c = clashing();
+    let plan = c.ok(&["spaces", "import", f, "--dry-run"]);
+    assert!(plan.contains("inner → inner-imported") && plan.contains("@imports rewritten (space:inner → space:inner-imported as inner)"), "{plan}");
+    c.ok(&["-y", "spaces", "import", f]);
+    let top = json(&c.ok(&["spaces", "show", "top", "--json"]));
+    let main = top["main"].as_str().unwrap().to_string();
+    let src = c.ok(&["code", "show", &main]);
+    assert!(src.contains("@imports space:inner-imported as inner"), "{src}");
+    // the pin follows the rewritten main, and the existing inner is untouched
+    assert!(top["members"].as_array().unwrap().iter().any(|m| m["code"] == main.as_str() && !m["pin"].is_null()), "{top}");
+    let s = c.ok(&["spaces", "show", "top"]);
+    assert!(!s.contains("changed since pinned"), "{s}");
+    assert_eq!(json(&c.ok(&["spaces", "show", "inner", "--json"]))["main"], "z");
+
+    // without a clash nothing is rewritten
+    let d = Env::new();
+    let plan = d.ok(&["spaces", "import", f, "--dry-run"]);
+    assert!(!plan.contains("rewritten"), "{plan}");
+}
+
+#[test]
+fn project_packs_carry_a_rules_space_and_rewrite_renamed_imports() {
+    let a = Env::new();
+    top_and_inner(&a);
+    a.ok(&["project", "create", "Lab"]);
+    a.ok(&["rule", "create", "Crunch", "--on", "import", "--then", "run-space top input=action", "--project", "Lab"]);
+    let pack = a.home().join("lab.mnnnp");
+    a.ok(&["project", "export", "Lab", "--out", pack.to_str().unwrap()]);
+
+    // round trip: the rule's space (and the space it imports) come with the pack
+    let b = Env::new();
+    let msg = b.ok(&["project", "import", pack.to_str().unwrap()]);
+    assert!(msg.contains("code spaces (to approve)"), "{msg}");
+    let list = b.ok(&["spaces", "list"]);
+    assert!(list.contains("top") && list.contains("inner"), "{list}");
+    let r = b.ok(&["rule", "show", "Crunch"]);
+    assert!(r.contains("run-space top input=action"), "{r}");
+
+    // a clash: inner lands as inner-imported and top's main follows it
+    let c = clashing();
+    let msg = c.ok(&["project", "import", pack.to_str().unwrap()]);
+    assert!(msg.contains("@imports rewritten"), "{msg}");
+    let top = json(&c.ok(&["spaces", "show", "top", "--json"]));
+    let src = c.ok(&["code", "show", top["main"].as_str().unwrap()]);
+    assert!(src.contains("@imports space:inner-imported as inner"), "{src}");
+    assert!(!c.ok(&["spaces", "show", "top"]).contains("changed since pinned"));
+}

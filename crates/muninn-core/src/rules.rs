@@ -686,7 +686,17 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
             _ => return Err(bad("run-code takes one code".into())),
         },
         "run-space" | "space" => match pos.as_slice() {
-            [n] => Then::RunSpace { space: store.find_space(n)?.id },
+            [n] => {
+                let input = take(&mut kv, "input");
+                if let Some(i) = &input
+                    && i != "action"
+                    && !i.contains('{')
+                    && crate::code::pipe::Source::parse(i).map_err(|e| bad(format!("input: {e}")))? == crate::code::pipe::Source::Stdin
+                {
+                    return Err(bad("input: `-` (standard input) can't feed a rule".into()));
+                }
+                Then::RunSpace { space: store.find_space(n)?.id, input }
+            }
             _ => return Err(bad("run-space takes one code space".into())),
         },
         v => {
@@ -780,7 +790,12 @@ pub fn then_text(store: &Store, t: &Then) -> String {
             w.extend(args.iter().map(|(k, v)| format!("{k}={}", quote(&crate::designer::value_text(v)))));
         }
         Then::RunCode { space } => w.push(quote(&name_of(store, ItemKind::Code, space))),
-        Then::RunSpace { space } => w.push(quote(&name_of(store, ItemKind::Space, space))),
+        Then::RunSpace { space, input } => {
+            w.push(quote(&name_of(store, ItemKind::Space, space)));
+            if let Some(i) = input {
+                w.push(format!("input={}", quote(i)));
+            }
+        }
         Then::CertWatch { renew_days, notify_days } => {
             w.push(format!("renew={renew_days}"));
             w.push(format!("notify={}", notify_days.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(",")));
@@ -1248,10 +1263,28 @@ pub fn plan(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
                 if store.mcp_approved(&srv.id, tool)? { "" } else { " — not approved yet, so it would fail" }
             )
         }
-        Then::RunSpace { space } => {
+        Then::RunSpace { space, input } => {
             let s = space_of(store, space)?;
-            let why = crate::code::spaces::ready_main(store, &s).err().map(|e| format!(" — {e}, so it would fail")).unwrap_or_default();
-            format!("run code space {} ({}, main {}){why}", s.name, s.kind, store.code_space(&s.main_code_id)?.map(|c| c.name).unwrap_or_default())
+            let mut why = crate::code::spaces::ready_main(store, &s).err().map(|e| format!(" — {e}, so it would fail")).unwrap_or_default();
+            let over = match input.as_deref() {
+                None => "main's own input".to_string(),
+                Some("action") => format!("the {} action (#{})", a.kind, a.id),
+                Some(i) => {
+                    let i = expand(store, r, a, i);
+                    if why.is_empty()
+                        && let Err(e) = crate::code::pipe::Source::parse(&i)
+                    {
+                        why = format!(" — input {i}: {e}, so it would fail");
+                    }
+                    i
+                }
+            };
+            format!(
+                "run code space {} ({}, main {}) over {over}{why}",
+                s.name,
+                s.kind,
+                store.code_space(&s.main_code_id)?.map(|c| c.name).unwrap_or_default()
+            )
         }
         Then::RunCode { space } => {
             let c = code_space(store, space)?;
@@ -1472,14 +1505,23 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
             let t: String = t.chars().take(200).collect();
             Ok(format!("{}/{tool}: {}", srv.name, t.lines().next().unwrap_or_default()))
         }
-        Then::RunSpace { space } => {
+        Then::RunSpace { space, input } => {
             let s = space_of(store, space)?;
             // refuse before building anything; spaces::run checks again (with cycles and depth)
             crate::code::spaces::ready_main(store, &s).map_err(|e| Error::invalid("run-space", e.to_string()))?;
             let env = crate::code::CodeEnv::for_store(store)?;
             let main =
                 store.code_space(&s.main_code_id)?.ok_or_else(|| Error::invalid("run-space", format!("{}: its main code is missing", s.name)))?;
-            let frame = crate::code::pipe::frame(store, &env, ORIGIN, &crate::code::pipe::Source::of(main.input.clone()), &mut |_| {})?;
+            use crate::code::pipe::{self, Source};
+            let src = match input.as_deref() {
+                None => Source::of(main.input.clone()),
+                Some("action") => Source::Frame(pipe::action_frame(a)),
+                Some(i) => match Source::parse(&expand(store, r, a, i)).map_err(|e| Error::invalid("run-space", format!("input: {e}")))? {
+                    Source::Stdin => return Err(Error::invalid("run-space", "input: `-` (standard input) can't feed a rule")),
+                    s => s,
+                },
+            };
+            let frame = pipe::frame(store, &env, ORIGIN, &src, &mut |_| {})?;
             // every check of running a space: enabled, line-up approved, pins, cycles, depth
             let info = crate::code::spaces::run(store, &env, ORIGIN, &s, frame, &format!("rule {}", r.name), &mut |_| {})
                 .map_err(|e| Error::invalid("run-space", e.to_string()))?;
@@ -2327,8 +2369,8 @@ mod tests {
         let sp = crate::code::spaces::create(&s, "test", "pair", "", SpaceKind::Analysis, &main).unwrap();
         s.add_space_member(&sp.id, &dbl, None, None).unwrap();
         // parse and text round-trip; `space` is a short form; unknown spaces are refused
-        assert_eq!(parse_then(&s, "run-space pair").unwrap(), Then::RunSpace { space: sp.id.clone() });
-        assert_eq!(parse_then(&s, "space pair").unwrap(), Then::RunSpace { space: sp.id.clone() });
+        assert_eq!(parse_then(&s, "run-space pair").unwrap(), Then::RunSpace { space: sp.id.clone(), input: None });
+        assert_eq!(parse_then(&s, "space pair").unwrap(), Then::RunSpace { space: sp.id.clone(), input: None });
         assert!(parse_then(&s, "run-space nope").is_err() && parse_then(&s, "run-space").is_err());
         let r = rule(&s, "import", &[], &["run-space pair"]);
         assert_eq!(then_text(&s, &r.spec.then[0]), "run-space pair");
@@ -2358,6 +2400,22 @@ mod tests {
         assert!(e.contains("approve"), "{e}");
         // the space's history names it as the subject
         assert!(s.find_space("pair").is_ok());
+        // input: the triggering action, or a pipeline source (templates filled); `-` is refused
+        assert!(parse_then(&s, "run-space pair input=-").is_err());
+        assert!(parse_then(&s, "run-space pair input=search:").is_err());
+        let ra = rule(&s, "import", &[], &["run-space pair input=action"]);
+        assert_eq!(ra.spec.then[0], Then::RunSpace { space: sp.id.clone(), input: Some("action".into()) });
+        assert_eq!(then_text(&s, &ra.spec.then[0]), "run-space pair input=action");
+        assert!(plan(&s, &ra, &a, &ra.spec.then[0]).unwrap().contains(&format!("over the import action (#{})", a.id)));
+        let rj = rule(&s, "import", &[], &["run-space pair input=journal:{name}"]);
+        let a2 = act(&s, "import", json!({ "name": "Lab" }));
+        let p = plan(&s, &rj, &a2, &rj.spec.then[0]).unwrap();
+        assert!(p.contains("over journal:Lab"), "{p}");
+        assert_eq!(then_text(&s, &rj.spec.then[0]), "run-space pair input=journal:{name}");
+        // the trigger as a one-row frame
+        let f = crate::code::pipe::action_frame(&a2);
+        assert_eq!(f["columns"]["name"], json!(["Lab"]));
+        assert_eq!(f["columns"]["action"], json!(["import"]));
     }
 
     #[test]

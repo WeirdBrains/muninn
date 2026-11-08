@@ -144,6 +144,8 @@ pub struct Restored {
     pub code: usize,
     /// Code spaces brought in (their line-ups need approving).
     pub spaces: usize,
+    /// Mains whose `@imports` were rewritten to follow a space landed as NAME-imported.
+    pub rewritten: usize,
     pub bars: u64,
     pub authors_added: usize,
 }
@@ -175,6 +177,9 @@ impl Restored {
             }
             if self.spaces > 0 {
                 v.push(n(self.spaces as u64, "code space (to approve)", "code spaces (to approve)"));
+            }
+            if self.rewritten > 0 {
+                v.push(n(self.rewritten as u64, "main's @imports rewritten", "mains' @imports rewritten"));
             }
             v.push(n(self.bars, "new bar", "new bars"));
         }
@@ -439,7 +444,7 @@ impl Store {
         // code spaces it uses (items, and the spaces their mains import): line-ups and code
         let mut space_todo: Vec<String> = items.iter().filter(|i| i.kind == ItemKind::Space).map(|i| i.ref_id.clone()).collect();
         space_todo.extend(rules.iter().flat_map(|r| r.spec.then.iter()).filter_map(|t| match t {
-            Then::RunSpace { space } => Some(space.clone()),
+            Then::RunSpace { space, .. } => Some(space.clone()),
             _ => None,
         }));
         let mut spaces: Vec<SpacePack> = vec![];
@@ -748,6 +753,7 @@ impl Store {
             ids.insert(c.id.clone(), nc.id);
             out.code += 1;
         }
+        let mut renamed: Vec<(String, String)> = vec![];
         for sp in &p.spaces {
             let Some(main) = ids.get(&sp.space.main_code_id).and_then(|id| self.code_space(id).ok().flatten()) else { continue };
             let mut name = sp.space.name.clone();
@@ -768,8 +774,37 @@ impl Store {
                     self.add_space_member(&ns.id, &c, Some(&m.alias), m.pin_hash.as_deref())?;
                 }
             }
+            if name != sp.space.name {
+                renamed.push((sp.space.name.clone(), name.clone()));
+            }
             ids.insert(sp.space.id.clone(), ns.id);
             out.spaces += 1;
+        }
+        // a space that landed as NAME-imported: the pack's mains importing it follow it
+        // (`space:A` → `space:A-imported as A`); a main pinned as packed stays pinned
+        if !renamed.is_empty() {
+            for sp in &p.spaces {
+                let (Some(nsid), Some(mid)) = (ids.get(&sp.space.id), ids.get(&sp.space.main_code_id)) else { continue };
+                let Some(main) = self.code_space(mid)? else { continue };
+                let mut src = main.source.clone();
+                for (from, to) in &renamed {
+                    if let Some(s) = crate::code::spaces::rename_space_import(&src, from, to) {
+                        src = s;
+                    }
+                }
+                if src == main.source {
+                    continue;
+                }
+                let old = crate::code::trust_hash(&main)?;
+                let c = self.update_code_space(&main.id, &super::CodeChange { source: Some(src), ..Default::default() })?;
+                let new = crate::code::trust_hash(&c)?;
+                for m in self.space_members(nsid)? {
+                    if m.code_id == c.id && m.pin_hash.as_deref() == Some(old.as_str()) {
+                        self.set_member_pin(nsid, &c.id, Some(&new))?;
+                    }
+                }
+                out.rewritten += 1;
+            }
         }
         for s in &p.live_searches {
             let nid = super::new_id();
@@ -993,7 +1028,7 @@ fn remap_then(t: &mut Then, map: &dyn Fn(&str) -> String) {
     match t {
         Then::Status { .. } | Then::CertWatch { .. } | Then::Notify { .. } | Then::Broadcast { .. } | Then::Mcp { .. } => {}
         Then::RunSearch { search } => opt(search),
-        Then::RunCode { space } | Then::RunSpace { space } => *space = map(space),
+        Then::RunCode { space } | Then::RunSpace { space, .. } => *space = map(space),
         Then::ExportReport { report, .. } => *report = map(report),
         Then::ExportJournal { journal, .. } | Then::WriteEntry { journal, .. } | Then::AddNote { journal, .. } => opt(journal),
         Then::AddToProject { project, item } => {

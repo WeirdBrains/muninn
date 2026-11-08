@@ -244,7 +244,16 @@ pub enum Then {
     RunCode { space: String },
     /// Run a code space (2.23+): its main over the main's input, calling its members, with
     /// the same checks as `mnnn spaces run` (enabled, line-up approved, pins, cycles, depth).
-    RunSpace { space: String },
+    ///
+    /// `input` (2.23+): `action` passes the triggering action as a one-row frame (its
+    /// kind, id and params); anything else is a pipeline source (`search:NAME`,
+    /// `journal:NAME`, `space:NAME`, `source:NAME`, a model query), `{field}` templates
+    /// filled first. None runs main over its own input.
+    RunSpace {
+        space: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        input: Option<String>,
+    },
     /// Check org certificates (2.16, the built-in `cert-expiry-watch`): ACME ones with fewer
     /// than `renew_days` left are renewed by the host; your own notify at `notify_days`
     /// and on expiry. See [`crate::org::tls::watch`].

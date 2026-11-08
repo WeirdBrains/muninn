@@ -133,6 +133,6 @@ fn the_rule_editor_takes_run_space() {
     typ(&mut a, "run-space pair\n\n");
     let all = a.store.rules().unwrap();
     assert_eq!(all.len(), 1, "{:?}", a.rules.msg);
-    assert_eq!(all[0].spec.then[0], crate::store::Then::RunSpace { space: sp.id });
+    assert_eq!(all[0].spec.then[0], crate::store::Then::RunSpace { space: sp.id, input: None });
     assert!(screen_text(&mut a).contains("run-space pair"));
 }
