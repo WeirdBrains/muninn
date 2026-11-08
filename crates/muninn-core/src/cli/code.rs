@@ -436,11 +436,11 @@ pub fn pipe(ctx: &Ctx, a: super::args::PipeArgs) -> anyhow::Result<()> {
         }
         let b =
             code::parsers::for_format(f).ok_or_else(|| anyhow::anyhow!("--format {f}: csv, json or ndjson (or put your own parser step first)"))?;
-        let (c, new) = code::parsers::install(&store, "cli", b)?;
+        let (s, new) = code::parsers::install_space(&store, "cli", b)?;
         if new {
-            ctx.io.note(format!("installed the built-in parser {} (`mnnn code show {}`)", c.name, c.name));
+            ctx.io.note(format!("installed the built-in parser {} as a code space (`mnnn spaces show {}`)", b.name, s.name));
         }
-        steps.insert(0, code::pipe::Step::Code(c.name));
+        steps.insert(0, code::pipe::Step::Space(s.name));
     }
     let to = a.to.iter().map(|s| code::pipe::Sink::parse(s)).collect::<crate::Result<Vec<_>>>()?;
     let keep_header = a.keep_header || a.format.as_deref().is_some_and(|f| f.eq_ignore_ascii_case("csv"));

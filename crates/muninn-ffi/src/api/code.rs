@@ -484,8 +484,8 @@ fn apply_pipe_format(store: &Store, src: &code::pipe::Source, format: Option<&st
         return Err(anyhow::anyhow!("--format parses standard input: use it with `-`"));
     }
     let b = code::parsers::for_format(f).ok_or_else(|| anyhow::anyhow!("--format {f}: csv, json or ndjson (or put your own parser step first)"))?;
-    let (c, _) = code::parsers::install(store, ORIGIN, b)?;
-    steps.insert(0, code::pipe::Step::Code(c.name));
+    let (s, _) = code::parsers::install_space(store, ORIGIN, b)?;
+    steps.insert(0, code::pipe::Step::Space(s.name));
     Ok(())
 }
 
@@ -498,6 +498,17 @@ fn approve_pipe_spaces(store: &Store, src: &code::pipe::Source, steps: &[code::p
     for n in &names {
         let c = store.find_code_space(n)?;
         approve_if_needed(store, &c)?;
+    }
+    let mut spaces: Vec<String> =
+        steps.iter().filter_map(|s| if let code::pipe::Step::Space(n) = s { Some(code::split_options(n).0) } else { None }).collect();
+    if let code::pipe::Source::Space(n) = src {
+        spaces.push(code::split_options(n).0);
+    }
+    for n in &spaces {
+        let s = store.find_space(n)?;
+        if !code::spaces::approved(store, &s) {
+            code::spaces::approve(store, ORIGIN, &s, true)?;
+        }
     }
     Ok(())
 }

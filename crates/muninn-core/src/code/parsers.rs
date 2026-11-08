@@ -48,6 +48,27 @@ pub fn install(store: &Store, origin: &str, b: &Builtin) -> Result<(CodeSpace, b
     Ok((c, true))
 }
 
+/// The code space of a built-in (`--format`): its code installed as above, in a space of
+/// the same name (kind parser; to-bars is a transform). An existing space whose main is that
+/// code is used as it is (e.g. one `mnnn migrate` made, maybe `NAME-migration`).
+pub fn install_space(store: &Store, origin: &str, b: &Builtin) -> Result<(crate::store::Space, bool)> {
+    let (c, _) = install(store, origin, b)?;
+    if let Ok(s) = store.find_space(b.name)
+        && s.main_code_id == c.id
+    {
+        return Ok((s, false));
+    }
+    if let Some(s) = store.spaces_of_code(&c.id)?.into_iter().find(|s| s.main_code_id == c.id) {
+        return Ok((s, false));
+    }
+    let kind = if b.name == "to-bars" { crate::store::SpaceKind::Transform } else { crate::store::SpaceKind::Parser };
+    let mut name = b.name.to_string();
+    if store.space_name_taken(&name)? {
+        name = format!("{}-migration", b.name);
+    }
+    Ok((super::spaces::create(store, origin, &name, b.about, kind, &c)?, true))
+}
+
 /// Raw text as a frame: one row, one `text` column, nothing parsed.
 pub fn raw_frame(text: &str, name: &str) -> serde_json::Value {
     serde_json::json!({ "model": name, "fields": [{ "name": "text", "type": "text" }], "ids": ["0"], "columns": { "text": [text] }, "groups": [] })

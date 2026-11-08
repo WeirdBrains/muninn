@@ -107,7 +107,7 @@ fn standard_input_is_a_pipe_source_in_one_go_or_in_chunks() {
     let o =
         feed(&["-y", "pipe", "-", "journal:Feed", "--to", "model:Ticks", "--json", "--format", "csv"], "sym,px\n\"BTC, spot\",42000.5\nETH,3000\n");
     assert!(o.status.success(), "{}", err(&o));
-    assert!(err(&o).contains("code:parse-csv"), "{}", err(&o));
+    assert!(err(&o).contains("space parse-csv"), "{}", err(&o));
     let j: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
     assert_eq!(nums(&j["output"]["columns"]["px"]), vec![42000.5, 3000.0], "{j}");
     assert_eq!(j["output"]["columns"]["sym"][0], "BTC, spot", "{j}");
