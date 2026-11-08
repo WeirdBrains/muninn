@@ -15,6 +15,15 @@ pub fn item(app: &App) -> Option<(ShareKind, String, String)> {
             None => get(app.models.list.get(app.models.sel).map(|m| (m.id.as_str(), m.name.as_str())), ShareKind::Model),
         },
         Modal::Code => get(app.code.list.get(app.code.sel).map(|c| (c.id.as_str(), c.name.as_str())), ShareKind::Code),
+        Modal::Spaces => {
+            let st = &app.spaces;
+            let s = match st.screen {
+                super::spaces::Screen::Members => st.open.as_ref(),
+                super::spaces::Screen::List => st.list.get(st.sel),
+                super::spaces::Screen::Migrate => None,
+            };
+            get(s.map(|s| (s.id.as_str(), s.name.as_str())), ShareKind::Space)
+        }
         Modal::Journals => get(app.journals.list.get(app.journals.sel).map(|j| (j.id.as_str(), j.name.as_str())), ShareKind::Journal),
         Modal::Searches => get(app.searches.list.get(app.searches.sel).map(|(s, _)| (s.id.as_str(), s.name.as_str())), ShareKind::LiveSearch),
         Modal::Reports => get(app.reports.list.get(app.reports.sel).map(|r| (r.id.as_str(), r.name.as_str())), ShareKind::Report),
@@ -54,6 +63,11 @@ pub fn choices(app: &App, kind: ShareKind, id: &str) -> Vec<String> {
                 .code_spaces()
                 .map(|l| l.into_iter().filter(|c| !(kind == ShareKind::Code && c.id == id)).map(|c| c.name).collect())
                 .unwrap_or_default(),
+            TargetKind::Space => app
+                .store
+                .spaces()
+                .map(|l| l.into_iter().filter(|s| !(kind == ShareKind::Space && s.id == id)).map(|s| s.name).collect())
+                .unwrap_or_default(),
             TargetKind::Net => vec!["all exchanges".into()],
         };
         v.extend(names.into_iter().map(|n| format!("{} · {n}", t.as_str())));
@@ -87,6 +101,13 @@ pub fn picked(app: &mut App, row: &str) {
                 app.set_status(s.summary());
                 super::code::open_space(app, &s.made);
                 super::code::run_piped(app, src, &s.summary());
+            }
+            Err(e) => app.set_status(format!("share: {e}")),
+        },
+        Ok(s) if t == TargetKind::Space => match crate::share::source_for(kind, &s.item, &s.name) {
+            Ok(src) => {
+                app.set_status(s.summary());
+                super::spaces::run_piped(app, &s.made, src, &s.summary());
             }
             Err(e) => app.set_status(format!("share: {e}")),
         },

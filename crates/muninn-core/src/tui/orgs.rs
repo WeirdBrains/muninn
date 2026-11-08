@@ -600,7 +600,7 @@ fn finish_ask(app: &mut App, kind: OAsk, v: String) {
             let Some(o) = app.orgs.current().cloned() else { return };
             let (k, name) = v.split_once(' ').map(|(a, b)| (a.trim(), b.trim())).unwrap_or((v.as_str(), ""));
             let Some(kind) = ShareKind::parse(k) else {
-                return err(app, format!("what kind is {k:?}? model, search, journal, project, report or code"));
+                return err(app, format!("what kind is {k:?}? model, search, journal, project, report, code or space"));
             };
             let r = org::transfer(&app.store, ORIGIN, &OWNER, &o, kind, name, None);
             done(app, r, |(r, _)| format!("{} {} belongs to {}", kind.label(), r.name, o.name));

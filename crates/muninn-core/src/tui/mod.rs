@@ -1368,6 +1368,8 @@ mod rules_tests;
 #[cfg(test)]
 mod screenshots;
 #[cfg(test)]
+mod spaces_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod workspace_tests;

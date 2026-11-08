@@ -54,6 +54,49 @@ pub fn open(app: &mut App) {
     app.modal = Some(super::modal::Modal::Spaces);
 }
 
+/// Back from picking a project: the window as it was.
+pub fn reopen(app: &mut App) {
+    reload(app);
+    app.modal = Some(super::modal::Modal::Spaces);
+}
+
+fn add_to_project(app: &mut App, s: &Space) {
+    use super::workspace::{Back, Purpose, pick_project};
+    pick_project(app, Purpose::Add(crate::store::ItemKind::Space, s.id.clone(), serde_json::json!({}), s.name.clone()), Back::Spaces);
+}
+
+/// `g`: give the space to one of your organizations (it then syncs to the org's nodes).
+fn give(app: &mut App, s: &Space) {
+    let orgs: Vec<String> = app.store.orgs().map(|l| l.into_iter().map(|o| o.name).collect()).unwrap_or_default();
+    if orgs.is_empty() {
+        app.spaces.msg = Some(("you have no organizations yet (Orgs ▸ New organization…)".into(), true));
+        return;
+    }
+    app.share_back = app.modal.take().map(Box::new);
+    app.share_item = Some((crate::store::ShareKind::Space, s.id.clone()));
+    app.modal = Some(super::modal::Modal::Pick {
+        title: format!("Give code space {} to", s.name),
+        items: orgs,
+        sel: 0,
+        kind: super::modal::PickKind::GiveSpace,
+    });
+}
+
+/// The organization was picked.
+pub fn give_picked(app: &mut App, org: &str) {
+    let back = app.share_back.take().map(|b| *b);
+    let Some((_, id)) = app.share_item.take() else { return };
+    app.modal = back;
+    let r = app.store.find_org(org).and_then(|o| {
+        crate::org::transfer(&app.store, "tui", &crate::org::Actor::Owner, &o, crate::store::ShareKind::Space, &id, None).map(|_| o.name)
+    });
+    app.spaces.msg = Some(match r {
+        Ok(o) => (format!("gave it to {o} · members sync it with `mnnn org sync-code`"), false),
+        Err(e) => (e.to_string(), true),
+    });
+    app.refresh_history(true);
+}
+
 /// One space's members (from a project item).
 pub fn open_space(app: &mut App, id: &str) {
     open(app);
@@ -90,12 +133,27 @@ fn selected(app: &App) -> Option<Space> {
 }
 
 fn run_space(app: &mut App, s: &Space) {
+    run_space_on(app, s, None);
+}
+
+/// Shared data into a space (Share ▸ space · NAME): open its members and run it over the
+/// data once its line-up is approved (the space is not changed).
+pub fn run_piped(app: &mut App, space_id: &str, src: code::pipe::Source, what: &str) {
+    open_space(app, space_id);
+    let Some(s) = app.spaces.open.clone() else { return };
+    if !spaces::approved(&app.store, &s) {
+        app.spaces.msg = Some((format!("{what}; approve {} first (a in the list), then share again", s.name), true));
+        return;
+    }
+    run_space_on(app, &s, Some(src));
+}
+
+fn run_space_on(app: &mut App, s: &Space, src: Option<code::pipe::Source>) {
     let env = CodeEnv::new(&app.paths.home);
     let mut log = vec![];
     let main = app.store.code_space(&s.main_code_id).ok().flatten();
-    let input = main.as_ref().and_then(|m| {
-        code::pipe::frame(&app.store, &env, "tui", &code::pipe::Source::of(m.input.clone()), &mut |l| log.push(l.to_string())).ok().flatten()
-    });
+    let src = src.or_else(|| main.as_ref().map(|m| code::pipe::Source::of(m.input.clone())));
+    let input = src.as_ref().and_then(|src| code::pipe::frame(&app.store, &env, "tui", src, &mut |l| log.push(l.to_string())).ok().flatten());
     match spaces::run(&app.store, &env, "tui", s, input, "the TUI", &mut |l| log.push(l.to_string())) {
         Ok(info) => {
             let mut lines: Vec<String> = log.into_iter().filter(|l| l.starts_with("note:")).collect();
@@ -187,6 +245,16 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                     }
                 }
                 KeyCode::Char('M') => open_migrate(app),
+                KeyCode::Char('p') => {
+                    if let Some(s) = selected(app) {
+                        add_to_project(app, &s);
+                    }
+                }
+                KeyCode::Char('g') => {
+                    if let Some(s) = selected(app) {
+                        give(app, &s);
+                    }
+                }
                 KeyCode::Esc | KeyCode::Char('q') => app.modal = None,
                 _ => {}
             }
@@ -202,6 +270,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             match k.code {
                 KeyCode::Down | KeyCode::Char('j') => app.spaces.msel = (app.spaces.msel + 1).min(n.saturating_sub(1)),
                 KeyCode::Up | KeyCode::Char('k') => app.spaces.msel = app.spaces.msel.saturating_sub(1),
+                KeyCode::Char('p') => add_to_project(app, &s),
                 KeyCode::Char('P') => {
                     if let Some(m) = cur {
                         let pin = match &m.member.pin_hash {
@@ -333,6 +402,8 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 ("a approve", KeyCode::Char('a')),
                 ("Space on/off", KeyCode::Char(' ')),
                 ("M migrate", KeyCode::Char('M')),
+                ("p add to project", KeyCode::Char('p')),
+                ("g give to org", KeyCode::Char('g')),
                 ("Esc", KeyCode::Esc),
             ];
         }
@@ -387,5 +458,6 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         v.ask = Some(("approve this space's line-up and its unreviewed code? (y/n)".into(), String::new()));
     }
     v.msg = st.msg.clone();
+    super::share::add_key(app, &mut v.keys);
     draw_view(f, r, v, &t, hits);
 }

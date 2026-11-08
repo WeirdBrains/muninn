@@ -558,6 +558,7 @@ fn pipe_on(app: &mut App) {
     }
     let mut items: Vec<String> =
         app.store.code_spaces().unwrap_or_default().into_iter().filter(|x| x.id != c.id).map(|x| format!("code · {}", x.name)).collect();
+    items.extend(app.store.spaces().unwrap_or_default().into_iter().map(|s| format!("space · {}", s.name)));
     items.extend(app.store.journals().unwrap_or_default().into_iter().map(|j| format!("save to journal · {}", j.name)));
     items.extend(
         app.store.models().unwrap_or_default().into_iter().filter(|m| !m.is_bars() && m.version > 0).map(|m| format!("save to model · {}", m.name)),
@@ -583,6 +584,10 @@ pub fn pipe_picked(app: &mut App, row: &str) {
         let Ok(next) = app.store.find_code_space(name) else { return err(app, format!("no code space {name}")) };
         open_space(app, &next.id);
         return run_piped(app, Source::Frame(frame), &format!("piped {} into {}", c.name, next.name));
+    }
+    if k == "space" {
+        let Ok(next) = app.store.find_space(name) else { return err(app, format!("no code space {name}")) };
+        return super::spaces::run_piped(app, &next.id, Source::Frame(frame), &format!("piped {} into code space {}", c.name, next.name));
     }
     let sink = match k {
         "save to journal" => Sink::Journal(name.into()),

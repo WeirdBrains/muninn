@@ -193,7 +193,7 @@ fn answer(app: &mut App, kind: DAsk, v: String) {
                     app.designer.open = Some(p.id);
                     app.designer.screen = Screen::Edit;
                     app.designer.node = 0;
-                    ok(app, "a: add a node (src=search:NAME, -, code:SPACE, view:chart, model:NAME) · e: connect A>B");
+                    ok(app, "a: add a node (src=search:NAME, -, space:NAME, view:chart, model:NAME) · e: connect A>B");
                 }
                 Err(e) => err(app, e),
             }
@@ -380,7 +380,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         }
         (Screen::Edit, KeyCode::Up | KeyCode::Char('k')) => app.designer.node = app.designer.node.saturating_sub(1),
         (Screen::Edit, KeyCode::Char('a')) => {
-            ask(app, DAsk::Node, "Node ID=KIND (src=search:NAME, -, code:SPACE, view:chart:col, filter:SEARCH, model:NAME)", "")
+            ask(app, DAsk::Node, "Node ID=KIND (src=search:NAME, -, space:NAME, view:chart:col, filter:SEARCH, model:NAME)", "")
         }
         (Screen::Edit, KeyCode::Char('e')) => {
             let from = sel_node(app).map(|n| format!("{}>", n.id)).unwrap_or_default();

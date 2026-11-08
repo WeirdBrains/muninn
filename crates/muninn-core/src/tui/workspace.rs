@@ -143,6 +143,7 @@ pub enum Back {
     Rules,
     Models,
     Code,
+    Spaces,
 }
 
 #[derive(Debug, Default)]
@@ -183,6 +184,7 @@ fn go_back(app: &mut App) {
         Back::Rules => super::rules::reopen(app),
         Back::Models => super::models::reopen(app),
         Back::Code => super::code::reopen(app),
+        Back::Spaces => super::spaces::reopen(app),
     }
 }
 
