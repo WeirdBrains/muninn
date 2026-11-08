@@ -24,7 +24,7 @@
 <h1 id="deploying-a-public-relay">Deploying a public relay</h1>
 <p>How the public Muninn relay node is set up on a DigitalOcean droplet. Nodes behind NAT
 reserve a slot on it and are reached through it (see <a href="/docs/network/#behind-nat">network</a>).
-The relay's name is <code>relay.muninn.weirdbrains.com</code>; its DNS record has to point at the
+The relay's name is <code>&lt;domain&gt;</code>; its DNS record has to point at the
 droplet before anything else works. The same steps set up a relay of your own.</p>
 <table>
 <thead>
@@ -62,17 +62,38 @@ droplet before anything else works. The same steps set up a relay of your own.</
 useradd --system --home-dir /var/lib/muninn --create-home --shell /usr/sbin/nologin muninn
 </code></pre>
 <h2 id="2-dns">2. DNS</h2>
-<p><code>relay.muninn.weirdbrains.com</code> must point at the droplet: add <code>A relay.muninn.weirdbrains.com → &lt;reserved IPv4&gt;</code> (and <code>AAAA</code> if the droplet has IPv6) at the
-domain's DNS host. Check with <code>dig +short relay.muninn.weirdbrains.com</code> before asking for a
+<p><code>&lt;domain&gt;</code> must point at the droplet: add <code>A &lt;domain&gt; → &lt;reserved IPv4&gt;</code> (and <code>AAAA</code> if the droplet has IPv6) at the
+domain's DNS host. Check with <code>dig +short &lt;domain&gt;</code> before asking for a
 certificate.</p>
 <h2 id="3-install-muninn">3. Install Muninn</h2>
+<h3 id="31-for-arch-based-distros">3.1. For Arch based distros</h3>
+<p>Use the release <code>.pkg.tar.zst</code> (prebuilt, no Rust needed; see <a href="/docs/install/">install</a>), checking it
+against <code>SHA256SUMS</code>:</p>
+<pre><code class="language-sh">ver=2.22.3
+base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
+curl -LO $base/muninn-bin-${ver}-1_x86_64.pkg.tar.zst -LO $base/SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+pacman -U ./muninn-bin-${ver}-1_x86_64.pkg.tar.zst
+mnnn --version
+</code></pre>
+<h3 id="32-for-debian-based-distros">3.2. For Debian based distros</h3>
 <p>Use the release <code>.deb</code> (prebuilt, no Rust needed; see <a href="/docs/install/">install</a>), checking it
 against <code>SHA256SUMS</code>:</p>
-<pre><code class="language-sh">ver=2.22.0
+<pre><code class="language-sh">ver=2.22.3
 base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
 curl -LO $base/muninn_${ver}-1_amd64.deb -LO $base/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS
 apt install ./muninn_${ver}-1_amd64.deb
+mnnn --version
+</code></pre>
+<h3 id="33-for-redhat-based-distros">3.3. For Redhat based distros</h3>
+<p>Use the release <code>.rpm</code> (prebuilt, no Rust needed; see <a href="/docs/install/">install</a>), checking it
+against <code>SHA256SUMS</code>:</p>
+<pre><code class="language-sh">ver=2.22.3
+base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
+curl -LO $base/muninn-${ver}-1_x86_64.rpm -LO $base/SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+dnf install ./muninn-${ver}-1_x86_64.rpm
 mnnn --version
 </code></pre>
 <h2 id="4-keys-and-settings">4. Keys and settings</h2>
@@ -85,15 +106,21 @@ cat /etc/muninn/relay.env                 # copy the password somewhere safe
 <p>This generates a random 64-character password. Save it in a password manager
 or other safe place as well: it unlocks the relay's keys, and without it (or the
 24 words from <code>keys init</code>) a restored <code>/var/lib/muninn</code> can't be opened.</p>
-<p>Then, as the service user (<code>sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) …</code>
+<p>Then, as the service user (<code>sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn &lt;sub commands...&gt;</code>
 for each command):</p>
-<pre><code class="language-sh">mnnn keys init --non-interactive          # prints the 24 words and shards: keep them offline
-mnnn net config --label relay --external relay.muninn.weirdbrains.com:4741 --mdns off --autostart off
-mnnn net relay serve on                   # relay traffic for other nodes
-mnnn org cert acme --domain relay.muninn.weirdbrains.com --email you@example.com   # Let's Encrypt, HTTP-01 on port 80
-mnnn org host autostart on                # the site (and its ACME renewals) runs with the node
+<pre><code class="language-sh"># Initialize the database
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn keys init --non-interactive          # prints the 24 words and shards: keep them offline
+
+# Set some safe configs
+# Note: changing the label to your domain for the relay would help you identify it later on other nodes
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net config --label relay --external &lt;domain&gt;:4741 --mdns off --autostart off
+
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net relay serve on                   # relay traffic for other nodes, etc
+
+# Let's Encrypt, HTTP-01 on port 80
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn org host autostart on                # the site (and its ACME renewals) runs with the node
 </code></pre>
-<p><code>--external</code> puts <code>/dns4/relay.muninn.weirdbrains.com/tcp/4741</code> and <code>…/udp/4741/quic-v1</code> first in
+<p><code>--external</code> puts <code>/dns4/&lt;domain&gt;/tcp/4741</code> and <code>…/udp/4741/quic-v1</code> first in
 invites and announces them to peers. In <code>/var/lib/muninn/preferences.toml</code>, set
 <code>[hosting] bind = &quot;0.0.0.0&quot;</code> so Let's Encrypt (port 80) and the site can reach it. The
 certificate is renewed by the running site when a third of its life is left
@@ -115,6 +142,47 @@ systemctl enable --now muninn-relay
 </code></pre>
 <p><code>mnnn net start</code> runs the node in the foreground until stopped, which is what systemd
 wants; there is no separate daemon.</p>
+<h3 id="set-or-correct-the-advertised-public-address">Set or correct the advertised public address</h3>
+<p>Before starting the relay, run this as its service account, with the <strong>same</strong>
+<code>MUNINN_HOME</code> <strong>and password environment as the service</strong> (see section 4). For the
+shipped unit this means user/group <code>muninn</code>, <code>MUNINN_HOME=/var/lib/muninn</code>, and the
+password environment loaded from <code>/etc/muninn/relay.env</code>. Do not print the password
+or pass it as a command-line argument. Running the command as your login user
+without the service's home override changes a different store; restarting the
+service does not transfer those settings:</p>
+<pre><code class="language-sh">sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net config --clear-external --external &lt;domain&gt;:4741
+</code></pre>
+<p><code>--external</code> belongs to <code>net config</code>, not <code>net start</code>. The service's
+<code>mnnn net start --relay-server --no-mdns</code> uses the saved settings. If it is already
+running, restart it after changing the settings: <code>systemctl restart muninn-relay</code>.
+<code>--clear-external</code> removes stale advertised addresses; omit it when deliberately
+retaining other valid ones. Repeat <code>--external</code> to advertise multiple addresses.
+A DNS <code>host:port</code> expands to TCP and QUIC multiaddrs; explicit IP or DNS multiaddrs
+are also accepted. No peer ID is needed in this setting.</p>
+<p>Listening/binding on <code>0.0.0.0</code> accepts traffic on local interfaces; it does not name
+the public address peers should dial. Advertising a public address does not create
+DNS records, forward ports, or open firewalls. Check DNS and allow the relevant
+TCP/UDP 4741 traffic separately. Confirm the server's <code>mnnn --version</code> and
+<code>mnnn net config --help</code> before applying instructions from a newer release.</p>
+<p>After restarting, run this in the <strong>same service account, home, and password
+environment</strong>, not your login user's default home:</p>
+<pre><code class="language-sh">sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net status --json
+</code></pre>
+<p>A successful restart alone does not confirm that the intended settings are active.
+Check that the node is running, then compare <code>settings.external_addresses</code> (saved
+configuration) with <code>status.external</code> (the running node's external multiaddrs).
+For the hostname above, the saved value should be
+<code>&lt;domain&gt;:4741</code>; the active addresses should include
+<code>/dns4/&lt;domain&gt;/tcp/4741</code> and
+<code>/dns4/&lt;domain&gt;/udp/4741/quic-v1</code>. Changing saved settings leaves
+the already-running node's addresses unchanged until restart; this was tested on
+2.22.3. Verify the actual server version rather than assuming an older binary has
+the same behavior.</p>
+<p>On a fresh client connected to the relay, use <code>mnnn net peers --json</code> to inspect
+what it actually learns about the relay. Compare those addresses with the intended
+public name and current DNS A/AAAA records, and confirm the current relay peer ID.
+Saved configuration, active external addresses, and peer-observed advertisements
+are separate checks; investigate discrepancies before declaring the setup fixed.</p>
 <h2 id="6-firewall">6. Firewall</h2>
 <p>Allow only SSH, the node and relay port, and port 80 for ACME (8443 only if the site
 should be public). With <code>ufw</code> on the droplet, or the same rules in a DigitalOcean Cloud
@@ -132,11 +200,7 @@ if peers collaborate with this node directly, otherwise they fall back to pollin
 <h2 id="7-using-it">7. Using it</h2>
 <p>Print the relay's address and add it on other nodes:</p>
 <pre><code class="language-sh">sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net status
-mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/&lt;PEER ID&gt;   # on each client node
-</code></pre>
-<p>The public relay <code>relay.muninn.weirdbrains.com</code> has peer ID
-<code>12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz</code>, so on any node:</p>
-<pre><code class="language-sh">mnnn net relay add /dns4/relay.muninn.weirdbrains.com/tcp/4741/p2p/12D3KooWEU3bqaeDhf4X7mf8QsJTsTUxP2vCENaRVMYYfp4mkdxz
+mnnn net relay add /dns4/&lt;domain&gt;/tcp/4741/p2p/&lt;PEER ID&gt;   # on each client node
 </code></pre>
 <p>With <code>--external</code> set, a relay announces only those addresses. Without it, it announces
 only routable listen addresses: private (10/8, 172.16/12, 192.168/16), CGNAT
@@ -160,6 +224,63 @@ systemctl status muninn-relay
 </code></pre>
 <p>For more detail add <code>Environment=MUNINN_LOG=debug</code> (or <code>libp2p=info,debug</code>) to the unit
 and restart.</p>
+<h2 id="10-verify-discovery-and-actual-delivery">10. Verify discovery and actual delivery</h2>
+<p>On each client, using its own intended home, inspect:</p>
+<pre><code class="language-sh">mnnn --version
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net status --json
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net relay list --json
+sudo -u muninn env MUNINN_HOME=/var/lib/muninn $(cat /etc/muninn/relay.env) mnnn net peers --json
+</code></pre>
+<p>A configured relay alone is not evidence of a live reservation. Check the running
+node's active relay connection, <code>reservations</code>, and externally usable circuit
+addresses ending in <code>/p2p/&lt;RELAY_ID&gt;/p2p-circuit/p2p/&lt;CLIENT_ID&gt;</code>. Compare the relay's
+current public peer ID from its status with the client configuration. Compare DNS
+A/AAAA answers with advertised addresses; stale/private/loopback relay addresses
+are not usable by arbitrary internet clients. Do not expose passwords or recovery
+words while collecting diagnostics.</p>
+<p>Record discovery <strong>before</strong> generating invites: do the two fresh client identities
+appear in each other's peer inventory and active connection list? Automatic peer
+discovery was observed through the public relay in the November 6, 2026 test; do
+not assume that sharing a relay either guarantees discovery or cannot discover
+peers. An active transport connection is also distinct from an approved key
+exchange, and a saved connected/exchange label does not prove message delivery.</p>
+<p>To distinguish discovery from connection approval and delivery, test only between
+identities you control:</p>
+<pre><code class="language-sh"># A, with its node running:
+mnnn net invite
+# B, with its node running:
+mnnn net connect '&lt;A invite link&gt;'
+# A, if approval is pending:
+mnnn net requests
+mnnn net accept '&lt;request ID or node name&gt;'
+# A:
+mnnn msg send '&lt;B peer ID&gt;' 'A-to-B relay test' --json
+# B:
+mnnn msg send '&lt;A peer ID&gt;' 'B-to-A relay test' --json
+# Both:
+mnnn msg list --json
+</code></pre>
+<p>Invites contain no secret and expire after seven days, but include node identity
+and addresses; share them only with the intended tester. Match each sent message
+ID to an incoming record on its recipient, not just a successful command or a
+persisted peer label. Capture exact errors and transport logs for either direction.</p>
+<p>For a cross-network claim, use separate networks and verify the active circuit
+transport rather than a direct LAN/VPN/loopback connection. Even an explicit
+circuit-target dial can coexist with a direct connection after hole punching;
+inspect the actual transport during message delivery. Do not change production
+firewalls/routes merely to make a test appear relay-only.</p>
+<h3 id="dated-probe-evidence-november-6-2026-est">Dated probe evidence (November 6, 2026, EST)</h3>
+<p>Two isolated 2.22.3 clients on the same alien-blue computer authenticated the public
+relay, obtained reservations, and discovered one another before explicit pairing.
+The relay identified itself as 2.20.0 and advertised addresses that differed from
+DNS, including private/loopback addresses. Clients logged repeated
+<code>Dropping in-flight connect request because we are at capacity</code> warnings. These are
+investigation leads, not proven causes of cross-network delivery failure; do not
+copy the observed transient IP addresses into deployment defaults.</p>
+<p>Explicit pairing and messages in both directions succeeded with recipient records,
+but direct loopback sockets were present. This test therefore does <strong>not</strong> prove
+relay-only or separate-network delivery. Check installed versions, advertised
+addresses, circuit selection, and actual bidirectional receipts when reproducing.</p>
 <p class="edit"><a href="https://github.com/WeirdBrains/muninn/edit/main/docs/deploy-relay.md">Edit this page on GitHub</a></p>
 </main>
 </div>
