@@ -230,6 +230,12 @@ Models: record tables you design (typed fields, references, constraints), change
 mnnn\-code(1)
 Code spaces: math, Polars, Rust or Python (or a prebuilt plugin) compiled into a native plugin that reads and writes your data and shows a result
 .TP
+mnnn\-spaces(1)
+Code spaces: collections of code with a kind and a main (the entry point). Pipelines run spaces (`space:NAME`); main can call its members and other spaces
+.TP
+mnnn\-migrate(1)
+Move code from before 2.23 into code spaces: one space per code (named as the code; taken: NAME\-migration; both taken: skipped), its kind inferred, and stored pipelines\*(Aq code: steps rewritten to space:. Offered, never automatic; safe to run again
+.TP
 mnnn\-net(1)
 The network: run a node, exchange keys with other nodes, share data with them, search across them and entrust them with dark shards. On with the TUI by default; nothing is shared until you ask
 .TP

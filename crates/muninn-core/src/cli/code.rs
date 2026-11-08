@@ -125,7 +125,7 @@ pub(crate) fn ensure_approved(ctx: &Ctx, store: &Store, c: &CodeSpace) -> anyhow
     Ok(())
 }
 
-fn print_run(info: &crate::store::RunInfo, rows: usize) {
+pub(crate) fn print_run(info: &crate::store::RunInfo, rows: usize) {
     for l in &info.logs {
         eprintln!("{l}");
     }
@@ -160,6 +160,9 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
         return Ok(());
     }
     let store = ctx.open_store()?;
+    if let Some(m) = code::migrate::offer_once(&store, &ctx.paths.home) {
+        ctx.io.note(m);
+    }
     match cmd {
         CodeCommand::Parsers { install, show } => {
             if let Some(n) = show {
@@ -382,6 +385,14 @@ pub(crate) fn run_pipe(
     for n in &names {
         let c = store.find_code_space(n)?;
         ensure_approved(ctx, store, &c)?;
+    }
+    let mut spaces: Vec<String> = steps.iter().filter_map(|s| if let Step::Space(n) = s { Some(code::split_options(n).0) } else { None }).collect();
+    if let Source::Space(n) = src {
+        spaces.push(n.clone());
+    }
+    for n in &spaces {
+        let s = store.find_space(n)?;
+        super::spaces::ensure_approved(ctx, store, &s)?;
     }
     let env = CodeEnv::for_store(store)?;
     let quiet = ctx.global.quiet;

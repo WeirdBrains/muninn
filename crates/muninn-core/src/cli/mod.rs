@@ -23,6 +23,7 @@ mod reports;
 mod review;
 mod rules;
 mod searches;
+mod spaces;
 mod sync;
 mod users;
 pub use args::*;
@@ -188,6 +189,8 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Rule(c) => rules::run(&ctx, c),
         Command::Model(c) => models::run(&ctx, c),
         Command::Code(c) => code::run(&ctx, c),
+        Command::Spaces(c) => spaces::run(&ctx, c),
+        Command::Migrate(a) => spaces::migrate(&ctx, a),
         Command::Net(c) => net::run(&ctx, c),
         Command::Org(c) => org::run(&ctx, c),
         Command::Review(c) => review::run(&ctx, c),

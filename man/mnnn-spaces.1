@@ -1,0 +1,152 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-spaces 1  "mnnn-spaces 2.22.3" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-spaces \- Code spaces: collections of code with a kind and a main (the entry point). Pipelines run spaces (`space:NAME`); main can call its members and other spaces
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn spaces\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Code spaces: collections of code with a kind and a main (the entry point). Pipelines run spaces (`space:NAME`); main can call its members and other spaces
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH NOTES
+.PP
+A code space is a collection of code (`mnnn code`) with a kind (parser, transform, analysis,
+ingest\-connector) and one main: the entry point that runs. Main can be plain code, or call
+members (`host.call(ALIAS, frame)`) and whole other spaces (`host.call_space(NAME, frame)`),
+declared in an `@imports a, b, space:NAME` header line. Only main calls; spaces calling spaces
+can't loop and nest at most 8 deep.
+.PP
+Approving a space approves its line\-up (main, kind, members, aliases, pins, imported spaces).
+Members follow their code: edits run at once, flagged unreviewed until the code is approved
+(`mnnn code approve`). \-\-pin freezes a member at its current version; a pinned member that
+changes fails until pinned again.
+.PP
+Examples:
+  mnnn spaces create prices \-\-kind transform \-\-main parse\-csv \-\-add to\-bars
+  mnnn spaces approve prices
+  mnnn pipe \- space:prices model:bars < prices.csv
+  mnnn spaces add prices clean\-rows \-\-as clean \-\-pin
+
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-spaces\-list(1)
+List code spaces: name, kind, main, members, approved, flags
+.TP
+mnnn\-spaces\-show(1)
+A space: kind, main, members (pins, unreviewed edits), imports, approval
+.TP
+mnnn\-spaces\-create(1)
+Create a space with MAIN as its main (not approved yet)
+.TP
+mnnn\-spaces\-add(1)
+Add code to a space (followed; \-\-pin freezes it at its current version)
+.TP
+mnnn\-spaces\-remove\-code(1)
+Take code out of a space (not its main)
+.TP
+mnnn\-spaces\-set\-main(1)
+Make code (a member, or added now) the main
+.TP
+mnnn\-spaces\-pin(1)
+Pin a member at its current version
+.TP
+mnnn\-spaces\-unpin(1)
+Let a member follow its code again
+.TP
+mnnn\-spaces\-approve(1)
+Approve a space\*(Aqs line\-up (and, asked, its unreviewed code)
+.TP
+mnnn\-spaces\-run(1)
+Run a space (its main), over SOURCE if given
+.TP
+mnnn\-spaces\-rename(1)
+Rename a space
+.TP
+mnnn\-spaces\-kind(1)
+Change a space\*(Aqs kind
+.TP
+mnnn\-spaces\-enable(1)
+.TP
+mnnn\-spaces\-disable(1)
+.TP
+mnnn\-spaces\-remove(1)
+Remove a space (its code stays; asks first)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.22.3
+.SH SEE ALSO
+\fBmnnn\fR(1)

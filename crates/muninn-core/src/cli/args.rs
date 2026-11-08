@@ -105,6 +105,14 @@ pub enum Command {
     /// plugin that reads and writes your data and shows a result.
     #[command(subcommand, alias = "codes", after_long_help = CODE_NOTES)]
     Code(CodeCommand),
+    /// Code spaces: collections of code with a kind and a main (the entry point). Pipelines
+    /// run spaces (`space:NAME`); main can call its members and other spaces.
+    #[command(subcommand, visible_alias = "code-spaces", alias = "space", after_long_help = SPACES_NOTES)]
+    Spaces(SpacesCommand),
+    /// Move code from before 2.23 into code spaces: one space per code (named as the code;
+    /// taken: NAME-migration; both taken: skipped), its kind inferred, and stored pipelines'
+    /// code: steps rewritten to space:. Offered, never automatic; safe to run again.
+    Migrate(MigrateArgs),
     /// The network: run a node, exchange keys with other nodes, share data with them, search
     /// across them and entrust them with dark shards. On with the TUI by default; nothing is shared until you ask.
     #[command(subcommand, alias = "network", after_long_help = NET_NOTES)]
@@ -2716,6 +2724,167 @@ Examples:
   mnnn code run fast -y
   mnnn code create spread --lang python --source $'def spread(high: float, low: float) -> float:\\n    return high - low'
   mnnn rule create on-import --on import --then \"run-code fast\"";
+
+pub const SPACES_NOTES: &str = "\
+A code space is a collection of code (`mnnn code`) with a kind (parser, transform, analysis,
+ingest-connector) and one main: the entry point that runs. Main can be plain code, or call
+members (`host.call(ALIAS, frame)`) and whole other spaces (`host.call_space(NAME, frame)`),
+declared in an `@imports a, b, space:NAME` header line. Only main calls; spaces calling spaces
+can't loop and nest at most 8 deep.
+
+Approving a space approves its line-up (main, kind, members, aliases, pins, imported spaces).
+Members follow their code: edits run at once, flagged unreviewed until the code is approved
+(`mnnn code approve`). --pin freezes a member at its current version; a pinned member that
+changes fails until pinned again.
+
+Examples:
+  mnnn spaces create prices --kind transform --main parse-csv --add to-bars
+  mnnn spaces approve prices
+  mnnn pipe - space:prices model:bars < prices.csv
+  mnnn spaces add prices clean-rows --as clean --pin
+";
+
+/// A space kind, as typed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum KindArg {
+    #[value(alias = "parsers")]
+    Parser,
+    #[value(alias = "transforms")]
+    Transform,
+    Analysis,
+    #[value(alias = "ingest", alias = "connector")]
+    IngestConnector,
+}
+
+impl KindArg {
+    pub fn kind(self) -> crate::store::SpaceKind {
+        use crate::store::SpaceKind as K;
+        match self {
+            KindArg::Parser => K::Parser,
+            KindArg::Transform => K::Transform,
+            KindArg::Analysis => K::Analysis,
+            KindArg::IngestConnector => K::IngestConnector,
+        }
+    }
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SpacesCommand {
+    /// List code spaces: name, kind, main, members, approved, flags.
+    #[command(alias = "ls")]
+    List {
+        #[arg(long, value_enum)]
+        kind: Option<KindArg>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// A space: kind, main, members (pins, unreviewed edits), imports, approval.
+    Show {
+        space: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Create a space with MAIN as its main (not approved yet).
+    #[command(alias = "new")]
+    Create {
+        name: String,
+        #[arg(long, value_enum)]
+        kind: KindArg,
+        /// The main: existing code.
+        #[arg(long)]
+        main: String,
+        /// More members: CODE or CODE=ALIAS.
+        #[arg(long)]
+        add: Vec<String>,
+        #[arg(long, default_value = "")]
+        description: String,
+    },
+    /// Add code to a space (followed; --pin freezes it at its current version).
+    Add {
+        space: String,
+        code: String,
+        #[arg(long = "as")]
+        alias: Option<String>,
+        #[arg(long)]
+        pin: bool,
+    },
+    /// Take code out of a space (not its main).
+    RemoveCode {
+        space: String,
+        code: String,
+    },
+    /// Make code (a member, or added now) the main.
+    SetMain {
+        space: String,
+        code: String,
+    },
+    /// Pin a member at its current version.
+    Pin {
+        space: String,
+        code: String,
+    },
+    /// Let a member follow its code again.
+    Unpin {
+        space: String,
+        code: String,
+    },
+    /// Approve a space's line-up (and, asked, its unreviewed code).
+    Approve {
+        space: String,
+    },
+    /// Run a space (its main), over SOURCE if given.
+    Run {
+        space: String,
+        #[arg(long)]
+        input: Option<String>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long, default_value_t = 20)]
+        rows: usize,
+    },
+    /// Rename a space.
+    Rename {
+        space: String,
+        name: String,
+    },
+    /// Change a space's kind.
+    Kind {
+        space: String,
+        #[arg(value_enum)]
+        kind: KindArg,
+    },
+    Enable {
+        space: String,
+    },
+    Disable {
+        space: String,
+    },
+    /// Remove a space (its code stays; asks first).
+    #[command(alias = "rm")]
+    Remove {
+        space: String,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct MigrateArgs {
+    /// Only these codes (default: every code in no space).
+    pub codes: Vec<String>,
+    /// The kind for code whose kind is unclear.
+    #[arg(long, value_enum)]
+    pub kind: Option<KindArg>,
+    /// Show the report; change nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Leave stored pipelines' code: steps as they are.
+    #[arg(long)]
+    pub no_rewrite_pipelines: bool,
+    /// Don't write the backup first.
+    #[arg(long)]
+    pub no_backup: bool,
+    #[arg(long)]
+    pub json: bool,
+}
 
 /// A code space language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
