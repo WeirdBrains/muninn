@@ -191,9 +191,9 @@ CREATE TABLE schedules (
     start_at INTEGER,                          -- epoch ms, UTC: first (or only) run; entered in `date -d` formats
     start_at_input TEXT,                       -- as typed, e.g. "tomorrow 9am" (shown in `schedule show`)
     tz TEXT,                                   -- optional IANA zone ("America/New_York"); NULL = UTC for cron, local for reading input
-    run_every TEXT,                            -- as written: "2 hours 30 minutes", "1 month", "250 milliseconds", "15m", "1M"
-    every_ms INTEGER,                          -- the fixed part in ms (ms..weeks); NULL when none
-    every_months INTEGER,                      -- calendar months (and years × 12); NULL when none
+    run_every TEXT,                            -- as written: "2 hours 30 minutes", "1 month", "250 milliseconds", "15m", "1M", or 'once'
+    every_ms INTEGER,                          -- the fixed part in ms (ms..weeks); NULL when none or for 'once'
+    every_months INTEGER,                      -- calendar months (and years × 12); NULL when none or for 'once'
     cron TEXT,                                 -- five fields, as scheduled rules use today
     enabled INTEGER NOT NULL DEFAULT 1,
     overlap TEXT NOT NULL DEFAULT 'skip' CHECK (overlap IN ('skip','queue')),
@@ -203,8 +203,9 @@ CREATE TABLE schedules (
     author_id TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    CHECK (NOT (run_every IS NOT NULL AND cron IS NOT NULL)),      -- one repeat rule at most
-    CHECK (run_every IS NOT NULL OR cron IS NOT NULL OR start_at IS NOT NULL),  -- something to run on
+    CHECK ((run_every IS NULL) <> (cron IS NULL)),                 -- exactly one: run_every (incl. 'once') or cron
+    CHECK (run_every IS NOT 'once' OR (start_at IS NOT NULL AND cron IS NULL
+           AND every_ms IS NULL AND every_months IS NULL)),           -- 'once' needs start_at, nothing else
     CHECK (target_kind <> 'connector' OR (plugin_id IS NOT NULL AND source_id IS NOT NULL)),
     CHECK (target_kind <> 'ruleset' OR ruleset_id IS NOT NULL)
 );
@@ -248,7 +249,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - **Two choices** when the schedule repeats:
     - **(a) Start at the next interval:** the first `start_at + k × run_every` (k ≥ 1, calendar months clamped as usual) that is in the future, or with cron, the next cron match not before `start_at` that is in the future. That time is shown: `Next interval: Mon 2026-11-10 09:00 EST (14:00Z), in 1 day 23 h.` The stored `start_at` becomes that time, and the original text stays in `start_at_input`.
     - **(b) Correct `start_at`:** enter it again. The new value is parsed and confirmed as usual, and checked again.
-  - **One-off (`start_at` only, no `run_every` or cron):** there is no interval, so the only choice is (b), correct it. The message says so: "a one-off has no interval to move to; enter a future time".
+  - **One-off (`run_every = 'once'`):** there is no interval, so the only choice is (b), correct it. The next-interval option isn't offered, and `--past next-interval` is an error. The message says so: "a one-off has no interval to move to; enter a future time".
   - **CLI:** an interactive prompt, `[n] next interval (Mon 2026-11-10 09:00 EST) · [c] correct start_at · [q] cancel`; `c` asks for the time again.
     - **Non-interactive** (`-y`, no TTY, scripts, MCP or the FFI without a prompt) never hangs. It needs **`--past next-interval`** to take choice (a). Otherwise it fails with: "start_at 2026-11-03 09:00 EST (14:00Z) is in the past. Choose one: start at the next interval (`--past next-interval`, would be Mon 2026-11-10 09:00 EST) or correct `--start-at`."
     - `--past next-interval` on a one-off is an error ("a one-off has no interval; correct --start-at").
@@ -266,6 +267,11 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - `MS`, `S`, `H`, `D` and `mo` are rejected with a hint listing both forms.
   - `w` (week), allowed by today's scheduled rules, is kept as a short code for `1 week`.
 - **Not allowed in an interval:** `ago`, signs, `next`, `last`, `tomorrow`, weekdays and dates (these are points in time, not intervals) are rejected with "that is a time, use --start-at". Zero and negative totals are rejected.
+- **`once` (Michael, 9:22 AM):** `run_every` also accepts the literal `once`, a run at `start_at` and nothing more.
+  - A schedule given `start_at` without `--every` or `--cron` is stored with `run_every = 'once'` automatically; `--every once` is accepted explicitly too.
+  - `every_ms` and `every_months` are NULL for it.
+  - **`once` requires `start_at`:** `--every once` without `--start-at` is an error ("once needs --start-at; to run now, use `mnnn schedule run-now NAME`"). Running something once right now is what `run-now` is for, so `once` never means "now".
+  - `once` can't be mixed with other units (`once 5 minutes` is refused).
 - **Stored as:**
   - the fixed part (milliseconds through weeks) → `every_ms`
   - months (and years × 12) → `every_months`
@@ -281,13 +287,15 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 
 | fields | runs |
 |--------|------|
-| `start_at` only | once, at `start_at`; afterwards the schedule is disabled and keeps its run history (Michael: Q-T4); `schedule show` says "ran once". If missed while nothing was running, it is skipped, not caught up (Q-T6, below) |
+| `start_at` only = `run_every = 'once'` (set automatically, or `--every once`) | once, at `start_at`; afterwards the schedule is disabled and keeps its run history (Michael: Q-T4); `schedule show` says "ran once". If missed while nothing was running, it is skipped, not caught up (Q-T6, below) |
 | `start_at` + `run_every` | first at `start_at`, then every interval after it |
 | `run_every` only | **immediately** on creation, then every interval; re-enabling a schedule also runs it at once (Michael: Q-T1, matching today's scheduled rules) |
 | `cron` only | at the next cron time |
 | `start_at` + `cron` | at the first cron time at or after `start_at` ("not before then") |
 | `run_every` + `cron` | refused (one repeat rule) |
-| `start_at` in the past | the user is told and chooses: next interval (repeating schedules only) or correct `start_at`; see "In the past" above |
+| `once` without `start_at` | refused: "once needs --start-at" (use `schedule run-now` to run now) |
+| `once` + `cron` | refused |
+| `start_at` in the past | the user is told and chooses: next interval (repeating schedules only; never for `once`) or correct `start_at`; see "In the past" above |
 
 **Parsing (nothing installed now; added as a dependency when phase 2 is built):**
 
@@ -304,7 +312,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 - **Crash recovery:** a `running` run whose heartbeat is more than 2 minutes old becomes `failed` (`error = "abandoned"`) and is retried.
 - **Missed runs and overlap (default accepted pending objection):**
   - `catch_up = once` runs one run for the latest missed slot; `all` runs each missed slot, oldest first, capped at 100; `none` skips ahead.
-  - **One-off schedules (`start_at` only) are never caught up (Michael: Q-T6),** whatever `catch_up` says. When the scheduler finds a one-off whose `start_at` passed while nothing was running, it doesn't run it. The skip has to fit the status enum (`pending|running|success|failed`), which has no "skipped", so it is recorded as a **`failed`** row with `timestamp = start_at`, `started_at = NULL`, `finished_at` = now and `error = "missed: one-off skipped (nothing was running at start_at)"`, plus a `schedule.missed` action (rules and notifications can react). The schedule is then disabled. No retry is made.
+  - **One-off schedules (`run_every = 'once'`) are never caught up (Michael: Q-T6),** whatever `catch_up` says. When the scheduler finds a one-off whose `start_at` passed while nothing was running, it doesn't run it. The skip has to fit the status enum (`pending|running|success|failed`), which has no "skipped", so it is recorded as a **`failed`** row with `timestamp = start_at`, `started_at = NULL`, `finished_at` = now and `error = "missed: one-off skipped (nothing was running at start_at)"`, plus a `schedule.missed` action (rules and notifications can react). The schedule is then disabled. No retry is made.
   - `overlap = skip` skips a slot while the previous run of the same schedule is open; `queue` keeps one pending run behind it.
   - At most 4 schedules run at once (`scheduler.workers`).
 - **Rule-set target:** a `schedule` action naming the schedule is recorded, then the rule set runs on it (each rule's `--if` sees `schedule` and `name`). The run is `success` when the set ran; a then-action error makes it `failed`.
@@ -313,7 +321,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 
 - **Migration (once, on opening a 2.24 database):** each rule whose `spec.schedule` is set (`--every` or `--cron`) becomes:
   - a rule set `NAME (scheduled)` containing just that rule, plus a schedule targeting it with the same interval or cron
-  - `next_run_at` taken from the rule's `last_run_at` and interval, so nothing runs early or twice; `start_at` stays NULL
+  - `next_run_at` taken from the rule's `last_run_at` and interval, so nothing runs early or twice; `start_at` stays NULL (today's scheduled rules always repeat, so none migrate to `once`)
   - the interval rewritten in the long form (`6h` → `run_every = "6 hours"`, `1w` → `"1 week"`), with the same `every_ms`; cron copied as is
   - the `schedule` field removed from the rule's spec
 - The built-in **cert-expiry-watch** moves the same way: rule set `cert-expiry-watch`, a schedule every 6 hours. It is still made the first time an org gets a domain.
@@ -333,13 +341,14 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
     - `mnnn schedule add fast --plugin ticker --source t --every 250ms` (short code)
     - `mnnn schedule add nightly --ruleset Nightly --cron "0 3 * * *" --start-at "2026-12-01"` (cron, not before Dec 1)
   - `mnnn schedule parse --start-at WHEN | --every INTERVAL [--json]` prints what an input means (local and UTC, the next three runs) without saving
-  - `mnnn schedule list|show|edit|enable|disable|remove|run-now NAME`
+  - `mnnn schedule list|show|edit|enable|disable|remove|run-now NAME` (`run-now` runs it once immediately, without changing its schedule)
+    - `mnnn schedule add audit --ruleset Audit --start-at "2026-11-10 14:00"` stores `run_every = once`; `--every once` says the same explicitly
   - `mnnn schedule runs NAME [--status S] [--json]`
   - `mnnn scheduler run|tick|status`
 - **TUI:** Projects ▸ **Schedules…** (a schedule window: `n`, `e`, Space, `r` run now, Enter runs), with the scheduler's state in the status bar.
   - **The new/edit form** has the fields Name · Target (connector or rule set) · Start at · Repeat (every / cron / once).
   - Start at takes `date` input, with the parsed time shown under the field in local and UTC as you type (red with the error when it doesn't parse).
-  - Repeat takes `date` intervals or short codes, shown back in the long form, with the next three run times listed before you save.
+  - Repeat offers **once** (the default when Start at is filled and Repeat is empty; it needs Start at, and the form says so), **every** (`date` intervals or short codes) or **cron**. Every takes `date` intervals or short codes, shown back in the long form, with the next three run times listed before you save.
 - **App** (Matematik): the same.
 
 ### Tests
@@ -355,7 +364,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
     - the message (local, UTC, how long ago)
     - the next-interval time for `run_every` (fixed and months, k ≥ 1, clamping) and for cron (next match, not before)
     - correcting it by re-entering
-    - a one-off offering only correction
+    - a `once` schedule offering only correction; `--past next-interval` with `once` failing
     - non-interactive without `--past next-interval` failing with the message naming both choices; with it, storing the next interval
     - `--past next-interval` on a one-off failing
     - the TUI and app inline warning and buttons
@@ -366,7 +375,12 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - rejecting `ago`, `next`, dates and zero
   - long-form printing round-trips
 - Month stepping: clamping (Jan 31 → Feb 28 → Feb 29 in a leap year → Mar 31), `1 month 2 days`. With `tz` NULL, steps stay in UTC across DST (the local hour shifts); with `tz` set, the local hour stays. `tz` is never set automatically, except for migrated rules (node zone, same wall-clock times as before).
-- Combinations: `start_at` alone (one run, then disabled with history kept), `start_at` + `run_every`, `run_every` alone (runs immediately, and again on re-enable), `cron` with `start_at` (not before), `run_every` + `cron` refused. A missed one-off produces one `failed` "missed" row and a `schedule.missed` action, doesn't run, and is disabled, even with `catch_up = all`. cron stepping (existing tests move).
+- `once`:
+  - `start_at` alone is stored as `run_every = 'once'` with `every_ms` and `every_months` NULL; `--every once` is the same
+  - `once` without `start_at` fails pointing to `run-now`; `once` + cron and `once 5 minutes` fail
+  - the CHECK constraints reject `once` rows without `start_at` or with cron or interval values
+  - after its run the schedule is disabled and its `schedule_runs` history kept
+- Combinations: `start_at` alone (`once`: one run, then disabled with history kept), `start_at` + `run_every`, `run_every` alone (runs immediately, and again on re-enable), `cron` with `start_at` (not before), `run_every` + `cron` refused. A missed one-off produces one `failed` "missed" row and a `schedule.missed` action, doesn't run, and is disabled, even with `catch_up = all`. cron stepping (existing tests move).
 - The migration writes the long forms and the same `every_ms`.
 - Scheduler, with a fake clock:
   - lease and claim-once under two schedulers
@@ -539,7 +553,7 @@ The inventory is checked against the code before implementing; any share point f
 - **Q-T1 `run_every` without `start_at`:** **Resolved.** It runs immediately on creation and on re-enable, matching today's scheduled rules.
 - **Q-T2 Filling `tz`:** **Resolved.** Steps happen in UTC even if the local time shifts. `tz` is never filled in automatically; it stays NULL unless `--tz` is given. The one exception is migrated local-time scheduled rules, which get the node's zone so they don't shift.
 - **Q-T3 Dependencies:** **Resolved.** Add `parse_datetime` for `start_at`. Approved for the plan; it goes into `Cargo.toml` when phase 2 is implemented.
-- **Q-T4 One-off schedules after they run:** **Resolved.** Disabled after the run, keeping its run history.
+- **Q-T4 One-off schedules after they run:** **Resolved.** Disabled after the run, keeping its run history. A one-off is stored as `run_every = 'once'` (Michael, 9:22 AM); `once` requires `start_at`.
 - **Q-T5 `start_at` in the past:** **Resolved, revised 9:17 AM.** Tell the user (local, UTC, how long ago) and ask: start at the next interval (shown), or correct `start_at`. A one-off can only be corrected. Non-interactive use needs `--past next-interval`, otherwise it fails naming both choices. `--allow-past` is removed.
 - **Q-T6 Missed one-off:** **Resolved.** Skipped, not caught up. It is recorded as a `failed` run with a "missed" error (the status enum has no "skipped"), then the schedule is disabled.
 
