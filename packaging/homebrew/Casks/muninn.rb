@@ -7,7 +7,7 @@ cask "muninn" do
 
   url "https://github.com/WeirdBrains/muninn/releases/download/v#{version}/muninn-#{version}-macos.dmg"
   name "Muninn"
-  desc "Local, encrypted workbench for market data with peer-to-peer data workflows"
+  desc "Data goes in, your magic transforms it"
   homepage "https://muninn.weirdbrains.com"
 
   conflicts_with cask: "muninn-app"

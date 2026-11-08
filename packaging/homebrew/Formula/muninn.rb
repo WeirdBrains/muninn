@@ -2,7 +2,7 @@
 # Published in the tap github.com/WeirdBrains/homebrew-tap as Formula/muninn.rb:
 #   brew install weirdbrains/tap/muninn   (scripts/fill-sums.py fills in the sums)
 class Muninn < Formula
-  desc "Local, encrypted workbench for market data with peer-to-peer data workflows"
+  desc "Data goes in, your magic transforms it"
   homepage "https://github.com/WeirdBrains/muninn"
   version "2.22.3"
   license "BSD-3-Clause"

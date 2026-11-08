@@ -1,6 +1,6 @@
 # Muninn (`mnnn`)
 
-Local, encrypted workbench for market data with peer-to-peer data workflows. Ingest from CSV, JSON,
+Data goes in, your magic transforms it. Ingest from CSV, JSON,
 HTTP APIs, Redis, SQLite and Postgres; export to CSV, Parquet or JSON; browse it in a TUI.
 
 Data lives in `~/.muninn` (override with `MUNINN_HOME` or `--home`), in a

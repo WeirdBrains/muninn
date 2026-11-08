@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Changed
+- New tagline: "data goes in, your magic transforms it" (README, About, the app, the website and package descriptions)
+
 ## [2.22.3] - 2026-11-07
 
 ### Fixed

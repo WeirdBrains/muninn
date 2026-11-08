@@ -6,7 +6,7 @@
 pkgname=muninn-bin
 pkgver=2.22.3
 pkgrel=1
-pkgdesc="Local, encrypted workbench for market data with peer-to-peer data workflows (mnnn), prebuilt"
+pkgdesc="Data goes in, your magic transforms it (mnnn), prebuilt"
 arch=('x86_64' 'aarch64')
 url="https://github.com/WeirdBrains/muninn"
 license=('BSD-3-Clause')

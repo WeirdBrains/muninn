@@ -41,7 +41,7 @@ class FakeApi implements MuninnApi {
   About about() => const About(
     name: 'Muninn',
     version: '2.21.0',
-    tagline: 'Local, encrypted workbench for market data with peer-to-peer data workflows.',
+    tagline: 'Data goes in, your magic transforms it.',
     motto: "Odin's raven of memory: it remembers every bar.",
     publisher: 'WeirdBrains',
     homepage: 'https://muninn.weirdbrains.com',

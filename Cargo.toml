@@ -3,7 +3,7 @@ name = "muninn"
 version.workspace = true
 edition = "2024"
 rust-version = "1.99"
-description = "Local, encrypted workbench for market data with peer-to-peer data workflows (mnnn): ingest, pipelines and encrypted peer-to-peer sharing, in a TUI and CLI."
+description = "Data goes in, your magic transforms it (mnnn): ingest, pipelines and encrypted peer-to-peer sharing, in a TUI and CLI."
 authors = ["Michael Christenson II <m3talsmith@gmail.com>"]
 license = "BSD-3-Clause"
 repository = "https://github.com/WeirdBrains/muninn"
@@ -138,7 +138,7 @@ assets = [
 
 # Fedora/RHEL package: `cargo build --release && cargo generate-rpm` (packaging/fedora)
 [package.metadata.generate-rpm]
-summary = "Local, encrypted workbench for market data with peer-to-peer data workflows (mnnn)"
+summary = "Data goes in, your magic transforms it (mnnn)"
 license = "BSD-3-Clause"
 release = "1"
 assets = [

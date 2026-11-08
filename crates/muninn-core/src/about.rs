@@ -4,7 +4,7 @@
 pub const NAME: &str = "Muninn";
 pub const BINARY: &str = "mnnn";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const TAGLINE: &str = "Local, encrypted workbench for market data with peer-to-peer data workflows.";
+pub const TAGLINE: &str = "Data goes in, your magic transforms it.";
 pub const MOTTO: &str = "Odin's raven of memory: it remembers every bar.";
 pub const PUBLISHER: &str = "WeirdBrains";
 pub const HOMEPAGE: &str = "https://muninn.weirdbrains.com";

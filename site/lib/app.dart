@@ -58,7 +58,7 @@ class App extends StatelessComponent {
         div(classes: 'hero-shot', [pair(pairs.first, lazy: false)]),
         p(classes: 'tagline', [
           Component.text(
-            'A local, encrypted workbench for market data: ingest, search, journal, model and share, in a terminal UI and a CLI.',
+            'data goes in, your magic transforms it',
           ),
         ]),
         nav(classes: 'links', [

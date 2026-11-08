@@ -1,5 +1,5 @@
 name: muninn
-description: "Muninn: local, encrypted workbench for market data with peer-to-peer data workflows"
+description: "Muninn: data goes in, your magic transforms it"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
