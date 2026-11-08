@@ -242,6 +242,9 @@ pub enum Then {
     },
     /// Run a code space (only once it is approved); its result becomes its last run (2.5+).
     RunCode { space: String },
+    /// Run a code space (2.23+): its main over the main's input, calling its members, with
+    /// the same checks as `mnnn spaces run` (enabled, line-up approved, pins, cycles, depth).
+    RunSpace { space: String },
     /// Check org certificates (2.16, the built-in `cert-expiry-watch`): ACME ones with fewer
     /// than `renew_days` left are renewed by the host; your own notify at `notify_days`
     /// and on expiry. See [`crate::org::tls::watch`].
@@ -307,6 +310,7 @@ impl Then {
             Then::RecordUpdate { .. } => "record-update",
             Then::RecordDelete { .. } => "record-delete",
             Then::RunCode { .. } => "run-code",
+            Then::RunSpace { .. } => "run-space",
             Then::CertWatch { .. } => "cert-watch",
             Then::Notify { .. } => "notify",
             Then::Broadcast { .. } => "broadcast",

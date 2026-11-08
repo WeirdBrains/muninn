@@ -9,6 +9,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ### Added
 - Code spaces are now collections of code: a kind, a main and members (`mnnn spaces`, aliases `code-spaces`, `space`). Main calls members and other spaces (`host.call`, `host.call_space`; SDK 1.2.0) with cycle and depth-8 checks; one approval covers the line-up; edited members run at once and show as unreviewed; pins are opt-in
 - `space:NAME` pipeline steps and sources
+- Rules: a `run-space SPACE` action (CLI, TUI rule editor, ffi) runs a code space with every check `spaces run` makes; project packs carry the space
 - `pipe - --format csv|json|ndjson` runs the built-in parser as a code space (made on first use, or the one `mnnn migrate` made)
 - Code spaces as project items (`mnnn project add --space`); project packs and pipeline files carry spaces with their members' code (imported unapproved, pins kept)
 - Code spaces share everywhere code does: `mnnn share space …` (project, journal, space, net), data shared *into* a space (`share KIND X space NAME`), `mnnn spaces export|import` (the `muninn-space` file), the network (peers receive the line-up and member code), org resources, `org give`, `--kind space` endpoints, `org code serve|stop --space`, and org code sync. Imports arrive unapproved with pins kept; a clash lands as `NAME-imported`

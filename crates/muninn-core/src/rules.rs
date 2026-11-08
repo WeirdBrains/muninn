@@ -495,7 +495,7 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
         return Err(Error::invalid(
             "--then",
             format!(
-                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch, notify, broadcast, mcp)"
+                "`{s}`: start with an action (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, run-space, cert-watch, notify, broadcast, mcp)"
             ),
         ));
     };
@@ -683,11 +683,15 @@ pub fn parse_then(store: &Store, s: &str) -> Result<Then> {
         }
         "run-code" | "code" => match pos.as_slice() {
             [n] => Then::RunCode { space: store.find_code_space(n)?.id },
-            _ => return Err(bad("run-code takes one code space".into())),
+            _ => return Err(bad("run-code takes one code".into())),
+        },
+        "run-space" | "space" => match pos.as_slice() {
+            [n] => Then::RunSpace { space: store.find_space(n)?.id },
+            _ => return Err(bad("run-space takes one code space".into())),
         },
         v => {
             return Err(bad(format!(
-                "unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, cert-watch, notify, broadcast, mcp)"
+                "unknown action `{v}` (status, search, export-report, export-journal, add-to-project, entry, note, model-create, model-edit, model-apply, model-remove, record-create, record-update, record-delete, run-code, run-space, cert-watch, notify, broadcast, mcp)"
             )));
         }
     };
@@ -776,6 +780,7 @@ pub fn then_text(store: &Store, t: &Then) -> String {
             w.extend(args.iter().map(|(k, v)| format!("{k}={}", quote(&crate::designer::value_text(v)))));
         }
         Then::RunCode { space } => w.push(quote(&name_of(store, ItemKind::Code, space))),
+        Then::RunSpace { space } => w.push(quote(&name_of(store, ItemKind::Space, space))),
         Then::CertWatch { renew_days, notify_days } => {
             w.push(format!("renew={renew_days}"));
             w.push(format!("notify={}", notify_days.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(",")));
@@ -1200,6 +1205,8 @@ fn subject(a: &ActionRecord) -> Result<(ItemKind, String)> {
         p("model").map(|i| (ItemKind::Model, i))
     } else if k.starts_with("code.") {
         p("id").map(|i| (ItemKind::Code, i))
+    } else if k.starts_with("space.") {
+        p("id").map(|i| (ItemKind::Space, i))
     } else if ["journal.", "entry.", "note.", "highlight.", "image."].iter().any(|x| k.starts_with(x)) {
         p("journal").map(|i| (ItemKind::Journal, i))
     } else {
@@ -1241,10 +1248,15 @@ pub fn plan(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
                 if store.mcp_approved(&srv.id, tool)? { "" } else { " — not approved yet, so it would fail" }
             )
         }
+        Then::RunSpace { space } => {
+            let s = space_of(store, space)?;
+            let why = crate::code::spaces::ready_main(store, &s).err().map(|e| format!(" — {e}, so it would fail")).unwrap_or_default();
+            format!("run code space {} ({}, main {}){why}", s.name, s.kind, store.code_space(&s.main_code_id)?.map(|c| c.name).unwrap_or_default())
+        }
         Then::RunCode { space } => {
             let c = code_space(store, space)?;
             format!(
-                "run code space {} ({}){}",
+                "run code {} ({}){}",
                 c.name,
                 c.lang.as_str(),
                 if crate::code::approved(&c) { "" } else { " — not approved yet, so it would fail" }
@@ -1352,6 +1364,10 @@ fn mcp_server(store: &Store, name: &str) -> Result<crate::store::McpServer> {
     store.find_mcp_server(name).map_err(|_| Error::invalid("MCP server", format!("`{name}` is not added on this node (`mnnn mcp add {name} …`)")))
 }
 
+fn space_of(store: &Store, id: &str) -> Result<crate::store::Space> {
+    store.space(id)?.ok_or_else(|| Error::invalid("code space", format!("`{id}` no longer exists")))
+}
+
 fn code_space(store: &Store, id: &str) -> Result<crate::store::CodeSpace> {
     store.code_space(id)?.ok_or_else(|| Error::invalid("code space", format!("`{id}` no longer exists")))
 }
@@ -1455,6 +1471,22 @@ pub fn exec(store: &Store, r: &Rule, a: &ActionRecord, t: &Then) -> Result<Strin
             let t = crate::mcp::result_text(&v);
             let t: String = t.chars().take(200).collect();
             Ok(format!("{}/{tool}: {}", srv.name, t.lines().next().unwrap_or_default()))
+        }
+        Then::RunSpace { space } => {
+            let s = space_of(store, space)?;
+            // refuse before building anything; spaces::run checks again (with cycles and depth)
+            crate::code::spaces::ready_main(store, &s).map_err(|e| Error::invalid("run-space", e.to_string()))?;
+            let env = crate::code::CodeEnv::for_store(store)?;
+            let main =
+                store.code_space(&s.main_code_id)?.ok_or_else(|| Error::invalid("run-space", format!("{}: its main code is missing", s.name)))?;
+            let frame = crate::code::pipe::frame(store, &env, ORIGIN, &crate::code::pipe::Source::of(main.input.clone()), &mut |_| {})?;
+            // every check of running a space: enabled, line-up approved, pins, cycles, depth
+            let info = crate::code::spaces::run(store, &env, ORIGIN, &s, frame, &format!("rule {}", r.name), &mut |_| {})
+                .map_err(|e| Error::invalid("run-space", e.to_string()))?;
+            match (&info.error, crate::code::run_view(&info)) {
+                (Some(e), _) => Err(Error::invalid("run-space", format!("code space {}: {e}", s.name))),
+                (None, v) => Ok(format!("code space {}: {}", s.name, v.map(|v| v.summary()).unwrap_or_default())),
+            }
         }
         Then::RunCode { space } => {
             let c = code_space(store, space)?;
@@ -2284,5 +2316,69 @@ mod tests {
         assert!(check(&s, &r, &a).matched);
         assert!(exec(&s, &r, &a, &t).unwrap().starts_with("fake/price: "));
         assert!(s.actions_of_kind("mcp.call").unwrap().iter().any(|c| c.params["ok"] == true && c.origin == ORIGIN));
+    }
+
+    #[test]
+    fn run_space_checks_what_running_a_space_checks() {
+        use crate::store::{Lang, SpaceKind};
+        let s = Store::open_in_memory().unwrap();
+        let main = s.create_code_space("mainc", "", Lang::Math, "// @imports dbl\nx = 1", Default::default()).unwrap();
+        let dbl = s.create_code_space("dbl", "", Lang::Math, "y = 2", Default::default()).unwrap();
+        let sp = crate::code::spaces::create(&s, "test", "pair", "", SpaceKind::Analysis, &main).unwrap();
+        s.add_space_member(&sp.id, &dbl, None, None).unwrap();
+        // parse and text round-trip; `space` is a short form; unknown spaces are refused
+        assert_eq!(parse_then(&s, "run-space pair").unwrap(), Then::RunSpace { space: sp.id.clone() });
+        assert_eq!(parse_then(&s, "space pair").unwrap(), Then::RunSpace { space: sp.id.clone() });
+        assert!(parse_then(&s, "run-space nope").is_err() && parse_then(&s, "run-space").is_err());
+        let r = rule(&s, "import", &[], &["run-space pair"]);
+        assert_eq!(then_text(&s, &r.spec.then[0]), "run-space pair");
+        assert_eq!(r.spec.then[0].verb(), "run-space");
+        let a = act(&s, "import", json!({}));
+        let t = &r.spec.then[0];
+        // not approved: the plan says so and the run fails
+        assert!(plan(&s, &r, &a, t).unwrap().contains("would fail"), "{}", plan(&s, &r, &a, t).unwrap());
+        let e = exec(&s, &r, &a, t).unwrap_err().to_string();
+        assert!(e.contains("approve"), "{e}");
+        // approved but disabled
+        crate::code::spaces::approve(&s, "test", &sp, true).unwrap();
+        assert!(!plan(&s, &r, &a, t).unwrap().contains("would fail"), "{}", plan(&s, &r, &a, t).unwrap());
+        s.set_space_enabled(&sp.id, false).unwrap();
+        let e = exec(&s, &r, &a, t).unwrap_err().to_string();
+        assert!(e.contains("disabled"), "{e}");
+        s.set_space_enabled(&sp.id, true).unwrap();
+        // a pinned main that changed fails until pinned again
+        s.set_member_pin(&sp.id, &main.id, Some(&crate::code::trust_hash(&main).unwrap())).unwrap();
+        crate::code::spaces::approve(&s, "test", &s.space(&sp.id).unwrap().unwrap(), true).unwrap();
+        s.update_code_space(&main.id, &crate::store::CodeChange { source: Some("// @imports dbl\nx = 2".into()), ..Default::default() }).unwrap();
+        let e = exec(&s, &r, &a, t).unwrap_err().to_string();
+        assert!(e.contains("pinned"), "{e}");
+        // a line-up change asks for approval again
+        s.set_member_pin(&sp.id, &main.id, None).unwrap();
+        let e = exec(&s, &r, &a, t).unwrap_err().to_string();
+        assert!(e.contains("approve"), "{e}");
+        // the space's history names it as the subject
+        assert!(s.find_space("pair").is_ok());
+    }
+
+    #[test]
+    fn run_space_refuses_spaces_deeper_than_eight() {
+        use crate::store::{Lang, SpaceKind};
+        let s = Store::open_in_memory().unwrap();
+        // a chain s0 → s1 → … → s9 through @imports: approving the top one is refused (depth)
+        let mut prev: Option<String> = None;
+        for i in (0..10).rev() {
+            let src = match &prev {
+                Some(p) => format!("// @imports space:{p}\nx = {i}"),
+                None => format!("x = {i}"),
+            };
+            let c = s.create_code_space(&format!("c{i}"), "", Lang::Math, &src, Default::default()).unwrap();
+            crate::code::spaces::create(&s, "test", &format!("s{i}"), "", SpaceKind::Analysis, &c).unwrap();
+            prev = Some(format!("s{i}"));
+        }
+        let top = s.find_space("s0").unwrap();
+        assert!(crate::code::spaces::approve(&s, "test", &top, true).is_err(), "too deep to approve");
+        let r = rule(&s, "import", &[], &["run-space s0"]);
+        let a = act(&s, "import", json!({}));
+        assert!(exec(&s, &r, &a, &r.spec.then[0]).is_err());
     }
 }

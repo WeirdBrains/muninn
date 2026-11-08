@@ -248,3 +248,17 @@ fn space_files_and_the_share_command_carry_spaces() {
     c.ok(&["-y", "spaces", "import", f, "--name", "copy"]);
     assert!(c.ok(&["spaces", "list"]).contains("copy"));
 }
+
+#[test]
+fn rules_run_a_code_space() {
+    let e = Env::new();
+    math(&e, "mainc", "x = 1\n");
+    e.ok(&["spaces", "create", "pair", "--kind", "analysis", "--main", "mainc"]);
+    e.ok(&["rule", "create", "Crunch", "--on", "import", "--then", "run-space pair"]);
+    let show = e.ok(&["rule", "show", "Crunch"]);
+    assert!(show.contains("run-space pair"), "{show}");
+    let o = e.run(&["rule", "create", "Bad", "--on", "import", "--then", "run-space nope"]);
+    assert!(!o.status.success() && err(&o).contains("nope"), "{}", err(&o));
+    let r = json(&e.ok(&["rule", "show", "Crunch", "--json"]));
+    assert!(r.to_string().contains("run-space"), "{r}");
+}

@@ -181,6 +181,21 @@ pub fn check_runnable(store: &Store, s: &Space) -> Result<()> {
     check(store, s)
 }
 
+/// Everything a top-level run checks before building: [`check_runnable`] and main's pin.
+/// Gives main. (Cycles and depth are checked by [`run`] itself.)
+pub fn ready_main(store: &Store, s: &Space) -> Result<MemberState> {
+    check_runnable(store, s)?;
+    let ms = members(store, s)?;
+    let main = ms.into_iter().find(|m| m.main).ok_or_else(|| Error::invalid("space", format!("{}: its main code is missing", s.name)))?;
+    if main.pin_broken {
+        return Err(Error::invalid(
+            "space",
+            format!("{}: main {} changed since pinned; `mnnn spaces pin {} {}` accepts it", s.name, main.code.name, s.name, main.code.name),
+        ));
+    }
+    Ok(main)
+}
+
 struct Frame {
     space: Space,
     /// A member (not main) is running: it may not call.
@@ -241,15 +256,7 @@ fn run_any(
     if depth >= MAX_DEPTH {
         return Err(Error::invalid("space", format!("spaces call spaces more than {MAX_DEPTH} deep (at {})", s.name)));
     }
-    check_runnable(store, s)?;
-    let ms = members(store, s)?;
-    let main = ms.iter().find(|m| m.main).ok_or_else(|| Error::invalid("space", format!("{}: its main code is missing", s.name)))?;
-    if main.pin_broken {
-        return Err(Error::invalid(
-            "space",
-            format!("{}: main {} changed since pinned; `mnnn spaces pin {} {}` accepts it", s.name, main.code.name, s.name, main.code.name),
-        ));
-    }
+    let main = ready_main(store, s)?;
     if main.unreviewed {
         log(&format!("note: {} runs main {} as edited (unreviewed)", s.name, main.code.name));
     }

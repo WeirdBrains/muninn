@@ -63,7 +63,8 @@ its values does. `mcp:SERVER/TOOL(key=value,…).path` reads an external
 | `record-create [MODEL] FIELD=VALUE…` | adds a record |
 | `record-update [MODEL] id=ID\|where="F OP V; …" FIELD=VALUE…` | changes one record, or all that match |
 | `record-delete [MODEL] id=ID\|where="F OP V; …"` | deletes one record, or all that match |
-| `run-code SPACE` | runs an approved [code space](code-spaces.md) (building it if needed); a changed or unapproved one fails |
+| `run-code CODE` | runs one approved piece of code (building it if needed); a changed or unapproved one fails |
+| `run-space SPACE` (or `space SPACE`) | runs a [code space](code-spaces.md): its main, over main's own input, with the same checks as `mnnn spaces run` — enabled, line-up approved, main's pin, cycles and the depth-8 limit; otherwise the rule's run fails and `rule test`/dry runs say why. Project packs carry the space |
 | `notify TITLE [body=T] [link=KIND:ID] [level=info\|warn\|error]` | a [notification](notifications.md); `notification` actions are triggers too |
 | `broadcast TOPIC [text=T] [to=nodes\|connections\|all\|org:SLUG]` | a [broadcast](notifications.md#broadcasts) to other nodes (queued; the running node sends it); `net.broadcast` triggers on one received |
 | `mcp SERVER TOOL [KEY=VALUE…]` | calls an external [MCP](mcp.md) server's tool (values are templates); the tool must be approved first (`mnnn mcp approve`) |

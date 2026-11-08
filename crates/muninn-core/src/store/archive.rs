@@ -438,6 +438,10 @@ impl Store {
         }));
         // code spaces it uses (items, and the spaces their mains import): line-ups and code
         let mut space_todo: Vec<String> = items.iter().filter(|i| i.kind == ItemKind::Space).map(|i| i.ref_id.clone()).collect();
+        space_todo.extend(rules.iter().flat_map(|r| r.spec.then.iter()).filter_map(|t| match t {
+            Then::RunSpace { space } => Some(space.clone()),
+            _ => None,
+        }));
         let mut spaces: Vec<SpacePack> = vec![];
         while let Some(id) = space_todo.pop() {
             if spaces.iter().any(|s| s.space.id == id) {
@@ -989,7 +993,7 @@ fn remap_then(t: &mut Then, map: &dyn Fn(&str) -> String) {
     match t {
         Then::Status { .. } | Then::CertWatch { .. } | Then::Notify { .. } | Then::Broadcast { .. } | Then::Mcp { .. } => {}
         Then::RunSearch { search } => opt(search),
-        Then::RunCode { space } => *space = map(space),
+        Then::RunCode { space } | Then::RunSpace { space } => *space = map(space),
         Then::ExportReport { report, .. } => *report = map(report),
         Then::ExportJournal { journal, .. } | Then::WriteEntry { journal, .. } | Then::AddNote { journal, .. } => opt(journal),
         Then::AddToProject { project, item } => {

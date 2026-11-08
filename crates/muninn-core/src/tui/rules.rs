@@ -25,7 +25,7 @@ impl RAsk {
             RAsk::Name => "Rule name",
             RAsk::On => "On (action kinds: import, journal.*, *; or every 6h / cron \"0 3 * * *\")",
             RAsk::If => "If (FIELD OP VALUE; …, empty: always)",
-            RAsk::Then => "Then (status …; search …; export-report … to=…; entry …)",
+            RAsk::Then => "Then (status …; search …; export-report … to=…; entry …; run-code CODE; run-space SPACE)",
             RAsk::Home => "Lives in (project:NAME, journal:NAME, search:NAME, model:NAME or empty)",
         }
     }

@@ -114,3 +114,25 @@ fn rules_menu_entry_matches_the_key() {
     assert!(matches!(a.modal, Some(Modal::Rules)));
     assert!(super::menu::menus().iter().any(|m| m.items.iter().any(|i| i.label == "Rules…" && i.shortcut == "R")));
 }
+
+#[test]
+fn the_rule_editor_takes_run_space() {
+    use crate::store::{CodeInput, Lang, SpaceKind};
+    let (_t, mut a) = app();
+    let c = a.store.create_code_space("calc", "", Lang::Math, "x = 1", CodeInput::default()).unwrap();
+    let sp = crate::code::spaces::create(&a.store, "test", "pair", "", SpaceKind::Analysis, &c).unwrap();
+    a.on_key(key(KeyCode::Char('R')));
+    a.on_key(key(KeyCode::Char('n')));
+    typ(&mut a, "Crunch\nimport\n\n");
+    assert!(screen_text(&mut a).contains("run-space SPACE"), "the hint names it");
+    typ(&mut a, "run-space nope\n");
+    assert!(a.rules.msg.as_ref().unwrap().1, "an unknown space is an error");
+    for _ in 0.."run-space nope".len() {
+        a.on_key(key(KeyCode::Backspace));
+    }
+    typ(&mut a, "run-space pair\n\n");
+    let all = a.store.rules().unwrap();
+    assert_eq!(all.len(), 1, "{:?}", a.rules.msg);
+    assert_eq!(all[0].spec.then[0], crate::store::Then::RunSpace { space: sp.id });
+    assert!(screen_text(&mut a).contains("run-space pair"));
+}
