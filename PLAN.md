@@ -184,9 +184,11 @@ CREATE TABLE schedules (
     source_id TEXT REFERENCES sources(id) ON DELETE CASCADE,           -- connector: where raw items land
     pipeline_id TEXT REFERENCES pipelines(id) ON DELETE SET NULL,      -- connector: turns them into model records
     options TEXT NOT NULL DEFAULT '{}',        -- JSON for host.option()
-    run_every TEXT,                            -- as written: "500ms", "30s", "15m", "6h", "1d", "1M"
-    every_ms INTEGER,                          -- parsed ms/s/m/h/d; NULL for months or cron
-    every_months INTEGER,                      -- parsed M; NULL otherwise
+    start_at INTEGER,                          -- epoch ms, UTC: first (or only) run; entered in `date -d` formats
+    start_at_input TEXT,                       -- as typed, e.g. "tomorrow 9am" (shown in `schedule show`)
+    run_every TEXT,                            -- as written: "2 hours 30 minutes", "1 month", "250 milliseconds", "15m", "1M"
+    every_ms INTEGER,                          -- the fixed part in ms (ms..weeks); NULL when none
+    every_months INTEGER,                      -- calendar months (and years × 12); NULL when none
     cron TEXT,                                 -- five fields, as scheduled rules use today
     enabled INTEGER NOT NULL DEFAULT 1,
     overlap TEXT NOT NULL DEFAULT 'skip' CHECK (overlap IN ('skip','queue')),
@@ -196,7 +198,8 @@ CREATE TABLE schedules (
     author_id TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    CHECK ((run_every IS NULL) <> (cron IS NULL)),
+    CHECK (NOT (run_every IS NOT NULL AND cron IS NOT NULL)),      -- one repeat rule at most
+    CHECK (run_every IS NOT NULL OR cron IS NOT NULL OR start_at IS NOT NULL),  -- something to run on
     CHECK (target_kind <> 'connector' OR (plugin_id IS NOT NULL AND source_id IS NOT NULL)),
     CHECK (target_kind <> 'ruleset' OR ruleset_id IS NOT NULL)
 );
@@ -226,15 +229,54 @@ CREATE INDEX schedule_runs_schedule ON schedule_runs(schedule_id, timestamp);
 CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pending','running');
 ```
 
-### run_every (Michael: case-sensitive `ms`, `s`, `m`, `h`, `d`, `M`)
+### When a schedule runs: `start_at`, `run_every`, `cron` (Michael: "follow the `date` command format")
 
-- `N` followed by a unit: **`ms`** milliseconds, **`s`** seconds, **`m`** minutes, **`h`** hours, **`d`** days, capital **`M`** months. N is a positive integer.
-- Units are case-sensitive: `1m` is a minute and `1M` is a month. `MS`, `S`, `H`, `D` and `mo` are rejected with a hint that lists the units.
-- `ms`–`d` become `every_ms`. `M` becomes `every_months`, stepped by calendar month in UTC and clamped to the month's last day, keeping the original day of month (Jan 31 → Feb 28/29 → Mar 31).
-- `next_run_at` advances from the due time, not the finish time, so it doesn't drift.
+**`start_at`** (Michael: "run a schedule on a particular date and/or time … a start_at field that takes a timestamp")
+
+- It is entered in GNU `date -d` input formats and stored as epoch ms, UTC. The text as typed is kept in `start_at_input`.
+  - Absolute: `2026-11-10 09:00`, `2026-11-10T09:00:00Z`, `Nov 10 2026 9am`, `@1762765200` (Unix seconds).
+  - Relative: `tomorrow 9am`, `next monday`, `next monday 14:30`, `2 hours`, `now + 90 minutes`.
+- **Time zone:** the input is read in local time unless it has a zone (`Z`, `+01:00`, `UTC`, `TZ="Europe/Paris" …`), as `date` does. Relative inputs are resolved once, when the schedule is saved (`tomorrow 9am` is a fixed time, not every day).
+- **Confirmation:** the parsed time is always shown back before saving, in local time and in UTC: `start_at: Tue 2026-11-10 09:00 EST (14:00Z) — in 1 d 23 h`. The CLI prints it and asks (`-y` skips, `--json` returns it), the TUI form shows it live as you type, and the app does the same.
+- **In the past:** a `start_at` in the past is refused unless `--allow-past` is given (then it runs at once, then follows `run_every`).
+
+**`run_every`** (Michael: `date` format, plus the earlier short codes)
+
+- It uses `date` relative-item syntax: `N unit`, items can be chained, and units take an optional plural `s`.
+  - Examples: `5 minutes`, `90 seconds`, `1 month`, `2 hours 30 minutes`, `1 week`, `1 fortnight`, `1 year`, `1 day 12 hours`.
+  - Units: `year`, `month`, `fortnight`, `week`, `day`, `hour`, `minute`/`min`, `second`/`sec`.
+- **Milliseconds,** which `date` lacks: `millisecond`/`milliseconds`/`msec`, for example `250 milliseconds`.
+- **Short codes (Michael's earlier answer), still accepted as shorthand and case-sensitive:** `ms`, `s`, `m` (minutes), `h`, `d`, capital `M` (months). They can be written joined or spaced: `15m`, `15 m`, `1M`, `500ms`. `1m` is a minute and `1M` is a month.
+  - `MS`, `S`, `H`, `D` and `mo` are rejected with a hint listing both forms.
+  - `w` (week), allowed by today's scheduled rules, is kept as a short code for `1 week`.
+- **Not allowed in an interval:** `ago`, signs, `next`, `last`, `tomorrow`, weekdays and dates (these are points in time, not intervals) are rejected with "that is a time, use --start-at". Zero and negative totals are rejected.
+- **Stored as:**
+  - the fixed part (milliseconds through weeks) → `every_ms`
+  - months (and years × 12) → `every_months`
+  - Mixed values such as `1 month 2 days` add months first, then the fixed part.
+- **Months are calendar months:** each run is the previous due time plus N months, clamped to the end of the month, keeping the original day of month (Jan 31 → Feb 28/29 → Mar 31). The clock time is kept in the time zone the schedule was entered in (see Q-T2).
+- **Printing:** `run_every` is shown in the long form (`every 2 hours 30 minutes`), and the short form is accepted on input.
+- **No drift:** `next_run_at` advances from the due time, not the finish time.
 - **Floor (default accepted pending objection):** the scheduler ticks every second, so anything under 1 s runs at most once per tick.
-- **Old scheduled rules** also allow `w` (week). It is kept as an alias that is stored as `7d`, and the old one-minute minimum goes away.
-- **cron:** the same five-field syntax, in local time, as scheduled rules have now (Q-S1 asks about UTC).
+
+**`cron`:** the same five-field syntax as scheduled rules today, in local time (Q-S1 asks about UTC).
+
+**How they combine** (`next_run_at` when saved):
+
+| fields | runs |
+|--------|------|
+| `start_at` only | once, at `start_at`; then the schedule is done (disabled; `schedule show` says "ran once") |
+| `start_at` + `run_every` | first at `start_at`, then every interval after it |
+| `run_every` only | first one interval after creation (proposed; Q-T1 asks about running immediately instead) |
+| `cron` only | at the next cron time |
+| `start_at` + `cron` | at the first cron time at or after `start_at` ("not before then") |
+| `run_every` + `cron` | refused (one repeat rule) |
+
+**Parsing (nothing installed now; added as a dependency when phase 2 is built):**
+
+- **`start_at`:** `parse_datetime` (uutils, MIT; version 0.17.0 on crates.io), the uutils `date -d` parser, built on `jiff`. It handles absolute dates and times, ISO 8601, `@epoch`, zones, `TZ="…"`, `tomorrow`, `next monday`, weekdays and relative offsets, resolved against a base time we pass, so tests use a fixed clock. Its result is converted to epoch ms.
+- **`run_every`:** Muninn's own small parser (a few dozen lines, next to `parse_every` in `rules.rs`). It implements the `date` relative-item grammar for intervals, plus `milliseconds` and the short codes, and returns `(every_months, every_ms)`. It is ours because the result is an interval, not a point in time, months must stay calendar months (not a fixed length), and `ms` is not in `date`. `parse_datetime`'s documented relative units don't include `month` or `year` (Q-T3).
+- The repo uses `chrono` today, and `parse_datetime` brings `jiff`. The conversion stays at the parse boundary. Q-T3 asks whether a second date library is acceptable.
 
 ### The scheduler service
 
@@ -253,7 +295,8 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 
 - **Migration (once, on opening a 2.24 database):** each rule whose `spec.schedule` is set (`--every` or `--cron`) becomes:
   - a rule set `NAME (scheduled)` containing just that rule, plus a schedule targeting it with the same interval or cron
-  - `next_run_at` taken from the rule's `last_run_at` and interval, so nothing runs early or twice
+  - `next_run_at` taken from the rule's `last_run_at` and interval, so nothing runs early or twice; `start_at` stays NULL
+  - the interval rewritten in the long form (`6h` → `run_every = "6 hours"`, `1w` → `"1 week"`), with the same `every_ms`; cron copied as is
   - the `schedule` field removed from the rule's spec
 - The built-in **cert-expiry-watch** moves the same way: rule set `cert-expiry-watch`, a schedule every 6 hours. It is still made the first time an org gets a domain.
 - The migration is recorded as a `schedule.migrate` action and covered by the database backup taken before migrations.
@@ -263,11 +306,22 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 ### Surfaces
 
 - **CLI:**
-  - `mnnn schedule add NAME (--plugin P --source S [--pipeline PL] | --ruleset R) (--every N[ms|s|m|h|d|M] | --cron "…") [--ruleset R] [--option k=v]… [--overlap skip|queue] [--catch-up once|all|none] [--max-attempts N]`
+  - `mnnn schedule add NAME (--plugin P --source S [--pipeline PL] | --ruleset R) [--start-at WHEN] [--every INTERVAL | --cron "…"] [--allow-past] [--ruleset R] [--option k=v]… [--overlap skip|queue] [--catch-up once|all|none] [--max-attempts N] [-y]`
+  - WHEN is any `date -d` input, and INTERVAL is `date` relative items or a short code. Examples:
+    - `mnnn schedule add weekly-report --ruleset Weekly --start-at "next monday 9am" --every "1 week"`
+    - `mnnn schedule add month-end --ruleset Close --start-at "2026-11-30 18:00" --every "1 month"` (then Dec 31, Jan 31, Feb 28…)
+    - `mnnn schedule add once --ruleset Audit --start-at "2026-11-10T14:00:00Z"` (a single run)
+    - `mnnn schedule add binance --plugin binance --source binance --pipeline to-bars-5m --ruleset Alerts --every "5 minutes"`
+    - `mnnn schedule add fast --plugin ticker --source t --every 250ms` (short code)
+    - `mnnn schedule add nightly --ruleset Nightly --cron "0 3 * * *" --start-at "2026-12-01"` (cron, not before Dec 1)
+  - `mnnn schedule parse --start-at WHEN | --every INTERVAL [--json]` prints what an input means (local and UTC, the next three runs) without saving
   - `mnnn schedule list|show|edit|enable|disable|remove|run-now NAME`
   - `mnnn schedule runs NAME [--status S] [--json]`
   - `mnnn scheduler run|tick|status`
 - **TUI:** Projects ▸ **Schedules…** (a schedule window: `n`, `e`, Space, `r` run now, Enter runs), with the scheduler's state in the status bar.
+  - **The new/edit form** has the fields Name · Target (connector or rule set) · Start at · Repeat (every / cron / once).
+  - Start at takes `date` input, with the parsed time shown under the field in local and UTC as you type (red with the error when it doesn't parse).
+  - Repeat takes `date` intervals or short codes, shown back in the long form, with the next three run times listed before you save.
 - **App** (Matematik): the same.
 
 ### Tests
@@ -276,7 +330,19 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - the same next runs
   - nothing runs twice
   - the cert watcher keeps working
-- run_every parsing, including case sensitivity (`1m` vs `1M`, rejecting `1MS` and `1mo`) and month clamping. cron stepping (existing tests move).
+- `start_at` parsing with a fixed clock and zone:
+  - absolute (`2026-11-10 09:00`, ISO with `Z` and offsets, `@1762765200`) and relative (`tomorrow 9am`, `next monday`)
+  - local vs explicit zones, and DST edges (a nonexistent or repeated local time)
+  - refusing the past without `--allow-past`
+  - the confirmation text
+- `run_every` parsing:
+  - `date` items (`5 minutes`, `90 seconds`, `2 hours 30 minutes`, `1 week`, `1 fortnight`, `1 month`, `1 year`, plurals and `min`/`sec`), and `250 milliseconds`
+  - the short codes, case-sensitive (`1m` vs `1M`, rejecting `1MS`, `1mo`, `S`)
+  - rejecting `ago`, `next`, dates and zero
+  - long-form printing round-trips
+- Month stepping: clamping (Jan 31 → Feb 28 → Feb 29 in a leap year → Mar 31), `1 month 2 days`, and the local clock time across DST.
+- Combinations: `start_at` alone (one run, then done), `start_at` + `run_every`, `run_every` alone (the first run one interval later), `cron` with `start_at` (not before), `run_every` + `cron` refused. cron stepping (existing tests move).
+- The migration writes the long forms and the same `every_ms`.
 - Scheduler, with a fake clock:
   - lease and claim-once under two schedulers
   - each status edge
@@ -416,7 +482,7 @@ The inventory is checked against the code before implementing; any share point f
 
 ### Answered by Michael (Nov 8, 2026)
 
-1. **Months vs minutes:** **Resolved.** `m` = minutes, capital `M` = months, case-sensitive (`ms`, `s`, `m`, `h`, `d`, `M`). The `mo` proposal is dropped.
+1. **Months vs minutes:** **Resolved.** `m` = minutes, capital `M` = months, case-sensitive (`ms`, `s`, `m`, `h`, `d`, `M`). The `mo` proposal is dropped. Later (9:11 AM): `run_every` and the new `start_at` follow the `date` command format; the short codes stay as shorthand (phase 2).
 2. **What is a "ruleset id"?** **Resolved.** A first-class `rulesets` table (designed in phase 2); `ruleset_id` references it.
 3. **Who calls the rule set?** **Resolved.** The plugin calls the pipeline and the rule set through host methods (`host.pipe(…)`, `host.run_ruleset(ruleset_id)`); Muninn doesn't do it after the plugin returns. Status recording is covered in phase 3.
 4. **Raw data in `source_data`?** **Resolved.** Yes: connectors store raw items in `source_data`, and a pipeline per schedule turns them into model records. Schedules keep `source_id` and `pipeline_id`.
@@ -442,3 +508,9 @@ The inventory is checked against the code before implementing; any share point f
 - **Q-I1 `host.pipe` target:** may a connector call pipelines other than its schedule's, or only that one?
 - **Q-I2 Skipped calls:** if a schedule has a pipeline or rule set and the plugin never calls `pipe` or `run_ruleset`, should the run be `success` with a flag (proposed) or `failed`?
 - **Q-SH1 Scope of create-then-share:** does it include creating the *target* too (for example a new project or journal while sharing into one), as planned, or only the item being shared?
+- **Q-T1 `run_every` without `start_at`:** run first one interval after the schedule is created (proposed: no surprise run while setting up), or immediately, as today's scheduled rules do ("a new one runs at once")? Same question when a schedule is re-enabled.
+- **Q-T2 Which clock for calendar steps:** months, days and weeks keep the wall-clock time in the zone the schedule was entered in (proposed: a `9am` schedule stays 9am through DST; needs a `tz` column, the IANA zone or the local one at entry), or step in UTC (simpler, but 9am becomes 8am or 10am after a DST change)?
+- **Q-T3 Dependencies:** OK to add `parse_datetime` (MIT, which pulls in `jiff`) next to our `chrono` for `start_at`, with `run_every` parsed by our own code? The alternative is to write the `date -d` subset ourselves on `chrono`, which is more work and a weaker match to `date`.
+- **Q-T4 One-off schedules after they run:** a `start_at`-only schedule is disabled and kept with its run history (proposed), deleted, or kept enabled but inert?
+- **Q-T5 `start_at` in the past:** refuse unless `--allow-past` (proposed), or accept and run at once?
+- **Q-T6 `start_at` with `catch_up`:** when the node was off at `start_at`, does a one-off run when it next starts (proposed: yes, following `catch_up = once`), or is it skipped?
