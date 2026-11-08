@@ -517,7 +517,7 @@ The inventory is checked against the code before implementing; any share point f
 ### Still open
 
 - **Q-T1 `run_every` without `start_at`:** run first one interval after the schedule is created (proposed: no surprise run while setting up), or immediately, as today's scheduled rules do ("a new one runs at once")? Same question when a schedule is re-enabled.
-- **Q-T2 Which clock for calendar steps:** months, days and weeks keep the wall-clock time in the zone the schedule was entered in (proposed: a `9am` schedule stays 9am through DST; needs a `tz` column, the IANA zone or the local one at entry), or step in UTC (simpler, but 9am becomes 8am or 10am after a DST change)?
+- **Q-T2 Filling `tz`:** now that schedules have an optional `tz` (Q-S1), should a new schedule get the node's local zone in `tz` automatically (proposed: a `9am` schedule then stays 9am through DST), or stay NULL (UTC steps and cron in UTC) unless `--tz` is given?
 - **Q-T3 Dependencies:** OK to add `parse_datetime` (MIT, which pulls in `jiff`) next to our `chrono` for `start_at`, with `run_every` parsed by our own code? The alternative is to write the `date -d` subset ourselves on `chrono`, which is more work and a weaker match to `date`.
 - **Q-T4 One-off schedules after they run:** a `start_at`-only schedule is disabled and kept with its run history (proposed), deleted, or kept enabled but inert?
 - **Q-T5 `start_at` in the past:** refuse unless `--allow-past` (proposed), or accept and run at once?
