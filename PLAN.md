@@ -46,7 +46,7 @@ Phase 1, [Plugins](#plugins), once Michael confirms the open questions.
 ### The manifest and `kind`
 
 - **Manifest** = the plugin's info JSON, extended. The SDK adds `"kind"` (and `name`, `version`, `description`), read from a `@kind` header in the source or set at build time: `{"sdk": "1.1.0", "lang": "rust", "kind": "parser", "name": "parse-csv", "version": "1"}`. The `code_spaces` table gets `kind TEXT` to match, so lists don't load libraries.
-- **Kinds (v1):** `parser` (raw bytes → rows), `transform` (frame → frame, a pipe step), `analysis` (runs for a view), `ingest-connector` (phase 3).
+- **One kind per plugin (Michael: Q-P2).** Kinds (v1): `parser` (raw bytes → rows), `transform` (frame → frame, a pipe step), `analysis` (runs for a view), `ingest-connector` (phase 3).
 - **Validation:**
   - `kind` is required: lowercase, one of the known kinds, and the same in the library and its `code_spaces` row.
   - An unknown kind is rejected and the error lists the known ones.
@@ -74,7 +74,7 @@ mnnn plugins migrate [NAME…] [--kind K] [--dry-run] [--yes] [--no-backup]
 - **Rewrites:**
   - sets `code_spaces.kind`
   - adds `@kind` to the source of source-built plugins
-  - rebuilds them; the approval stays when only the header changed (Q-P3)
+  - rebuilds them; the approval stays when only the kind was added (Michael: Q-P3); any other change needs approving again
   - prebuilt libraries can't be rewritten: their kind is recorded on the row, and `info` says to rebuild with SDK 1.1.0
 - **Backups:** writes `MUNINN_HOME/backups/plugins-migrate-<UTC timestamp>.tar.zst` first (rows and sources), unless `--no-backup`.
 - **`--dry-run`:** prints each plugin, the kind it would get and why, and changes nothing.
@@ -84,7 +84,11 @@ mnnn plugins migrate [NAME…] [--kind K] [--dry-run] [--yes] [--no-backup]
 ### Menus
 
 - **TUI:** a new **Plugins** main menu, with one entry per kind: **Parsers…**, **Transforms…**, **Analysis…**, **Ingest connectors…** (phase 3), plus **All plugins…** and **Migrate…**. Each opens a Plugins window filtered to the kind, with `n` new or install, Enter info, `e` edit (opens the code space), Space enable or disable, `d` remove and `m` migrate.
-  - The bar becomes File, View, Data, Projects, **Code**, **Plugins**, Net, Orgs, Keys, Theme, Help: eleven categories, which no longer fit in 80 columns. Q-P1 asks how to handle that.
+  - **Short labels (Michael: Q-P1).** The bar becomes **File · View · Data · Proj · Code · Plug · Net · Orgs · Keys · Theme · Help**.
+    - Width: each label plus 2, plus 1 = 67 columns, leaving 13 of 80 for the `F10 menu` hint (dropped when there is no room, as now).
+    - The full names would take 74 columns and leave almost no room for the hint.
+    - Mnemonics: Alt+P Proj, Alt+C Code, Alt+L Plug; the others are unchanged.
+    - The full names stay as dropdown headers, in help, in the docs and in the app.
 - **App** (Matematik): a **Plugins** destination with the same per-kind sub-entries, under "More" on phones.
 
 ### Docs and tests
@@ -107,7 +111,7 @@ mnnn plugins migrate [NAME…] [--kind K] [--dry-run] [--yes] [--no-backup]
 
 ### Today and plan
 
-- **CLI:** `mnnn code` already exists (alias `mnnn codes`) with list, create, edit, show, approve, build, run, check, remove, sdk and parsers. The plan keeps `mnnn code` and adds `mnnn code-spaces` as a second alias, rather than renaming (Q-C1).
+- **CLI:** `mnnn code` already exists (alias `mnnn codes`) with list, create, edit, show, approve, build, run, check, remove, sdk and parsers. It stays `mnnn code` (alias `codes`), with `mnnn code-spaces` added as a further alias (Michael: Q-C1).
 - **TUI:** code spaces move from **Projects ▸ Code spaces…** to a main **Code** menu, Alt+C, with:
   - Code spaces…
   - New code space…
@@ -119,7 +123,7 @@ mnnn plugins migrate [NAME…] [--kind K] [--dry-run] [--yes] [--no-backup]
   - Pipelines…
   - Plugin SDK…
 
-  Pipes and pipelines move with it (Q-C2). Projects ▸ Code spaces… stays one release as a pointer.
+  Live pipes and Pipelines move from Projects into Code (Michael: Q-C2); Projects ▸ Pipes and Pipelines stay one release as pointers. Projects ▸ Code spaces… stays one release as a pointer.
 - **App** (Matematik): a **Code spaces** main destination with the same items.
 - **Code spaces and Plugins:** a code space is the source you write; a plugin is what it builds, plus prebuilt libraries. Code ▸ manages sources, and Plugins ▸ manages kinds and installs. Both open the same item.
 - **Tests:** menu and keybinding tests, and the alias in the CLI tests. Help topics and the docs (`menus.md`, `code-spaces.md`) are updated.
@@ -186,6 +190,7 @@ CREATE TABLE schedules (
     options TEXT NOT NULL DEFAULT '{}',        -- JSON for host.option()
     start_at INTEGER,                          -- epoch ms, UTC: first (or only) run; entered in `date -d` formats
     start_at_input TEXT,                       -- as typed, e.g. "tomorrow 9am" (shown in `schedule show`)
+    tz TEXT,                                   -- optional IANA zone ("America/New_York"); NULL = UTC for cron, local for reading input
     run_every TEXT,                            -- as written: "2 hours 30 minutes", "1 month", "250 milliseconds", "15m", "1M"
     every_ms INTEGER,                          -- the fixed part in ms (ms..weeks); NULL when none
     every_months INTEGER,                      -- calendar months (and years × 12); NULL when none
@@ -236,7 +241,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 - It is entered in GNU `date -d` input formats and stored as epoch ms, UTC. The text as typed is kept in `start_at_input`.
   - Absolute: `2026-11-10 09:00`, `2026-11-10T09:00:00Z`, `Nov 10 2026 9am`, `@1762765200` (Unix seconds).
   - Relative: `tomorrow 9am`, `next monday`, `next monday 14:30`, `2 hours`, `now + 90 minutes`.
-- **Time zone:** the input is read in local time unless it has a zone (`Z`, `+01:00`, `UTC`, `TZ="Europe/Paris" …`), as `date` does. Relative inputs are resolved once, when the schedule is saved (`tomorrow 9am` is a fixed time, not every day).
+- **Time zone (Michael: Q-S1):** the input is read in the schedule's `tz` if set, otherwise local time, unless the text has a zone (`Z`, `+01:00`, `UTC`, `TZ="Europe/Paris" …`), as `date` does. It is converted to UTC when entered and stored as epoch ms, UTC. Relative inputs are resolved once, when the schedule is saved (`tomorrow 9am` is a fixed time, not every day).
 - **Confirmation:** the parsed time is always shown back before saving, in local time and in UTC: `start_at: Tue 2026-11-10 09:00 EST (14:00Z) — in 1 d 23 h`. The CLI prints it and asks (`-y` skips, `--json` returns it), the TUI form shows it live as you type, and the app does the same.
 - **In the past:** a `start_at` in the past is refused unless `--allow-past` is given (then it runs at once, then follows `run_every`).
 
@@ -254,12 +259,12 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - the fixed part (milliseconds through weeks) → `every_ms`
   - months (and years × 12) → `every_months`
   - Mixed values such as `1 month 2 days` add months first, then the fixed part.
-- **Months are calendar months:** each run is the previous due time plus N months, clamped to the end of the month, keeping the original day of month (Jan 31 → Feb 28/29 → Mar 31). The clock time is kept in the time zone the schedule was entered in (see Q-T2).
+- **Months are calendar months:** each run is the previous due time plus N months, clamped to the end of the month, keeping the original day of month (Jan 31 → Feb 28/29 → Mar 31). Calendar steps (months, days, weeks) follow `tz` when it is set, so 9am stays 9am through DST; without `tz` they step in UTC (Q-T2 asks whether to fill `tz` automatically).
 - **Printing:** `run_every` is shown in the long form (`every 2 hours 30 minutes`), and the short form is accepted on input.
 - **No drift:** `next_run_at` advances from the due time, not the finish time.
 - **Floor (default accepted pending objection):** the scheduler ticks every second, so anything under 1 s runs at most once per tick.
 
-**`cron`:** the same five-field syntax as scheduled rules today, in local time (Q-S1 asks about UTC).
+**`cron`:** the same five-field syntax as scheduled rules today, evaluated **in UTC**, or in the schedule's `tz` when set (Michael: Q-S1). `--tz ZONE` on `schedule add|edit`; `schedule show` gives both the zone's and UTC times. Migrated scheduled rules (local-time cron today) get `tz` set to the node's local zone, so they keep firing at the same wall-clock times.
 
 **How they combine** (`next_run_at` when saved):
 
@@ -410,7 +415,7 @@ A system scheduler service needs to be created to support this.
 | `host.context()` | `{schedule_id, run_id, ruleset_id, source, pipeline, last_success_at, options}` |
 | `host.option(name)` | (exists) the schedule's options |
 | `host.store_raw(name, format, bytes)` | one raw item into the run's source; returns its id |
-| `host.pipe([pipeline])` | runs the schedule's pipeline (or one named, if allowed, Q-I1) over this run's raw items; returns `{inserted, sinks}` or an error |
+| `host.pipe()` | runs the schedule's pipeline (only that one, default accepted pending objection) over this run's raw items; returns `{inserted, sinks}` or an error |
 | `host.run_ruleset([ruleset_id])` | records `connector.run` and runs the rule set (default: the schedule's); returns `{rules_run, errors}` or an error |
 | `host.fetch(request)` | HTTP with Muninn's client (user agent, retries, rate limit). **Default accepted pending objection.** |
 | `host.state_get/state_set(key, value)` | a small per-schedule cursor (for example the last timestamp) |
@@ -419,7 +424,7 @@ A system scheduler service needs to be created to support this.
 
 - Muninn does **not** pipe or run the rule set after the plugin returns. The run's status is the plugin's result: `Ok` means `success`, and `Err` or a panic means `failed` with the error.
 - Every host call is counted on the run: `stored` and `bytes` (store_raw), `inserted` and `piped` (pipe), `ruleset_ran` (run_ruleset).
-- **The plugin skips `pipe` or `run_ruleset`:** the run can still be `success`, and its `piped = 0` / `ruleset_ran = 0` show that. `mnnn schedule runs` and the TUI flag it: "stored 12 items, not piped". Q-I2 asks whether a schedule with a pipeline or rule set should make a skipped call a failure instead.
+- **The plugin skips `pipe` or `run_ruleset` (Michael: Q-I2):** if the schedule has a pipeline and `piped = 0`, or a rule set and `ruleset_ran = 0`, when the plugin returns `Ok`, the run is **`failed`**, with `error = "plugin did not call pipe"` (or `run_ruleset`, or both). The raw items it stored stay in `source_data` with the run id, so they can be re-piped. A schedule with neither a pipeline nor a rule set only needs `Ok`. Retries apply as for any failure.
 - **A host call fails:** the error is returned to the plugin. If the plugin returns it, the run is `failed` with that error, and rules don't run unless the plugin already called them. If the plugin carries on, the run can end `success`, with the failed call in `warnings` (JSON list: method, error, UTC time).
 - `connector.run` is always recorded, even when `run_ruleset` was never called, so history and notifications see every run. Rules only run through `run_ruleset`.
 
@@ -494,20 +499,23 @@ The inventory is checked against the code before implementing; any share point f
 10. **Missed runs and overlap defaults:** `catch_up = once`, `overlap = skip`. **Default accepted pending objection.**
 11. **Version:** the scheduler, rule sets and tables first (v2.24.0), connectors after (v2.25.0), following phase 1 (v2.23.0). **Default accepted pending objection.**
 
-### New
+### Answered by Michael (Nov 8, 2026, second round)
 
-- **Q-P1 Menu width:** with Code and Plugins the TUI bar has eleven categories and no longer fits 80 columns. Shorten labels, put Theme under View, or let the bar scroll?
-- **Q-P2 Kinds:** are `parser`, `transform`, `analysis` and `ingest-connector` the right first set, and should a plugin be able to have more than one kind (for example a parser that also works as a transform)?
-- **Q-P3 Approval on migrate:** may `migrate` keep a code space's approval when only the `@kind` header was added, or must every migrated plugin be approved again?
-- **Q-P4 Prebuilt libraries without a kind:** after `migrate` records the kind on the row, should they run as-is, or be required to be rebuilt with SDK 1.1 so the library itself declares it?
-- **Q-P5 `install`:** should `mnnn plugins install` also take URLs or org/peer plugins (shared code spaces), or only local libraries and code spaces for now?
-- **Q-C1 CLI name:** keep `mnnn code` (with `codes`) and add `code-spaces` as an alias, or rename to `code-spaces` and keep `code` as the alias?
-- **Q-C2 Pipes and pipelines:** do Live pipes and Pipelines move into the new Code menu, or stay under Projects?
-- **Q-S1 cron time zone:** keep cron in local time (today's behaviour) or switch schedules to UTC, with an optional time zone column?
-- **Q-S2 Project rule sets:** is turning each project's rules into a project-owned rule set the right migration, or should projects reference rule sets instead of holding rules?
-- **Q-I1 `host.pipe` target:** may a connector call pipelines other than its schedule's, or only that one?
-- **Q-I2 Skipped calls:** if a schedule has a pipeline or rule set and the plugin never calls `pipe` or `run_ruleset`, should the run be `success` with a flag (proposed) or `failed`?
-- **Q-SH1 Scope of create-then-share:** does it include creating the *target* too (for example a new project or journal while sharing into one), as planned, or only the item being shared?
+- **Q-P1 Menu width:** **Resolved.** Shorten the TUI menu labels so the bar fits 80 columns: File · View · Data · Proj · Code · Plug · Net · Orgs · Keys · Theme · Help (67 columns).
+- **Q-P2 Kinds:** **Resolved.** One kind per plugin. The first set is `parser`, `transform`, `analysis`, `ingest-connector`.
+- **Q-P3 Approval on migrate:** **Resolved.** `migrate` keeps the approval when it only adds the kind.
+- **Q-P4 Prebuilt libraries without a kind:** they run as-is once `migrate` records the kind on the row. **Default accepted pending objection.**
+- **Q-P5 `install`:** local libraries and code spaces only for now. **Default accepted pending objection.**
+- **Q-C1 CLI name:** **Resolved.** Keep `mnnn code` (alias `codes`) and add `code-spaces` as an alias.
+- **Q-C2 Pipes and pipelines:** **Resolved.** Live pipes and Pipelines move into the new Code menu.
+- **Q-S1 cron time zone:** **Resolved.** cron runs in UTC, with an optional per-schedule `tz` column. `date`-style input in local time is converted to UTC when entered, using `tz` when it is set.
+- **Q-S2 Project rule sets:** each project's rules become a project-owned rule set. **Default accepted pending objection.**
+- **Q-I1 `host.pipe` target:** a connector pipes only to its schedule's pipeline. **Default accepted pending objection.**
+- **Q-I2 Skipped calls:** **Resolved.** If a schedule has a pipeline or rule set and the plugin never calls `pipe` or `run_ruleset`, the run is `failed`.
+- **Q-SH1 Scope of create-then-share:** **Resolved.** It covers creating the target too.
+
+### Still open
+
 - **Q-T1 `run_every` without `start_at`:** run first one interval after the schedule is created (proposed: no surprise run while setting up), or immediately, as today's scheduled rules do ("a new one runs at once")? Same question when a schedule is re-enabled.
 - **Q-T2 Which clock for calendar steps:** months, days and weeks keep the wall-clock time in the zone the schedule was entered in (proposed: a `9am` schedule stays 9am through DST; needs a `tz` column, the IANA zone or the local one at entry), or step in UTC (simpler, but 9am becomes 8am or 10am after a DST change)?
 - **Q-T3 Dependencies:** OK to add `parse_datetime` (MIT, which pulls in `jiff`) next to our `chrono` for `start_at`, with `run_every` parsed by our own code? The alternative is to write the `date -d` subset ourselves on `chrono`, which is more work and a weaker match to `date`.
