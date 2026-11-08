@@ -243,7 +243,18 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - Relative: `tomorrow 9am`, `next monday`, `next monday 14:30`, `2 hours`, `now + 90 minutes`.
 - **Time zone (Michael: Q-S1):** the input is read in the schedule's `tz` if set, otherwise local time, unless the text has a zone (`Z`, `+01:00`, `UTC`, `TZ="Europe/Paris" …`), as `date` does. It is converted to UTC when entered and stored as epoch ms, UTC. Relative inputs are resolved once, when the schedule is saved (`tomorrow 9am` is a fixed time, not every day).
 - **Confirmation:** the parsed time is always shown back before saving, in local time and in UTC: `start_at: Tue 2026-11-10 09:00 EST (14:00Z) — in 1 d 23 h`. The CLI prints it and asks (`-y` skips, `--json` returns it), the TUI form shows it live as you type, and the app does the same.
-- **In the past:** a `start_at` in the past is refused unless `--allow-past` is given (then it runs at once, then follows `run_every`) (Michael: Q-T5).
+- **In the past (Michael: Q-T5, revised 9:17 AM):** Muninn tells the user and asks what to do. There is no `--allow-past`.
+  - **The message** shows the parsed time in local and UTC and how long ago it was: `start_at Tue 2026-11-03 09:00 EST (14:00Z) is in the past (5 days 0 h ago).`
+  - **Two choices** when the schedule repeats:
+    - **(a) Start at the next interval:** the first `start_at + k × run_every` (k ≥ 1, calendar months clamped as usual) that is in the future, or with cron, the next cron match not before `start_at` that is in the future. That time is shown: `Next interval: Mon 2026-11-10 09:00 EST (14:00Z), in 1 day 23 h.` The stored `start_at` becomes that time, and the original text stays in `start_at_input`.
+    - **(b) Correct `start_at`:** enter it again. The new value is parsed and confirmed as usual, and checked again.
+  - **One-off (`start_at` only, no `run_every` or cron):** there is no interval, so the only choice is (b), correct it. The message says so: "a one-off has no interval to move to; enter a future time".
+  - **CLI:** an interactive prompt, `[n] next interval (Mon 2026-11-10 09:00 EST) · [c] correct start_at · [q] cancel`; `c` asks for the time again.
+    - **Non-interactive** (`-y`, no TTY, scripts, MCP or the FFI without a prompt) never hangs. It needs **`--past next-interval`** to take choice (a). Otherwise it fails with: "start_at 2026-11-03 09:00 EST (14:00Z) is in the past. Choose one: start at the next interval (`--past next-interval`, would be Mon 2026-11-10 09:00 EST) or correct `--start-at`."
+    - `--past next-interval` on a one-off is an error ("a one-off has no interval; correct --start-at").
+    - `--past` without a past `start_at` does nothing.
+  - **TUI and app forms:** an inline warning under Start at with the same text and two buttons, **Next interval (time)** and **Correct start at** (focuses the field). A one-off shows only Correct. Saving is blocked until one is picked.
+  - **Edit:** the same applies when `schedule edit` sets a past `start_at`, and when a disabled schedule is re-enabled with a `start_at` that has since passed.
 
 **`run_every`** (Michael: `date` format, plus the earlier short codes)
 
@@ -276,6 +287,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 | `cron` only | at the next cron time |
 | `start_at` + `cron` | at the first cron time at or after `start_at` ("not before then") |
 | `run_every` + `cron` | refused (one repeat rule) |
+| `start_at` in the past | the user is told and chooses: next interval (repeating schedules only) or correct `start_at`; see "In the past" above |
 
 **Parsing (nothing installed now; added as a dependency when phase 2 is built):**
 
@@ -312,7 +324,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 ### Surfaces
 
 - **CLI:**
-  - `mnnn schedule add NAME (--plugin P --source S [--pipeline PL] | --ruleset R) [--start-at WHEN] [--every INTERVAL | --cron "…"] [--allow-past] [--ruleset R] [--option k=v]… [--overlap skip|queue] [--catch-up once|all|none] [--max-attempts N] [-y]`
+  - `mnnn schedule add NAME (--plugin P --source S [--pipeline PL] | --ruleset R) [--start-at WHEN] [--every INTERVAL | --cron "…"] [--past next-interval] [--ruleset R] [--option k=v]… [--overlap skip|queue] [--catch-up once|all|none] [--max-attempts N] [-y]`
   - WHEN is any `date -d` input, and INTERVAL is `date` relative items or a short code. Examples:
     - `mnnn schedule add weekly-report --ruleset Weekly --start-at "next monday 9am" --every "1 week"`
     - `mnnn schedule add month-end --ruleset Close --start-at "2026-11-30 18:00" --every "1 month"` (then Dec 31, Jan 31, Feb 28…)
@@ -339,7 +351,14 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 - `start_at` parsing with a fixed clock and zone:
   - absolute (`2026-11-10 09:00`, ISO with `Z` and offsets, `@1762765200`) and relative (`tomorrow 9am`, `next monday`)
   - local vs explicit zones, and DST edges (a nonexistent or repeated local time)
-  - refusing the past without `--allow-past`, and running at once with it
+  - a past `start_at`:
+    - the message (local, UTC, how long ago)
+    - the next-interval time for `run_every` (fixed and months, k ≥ 1, clamping) and for cron (next match, not before)
+    - correcting it by re-entering
+    - a one-off offering only correction
+    - non-interactive without `--past next-interval` failing with the message naming both choices; with it, storing the next interval
+    - `--past next-interval` on a one-off failing
+    - the TUI and app inline warning and buttons
   - the confirmation text
 - `run_every` parsing:
   - `date` items (`5 minutes`, `90 seconds`, `2 hours 30 minutes`, `1 week`, `1 fortnight`, `1 month`, `1 year`, plurals and `min`/`sec`), and `250 milliseconds`
@@ -521,7 +540,7 @@ The inventory is checked against the code before implementing; any share point f
 - **Q-T2 Filling `tz`:** **Resolved.** Steps happen in UTC even if the local time shifts. `tz` is never filled in automatically; it stays NULL unless `--tz` is given. The one exception is migrated local-time scheduled rules, which get the node's zone so they don't shift.
 - **Q-T3 Dependencies:** **Resolved.** Add `parse_datetime` for `start_at`. Approved for the plan; it goes into `Cargo.toml` when phase 2 is implemented.
 - **Q-T4 One-off schedules after they run:** **Resolved.** Disabled after the run, keeping its run history.
-- **Q-T5 `start_at` in the past:** **Resolved.** Refused unless `--allow-past`.
+- **Q-T5 `start_at` in the past:** **Resolved, revised 9:17 AM.** Tell the user (local, UTC, how long ago) and ask: start at the next interval (shown), or correct `start_at`. A one-off can only be corrected. Non-interactive use needs `--past next-interval`, otherwise it fails naming both choices. `--allow-past` is removed.
 - **Q-T6 Missed one-off:** **Resolved.** Skipped, not caught up. It is recorded as a `failed` run with a "missed" error (the status enum has no "skipped"), then the schedule is disabled.
 
 ### Still open
