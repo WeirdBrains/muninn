@@ -87,7 +87,7 @@ CREATE TABLE code_space_members (
     code_id TEXT NOT NULL REFERENCES code(id) ON DELETE RESTRICT,
     alias TEXT NOT NULL COLLATE NOCASE,   -- the name main imports it by (default: the code's name)
     position INTEGER NOT NULL,            -- display order; main is position 0
-    pin_hash TEXT,                        -- NULL (default): follow the latest approved version; set by --pin (Q-CS5)
+    pin_hash TEXT,                        -- NULL (default): follow the current source; set by --pin (Q-CS5)
     added_at INTEGER NOT NULL,
     PRIMARY KEY (space_id, code_id),
     UNIQUE (space_id, alias)
@@ -113,7 +113,7 @@ CREATE TABLE code_space_members (
   - At run time a call stack of space ids enforces the same rule (re-entry is an error), plus a **depth limit of 8** nested spaces, for edits that race the check.
   - Member calls add no depth, since members can't call.
 - **Following and pinning (Q-CS5, resolved):**
-  - Members follow the **latest approved version** of their code by default (`pin_hash` NULL).
+  - Members follow their code by default (`pin_hash` NULL).
   - Following means the member runs the code's **current** source, including unreviewed edits (Michael: Q-CS11).
   - `--pin` (`mnnn spaces add SPACE CODE --pin`, `mnnn spaces pin SPACE CODE`) records the code's current trust hash. A pinned member runs only while the code's current hash equals the pin; otherwise calls fail with "X changed since pinned: `mnnn spaces pin SPACE X` to accept". `pin`/`unpin` change it. No old versions are stored.
   - There are no version numbers: the trust hash is the version.
@@ -791,7 +791,7 @@ The inventory is checked against the code before implementing; any share point f
 - **Q-CS2 Who may call:** **Resolved.** Only main calls, inside the space and across spaces.
 - **Q-CS3 Approval model:** **Resolved.** A space has its own approval, covering the **line-up** (main, members, aliases, pins, kind, imported spaces). Member and main edits run immediately without re-approval (Q-CS11) and are flagged as unreviewed.
 - **Q-CS4 `code:` steps:** **Resolved.** Kept one release, deprecated; `mnnn migrate` rewrites pipelines to `space:`.
-- **Q-CS5 Pinning:** **Resolved.** Members follow the latest approved version by default (`pin_hash` NULL); `--pin` is opt-in.
+- **Q-CS5 Pinning:** **Resolved.** Members follow their code's current source by default (`pin_hash` NULL; edits run at once, Q-CS11); `--pin` is opt-in.
 - **Q-CS6 CLI naming:** **Resolved.** `mnnn code` = single code; `mnnn spaces` (aliases `code-spaces`, `space`) = collections.
 - **Q-CS7 Where kind lives:** **Resolved.** On the **space**. Code has no kind. An ingest connector is a space of kind `ingest-connector`.
 - **Q-CS8 Migrate:** **Resolved.** A single `mnnn migrate` (code → spaces, kinds, pipeline rewrite), with `--dry-run`, a backup, idempotency, the `-migration`/skip rules and one report. `mnnn plugins migrate` and `mnnn code migrate` are removed.
