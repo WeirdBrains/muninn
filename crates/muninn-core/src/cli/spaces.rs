@@ -267,6 +267,53 @@ fn toggle(ctx: &Ctx, store: &Store, space: &str, on: bool) -> anyhow::Result<()>
 }
 
 /// `mnnn migrate`.
+/// `mnnn status`: the home, the database, counts, and the reminder to migrate.
+pub fn status(ctx: &Ctx, json: bool) -> anyhow::Result<()> {
+    let store = ctx.open_store()?;
+    let pending = migrate::pending(&store)?;
+    let code = store.code_spaces()?.len();
+    let spaces = store.spaces()?;
+    let unapproved = spaces.iter().filter(|s| !crate::code::spaces::approved(&store, s)).count();
+    let bars = store.count_bars()?;
+    let todo: Vec<String> = [
+        (pending > 0).then(|| {
+            format!("{pending} code not in any code space: `mnnn migrate --dry-run` shows what `mnnn migrate` would do (pipelines run spaces; code: steps are deprecated)")
+        }),
+        (unapproved > 0).then(|| format!("{unapproved} code space(s) not approved: `mnnn spaces list`")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "version": env!("CARGO_PKG_VERSION"),
+                "home": ctx.paths.home,
+                "database": ctx.paths.db,
+                "schema": store.schema_version()?,
+                "bars": bars,
+                "code": code,
+                "spaces": spaces.len(),
+                "unmigrated_code": pending,
+                "unapproved_spaces": unapproved,
+                "todo": todo,
+            }))?
+        );
+        return Ok(());
+    }
+    println!("muninn      {}", env!("CARGO_PKG_VERSION"));
+    println!("home        {}", ctx.paths.home.display());
+    println!("database    {} (schema {})", ctx.paths.db.display(), store.schema_version()?);
+    println!("bars        {bars}");
+    println!("code        {code} ({pending} not in a code space)");
+    println!("code spaces {} ({unapproved} not approved)", spaces.len());
+    for t in &todo {
+        println!("to do: {t}");
+    }
+    Ok(())
+}
+
 pub fn migrate(ctx: &Ctx, a: MigrateArgs) -> anyhow::Result<()> {
     let store = ctx.open_store()?;
     let _ = migrate::offer_once(&store, &ctx.paths.home);

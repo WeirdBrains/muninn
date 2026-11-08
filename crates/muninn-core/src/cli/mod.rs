@@ -191,6 +191,7 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Code(c) => code::run(&ctx, c),
         Command::Spaces(c) => spaces::run(&ctx, c),
         Command::Migrate(a) => spaces::migrate(&ctx, a),
+        Command::Status { json } => spaces::status(&ctx, json),
         Command::Net(c) => net::run(&ctx, c),
         Command::Org(c) => org::run(&ctx, c),
         Command::Review(c) => review::run(&ctx, c),

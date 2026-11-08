@@ -171,6 +171,13 @@ pub enum Command {
     /// lost; bars on request.
     #[command(subcommand, after_long_help = SYNC_NOTES)]
     Sync(SyncCommand),
+    /// Where things stand: the home and database, what it holds, and what needs doing
+    /// (code to migrate into code spaces).
+    Status {
+        /// Machine-readable output.
+        #[arg(long)]
+        json: bool,
+    },
     /// Launch the terminal UI.
     #[command(after_long_help = TUI_NOTES)]
     Tui,
@@ -1248,7 +1255,7 @@ pub enum ProjectCommand {
     Remove { project: String },
     /// Add a live search, a journal, a report, a rule, a model, a code space or a result (a
     /// series, optionally a time range) to a project.
-    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "rule", "model", "code", "result"])))]
+    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "rule", "model", "code", "space", "result"])))]
     Add {
         project: String,
         /// Live search id or name.
@@ -1266,9 +1273,12 @@ pub enum ProjectCommand {
         /// Model id or name.
         #[arg(long)]
         model: Option<String>,
-        /// Code space id or name.
+        /// Code id or name.
         #[arg(long)]
         code: Option<String>,
+        /// Code space (`mnnn spaces`) id or name.
+        #[arg(long)]
+        space: Option<String>,
         /// A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m.
         #[arg(long, value_name = "SERIES")]
         result: Option<String>,

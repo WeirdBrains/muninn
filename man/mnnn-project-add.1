@@ -8,7 +8,7 @@ mnnn\-project\-add \- Add a live search, a journal, a report, a rule, a model, a
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn project add\fR [\fB\-\-home\fR] [\fB\-\-search\fR] [\fB\-\-db\fR] [\fB\-\-rule\fR] [\fB\-\-journal\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-report\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-model\fR] [\fB\-\-code\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-result\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-from\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-to\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPROJECT\fR> 
+\fBmnnn project add\fR [\fB\-\-home\fR] [\fB\-\-search\fR] [\fB\-\-db\fR] [\fB\-\-rule\fR] [\fB\-\-journal\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-report\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-model\fR] [\fB\-\-code\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-space\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-result\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-from\fR] [\fB\-\-transport\fR] [\fB\-\-to\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPROJECT\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -60,7 +60,7 @@ May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable.
 Model id or name
 .TP
 \fB\-\-code\fR \fI<CODE>\fR
-Code space id or name
+Code id or name
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -68,8 +68,8 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-result\fR \fI<SERIES>\fR
-A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m
+\fB\-\-space\fR \fI<SPACE>\fR
+Code space (`mnnn spaces`) id or name
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -77,8 +77,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-from\fR \fI<TIME>\fR
-Result time range start
+\fB\-\-result\fR \fI<SERIES>\fR
+A series as SOURCE:SYMBOL:PERIOD, e.g. binance:BTC/USDT:5m
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -98,11 +98,14 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
-\fB\-\-to\fR \fI<TIME>\fR
-Result time range end
+\fB\-\-from\fR \fI<TIME>\fR
+Result time range start
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-\-to\fR \fI<TIME>\fR
+Result time range end
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
