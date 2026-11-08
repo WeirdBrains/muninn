@@ -243,7 +243,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - Relative: `tomorrow 9am`, `next monday`, `next monday 14:30`, `2 hours`, `now + 90 minutes`.
 - **Time zone (Michael: Q-S1):** the input is read in the schedule's `tz` if set, otherwise local time, unless the text has a zone (`Z`, `+01:00`, `UTC`, `TZ="Europe/Paris" …`), as `date` does. It is converted to UTC when entered and stored as epoch ms, UTC. Relative inputs are resolved once, when the schedule is saved (`tomorrow 9am` is a fixed time, not every day).
 - **Confirmation:** the parsed time is always shown back before saving, in local time and in UTC: `start_at: Tue 2026-11-10 09:00 EST (14:00Z) — in 1 d 23 h`. The CLI prints it and asks (`-y` skips, `--json` returns it), the TUI form shows it live as you type, and the app does the same.
-- **In the past:** a `start_at` in the past is refused unless `--allow-past` is given (then it runs at once, then follows `run_every`).
+- **In the past:** a `start_at` in the past is refused unless `--allow-past` is given (then it runs at once, then follows `run_every`) (Michael: Q-T5).
 
 **`run_every`** (Michael: `date` format, plus the earlier short codes)
 
@@ -259,20 +259,20 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
   - the fixed part (milliseconds through weeks) → `every_ms`
   - months (and years × 12) → `every_months`
   - Mixed values such as `1 month 2 days` add months first, then the fixed part.
-- **Months are calendar months:** each run is the previous due time plus N months, clamped to the end of the month, keeping the original day of month (Jan 31 → Feb 28/29 → Mar 31). Calendar steps (months, days, weeks) follow `tz` when it is set, so 9am stays 9am through DST; without `tz` they step in UTC (Q-T2 asks whether to fill `tz` automatically).
+- **Months are calendar months:** each run is the previous due time plus N months, clamped to the end of the month, keeping the original day of month (Jan 31 → Feb 28/29 → Mar 31). Calendar steps (months, days, weeks) happen **in UTC** unless `tz` is set, even if that shifts the local clock time across DST: a 14:00Z schedule is 9am EST in winter and 10am EDT in summer (Michael: Q-T2). `tz` is never filled in automatically and stays NULL unless `--tz` is given; with `tz`, steps keep the wall-clock time in that zone.
 - **Printing:** `run_every` is shown in the long form (`every 2 hours 30 minutes`), and the short form is accepted on input.
 - **No drift:** `next_run_at` advances from the due time, not the finish time.
 - **Floor (default accepted pending objection):** the scheduler ticks every second, so anything under 1 s runs at most once per tick.
 
-**`cron`:** the same five-field syntax as scheduled rules today, evaluated **in UTC**, or in the schedule's `tz` when set (Michael: Q-S1). `--tz ZONE` on `schedule add|edit`; `schedule show` gives both the zone's and UTC times. Migrated scheduled rules (local-time cron today) get `tz` set to the node's local zone, so they keep firing at the same wall-clock times.
+**`cron`:** the same five-field syntax as scheduled rules today, evaluated **in UTC**, or in the schedule's `tz` when set (Michael: Q-S1). `--tz ZONE` on `schedule add|edit`; `schedule show` gives both the zone's and UTC times. **Migration exception:** scheduled rules migrated from 2.23 (local-time `--cron` and `--every` today) are the one case where `tz` is set without `--tz`. They get the node's local zone, so they keep firing at the same wall-clock times instead of shifting with DST. New schedules never get `tz` automatically (Q-T2).
 
 **How they combine** (`next_run_at` when saved):
 
 | fields | runs |
 |--------|------|
-| `start_at` only | once, at `start_at`; then the schedule is done (disabled; `schedule show` says "ran once") |
+| `start_at` only | once, at `start_at`; afterwards the schedule is disabled and keeps its run history (Michael: Q-T4); `schedule show` says "ran once". If missed while nothing was running, it is skipped, not caught up (Q-T6, below) |
 | `start_at` + `run_every` | first at `start_at`, then every interval after it |
-| `run_every` only | first one interval after creation (proposed; Q-T1 asks about running immediately instead) |
+| `run_every` only | **immediately** on creation, then every interval; re-enabling a schedule also runs it at once (Michael: Q-T1, matching today's scheduled rules) |
 | `cron` only | at the next cron time |
 | `start_at` + `cron` | at the first cron time at or after `start_at` ("not before then") |
 | `run_every` + `cron` | refused (one repeat rule) |
@@ -280,8 +280,8 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 **Parsing (nothing installed now; added as a dependency when phase 2 is built):**
 
 - **`start_at`:** `parse_datetime` (uutils, MIT; version 0.17.0 on crates.io), the uutils `date -d` parser, built on `jiff`. It handles absolute dates and times, ISO 8601, `@epoch`, zones, `TZ="…"`, `tomorrow`, `next monday`, weekdays and relative offsets, resolved against a base time we pass, so tests use a fixed clock. Its result is converted to epoch ms.
-- **`run_every`:** Muninn's own small parser (a few dozen lines, next to `parse_every` in `rules.rs`). It implements the `date` relative-item grammar for intervals, plus `milliseconds` and the short codes, and returns `(every_months, every_ms)`. It is ours because the result is an interval, not a point in time, months must stay calendar months (not a fixed length), and `ms` is not in `date`. `parse_datetime`'s documented relative units don't include `month` or `year` (Q-T3).
-- The repo uses `chrono` today, and `parse_datetime` brings `jiff`. The conversion stays at the parse boundary. Q-T3 asks whether a second date library is acceptable.
+- **`run_every`:** Muninn's own small parser (a few dozen lines, next to `parse_every` in `rules.rs`). It implements the `date` relative-item grammar for intervals, plus `milliseconds` and the short codes, and returns `(every_months, every_ms)`. It is ours because the result is an interval, not a point in time, months must stay calendar months (not a fixed length), and `ms` is not in `date`. `parse_datetime`'s documented relative units don't include `month` or `year`.
+- The repo uses `chrono` today, and `parse_datetime` brings `jiff`. The conversion stays at the parse boundary. **Approved (Michael: Q-T3):** `parse_datetime` is added to `crates/muninn-core/Cargo.toml` when phase 2 is implemented, not before.
 
 ### The scheduler service
 
@@ -292,6 +292,7 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 - **Crash recovery:** a `running` run whose heartbeat is more than 2 minutes old becomes `failed` (`error = "abandoned"`) and is retried.
 - **Missed runs and overlap (default accepted pending objection):**
   - `catch_up = once` runs one run for the latest missed slot; `all` runs each missed slot, oldest first, capped at 100; `none` skips ahead.
+  - **One-off schedules (`start_at` only) are never caught up (Michael: Q-T6),** whatever `catch_up` says. When the scheduler finds a one-off whose `start_at` passed while nothing was running, it doesn't run it. The skip has to fit the status enum (`pending|running|success|failed`), which has no "skipped", so it is recorded as a **`failed`** row with `timestamp = start_at`, `started_at = NULL`, `finished_at` = now and `error = "missed: one-off skipped (nothing was running at start_at)"`, plus a `schedule.missed` action (rules and notifications can react). The schedule is then disabled. No retry is made.
   - `overlap = skip` skips a slot while the previous run of the same schedule is open; `queue` keeps one pending run behind it.
   - At most 4 schedules run at once (`scheduler.workers`).
 - **Rule-set target:** a `schedule` action naming the schedule is recorded, then the rule set runs on it (each rule's `--if` sees `schedule` and `name`). The run is `success` when the set ran; a then-action error makes it `failed`.
@@ -338,15 +339,15 @@ CREATE INDEX schedule_runs_open ON schedule_runs(status) WHERE status IN ('pendi
 - `start_at` parsing with a fixed clock and zone:
   - absolute (`2026-11-10 09:00`, ISO with `Z` and offsets, `@1762765200`) and relative (`tomorrow 9am`, `next monday`)
   - local vs explicit zones, and DST edges (a nonexistent or repeated local time)
-  - refusing the past without `--allow-past`
+  - refusing the past without `--allow-past`, and running at once with it
   - the confirmation text
 - `run_every` parsing:
   - `date` items (`5 minutes`, `90 seconds`, `2 hours 30 minutes`, `1 week`, `1 fortnight`, `1 month`, `1 year`, plurals and `min`/`sec`), and `250 milliseconds`
   - the short codes, case-sensitive (`1m` vs `1M`, rejecting `1MS`, `1mo`, `S`)
   - rejecting `ago`, `next`, dates and zero
   - long-form printing round-trips
-- Month stepping: clamping (Jan 31 → Feb 28 → Feb 29 in a leap year → Mar 31), `1 month 2 days`, and the local clock time across DST.
-- Combinations: `start_at` alone (one run, then done), `start_at` + `run_every`, `run_every` alone (the first run one interval later), `cron` with `start_at` (not before), `run_every` + `cron` refused. cron stepping (existing tests move).
+- Month stepping: clamping (Jan 31 → Feb 28 → Feb 29 in a leap year → Mar 31), `1 month 2 days`. With `tz` NULL, steps stay in UTC across DST (the local hour shifts); with `tz` set, the local hour stays. `tz` is never set automatically, except for migrated rules (node zone, same wall-clock times as before).
+- Combinations: `start_at` alone (one run, then disabled with history kept), `start_at` + `run_every`, `run_every` alone (runs immediately, and again on re-enable), `cron` with `start_at` (not before), `run_every` + `cron` refused. A missed one-off produces one `failed` "missed" row and a `schedule.missed` action, doesn't run, and is disabled, even with `catch_up = all`. cron stepping (existing tests move).
 - The migration writes the long forms and the same `every_ms`.
 - Scheduler, with a fake clock:
   - lease and claim-once under two schedulers
@@ -514,11 +515,15 @@ The inventory is checked against the code before implementing; any share point f
 - **Q-I2 Skipped calls:** **Resolved.** If a schedule has a pipeline or rule set and the plugin never calls `pipe` or `run_ruleset`, the run is `failed`.
 - **Q-SH1 Scope of create-then-share:** **Resolved.** It covers creating the target too.
 
+### Answered by Michael (Nov 8, 2026, third round)
+
+- **Q-T1 `run_every` without `start_at`:** **Resolved.** It runs immediately on creation and on re-enable, matching today's scheduled rules.
+- **Q-T2 Filling `tz`:** **Resolved.** Steps happen in UTC even if the local time shifts. `tz` is never filled in automatically; it stays NULL unless `--tz` is given. The one exception is migrated local-time scheduled rules, which get the node's zone so they don't shift.
+- **Q-T3 Dependencies:** **Resolved.** Add `parse_datetime` for `start_at`. Approved for the plan; it goes into `Cargo.toml` when phase 2 is implemented.
+- **Q-T4 One-off schedules after they run:** **Resolved.** Disabled after the run, keeping its run history.
+- **Q-T5 `start_at` in the past:** **Resolved.** Refused unless `--allow-past`.
+- **Q-T6 Missed one-off:** **Resolved.** Skipped, not caught up. It is recorded as a `failed` run with a "missed" error (the status enum has no "skipped"), then the schedule is disabled.
+
 ### Still open
 
-- **Q-T1 `run_every` without `start_at`:** run first one interval after the schedule is created (proposed: no surprise run while setting up), or immediately, as today's scheduled rules do ("a new one runs at once")? Same question when a schedule is re-enabled.
-- **Q-T2 Filling `tz`:** now that schedules have an optional `tz` (Q-S1), should a new schedule get the node's local zone in `tz` automatically (proposed: a `9am` schedule then stays 9am through DST), or stay NULL (UTC steps and cron in UTC) unless `--tz` is given?
-- **Q-T3 Dependencies:** OK to add `parse_datetime` (MIT, which pulls in `jiff`) next to our `chrono` for `start_at`, with `run_every` parsed by our own code? The alternative is to write the `date -d` subset ourselves on `chrono`, which is more work and a weaker match to `date`.
-- **Q-T4 One-off schedules after they run:** a `start_at`-only schedule is disabled and kept with its run history (proposed), deleted, or kept enabled but inert?
-- **Q-T5 `start_at` in the past:** refuse unless `--allow-past` (proposed), or accept and run at once?
-- **Q-T6 `start_at` with `catch_up`:** when the node was off at `start_at`, does a one-off run when it next starts (proposed: yes, following `catch_up = once`), or is it skipped?
+None. Every remaining item is marked "default accepted pending objection" above (retries, the 1 s floor, `host.fetch`, the headless scheduler, catch-up and overlap defaults, versions, Q-P4, Q-P5, Q-S2, Q-I1).
