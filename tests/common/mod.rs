@@ -62,8 +62,8 @@ impl Env {
         self.ok(&["-y", "ingest", "csv", "--path", f.to_str().unwrap(), "--source", &raw]);
         let (pair, dur) = stem.rsplit_once('_').unwrap_or((stem, "5m"));
         let sym = format!("{}/USDT", pair.trim_end_matches("USDT"));
-        let to_bars = format!("code:to-bars?symbol={sym}&duration={dur}&source={source}");
+        let to_bars = format!("space:to-bars?symbol={sym}&duration={dur}&source={source}");
         self.ok(&["-y", "code", "parsers", "--install"]);
-        self.ok(&["-y", "pipe", &format!("source:{raw}"), "code:parse-csv", &to_bars, "--to", "model:bars", "--rows", "1"]);
+        self.ok(&["-y", "pipe", &format!("source:{raw}"), "space:parse-csv", &to_bars, "--to", "model:bars", "--rows", "1"]);
     }
 }

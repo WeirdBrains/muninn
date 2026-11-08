@@ -68,7 +68,9 @@ fn imports_exports_and_view_changes_are_recorded_and_forks_kept() {
     let tree = e.ok(&["history", "tree"]);
     assert!(tree.contains(&format!("⑂ from #{}", id(3))), "{tree}");
     assert!(tree.contains("theme nord") && tree.contains("theme dracula"), "{tree}");
-    assert_eq!(e.ok(&["history", "list", "--all", "--json"]).matches("\"kind\"").count(), export + 3);
+    // (the built-in parsers' code spaces are made with no history id of their own)
+    let all = e.ok(&["history", "list", "--all", "--json"]);
+    assert_eq!(all.matches("\"kind\"").count() - all.matches("\"space.create\"").count(), export + 3);
     // Goto the old branch's tip brings back nord + dark.
     e.ok(&["history", "goto", &id(5)]);
     let prefs = std::fs::read_to_string(e.home().join("preferences.toml")).unwrap();

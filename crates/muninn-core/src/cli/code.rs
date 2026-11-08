@@ -173,10 +173,15 @@ pub fn run(ctx: &Ctx, cmd: CodeCommand) -> anyhow::Result<()> {
             for b in code::parsers::BUILTINS {
                 let have = store.find_code_space(b.name).ok();
                 let state = match (&have, install) {
-                    (Some(_), _) => "installed".to_string(),
+                    (Some(_), true) => {
+                        // a code space too (2.23+): what `space:NAME` and `--format` run
+                        let (s, new) = code::parsers::install_space(&store, "cli", b)?;
+                        if new { format!("installed; code space {} made now", s.name) } else { "installed".to_string() }
+                    }
+                    (Some(_), false) => "installed".to_string(),
                     (None, true) => {
-                        code::parsers::install(&store, "cli", b)?;
-                        "installed now (approve it on first run)".to_string()
+                        let (s, _) = code::parsers::install_space(&store, "cli", b)?;
+                        format!("installed now as code space {} (approve it on first run)", s.name)
                     }
                     (None, false) => "not installed (--install)".to_string(),
                 };
