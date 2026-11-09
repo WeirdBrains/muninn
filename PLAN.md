@@ -759,12 +759,9 @@ A system scheduler service needs to be created to support this.
 
 **Checklist vs implementation:** CLI `--create` / `--create-to` on `mnnn share`, `org resource add`, `org give`, `org project add`, `project add`, `net share`, `review request`, `org code serve`; TUI **+ New …** on the share target picker, org Resources `n`, Net Shared `n`, reviews `+kind NAME`, pipe `>` picker (code/space/journal/project), project picker already had **+ New project…**. Creating a code space without `--main` makes `{name}-main` first. History records create then share.
 
-**Exceptions (real, not called done):**
-- **Net target create:** exchanges are not created inline (open `mnnn net exchange`); share with every exchange needs no TO. Documented in `docs/share.md`.
-- **App / FFI:** no new Flutter surfaces and no new FFI exports this phase (Matematik’s area; same store APIs the CLI uses). `+ New…` in the app pickers is not shipped here.
-- **Review entry/record create:** `--create` / `+` only for journal, project, search (an entry or record needs a parent).
-- **Series `--result`:** not created via `--create` (use `--result SERIES`).
-- **Phase 4 liveness correction in this commit:** `scheduler.last_tick_holder` must match the current session; a quick restart within `ALIVE_GAP_MS` no longer looks continuously alive from a persisted tick alone (regression `quick_restart_across_deadline_skips_once`).
+**Checklist (closed):** net `--create-to` / **+ New exchange…** offers a key exchange then shares; review `--create` / `+KIND` for every `ReviewKind` (entry writes into `--journal` or `{name}-journal`; record creates in `--model` / `MODEL`); `project add --create result SERIES` attaches an **existing** imported series (Muninn does not invent bars — genuine data blocker); FFI `share_create_*` for app consumption (Dart/frb regen and Flutter `+ New…` UI remain Matematik’s `app/` work). Phase 4 holder liveness stays as shipped.
+
+**Remaining outside this tree:** Flutter `app/` pickers (`+ New…` UI) — Matematik; FRB Dart bindings regen after FFI adds.
 
 
 **Reworked for phase 1:** every share point that takes a code space now takes both **code** and **code spaces** (Michael, Nov 8 11:50: "all the share options need to be on codespaces"; 2.23 ships the sharing itself, this phase adds creating inline), and each gets its own **+ New code…** / **+ New code space…** (a new space asks for its main: pick existing code or write a new one). Sharing a space carries its members and pins.

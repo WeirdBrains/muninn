@@ -133,8 +133,9 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
             ctx.io.info(format!("removed project {}", p.name));
         }
         ProjectCommand::Add { project, search, rule, journal, report, model, code, space, result, from, to, create, create_opts } => {
-            if result.is_none() && (from.is_some() || to.is_some()) {
-                return Err(anyhow!("--from and --to belong to --result"));
+            let creating_result = create.as_ref().is_some_and(|p| matches!(p.first().map(String::as_str), Some("result" | "series")));
+            if result.is_none() && !creating_result && (from.is_some() || to.is_some()) {
+                return Err(anyhow!("--from and --to belong to --result (or --create result)"));
             }
             let p = store.find_project(&project)?;
             let opts = super::create_share::opts(&create_opts)?;
@@ -149,12 +150,27 @@ pub fn run(ctx: &Ctx, cmd: ProjectCommand) -> anyhow::Result<()> {
                     "space" | "spaces" => ItemKind::Space,
                     "pipeline" => ItemKind::Pipeline,
                     "rule" | "ruleset" | "rule_set" | "rule-set" => ItemKind::RuleSet,
-                    "result" => return Err(anyhow!("a result is a series; use --result, not --create result")),
-                    other => return Err(anyhow!("unknown kind {other:?} for --create (search, journal, report, model, code, space, pipeline, rule)")),
+                    "result" | "series" => ItemKind::Result,
+                    other => {
+                        return Err(anyhow!(
+                            "unknown kind {other:?} for --create (search, journal, report, model, code, space, pipeline, rule, result)"
+                        ));
+                    }
                 };
-                let c = crate::share::create_project_item(&store, kind, name, &opts, "cli")?;
-                ctx.io.note(format!("created {} {}", c.kind, c.name));
-                store.add_project_item(&p.id, kind, &c.id, serde_json::json!({}))?
+                if kind == ItemKind::Result {
+                    let r = crate::share::parse_series_ref(&store, name).map_err(|e| anyhow!("{e}"))?;
+                    // optional from/to on the create path
+                    let mut r = r;
+                    if from.is_some() || to.is_some() {
+                        r = parse_result(&store, name, from.as_deref(), to.as_deref())?;
+                    }
+                    ctx.io.note(format!("using series {}", r.label()));
+                    store.add_project_result(&p.id, &r)?
+                } else {
+                    let c = crate::share::create_project_item(&store, kind, name, &opts, "cli")?;
+                    ctx.io.note(format!("created {} {}", c.kind, c.name));
+                    store.add_project_item(&p.id, kind, &c.id, serde_json::json!({}))?
+                }
             } else if let Some(s) = search {
                 let s = store.find_live_search(&s)?;
                 store.add_project_item(&p.id, ItemKind::LiveSearch, &s.id, serde_json::json!({}))?

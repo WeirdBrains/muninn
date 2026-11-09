@@ -114,24 +114,12 @@ fn code_spaces_share_everywhere_code_does_and_take_data_like_code() {
     assert_eq!(ShareKind::parse("code-space"), Some(ShareKind::Space));
 }
 
-
 #[test]
 fn create_then_share_records_both_and_builds_target() {
     let s = Store::open_in_memory().unwrap();
     let opts = CreateOpts::default();
-    let (item, to, shared) = create_then_share(
-        &s,
-        ShareKind::Journal,
-        "Lab notes",
-        TargetKind::Project,
-        &[],
-        "",
-        "test",
-        true,
-        Some("Alpha"),
-        &opts,
-    )
-    .unwrap();
+    let (item, to, shared) =
+        create_then_share(&s, ShareKind::Journal, "Lab notes", TargetKind::Project, &[], "", "test", true, Some("Alpha"), &opts, None).unwrap();
     assert_eq!(item.unwrap().name, "Lab notes");
     assert_eq!(to.unwrap().name, "Alpha");
     assert!(shared.new);
@@ -152,17 +140,69 @@ fn create_then_share_records_both_and_builds_target() {
 #[test]
 fn create_space_makes_main_when_none_named() {
     let s = Store::open_in_memory().unwrap();
-    let c = create_item(&s, ShareKind::Space, "Ingest", &CreateOpts { space_kind: Some(crate::store::SpaceKind::Analysis), ..Default::default() }, "test").unwrap();
+    let c = create_item(
+        &s,
+        ShareKind::Space,
+        "Ingest",
+        &CreateOpts { space_kind: Some(crate::store::SpaceKind::Analysis), ..Default::default() },
+        "test",
+    )
+    .unwrap();
     let sp = s.find_space(&c.name).unwrap();
     let main = s.code_space(&sp.main_code_id).unwrap().unwrap();
     assert_eq!(main.name, "Ingest-main");
 }
 
 #[test]
-fn create_net_target_is_refused() {
+fn create_net_target_needs_identity() {
     let s = Store::open_in_memory().unwrap();
-    let e = create_target(&s, TargetKind::Net, "x", &CreateOpts::default(), "test").unwrap_err();
-    assert!(e.to_string().contains("exchange"), "{e}");
+    let e = create_target(&s, TargetKind::Net, "x", &CreateOpts::default(), "test", None).unwrap_err();
+    assert!(e.to_string().contains("identity"), "{e}");
+}
+
+#[test]
+fn create_net_exchange_then_share() {
+    let s = Store::open_in_memory().unwrap();
+    let kp = crate::net::identity::load_or_create(&s).unwrap();
+    let relays: Vec<String> = vec![];
+    let net = NetCreate { node: None, kp: &kp, my_label: "me", addrs: vec![], relays: &relays };
+    s.create_project("Alpha", "").unwrap();
+    let (item, to, shared) =
+        create_then_share(&s, ShareKind::Project, "Alpha", TargetKind::Net, &[], "", "test", false, Some("lab"), &CreateOpts::default(), Some(&net))
+            .unwrap();
+    assert!(item.is_none());
+    assert_eq!(to.as_ref().unwrap().kind, "net");
+    assert!(shared.new || !shared.made.is_empty(), "{shared:?}");
+    assert_eq!(s.exchanges().unwrap().len(), 1);
+}
+
+#[test]
+fn create_review_entry_and_record() {
+    let s = Store::open_in_memory().unwrap();
+    let e = create_review_subject(&s, crate::store::ReviewKind::Entry, "Monday", &CreateOpts::default(), "test").unwrap();
+    assert_eq!(e.kind, "entry");
+    assert!(s.find_entry(&e.id).is_ok());
+    let r = create_review_subject(&s, crate::store::ReviewKind::Record, "Signals", &CreateOpts::default(), "test").unwrap();
+    assert_eq!(r.kind, "record");
+    assert!(r.name.to_ascii_lowercase().starts_with("signals/"), "{}", r.name);
+}
+
+#[test]
+fn create_review_all_kinds() {
+    let s = Store::open_in_memory().unwrap();
+    for (k, name) in [(crate::store::ReviewKind::Journal, "J1"), (crate::store::ReviewKind::Project, "P1"), (crate::store::ReviewKind::Search, "S1")]
+    {
+        let c = create_review_subject(&s, k, name, &CreateOpts::default(), "test").unwrap();
+        assert_eq!(c.kind, k.as_str(), "{k:?}");
+        assert_eq!(c.name, name);
+    }
+}
+
+#[test]
+fn create_result_requires_existing_series() {
+    let s = Store::open_in_memory().unwrap();
+    let e = create_project_item(&s, crate::store::ItemKind::Result, "binance:BTC/USDT:5m", &CreateOpts::default(), "test").unwrap_err();
+    assert!(e.to_string().contains("import"), "{e}");
 }
 
 #[test]

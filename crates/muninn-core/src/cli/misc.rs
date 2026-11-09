@@ -139,9 +139,23 @@ pub fn share(ctx: &Ctx, a: super::args::ShareArgs) -> anyhow::Result<()> {
     let (item, target) = (a.item.unwrap_or_default(), a.target.unwrap_or_default());
     let t = TargetKind::parse(&target).ok_or_else(|| anyhow::anyhow!("unknown target {target:?} (project, journal, code, space, net)"))?;
     let store = ctx.open_store()?;
-    let opts = super::create_share::opts(&a.create_opts)?;
+    let mut opts = super::create_share::opts(&a.create_opts)?;
+    opts.peer = a.peer.clone();
+    opts.hours = a.hours;
     let (made_item, made_to, out) = if a.create || a.create_to.is_some() {
-        create_then_share(&store, kind, &item, t, &a.to, &a.note, "cli", a.create, a.create_to.as_deref(), &opts)?
+        if t == TargetKind::Net && a.create_to.is_some() {
+            use crate::net::{identity, local};
+            use crate::prefs::Preferences;
+            let kp = identity::load_or_create(&store)?;
+            let prefs = Preferences::load_or_create(&ctx.paths).unwrap_or_default();
+            let relays = prefs.net.relays.clone();
+            let addrs = local::offer_addrs(&ctx.paths.home, &store, None);
+            let label = prefs.net.label.clone();
+            let net = crate::share::NetCreate { node: None, kp: &kp, my_label: &label, addrs, relays: &relays };
+            create_then_share(&store, kind, &item, t, &a.to, &a.note, "cli", a.create, a.create_to.as_deref(), &opts, Some(&net))?
+        } else {
+            create_then_share(&store, kind, &item, t, &a.to, &a.note, "cli", a.create, a.create_to.as_deref(), &opts, None)?
+        }
     } else {
         (None, None, share(&store, kind, &item, t, &a.to, &a.note, "cli")?)
     };

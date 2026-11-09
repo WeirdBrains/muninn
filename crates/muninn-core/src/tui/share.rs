@@ -1,8 +1,8 @@
 //! The Share action in the TUI: `S` (or the `[S share]` button) on a window with a selected
 //! shareable item opens a picker of every place that takes it.
-use super::App;
 use super::modal::{Modal, PickKind};
-use crate::share::{TargetKind, share, targets_for};
+use super::App;
+use crate::share::{share, targets_for, TargetKind};
 use crate::store::ShareKind;
 use ratatui::crossterm::event::KeyCode;
 
@@ -52,9 +52,7 @@ pub fn add_key(app: &App, keys: &mut Vec<(&'static str, KeyCode)>) {
 pub fn choices(app: &App, kind: ShareKind, id: &str) -> Vec<String> {
     let mut v = vec![];
     for t in targets_for(kind) {
-        if t != TargetKind::Net {
-            v.push(format!("{} · + New {}…", t.as_str(), t.as_str()));
-        }
+        v.push(format!("{} · + New {}…", t.as_str(), if t == TargetKind::Net { "exchange" } else { t.as_str() }));
         let names: Vec<String> = match t {
             TargetKind::Project => app.store.projects().map(|l| l.into_iter().map(|p| p.name).collect()).unwrap_or_default(),
             TargetKind::Journal => app
@@ -96,10 +94,7 @@ pub fn picked(app: &mut App, row: &str) {
     if rest.starts_with("+ New ") {
         // Ask for the new target's name; keep share_item / share_back for after.
         app.share_new_target = Some(t);
-        app.modal = Some(super::modal::Modal::prompt(
-            &format!("New {} name", t.as_str()),
-            super::modal::PromptKind::ShareCreateTo,
-        ));
+        app.modal = Some(super::modal::Modal::prompt(&format!("New {} name", t.as_str()), super::modal::PromptKind::ShareCreateTo));
         return;
     }
     let back = app.share_back.take().map(|b| *b);
@@ -147,10 +142,25 @@ pub fn created_target(app: &mut App, name: &str) {
         app.set_status("share: give a name");
         return;
     }
-    match crate::share::create_target(&app.store, t, name, &Default::default(), "tui") {
+    let made = if t == TargetKind::Net {
+        match crate::net::identity::load_or_create(&app.store) {
+            Ok(kp) => {
+                let relays = app.prefs.net.relays.clone();
+                let addrs = crate::net::local::offer_addrs(&app.paths.home, &app.store, None);
+                let label = app.prefs.net.label.clone();
+                let net = crate::share::NetCreate { node: None, kp: &kp, my_label: &label, addrs, relays: &relays };
+                crate::share::create_target(&app.store, t, name, &Default::default(), "tui", Some(&net))
+            }
+            Err(e) => Err(e),
+        }
+    } else {
+        crate::share::create_target(&app.store, t, name, &Default::default(), "tui", None)
+    };
+    match made {
         Ok(c) => {
             app.set_status(format!("created {} {}", c.kind, c.name));
-            finish_share(app, kind, &id, t, &[c.name]);
+            let to = if t == TargetKind::Net { c.id } else { c.name };
+            finish_share(app, kind, &id, t, &[to]);
         }
         Err(e) => app.set_status(format!("create: {e}")),
     }
@@ -187,32 +197,24 @@ pub fn created_item(app: &mut App, name: &str) {
                         match crate::org::transfer(&app.store, "tui", &crate::org::Actor::Owner, &o, kind, &c.name, None) {
                             Ok((r, new)) => {
                                 super::orgs::reload(app);
-                                app.set_status(format!(
-                                    "{} {} {} {}",
-                                    if new { "added" } else { "already has" },
-                                    kind.label(),
-                                    r.name,
-                                    o.name
-                                ));
+                                app.set_status(format!("{} {} {} {}", if new { "added" } else { "already has" }, kind.label(), r.name, o.name));
                             }
                             Err(e) => app.set_status(format!("resource: {e}")),
                         }
                     }
                 }
-                Some(CreateResume::NetShare { with }) => {
-                    match crate::net::client::share(&app.store, kind, &c.name, &with, "tui") {
-                        Ok(made) => {
-                            let n = made.iter().filter(|(_, n)| *n).count();
-                            super::network::reload(app);
-                            app.set_status(if n > 0 {
-                                format!("shared {} {} with {}", kind.label(), c.name, if with.is_empty() { "everyone".into() } else { with.join(", ") })
-                            } else {
-                                "already shared".into()
-                            });
-                        }
-                        Err(e) => app.set_status(format!("share: {e}")),
+                Some(CreateResume::NetShare { with }) => match crate::net::client::share(&app.store, kind, &c.name, &with, "tui") {
+                    Ok(made) => {
+                        let n = made.iter().filter(|(_, n)| *n).count();
+                        super::network::reload(app);
+                        app.set_status(if n > 0 {
+                            format!("shared {} {} with {}", kind.label(), c.name, if with.is_empty() { "everyone".into() } else { with.join(", ") })
+                        } else {
+                            "already shared".into()
+                        });
                     }
-                }
+                    Err(e) => app.set_status(format!("share: {e}")),
+                },
                 Some(CreateResume::ReviewAsk) => match kind {
                     ShareKind::Journal | ShareKind::Project | ShareKind::LiveSearch => {
                         let rk = match kind {

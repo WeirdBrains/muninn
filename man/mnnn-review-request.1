@@ -8,7 +8,7 @@ mnnn\-review\-request \- Ask for a review of an entry, journal, project, search 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn review request\fR [\fB\-\-create\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-lang\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-code\-from\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-space\-kind\fR] [\fB\-\-main\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-format\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-query\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-title\fR] [\fB\-\-transport\fR] [\fB\-\-note\fR] [\fB\-\-allow\fR] [\fB\-\-label\fR] [\fB\-\-peer\fR] [\fB\-\-no\-link\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fITARGET\fR> 
+\fBmnnn review request\fR [\fB\-\-create\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-lang\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-code\-from\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-space\-kind\fR] [\fB\-\-main\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-format\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-query\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-journal\fR] [\fB\-\-transport\fR] [\fB\-\-body\fR] [\fB\-\-model\fR] [\fB\-\-title\fR] [\fB\-\-note\fR] [\fB\-\-allow\fR] [\fB\-\-label\fR] [\fB\-\-peer\fR] [\fB\-\-no\-link\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fITARGET\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -18,7 +18,7 @@ Ask for a review of an entry, journal, project, search or record (makes a link)
 .SH OPTIONS
 .TP
 \fB\-\-create\fR
-Create the thing first (journal, project or search), then ask for a review
+Create the thing first (entry, journal, project, search or record), then ask for a review
 .TP
 \fB\-\-home\fR \fI<DIR>\fR
 Muninn home directory (default ~/.muninn)
@@ -98,11 +98,20 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
-\fB\-\-title\fR \fI<TITLE>\fR [default: ]
-
+\fB\-\-journal\fR \fI<JOURNAL>\fR
+With \-\-create entry: journal to write into (created if missing → `{name}\-journal`)
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-\-body\fR \fI<BODY>\fR
+With \-\-create entry/record: entry body, or record field values (`k=v` / JSON)
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR
+With \-\-create record: model to create in (or MODEL from MODEL/…)
+.TP
+\fB\-\-title\fR \fI<TITLE>\fR [default: ]
+
 .TP
 \fB\-\-note\fR \fI<NOTE>\fR [default: ]
 A word for reviewers

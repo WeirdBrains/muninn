@@ -30,12 +30,13 @@ Every share is recorded in [history](history.md).
 
 Wherever a share can be added, the thing can be created there too (item and destination).
 Create is recorded in history before the share, with the same author. Cancelling a create
-makes nothing. A net destination is an exchange — create those with `mnnn net exchange`
-(sharing with every exchange needs no TO).
+makes nothing. A net `--create-to LABEL` (or **+ New exchange…** in the picker) offers a
+key exchange with that label, then shares to it (`--peer` / `--hours` optional). Sharing
+with every exchange still needs no TO.
 
 | Where | Create |
 |-------|--------|
-| `mnnn share` | `--create` makes the item; `--create-to NAME` makes the project/journal/code/space |
+| `mnnn share` | `--create` makes the item; `--create-to NAME` makes the project/journal/code/space/net exchange |
 | Orgs ▸ Resources / `mnnn org resource add` | `n` / `--create` |
 | `mnnn org give` | `--create` |
 | Org projects / `mnnn org project add` | `+ New project…` / `--create` |
@@ -54,6 +55,10 @@ Create flags (`--description`, `--lang`, `--code-from`, `--space-kind`, `--main`
 ```
 mnnn share KIND ITEM TARGET [TO…] [--note TEXT] [--json]
 mnnn share KIND NAME project --create --create-to Alpha
+mnnn share journal Notes net --create-to lab [--peer NODE]
+mnnn project add P --create result binance:BTC/USDT:5m   # series must already be imported
+mnnn review request entry Monday --create [--journal J]
+mnnn review request record Signals --create [--model Signals]
 mnnn share KIND --targets
 mnnn share search usdt project Alpha
 mnnn share code calc journal Notes --note "worth a look"

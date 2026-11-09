@@ -4053,6 +4053,7 @@ pub struct ReviewAnchor {
 
 /// Review commands.
 #[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)] // clap flatten CreateShareOpts on Request
 pub enum ReviewCommand {
     /// Ask for a review of an entry, journal, project, search or record (makes a link).
     Request {
@@ -4060,11 +4061,20 @@ pub enum ReviewCommand {
         kind: String,
         /// Its name or id (records: MODEL/RECORD). With --create, the new item's name.
         target: String,
-        /// Create the thing first (journal, project or search), then ask for a review.
+        /// Create the thing first (entry, journal, project, search or record), then ask for a review.
         #[arg(long)]
         create: bool,
         #[command(flatten)]
         create_opts: CreateShareOpts,
+        /// With --create entry: journal to write into (created if missing → `{name}-journal`).
+        #[arg(long)]
+        journal: Option<String>,
+        /// With --create entry/record: entry body, or record field values (`k=v` / JSON).
+        #[arg(long)]
+        body: Option<String>,
+        /// With --create record: model to create in (or MODEL from MODEL/…).
+        #[arg(long)]
+        model: Option<String>,
         #[arg(long, default_value = "")]
         title: String,
         /// A word for reviewers.
@@ -4365,9 +4375,15 @@ pub struct ShareArgs {
     /// Create the item first, then share it (same create as `mnnn KIND create`).
     #[arg(long)]
     pub create: bool,
-    /// Create this target first, then share to it (project, journal, code or space name).
+    /// Create this target first, then share to it (project, journal, code, space, or net exchange label).
     #[arg(long = "create-to", value_name = "NAME")]
     pub create_to: Option<String>,
+    /// With `--create-to` on net: send the exchange offer to this peer.
+    #[arg(long)]
+    pub peer: Option<String>,
+    /// With `--create-to` on net: hours the offer stays valid (default 168).
+    #[arg(long)]
+    pub hours: Option<u64>,
     #[command(flatten)]
     pub create_opts: CreateShareOpts,
     /// List where this kind of item can be shared.
@@ -4591,11 +4607,17 @@ pub enum ScheduleCommand {
         #[arg(long, conflicts_with_all = ["ends_at", "for_"])]
         no_end: bool,
     },
-    Enable { schedule: String },
-    Disable { schedule: String },
+    Enable {
+        schedule: String,
+    },
+    Disable {
+        schedule: String,
+    },
     /// Remove a schedule and its runs.
     #[command(alias = "rm")]
-    Remove { schedule: String },
+    Remove {
+        schedule: String,
+    },
     /// Run it once now (outside its timing).
     RunNow {
         schedule: String,

@@ -2,7 +2,10 @@
 //! that accepts shares (a [`Target`]): a project, a journal (as a new entry about it), a code
 //! space (data is piped into it and it runs) or the network (an exchange share, `mnnn net share`).
 mod create;
-pub use create::{CreateOpts, Created, create_item, create_project_item, create_target, create_then_share};
+pub use create::{
+    create_exchange_target, create_item, create_project_item, create_review_subject, create_target, create_then_share, parse_series_ref, CreateOpts,
+    Created, NetCreate,
+};
 
 use crate::code::pipe::Source;
 use crate::error::{Error, Result};

@@ -24,6 +24,7 @@ pub mod reviews;
 pub mod rules;
 pub mod schedules;
 pub mod searches;
+pub mod share;
 pub mod themes;
 
 #[flutter_rust_bridge::frb(init)]

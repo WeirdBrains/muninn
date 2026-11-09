@@ -12,6 +12,11 @@ pub fn opts(a: &CreateShareOpts) -> anyhow::Result<CreateOpts> {
         main: a.main.clone(),
         format: a.format.as_deref().map(|f| EntryFormat::parse(f).map_err(|e| anyhow::anyhow!("{e}"))).transpose()?,
         query: a.query.clone(),
+        journal: None,
+        body: None,
+        model: None,
+        peer: None,
+        hours: None,
     })
 }
 

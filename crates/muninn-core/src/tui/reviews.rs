@@ -276,24 +276,20 @@ fn finish_ask(app: &mut App, kind: RAsk, v: String) {
             let create = k0.starts_with('+');
             let k_raw = k0.trim_start_matches('+').trim().to_ascii_lowercase();
             let Some(k) = kind_of(&k_raw) else {
-                return err(app, format!("what kind is {k0:?}? entry, journal, project, search or record (+journal NAME creates)"));
+                return err(app, format!("what kind is {k0:?}? entry, journal, project, search or record (+KIND NAME creates)"));
             };
-            if create {
-                use crate::store::{ReviewKind, ShareKind};
-                let sk = match k {
-                    ReviewKind::Journal => ShareKind::Journal,
-                    ReviewKind::Project => ShareKind::Project,
-                    ReviewKind::Search => ShareKind::LiveSearch,
-                    other => return err(app, format!("+create supports journal, project or search (not {})", other.label())),
-                };
-                if name.is_empty() {
-                    return err(app, "give a name after the kind");
-                }
-                if let Err(e) = crate::share::create_item(&app.store, sk, name, &Default::default(), ORIGIN) {
-                    return err(app, e.to_string());
-                }
+            if create && name.is_empty() {
+                return err(app, "give a name after the kind");
             }
-            let r = review::request(&app.store, ORIGIN, k, name, "", "", &[]);
+            let key = if create {
+                match crate::share::create_review_subject(&app.store, k, name, &Default::default(), ORIGIN) {
+                    Ok(c) => c.id,
+                    Err(e) => return err(app, e.to_string()),
+                }
+            } else {
+                name.to_string()
+            };
+            let r = review::request(&app.store, ORIGIN, k, &key, "", "", &[]);
             if let Ok(r) = &r {
                 app.reviews.review = Some(r.id.clone());
             }

@@ -8,7 +8,7 @@ mnnn\-share \- Share anything shareable to anything that takes shares: a project
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn share\fR [\fB\-\-home\fR] [\fB\-\-note\fR] [\fB\-\-create\fR] [\fB\-\-db\fR] [\fB\-\-create\-to\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-description\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-lang\fR] [\fB\-\-log\-file\fR] [\fB\-\-code\-from\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-space\-kind\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-main\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-format\fR] [\fB\-\-transport\fR] [\fB\-\-query\fR] [\fB\-\-targets\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> [\fIITEM\fR] [\fITARGET\fR] [\fITO\fR] 
+\fBmnnn share\fR [\fB\-\-home\fR] [\fB\-\-note\fR] [\fB\-\-create\fR] [\fB\-\-db\fR] [\fB\-\-create\-to\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-peer\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-hours\fR] [\fB\-\-log\-file\fR] [\fB\-\-description\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-lang\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-code\-from\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-space\-kind\fR] [\fB\-\-transport\fR] [\fB\-\-main\fR] [\fB\-\-format\fR] [\fB\-\-query\fR] [\fB\-\-targets\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> [\fIITEM\fR] [\fITARGET\fR] [\fITO\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -36,7 +36,7 @@ May also be specified with the \fBMUNINN_DB\fR environment variable.
 .RE
 .TP
 \fB\-\-create\-to\fR \fI<NAME>\fR
-Create this target first, then share to it (project, journal, code or space name)
+Create this target first, then share to it (project, journal, code, space, or net exchange label)
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
@@ -44,14 +44,14 @@ Never prompt; missing values are errors
 May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
 .RE
 .TP
-\fB\-\-description\fR \fI<DESCRIPTION>\fR [default: ]
-
+\fB\-\-peer\fR \fI<PEER>\fR
+With `\-\-create\-to` on net: send the exchange offer to this peer
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
 .TP
-\fB\-\-lang\fR \fI<LANG>\fR
-Code language when creating code (default math)
+\fB\-\-hours\fR \fI<HOURS>\fR
+With `\-\-create\-to` on net: hours the offer stays valid (default 168)
 .TP
 \fB\-\-log\-file\fR \fI<PATH>\fR
 Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
@@ -59,8 +59,8 @@ Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.l
 May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
 .RE
 .TP
-\fB\-\-code\-from\fR \fI<CODE>\fR
-Code: copy from an existing code or built\-in (`csv`, `template:ingest\-connector`, …)
+\fB\-\-description\fR \fI<DESCRIPTION>\fR [default: ]
+
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -68,8 +68,8 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-space\-kind\fR \fI<SPACE_KIND>\fR
-Code space kind when creating a space (default analysis)
+\fB\-\-lang\fR \fI<LANG>\fR
+Code language when creating code (default math)
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
@@ -77,8 +77,8 @@ Answer yes to every confirmation
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
 .TP
-\fB\-\-main\fR \fI<MAIN>\fR
-Code space main (existing code). Without it a `{name}\-main` code is created
+\fB\-\-code\-from\fR \fI<CODE>\fR
+Code: copy from an existing code or built\-in (`csv`, `template:ingest\-connector`, …)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -98,11 +98,17 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
-\fB\-\-format\fR \fI<FORMAT>\fR
-Journal format when creating a journal (markdown or latex)
+\fB\-\-space\-kind\fR \fI<SPACE_KIND>\fR
+Code space kind when creating a space (default analysis)
 .TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-\-main\fR \fI<MAIN>\fR
+Code space main (existing code). Without it a `{name}\-main` code is created
+.TP
+\fB\-\-format\fR \fI<FORMAT>\fR
+Journal format when creating a journal (markdown or latex)
 .TP
 \fB\-\-query\fR \fI<QUERY>\fR
 Live search query when creating a search
