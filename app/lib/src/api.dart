@@ -612,6 +612,99 @@ class CodeRunResult {
   final int writes, ms;
 }
 
+
+/// Plugin = a code space listed by kind (`mnnn plugins list`).
+class PluginInfo {
+  const PluginInfo({
+    required this.name,
+    required this.kind,
+    this.lang = '',
+    this.main = '',
+    this.approved = false,
+    this.enabled = true,
+  });
+  final String name, kind, lang, main;
+  final bool approved, enabled;
+}
+
+class RulesetInfo {
+  const RulesetInfo({
+    required this.id,
+    required this.name,
+    this.description = '',
+    this.ownerKind = 'standalone',
+    this.enabled = true,
+    this.rules = const [],
+    this.schedules = const [],
+  });
+  final String id, name, description, ownerKind;
+  final bool enabled;
+  final List<String> rules, schedules;
+}
+
+class ScheduleInfo {
+  const ScheduleInfo({
+    required this.id,
+    required this.name,
+    this.targetKind = '',
+    this.target = '',
+    this.runEvery = '',
+    this.cron = '',
+    this.tz = '',
+    this.startAt = 0,
+    this.endsAt = 0,
+    this.enabled = true,
+    this.nextRunAt = 0,
+    this.overlap = 'skip',
+    this.catchUp = 'once',
+    this.maxAttempts = 3,
+    this.describe = const [],
+  });
+  final String id, name, targetKind, target, runEvery, cron, tz, overlap, catchUp;
+  final int startAt, endsAt, nextRunAt, maxAttempts;
+  final bool enabled;
+  final List<String> describe;
+}
+
+class ScheduleRunInfo {
+  const ScheduleRunInfo({
+    required this.id,
+    this.status = '',
+    this.timestamp = 0,
+    this.attempt = 1,
+    this.startedAt = 0,
+    this.finishedAt = 0,
+    this.rulesetRan = 0,
+    this.stored = 0,
+    this.error = '',
+  });
+  final int id, timestamp, attempt, startedAt, finishedAt, rulesetRan, stored;
+  final String status, error;
+}
+
+/// Outcome of create-then-share (`mnnn share --create` / `--create-to`).
+class ShareCreated {
+  const ShareCreated({
+    this.createdItemKind = '',
+    this.createdItemId = '',
+    this.createdItemName = '',
+    this.createdToKind = '',
+    this.createdToId = '',
+    this.createdToName = '',
+    this.summary = '',
+    this.itemId = '',
+    this.itemName = '',
+    this.target = '',
+    this.to = '',
+    this.made = '',
+    this.newShare = false,
+  });
+  final String createdItemKind, createdItemId, createdItemName;
+  final String createdToKind, createdToId, createdToName;
+  final String summary, itemId, itemName, target, to, made;
+  final bool newShare;
+}
+
 class LiveHopInfo {
   const LiveHopInfo({
     required this.name,
@@ -2528,6 +2621,116 @@ abstract class MuninnApi {
   Future<List<OrgCodeServedInfo>> orgCodeList(String org);
   Future<String> orgCodeServe(String org, String space);
   Future<String> orgCodeStop(String org, String space);
+
+
+  /// Plugins by kind (`mnnn plugins list [--kind]`).
+  Future<List<PluginInfo>> pluginsList({String? kind});
+  Future<String> pluginSetEnabled(String name, bool enabled);
+
+  /// Code space export/import (`mnnn spaces export|import`).
+  Future<String> spaceExport(String space, String path);
+  Future<List<String>> spaceImportPlan(String path, {String? name});
+  Future<String> spaceImport(String path, {String? name});
+
+  /// Rule sets and schedules (`mnnn ruleset` / `mnnn schedule`).
+  Future<List<RulesetInfo>> rulesetsList();
+  Future<RulesetInfo> rulesetCreate(String name, {String description = '', List<String> rules = const []});
+  Future<RulesetInfo> rulesetEdit(String ruleset, {String? name, String? description, bool? enable});
+  Future<String> rulesetRemove(String ruleset, {bool force = false});
+  Future<RulesetInfo> rulesetAddRule(String ruleset, String rule, {int? position});
+  Future<RulesetInfo> rulesetDropRule(String ruleset, String rule);
+
+  Future<List<ScheduleInfo>> schedulesList();
+  Future<List<ScheduleRunInfo>> scheduleRuns(String key);
+  Future<ScheduleRunInfo> scheduleRunNow(String key);
+  Future<ScheduleInfo> scheduleSetEnabled(String key, bool enabled);
+  Future<String> schedulerTick();
+  Future<String> schedulePastStart({
+    String? runEvery,
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+  });
+  Future<ScheduleInfo> scheduleAdd({
+    required String name,
+    String? runEvery,
+    String? ruleset,
+    String? plugin,
+    String? source,
+    String? pipeline,
+    String? connectorRuleset,
+    List<String> options = const [],
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+    bool pastNext = false,
+    String? overlap,
+    String? catchUp,
+    int? maxAttempts,
+    bool disabled = false,
+  });
+  Future<ScheduleInfo> scheduleEdit(
+    String key, {
+    String? name,
+    String? runEvery,
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+    bool pastNext = false,
+    String? overlap,
+    String? catchUp,
+    int? maxAttempts,
+    bool clearEnds = false,
+  });
+  Future<String> scheduleRemove(String key);
+
+  /// Create-then-share (`mnnn share --create` / `--create-to`).
+  Future<ShareCreated> shareCreateItem(
+    String kind,
+    String name, {
+    String description = '',
+    String? lang,
+    String? codeFrom,
+    String? spaceKind,
+    String? main,
+    String? format,
+    String? query,
+  });
+  Future<ShareCreated> shareCreateThen({
+    required String kind,
+    required String item,
+    required String target,
+    List<String> to = const [],
+    String note = '',
+    bool createItem = false,
+    String? createTo,
+    String description = '',
+    String? lang,
+    String? codeFrom,
+    String? spaceKind,
+    String? main,
+    String? format,
+    String? query,
+    String? peer,
+    int? hours,
+  });
+  Future<ShareCreated> shareCreateReviewSubject(
+    String kind,
+    String name, {
+    String description = '',
+    String? journal,
+    String? body,
+    String? model,
+    String? format,
+    String? query,
+  });
+  Future<ShareCreated> shareCreateProjectItem(String kind, String name, {String description = ''});
 
   /// `mnnn keys status`: database id, path and service-key versions. No key material.
   Future<KeysStatus> keysStatus();

@@ -264,24 +264,26 @@ mod tests {
     #[test]
     fn writes_need_unlock() {
         assert!(share_create_item("journal".into(), "X".into(), String::new(), None, None, None, None, None, None).is_err());
-        assert!(share_create_then(
-            "journal".into(),
-            "X".into(),
-            "project".into(),
-            vec![],
-            String::new(),
-            true,
-            Some("P".into()),
-            String::new(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .is_err());
+        assert!(
+            share_create_then(
+                "journal".into(),
+                "X".into(),
+                "project".into(),
+                vec![],
+                String::new(),
+                true,
+                Some("P".into()),
+                String::new(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .is_err()
+        );
     }
 }

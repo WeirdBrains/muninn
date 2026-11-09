@@ -2504,6 +2504,11 @@ class FakeApi implements MuninnApi {
   }
 
   List<RuleInfo> ruleList = [];
+  List<RulesetInfo> rulesetList = [];
+  List<ScheduleInfo> scheduleList = [];
+  List<PluginInfo> pluginList = [];
+  List<ScheduleRunInfo> scheduleRunList = [];
+
   List<ReviewInfo> reviewList = [];
   List<ReviewingInfo> reviewingList = [];
   List<NotificationInfo> notificationList = [];
@@ -4747,4 +4752,358 @@ class FakeApi implements MuninnApi {
     String? masterFile,
     String? filePassword,
   }) async => _newReveal(shards: 5);
+
+  @override
+  Future<List<PluginInfo>> pluginsList({String? kind}) async {
+    final all = List.of(pluginList);
+    if (kind == null || kind.isEmpty) return all;
+    return [for (final p in all) if (p.kind == kind) p];
+  }
+
+  @override
+  Future<String> pluginSetEnabled(String name, bool enabled) async {
+    final i = pluginList.indexWhere((p) => p.name == name);
+    if (i < 0) throw 'no plugin $name';
+    final p = pluginList[i];
+    pluginList[i] = PluginInfo(
+      name: p.name,
+      kind: p.kind,
+      lang: p.lang,
+      main: p.main,
+      approved: p.approved,
+      enabled: enabled,
+    );
+    return '${enabled ? 'enabled' : 'disabled'} plugin $name';
+  }
+
+  @override
+  Future<String> spaceExport(String space, String path) async =>
+      'wrote $path';
+
+  @override
+  Future<List<String>> spaceImportPlan(String path, {String? name}) async =>
+      ['would import from $path'];
+
+  @override
+  Future<String> spaceImport(String path, {String? name}) async =>
+      'imported from $path';
+
+  @override
+  Future<List<RulesetInfo>> rulesetsList() async => List.of(rulesetList);
+
+  @override
+  Future<RulesetInfo> rulesetCreate(
+    String name, {
+    String description = '',
+    List<String> rules = const [],
+  }) async {
+    final r = RulesetInfo(
+      id: 'rs-${rulesetList.length + 1}',
+      name: name,
+      description: description,
+      rules: List.of(rules),
+    );
+    rulesetList.add(r);
+    return r;
+  }
+
+  @override
+  Future<RulesetInfo> rulesetEdit(
+    String ruleset, {
+    String? name,
+    String? description,
+    bool? enable,
+  }) async {
+    final i = rulesetList.indexWhere((r) => r.id == ruleset || r.name == ruleset);
+    if (i < 0) throw 'no ruleset $ruleset';
+    final r = rulesetList[i];
+    final n = RulesetInfo(
+      id: r.id,
+      name: name ?? r.name,
+      description: description ?? r.description,
+      ownerKind: r.ownerKind,
+      enabled: enable ?? r.enabled,
+      rules: r.rules,
+      schedules: r.schedules,
+    );
+    rulesetList[i] = n;
+    return n;
+  }
+
+  @override
+  Future<String> rulesetRemove(String ruleset, {bool force = false}) async {
+    rulesetList.removeWhere((r) => r.id == ruleset || r.name == ruleset);
+    return 'removed rule set $ruleset';
+  }
+
+  @override
+  Future<RulesetInfo> rulesetAddRule(
+    String ruleset,
+    String rule, {
+    int? position,
+  }) async {
+    final i = rulesetList.indexWhere((r) => r.id == ruleset || r.name == ruleset);
+    if (i < 0) throw 'no ruleset $ruleset';
+    final r = rulesetList[i];
+    final rules = List<String>.of(r.rules)..add(rule);
+    final n = RulesetInfo(
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      ownerKind: r.ownerKind,
+      enabled: r.enabled,
+      rules: rules,
+      schedules: r.schedules,
+    );
+    rulesetList[i] = n;
+    return n;
+  }
+
+  @override
+  Future<RulesetInfo> rulesetDropRule(String ruleset, String rule) async {
+    final i = rulesetList.indexWhere((r) => r.id == ruleset || r.name == ruleset);
+    if (i < 0) throw 'no ruleset $ruleset';
+    final r = rulesetList[i];
+    final rules = List<String>.of(r.rules)..remove(rule);
+    final n = RulesetInfo(
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      ownerKind: r.ownerKind,
+      enabled: r.enabled,
+      rules: rules,
+      schedules: r.schedules,
+    );
+    rulesetList[i] = n;
+    return n;
+  }
+
+  @override
+  Future<List<ScheduleInfo>> schedulesList() async => List.of(scheduleList);
+
+  @override
+  Future<List<ScheduleRunInfo>> scheduleRuns(String key) async =>
+      List.of(scheduleRunList);
+
+  @override
+  Future<ScheduleRunInfo> scheduleRunNow(String key) async {
+    final r = ScheduleRunInfo(id: scheduleRunList.length + 1, status: 'ok');
+    scheduleRunList.add(r);
+    return r;
+  }
+
+  @override
+  Future<ScheduleInfo> scheduleSetEnabled(String key, bool enabled) async {
+    final i = scheduleList.indexWhere((s) => s.id == key || s.name == key);
+    if (i < 0) throw 'no schedule $key';
+    final s = scheduleList[i];
+    final n = ScheduleInfo(
+      id: s.id,
+      name: s.name,
+      targetKind: s.targetKind,
+      target: s.target,
+      runEvery: s.runEvery,
+      cron: s.cron,
+      tz: s.tz,
+      startAt: s.startAt,
+      endsAt: s.endsAt,
+      enabled: enabled,
+      nextRunAt: s.nextRunAt,
+      overlap: s.overlap,
+      catchUp: s.catchUp,
+      maxAttempts: s.maxAttempts,
+      describe: s.describe,
+    );
+    scheduleList[i] = n;
+    return n;
+  }
+
+  @override
+  Future<String> schedulerTick() async => 'nothing is due';
+
+  @override
+  Future<String> schedulePastStart({
+    String? runEvery,
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+  }) async =>
+      'ok';
+
+  @override
+  Future<ScheduleInfo> scheduleAdd({
+    required String name,
+    String? runEvery,
+    String? ruleset,
+    String? plugin,
+    String? source,
+    String? pipeline,
+    String? connectorRuleset,
+    List<String> options = const [],
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+    bool pastNext = false,
+    String? overlap,
+    String? catchUp,
+    int? maxAttempts,
+    bool disabled = false,
+  }) async {
+    final s = ScheduleInfo(
+      id: 'sch-${scheduleList.length + 1}',
+      name: name,
+      targetKind: plugin != null ? 'connector' : 'ruleset',
+      target: plugin ?? ruleset ?? '',
+      runEvery: runEvery ?? '',
+      cron: cron ?? '',
+      tz: tz ?? '',
+      enabled: !disabled,
+      overlap: overlap ?? 'skip',
+      catchUp: catchUp ?? 'once',
+      maxAttempts: maxAttempts ?? 3,
+      describe: ['fake schedule'],
+    );
+    scheduleList.add(s);
+    return s;
+  }
+
+  @override
+  Future<ScheduleInfo> scheduleEdit(
+    String key, {
+    String? name,
+    String? runEvery,
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+    bool pastNext = false,
+    String? overlap,
+    String? catchUp,
+    int? maxAttempts,
+    bool clearEnds = false,
+  }) async {
+    final i = scheduleList.indexWhere((s) => s.id == key || s.name == key);
+    if (i < 0) throw 'no schedule $key';
+    final s = scheduleList[i];
+    final n = ScheduleInfo(
+      id: s.id,
+      name: name ?? s.name,
+      targetKind: s.targetKind,
+      target: s.target,
+      runEvery: runEvery ?? s.runEvery,
+      cron: cron ?? s.cron,
+      tz: tz ?? s.tz,
+      startAt: s.startAt,
+      endsAt: clearEnds ? 0 : s.endsAt,
+      enabled: s.enabled,
+      nextRunAt: s.nextRunAt,
+      overlap: overlap ?? s.overlap,
+      catchUp: catchUp ?? s.catchUp,
+      maxAttempts: maxAttempts ?? s.maxAttempts,
+      describe: s.describe,
+    );
+    scheduleList[i] = n;
+    return n;
+  }
+
+  @override
+  Future<String> scheduleRemove(String key) async {
+    scheduleList.removeWhere((s) => s.id == key || s.name == key);
+    return 'removed schedule $key';
+  }
+
+  @override
+  Future<ShareCreated> shareCreateItem(
+    String kind,
+    String name, {
+    String description = '',
+    String? lang,
+    String? codeFrom,
+    String? spaceKind,
+    String? main,
+    String? format,
+    String? query,
+  }) async =>
+      ShareCreated(
+        createdItemKind: kind,
+        createdItemId: 'new-$name',
+        createdItemName: name,
+        summary: 'created $kind $name',
+        itemId: 'new-$name',
+        itemName: name,
+        newShare: true,
+      );
+
+  @override
+  Future<ShareCreated> shareCreateThen({
+    required String kind,
+    required String item,
+    required String target,
+    List<String> to = const [],
+    String note = '',
+    bool createItem = false,
+    String? createTo,
+    String description = '',
+    String? lang,
+    String? codeFrom,
+    String? spaceKind,
+    String? main,
+    String? format,
+    String? query,
+    String? peer,
+    int? hours,
+  }) async =>
+      ShareCreated(
+        createdItemKind: createItem ? kind : '',
+        createdItemName: createItem ? item : '',
+        createdToKind: createTo != null ? target : '',
+        createdToName: createTo ?? '',
+        summary: 'shared $item to $target',
+        itemName: item,
+        target: target,
+        to: createTo ?? (to.isEmpty ? '' : to.first),
+        newShare: true,
+      );
+
+  @override
+  Future<ShareCreated> shareCreateReviewSubject(
+    String kind,
+    String name, {
+    String description = '',
+    String? journal,
+    String? body,
+    String? model,
+    String? format,
+    String? query,
+  }) async =>
+      ShareCreated(
+        createdItemKind: kind,
+        createdItemId: 'rev-$name',
+        createdItemName: name,
+        summary: 'created $kind $name',
+        itemId: 'rev-$name',
+        itemName: name,
+        newShare: true,
+      );
+
+  @override
+  Future<ShareCreated> shareCreateProjectItem(
+    String kind,
+    String name, {
+    String description = '',
+  }) async =>
+      ShareCreated(
+        createdItemKind: kind,
+        createdItemId: 'pi-$name',
+        createdItemName: name,
+        summary: 'created $kind $name',
+        itemId: 'pi-$name',
+        itemName: name,
+        newShare: true,
+      );
 }

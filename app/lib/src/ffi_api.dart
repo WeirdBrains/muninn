@@ -26,6 +26,8 @@ import 'rust/api/reports.dart' as r_reports;
 import 'rust/api/notify.dart' as r_notify;
 import 'rust/api/reviews.dart' as r_reviews;
 import 'rust/api/rules.dart' as r_rules;
+import 'rust/api/schedules.dart' as r_sched;
+import 'rust/api/share.dart' as r_share;
 import 'rust/api/searches.dart' as r_searches;
 import 'rust/api/themes.dart' as r_themes;
 
@@ -3066,6 +3068,357 @@ class FfiMuninnApi implements MuninnApi {
       filePassword: filePassword,
     ),
   );
+  PluginInfo _plugin(r_code.PluginInfo p) => PluginInfo(
+    name: p.name,
+    kind: p.kind,
+    lang: p.lang,
+    main: p.main,
+    approved: p.approved,
+    enabled: p.enabled,
+  );
+
+  RulesetInfo _ruleset(r_sched.RulesetInfo r) => RulesetInfo(
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    ownerKind: r.ownerKind,
+    enabled: r.enabled,
+    rules: r.rules,
+    schedules: r.schedules,
+  );
+
+  ScheduleInfo _schedule(r_sched.ScheduleInfo s) => ScheduleInfo(
+    id: s.id,
+    name: s.name,
+    targetKind: s.targetKind,
+    target: s.target,
+    runEvery: s.runEvery,
+    cron: s.cron,
+    tz: s.tz,
+    startAt: s.startAt.toInt(),
+    endsAt: s.endsAt.toInt(),
+    enabled: s.enabled,
+    nextRunAt: s.nextRunAt.toInt(),
+    overlap: s.overlap,
+    catchUp: s.catchUp,
+    maxAttempts: s.maxAttempts.toInt(),
+    describe: s.describe,
+  );
+
+  ScheduleRunInfo _scheduleRun(r_sched.ScheduleRunInfo r) => ScheduleRunInfo(
+    id: r.id.toInt(),
+    status: r.status,
+    timestamp: r.timestamp.toInt(),
+    attempt: r.attempt.toInt(),
+    startedAt: r.startedAt.toInt(),
+    finishedAt: r.finishedAt.toInt(),
+    rulesetRan: r.rulesetRan.toInt(),
+    stored: r.stored.toInt(),
+    error: r.error,
+  );
+
+  ShareCreated _share(r_share.ShareCreated s) => ShareCreated(
+    createdItemKind: s.createdItemKind,
+    createdItemId: s.createdItemId,
+    createdItemName: s.createdItemName,
+    createdToKind: s.createdToKind,
+    createdToId: s.createdToId,
+    createdToName: s.createdToName,
+    summary: s.summary,
+    itemId: s.itemId,
+    itemName: s.itemName,
+    target: s.target,
+    to: s.to,
+    made: s.made,
+    newShare: s.newShare,
+  );
+
+  @override
+  Future<List<PluginInfo>> pluginsList({String? kind}) async => [
+    for (final p in await r_code.pluginsList(kind: kind)) _plugin(p),
+  ];
+
+  @override
+  Future<String> pluginSetEnabled(String name, bool enabled) =>
+      r_code.pluginSetEnabled(name: name, enabled: enabled);
+
+  @override
+  Future<String> spaceExport(String space, String path) =>
+      r_code.spaceExport(space: space, path: path);
+
+  @override
+  Future<List<String>> spaceImportPlan(String path, {String? name}) =>
+      r_code.spaceImportPlan(path: path, name: name);
+
+  @override
+  Future<String> spaceImport(String path, {String? name}) =>
+      r_code.spaceImport(path: path, name: name);
+
+  @override
+  Future<List<RulesetInfo>> rulesetsList() async => [
+    for (final r in await r_sched.rulesetsList()) _ruleset(r),
+  ];
+
+  @override
+  Future<RulesetInfo> rulesetCreate(
+    String name, {
+    String description = '',
+    List<String> rules = const [],
+  }) async =>
+      _ruleset(await r_sched.rulesetCreate(
+        name: name,
+        description: description,
+        rules: rules,
+      ));
+
+  @override
+  Future<RulesetInfo> rulesetEdit(
+    String ruleset, {
+    String? name,
+    String? description,
+    bool? enable,
+  }) async =>
+      _ruleset(await r_sched.rulesetEdit(
+        ruleset: ruleset,
+        name: name,
+        description: description,
+        enable: enable,
+      ));
+
+  @override
+  Future<String> rulesetRemove(String ruleset, {bool force = false}) =>
+      r_sched.rulesetRemove(ruleset: ruleset, force: force);
+
+  @override
+  Future<RulesetInfo> rulesetAddRule(
+    String ruleset,
+    String rule, {
+    int? position,
+  }) async =>
+      _ruleset(await r_sched.rulesetAddRule(
+        ruleset: ruleset,
+        rule: rule,
+        position: position,
+      ));
+
+  @override
+  Future<RulesetInfo> rulesetDropRule(String ruleset, String rule) async =>
+      _ruleset(await r_sched.rulesetDropRule(ruleset: ruleset, rule: rule));
+
+  @override
+  Future<List<ScheduleInfo>> schedulesList() async => [
+    for (final s in await r_sched.schedulesList()) _schedule(s),
+  ];
+
+  @override
+  Future<List<ScheduleRunInfo>> scheduleRuns(String key) async => [
+    for (final r in await r_sched.scheduleRuns(key: key)) _scheduleRun(r),
+  ];
+
+  @override
+  Future<ScheduleRunInfo> scheduleRunNow(String key) async =>
+      _scheduleRun(await r_sched.scheduleRunNow(key: key));
+
+  @override
+  Future<ScheduleInfo> scheduleSetEnabled(String key, bool enabled) async =>
+      _schedule(await r_sched.scheduleSetEnabled(key: key, enabled: enabled));
+
+  @override
+  Future<String> schedulerTick() => r_sched.schedulerTick();
+
+  @override
+  Future<String> schedulePastStart({
+    String? runEvery,
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+  }) =>
+      r_sched.schedulePastStart(
+        runEvery: runEvery,
+        cron: cron,
+        startAt: startAt,
+        endsAt: endsAt,
+        for_: for_,
+        tz: tz,
+      );
+
+  @override
+  Future<ScheduleInfo> scheduleAdd({
+    required String name,
+    String? runEvery,
+    String? ruleset,
+    String? plugin,
+    String? source,
+    String? pipeline,
+    String? connectorRuleset,
+    List<String> options = const [],
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+    bool pastNext = false,
+    String? overlap,
+    String? catchUp,
+    int? maxAttempts,
+    bool disabled = false,
+  }) async =>
+      _schedule(await r_sched.scheduleAdd(
+        name: name,
+        runEvery: runEvery,
+        ruleset: ruleset,
+        plugin: plugin,
+        source: source,
+        pipeline: pipeline,
+        connectorRuleset: connectorRuleset,
+        options: options,
+        cron: cron,
+        startAt: startAt,
+        endsAt: endsAt,
+        for_: for_,
+        tz: tz,
+        pastNext: pastNext,
+        overlap: overlap,
+        catchUp: catchUp,
+        maxAttempts:
+            maxAttempts == null ? null : PlatformInt64Util.from(maxAttempts),
+        disabled: disabled,
+      ));
+
+  @override
+  Future<ScheduleInfo> scheduleEdit(
+    String key, {
+    String? name,
+    String? runEvery,
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+    bool pastNext = false,
+    String? overlap,
+    String? catchUp,
+    int? maxAttempts,
+    bool clearEnds = false,
+  }) async =>
+      _schedule(await r_sched.scheduleEdit(
+        key: key,
+        name: name,
+        runEvery: runEvery,
+        cron: cron,
+        startAt: startAt,
+        endsAt: endsAt,
+        for_: for_,
+        tz: tz,
+        pastNext: pastNext,
+        overlap: overlap,
+        catchUp: catchUp,
+        maxAttempts:
+            maxAttempts == null ? null : PlatformInt64Util.from(maxAttempts),
+        clearEnds: clearEnds,
+      ));
+
+  @override
+  Future<String> scheduleRemove(String key) => r_sched.scheduleRemove(key: key);
+
+  @override
+  Future<ShareCreated> shareCreateItem(
+    String kind,
+    String name, {
+    String description = '',
+    String? lang,
+    String? codeFrom,
+    String? spaceKind,
+    String? main,
+    String? format,
+    String? query,
+  }) async =>
+      _share(await r_share.shareCreateItem(
+        kind: kind,
+        name: name,
+        description: description,
+        lang: lang,
+        codeFrom: codeFrom,
+        spaceKind: spaceKind,
+        main: main,
+        format: format,
+        query: query,
+      ));
+
+  @override
+  Future<ShareCreated> shareCreateThen({
+    required String kind,
+    required String item,
+    required String target,
+    List<String> to = const [],
+    String note = '',
+    bool createItem = false,
+    String? createTo,
+    String description = '',
+    String? lang,
+    String? codeFrom,
+    String? spaceKind,
+    String? main,
+    String? format,
+    String? query,
+    String? peer,
+    int? hours,
+  }) async =>
+      _share(await r_share.shareCreateThen(
+        kind: kind,
+        item: item,
+        target: target,
+        to: to,
+        note: note,
+        createItem: createItem,
+        createTo: createTo,
+        description: description,
+        lang: lang,
+        codeFrom: codeFrom,
+        spaceKind: spaceKind,
+        main: main,
+        format: format,
+        query: query,
+        peer: peer,
+        hours: hours == null ? null : BigInt.from(hours),
+      ));
+
+  @override
+  Future<ShareCreated> shareCreateReviewSubject(
+    String kind,
+    String name, {
+    String description = '',
+    String? journal,
+    String? body,
+    String? model,
+    String? format,
+    String? query,
+  }) async =>
+      _share(await r_share.shareCreateReviewSubject(
+        kind: kind,
+        name: name,
+        description: description,
+        journal: journal,
+        body: body,
+        model: model,
+        format: format,
+        query: query,
+      ));
+
+  @override
+  Future<ShareCreated> shareCreateProjectItem(
+    String kind,
+    String name, {
+    String description = '',
+  }) async =>
+      _share(await r_share.shareCreateProjectItem(
+        kind: kind,
+        name: name,
+        description: description,
+      ));
+
 }
 
 OrgOverview _orgOverview(r_orgs.OrgOverview o) => OrgOverview(

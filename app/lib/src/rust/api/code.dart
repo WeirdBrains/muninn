@@ -7,8 +7,8 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `apply_pipe_format`, `approve_if_needed`, `approve_pipe_spaces`, `chunk_frames`, `code_spaces_of`, `edge_spec`, `frame_cell`, `graph_lines`, `hash16`, `latest_pipe_frame_of`, `live_pipes_of`, `node_spec`, `nonempty`, `parse_lang`, `pipe_result`, `pipe_run_of`, `pipeline_end_in_model_of`, `pipeline_info`, `pipeline_monitor_of`, `pipeline_run_of`, `pipeline_run_once`, `pipeline_tee_of`, `pipelines_of`, `run_result`, `scope_label`, `source_from`, `space_info`, `stdin_body`, `strs`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`
+// These functions are ignored because they are not marked as `pub`: `apply_pipe_format`, `approve_if_needed`, `approve_pipe_spaces`, `chunk_frames`, `code_spaces_of`, `edge_spec`, `frame_cell`, `graph_lines`, `hash16`, `latest_pipe_frame_of`, `live_pipes_of`, `node_spec`, `nonempty`, `parse_lang`, `pipe_result`, `pipe_run_of`, `pipeline_end_in_model_of`, `pipeline_info`, `pipeline_monitor_of`, `pipeline_run_of`, `pipeline_run_once`, `pipeline_tee_of`, `pipelines_of`, `plugins_of`, `run_result`, `scope_label`, `source_from`, `space_info`, `stdin_body`, `strs`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`, `fmt`
 
 /// `mnnn code list` / TUI Code spaces….
 Future<List<CodeSpaceInfo>> codeSpaces() =>
@@ -222,6 +222,31 @@ Future<String> pipelineImport({
   path: path,
   name: name,
   merge: merge,
+);
+
+/// `mnnn spaces export`: a code space file (main, members, imported spaces, their code).
+Future<String> spaceExport({required String space, required String path}) =>
+    RustLib.instance.api.crateApiCodeSpaceExport(space: space, path: path);
+
+/// `mnnn spaces import --dry-run`: what importing would do.
+Future<List<String>> spaceImportPlan({required String path, String? name}) =>
+    RustLib.instance.api.crateApiCodeSpaceImportPlan(path: path, name: name);
+
+/// `mnnn spaces import`: lands unapproved (pins kept; a clash is NAME-imported).
+Future<String> spaceImport({required String path, String? name}) =>
+    RustLib.instance.api.crateApiCodeSpaceImport(path: path, name: name);
+
+/// `mnnn plugins list [--kind K]`.
+Future<List<PluginInfo>> pluginsList({String? kind}) =>
+    RustLib.instance.api.crateApiCodePluginsList(kind: kind);
+
+/// `mnnn plugins enable|disable NAME`.
+Future<String> pluginSetEnabled({
+  required String name,
+  required bool enabled,
+}) => RustLib.instance.api.crateApiCodePluginSetEnabled(
+  name: name,
+  enabled: enabled,
 );
 
 class CodeParserInfo {
@@ -656,4 +681,46 @@ class PipelineRunResult {
           ok == other.ok &&
           lines == other.lines &&
           landed == other.landed;
+}
+
+/// A plugin: a code space by kind (Plugins ▸ KIND).
+class PluginInfo {
+  final String name;
+  final String kind;
+
+  /// main's language
+  final String lang;
+  final String main;
+  final bool approved;
+  final bool enabled;
+
+  const PluginInfo({
+    required this.name,
+    required this.kind,
+    required this.lang,
+    required this.main,
+    required this.approved,
+    required this.enabled,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^
+      kind.hashCode ^
+      lang.hashCode ^
+      main.hashCode ^
+      approved.hashCode ^
+      enabled.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PluginInfo &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          kind == other.kind &&
+          lang == other.lang &&
+          main == other.main &&
+          approved == other.approved &&
+          enabled == other.enabled;
 }
