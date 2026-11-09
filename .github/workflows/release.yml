@@ -80,25 +80,63 @@ jobs:
           if-no-files-found: error
 
   windows:
-    name: windows (x86_64, aarch64)
+    name: windows (${{ matrix.arch }})
     needs: version
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.tag || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-gnullvm,aarch64-pc-windows-gnullvm
+          targets: ${{ matrix.arch }}-pc-windows-gnullvm
       - name: llvm-mingw
         run: |
           curl -sSfL "https://github.com/mstorsjo/llvm-mingw/releases/download/20261020/$LLVM_MINGW.tar.xz" | tar -xJ -C "$RUNNER_TEMP"
       - name: Build
-        run: LLVM_MINGW="$RUNNER_TEMP/$LLVM_MINGW" scripts/cross-windows.sh x86_64 aarch64
+        run: LLVM_MINGW="$RUNNER_TEMP/$LLVM_MINGW" scripts/cross-windows.sh ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-windows
-          path: dist/*.zip
+          name: dist-windows-${{ matrix.arch }}
+          path: dist/muninn-*-${{ matrix.arch }}-pc-windows-gnullvm.zip
+          if-no-files-found: error
+
+  windows-installer:
+    name: windows setup installer
+    needs: [windows]
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Install Inno Setup
+        run: winget install --id JRSoftware.InnoSetup -e --accept-package-agreements --accept-source-agreements
+        shell: pwsh
+      - name: Install ImageMagick (icon generation)
+        run: winget install --id ImageMagick.ImageMagick -e --accept-package-agreements --accept-source-agreements
+        shell: pwsh
+      - name: Refresh PATH
+        run: |
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","User") + ";" + [System.Environment]::GetEnvironmentVariable("Path","Machine")
+          echo $env:Path >> $env:GITHUB_PATH
+        shell: pwsh
+      - name: Download cross-compiled binaries
+        uses: actions/download-artifact@v5
+        with:
+          pattern: dist-windows-*
+          path: dist
+          merge-multiple: true
+      - name: Generate icon
+        run: scripts\windows-installer-build.ps1
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows-setup
+          path: dist\*-windows-setup.exe
           if-no-files-found: error
 
   arch:
@@ -140,7 +178,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [unix, windows, arch]
+    needs: [unix, windows-installer, arch]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v5

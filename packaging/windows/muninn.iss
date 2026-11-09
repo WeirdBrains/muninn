@@ -15,6 +15,9 @@
 #ifndef OutDir
   #define OutDir "."
 #endif
+#ifndef IconFile
+  #define IconFile "muninn.ico"
+#endif
 
 [Setup]
 AppId={{6A1C3E52-7B1F-4C3E-9D2A-4D5E6F708192}
@@ -33,7 +36,7 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=
 ChangesEnvironment=yes
 LicenseFile={#SrcDir}\LICENSE
-SetupIconFile=muninn.ico
+SetupIconFile={#IconFile}
 UninstallDisplayIcon={app}\muninn.ico
 UninstallDisplayName=Muninn {#AppVersion}
 OutputDir={#OutDir}
@@ -55,7 +58,7 @@ Source: "{#SrcDir}\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcDir}\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcDir}\LICENSE-FONTS"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "muninn.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#IconFile}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "muninn-launch.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

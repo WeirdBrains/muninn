@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Build the Windows installers (muninn-<ver>-<arch>-windows-setup.exe) with Inno Setup on a
 # Windows host reached over ssh, from the release zips that scripts/cross-windows.sh makes.
+# NOTE: CI builds installers on the GitHub windows-2025 runner via scripts/windows-installer-build.ps1.
+# This script is kept for local dev / manual builds (e.g. when testing installer changes).
 #   scripts/windows-setup.sh [x86_64] [aarch64]
 # Environment: DIST (default dist) holds muninn-<ver>-<arch>-pc-windows-gnullvm.zip and
 # receives the setup exes; WIN_SSH (default m3talsmith@127.0.0.1) and WIN_PORT (2222, the
@@ -33,6 +35,7 @@ for a in "${archs[@]}"; do
   src="%USERPROFILE%\\$work\\$a\\muninn-$ver-$a-pc-windows-gnullvm"
   win "cd /d %USERPROFILE%\\$work && \"$iscc\" /Q /DAppVersion=$ver /DArch=$a \"/DSrcDir=$src\" \"/DOutDir=%USERPROFILE%\\$work\\out\" muninn.iss"
   scp -q -P "$port" "$host:$work/out/muninn-$ver-$a-windows-setup.exe" "$dist/"
+  cp "/out/muninn-$ver-$a-windows-setup.exe" "$dist/"
   echo "$dist/muninn-$ver-$a-windows-setup.exe"
 done
 win "rmdir /s /q %USERPROFILE%\\$work"
