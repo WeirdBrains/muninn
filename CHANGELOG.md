@@ -7,6 +7,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ## [Unreleased]
 
 ### Changed
+- Scheduler liveness: continuous only when the same holder wrote the last tick within 120s (quick restart across a deadline is a miss, not a fire)
 - Scheduler: missed one-offs skip on restart after the deadline (daemon-alive vs cold gap), not a 60s grace; `rule edit --every/--cron` migrates onto schedules; `once` ends_at_input is `auto (once)`
 - 2.25 database migration: each project's rules become a rule set owned by the project; scheduled rules become rule set `NAME (scheduled)` plus a schedule (node's zone, next run from the last). `rule create --every/--cron` make a rule set and schedule (deprecated); `mnnn rule tick` runs `mnnn scheduler tick` (deprecated); the cert expiry watcher is a rule, rule set and schedule. New dependency: `parse_datetime`
 

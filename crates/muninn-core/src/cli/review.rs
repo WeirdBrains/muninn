@@ -155,9 +155,21 @@ fn print_view(v: &Value) {
 
 pub fn run(ctx: &Ctx, cmd: ReviewCommand) -> anyhow::Result<()> {
     match cmd {
-        ReviewCommand::Request { kind: k, target: t, title, note, allow, label, peer, no_link } => {
+        ReviewCommand::Request { kind: k, target: t, title, note, allow, label, peer, no_link, create, create_opts } => {
             let k = kind(&k)?;
             let mut n = Net::open(ctx)?;
+            if create {
+                use crate::store::{ReviewKind, ShareKind};
+                let sk = match k {
+                    ReviewKind::Journal => ShareKind::Journal,
+                    ReviewKind::Project => ShareKind::Project,
+                    ReviewKind::Search => ShareKind::LiveSearch,
+                    other => return Err(anyhow::anyhow!("--create for a review supports journal, project or search (not {})", other.label())),
+                };
+                let opts = super::create_share::opts(&create_opts)?;
+                let c = crate::share::create_item(&n.store, sk, &t, &opts, ORIGIN)?;
+                ctx.io.note(format!("created {} {}", c.kind, c.name));
+            }
             let r = review::request(&n.store, ORIGIN, k, &t, &title, &note, &allow)?;
             ctx.io.info(format!("review {} of {} {} ({}; reviewers may {})", r.short_id(), k.label(), r.name, r.title(), r.allow.join(", ")));
             if no_link {

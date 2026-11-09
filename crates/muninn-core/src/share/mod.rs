@@ -1,6 +1,9 @@
 //! The universal Share action: anything shareable (a [`ShareKind`] item) goes to anything
 //! that accepts shares (a [`Target`]): a project, a journal (as a new entry about it), a code
 //! space (data is piped into it and it runs) or the network (an exchange share, `mnnn net share`).
+mod create;
+pub use create::{CreateOpts, Created, create_item, create_project_item, create_target, create_then_share};
+
 use crate::code::pipe::Source;
 use crate::error::{Error, Result};
 use crate::store::{CodeInput, ItemKind, NewAction, ShareKind, Store};

@@ -9,9 +9,12 @@ use serde_json::{Value, json};
 pub const ORIGIN: &str = "scheduler";
 /// Setting: last scheduler tick (epoch ms). Distinguishes a continuous daemon from a restart.
 pub const LAST_TICK_KEY: &str = "scheduler.last_tick_at";
+/// Who wrote [`LAST_TICK_KEY`] (`cli:PID`, `tui:PID`, …). A new process/session must not
+/// look "alive" just because a persisted tick is recent (quick restart across a deadline).
+pub const LAST_HOLDER_KEY: &str = "scheduler.last_tick_holder";
 /// start_at this far in the past counts as "past" when adding/editing (UX only).
 pub const PAST_SLACK_MS: i64 = 60_000;
-/// Gap longer than this between ticks means the node was off (restart / cold).
+/// Max gap between ticks of the *same* holder still counts as one continuous session.
 pub const ALIVE_GAP_MS: i64 = 120_000;
 /// A running run whose heartbeat is older than this is abandoned.
 pub const ABANDON_MS: i64 = 120_000;
@@ -561,7 +564,12 @@ pub fn tick(store: &Store, holder: &str, now: i64) -> Result<TickReport> {
         }
     }
     let last_tick = last_tick_at(store)?;
-    let alive = last_tick > 0 && now.saturating_sub(last_tick) <= ALIVE_GAP_MS;
+    let last_holder = last_tick_holder(store)?;
+    // Continuous only if *this* scheduler session wrote the last tick recently.
+    // A quick restart (new holder) within ALIVE_GAP_MS must not inherit aliveness.
+    let alive = last_tick > 0
+        && last_holder.as_deref() == Some(holder)
+        && now.saturating_sub(last_tick) <= ALIVE_GAP_MS;
     // due slots
     for mut s in store.schedules()? {
         if !s.enabled || s.next_run_at > now {
@@ -571,7 +579,7 @@ pub fn tick(store: &Store, holder: &str, now: i64) -> Result<TickReport> {
     }
     // leftover legacy per-rule schedules (pre-2.25; edit --every migrates them off)
     rep.legacy = crate::rules::tick(store, now)?;
-    set_last_tick_at(store, now)?;
+    set_last_tick(store, holder, now)?;
     // start pending
     let pending: Vec<ScheduleRun> = store.open_runs()?.into_iter().filter(|r| r.status == "pending" && r.not_before <= now).collect();
     let mut busy: Vec<String> = store.open_runs()?.into_iter().filter(|r| r.status == "running").map(|r| r.schedule_id).collect();
@@ -605,16 +613,21 @@ fn last_tick_at(store: &Store) -> Result<i64> {
     Ok(store.setting(LAST_TICK_KEY)?.as_deref().and_then(|s| s.parse().ok()).unwrap_or(0))
 }
 
-fn set_last_tick_at(store: &Store, now: i64) -> Result<()> {
-    store.set_setting(LAST_TICK_KEY, Some(&now.to_string()))
+fn last_tick_holder(store: &Store) -> Result<Option<String>> {
+    store.setting(LAST_HOLDER_KEY)
+}
+
+fn set_last_tick(store: &Store, holder: &str, now: i64) -> Result<()> {
+    store.set_setting(LAST_TICK_KEY, Some(&now.to_string()))?;
+    store.set_setting(LAST_HOLDER_KEY, Some(holder))
 }
 
 /// Queue due slots.
 ///
-/// A continuous daemon (`alive`: last tick within [`ALIVE_GAP_MS`]) that crosses a due
-/// time runs it even when a tiny `once` window (`ends_at = start_at + 1 ms`) has closed.
-/// A restart after the deadline (`!alive` and `ends_at <= now`) takes the generic
-/// ended-while-missed path — no grace that would fire a missed one-off late.
+/// A continuous *session* (`alive`: same holder as the last tick, within [`ALIVE_GAP_MS`])
+/// that crosses a due time runs it even when a tiny `once` window has closed. A new
+/// process/session after the deadline (`!alive` and `ends_at <= now`) takes the generic
+/// ended-while-missed path — a quick restart must not look alive from a stale tick alone.
 fn queue_due(store: &Store, s: &mut ScheduleDef, now: i64, last_tick: i64, alive: bool, rep: &mut TickReport) -> Result<()> {
     let end = s.ends_at;
     if !alive && end.is_some_and(|e| e <= now) && s.next_run_at < end.unwrap_or(0) && s.next_run_at > last_tick {

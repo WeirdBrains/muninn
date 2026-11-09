@@ -137,6 +137,11 @@ pub struct App {
     /// The item being shared and the window to go back to.
     pub share_item: Option<(crate::store::ShareKind, String)>,
     pub share_back: Option<Box<modal::Modal>>,
+    /// Target kind while naming a new share destination (`+ New …`).
+    pub share_new_target: Option<crate::share::TargetKind>,
+    /// Kind while naming a new item to share/add (`+ New …` on org/net/review).
+    pub share_new_item: Option<crate::store::ShareKind>,
+    pub share_create_resume: Option<share::CreateResume>,
     /// Where the open popup is drawn (its hint text is clickable).
     pub modal_area: Rect,
     /// `Ctrl-w` was pressed; the next key is a window command.
@@ -200,6 +205,9 @@ impl App {
             modal_hits: vec![],
             share_item: None,
             share_back: None,
+            share_new_target: None,
+            share_new_item: None,
+            share_create_resume: None,
             modal_area: Rect::default(),
             content: Rect::new(0, 0, 120, 30),
             export: forms::ExportForm::default(),

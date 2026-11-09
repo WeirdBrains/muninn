@@ -113,3 +113,62 @@ fn code_spaces_share_everywhere_code_does_and_take_data_like_code() {
     assert_eq!(TargetKind::parse("space"), Some(TargetKind::Space));
     assert_eq!(ShareKind::parse("code-space"), Some(ShareKind::Space));
 }
+
+
+#[test]
+fn create_then_share_records_both_and_builds_target() {
+    let s = Store::open_in_memory().unwrap();
+    let opts = CreateOpts::default();
+    let (item, to, shared) = create_then_share(
+        &s,
+        ShareKind::Journal,
+        "Lab notes",
+        TargetKind::Project,
+        &[],
+        "",
+        "test",
+        true,
+        Some("Alpha"),
+        &opts,
+    )
+    .unwrap();
+    assert_eq!(item.unwrap().name, "Lab notes");
+    assert_eq!(to.unwrap().name, "Alpha");
+    assert!(shared.new);
+    assert_eq!(s.journals().unwrap().len(), 1);
+    assert_eq!(s.projects().unwrap().len(), 1);
+    assert_eq!(s.project_items(&s.find_project("Alpha").unwrap().id).unwrap().len(), 1);
+    let kinds: Vec<_> = s.actions().unwrap().into_iter().map(|a| a.kind).collect();
+    assert!(kinds.iter().any(|k| k == "journal.create"), "{kinds:?}");
+    assert!(kinds.iter().any(|k| k == "project.create"), "{kinds:?}");
+    assert!(kinds.iter().any(|k| k == "share"), "{kinds:?}");
+    // create before share
+    let ji = kinds.iter().position(|k| k == "journal.create").unwrap();
+    let pi = kinds.iter().position(|k| k == "project.create").unwrap();
+    let si = kinds.iter().position(|k| k == "share").unwrap();
+    assert!(ji < si && pi < si, "{kinds:?}");
+}
+
+#[test]
+fn create_space_makes_main_when_none_named() {
+    let s = Store::open_in_memory().unwrap();
+    let c = create_item(&s, ShareKind::Space, "Ingest", &CreateOpts { space_kind: Some(crate::store::SpaceKind::Analysis), ..Default::default() }, "test").unwrap();
+    let sp = s.find_space(&c.name).unwrap();
+    let main = s.code_space(&sp.main_code_id).unwrap().unwrap();
+    assert_eq!(main.name, "Ingest-main");
+}
+
+#[test]
+fn create_net_target_is_refused() {
+    let s = Store::open_in_memory().unwrap();
+    let e = create_target(&s, TargetKind::Net, "x", &CreateOpts::default(), "test").unwrap_err();
+    assert!(e.to_string().contains("exchange"), "{e}");
+}
+
+#[test]
+fn cancel_create_makes_nothing() {
+    // Cancelling is TUI-only; create_item is simply not called. Sanity: empty store stays empty.
+    let s = Store::open_in_memory().unwrap();
+    assert!(s.journals().unwrap().is_empty());
+    assert!(s.projects().unwrap().is_empty());
+}

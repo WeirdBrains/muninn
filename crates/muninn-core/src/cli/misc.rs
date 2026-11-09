@@ -121,7 +121,7 @@ pub fn man(out: &Path) -> anyhow::Result<()> {
 
 /// `mnnn share`.
 pub fn share(ctx: &Ctx, a: super::args::ShareArgs) -> anyhow::Result<()> {
-    use crate::share::{TargetKind, share, targets_for};
+    use crate::share::{TargetKind, create_then_share, share, targets_for};
     use crate::store::ShareKind;
     let kind = ShareKind::parse(&a.kind)
         .ok_or_else(|| anyhow::anyhow!("unknown kind {:?} (model, search, journal, project, report, code, space, pipeline)", a.kind))?;
@@ -139,7 +139,18 @@ pub fn share(ctx: &Ctx, a: super::args::ShareArgs) -> anyhow::Result<()> {
     let (item, target) = (a.item.unwrap_or_default(), a.target.unwrap_or_default());
     let t = TargetKind::parse(&target).ok_or_else(|| anyhow::anyhow!("unknown target {target:?} (project, journal, code, space, net)"))?;
     let store = ctx.open_store()?;
-    let out = share(&store, kind, &item, t, &a.to, &a.note, "cli")?;
+    let opts = super::create_share::opts(&a.create_opts)?;
+    let (made_item, made_to, out) = if a.create || a.create_to.is_some() {
+        create_then_share(&store, kind, &item, t, &a.to, &a.note, "cli", a.create, a.create_to.as_deref(), &opts)?
+    } else {
+        (None, None, share(&store, kind, &item, t, &a.to, &a.note, "cli")?)
+    };
+    if let Some(c) = made_item {
+        ctx.io.note(format!("created {} {}", c.kind, c.name));
+    }
+    if let Some(c) = made_to {
+        ctx.io.note(format!("created {} {}", c.kind, c.name));
+    }
     if t == TargetKind::Code {
         // data into a code space: run it over the data (the space keeps none of it)
         let src = crate::share::source_for(kind, &out.item, &out.name)?;

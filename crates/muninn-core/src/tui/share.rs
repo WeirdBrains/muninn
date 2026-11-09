@@ -48,9 +48,13 @@ pub fn add_key(app: &App, keys: &mut Vec<(&'static str, KeyCode)>) {
 }
 
 /// Picker rows `target · name` for everywhere `kind` can go (`net · all exchanges` for net).
+/// Each creatable target starts with `+ New target…`.
 pub fn choices(app: &App, kind: ShareKind, id: &str) -> Vec<String> {
     let mut v = vec![];
     for t in targets_for(kind) {
+        if t != TargetKind::Net {
+            v.push(format!("{} · + New {}…", t.as_str(), t.as_str()));
+        }
         let names: Vec<String> = match t {
             TargetKind::Project => app.store.projects().map(|l| l.into_iter().map(|p| p.name).collect()).unwrap_or_default(),
             TargetKind::Journal => app
@@ -87,13 +91,26 @@ pub fn open(app: &mut App) -> bool {
 
 /// A picker row was chosen.
 pub fn picked(app: &mut App, row: &str) {
+    let Some((t, rest)) = row.split_once(" · ") else { return };
+    let Some(t) = TargetKind::parse(t) else { return };
+    if rest.starts_with("+ New ") {
+        // Ask for the new target's name; keep share_item / share_back for after.
+        app.share_new_target = Some(t);
+        app.modal = Some(super::modal::Modal::prompt(
+            &format!("New {} name", t.as_str()),
+            super::modal::PromptKind::ShareCreateTo,
+        ));
+        return;
+    }
     let back = app.share_back.take().map(|b| *b);
     let Some((kind, id)) = app.share_item.take() else { return };
     app.modal = back;
-    let Some((t, to)) = row.split_once(" · ") else { return };
-    let Some(t) = TargetKind::parse(t) else { return };
-    let to: Vec<String> = if t == TargetKind::Net { vec![] } else { vec![to.to_string()] };
-    match share(&app.store, kind, &id, t, &to, "", "tui") {
+    let to: Vec<String> = if t == TargetKind::Net { vec![] } else { vec![rest.to_string()] };
+    finish_share(app, kind, &id, t, &to);
+}
+
+fn finish_share(app: &mut App, kind: ShareKind, id: &str, t: TargetKind, to: &[String]) {
+    match share(&app.store, kind, id, t, to, "", "tui") {
         // data into a code space: open it and run it over the data (the space is not
         // changed; a new or changed source asks to be approved first)
         Ok(s) if t == TargetKind::Code => match crate::share::source_for(kind, &s.item, &s.name) {
@@ -113,5 +130,113 @@ pub fn picked(app: &mut App, row: &str) {
         },
         Ok(s) => app.set_status(s.summary()),
         Err(e) => app.set_status(format!("share: {e}")),
+    }
+}
+
+/// Prompt for a new share target finished (`PromptKind::ShareCreateTo`).
+pub fn created_target(app: &mut App, name: &str) {
+    let Some(t) = app.share_new_target.take() else { return };
+    let back = app.share_back.take().map(|b| *b);
+    let Some((kind, id)) = app.share_item.take() else {
+        app.modal = back;
+        return;
+    };
+    app.modal = back;
+    let name = name.trim();
+    if name.is_empty() {
+        app.set_status("share: give a name");
+        return;
+    }
+    match crate::share::create_target(&app.store, t, name, &Default::default(), "tui") {
+        Ok(c) => {
+            app.set_status(format!("created {} {}", c.kind, c.name));
+            finish_share(app, kind, &id, t, &[c.name]);
+        }
+        Err(e) => app.set_status(format!("create: {e}")),
+    }
+}
+
+/// Where to put a newly created item after the name prompt.
+#[derive(Debug, Clone)]
+pub enum CreateResume {
+    /// Orgs ▸ Resources: add to the current org.
+    OrgResource { org_id: String },
+    /// Net ▸ Shared: share with every exchange (or these).
+    NetShare { with: Vec<String> },
+    /// Reviews ▸ Ask: open a review of the new item.
+    ReviewAsk,
+    /// Code `>` pipe: create target then pipe into it (`kind_label` is the picker prefix).
+    PipeAfter { kind_label: String },
+}
+
+/// After naming a new item for org resource / net share / review ask.
+pub fn created_item(app: &mut App, name: &str) {
+    let Some(kind) = app.share_new_item.take() else { return };
+    let resume = app.share_create_resume.take();
+    let name = name.trim();
+    if name.is_empty() {
+        app.set_status("create: give a name");
+        return;
+    }
+    match crate::share::create_item(&app.store, kind, name, &Default::default(), "tui") {
+        Ok(c) => {
+            app.set_status(format!("created {} {}", c.kind, c.name));
+            match resume {
+                Some(CreateResume::OrgResource { org_id }) => {
+                    if let Ok(Some(o)) = app.store.org(&org_id) {
+                        match crate::org::transfer(&app.store, "tui", &crate::org::Actor::Owner, &o, kind, &c.name, None) {
+                            Ok((r, new)) => {
+                                super::orgs::reload(app);
+                                app.set_status(format!(
+                                    "{} {} {} {}",
+                                    if new { "added" } else { "already has" },
+                                    kind.label(),
+                                    r.name,
+                                    o.name
+                                ));
+                            }
+                            Err(e) => app.set_status(format!("resource: {e}")),
+                        }
+                    }
+                }
+                Some(CreateResume::NetShare { with }) => {
+                    match crate::net::client::share(&app.store, kind, &c.name, &with, "tui") {
+                        Ok(made) => {
+                            let n = made.iter().filter(|(_, n)| *n).count();
+                            super::network::reload(app);
+                            app.set_status(if n > 0 {
+                                format!("shared {} {} with {}", kind.label(), c.name, if with.is_empty() { "everyone".into() } else { with.join(", ") })
+                            } else {
+                                "already shared".into()
+                            });
+                        }
+                        Err(e) => app.set_status(format!("share: {e}")),
+                    }
+                }
+                Some(CreateResume::ReviewAsk) => match kind {
+                    ShareKind::Journal | ShareKind::Project | ShareKind::LiveSearch => {
+                        let rk = match kind {
+                            ShareKind::Journal => crate::store::ReviewKind::Journal,
+                            ShareKind::Project => crate::store::ReviewKind::Project,
+                            _ => crate::store::ReviewKind::Search,
+                        };
+                        match crate::review::request(&app.store, "tui", rk, &c.name, "", "", &[]) {
+                            Ok(r) => {
+                                super::reviews::reload(app);
+                                app.set_status(format!("review {} of {} {}", r.short_id(), kind.label(), c.name));
+                            }
+                            Err(e) => app.set_status(format!("review: {e}")),
+                        }
+                    }
+                    other => app.set_status(format!("create-then-review supports journal, project or search (not {})", other.label())),
+                },
+                Some(CreateResume::PipeAfter { kind_label }) => {
+                    let row = format!("{kind_label} · {}", c.name);
+                    super::code::pipe_picked(app, &row);
+                }
+                None => {}
+            }
+        }
+        Err(e) => app.set_status(format!("create: {e}")),
     }
 }

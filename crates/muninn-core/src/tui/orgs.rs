@@ -66,6 +66,9 @@ pub enum OAsk {
     NewRole,
     RolePerms,
     AddResource,
+    /// Create-then-share: kind for a new resource.
+    NewResourceKind,
+    NewResourceName { kind: ShareKind },
     Browse,
     Apply,
     Join,
@@ -187,7 +190,7 @@ pub fn open_new(app: &mut App) {
     app.orgs.ask = Some(Ask::new(OAsk::NewOrg, "New organization name", ""));
 }
 
-fn reload(app: &mut App) {
+pub(crate) fn reload(app: &mut App) {
     let s = &app.store;
     let st = &mut app.orgs;
     st.orgs = s.orgs().unwrap_or_default();
@@ -605,6 +608,26 @@ fn finish_ask(app: &mut App, kind: OAsk, v: String) {
             let r = org::transfer(&app.store, ORIGIN, &OWNER, &o, kind, name, None);
             done(app, r, |(r, _)| format!("{} {} belongs to {}", kind.label(), r.name, o.name));
         }
+        OAsk::NewResourceKind => {
+            let Some(kind) = ShareKind::parse(v.trim()) else {
+                return err(app, format!("what kind is {v:?}? model, search, journal, project, report, code or space"));
+            };
+            app.orgs.ask = Some(Ask::new(OAsk::NewResourceName { kind }, format!("New {} name", kind.label()), ""));
+        }
+        OAsk::NewResourceName { kind } => {
+            let Some(o) = app.orgs.current().cloned() else { return };
+            let name = v.trim();
+            if name.is_empty() {
+                return err(app, "give a name");
+            }
+            match crate::share::create_item(&app.store, kind, name, &Default::default(), ORIGIN) {
+                Ok(c) => {
+                    let r = org::transfer(&app.store, ORIGIN, &OWNER, &o, kind, &c.name, None);
+                    done(app, r, |(r, _)| format!("created and added {} {} to {}", kind.label(), r.name, o.name));
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
         OAsk::Browse => {
             if v.is_empty() {
                 return;
@@ -977,6 +1000,10 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             }
         }
         (Tab::Resources, KeyCode::Char('a')) => ask(app, OAsk::AddResource, "Give the org: kind name (e.g. journal Field notes)", ""),
+        (Tab::Resources, KeyCode::Char('n')) => {
+            // create-then-add: pick kind, then name, then transfer
+            ask(app, OAsk::NewResourceKind, "New resource kind (model, search, journal, project, report, code, space)", "")
+        }
         (Tab::Resources, KeyCode::Char('p') | KeyCode::Enter) => {
             let Some((o, r)) = sel_resource(app) else { return };
             let to = match r.published {
@@ -1500,6 +1527,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         Tab::Resources => {
             vec![
                 ("a add", KeyCode::Char('a')),
+                ("n new", KeyCode::Char('n')),
                 ("p publish", KeyCode::Char('p')),
                 ("z archive", KeyCode::Char('z')),
                 ("d release", KeyCode::Char('d')),

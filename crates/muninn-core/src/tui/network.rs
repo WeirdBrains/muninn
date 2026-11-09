@@ -71,6 +71,9 @@ pub enum NAsk {
     ExchangeLabel,
     /// Share with every exchange (false) or the selected one (true).
     Share(bool),
+    /// Create-then-share: kind, then name.
+    NewShareKind(bool),
+    NewShareName { one: bool, kind: ShareKind },
     Setting(Setting),
 }
 
@@ -205,7 +208,7 @@ pub fn open_invite(app: &mut App) {
     app.network.ask = Some(Ask::new(NAsk::Offer, "Invite link (Enter) or connect to (address, peer id)", ""));
 }
 
-fn reload(app: &mut App) {
+pub(crate) fn reload(app: &mut App) {
     let s = &app.store;
     let st = &mut app.network;
     st.peers = s.net_peers().unwrap_or_default();
@@ -620,6 +623,34 @@ fn finish_ask(app: &mut App, kind: NAsk, v: String) {
                 Err(e) => err(app, e.to_string()),
             }
         }
+        NAsk::NewShareKind(one) => {
+            let Some(kind) = ShareKind::parse(v.trim()) else {
+                return err(app, format!("what kind is {v:?}? model, search, journal, project, report, code, space or pipeline"));
+            };
+            app.network.ask = Some(Ask::new(NAsk::NewShareName { one, kind }, format!("New {} name", kind.label()), ""));
+        }
+        NAsk::NewShareName { one, kind } => {
+            let name = v.trim();
+            if name.is_empty() {
+                return err(app, "give a name");
+            }
+            match crate::share::create_item(&app.store, kind, name, &Default::default(), ORIGIN) {
+                Ok(c) => {
+                    let with: Vec<String> = if one { selected_exchange(app).map(|x| vec![x.id]).unwrap_or_default() } else { vec![] };
+                    match client::share(&app.store, kind, &c.name, &with, ORIGIN) {
+                        Ok(v) => {
+                            reload(app);
+                            app.refresh_history(true);
+                            let new = v.iter().filter(|(_, n)| *n).count();
+                            let to = if one { "this exchange" } else { "every exchange" };
+                            ok(app, if new > 0 { format!("created and shared {} {} with {to}", kind.label(), c.name) } else { format!("created {}; already shared", c.name) });
+                        }
+                        Err(e) => err(app, e.to_string()),
+                    }
+                }
+                Err(e) => err(app, e.to_string()),
+            }
+        }
         NAsk::Setting(s) => {
             let p = &mut app.prefs.net;
             match s {
@@ -876,6 +907,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             );
         }
         (Tab::Shared, KeyCode::Char('a')) => ask(app, NAsk::Share(false), "Share with every exchange (kind name: journal Field notes)", ""),
+        (Tab::Shared, KeyCode::Char('n')) => ask(app, NAsk::NewShareKind(false), "New shared item kind (model, search, journal, project, report, code, space, pipeline)", ""),
         (Tab::Shared, KeyCode::Char('d')) => {
             let Some(sh) = app.network.shares.get(app.network.sel).cloned() else { return };
             let with: Vec<String> = sh.exchange_id.clone().into_iter().collect();
@@ -1399,7 +1431,7 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
             ("l label", KeyCode::Char('l')),
             ("r disconnect", KeyCode::Char('r')),
         ],
-        Tab::Shared => vec![("a share", KeyCode::Char('a')), ("d unshare", KeyCode::Char('d'))],
+        Tab::Shared => vec![("a share", KeyCode::Char('a')), ("n new", KeyCode::Char('n')), ("d unshare", KeyCode::Char('d'))],
         Tab::Shards => vec![("e entrust / check", KeyCode::Char('e')), ("d drop held", KeyCode::Char('d'))],
         Tab::Search => vec![("Enter run", KeyCode::Enter)],
         Tab::Settings => vec![("Enter edit", KeyCode::Enter)],

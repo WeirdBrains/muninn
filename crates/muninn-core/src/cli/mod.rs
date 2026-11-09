@@ -13,6 +13,7 @@ mod keys;
 pub mod man;
 mod mcp;
 mod misc;
+mod create_share;
 mod models;
 mod net;
 mod notify;

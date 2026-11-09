@@ -13,7 +13,7 @@ changelog are archived in [`docs/historical/2.0/`](docs/historical/2.0/), and 1.
 | 2 | [Plugins](#plugins): a required `kind` on every **code**, `mnnn plugins` with kind migration, a Plugins menu per kind; and the [Code spaces + Code menus and CLI](#code-spaces-menu-and-cli) | v2.24.0 | ✅ Done (Nov 8, on main; no tag) |
 | 3 | [Rule Sets + Scheduler](#rule-sets--scheduler): a first-class `rulesets` table, the system scheduler with `schedules` and `schedule_runs`, scheduled rules moved onto it, `rule tick` deprecated | v2.25.0 | ✅ Done (unreleased) |
 | 4 | [Ingest Connector Plugins](#ingest-connector-plugins): code spaces whose main is of kind `ingest-connector`, managed under Plugins ▸ Ingest connectors, run on a schedule; they store raw data, call a pipeline and a rule set | v2.26.0 | ✅ Done (unreleased) |
-| 5 | [Shares: Create Then Share](#shares-create-then-share): wherever a share can be added, the thing can be created there too (code and code spaces both) | v2.27.0 | 📝 Planned |
+| 5 | [Shares: Create Then Share](#shares-create-then-share): wherever a share can be added, the thing can be created there too (code and code spaces both) | v2.27.0 | ✅ Done (unreleased) |
 
 **Order:** phase 1 now comes first, because it renames the table every later phase builds on (`code_spaces` → `code`) and changes what a pipeline step runs. Kinds (phase 2) attach to **code** after the rename, so the paused kind work is rebased onto the `code` table rather than shipped against `code_spaces` and moved a release later. The scheduler (3) and connectors (4) follow as before, and shares (5) stay independent. Each phase is a minor release. App work in every phase (the Flutter app, `app/`) is **Matematik's area**: here it is planned only as surfaces matching the TUI, through `muninn-ffi`.
 
@@ -755,7 +755,17 @@ A system scheduler service needs to be created to support this.
 
 ## Shares: Create Then Share
 
-> **Phase 5 · v2.27.0 · 📝 Planned**
+> **Phase 5 · v2.27.0 · ✅ Done on main (unreleased)**
+
+**Checklist vs implementation:** CLI `--create` / `--create-to` on `mnnn share`, `org resource add`, `org give`, `org project add`, `project add`, `net share`, `review request`, `org code serve`; TUI **+ New …** on the share target picker, org Resources `n`, Net Shared `n`, reviews `+kind NAME`, pipe `>` picker (code/space/journal/project), project picker already had **+ New project…**. Creating a code space without `--main` makes `{name}-main` first. History records create then share.
+
+**Exceptions (real, not called done):**
+- **Net target create:** exchanges are not created inline (open `mnnn net exchange`); share with every exchange needs no TO. Documented in `docs/share.md`.
+- **App / FFI:** no new Flutter surfaces and no new FFI exports this phase (Matematik’s area; same store APIs the CLI uses). `+ New…` in the app pickers is not shipped here.
+- **Review entry/record create:** `--create` / `+` only for journal, project, search (an entry or record needs a parent).
+- **Series `--result`:** not created via `--create` (use `--result SERIES`).
+- **Phase 4 liveness correction in this commit:** `scheduler.last_tick_holder` must match the current session; a quick restart within `ALIVE_GAP_MS` no longer looks continuously alive from a persisted tick alone (regression `quick_restart_across_deadline_skips_once`).
+
 
 **Reworked for phase 1:** every share point that takes a code space now takes both **code** and **code spaces** (Michael, Nov 8 11:50: "all the share options need to be on codespaces"; 2.23 ships the sharing itself, this phase adds creating inline), and each gets its own **+ New code…** / **+ New code space…** (a new space asks for its main: pick existing code or write a new one). Sharing a space carries its members and pins.
 

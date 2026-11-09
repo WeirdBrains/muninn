@@ -556,8 +556,13 @@ fn pipe_on(app: &mut App) {
     if let Err(e) = code::pipe::output(&c, &info) {
         return err(app, e);
     }
-    let mut items: Vec<String> =
-        app.store.code_spaces().unwrap_or_default().into_iter().filter(|x| x.id != c.id).map(|x| format!("code · {}", x.name)).collect();
+    let mut items: Vec<String> = vec![
+        "code · + New code…".into(),
+        "space · + New space…".into(),
+        "save to journal · + New journal…".into(),
+        "save to project · + New project…".into(),
+    ];
+    items.extend(app.store.code_spaces().unwrap_or_default().into_iter().filter(|x| x.id != c.id).map(|x| format!("code · {}", x.name)));
     items.extend(app.store.spaces().unwrap_or_default().into_iter().map(|s| format!("space · {}", s.name)));
     items.extend(app.store.journals().unwrap_or_default().into_iter().map(|j| format!("save to journal · {}", j.name)));
     items.extend(
@@ -573,13 +578,30 @@ fn pipe_on(app: &mut App) {
 
 /// A row of the `>` picker was chosen.
 pub fn pipe_picked(app: &mut App, row: &str) {
+    let Some((k, name)) = row.split_once(" · ") else { return };
+    if name.starts_with("+ New ") {
+        // Keep the pipe context; ask for a name then resume.
+        let kind = match k {
+            "code" => crate::store::ShareKind::Code,
+            "space" => crate::store::ShareKind::Space,
+            "save to journal" => crate::store::ShareKind::Journal,
+            "save to project" => crate::store::ShareKind::Project,
+            _ => return err(app, format!("cannot create inline for {k}")),
+        };
+        app.share_new_item = Some(kind);
+        app.share_create_resume = Some(super::share::CreateResume::PipeAfter { kind_label: k.into() });
+        app.modal = Some(super::modal::Modal::prompt(
+            &format!("New {} name", kind.label()),
+            super::modal::PromptKind::ShareCreateItem,
+        ));
+        return;
+    }
     app.modal = app.share_back.take().map(|b| *b);
     let (Some(c), Some(info)) = (app.code.space.clone(), app.code.result.clone()) else { return };
     let frame = match code::pipe::output(&c, &info) {
         Ok(f) => f,
         Err(e) => return err(app, e),
     };
-    let Some((k, name)) = row.split_once(" · ") else { return };
     if k == "code" {
         let Ok(next) = app.store.find_code_space(name) else { return err(app, format!("no code space {name}")) };
         open_space(app, &next.id);

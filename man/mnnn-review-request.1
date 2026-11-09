@@ -8,7 +8,7 @@ mnnn\-review\-request \- Ask for a review of an entry, journal, project, search 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn review request\fR [\fB\-\-home\fR] [\fB\-\-title\fR] [\fB\-\-db\fR] [\fB\-\-note\fR] [\fB\-\-allow\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-label\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-peer\fR] [\fB\-\-no\-link\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fITARGET\fR> 
+\fBmnnn review request\fR [\fB\-\-create\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-lang\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-code\-from\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-space\-kind\fR] [\fB\-\-main\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-format\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-query\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-title\fR] [\fB\-\-transport\fR] [\fB\-\-note\fR] [\fB\-\-allow\fR] [\fB\-\-label\fR] [\fB\-\-peer\fR] [\fB\-\-no\-link\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fITARGET\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -17,14 +17,14 @@ Ask for a review of an entry, journal, project, search or record (makes a link)
 .el .ds Aq '
 .SH OPTIONS
 .TP
+\fB\-\-create\fR
+Create the thing first (journal, project or search), then ask for a review
+.TP
 \fB\-\-home\fR \fI<DIR>\fR
 Muninn home directory (default ~/.muninn)
 .RS
 May also be specified with the \fBMUNINN_HOME\fR environment variable. 
 .RE
-.TP
-\fB\-\-title\fR \fI<TITLE>\fR [default: ]
-
 .TP
 \fB\-\-db\fR \fI<PATH>\fR
 Database file (default <home>/storage/muninn.database)
@@ -32,11 +32,11 @@ Database file (default <home>/storage/muninn.database)
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
 .TP
-\fB\-\-note\fR \fI<NOTE>\fR [default: ]
-A word for reviewers
+\fB\-\-description\fR \fI<DESCRIPTION>\fR [default: ]
+
 .TP
-\fB\-\-allow\fR \fI<ALLOW>\fR
-What reviewers may do: view, comment, suggest, highlight, vote (default: all)
+\fB\-\-lang\fR \fI<LANG>\fR
+Code language when creating code (default math)
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
@@ -44,8 +44,8 @@ Never prompt; missing values are errors
 May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
 .RE
 .TP
-\fB\-\-label\fR \fI<LABEL>\fR [default: ]
-Who the first link is for
+\fB\-\-code\-from\fR \fI<CODE>\fR
+Code: copy from an existing code or built\-in (`csv`, `template:ingest\-connector`, …)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
@@ -56,11 +56,11 @@ Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.l
 May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
 .RE
 .TP
-\fB\-\-peer\fR \fI<PEER>\fR
-Send the link to this peer (a known peer, peer id or address)
+\fB\-\-space\-kind\fR \fI<SPACE_KIND>\fR
+Code space kind when creating a space (default analysis)
 .TP
-\fB\-\-no\-link\fR
-Make no link yet (`mnnn review invite` makes them)
+\fB\-\-main\fR \fI<MAIN>\fR
+Code space main (existing code). Without it a `{name}\-main` code is created
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -68,11 +68,17 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
+\fB\-\-format\fR \fI<FORMAT>\fR
+Journal format when creating a journal (markdown or latex)
+.TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
+.TP
+\fB\-\-query\fR \fI<QUERY>\fR
+Live search query when creating a search
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -92,8 +98,26 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
+\fB\-\-title\fR \fI<TITLE>\fR [default: ]
+
+.TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-\-note\fR \fI<NOTE>\fR [default: ]
+A word for reviewers
+.TP
+\fB\-\-allow\fR \fI<ALLOW>\fR
+What reviewers may do: view, comment, suggest, highlight, vote (default: all)
+.TP
+\fB\-\-label\fR \fI<LABEL>\fR [default: ]
+Who the first link is for
+.TP
+\fB\-\-peer\fR \fI<PEER>\fR
+Send the link to this peer (a known peer, peer id or address)
+.TP
+\fB\-\-no\-link\fR
+Make no link yet (`mnnn review invite` makes them)
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
@@ -102,7 +126,7 @@ Print help
 entry, journal, project, search or record
 .TP
 <\fITARGET\fR>
-Its name or id (records: MODEL/RECORD)
+Its name or id (records: MODEL/RECORD). With \-\-create, the new item\*(Aqs name
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION

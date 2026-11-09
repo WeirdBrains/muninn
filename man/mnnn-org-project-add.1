@@ -8,13 +8,16 @@ mnnn\-org\-project\-add
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org project add\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> <\fIPROJECT\fR> 
+\fBmnnn org project add\fR [\fB\-\-create\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> <\fIPROJECT\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
+.TP
+\fB\-\-create\fR
+Create the project first, then add it to the org
 .TP
 \fB\-\-home\fR \fI<DIR>\fR
 Muninn home directory (default ~/.muninn)
@@ -27,6 +30,9 @@ Database file (default <home>/storage/muninn.database)
 .RS
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
+.TP
+\fB\-\-description\fR \fI<DESCRIPTION>\fR [default: ]
+
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors

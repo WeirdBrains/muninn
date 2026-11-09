@@ -310,12 +310,17 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
             }
             Ok(())
         }
-        OrgCommand::Give { org: key, kind: k, name } => {
+        OrgCommand::Give { org: key, kind: k, name, create, create_opts } => {
             let k = kind(&k)?;
             let mut n = Net::open(ctx)?;
             let relays = n.relays();
             let j = n.store.find_joined(&key)?;
             n.node()?;
+            if create {
+                let opts = super::create_share::opts(&create_opts)?;
+                let c = crate::share::create_item(&n.store, k, &name, &opts, ORIGIN)?;
+                ctx.io.note(format!("created {} {}", c.kind, c.name));
+            }
             onet::transfer(&n.store, n.node.as_ref().expect("node"), &j, k, &name, &relays, ORIGIN)?;
             ctx.io.info(format!("gave {} {name} to {} (yours stays as it is)", k.label(), j.name));
             Ok(())
@@ -674,9 +679,14 @@ fn resource(ctx: &Ctx, cmd: OrgResourceCommand) -> anyhow::Result<()> {
                 Ok(())
             }
         },
-        OrgResourceCommand::Add { org: key, kind: k, name } => {
+        OrgResourceCommand::Add { org: key, kind: k, name, create, create_opts } => {
             let o = mine(s, &key)?;
             let k = kind(&k)?;
+            if create {
+                let opts = super::create_share::opts(&create_opts)?;
+                let c = crate::share::create_item(s, k, &name, &opts, ORIGIN)?;
+                ctx.io.note(format!("created {} {}", c.kind, c.name));
+            }
             let (r, new) = org::transfer(s, ORIGIN, &OWNER, &o, k, &name, None)?;
             ctx.io.info(format!("{} {} {} {}", if new { "added" } else { "already has" }, k.label(), r.name, o.name));
             Ok(())
@@ -730,8 +740,13 @@ fn project(ctx: &Ctx, cmd: OrgProjectCommand) -> anyhow::Result<()> {
             }
             Ok(())
         }
-        OrgProjectCommand::Add { org: key, project } => {
+        OrgProjectCommand::Add { org: key, project, create, description } => {
             let o = mine(s, &key)?;
+            if create {
+                let opts = crate::share::CreateOpts { description, ..Default::default() };
+                let c = crate::share::create_item(s, crate::store::ShareKind::Project, &project, &opts, ORIGIN)?;
+                ctx.io.note(format!("created project {}", c.name));
+            }
             let p = org::add_project(s, ORIGIN, &OWNER, &o, &project)?;
             ctx.io.info(format!("{} is a project of {}", p.name, o.name));
             Ok(())
@@ -810,7 +825,12 @@ fn served(ctx: &Ctx, cmd: OrgCodeCommand) -> anyhow::Result<()> {
             }
             Ok(())
         }
-        OrgCodeCommand::Serve { org: key, space, is_space: true } => {
+        OrgCodeCommand::Serve { org: key, space, is_space: true, create, create_opts } => {
+            if create {
+                let opts = super::create_share::opts(&create_opts)?;
+                let c = crate::share::create_item(s, crate::store::ShareKind::Space, &space, &opts, ORIGIN)?;
+                ctx.io.note(format!("created space {}", c.name));
+            }
             let (sp, name) = match target(s, &key)? {
                 Target::Mine(o) => (org::serve_space(s, ORIGIN, &OWNER, Ok(&o), None, &space, true)?, o.name),
                 Target::Joined(j) => {
@@ -820,7 +840,12 @@ fn served(ctx: &Ctx, cmd: OrgCodeCommand) -> anyhow::Result<()> {
             ctx.io.info(format!("this node serves code space {} for {name}", sp.name));
             Ok(())
         }
-        OrgCodeCommand::Serve { org: key, space, is_space: false } => {
+        OrgCodeCommand::Serve { org: key, space, is_space: false, create, create_opts } => {
+            if create {
+                let opts = super::create_share::opts(&create_opts)?;
+                let c = crate::share::create_item(s, crate::store::ShareKind::Code, &space, &opts, ORIGIN)?;
+                ctx.io.note(format!("created code {}", c.name));
+            }
             let (c, name) = match target(s, &key)? {
                 Target::Mine(o) => (org::serve_code(s, ORIGIN, &OWNER, &o, &space)?, o.name),
                 Target::Joined(j) => (org::serve_joined_code(s, ORIGIN, &j, &space, true)?, j.name),

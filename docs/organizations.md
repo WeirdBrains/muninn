@@ -107,7 +107,7 @@ spaces. Each is `active` or `archived`, and published to nobody (`none`), the or
 | Release | `mnnn org resource release ORG RESOURCE` (the org stops holding it) | `d` |
 | Fetch from a joined org | `mnnn org fetch ORG RESOURCE [--format F] [-o FILE]` | |
 
-Org projects have their own members: `mnnn org project add ORG PROJECT`,
+Org projects have their own members: `mnnn org project add ORG PROJECT [--create]`,
 `mnnn org project member ORG PROJECT MEMBER [--role R]`, `mnnn org project list|remove`.
 
 ## Endpoints

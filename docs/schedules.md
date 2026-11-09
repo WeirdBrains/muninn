@@ -53,13 +53,13 @@ next   Mon 2099-01-05 09:00:00 UTC (2099-01-05 09:00:00Z)
 ```
 
 ## Missed one-offs and restarts
-
 A one-off (`once`) uses autofilled `ends_at = start_at + 1 ms` (`auto (once)`). There is no
 once-specific disable path: after its run, the generic `ends_at` rule turns it off.
 
 If the node was **off** at `start_at` (restart after the deadline: no tick within the last
 120 s), the generic ended-while-missed rule records one `failed` `missed` run and disables
-it. If the daemon was **alive** and crossed the due time on a tick, the run still starts
+it. If the daemon was **alive** (same `scheduler.last_tick_holder` as this session, and
+`scheduler.last_tick_at` within 120s) and crossed the due time on a tick, the run still starts
 even when that tiny window has already closed — so a 15–60 s tick interval can still fire
 an on-time one-off. There is no grace that would run a one-off hours after a restart.
 

@@ -21,6 +21,10 @@ pub enum PromptKind {
     Mas,
     /// A data tile's columns or series.
     FrameColumns,
+    /// Create-then-share: name for a new share target.
+    ShareCreateTo,
+    /// Create-then-share: name for a new item (org resource / net share / review).
+    ShareCreateItem,
 }
 
 pub struct Prompt {
@@ -500,10 +504,16 @@ impl App {
         }
     }
 
-    /// Prompts handled by later features (layouts, charts).
+    /// Prompts handled by later features (layouts, charts, create-then-share).
     pub fn on_prompt_ext(&mut self, kind: PromptKind, input: &str) {
         if kind == PromptKind::FrameColumns {
             return super::frametile::set_columns(self, input);
+        }
+        if kind == PromptKind::ShareCreateTo {
+            return super::share::created_target(self, input);
+        }
+        if kind == PromptKind::ShareCreateItem {
+            return super::share::created_item(self, input);
         }
         if kind != PromptKind::LayoutSave {
             return self.chart_prompt(kind, input);

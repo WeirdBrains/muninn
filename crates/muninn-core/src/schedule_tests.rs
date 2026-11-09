@@ -187,8 +187,9 @@ fn missed_one_off_is_skipped_on_restart() {
 #[test]
 fn daemon_alive_runs_once_after_tiny_window() {
     let (st, mut s) = setup();
-    // prior tick kept the daemon "alive"
+    // prior tick of *this* session kept the daemon "alive"
     st.set_setting(LAST_TICK_KEY, Some(&(T0 - 15_000).to_string())).unwrap();
+    st.set_setting(LAST_HOLDER_KEY, Some("t")).unwrap();
     apply_timing(
         &mut s,
         &Timing { run_every: Some("once".into()), start_at: Some("2026-11-10 14:00:00".into()), tz: Some("UTC".into()), ..Default::default() },
@@ -204,9 +205,32 @@ fn daemon_alive_runs_once_after_tiny_window() {
 }
 
 #[test]
+fn quick_restart_across_deadline_skips_once() {
+    // A persisted tick 10s ago under another holder must not look "alive".
+    let (st, mut s) = setup();
+    st.set_setting(LAST_TICK_KEY, Some(&(T0 - 10_000).to_string())).unwrap();
+    st.set_setting(LAST_HOLDER_KEY, Some("old:1")).unwrap();
+    apply_timing(
+        &mut s,
+        &Timing { run_every: Some("once".into()), start_at: Some("2026-11-10 14:00:00".into()), tz: Some("UTC".into()), ..Default::default() },
+        T0 - 60_000,
+    )
+    .unwrap();
+    s.next_run_at = T0;
+    st.save_schedule(&s).unwrap();
+    // new session 5s after the 1ms window — gap is only 15s (< ALIVE_GAP) but holder differs
+    let rep = tick(&st, "t-new", T0 + 5_000).unwrap();
+    assert_eq!(rep.missed, vec!["every hour".to_string()], "quick restart must miss, not fire: {rep:?}");
+    assert!(rep.succeeded.is_empty(), "{rep:?}");
+    assert!(!st.schedule(&s.id).unwrap().unwrap().enabled);
+    assert!(st.schedule_runs(&s.id).unwrap()[0].error.as_deref().unwrap().starts_with("missed"));
+}
+
+#[test]
 fn ends_at_disables_repeating_like_once() {
     let (st, mut s) = setup();
     st.set_setting(LAST_TICK_KEY, Some(&(T0 - 1_000).to_string())).unwrap();
+    st.set_setting(LAST_HOLDER_KEY, Some("t")).unwrap();
     apply_timing(
         &mut s,
         &Timing {

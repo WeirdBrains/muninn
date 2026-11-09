@@ -8,7 +8,7 @@ mnnn\-net\-share \- Share an item: model, search, journal, project, report, code
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn net share\fR [\fB\-\-home\fR] [\fB\-\-with\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fIITEM\fR> 
+\fBmnnn net share\fR [\fB\-\-home\fR] [\fB\-\-with\fR] [\fB\-\-create\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-lang\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-code\-from\fR] [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-space\-kind\fR] [\fB\-\-main\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-format\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-query\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIKIND\fR> <\fIITEM\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -26,11 +26,17 @@ May also be specified with the \fBMUNINN_HOME\fR environment variable.
 \fB\-\-with\fR \fI<EXCHANGE>\fR
 Only with these exchanges or peers (default: every exchange)
 .TP
+\fB\-\-create\fR
+Create the item first, then share it
+.TP
 \fB\-\-db\fR \fI<PATH>\fR
 Database file (default <home>/storage/muninn.database)
 .RS
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
+.TP
+\fB\-\-description\fR \fI<DESCRIPTION>\fR [default: ]
+
 .TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
@@ -38,8 +44,14 @@ Never prompt; missing values are errors
 May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
 .RE
 .TP
+\fB\-\-lang\fR \fI<LANG>\fR
+Code language when creating code (default math)
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
+.TP
+\fB\-\-code\-from\fR \fI<CODE>\fR
+Code: copy from an existing code or built\-in (`csv`, `template:ingest\-connector`, …)
 .TP
 \fB\-\-log\-file\fR \fI<PATH>\fR
 Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
@@ -53,11 +65,20 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
+\fB\-\-space\-kind\fR \fI<SPACE_KIND>\fR
+Code space kind when creating a space (default analysis)
+.TP
+\fB\-\-main\fR \fI<MAIN>\fR
+Code space main (existing code). Without it a `{name}\-main` code is created
+.TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
+.TP
+\fB\-\-format\fR \fI<FORMAT>\fR
+Journal format when creating a journal (markdown or latex)
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -77,6 +98,9 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
+\fB\-\-query\fR \fI<QUERY>\fR
+Live search query when creating a search
+.TP
 \fB\-\-transport\fR \fI<stream|poll>\fR
 How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
@@ -87,7 +111,7 @@ Print help
 model, search, journal, project, report, code, space or pipeline
 .TP
 <\fIITEM\fR>
-Id, id prefix or name
+Id, id prefix or name. With \-\-create, the new item\*(Aqs name
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH VERSION

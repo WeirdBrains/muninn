@@ -8,7 +8,7 @@ mnnn\-org\-resource\-add \- Give the org one of your things here (the original s
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn org resource add\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> <\fIKIND\fR> <\fINAME\fR> 
+\fBmnnn org resource add\fR [\fB\-\-create\fR] [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-description\fR] [\fB\-\-lang\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-code\-from\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-space\-kind\fR] [\fB\-\-main\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-format\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-query\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIORG\fR> <\fIKIND\fR> <\fINAME\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -16,6 +16,9 @@ Give the org one of your things here (the original stays as it is)
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
+.TP
+\fB\-\-create\fR
+Create the thing first, then add it
 .TP
 \fB\-\-home\fR \fI<DIR>\fR
 Muninn home directory (default ~/.muninn)
@@ -29,11 +32,20 @@ Database file (default <home>/storage/muninn.database)
 May also be specified with the \fBMUNINN_DB\fR environment variable. 
 .RE
 .TP
+\fB\-\-description\fR \fI<DESCRIPTION>\fR [default: ]
+
+.TP
+\fB\-\-lang\fR \fI<LANG>\fR
+Code language when creating code (default math)
+.TP
 \fB\-\-non\-interactive\fR
 Never prompt; missing values are errors
 .RS
 May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
 .RE
+.TP
+\fB\-\-code\-from\fR \fI<CODE>\fR
+Code: copy from an existing code or built\-in (`csv`, `template:ingest\-connector`, …)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
@@ -44,17 +56,29 @@ Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.l
 May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
 .RE
 .TP
+\fB\-\-space\-kind\fR \fI<SPACE_KIND>\fR
+Code space kind when creating a space (default analysis)
+.TP
+\fB\-\-main\fR \fI<MAIN>\fR
+Code space main (existing code). Without it a `{name}\-main` code is created
+.TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
 .RS
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
+\fB\-\-format\fR \fI<FORMAT>\fR
+Journal format when creating a journal (markdown or latex)
+.TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
+.TP
+\fB\-\-query\fR \fI<QUERY>\fR
+Live search query when creating a search
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run

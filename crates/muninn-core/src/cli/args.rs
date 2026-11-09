@@ -1237,6 +1237,7 @@ pub enum SearchCommand {
 }
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)] // clap flatten CreateShareOpts on Add
 pub enum ProjectCommand {
     /// List projects.
     List {
@@ -1269,7 +1270,7 @@ pub enum ProjectCommand {
     Remove { project: String },
     /// Add a live search, a journal, a report, a rule, a model, a code space or a result (a
     /// series, optionally a time range) to a project.
-    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "rule", "model", "code", "space", "result"])))]
+    #[command(group(ArgGroup::new("item").required(true).args(["search", "journal", "report", "rule", "model", "code", "space", "result", "create"])))]
     Add {
         project: String,
         /// Live search id or name.
@@ -1302,6 +1303,11 @@ pub enum ProjectCommand {
         /// Result time range end.
         #[arg(long, value_name = "TIME")]
         to: Option<String>,
+        /// Create KIND NAME first, then add it (`mnnn project add P --create journal Notes`).
+        #[arg(long, num_args = 2, value_names = ["KIND", "NAME"])]
+        create: Option<Vec<String>>,
+        #[command(flatten)]
+        create_opts: CreateShareOpts,
     },
     /// Take an item out of a project (the item itself is kept).
     Drop {
@@ -2538,11 +2544,16 @@ pub enum NetCommand {
     Share {
         /// model, search, journal, project, report, code, space or pipeline.
         kind: String,
-        /// Id, id prefix or name.
+        /// Id, id prefix or name. With --create, the new item's name.
         item: String,
         /// Only with these exchanges or peers (default: every exchange).
         #[arg(long = "with", value_name = "EXCHANGE")]
         with: Vec<String>,
+        /// Create the item first, then share it.
+        #[arg(long)]
+        create: bool,
+        #[command(flatten)]
+        create_opts: CreateShareOpts,
     },
     /// Stop sharing an item (everywhere, or with --with).
     Unshare {
@@ -3586,6 +3597,11 @@ pub enum OrgCommand {
         /// model, search, journal, project, report, code or space.
         kind: String,
         name: String,
+        /// Create the thing first, then give it.
+        #[arg(long)]
+        create: bool,
+        #[command(flatten)]
+        create_opts: CreateShareOpts,
     },
     /// Copy a joined org's public site here to serve it (needs the host permission).
     Mirror { org: String },
@@ -3742,6 +3758,11 @@ pub enum OrgResourceCommand {
         /// model, search, journal, project, report, code or space.
         kind: String,
         name: String,
+        /// Create the thing first, then add it.
+        #[arg(long)]
+        create: bool,
+        #[command(flatten)]
+        create_opts: CreateShareOpts,
     },
     /// Hide a resource from members (it is kept; restore brings it back).
     Archive { org: String, resource: String },
@@ -3759,6 +3780,11 @@ pub enum OrgProjectCommand {
     Add {
         org: String,
         project: String,
+        /// Create the project first, then add it to the org.
+        #[arg(long)]
+        create: bool,
+        #[arg(long, default_value = "")]
+        description: String,
     },
     Remove {
         org: String,
@@ -3818,6 +3844,11 @@ pub enum OrgCodeCommand {
         /// It is a code space (`mnnn spaces`), not a code.
         #[arg(long = "space")]
         is_space: bool,
+        /// Create the code or code space first, then serve it.
+        #[arg(long)]
+        create: bool,
+        #[command(flatten)]
+        create_opts: CreateShareOpts,
     },
     /// Stop serving it here (its endpoints then refuse calls on this node).
     Stop {
@@ -4027,8 +4058,13 @@ pub enum ReviewCommand {
     Request {
         /// entry, journal, project, search or record.
         kind: String,
-        /// Its name or id (records: MODEL/RECORD).
+        /// Its name or id (records: MODEL/RECORD). With --create, the new item's name.
         target: String,
+        /// Create the thing first (journal, project or search), then ask for a review.
+        #[arg(long)]
+        create: bool,
+        #[command(flatten)]
+        create_opts: CreateShareOpts,
         #[arg(long, default_value = "")]
         title: String,
         /// A word for reviewers.
@@ -4315,7 +4351,7 @@ pub struct PipeArgs {
 pub struct ShareArgs {
     /// What to share: model, search, journal, project, report, code, space or pipeline.
     pub kind: String,
-    /// The item (id or name).
+    /// The item (id or name). With --create, the name of the new item.
     #[arg(required_unless_present = "targets")]
     pub item: Option<String>,
     /// Where: project, journal, code, space or net.
@@ -4326,11 +4362,44 @@ pub struct ShareArgs {
     /// A note for a journal entry.
     #[arg(long, default_value = "")]
     pub note: String,
+    /// Create the item first, then share it (same create as `mnnn KIND create`).
+    #[arg(long)]
+    pub create: bool,
+    /// Create this target first, then share to it (project, journal, code or space name).
+    #[arg(long = "create-to", value_name = "NAME")]
+    pub create_to: Option<String>,
+    #[command(flatten)]
+    pub create_opts: CreateShareOpts,
     /// List where this kind of item can be shared.
     #[arg(long)]
     pub targets: bool,
     #[arg(long)]
     pub json: bool,
+}
+
+/// Flags shared by every `--create` / `--create-to` path (create-then-share).
+#[derive(Debug, Default, Args)]
+pub struct CreateShareOpts {
+    #[arg(long, default_value = "")]
+    pub description: String,
+    /// Code language when creating code (default math).
+    #[arg(long)]
+    pub lang: Option<String>,
+    /// Code: copy from an existing code or built-in (`csv`, `template:ingest-connector`, …).
+    #[arg(long = "code-from", value_name = "CODE")]
+    pub code_from: Option<String>,
+    /// Code space kind when creating a space (default analysis).
+    #[arg(long = "space-kind")]
+    pub space_kind: Option<String>,
+    /// Code space main (existing code). Without it a `{name}-main` code is created.
+    #[arg(long)]
+    pub main: Option<String>,
+    /// Journal format when creating a journal (markdown or latex).
+    #[arg(long)]
+    pub format: Option<String>,
+    /// Live search query when creating a search.
+    #[arg(long)]
+    pub query: Option<String>,
 }
 
 pub const SCHEDULE_NOTES: &str = r#"Timing:

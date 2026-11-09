@@ -410,7 +410,7 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
             Ok(())
         }
         NetCommand::Exchange(c) => exchange(ctx, c),
-        NetCommand::Share { kind: k, item, with } => {
+        NetCommand::Share { kind: k, item, with, create, create_opts } => {
             let mut n = Net::open(ctx)?;
             // not connected yet: connect first (it may wait for the other side)
             for w in &with {
@@ -425,6 +425,12 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                         return Err(anyhow!("{}", l.detail));
                     }
                 }
+            }
+            if create {
+                let k = kind(&k)?;
+                let opts = super::create_share::opts(&create_opts)?;
+                let c = crate::share::create_item(&n.store, k, &item, &opts, ORIGIN)?;
+                ctx.io.note(format!("created {} {}", c.kind, c.name));
             }
             let made = client::share(&n.store, kind(&k)?, &item, &with, ORIGIN)?;
             let fresh = made.iter().filter(|(_, new)| *new).count();
