@@ -454,7 +454,10 @@ enum ProjectPane {
   code,
   pipes,
   pipelines,
+  plugins,
   rules,
+  rulesets,
+  schedules,
   reviews,
   notifications,
 }
@@ -565,6 +568,23 @@ final rulesProvider = FutureProvider<List<RuleInfo>?>((ref) {
   return ref.watch(apiProvider).rules();
 });
 
+final pluginKindFilterProvider = StateProvider<String?>((ref) => null);
+
+final pluginsProvider = FutureProvider<List<PluginInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).pluginsList(kind: ref.watch(pluginKindFilterProvider));
+});
+
+final rulesetsProvider = FutureProvider<List<RulesetInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).rulesetsList();
+});
+
+final schedulesProvider = FutureProvider<List<ScheduleInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).schedulesList();
+});
+
 final reviewsProvider = FutureProvider<List<ReviewInfo>?>((ref) {
   if (!ref.watch(unlockedProvider)) return Future.value(null);
   return ref.watch(apiProvider).reviews();
@@ -602,6 +622,9 @@ void refreshProjectExtras(WidgetRef ref) {
   ref.invalidate(pipesLiveProvider);
   ref.invalidate(pipelinesProvider);
   ref.invalidate(rulesProvider);
+  ref.invalidate(pluginsProvider);
+  ref.invalidate(rulesetsProvider);
+  ref.invalidate(schedulesProvider);
   ref.invalidate(reviewsProvider);
   ref.invalidate(reviewsJoinedProvider);
   ref.invalidate(notificationsProvider);

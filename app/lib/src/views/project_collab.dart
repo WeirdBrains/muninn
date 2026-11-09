@@ -404,7 +404,7 @@ class _RuleDialogState extends ConsumerState<_RuleDialog> {
                 controller: _then,
                 maxLines: 3,
                 decoration: const InputDecoration(
-                  labelText: 'Then',
+                  labelText: 'Then (status…, notify…, run-space NAME [input=action|SOURCE], …)',
                   hintText: 'status Imported {inserted} bars',
                 ),
               ),

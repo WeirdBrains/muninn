@@ -425,6 +425,7 @@ class _ShareDialogState extends State<_ShareDialog> {
     'journal',
     'report',
     'code',
+    'space',
     'pipeline',
   ];
 

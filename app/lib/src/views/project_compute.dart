@@ -11,6 +11,7 @@ import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
 import '../workspace.dart';
+import 'create_then_share.dart';
 import 'frame_tile.dart';
 
 void _ok(BuildContext context, String msg, {Color? color}) {
@@ -143,6 +144,11 @@ class CodeSpacesPane extends ConsumerWidget {
                       label: const Text('New code space…'),
                     ),
                     OutlinedButton(
+                      key: const ValueKey('code-import'),
+                      onPressed: () => _importSpace(context, ref),
+                      child: const Text('Import space…'),
+                    ),
+                    OutlinedButton(
                       key: const ValueKey('code-parsers'),
                       onPressed: () => _showParsers(context, ref),
                       child: const Text('Parsers…'),
@@ -189,6 +195,14 @@ class CodeSpacesPane extends ConsumerWidget {
                           PopupMenuItem(
                             value: 'give',
                             child: Text('Give to org…'),
+                          ),
+                          PopupMenuItem(
+                            value: 'share',
+                            child: Text('Share…'),
+                          ),
+                          PopupMenuItem(
+                            value: 'export',
+                            child: Text('Export…'),
                           ),
                           PopupMenuItem(value: 'remove', child: Text('Remove')),
                         ],
@@ -252,6 +266,10 @@ Future<void> _codeAction(
         }
       case 'give':
         await showCodeGiveToOrgDialog(context, ref, c);
+      case 'share':
+        await _shareCodeSpace(context, ref, c);
+      case 'export':
+        await _exportSpace(context, ref, c);
       case 'remove':
         if (!await _confirm(
           context,
@@ -1561,3 +1579,113 @@ Future<void> showPipelineStdinRunDialog(
     if (context.mounted) _ok(context, '$e', color: context.muninn.error);
   }
 }
+
+Future<void> _shareCodeSpace(
+  BuildContext context,
+  WidgetRef ref,
+  CodeSpaceInfo c,
+) async {
+  final m = context.muninn;
+  final withWhom = await showDialog<String>(
+    context: context,
+    builder: (ctx) {
+      final ctl = TextEditingController();
+      return AlertDialog(
+        backgroundColor: m.bg,
+        title: Text('Share ${c.name}', style: TextStyle(color: m.header)),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Share this code space with every exchange, or name one. Use Create-then-share for + New destinations.',
+                style: TextStyle(color: m.muted),
+              ),
+              TextField(
+                controller: ctl,
+                decoration: const InputDecoration(
+                  labelText: 'Exchange / peer (optional)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx, '__create_then__');
+                  },
+                  child: const Text('+ New… create then share'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctl.text.trim()),
+            child: const Text('Share'),
+          ),
+        ],
+      );
+    },
+  );
+  if (withWhom == null || !context.mounted) return;
+  if (withWhom == '__create_then__') {
+    await showCreateThenShareDialog(
+      context,
+      ref,
+      kind: 'space',
+      item: c.name,
+    );
+    return;
+  }
+  final peers = withWhom.isEmpty ? const <String>[] : [withWhom];
+  try {
+    final msg = await ref.read(apiProvider).netShare('space', c.name, withPeers: peers);
+    if (context.mounted) _ok(context, msg);
+  } catch (e) {
+    // Some builds use kind "code" for spaces.
+    try {
+      final msg = await ref.read(apiProvider).netShare('code', c.name, withPeers: peers);
+      if (context.mounted) _ok(context, msg);
+    } catch (e2) {
+      if (context.mounted) _ok(context, '$e2', color: m.error);
+    }
+  }
+}
+
+Future<void> _exportSpace(
+  BuildContext context,
+  WidgetRef ref,
+  CodeSpaceInfo c,
+) async {
+  final m = context.muninn;
+  final path = await FilePicker.platform.saveFile(fileName: '${c.name}.space.json');
+  if (path == null || !context.mounted) return;
+  try {
+    final msg = await ref.read(apiProvider).spaceExport(c.id, path);
+    if (context.mounted) _ok(context, msg);
+  } catch (e) {
+    if (context.mounted) _ok(context, '$e', color: m.error);
+  }
+}
+
+Future<void> _importSpace(BuildContext context, WidgetRef ref) async {
+  final m = context.muninn;
+  final picked = await FilePicker.platform.pickFiles();
+  final path = picked?.files.single.path;
+  if (path == null || !context.mounted) return;
+  try {
+    final plan = await ref.read(apiProvider).spaceImportPlan(path);
+    if (!context.mounted) return;
+    if (!await _confirm(context, 'Import code space', plan.join('\n'))) return;
+    final msg = await ref.read(apiProvider).spaceImport(path);
+    refreshProjectExtras(ref);
+    if (context.mounted) _ok(context, msg);
+  } catch (e) {
+    if (context.mounted) _ok(context, '$e', color: m.error);
+  }
+}
+

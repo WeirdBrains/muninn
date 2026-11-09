@@ -31,7 +31,7 @@ Users never need Rust: release builds ship the compiled library.
 - **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
-  Live searches… / Journals… / New journal… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Rules… / Reviews… / Notifications… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Peers, messages & live / MCP / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
+  Live searches… / Journals… / New journal… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Plugins (by kind)… / Rules… / Rule sets… / Schedules… / Reviews… / Notifications… / Create then share… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Peers, messages & live / MCP / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
   Rekey, Export, Recover and Re-issue shards, and Data ▸ Sources… / Symbols…. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has

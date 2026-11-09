@@ -18,6 +18,8 @@ import 'theme/muninn_theme.dart';
 import 'time_range.dart';
 import 'views/catalog.dart';
 import 'views/project_compute.dart';
+import 'views/schedules_plugins.dart';
+import 'views/create_then_share.dart';
 import 'views/project_collab.dart';
 import 'views/chart.dart';
 import 'views/data.dart';
@@ -556,6 +558,26 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
             go(Section.projects);
           }, const SingleActivator(LogicalKeyboardKey.keyR, shift: true)),
           item('New rule…', () => showNewRuleDialog(context, ref)),
+          item('Rule sets…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.rulesets;
+            go(Section.projects);
+          }),
+          item('New rule set…', () => showNewRulesetDialog(context, ref)),
+          item('Schedules…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.schedules;
+            go(Section.projects);
+          }),
+          item('New schedule…', () => showNewScheduleDialog(context, ref)),
+          item('Create then share…', () => showCreateThenShareDialog(context, ref)),
+          item('+ New review subject…', () => showCreateReviewSubjectDialog(context, ref)),
+          item('Plugins…', () => showPluginsPane(context, ref)),
+          item('Parsers…', () => showPluginsPane(context, ref, kind: 'parser')),
+          item('Transforms…', () => showPluginsPane(context, ref, kind: 'transform')),
+          item('Analysis…', () => showPluginsPane(context, ref, kind: 'analysis')),
+          item(
+            'Ingest connectors…',
+            () => showPluginsPane(context, ref, kind: 'ingest-connector'),
+          ),
           item('Reviews…', () {
             ref.read(projectPaneProvider.notifier).state = ProjectPane.reviews;
             go(Section.projects);

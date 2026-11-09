@@ -13,6 +13,7 @@ import '../state.dart';
 import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 import 'project_compute.dart';
+import 'schedules_plugins.dart';
 import 'project_collab.dart';
 import 'models.dart';
 import 'project_extras.dart';
@@ -67,7 +68,10 @@ class ProjectsView extends ConsumerWidget {
               ProjectPane.code => const CodeSpacesPane(),
               ProjectPane.pipes => const PipesPane(),
               ProjectPane.pipelines => const PipelinesPane(),
+              ProjectPane.plugins => const PluginsPane(),
               ProjectPane.rules => const RulesPane(),
+              ProjectPane.rulesets => const RulesetsPane(),
+              ProjectPane.schedules => const SchedulesPane(),
               ProjectPane.reviews => const ReviewsPane(),
               ProjectPane.notifications => const NotificationsPane(),
             },
@@ -86,7 +90,10 @@ class ProjectsView extends ConsumerWidget {
     ProjectPane.code => 'Code',
     ProjectPane.pipes => 'Pipes',
     ProjectPane.pipelines => 'Pipelines',
+    ProjectPane.plugins => 'Plugins',
     ProjectPane.rules => 'Rules',
+    ProjectPane.rulesets => 'Rule sets',
+    ProjectPane.schedules => 'Schedules',
     ProjectPane.reviews => 'Reviews',
     ProjectPane.notifications => 'Notifications',
   };
