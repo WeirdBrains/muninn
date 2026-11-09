@@ -396,6 +396,10 @@ impl Store {
         Ok(v)
     }
 
+    pub fn source_by_id(&self, id: &str) -> Result<Option<crate::model::Source>> {
+        Ok(self.sources()?.into_iter().find(|s| s.id == id))
+    }
+
     pub fn source_by_name(&self, name: &str) -> Result<Option<Source>> {
         Ok(self.conn.query_row("SELECT id, name, kind, locator, created_at FROM sources WHERE name = ?1", [name], Self::row_source).optional()?)
     }

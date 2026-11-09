@@ -195,6 +195,11 @@ fn apply(ctx: &Ctx, s: &mut ScheduleDef, mut t: Timing, now: i64) -> anyhow::Res
 fn print_schedule(store: &Store, s: &ScheduleDef) -> anyhow::Result<()> {
     let target = match s.target_kind.as_str() {
         "ruleset" => format!("rule set {}", s.ruleset_id.as_deref().and_then(|id| store.ruleset(id).ok().flatten()).map_or("(removed)".into(), |r| r.name)),
+        "connector" => format!(
+            "connector {} → source {}",
+            s.plugin_id.as_deref().and_then(|id| store.space(id).ok().flatten()).map_or("(removed)".into(), |x| x.name),
+            s.source_id.as_deref().and_then(|id| store.source_by_id(id).ok().flatten()).map_or("(removed)".into(), |x| x.name)
+        ),
         k => k.to_string(),
     };
     println!("schedule {}{} → {target}", s.name, if s.enabled { "" } else { " (off)" });
@@ -220,12 +225,9 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
     let store = ctx.open_store()?;
     let now = now_ms();
     match cmd {
-        ScheduleCommand::Add { name, run_every, ruleset, timing: t, policy: p, disabled } => {
-            let set = store.find_ruleset(&ruleset)?;
+        ScheduleCommand::Add { name, run_every, ruleset, plugin, source, pipeline, connector_ruleset, options, timing: t, policy: p, disabled } => {
             let mut s = ScheduleDef {
                 name,
-                target_kind: "ruleset".into(),
-                ruleset_id: Some(set.id.clone()),
                 overlap: "skip".into(),
                 catch_up: "once".into(),
                 max_attempts: 3,
@@ -233,11 +235,50 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
                 created_at: now,
                 ..Default::default()
             };
-            policy(&mut s, &p)?;
-            apply(ctx, &mut s, timing(&t, run_every), now)?;
-            let s = store.save_schedule(&s)?;
-            record(&store, "schedule.add", format!("add schedule {} for rule set {}", s.name, set.name), json!({ "schedule": s.id, "name": s.name, "ruleset": set.id }));
-            print_schedule(&store, &s)?;
+            match (ruleset, plugin) {
+                (Some(rs), None) => {
+                    let set = store.find_ruleset(&rs)?;
+                    s.target_kind = "ruleset".into();
+                    s.ruleset_id = Some(set.id.clone());
+                    policy(&mut s, &p)?;
+                    apply(ctx, &mut s, timing(&t, run_every), now)?;
+                    let s = store.save_schedule(&s)?;
+                    record(&store, "schedule.add", format!("add schedule {} for rule set {}", s.name, set.name), json!({ "schedule": s.id, "name": s.name, "ruleset": set.id }));
+                    print_schedule(&store, &s)?;
+                }
+                (None, Some(plug)) => {
+                    let space = store.find_space(&plug)?;
+                    if space.kind != crate::store::SpaceKind::IngestConnector {
+                        bail!("{} is a {} space; connector schedules need kind ingest-connector", space.name, space.kind);
+                    }
+                    let src_name = source.ok_or_else(|| anyhow::anyhow!("--plugin needs --source"))?;
+                    let src = store.source_by_name(&src_name)?.ok_or_else(|| anyhow::anyhow!("no source `{src_name}` (`mnnn sources list`)"))?;
+                    let pipe = pipeline.map(|n| store.find_pipeline(&n)).transpose()?;
+                    let rset = connector_ruleset.map(|n| store.find_ruleset(&n)).transpose()?;
+                    let mut opts = serde_json::Map::new();
+                    for o in options {
+                        let (k, v) = o.split_once('=').ok_or_else(|| anyhow::anyhow!("--option KEY=VALUE"))?;
+                        opts.insert(k.trim().into(), json!(v));
+                    }
+                    s.target_kind = "connector".into();
+                    s.plugin_id = Some(space.id.clone());
+                    s.source_id = Some(src.id.clone());
+                    s.pipeline_id = pipe.as_ref().map(|p| p.id.clone());
+                    s.ruleset_id = rset.as_ref().map(|r| r.id.clone());
+                    s.options = opts;
+                    policy(&mut s, &p)?;
+                    apply(ctx, &mut s, timing(&t, run_every), now)?;
+                    let s = store.save_schedule(&s)?;
+                    record(
+                        &store,
+                        "schedule.add",
+                        format!("add schedule {} for connector {}", s.name, space.name),
+                        json!({ "schedule": s.id, "name": s.name, "plugin": space.id, "source": src.id }),
+                    );
+                    print_schedule(&store, &s)?;
+                }
+                _ => bail!("give --ruleset SET or --plugin CONNECTOR --source SRC"),
+            }
         }
         ScheduleCommand::Parse { run_every, timing: t, json } => {
             let mut s = ScheduleDef { name: "parse".into(), target_kind: "ruleset".into(), enabled: true, created_at: now, ..Default::default() };

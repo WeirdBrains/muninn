@@ -7,8 +7,12 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 pub const ORIGIN: &str = "scheduler";
-/// A slot is on time when the scheduler sees it within this long of its due time.
-pub const GRACE_MS: i64 = 60_000;
+/// Setting: last scheduler tick (epoch ms). Distinguishes a continuous daemon from a restart.
+pub const LAST_TICK_KEY: &str = "scheduler.last_tick_at";
+/// start_at this far in the past counts as "past" when adding/editing (UX only).
+pub const PAST_SLACK_MS: i64 = 60_000;
+/// Gap longer than this between ticks means the node was off (restart / cold).
+pub const ALIVE_GAP_MS: i64 = 120_000;
 /// A running run whose heartbeat is older than this is abandoned.
 pub const ABANDON_MS: i64 = 120_000;
 /// How long a tick's lease lasts.
@@ -367,7 +371,13 @@ pub fn apply_timing(s: &mut ScheduleDef, t: &Timing, now: i64) -> Result<()> {
         (None, None) => {}
     }
     if s.run_every.is_none() && s.cron.is_none() {
-        return Err(Error::missing("run_every", "give an interval (1h, 2 days, 1 month, once) or --cron \"0 9 * * 1-5\"".to_string()));
+        if t.start_at.is_some() || s.start_at.is_some() {
+            s.run_every = Some("once".into());
+            s.every_ms = None;
+            s.every_months = None;
+        } else {
+            return Err(Error::missing("run_every", "give an interval (1h, 2 days, 1 month, once) or --cron \"0 9 * * 1-5\"".to_string()));
+        }
     }
     if let Some(st) = &t.start_at {
         s.start_at = Some(parse_when(st, now, tz.as_deref())?);
@@ -375,6 +385,9 @@ pub fn apply_timing(s: &mut ScheduleDef, t: &Timing, now: i64) -> Result<()> {
     }
     if s.is_once() && s.start_at.is_none() {
         return Err(Error::missing("start_at", "a one-off (once) needs --start-at, e.g. --start-at \"tomorrow 9am\"".to_string()));
+    }
+    if s.is_once() && (t.ends_at.is_some() || t.for_.is_some()) {
+        return Err(Error::invalid("ends_at", "a once schedule runs a single time at start_at; its end is filled in automatically".to_string()));
     }
     if let Some(e) = &t.ends_at {
         if t.for_.is_some() {
@@ -393,9 +406,9 @@ pub fn apply_timing(s: &mut ScheduleDef, t: &Timing, now: i64) -> Result<()> {
         s.ends_at_input = Some(format!("for {f}"));
     }
     if s.is_once() {
-        // `once` ends 1 ms after it starts
+        // `once` ends 1 ms after it starts — generic ends_at path disables after the run
         s.ends_at = s.start_at.map(|x| x + 1);
-        s.ends_at_input = None;
+        s.ends_at_input = Some("auto (once)".into());
     }
     if let (Some(st), Some(en)) = (s.start_at, s.ends_at)
         && en <= st
@@ -443,7 +456,7 @@ pub fn apply_timing(s: &mut ScheduleDef, t: &Timing, now: i64) -> Result<()> {
 /// Whether `s.start_at` is in the past at `now` (a minute's slack), and the next slot.
 pub fn past_of(s: &ScheduleDef, now: i64) -> Past {
     match s.start_at {
-        Some(st) if st < now - GRACE_MS => Past::Yes { next: if s.is_once() { None } else { first_due(s, now) } },
+        Some(st) if st < now - PAST_SLACK_MS => Past::Yes { next: if s.is_once() { None } else { first_due(s, now) } },
         _ => Past::No,
     }
 }
@@ -547,15 +560,18 @@ pub fn tick(store: &Store, holder: &str, now: i64) -> Result<TickReport> {
             }
         }
     }
+    let last_tick = last_tick_at(store)?;
+    let alive = last_tick > 0 && now.saturating_sub(last_tick) <= ALIVE_GAP_MS;
     // due slots
     for mut s in store.schedules()? {
         if !s.enabled || s.next_run_at > now {
             continue;
         }
-        queue_due(store, &mut s, now, &mut rep)?;
+        queue_due(store, &mut s, now, last_tick, alive, &mut rep)?;
     }
-    // legacy rule schedules
+    // leftover legacy per-rule schedules (pre-2.25; edit --every migrates them off)
     rep.legacy = crate::rules::tick(store, now)?;
+    set_last_tick_at(store, now)?;
     // start pending
     let pending: Vec<ScheduleRun> = store.open_runs()?.into_iter().filter(|r| r.status == "pending" && r.not_before <= now).collect();
     let mut busy: Vec<String> = store.open_runs()?.into_iter().filter(|r| r.status == "running").map(|r| r.schedule_id).collect();
@@ -585,15 +601,65 @@ pub fn tick(store: &Store, holder: &str, now: i64) -> Result<TickReport> {
     Ok(rep)
 }
 
-fn queue_due(store: &Store, s: &mut ScheduleDef, now: i64, rep: &mut TickReport) -> Result<()> {
+fn last_tick_at(store: &Store) -> Result<i64> {
+    Ok(store.setting(LAST_TICK_KEY)?.as_deref().and_then(|s| s.parse().ok()).unwrap_or(0))
+}
+
+fn set_last_tick_at(store: &Store, now: i64) -> Result<()> {
+    store.set_setting(LAST_TICK_KEY, Some(&now.to_string()))
+}
+
+/// Queue due slots.
+///
+/// A continuous daemon (`alive`: last tick within [`ALIVE_GAP_MS`]) that crosses a due
+/// time runs it even when a tiny `once` window (`ends_at = start_at + 1 ms`) has closed.
+/// A restart after the deadline (`!alive` and `ends_at <= now`) takes the generic
+/// ended-while-missed path — no grace that would fire a missed one-off late.
+fn queue_due(store: &Store, s: &mut ScheduleDef, now: i64, last_tick: i64, alive: bool, rep: &mut TickReport) -> Result<()> {
+    let end = s.ends_at;
+    if !alive && end.is_some_and(|e| e <= now) && s.next_run_at < end.unwrap_or(0) && s.next_run_at > last_tick {
+        let due = s.next_run_at;
+        store.insert_run(&ScheduleRun {
+            schedule_id: s.id.clone(),
+            status: "failed".into(),
+            timestamp: due,
+            attempt: 1,
+            finished_at: Some(now),
+            error: Some(format!(
+                "missed: due {} and the node was not running (ended {})",
+                show_time(due, s.tz.as_deref()),
+                show_time(end.unwrap_or(due), s.tz.as_deref())
+            )),
+            ..Default::default()
+        })?;
+        record(
+            store,
+            "schedule.missed",
+            format!("schedule {} missed its run and ended", s.name),
+            json!({ "schedule": s.id, "name": s.name, "due": due }),
+        );
+        rep.missed.push(s.name.clone());
+        s.enabled = false;
+        store.save_schedule(s)?;
+        rep.ended.push(s.name.clone());
+        return Ok(());
+    }
     let mut slots = vec![];
     let mut t = s.next_run_at;
     let mut guard = 0;
     loop {
-        if s.ends_at.is_some_and(|e| t >= e) || t > now || guard > 1_000_000 {
+        if t > now || guard > 1_000_000 {
             break;
         }
-        slots.push(t);
+        if end.is_some_and(|e| t >= e) {
+            break;
+        }
+        let take = if alive { t > last_tick } else { t > last_tick && end.is_none_or(|e| now < e) };
+        if take {
+            slots.push(t);
+        } else if !alive && end.is_some_and(|e| now >= e) {
+            break;
+        }
         guard += 1;
         match step(s, t) {
             Some(n) => t = n,
@@ -603,34 +669,17 @@ fn queue_due(store: &Store, s: &mut ScheduleDef, now: i64, rep: &mut TickReport)
             }
         }
     }
-    let ended = s.ends_at.is_some_and(|e| t >= e) || t == i64::MAX;
-    let on_time: Vec<i64> = slots.iter().copied().filter(|x| now - x <= GRACE_MS).collect();
-    if ended && on_time.is_empty() && !slots.is_empty() && s.ends_at.is_some_and(|e| e <= now) {
-        // ended while missed: one failed row, then disabled (history kept)
-        let last = *slots.last().unwrap_or(&s.next_run_at);
-        store.insert_run(&ScheduleRun {
-            schedule_id: s.id.clone(),
-            status: "failed".into(),
-            timestamp: last,
-            attempt: 1,
-            finished_at: Some(now),
-            error: Some(format!("missed: due {} and it ended before the scheduler ran", show_time(last, s.tz.as_deref()))),
-            ..Default::default()
-        })?;
-        record(store, "schedule.missed", format!("schedule {} missed its run and ended", s.name), json!({ "schedule": s.id, "name": s.name, "due": last }));
-        rep.missed.push(s.name.clone());
-        s.enabled = false;
-        store.save_schedule(s)?;
-        rep.ended.push(s.name.clone());
-        return Ok(());
-    }
+    let ended = end.is_some_and(|e| t >= e) || t == i64::MAX;
     let pick: Vec<i64> = match s.catch_up.as_str() {
         "all" => slots.iter().copied().take(CATCH_UP_MAX).collect(),
-        "none" => on_time.last().copied().into_iter().collect(),
+        "none" => {
+            // skip missed: while alive, the crossed slot is on time; after a restart, queue nothing
+            if alive { slots.last().copied().into_iter().collect() } else { vec![] }
+        }
         _ => slots.last().copied().into_iter().collect(),
     };
     let open: Vec<ScheduleRun> = store.open_runs()?.into_iter().filter(|r| r.schedule_id == s.id).collect();
-    for due in pick {
+    for due in &pick {
         let has_open = !open.is_empty();
         if has_open && s.overlap == "skip" {
             break;
@@ -638,17 +687,25 @@ fn queue_due(store: &Store, s: &mut ScheduleDef, now: i64, rep: &mut TickReport)
         if has_open && open.iter().any(|r| r.status == "pending") {
             break;
         }
-        store.insert_run(&ScheduleRun { schedule_id: s.id.clone(), status: "pending".into(), timestamp: due, attempt: 1, ..Default::default() })?;
+        store.insert_run(&ScheduleRun {
+            schedule_id: s.id.clone(),
+            status: "pending".into(),
+            timestamp: *due,
+            attempt: 1,
+            ..Default::default()
+        })?;
         rep.queued.push(s.name.clone());
         if has_open {
-            break; // queue keeps one waiting run
+            break;
         }
     }
     if ended {
         s.enabled = false;
-        rep.ended.push(s.name.clone());
-        record(store, "schedule.end", format!("schedule {} ended", s.name), json!({ "schedule": s.id, "name": s.name }));
-    } else {
+        if !rep.ended.iter().any(|n| n == &s.name) {
+            rep.ended.push(s.name.clone());
+            record(store, "schedule.end", format!("schedule {} ended", s.name), json!({ "schedule": s.id, "name": s.name }));
+        }
+    } else if s.enabled {
         s.next_run_at = t;
     }
     store.save_schedule(s)?;
@@ -721,9 +778,86 @@ fn execute(store: &Store, s: &ScheduleDef, run_id: i64, holder: &str, now: i64) 
     Ok(r)
 }
 
-/// Connector schedules (2.26).
-fn connector_target(_store: &Store, _s: &ScheduleDef, _r: &mut ScheduleRun, _now: i64) -> Result<(Option<i64>, i64, Vec<String>)> {
-    Err(Error::invalid("schedule", "connector schedules run from 2.26".to_string()))
+/// Connector schedules (2.26): run the ingest-connector space with a live host context.
+fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i64) -> Result<(Option<i64>, i64, Vec<String>)> {
+    use crate::code::connector::{self, Live};
+    use crate::store::SpaceKind;
+    let plugin_id = s.plugin_id.clone().ok_or_else(|| Error::invalid("schedule", "its connector was removed".to_string()))?;
+    let space = store.space(&plugin_id)?.ok_or_else(|| Error::invalid("schedule", "its connector was removed".to_string()))?;
+    if space.kind != SpaceKind::IngestConnector {
+        return Err(Error::invalid("schedule", format!("{} is not an ingest connector", space.name)));
+    }
+    if !space.enabled {
+        return Err(Error::invalid("schedule", format!("connector {} is disabled", space.name)));
+    }
+    crate::code::spaces::ready_main(store, &space).map_err(|e| Error::invalid("schedule", e.to_string()))?;
+    let source_id = s.source_id.clone().ok_or_else(|| Error::invalid("schedule", "its source was removed".to_string()))?;
+    let source = store.source_by_id(&source_id)?.ok_or_else(|| Error::invalid("schedule", "its source was removed".to_string()))?;
+    let last_success_at = store
+        .schedule_runs(&s.id)?
+        .into_iter()
+        .rev()
+        .find(|x| x.status == "success")
+        .map(|x| x.finished_at.unwrap_or(x.timestamp));
+    let live = Live {
+        schedule_id: s.id.clone(),
+        schedule_name: s.name.clone(),
+        run_id: r.id,
+        plugin_id: plugin_id.clone(),
+        source_id: source.id.clone(),
+        source_name: source.name.clone(),
+        pipeline_id: s.pipeline_id.clone(),
+        ruleset_id: s.ruleset_id.clone(),
+        options: s.options.clone(),
+        last_success_at,
+        stored: 0,
+        bytes: 0,
+        inserted: 0,
+        piped: 0,
+        ruleset_ran: 0,
+        warnings: vec![],
+        state: connector::load_state(store, &s.id)?,
+    };
+    let env = crate::code::CodeEnv::for_store(store)?;
+    let (info, live) = connector::live_run(live, || crate::code::spaces::run_connector(store, &env, ORIGIN, &space, &format!("schedule:{}", s.name), &mut |_| {}));
+    let info = info?;
+    let _ = connector::save_state(store, &s.id, &live.state);
+    r.stored = live.stored;
+    r.bytes = live.bytes;
+    r.inserted = live.inserted;
+    r.piped = live.piped;
+    r.ruleset_ran = live.ruleset_ran;
+    r.warnings.extend(live.warnings);
+    if info.status != "ok" {
+        return Err(Error::invalid("connector", info.error.clone().unwrap_or_else(|| info.status.clone())));
+    }
+    // Q-I2: required pipe / run_ruleset must have been called
+    let mut missing = vec![];
+    if s.pipeline_id.is_some() && live.piped == 0 {
+        missing.push("pipe");
+    }
+    if s.ruleset_id.is_some() && live.ruleset_ran == 0 {
+        missing.push("run_ruleset");
+    }
+    if !missing.is_empty() {
+        let msg = format!("plugin did not call {}", missing.join(" or "));
+        // always record connector.run for history even when run_ruleset was skipped
+        if live.ruleset_ran == 0 {
+            let _ = store.record_action(
+                &NewAction::new(
+                    "connector.run",
+                    ORIGIN,
+                    format!("connector schedule {} run #{} ({msg})", s.name, r.id),
+                )
+                .params(json!({
+                    "schedule": s.id, "name": s.name, "run": r.id, "connector": plugin_id,
+                    "stored": live.stored, "bytes": live.bytes, "inserted": live.inserted, "error": msg
+                })),
+            );
+        }
+        return Err(Error::invalid("connector", msg));
+    }
+    Ok((None, live.ruleset_ran, vec![]))
 }
 
 /// Enable or disable `s` (saved). Enabling picks the next slot from now (a run_every
@@ -758,31 +892,68 @@ pub fn schedule_rule(store: &Store, r: &crate::store::Rule, sched: &crate::store
     if !store.ruleset_rules(&set.id)?.iter().any(|x| x.id == r.id) {
         store.add_ruleset_rule(&set.id, &r.id, None)?;
     }
-    let mut name = r.name.clone();
-    let mut i = 2;
-    while store.schedules()?.iter().any(|x| x.name.eq_ignore_ascii_case(&name)) {
-        name = format!("{} {i}", r.name);
-        i += 1;
+    let existing = store.schedules_using("ruleset_id", &set.id)?.into_iter().find(|x| x.target_kind == "ruleset");
+    let mut s = existing.unwrap_or_else(|| {
+        let mut name = r.name.clone();
+        let mut i = 2;
+        let taken = store.schedules().unwrap_or_default();
+        while taken.iter().any(|x| x.name.eq_ignore_ascii_case(&name)) {
+            name = format!("{} {i}", r.name);
+            i += 1;
+        }
+        ScheduleDef {
+            name,
+            target_kind: "ruleset".into(),
+            ruleset_id: Some(set.id.clone()),
+            tz: local_zone(),
+            overlap: "skip".into(),
+            catch_up: "once".into(),
+            max_attempts: 3,
+            enabled: true,
+            ..Default::default()
+        }
+    });
+    s.ruleset_id = Some(set.id.clone());
+    s.target_kind = "ruleset".into();
+    s.enabled = true;
+    if s.tz.is_none() {
+        s.tz = local_zone();
     }
-    let mut s = ScheduleDef {
-        name,
-        target_kind: "ruleset".into(),
-        ruleset_id: Some(set.id.clone()),
-        tz: local_zone(),
-        overlap: "skip".into(),
-        catch_up: "once".into(),
-        max_attempts: 3,
-        enabled: true,
-        ..Default::default()
-    };
+    let now = now_ms();
     let timing = match sched {
-        crate::store::Schedule::Every(ms) => Timing { run_every: Some(long_form(0, *ms)), ..Default::default() },
-        crate::store::Schedule::Cron(c) => Timing { cron: Some(c.clone()), ..Default::default() },
+        crate::store::Schedule::Every(ms) => Timing {
+            run_every: Some(long_form(0, *ms)),
+            past_next: s.start_at.is_some_and(|x| x < now),
+            ..Default::default()
+        },
+        crate::store::Schedule::Cron(c) => Timing {
+            cron: Some(c.clone()),
+            past_next: s.start_at.is_some_and(|x| x < now),
+            ..Default::default()
+        },
     };
-    apply_timing(&mut s, &timing, now_ms())?;
+    apply_timing(&mut s, &timing, now)?;
     let s = store.save_schedule(&s)?;
     Ok((set, s))
 }
+
+/// Remove schedules that exist only to run this rule (edit --no-schedule).
+pub fn unschedule_rule(store: &Store, r: &crate::store::Rule) -> Result<Vec<String>> {
+    let mut removed = vec![];
+    for set in store.rulesets_of_rule(&r.id)? {
+        let alone = store.ruleset_rules(&set.id)?.len() <= 1;
+        let ours = set.name.eq_ignore_ascii_case(&format!("{} (scheduled)", r.name)) || set.name == crate::rules::CERT_WATCH;
+        if !(alone || ours) {
+            continue;
+        }
+        for s in store.schedules_using("ruleset_id", &set.id)? {
+            store.remove_schedule(&s.id)?;
+            removed.push(s.name);
+        }
+    }
+    Ok(removed)
+}
+
 
 /// `scheduler status`: the lease and what is open or next.
 pub fn status(store: &Store, now: i64) -> Result<Value> {

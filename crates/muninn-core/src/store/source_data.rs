@@ -96,6 +96,14 @@ impl Store {
         Ok(st.query_map([source_id], row)?.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// A source's items for one schedule run (`host.pipe` over this run only).
+    pub fn source_data_for_run(&self, source_id: &str, run_id: i64) -> Result<Vec<SourceData>> {
+        let mut st = self.conn.prepare(&format!(
+            "SELECT {COLS} FROM source_data WHERE source_id = ?1 AND run_id = ?2 ORDER BY received_at, rowid"
+        ))?;
+        Ok(st.query_map(params![source_id, run_id], row)?.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     /// One item's bytes.
     pub fn source_data_bytes(&self, id: &str) -> Result<Vec<u8>> {
         Ok(self.conn.query_row("SELECT data FROM source_data WHERE id = ?1", [id], |r| r.get(0))?)

@@ -306,6 +306,21 @@ pub fn run(
     run_any(store, env, origin, s, input, from, log)
 }
 
+/// Run an ingest-connector space from the scheduler (or a dry run already on the TLS).
+pub fn run_connector(
+    store: &Store,
+    env: &CodeEnv,
+    origin: &str,
+    s: &Space,
+    from: &str,
+    log: &mut dyn FnMut(&str),
+) -> Result<crate::store::RunInfo> {
+    if s.kind != SpaceKind::IngestConnector {
+        return Err(Error::invalid("space", format!("{} is not an ingest connector", s.name)));
+    }
+    run_any(store, env, origin, s, None, from, log)
+}
+
 fn run_any(
     store: &Store,
     env: &CodeEnv,
@@ -333,6 +348,11 @@ fn run_any(
     STACK.with(|st| st.borrow_mut().push(Frame { space: s.clone(), in_member: false, calling: false }));
     let _pop = Pop;
     super::run_in_space(store, env, origin, &main.code, input, &format!("space:{} ({from})", s.name), log)
+}
+
+/// True when the current frame is a member (not main) — connector methods refuse.
+pub(crate) fn connector_in_member() -> bool {
+    STACK.with(|st| st.borrow().last().is_some_and(|f| f.in_member))
 }
 
 fn top_may_call() -> Result<Space> {

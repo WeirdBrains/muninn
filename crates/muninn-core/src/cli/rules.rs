@@ -151,17 +151,44 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
                 sp.then = t;
                 spec_changed = true;
             }
-            if schedule.is_some() || no_schedule {
-                sp.schedule = schedule;
-                spec_changed = true;
-            }
             if related || unrelated {
                 sp.related = related;
+                spec_changed = true;
+            }
+            // 2.25+: --every/--cron migrate onto a schedule; never write legacy spec.schedule
+            let migrate = schedule.clone();
+            if no_schedule {
+                sp.schedule = None;
+                if !sp.on.iter().any(|k| k == "*") && sp.on.is_empty() {
+                    // keep on schedule if still in a set; else require --on (checked by update)
+                }
+                spec_changed = true;
+            } else if migrate.is_some() {
+                sp.schedule = None;
+                if sp.on.is_empty() {
+                    sp.on = vec![rules::SCHEDULE.to_string()];
+                }
                 spec_changed = true;
             }
             let owner = if standalone { Some((OwnerKind::Standalone, None)) } else { owner(&store, &journal, &search, &model)? };
             let c = RuleChange { name, description, owner, spec: spec_changed.then_some(sp) };
             let n = store.update_rule(&r.id, &c)?;
+            if let Some(sc) = migrate {
+                let (set, sch) = crate::schedule::schedule_rule(&store, &n, &sc, &format!("{} (scheduled)", n.name))?;
+                record(&store, "schedule.add", format!("schedule {} for rule set {}", sch.name, set.name), json!({ "schedule": sch.id, "ruleset": set.id }));
+                ctx.io.warn(format!(
+                    "--every/--cron on a rule are deprecated: rule set `{}`, schedule `{}` ({})",
+                    set.name,
+                    sch.name,
+                    crate::schedule::describe(&sch).join(", ")
+                ));
+            }
+            if no_schedule {
+                for name in crate::schedule::unschedule_rule(&store, &n)? {
+                    record(&store, "schedule.remove", format!("remove schedule {name}"), json!({ "name": name }));
+                    ctx.io.info(format!("removed schedule {name}"));
+                }
+            }
             record(&store, "rule.edit", format!("edit rule {}", n.name), params(&n));
             ctx.io.info(format!("updated rule {}, {}, in {}", n.name, rules::brief(&n), rules::home(&store, &n)));
         }

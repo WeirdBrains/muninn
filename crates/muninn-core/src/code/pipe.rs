@@ -150,14 +150,18 @@ pub fn frame(store: &Store, env: &CodeEnv, origin: &str, src: &Source, log: &mut
 
 /// A source's stored items as a frame, one row each, the bytes as text (`text`).
 pub fn data_frame(store: &Store, src: &crate::model::Source) -> Result<Value> {
-    let items = store.source_data(&src.id)?;
+    data_frame_items(store, &src.name, &store.source_data(&src.id)?)
+}
+
+/// Stored items as a frame (connector `host.pipe` passes one run's items).
+pub fn data_frame_items(store: &Store, source_name: &str, items: &[crate::store::SourceData]) -> Result<Value> {
     let mut text = vec![];
-    for i in &items {
+    for i in items {
         text.push(Value::String(String::from_utf8_lossy(&store.source_data_bytes(&i.id)?).into_owned()));
     }
     let col = |f: &dyn Fn(&crate::store::SourceData) -> Value| items.iter().map(f).collect::<Vec<_>>();
     Ok(col_frame(
-        &format!("source:{}", src.name),
+        &format!("source:{source_name}"),
         vec![
             ("text", "text", text),
             ("name", "text", col(&|i| json!(i.name))),
@@ -165,7 +169,7 @@ pub fn data_frame(store: &Store, src: &crate::model::Source) -> Result<Value> {
             ("locator", "text", col(&|i| json!(i.locator))),
             ("received_at", "time", col(&|i| json!(i.received_at))),
             ("item", "text", col(&|i| json!(i.id))),
-            ("source", "text", col(&|_| json!(src.name))),
+            ("source", "text", col(&|_| json!(source_name))),
         ],
         items.iter().map(|i| i.id.clone()).collect(),
         vec![],

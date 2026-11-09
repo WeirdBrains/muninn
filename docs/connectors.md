@@ -108,3 +108,16 @@ pub fn run(host: &Host) -> Result<View> {
 // Muninn exports `run` for you. A connector built elsewhere (a prebuilt `plugin` library)
 // ends with: muninn_plugin::plugin!(run, kind = "ingest-connector");
 ```
+
+## Schedules (2.26)
+
+```
+mnnn schedule add NAME 15m --plugin FEED --source SRC [--pipeline PL] [--connector-ruleset R] [--option k=v]
+```
+
+When the schedule runs, the connector's main gets a live context (`host.context`,
+`store_raw` → `source_data` with this run's id, `pipe` over those items only,
+`run_ruleset`, `fetch`, `state_get`/`state_set`). Members cannot call those methods.
+If the schedule has a pipeline or rule set and the plugin never calls `pipe` /
+`run_ruleset`, the run is `failed` (`plugin did not call …`); raw items stay for a
+re-pipe. Removing a plugin that a schedule uses is refused.

@@ -4452,15 +4452,30 @@ pub struct RunPolicyArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum ScheduleCommand {
-    /// Add a schedule running a rule set.
+    /// Add a schedule running a rule set or an ingest connector.
     #[command(alias = "new")]
     Add {
         name: String,
         /// The interval (1h, "2 days", "1 month", once); not with --cron.
         run_every: Option<String>,
-        /// The rule set to run.
+        /// The rule set to run (ruleset schedules).
+        #[arg(long, conflicts_with = "plugin")]
+        ruleset: Option<String>,
+        /// Ingest connector (code space) to run.
         #[arg(long)]
-        ruleset: String,
+        plugin: Option<String>,
+        /// Source where the connector stores raw items.
+        #[arg(long)]
+        source: Option<String>,
+        /// Pipeline the connector's `host.pipe` runs.
+        #[arg(long)]
+        pipeline: Option<String>,
+        /// Rule set the connector's `host.run_ruleset` runs (optional).
+        #[arg(long = "connector-ruleset")]
+        connector_ruleset: Option<String>,
+        /// Schedule options for the connector (`key=value`, repeatable).
+        #[arg(long = "option", value_name = "KEY=VALUE")]
+        options: Vec<String>,
         #[command(flatten)]
         timing: TimingArgs,
         #[command(flatten)]

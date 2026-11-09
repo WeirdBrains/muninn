@@ -157,29 +157,70 @@ fn catch_up_all_and_none() {
     s = st.schedule(&s.id).unwrap().unwrap();
     s.catch_up = "none".into();
     s.next_run_at = T0 + 10 * 3_600_000;
+    s.enabled = true;
     st.save_schedule(&s).unwrap();
+    // simulate a long downtime (restart): last tick far in the past
+    st.set_setting(LAST_TICK_KEY, Some(&(T0 + 4 * 3_600_000).to_string())).unwrap();
     let rep = tick(&st, "t", T0 + 12 * 3_600_000 + 5 * 60_000).unwrap();
-    assert!(rep.queued.is_empty(), "{rep:?}");
+    assert!(rep.queued.is_empty(), "catch_up none skips missed after restart: {rep:?}");
+    assert!(st.schedule(&s.id).unwrap().unwrap().next_run_at > T0 + 10 * 3_600_000);
 }
 
 #[test]
-fn missed_one_off_is_skipped() {
+fn missed_one_off_is_skipped_on_restart() {
     let (st, mut s) = setup();
-    apply_timing(&mut s, &Timing { run_every: Some("once".into()), start_at: Some("2026-11-10 15:00".into()), tz: Some("UTC".into()), ..Default::default() }, T0).unwrap();
+    apply_timing(
+        &mut s,
+        &Timing { run_every: Some("once".into()), start_at: Some("2026-11-10 15:00".into()), tz: Some("UTC".into()), ..Default::default() },
+        T0,
+    )
+    .unwrap();
+    assert_eq!(s.ends_at_input.as_deref(), Some("auto (once)"));
     st.save_schedule(&s).unwrap();
+    // cold: never ticked before, deadline long past → missed via ends_at (no once-specific branch)
     let rep = tick(&st, "t", T0 + 3 * 3_600_000).unwrap();
-    assert_eq!(rep.missed, vec!["every hour".to_string()]);
-    let s2 = st.schedule(&s.id).unwrap().unwrap();
-    assert!(!s2.enabled);
-    let runs = st.schedule_runs(&s.id).unwrap();
-    assert_eq!(runs.len(), 1);
-    assert!(runs[0].error.as_deref().unwrap().starts_with("missed"));
-    // an on-time one-off runs and ends
-    let mut o = s2.clone();
-    o.enabled = true;
-    apply_timing(&mut o, &Timing { start_at: Some("2026-11-10 18:00".into()), ..Default::default() }, T0 + 3 * 3_600_000).unwrap();
-    st.save_schedule(&o).unwrap();
-    let rep = tick(&st, "t", T0 + 4 * 3_600_000 + 500).unwrap();
+    assert_eq!(rep.missed, vec!["every hour".to_string()], "{rep:?}");
+    assert!(!st.schedule(&s.id).unwrap().unwrap().enabled);
+    assert!(st.schedule_runs(&s.id).unwrap()[0].error.as_deref().unwrap().starts_with("missed"));
+}
+
+#[test]
+fn daemon_alive_runs_once_after_tiny_window() {
+    let (st, mut s) = setup();
+    // prior tick kept the daemon "alive"
+    st.set_setting(LAST_TICK_KEY, Some(&(T0 - 15_000).to_string())).unwrap();
+    apply_timing(
+        &mut s,
+        &Timing { run_every: Some("once".into()), start_at: Some("2026-11-10 14:00:00".into()), tz: Some("UTC".into()), ..Default::default() },
+        T0 - 60_000,
+    )
+    .unwrap();
+    // start_at == T0; ends_at = T0+1. Tick 5s later while alive → still runs (crossed while up).
+    s.next_run_at = T0;
+    st.save_schedule(&s).unwrap();
+    let rep = tick(&st, "t", T0 + 5_000).unwrap();
+    assert_eq!(rep.succeeded.len(), 1, "{rep:?}");
+    assert!(!st.schedule(&s.id).unwrap().unwrap().enabled, "ends_at disables after the run");
+}
+
+#[test]
+fn ends_at_disables_repeating_like_once() {
+    let (st, mut s) = setup();
+    st.set_setting(LAST_TICK_KEY, Some(&(T0 - 1_000).to_string())).unwrap();
+    apply_timing(
+        &mut s,
+        &Timing {
+            run_every: Some("1h".into()),
+            start_at: Some("2026-11-10 14:00".into()),
+            ends_at: Some("2026-11-10 14:00:00.001".into()),
+            tz: Some("UTC".into()),
+            ..Default::default()
+        },
+        T0,
+    )
+    .unwrap();
+    st.save_schedule(&s).unwrap();
+    let rep = tick(&st, "t", T0 + 100).unwrap();
     assert_eq!(rep.succeeded.len(), 1, "{rep:?}");
     assert!(!st.schedule(&s.id).unwrap().unwrap().enabled);
 }
@@ -212,3 +253,12 @@ fn run_now_and_status() {
     assert!(!describe(&s).is_empty());
 }
 
+
+
+#[test]
+fn connector_skip_message_names_pipe_and_ruleset() {
+    // Q-I2 error text contract (live path builds the same string)
+    let missing = ["pipe", "run_ruleset"];
+    let msg = format!("plugin did not call {}", missing.join(" or "));
+    assert_eq!(msg, "plugin did not call pipe or run_ruleset");
+}

@@ -325,6 +325,14 @@ pub fn run(ctx: &Ctx, cmd: SpacesCommand) -> anyhow::Result<()> {
         }
         SpacesCommand::Remove { space } => {
             let s = store.find_space(&space)?;
+            let using = store.schedules_using("plugin_id", &s.id)?;
+            if !using.is_empty() {
+                anyhow::bail!(
+                    "schedules use plugin {}: {} (remove or retarget them first)",
+                    s.name,
+                    using.iter().map(|x| x.name.as_str()).collect::<Vec<_>>().join(", ")
+                );
+            }
             if !ctx.io.confirm(&format!("remove code space `{}`? (its code stays)", s.name))? {
                 return Err(crate::Error::Aborted.into());
             }

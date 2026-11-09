@@ -102,7 +102,7 @@ impl<'a> Run<'a> {
             "methods" => Ok(json!(METHODS)),
             "call" => super::spaces::host_call(s, &req),
             "call_space" => super::spaces::host_call_space(s, &req),
-            m if super::connector::METHODS.contains(&m) => super::connector::call(m, &req),
+            m if super::connector::METHODS.contains(&m) => super::connector::call(self.store, m, &req),
             "input_request" => Ok(serde_json::to_value(&self.space.input)?),
             "inputs" => Ok(json!(self.named.iter().map(|(n, _)| n).collect::<Vec<_>>())),
             // a connector run's options are its schedule's (a step's own come first)

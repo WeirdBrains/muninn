@@ -172,6 +172,22 @@ fn scheduled_rules_become_rule_sets_with_schedules() {
 }
 
 #[test]
+fn rule_edit_every_migrates_onto_a_schedule() {
+    let e = Env::new();
+    e.ok(&["journal", "new", "Log"]);
+    e.ok(&["rule", "create", "Hourly", "--on", "import", "--then", "note Log \"x\""]);
+    let o = e.run(&["rule", "edit", "Hourly", "--every", "2h"]);
+    assert!(o.status.success(), "{:?}", o);
+    assert!(String::from_utf8_lossy(&o.stderr).contains("deprecated") || String::from_utf8_lossy(&o.stderr).contains("schedule"), "{:?}", o);
+    let show = e.ok(&["schedule", "show", "Hourly"]);
+    assert!(show.contains("every 2 hours"), "{show}");
+    // no legacy schedule on the rule
+    assert!(!e.ok(&["rule", "show", "Hourly"]).contains("every 2h"));
+    e.ok(&["rule", "edit", "Hourly", "--no-schedule", "--on", "import"]);
+    assert!(e.ok(&["schedule", "list"]).contains("no schedules") || !e.ok(&["schedule", "list"]).contains("Hourly"));
+}
+
+#[test]
 fn rule_sets_and_schedules() {
     let e = Env::new();
     e.ok(&["journal", "new", "Log"]);
