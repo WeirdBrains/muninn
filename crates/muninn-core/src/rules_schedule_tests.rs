@@ -83,7 +83,11 @@ fn the_cert_watcher_is_built_in_once_editable_and_notifies_for_your_certificates
     assert_eq!(parse_then(&s, "cert-watch renew=20 notify=7,1").unwrap(), crate::store::Then::CertWatch { renew_days: 20, notify_days: vec![7, 1] });
     // your certificate with 10 days left: the 14-day notice, once
     tls::set_user_cert(&s, &o, &self_signed(&["lab.example.org".into()], 10).unwrap()).unwrap();
-    assert!(tick(&s, now_ms()).unwrap().contains(&CERT_WATCH.to_string()));
+    let sch = s.find_schedule(CERT_WATCH).unwrap();
+    assert_eq!((sch.every_ms, sch.run_every.as_deref()), (Some(6 * 3_600_000), Some("6 hours")));
+    assert_eq!(s.ruleset_rules(sch.ruleset_id.as_deref().unwrap()).unwrap()[0].id, w.id);
+    let rep = crate::schedule::tick(&s, "test", now_ms()).unwrap();
+    assert_eq!(rep.succeeded.len(), 1, "{rep:?}");
     let notes: Vec<_> = s.actions_of_kind("notify").unwrap();
     assert_eq!(notes.len(), 1);
     assert_eq!(notes[0].params["about"], "cert.expiry");

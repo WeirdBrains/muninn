@@ -87,6 +87,19 @@ pub struct RulesState {
     pub seen: Option<i64>,
     /// When due scheduled rules were last run from here.
     pub last_tick: Option<std::time::Instant>,
+    /// Tab: rules, rule sets or schedules (2.25).
+    pub view: RView,
+    pub sets: Vec<crate::store::Ruleset>,
+    pub schedules: Vec<crate::store::ScheduleDef>,
+}
+
+/// What the Rules window lists (Tab cycles).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RView {
+    #[default]
+    Rules,
+    Sets,
+    Schedules,
 }
 
 impl RulesState {
@@ -131,7 +144,110 @@ pub fn open_rule(app: &mut App, id: &str) {
 
 fn reload(app: &mut App) {
     app.rules.list = app.store.rules().unwrap_or_default();
-    app.rules.sel = app.rules.sel.min(app.rules.list.len().saturating_sub(1));
+    app.rules.sets = app.store.rulesets().unwrap_or_default();
+    app.rules.schedules = app.store.schedules().unwrap_or_default();
+    app.rules.sel = app.rules.sel.min(view_len(&app.rules).saturating_sub(1));
+}
+
+fn view_len(st: &RulesState) -> usize {
+    match st.view {
+        RView::Rules => st.list.len(),
+        RView::Sets => st.sets.len(),
+        RView::Schedules => st.schedules.len(),
+    }
+}
+
+fn show_set(app: &mut App) {
+    let Some(r) = app.rules.sets.get(app.rules.sel).cloned() else { return };
+    let s = &app.store;
+    let mut d = vec![format!("rule set {} · {} · {}", r.name, if r.enabled { "on" } else { "off" }, r.owner_kind)];
+    for (i, x) in s.ruleset_rules(&r.id).unwrap_or_default().iter().enumerate() {
+        d.push(format!("  {}. {}{}", i + 1, x.name, if x.enabled { "" } else { " (off)" }));
+    }
+    for sc in s.schedules_using("ruleset_id", &r.id).unwrap_or_default() {
+        d.push(format!("run by {}: {}", sc.name, crate::schedule::describe(&sc).join("; ")));
+    }
+    app.rules.detail = d;
+}
+
+fn show_schedule(app: &mut App) {
+    let Some(sc) = app.rules.schedules.get(app.rules.sel).cloned() else { return };
+    let mut d = vec![format!("schedule {} · {}", sc.name, if sc.enabled { "on" } else { "off" })];
+    d.extend(crate::schedule::describe(&sc));
+    d.push(format!("overlap {} · catch up {} · {} attempt(s)", sc.overlap, sc.catch_up, sc.max_attempts));
+    for r in app.store.schedule_runs(&sc.id).unwrap_or_default().iter().rev().take(4) {
+        d.push(format!("  #{} {} {}{}", r.id, r.status, crate::schedule::show_time(r.timestamp, sc.tz.as_deref()), r.error.as_ref().map(|e| format!(": {e}")).unwrap_or_default()));
+    }
+    app.rules.detail = d;
+}
+
+/// Sets and schedules: Enter shows, Space switches on/off, r runs now.
+fn other_key(app: &mut App, k: KeyEvent) {
+    let now = crate::store::now_ms();
+    match (app.rules.view, k.code) {
+        (_, KeyCode::Down | KeyCode::Char('j')) => {
+            app.rules.sel = (app.rules.sel + 1).min(view_len(&app.rules).saturating_sub(1));
+            app.rules.detail.clear();
+        }
+        (_, KeyCode::Up | KeyCode::Char('k')) => {
+            app.rules.sel = app.rules.sel.saturating_sub(1);
+            app.rules.detail.clear();
+        }
+        (RView::Sets, KeyCode::Enter) => show_set(app),
+        (RView::Schedules, KeyCode::Enter) => show_schedule(app),
+        (RView::Sets, KeyCode::Char(' ')) => {
+            if let Some(r) = app.rules.sets.get(app.rules.sel).cloned() {
+                let res = app.store.set_ruleset_enabled(&r.id, !r.enabled);
+                record(app, "ruleset.edit", format!("switch rule set {} {}", r.name, if r.enabled { "off" } else { "on" }), serde_json::json!({ "ruleset": r.id, "enabled": !r.enabled }));
+                app.rules.msg = Some(res.map_or_else(|e| (e.to_string(), true), |_| (format!("rule set {} is {}", r.name, if r.enabled { "off" } else { "on" }), false)));
+                reload(app);
+            }
+        }
+        (RView::Schedules, KeyCode::Char(' ')) => {
+            if let Some(mut s) = app.rules.schedules.get(app.rules.sel).cloned() {
+                let on = !s.enabled;
+                match crate::schedule::set_enabled(&app.store, &mut s, on, now) {
+                    Ok(()) => {
+                        record(app, if on { "schedule.enable" } else { "schedule.disable" }, format!("switch schedule {} {}", s.name, if on { "on" } else { "off" }), serde_json::json!({ "schedule": s.id }));
+                        app.rules.msg = Some((format!("schedule {} is {}", s.name, if on { "on" } else { "off" }), false));
+                    }
+                    Err(e) => app.rules.msg = Some((e.to_string(), true)),
+                }
+                reload(app);
+            }
+        }
+        (RView::Sets, KeyCode::Char('r')) => {
+            if let Some(r) = app.rules.sets.get(app.rules.sel).cloned() {
+                let ran = app
+                    .store
+                    .record_action(&crate::store::NewAction::new(rules::SCHEDULE, "tui", format!("run rule set {}", r.name)).params(serde_json::json!({ "ruleset": r.id, "manual": true })))
+                    .and_then(|id| app.store.action(id))
+                    .and_then(|a| a.map_or(Ok(Default::default()), |a| crate::schedule::run_ruleset(&app.store, &r.id, &a)));
+                app.rules.msg = Some(match ran {
+                    Ok(x) if x.failed.is_empty() => (format!("ran {} rule(s) of {}", x.ran.len(), r.name), false),
+                    Ok(x) => (format!("failed: {}", x.failed.join(", ")), true),
+                    Err(e) => (e.to_string(), true),
+                });
+                reload(app);
+            }
+        }
+        (RView::Schedules, KeyCode::Char('r')) => {
+            if let Some(s) = app.rules.schedules.get(app.rules.sel).cloned() {
+                app.rules.msg = Some(match crate::schedule::run_now(&app.store, &s, &crate::schedule::holder("tui"), now) {
+                    Ok(r) => {
+                        record(app, "schedule.run", format!("run schedule {} now", s.name), serde_json::json!({ "schedule": s.id, "run": r.id }));
+                        (format!("run #{} {}{}", r.id, r.status, r.error.map(|e| format!(": {e}")).unwrap_or_default()), r.status != "success")
+                    }
+                    Err(e) => (e.to_string(), true),
+                });
+                reload(app);
+                show_schedule(app);
+            }
+        }
+        (_, KeyCode::Esc) if !app.rules.detail.is_empty() => app.rules.detail.clear(),
+        (_, KeyCode::Esc | KeyCode::Char('q')) => app.modal = None,
+        _ => {}
+    }
 }
 
 fn select_id(app: &mut App, id: &str) {
@@ -150,8 +266,8 @@ fn tick_schedules(app: &mut App) {
         return;
     }
     app.store.set_host_running(false);
-    if let Err(e) = rules::tick(&app.store, crate::store::now_ms()) {
-        tracing::warn!("scheduled rules: {e}");
+    if let Err(e) = crate::schedule::tick(&app.store, &crate::schedule::holder("tui"), crate::store::now_ms()) {
+        tracing::warn!("scheduler: {e}");
     }
 }
 
@@ -194,6 +310,11 @@ fn show(app: &mut App) {
     {
         d.push(format!("next run {}", crate::ingest::time::fmt_ts(n.max(crate::store::now_ms()))));
     }
+    for set in app.store.rulesets_of_rule(&r.id).unwrap_or_default() {
+        for sc in app.store.schedules_using("ruleset_id", &set.id).unwrap_or_default() {
+            d.push(format!("schedule {}: {}", sc.name, crate::schedule::describe(&sc).join("; ")));
+        }
+    }
     d.extend(r.spec.when.iter().map(|c| format!("if {}", rules::condition_text(c))));
     d.extend(r.spec.then.iter().map(|t| format!("then {}", rules::then_text(s, t))));
     let runs = s.rule_runs(&r.id, 3).unwrap_or_default();
@@ -206,7 +327,11 @@ fn show(app: &mut App) {
 fn try_rule(app: &mut App, dry: bool) {
     let Some(r) = app.rules.selected().cloned() else { return };
     let s = &app.store;
-    let a = if r.spec.schedule.is_some() { Some(rules::schedule_action(&r)) } else { rules::last_trigger(s).ok().flatten() };
+    let a = if r.spec.schedule.is_some() || r.spec.on.iter().any(|k| k == rules::SCHEDULE) {
+        Some(rules::schedule_action(&r))
+    } else {
+        rules::last_trigger(s).ok().flatten()
+    };
     let Some(a) = a else {
         app.rules.msg = Some(("nothing in the history yet".into(), true));
         return;
@@ -431,8 +556,23 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
         }
         return;
     }
-    let n = st.list.len();
     st.msg = None;
+    if k.code == KeyCode::Tab {
+        st.view = match st.view {
+            RView::Rules => RView::Sets,
+            RView::Sets => RView::Schedules,
+            RView::Schedules => RView::Rules,
+        };
+        st.sel = 0;
+        st.detail.clear();
+        reload(app);
+        return;
+    }
+    if st.view != RView::Rules {
+        other_key(app, k);
+        return;
+    }
+    let n = st.list.len();
     match k.code {
         KeyCode::Down | KeyCode::Char('j') => {
             st.sel = (st.sel + 1).min(n.saturating_sub(1));
@@ -471,7 +611,7 @@ pub fn on_click(app: &mut App, i: usize) {
     }
     if app.rules.sel == i {
         on_key(app, KeyEvent::from(KeyCode::Enter));
-    } else if i < app.rules.list.len() {
+    } else if i < view_len(&app.rules) {
         app.rules.sel = i;
         app.rules.detail.clear();
     }
@@ -480,7 +620,10 @@ pub fn on_click(app: &mut App, i: usize) {
 pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) {
     let t = app.theme.clone();
     let st = &app.rules;
-    let mut v = View::new("Rules · when this happens, do that");
+    if st.view != RView::Rules {
+        return draw_other(app, f, r, hits);
+    }
+    let mut v = View::new("Rules · when this happens, do that  (Tab: rule sets, schedules)");
     for d in &st.detail {
         v.head.push(Line::styled(format!(" {d}"), Style::new().fg(t.fg)));
     }
@@ -512,7 +655,54 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
         ("x dry run", KeyCode::Char('x')),
         ("d delete", KeyCode::Char('d')),
         ("p project", KeyCode::Char('p')),
+        ("Tab sets", KeyCode::Tab),
         ("Esc", KeyCode::Esc),
     ];
+    draw_view(f, r, v, &t, hits);
+}
+
+fn draw_other(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) {
+    let t = app.theme.clone();
+    let st = &app.rules;
+    let sets = st.view == RView::Sets;
+    let mut v = View::new(if sets { "Rule sets · rules run together, in order  (Tab: schedules)" } else { "Schedules · run a rule set on time  (Tab: rules)" });
+    for d in &st.detail {
+        v.head.push(Line::styled(format!(" {d}"), Style::new().fg(t.fg)));
+    }
+    if !st.detail.is_empty() {
+        v.head.push(Line::raw(""));
+    }
+    if sets {
+        for (i, x) in st.sets.iter().enumerate() {
+            let n = app.store.ruleset_rules(&x.id).map(|v| v.len()).unwrap_or(0);
+            v.rows.push(Line::from(vec![
+                Span::styled(format!(" {} ", if x.enabled { "●" } else { "○" }), Style::new().fg(if x.enabled { t.accent } else { t.muted })),
+                Span::styled(format!("{:<28} ", x.name), row_style(&t, i == st.sel)),
+                Span::styled(format!(" {n} rule(s) · {}", x.owner_kind), Style::new().fg(t.muted)),
+            ]));
+        }
+        if st.sets.is_empty() && st.detail.is_empty() {
+            v.head.push(muted(&t, " no rule sets: mnnn ruleset create NAME --rule RULE"));
+        }
+    } else {
+        for (i, x) in st.schedules.iter().enumerate() {
+            let when = x.cron.clone().map(|c| format!("cron {c}")).or(x.run_every.clone()).unwrap_or_default();
+            v.rows.push(Line::from(vec![
+                Span::styled(format!(" {} ", if x.enabled { "●" } else { "○" }), Style::new().fg(if x.enabled { t.accent } else { t.muted })),
+                Span::styled(format!("{:<24} ", x.name), row_style(&t, i == st.sel)),
+                Span::styled(format!(" {when} "), Style::new().fg(t.accent)),
+                Span::styled(
+                    if x.enabled { format!(" next {}", crate::schedule::show_time(x.next_run_at, x.tz.as_deref())) } else { " off".into() },
+                    Style::new().fg(t.muted),
+                ),
+            ]));
+        }
+        if st.schedules.is_empty() && st.detail.is_empty() {
+            v.head.push(muted(&t, " no schedules: mnnn schedule add NAME 1h --ruleset SET"));
+        }
+    }
+    v.sel = (view_len(st) > 0).then_some(st.sel);
+    v.msg = st.msg.clone();
+    v.keys = vec![("Enter show", KeyCode::Enter), ("Space on/off", KeyCode::Char(' ')), ("r run now", KeyCode::Char('r')), ("Tab next", KeyCode::Tab), ("Esc", KeyCode::Esc)];
     draw_view(f, r, v, &t, hits);
 }

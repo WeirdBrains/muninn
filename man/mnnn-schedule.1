@@ -1,0 +1,140 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-schedule 1  "mnnn-schedule 2.22.3" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-schedule \- Schedules: run a rule set (or, from 2.26, an ingest connector) at start_at, every interval or at cron times, until ends_at
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn schedule\fR [\fB\-\-home\fR] [\fB\-\-db\fR] [\fB\-\-non\-interactive\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-transport\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Schedules: run a rule set (or, from 2.26, an ingest connector) at start_at, every interval or at cron times, until ends_at
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH NOTES
+.PP
+Timing:
+  run_every   an interval: date items (2 hours 30 minutes, 1 month, 1 year), short codes
+              (ms s m h d w M y: 90m, 1h30m, 2w, 1M), milliseconds (5000), or `once`.
+              Times (tomorrow, 9am, next monday) go in \-\-start\-at.
+  \-\-cron      instead of run_every: "0 9 * * 1\-5" (minute hour day month weekday), in \-\-tz.
+  \-\-start\-at  when the first run is due (GNU date style: "tomorrow 9am", "2026\-12\-01 08:00",
+              "next monday 06:00", "+2 hours"). None: right away (run_every) or the next cron time.
+  \-\-ends\-at   no run starts at or after it. \-\-for 2w: ends_at = start + 2 weeks.
+  \-\-tz        the zone dates are read and months/cron step in (UTC when not given; `local`).
+  once        one run at \-\-start\-at (ends_at = start_at + 1 ms). Missed, it is skipped:
+              one failed `missed` run, then disabled (history kept).
+A past \-\-start\-at asks: the next interval, or a corrected start (a one\-off can only be
+corrected). Without a terminal give \-\-past next\-interval.
+.PP
+Examples:
+  mnnn schedule add nightly \-\-ruleset Cleanup "1 day" \-\-start\-at "tomorrow 02:00" \-\-tz local
+  mnnn schedule add weekdays \-\-ruleset Report \-\-cron "0 9 * * 1\-5" \-\-tz Europe/Oslo
+  mnnn schedule add reminder \-\-ruleset Notes once \-\-start\-at "2026\-12\-01 09:00"
+  mnnn schedule parse "1h30m" \-\-start\-at "next monday 9am"
+  mnnn scheduler run          # keep running (or let the TUI / org host do it)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+mnnn\-schedule\-add(1)
+Add a schedule running a rule set
+.TP
+mnnn\-schedule\-parse(1)
+Show what a timing means (no schedule is made)
+.TP
+mnnn\-schedule\-list(1)
+List schedules
+.TP
+mnnn\-schedule\-show(1)
+Show a schedule and its last runs
+.TP
+mnnn\-schedule\-edit(1)
+Change a schedule\*(Aqs timing, rule set or policy
+.TP
+mnnn\-schedule\-enable(1)
+.TP
+mnnn\-schedule\-disable(1)
+.TP
+mnnn\-schedule\-remove(1)
+Remove a schedule and its runs
+.TP
+mnnn\-schedule\-run\-now(1)
+Run it once now (outside its timing)
+.TP
+mnnn\-schedule\-runs(1)
+A schedule\*(Aqs runs, newest first
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.22.3
+.SH SEE ALSO
+\fBmnnn\fR(1)

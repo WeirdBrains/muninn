@@ -97,6 +97,16 @@ pub enum Command {
     /// their own, in a journal, a live search or projects.
     #[command(subcommand, alias = "rules", after_long_help = RULE_NOTES)]
     Rule(RuleCommand),
+    /// Rule sets: rules run together, in order (a schedule runs one; a project's rules are one).
+    #[command(subcommand, alias = "rulesets")]
+    Ruleset(RulesetCommand),
+    /// Schedules: run a rule set (or, from 2.26, an ingest connector) at start_at, every
+    /// interval or at cron times, until ends_at.
+    #[command(subcommand, alias = "schedules", after_long_help = SCHEDULE_NOTES)]
+    Schedule(ScheduleCommand),
+    /// The scheduler: runs what is due (the TUI and an org host run it; or `scheduler run`).
+    #[command(subcommand)]
+    Scheduler(SchedulerCommand),
     /// Models: record tables you design (typed fields, references, constraints), changed by
     /// versioned migrations you preview, apply and roll back; and their records.
     #[command(subcommand, alias = "models", after_long_help = MODEL_NOTES)]
@@ -1428,10 +1438,11 @@ pub struct RuleSpecArgs {
     /// A then-action, e.g. "status Imported {inserted} bars" (repeat: run in order).
     #[arg(long = "then", value_name = "ACTION")]
     pub then: Vec<String>,
-    /// Run it on a schedule: every 30m, 6h, 1d, 1w (the node runs it; see `mnnn rule tick`).
+    /// Deprecated (2.25): on create, makes rule set `NAME (scheduled)` and a schedule running
+    /// it every 30m, 6h, 1d, 1w (see `mnnn schedule add`).
     #[arg(long, value_name = "INTERVAL", conflicts_with = "cron")]
     pub every: Option<String>,
-    /// Run it at cron times, local time: "0 3 * * *" (minute hour day month weekday).
+    /// Deprecated (2.25): like --every, at cron times in this node's zone: "0 3 * * *".
     #[arg(long, value_name = "CRON")]
     pub cron: Option<String>,
 }
@@ -1464,6 +1475,9 @@ pub enum RuleCommand {
         disabled: bool,
         #[arg(long, default_value = "")]
         description: String,
+        /// Add it to a rule set (by name or id); with no --on it reacts to `schedule`.
+        #[arg(long)]
+        ruleset: Option<String>,
     },
     /// Change a rule: given --on, --if or --then replace the old ones.
     Edit {
@@ -1499,8 +1513,7 @@ pub enum RuleCommand {
         #[arg(long, conflicts_with_all = ["every", "cron"])]
         no_schedule: bool,
     },
-    /// Run the scheduled rules that are due now (the TUI and a running org host do this
-    /// every minute; call it from cron or a timer when neither runs).
+    /// Deprecated (2.25): runs `mnnn scheduler tick`.
     Tick {
         #[arg(long)]
         json: bool,
@@ -4318,4 +4331,218 @@ pub struct ShareArgs {
     pub targets: bool,
     #[arg(long)]
     pub json: bool,
+}
+
+pub const SCHEDULE_NOTES: &str = r#"Timing:
+  run_every   an interval: date items (2 hours 30 minutes, 1 month, 1 year), short codes
+              (ms s m h d w M y: 90m, 1h30m, 2w, 1M), milliseconds (5000), or `once`.
+              Times (tomorrow, 9am, next monday) go in --start-at.
+  --cron      instead of run_every: "0 9 * * 1-5" (minute hour day month weekday), in --tz.
+  --start-at  when the first run is due (GNU date style: "tomorrow 9am", "2026-12-01 08:00",
+              "next monday 06:00", "+2 hours"). None: right away (run_every) or the next cron time.
+  --ends-at   no run starts at or after it. --for 2w: ends_at = start + 2 weeks.
+  --tz        the zone dates are read and months/cron step in (UTC when not given; `local`).
+  once        one run at --start-at (ends_at = start_at + 1 ms). Missed, it is skipped:
+              one failed `missed` run, then disabled (history kept).
+A past --start-at asks: the next interval, or a corrected start (a one-off can only be
+corrected). Without a terminal give --past next-interval.
+
+Examples:
+  mnnn schedule add nightly --ruleset Cleanup "1 day" --start-at "tomorrow 02:00" --tz local
+  mnnn schedule add weekdays --ruleset Report --cron "0 9 * * 1-5" --tz Europe/Oslo
+  mnnn schedule add reminder --ruleset Notes once --start-at "2026-12-01 09:00"
+  mnnn schedule parse "1h30m" --start-at "next monday 9am"
+  mnnn scheduler run          # keep running (or let the TUI / org host do it)"#;
+
+#[derive(Debug, Subcommand)]
+pub enum RulesetCommand {
+    /// List rule sets.
+    #[command(alias = "ls")]
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show a rule set: its rules (in order) and the schedules running it.
+    Show {
+        ruleset: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Create a rule set (optionally with rules).
+    #[command(alias = "new")]
+    Create {
+        name: String,
+        #[arg(long, default_value = "")]
+        description: String,
+        /// Rules to put in it, in order.
+        #[arg(long = "rule", value_name = "RULE")]
+        rules: Vec<String>,
+    },
+    /// Rename, describe, enable or disable a rule set.
+    Edit {
+        ruleset: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long, conflicts_with = "disable")]
+        enable: bool,
+        #[arg(long)]
+        disable: bool,
+    },
+    /// Remove a rule set (its rules stay; schedules running it are refused unless --force).
+    #[command(alias = "rm")]
+    Remove {
+        ruleset: String,
+        /// Remove the schedules running it too.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Add a rule to a rule set (at the end, or at --position, 1-based).
+    Add {
+        ruleset: String,
+        rule: String,
+        #[arg(long)]
+        position: Option<usize>,
+    },
+    /// Take a rule out of a rule set (the rule stays).
+    Drop { ruleset: String, rule: String },
+    /// Run a rule set now on a `schedule` action.
+    Run {
+        ruleset: String,
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct TimingArgs {
+    /// Start: GNU date style ("tomorrow 9am", "2026-12-01 08:00").
+    #[arg(long, value_name = "DATE")]
+    pub start_at: Option<String>,
+    /// End: no run starts at or after it.
+    #[arg(long, value_name = "DATE", conflicts_with = "for_")]
+    pub ends_at: Option<String>,
+    /// End this long after the start (2 weeks, 30d).
+    #[arg(long = "for", value_name = "INTERVAL")]
+    pub for_: Option<String>,
+    /// Cron times instead of run_every: "0 9 * * 1-5".
+    #[arg(long)]
+    pub cron: Option<String>,
+    /// Zone for dates, months and cron (default UTC; `local` for this node's).
+    #[arg(long)]
+    pub tz: Option<String>,
+    /// A past --start-at: `next-interval` moves it to the next slot (without asking).
+    #[arg(long, value_name = "WHAT", value_parser = ["next-interval"])]
+    pub past: Option<String>,
+}
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct RunPolicyArgs {
+    /// A run still going when the next is due: skip it or queue one.
+    #[arg(long, value_parser = ["skip", "queue"])]
+    pub overlap: Option<String>,
+    /// Missed runs (the scheduler was off): once, all (up to 100) or none.
+    #[arg(long, value_parser = ["once", "all", "none"])]
+    pub catch_up: Option<String>,
+    /// Tries per run (failures retry after 30 s, 1 min, 2 min, …).
+    #[arg(long)]
+    pub max_attempts: Option<i64>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ScheduleCommand {
+    /// Add a schedule running a rule set.
+    #[command(alias = "new")]
+    Add {
+        name: String,
+        /// The interval (1h, "2 days", "1 month", once); not with --cron.
+        run_every: Option<String>,
+        /// The rule set to run.
+        #[arg(long)]
+        ruleset: String,
+        #[command(flatten)]
+        timing: TimingArgs,
+        #[command(flatten)]
+        policy: RunPolicyArgs,
+        /// Add it switched off.
+        #[arg(long)]
+        disabled: bool,
+    },
+    /// Show what a timing means (no schedule is made).
+    Parse {
+        run_every: Option<String>,
+        #[command(flatten)]
+        timing: TimingArgs,
+        #[arg(long)]
+        json: bool,
+    },
+    /// List schedules.
+    #[command(alias = "ls")]
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show a schedule and its last runs.
+    Show {
+        schedule: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Change a schedule's timing, rule set or policy.
+    Edit {
+        schedule: String,
+        #[arg(long)]
+        name: Option<String>,
+        /// A new interval (1h, once); clears --cron.
+        #[arg(long)]
+        every: Option<String>,
+        #[arg(long)]
+        ruleset: Option<String>,
+        #[command(flatten)]
+        timing: TimingArgs,
+        #[command(flatten)]
+        policy: RunPolicyArgs,
+        /// Clear ends_at.
+        #[arg(long, conflicts_with_all = ["ends_at", "for_"])]
+        no_end: bool,
+    },
+    Enable { schedule: String },
+    Disable { schedule: String },
+    /// Remove a schedule and its runs.
+    #[command(alias = "rm")]
+    Remove { schedule: String },
+    /// Run it once now (outside its timing).
+    RunNow {
+        schedule: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// A schedule's runs, newest first.
+    Runs {
+        schedule: String,
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SchedulerCommand {
+    /// One pass: run what is due now (for cron or a timer).
+    Tick {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Keep running: a pass every --every seconds until stopped (Ctrl-C).
+    Run {
+        #[arg(long, default_value_t = 15)]
+        every: u64,
+    },
+    /// Who holds the lease, open runs, what is next.
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
 }

@@ -47,7 +47,9 @@ fn owner(
 /// The action a rule is checked against: the one given; for a scheduled rule, its
 /// `schedule` action; otherwise the newest.
 fn action_for(store: &Store, r: &Rule, id: Option<i64>) -> anyhow::Result<ActionRecord> {
-    if id.is_none() && r.spec.schedule.is_some() {
+    // a scheduled rule (legacy) or one that reacts to `schedule` (2.25 rule sets): dry-run
+    // against its schedule action unless --action is given
+    if id.is_none() && (r.spec.schedule.is_some() || r.spec.on.iter().any(|k| k == rules::SCHEDULE)) {
         return Ok(rules::schedule_action(r));
     }
     the_action(store, id)
@@ -87,8 +89,11 @@ fn print_check(store: &Store, r: &Rule, c: &rules::Check) {
 pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
     let store = ctx.open_store()?;
     match cmd {
-        RuleCommand::Create { name, spec, project, journal, search, model, related, disabled, description } => {
+        RuleCommand::Create { name, spec, project, journal, search, model, related, disabled, description, ruleset } => {
             let (on, when, then, schedule) = spec.parts(&store)?;
+            let set = ruleset.map(|k| store.find_ruleset(&k)).transpose()?;
+            // 2.25: scheduled rules are rule sets run by schedules; a rule only in a set reacts to them
+            let on = on.or_else(|| (schedule.is_some() || set.is_some()).then(|| vec![rules::SCHEDULE.to_string()]));
             let (kind, id) = owner(&store, &journal, &search, &model)?.unwrap_or((OwnerKind::Standalone, None));
             let project = project.map(|p| store.find_project(&p)).transpose()?;
             let spec = RuleSpec {
@@ -96,11 +101,24 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
                 when: when.unwrap_or_default(),
                 then: then.unwrap_or_default(),
                 related,
-                schedule,
                 ..Default::default()
             };
             let r = store.create_rule(&NewRule { name, description, owner_kind: kind, owner_id: id, spec, enabled: !disabled })?;
             record(&store, "rule.create", format!("create rule {}", r.name), params(&r));
+            if let Some(s) = &set {
+                store.add_ruleset_rule(&s.id, &r.id, None)?;
+                record(&store, "ruleset.add", format!("add rule {} to rule set {}", r.name, s.name), json!({ "ruleset": s.id, "rule": r.id }));
+            }
+            if let Some(sc) = &schedule {
+                let (set, sch) = crate::schedule::schedule_rule(&store, &r, sc, &format!("{} (scheduled)", r.name))?;
+                record(&store, "schedule.add", format!("add schedule {} for rule set {}", sch.name, set.name), json!({ "schedule": sch.id, "ruleset": set.id }));
+                ctx.io.warn(format!(
+                    "--every/--cron on a rule are deprecated: made rule set `{}` and schedule `{}` ({}); next time use `mnnn schedule add`",
+                    set.name,
+                    sch.name,
+                    crate::schedule::describe(&sch).join(", ")
+                ));
+            }
             if let Some(p) = project {
                 let (it, _) = store.add_project_item(&p.id, ItemKind::RuleSet, &r.id, json!({}))?;
                 record(
@@ -294,15 +312,9 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
             }
         }
         RuleCommand::Tick { json } => {
-            store.set_host_running(crate::org::host::running(&ctx.paths.home).is_some());
-            let ran = rules::tick(&store, crate::store::now_ms())?;
-            if json {
-                println!("{}", serde_json::to_string_pretty(&json!({ "ran": ran }))?);
-            } else if ran.is_empty() {
-                ctx.io.info("no scheduled rules are due");
-            } else {
-                ctx.io.info(format!("ran {}", ran.join(", ")));
-            }
+            ctx.io.warn("`mnnn rule tick` is deprecated: use `mnnn scheduler tick`");
+            drop(store);
+            super::schedules::scheduler(ctx, super::SchedulerCommand::Tick { json })?;
         }
         RuleCommand::Events { kind, json } => {
             let ev: Vec<_> = rules::EVENTS

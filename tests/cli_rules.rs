@@ -145,30 +145,74 @@ fn rules_live_in_projects_journals_and_searches() {
 }
 
 #[test]
-fn scheduled_rules_are_shown_dry_run_edited_and_ticked() {
+fn scheduled_rules_become_rule_sets_with_schedules() {
     let e = Env::new();
     e.ok(&["journal", "new", "Log"]);
-    // a schedule needs no --on; bad ones are refused
+    // bad schedules are refused; no --on and no schedule is refused
     assert!(!e.run(&["rule", "create", "Bad", "--every", "5s", "--then", "status x"]).status.success());
     assert!(!e.run(&["rule", "create", "Bad", "--cron", "0 3 * *", "--then", "status x"]).status.success());
     assert!(!e.run(&["rule", "create", "Bad", "--then", "status x"]).status.success());
+    // 2.25: --every / --cron make a rule set and a schedule (deprecated)
+    let o = e.run(&["rule", "create", "Hourly", "--every", "1h", "--then", "note Log \"hourly {kind}\""]);
+    assert!(o.status.success() && String::from_utf8_lossy(&o.stderr).contains("deprecated"), "{o:?}");
     e.ok(&["rule", "create", "Nightly", "--cron", "0 3 * * *", "--then", "note Log \"nightly {kind}\""]);
-    e.ok(&["rule", "create", "Hourly", "--every", "1h", "--then", "note Log \"hourly {kind}\""]);
-    let show = e.ok(&["rule", "show", "Hourly"]);
-    assert!(show.contains("every 1h (next"), "{show}");
-    assert!(e.ok(&["rule", "list"]).contains("cron \"0 3 * * *\" →"));
-    let dry = e.ok(&["rule", "dry-run", "Hourly"]);
-    assert!(dry.contains("✓ on schedule") && dry.contains("would add a note to Log: hourly schedule"), "{dry}");
-    // tick: the hourly one never ran, so it is due; the nightly one waits for 3:00
-    assert!(e.ok(&["rule", "tick", "--json"]).contains("Hourly"));
-    assert!(!e.ok(&["rule", "tick", "--json"]).contains("Hourly"), "not again within the hour");
-    let notes = e.ok(&["history", "list"]);
-    assert!(notes.contains("rule Hourly on #"), "{notes}");
-    // edit the schedule, then drop it (it then needs --on)
-    e.ok(&["rule", "edit", "Hourly", "--every", "6h"]);
-    assert!(e.ok(&["rule", "show", "Hourly"]).contains("every 6h"));
-    assert!(!e.run(&["rule", "edit", "Hourly", "--no-schedule"]).status.success());
-    e.ok(&["rule", "edit", "Hourly", "--no-schedule", "--on", "journal.create"]);
-    assert!(!e.ok(&["rule", "show", "Hourly"]).contains("every"));
+    assert!(e.ok(&["ruleset", "show", "Hourly (scheduled)"]).contains("1. Hourly"));
+    let list = e.ok(&["schedule", "list"]);
+    assert!(list.contains("Hourly") && list.contains("every 1 hour") && list.contains("cron 0 3 * * *"), "{list}");
+    // the scheduler runs the hourly one now (run_every alone: right away), not again
+    let t = e.ok(&["scheduler", "tick", "--json"]);
+    assert!(t.contains("\"succeeded\": [\n    1"), "{t}");
+    assert!(e.ok(&["scheduler", "tick", "--json"]).contains("\"started\": []"));
+    // rule tick is deprecated and does the same
+    let o = e.run(&["rule", "tick"]);
+    assert!(o.status.success() && String::from_utf8_lossy(&o.stderr).contains("scheduler tick"));
+    assert!(e.ok(&["history", "list"]).contains("rule Hourly on #"));
+    assert!(e.ok(&["schedule", "runs", "Hourly"]).contains("success"));
     assert!(e.ok(&["rule", "events"]).contains("schedule"));
+}
+
+#[test]
+fn rule_sets_and_schedules() {
+    let e = Env::new();
+    e.ok(&["journal", "new", "Log"]);
+    e.ok(&["ruleset", "create", "Daily"]);
+    // a rule only in a set reacts to `schedule`
+    e.ok(&["rule", "create", "Note", "--ruleset", "Daily", "--then", "note Log \"daily {kind}\""]);
+    e.ok(&["rule", "create", "Also", "--on", "import", "--then", "status hi"]);
+    e.ok(&["ruleset", "add", "Daily", "Also", "--position", "1"]);
+    assert!(e.ok(&["ruleset", "show", "Daily"]).contains("1. Also"));
+    e.ok(&["ruleset", "drop", "Daily", "Also"]);
+    e.ok(&["ruleset", "run", "Daily"]);
+    assert!(e.ok(&["rulesets", "list"]).contains("Daily  1 rule(s), 0 schedule(s)"));
+    // parse: what a timing means
+    let p = e.ok(&["schedule", "parse", "1h30m", "--start-at", "2099-01-01 09:00", "--tz", "UTC"]);
+    assert!(p.contains("every 1 hour 30 minutes") && p.contains("2099-01-01 09:00:00Z") && p.contains("then"), "{p}");
+    let m = e.ok(&["schedule", "parse", "1 month", "--start-at", "2099-01-31 09:00", "--tz", "UTC"]);
+    assert!(m.contains("2099-02-28 09:00:00Z") && m.contains("2099-03-31 09:00:00Z"), "{m}");
+    let o = e.run(&["schedule", "parse", "tomorrow"]);
+    assert!(String::from_utf8_lossy(&o.stderr).contains("--start-at"));
+    // a past start: refused without a terminal unless --past next-interval; a one-off can only be corrected
+    let o = e.run(&["schedule", "add", "late", "1 day", "--ruleset", "Daily", "--start-at", "2020-01-01 09:00", "--tz", "UTC"]);
+    assert!(!o.status.success() && String::from_utf8_lossy(&o.stderr).contains("--past next-interval"), "{o:?}");
+    let o = e.run(&["schedule", "add", "late", "once", "--ruleset", "Daily", "--start-at", "2020-01-01 09:00"]);
+    assert!(!o.status.success() && String::from_utf8_lossy(&o.stderr).contains("corrected"));
+    let s = e.ok(&["schedule", "add", "late", "1 day", "--ruleset", "Daily", "--start-at", "2020-01-01 09:00", "--tz", "UTC", "--past", "next-interval"]);
+    assert!(s.contains("09:00:00Z"), "{s}");
+    e.ok(&["schedule", "add", "weekdays", "--ruleset", "Daily", "--cron", "0 9 * * 1-5", "--tz", "Europe/Oslo", "--for", "2 weeks", "--catch-up", "none"]);
+    assert!(e.ok(&["schedule", "show", "weekdays"]).contains("cron `0 9 * * 1-5` in Europe/Oslo"));
+    assert!(!e.run(&["schedule", "add", "bad", "1h", "--ruleset", "Daily", "--tz", "Nowhere/Land"]).status.success());
+    e.ok(&["schedule", "add", "one", "once", "--ruleset", "Daily", "--start-at", "+1 hour"]);
+    // run now, runs, disable / enable, edit
+    assert!(e.ok(&["schedule", "run-now", "late"]).contains("success"));
+    assert!(e.ok(&["history", "list"]).contains("rule Note on #"));
+    e.ok(&["schedule", "disable", "late"]);
+    assert!(e.ok(&["schedule", "list"]).contains("late (off)"));
+    e.ok(&["schedule", "enable", "late"]);
+    let ed = e.ok(&["schedule", "edit", "late", "--every", "2 days", "--overlap", "queue"]);
+    assert!(ed.contains("every 2 days") && ed.contains("overlap queue"), "{ed}");
+    assert!(e.ok(&["scheduler", "status"]).contains("next:"));
+    // a rule set with schedules is not removed without --force
+    assert!(!e.run(&["-y", "ruleset", "remove", "Daily"]).status.success());
+    e.ok(&["-y", "ruleset", "remove", "Daily", "--force"]);
+    assert!(e.ok(&["schedule", "list"]).contains("no schedules") || e.ok(&["schedule", "list"]).is_empty());
 }

@@ -6,10 +6,14 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Changed
+- 2.25 database migration: each project's rules become a rule set owned by the project; scheduled rules become rule set `NAME (scheduled)` plus a schedule (node's zone, next run from the last). `rule create --every/--cron` make a rule set and schedule (deprecated); `mnnn rule tick` runs `mnnn scheduler tick` (deprecated); the cert expiry watcher is a rule, rule set and schedule. New dependency: `parse_datetime`
+
 ### Fixed
 - `cargo clippy --workspace --all-targets` is clean (tests/site.rs, muninn-ffi; no behavior change)
 
 ### Added
+- Rule sets and the scheduler (phase 3): `mnnn ruleset list|show|create|edit|remove|add|drop|run`, `rule create --ruleset`; `mnnn schedule add|parse|list|show|edit|enable|disable|remove|run-now|runs` with start_at / run_every / ends_at (or cron), GNU-style dates (`tomorrow 9am`), intervals as date items, short codes or ms, `once`, `--for`, `--tz` (UTC by default), calendar months clamped to the month, past-start handling (`--past next-interval`); `mnnn scheduler tick|run|status`: one lease holder, claims, heartbeats, retries with backoff, abandoned runs, catch-up, overlap, up to 4 runs a pass, missed one-offs skipped. TUI Rules ▸ Tab: Rule sets, Schedules ([docs/schedules.md](docs/schedules.md))
 - Plugins (phase 2): `mnnn plugins list|info|install|enable|disable|remove` over code spaces by kind; a Plug menu (Alt+L) with Parsers, Transforms, Analysis, Ingest connectors and All plugins; a prebuilt main's declared kind must match its space's ([docs/plugins.md](docs/plugins.md))
 - Plugin SDK 1.3 (`muninn-plugin`, now publishable to crates.io): typed ingest-connector host methods `context()`, `store_raw(name, format, bytes)`, `pipe()`, `run_ruleset(Option<id>)`, `fetch(&Request)`, `state_get`/`state_set`, and `plugin!(run, kind = "…")` declaring a kind in the plugin's info. Outside a connector run they say where they work (the v2.26 scheduler or a dry run)
 - `mnnn spaces run NAME --connector-dry-run` (`--source`, `--pipeline`, `--ruleset`, `--option`, `--state`): runs an ingest-connector space with an in-memory context that records store_raw, pipe and run_ruleset instead of doing them; `fetch` is real

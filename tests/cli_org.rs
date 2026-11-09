@@ -241,9 +241,12 @@ fn org_domains_and_your_own_certificate() {
     assert!(!e.run(&["org", "domain", "add", "comet-lab", "not a host"]).status.success());
     e.ok(&["org", "domain", "add", "comet-lab", "Lab.Example.org"]);
     assert!(e.ok(&["org", "domain", "list"]).contains("lab.example.org"));
-    // the built-in watcher came with it, and is an ordinary scheduled rule
+    // the built-in watcher came with it: a rule, a rule set and a schedule (2.25)
     let w = e.ok(&["rule", "show", "cert-expiry-watch"]);
-    assert!(w.contains("every 6h") && w.contains("cert-watch renew=30 notify=30,14,3"), "{w}");
+    assert!(w.contains("cert-watch renew=30 notify=30,14,3") && w.contains("on:       schedule"), "{w}");
+    let s = e.ok(&["schedule", "show", "cert-expiry-watch"]);
+    assert!(s.contains("every 6 hours") && s.contains("rule set cert-expiry-watch"), "{s}");
+    assert!(e.ok(&["ruleset", "show", "cert-expiry-watch"]).contains("1. cert-expiry-watch"));
     assert!(e.ok(&["rule", "dry-run", "cert-expiry-watch"]).contains("would check org certificates"));
     // with no certificate of yours: self-signed
     assert!(e.ok(&["org", "cert", "status", "comet-lab"]).contains("self-signed"));

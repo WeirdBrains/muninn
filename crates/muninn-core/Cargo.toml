@@ -35,6 +35,8 @@ rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl",
 uuid = { version = "1", features = ["v4"] }
 blake3 = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+# `date -d` style times for schedules (start_at, ends_at); approved by Michael (Q-T3)
+parse_datetime = "0.17"
 bip39 = "2"
 vsss-rs = { version = "5", features = ["std"] }
 argon2 = "0.5"

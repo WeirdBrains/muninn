@@ -11,7 +11,7 @@ changelog are archived in [`docs/historical/2.0/`](docs/historical/2.0/), and 1.
 | ----- | ----------- | ------- | ------ |
 | 1 | [Code Spaces as Collections of Code](#code-spaces-as-collections-of-code): today's code spaces become **code** (single units). A new **code space** is a collection of code with a required **main**, which can import and call other code. Pipelines run spaces (`space:NAME`), and an offered `mnnn code migrate` turns each code into a space | v2.23.0 | 📝 Planned (reworked Nov 8, 9:43 AM) |
 | 2 | [Plugins](#plugins): a required `kind` on every **code**, `mnnn plugins` with kind migration, a Plugins menu per kind; and the [Code spaces + Code menus and CLI](#code-spaces-menu-and-cli) | v2.24.0 | ✅ Done (Nov 8, on main; no tag) |
-| 3 | [Rule Sets + Scheduler](#rule-sets--scheduler): a first-class `rulesets` table, the system scheduler with `schedules` and `schedule_runs`, scheduled rules moved onto it, `rule tick` deprecated | v2.25.0 | 📝 Planned |
+| 3 | [Rule Sets + Scheduler](#rule-sets--scheduler): a first-class `rulesets` table, the system scheduler with `schedules` and `schedule_runs`, scheduled rules moved onto it, `rule tick` deprecated | v2.25.0 | ✅ Done (unreleased) |
 | 4 | [Ingest Connector Plugins](#ingest-connector-plugins): code spaces whose main is of kind `ingest-connector`, managed under Plugins ▸ Ingest connectors, run on a schedule; they store raw data, call a pipeline and a rule set | v2.26.0 | 📝 Planned |
 | 5 | [Shares: Create Then Share](#shares-create-then-share): wherever a share can be added, the thing can be created there too (code and code spaces both) | v2.27.0 | 📝 Planned |
 
@@ -342,7 +342,10 @@ mnnn plugins enable|disable NAME                 # disabled plugins don't run (p
 
 ## Rule Sets + Scheduler
 
-> **Phase 3 · v2.25.0 · 📝 Planned (Michael answered Q1, Q2 and Q5)**
+> **Phase 3 · v2.25.0 · ✅ Done on main (unreleased) (Michael answered Q1, Q2 and Q5)**
+>
+> **Built:** tables `rulesets`, `ruleset_rules`, `schedules`, `schedule_runs`, `scheduler_lease` with the 2.25 move; `crate::schedule` (parsers, stepping, scheduler); CLI `ruleset`, `schedule`, `scheduler`; TUI Rules ▸ Tab (Rule sets, Schedules); ffi `schedules` (list, runs, run-now, enable, tick); docs/schedules.md.
+> **Choices where the plan was silent:** a slot is *on time* within 60 s of its due time (otherwise a one-off with ends_at = start + 1 ms could never run): "ended while missed" means ends_at passed and no slot was seen within that minute. `catch_up all` queues every missed slot (max 100); `overlap` looks at runs open before the pass. Runs execute in-process, one after another, up to 4 a pass. Retries: 30 s doubling, max 1 h, never at/after ends_at; `schedule_runs.not_before` holds the wait. Fixed-ms parts are exact (a day is 24 h across DST); months and cron use wall time in the zone; cron in a zone uses the zone's offset, rechecked after a DST change. `rule edit --every/--cron` still set the legacy per-rule schedule (kept and still run by the scheduler) instead of making a schedule. A rule created only into a set (`--ruleset`, no `--on`) reacts to `schedule`. Migrated schedules use the node's IANA zone. Schedule names default to the rule name (suffix 2, 3 … on a clash). Removing a rule set used by schedules needs `--force` (removes them). Connector targets arrive in phase 4.
 
 **Reworked for phase 1:** unchanged, except that a schedule's plugin target is a **code space** (`space_id`), and Muninn triggers its main.
 

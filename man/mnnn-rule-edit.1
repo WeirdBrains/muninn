@@ -60,7 +60,7 @@ May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable.
 A then\-action, e.g. "status Imported {inserted} bars" (repeat: run in order)
 .TP
 \fB\-\-every\fR \fI<INTERVAL>\fR
-Run it on a schedule: every 30m, 6h, 1d, 1w (the node runs it; see `mnnn rule tick`)
+Deprecated (2.25): on create, makes rule set `NAME (scheduled)` and a schedule running it every 30m, 6h, 1d, 1w (see `mnnn schedule add`)
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -69,7 +69,7 @@ May also be specified with the \fBMUNINN_QUIET\fR environment variable.
 .RE
 .TP
 \fB\-\-cron\fR \fI<CRON>\fR
-Run it at cron times, local time: "0 3 * * *" (minute hour day month weekday)
+Deprecated (2.25): like \-\-every, at cron times in this node\*(Aqs zone: "0 3 * * *"
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation

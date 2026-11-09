@@ -23,6 +23,7 @@ pub mod reports;
 pub mod reviews;
 pub mod rules;
 pub mod runs;
+pub mod schedules;
 pub mod searches;
 pub mod source_data;
 pub mod spaces;
@@ -52,6 +53,7 @@ pub use reviews::{
 };
 pub use rules::{Condition, ItemRef, NewRule, Op, OwnerKind, Rule, RuleChange, RuleSpec, Schedule, Then};
 pub use runs::{Artifact, ImportRun};
+pub use schedules::{Ruleset, ScheduleDef, ScheduleRun};
 pub use searches::{LiveSearch, SearchSpec, SearchTarget};
 pub use source_data::{NewSourceData, SourceData};
 pub use spaces::{Space, SpaceKind, SpaceMember};
@@ -178,6 +180,8 @@ INSERT INTO series_stats SELECT source_id, base, quote, duration_s, COUNT(*), MI
     source_data::MIGRATION,
     // 2.23: code spaces become `code`; spaces are collections of code
     spaces::MIGRATION,
+    // 2.25: rule sets and schedules
+    schedules::MIGRATION,
 ];
 
 /// A new random id (32 hex characters).
@@ -354,6 +358,9 @@ impl Store {
                 tx.execute_batch(m)?;
                 if std::ptr::eq(*m, models::MIGRATION_2_16) {
                     models::upgrade_bars_2_16(&tx)?;
+                }
+                if std::ptr::eq(*m, schedules::MIGRATION) {
+                    schedules::upgrade_2_25(&tx)?;
                 }
                 tx.execute("INSERT INTO schema_version(version) VALUES (?1)", [target])?;
                 if target == 1 {
@@ -866,7 +873,7 @@ mod tests {
 
     #[test]
     fn a_2_2_database_migrates_and_gains_rules() {
-        let upto = MIGRATIONS.len() - 14;
+        let upto = MIGRATIONS.len() - 15;
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join("v22.database");
         let key = [3u8; 32];
@@ -903,7 +910,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 14).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 15).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
             old_bars(&s, &src, &Symbol::new("BTC", "USDT"), Duration(300), &[bar(0)]);
             let spec = RuleSpec { on: vec!["*".into()], then: vec![Then::Status { text: "x".into() }], ..Default::default() };
@@ -932,7 +939,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 13).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 14).unwrap();
             s.create_model("trades", "", Design { fields: vec![Field::new("note", FieldType::Text)], ..Default::default() }, true).unwrap();
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -955,7 +962,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 12).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 13).unwrap();
             old_code(&s);
         }
         let s = Store::open(&db, Some(&key)).unwrap();
@@ -981,7 +988,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 12).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 13).unwrap();
             s.set_node_identity(b"kp", "12D3KooWx").unwrap();
             s.create_project("p", "").unwrap();
         }
@@ -1014,7 +1021,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 11).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 12).unwrap();
             old_org(&s, "o-lab");
             let j = s.create_journal("Lab book", None, EntryFormat::Markdown).unwrap();
             s.add_entry(&j.id, "Day 1", "teh result", None).unwrap();
@@ -1042,7 +1049,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 9).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 10).unwrap();
             let src = s.add_source("binance", "file", None).unwrap();
             let sym = Symbol::new("BTC", "USDT");
             old_bars(&s, &src, &sym, Duration(300), &[bar(0), bar(300_000), bar(600_000)]);
@@ -1124,7 +1131,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 11).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 12).unwrap();
             old_org(&s, "o-lab");
             let c = old_code(&s);
             s.save_endpoint("o-lab", "calc", EndpointKind::Code, &c.id, "call", false).unwrap();
@@ -1144,7 +1151,7 @@ mod tests {
             let conn = Connection::open(&db).unwrap();
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
-            s.migrate_to(MIGRATIONS.len() - 10).unwrap();
+            s.migrate_to(MIGRATIONS.len() - 11).unwrap();
             s.conn
                 .execute(
                     "INSERT INTO reviewing(review_id, title, node_peer, status, created_at, updated_at) VALUES ('r1', 'Notes', '12D3', 'joined', 1, 1)",
@@ -1157,5 +1164,41 @@ mod tests {
         let g = s.find_reviewing("r1").unwrap();
         assert!(g.copy.is_null() && g.copied_at == 0 && g.title == "Notes");
         assert!(s.review_work("r1").unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_2_24_database_moves_rules_into_sets_and_schedules() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("v224.database");
+        let key = [9u8; 32];
+        {
+            let conn = Connection::open(&db).unwrap();
+            Store::apply_key(&conn, Some(&key)).unwrap();
+            let mut s = Store::wrap(conn);
+            s.migrate_to(MIGRATIONS.len() - 1).unwrap();
+            let spec = |sched: &str| format!(r#"{{"version":1,"on":["import"],"if":[],"then":[{{"do":"status","text":"hi"}}],"related":false{sched}}}"#);
+            for (id, name, sp, last) in [("r1", "hourly", spec(r#","schedule":{"every":3600000}"#), Some(1_000i64)), ("r2", "plain", spec(""), None)] {
+                s.conn
+                    .execute(
+                        "INSERT INTO rules(id, name, description, owner_kind, enabled, spec, created_at, updated_at, last_run_at) VALUES (?1, ?2, '', 'standalone', 1, ?3, 1, 1, ?4)",
+                        params![id, name, sp, last],
+                    )
+                    .unwrap();
+            }
+            let p = s.create_project("Desk", "").unwrap();
+            s.add_project_item(&p.id, ItemKind::RuleSet, "r2", serde_json::json!({})).unwrap();
+        }
+        let s = Store::open(&db, Some(&key)).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        let sets = s.rulesets().unwrap();
+        let desk = sets.iter().find(|x| x.owner_kind == "project").unwrap();
+        assert_eq!(s.ruleset_rules(&desk.id).unwrap()[0].id, "r2");
+        let hourly = sets.iter().find(|x| x.name == "hourly (scheduled)").unwrap();
+        let sch = s.schedules().unwrap();
+        assert_eq!(sch.len(), 1);
+        assert_eq!((sch[0].ruleset_id.as_deref(), sch[0].every_ms, sch[0].next_run_at), (Some(hourly.id.as_str()), Some(3_600_000), 3_601_000));
+        assert_eq!(sch[0].run_every.as_deref(), Some("1 hour"));
+        assert!(s.find_rule("hourly").unwrap().spec.schedule.is_none());
+        assert!(s.setting(schedules::MIGRATED_NOTE).unwrap().is_some());
     }
 }

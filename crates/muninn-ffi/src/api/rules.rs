@@ -267,7 +267,7 @@ pub fn rule_show(rule: String) -> anyhow::Result<Vec<String>> {
 }
 
 fn action_for(store: &Store, r: &Rule, id: Option<i64>) -> anyhow::Result<muninn_core::store::ActionRecord> {
-    if id.is_none() && r.spec.schedule.is_some() {
+    if id.is_none() && (r.spec.schedule.is_some() || r.spec.on.iter().any(|k| k == rules::SCHEDULE)) {
         return Ok(rules::schedule_action(r));
     }
     match id {
@@ -330,8 +330,8 @@ pub fn rule_tick() -> anyhow::Result<String> {
     if let Ok(p) = super::info::paths(None) {
         store.set_host_running(muninn_core::org::host::running(&p.home).is_some());
     }
-    let ran = rules::tick(&store, muninn_core::store::now_ms())?;
-    if ran.is_empty() { Ok("no scheduled rules are due".into()) } else { Ok(format!("ran {}", ran.join(", "))) }
+    let rep = muninn_core::schedule::tick(&store, &muninn_core::schedule::holder("app"), muninn_core::store::now_ms())?;
+    Ok(super::schedules::tick_text(&rep))
 }
 
 /// `mnnn rule events`.

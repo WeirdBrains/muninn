@@ -1298,12 +1298,12 @@ async fn renew_loop(state: Arc<State>, mut stop: watch::Receiver<bool>) {
         if let Err(e) = state.load_orgs() {
             tracing::warn!("could not reload org certificates: {e}");
         }
-        // the host runs the node's scheduled rules (the cert expiry watcher among them)
+        // the host runs the node's schedules (the cert expiry watcher among them)
         if let Err(e) = with_store(&state.store, |s| {
             s.set_host_running(true);
-            crate::rules::tick(s, now_ms())
+            crate::schedule::tick(s, &crate::schedule::holder("host"), now_ms())
         }) {
-            tracing::warn!("scheduled rules: {e}");
+            tracing::warn!("scheduler: {e}");
         }
         tokio::select! {
             _ = stop.changed() => return,

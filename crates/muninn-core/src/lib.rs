@@ -25,6 +25,7 @@ pub mod org;
 pub mod render;
 pub mod review;
 pub mod rules;
+pub mod schedule;
 pub mod share;
 pub mod store;
 pub mod theme;

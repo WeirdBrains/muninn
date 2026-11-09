@@ -29,6 +29,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 - [Journals](journals.md): Markdown or LaTeX entries with images, notes and highlights
 - [Reports](reports.md): sections built from records, journals, projects and authors
 - [Rules](rules.md): when an action happens, run searches, export, write entries or notes, feed models
+- [Schedules](schedules.md): rule sets on time (start_at, run_every, ends_at, cron), the scheduler
 - [Models](models.md): design record tables, migrate them with previews and roll back; records
 - [Model design templates](model-templates.md): export, import and share model designs; built-in templates
 - [Code spaces](code-spaces.md): math, Polars, Rust or Python compiled to native plugins over your data

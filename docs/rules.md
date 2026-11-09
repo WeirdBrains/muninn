@@ -101,7 +101,7 @@ A stopped run is recorded as a `rule.run` with status `blocked`.
 
 ```
 mnnn rule list [--json]
-mnnn rule create NAME (--on KIND | --every 6h | --cron "0 3 * * *") [--if COND]... --then ACTION... [--description TEXT]
+mnnn rule create NAME (--on KIND | --ruleset SET | --every 6h | --cron "0 3 * * *") [--if COND]... --then ACTION... [--description TEXT]
                 [--journal J | --search S | --model M] [--project P] [--related] [--disabled]
 mnnn rule edit RULE [--name N] [--on ...] [--if ...] [--clear-if] [--then ...]
                 [--journal J | --search S | --model M | --standalone] [--related | --unrelated]
@@ -112,7 +112,7 @@ mnnn rule remove RULE                        # asks first; -y skips
 mnnn rule test [RULE] [--action ID]          # would it match? each condition shown
 mnnn rule dry-run [RULE] [--action ID]       # ... and what it would do
 mnnn rule events                             # kinds and their fields
-mnnn rule tick [--json]                      # run the scheduled rules that are due
+mnnn rule tick [--json]                      # deprecated: mnnn scheduler tick
 ```
 
 `RULE` is an id, a unique id prefix or a name; `mnnn rules` is an alias. `test` and
@@ -120,33 +120,33 @@ mnnn rule tick [--json]                      # run the scheduled rules that are 
 (skipping rule runs) unless `--action` says otherwise. They never change anything.
 `--quiet` hides rule messages.
 
-## Scheduled rule sets
+## Rule sets and schedules (2.25)
 
-A rule can run on a schedule instead of (or as well as) on actions:
+Rules run on time through **rule sets** and **schedules** ([schedules.md](schedules.md)):
 
-- `--every 30m`, `6h`, `1d`, `1w` (at least a minute): an interval after its last run; a
-  new one runs at once.
-- `--cron "0 3 * * *"`: five fields, minute hour day month weekday, in local time, with
-  `*`, lists (`0,30`), ranges (`9-17`) and steps (`*/15`); Sunday is 0 or 7.
+```
+mnnn ruleset create Morning --rule Report --rule Cleanup
+mnnn rule create Digest --ruleset Morning --then "note Log \"digest {date}\""   # no --on: reacts to `schedule`
+mnnn schedule add morning "1 day" --ruleset Morning --start-at "tomorrow 07:00" --tz local
+```
 
-When a scheduled rule is due, a `schedule` action naming it is recorded and the rule runs
-on it like on any action (its `--if` conditions see `rule`, `name` and `schedule`). Only
-that rule reacts to its schedule action, so a `--on "*"` rule does not fire every tick.
-`show` gives the schedule and the next run; `test` and `dry-run` check a scheduled rule
-against its schedule action unless `--action` is given; `edit --every`/`--cron` changes
-the schedule and `--no-schedule` drops it (the rule then needs `--on`).
+A schedule's run records a `schedule` action (`schedule`, `name`, `run`, `ruleset`) and
+runs the set's enabled rules in order on it. Only the set's rules run: a `--on schedule`
+rule outside the set does not fire.
 
-Who runs them: the TUI (about once a minute) and a running org host
-(`mnnn org host start`, or the TUI's site) check for due rules; when a host serves from
-this node, it does and the TUI leaves it to it. With neither running, call
-`mnnn rule tick` from cron or a systemd timer. A run missed while nothing was running
-happens once when something next checks.
+`rule create --every`/`--cron` still work but are deprecated: they make rule set
+`NAME (scheduled)` and a schedule `NAME` (this node's zone) and say so. 2.25 moved older
+scheduled rules the same way on first open, and each project's rules into a rule set
+owned by the project. `rule edit --every`/`--cron` still set the old per-rule schedule,
+which the scheduler keeps running; move it with `mnnn schedule add`. `mnnn rule tick` is
+`mnnn scheduler tick` with a warning.
 
 ### The cert expiry watcher
 
-`cert-expiry-watch` is a built-in scheduled rule set, made the first time an org gets a
-domain, a certificate of yours or ACME. It is an ordinary rule: show, edit, copy,
-switch off or remove it (removed, it is not made again). It runs every 6 hours and does
+`cert-expiry-watch` is a built-in rule, rule set and schedule (all named so), made the
+first time an org gets a domain, a certificate of yours or ACME. They are ordinary: show,
+edit, copy, switch off or remove them (removed, they are not made again). The schedule
+runs the set every 6 hours and the rule does
 `cert-watch renew=30 notify=30,14,3`:
 
 - **Let's Encrypt certificates** with fewer than `renew` days left (or none yet) are
@@ -175,6 +175,7 @@ that rule.
 | `e` | edit the selected rule (the same steps, filled in) |
 | Space | switch on / off |
 | `t` / `x` | test / dry run against the newest action (a scheduled rule: its schedule) |
+| `Tab` | Rule sets, then Schedules (`Enter` show, `Space` on/off, `r` run now), then back |
 | `p` | add to a project |
 | `d` | delete (`y` confirms) |
 | Esc | close the details, then the window |

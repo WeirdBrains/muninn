@@ -1,0 +1,156 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mnnn-schedule-add 1  "mnnn-schedule-add 2.22.3" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+mnnn\-schedule\-add \- Add a schedule running a rule set
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBmnnn schedule add\fR [\fB\-\-home\fR] <\fB\-\-ruleset\fR> [\fB\-\-db\fR] [\fB\-\-start\-at\fR] [\fB\-\-ends\-at\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-for\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-cron\fR] [\fB\-\-log\-file\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-tz\fR] [\fB\-\-past\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-overlap\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-catch\-up\fR] [\fB\-\-transport\fR] [\fB\-\-max\-attempts\fR] [\fB\-\-disabled\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> [\fIRUN_EVERY\fR] 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Add a schedule running a rule set
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-home\fR \fI<DIR>\fR
+Muninn home directory (default ~/.muninn)
+.RS
+May also be specified with the \fBMUNINN_HOME\fR environment variable. 
+.RE
+.TP
+\fB\-\-ruleset\fR \fI<RULESET>\fR
+The rule set to run
+.TP
+\fB\-\-db\fR \fI<PATH>\fR
+Database file (default <home>/storage/muninn.database)
+.RS
+May also be specified with the \fBMUNINN_DB\fR environment variable. 
+.RE
+.TP
+\fB\-\-start\-at\fR \fI<DATE>\fR
+Start: GNU date style ("tomorrow 9am", "2026\-12\-01 08:00")
+.TP
+\fB\-\-ends\-at\fR \fI<DATE>\fR
+End: no run starts at or after it
+.TP
+\fB\-\-non\-interactive\fR
+Never prompt; missing values are errors
+.RS
+May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable. 
+.RE
+.TP
+\fB\-\-for\fR \fI<INTERVAL>\fR
+End this long after the start (2 weeks, 30d)
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+More output (repeatable)
+.TP
+\fB\-\-cron\fR \fI<CRON>\fR
+Cron times instead of run_every: "0 9 * * 1\-5"
+.TP
+\fB\-\-log\-file\fR \fI<PATH>\fR
+Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
+.RS
+May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
+.RE
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Print nothing but errors and requested data
+.RS
+May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
+.RE
+.TP
+\fB\-\-tz\fR \fI<TZ>\fR
+Zone for dates, months and cron (default UTC; `local` for this node\*(Aqs)
+.TP
+\fB\-\-past\fR \fI<WHAT>\fR
+A past \-\-start\-at: `next\-interval` moves it to the next slot (without asking)
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+next\-interval
+.RE
+.TP
+\fB\-y\fR, \fB\-\-yes\fR
+Answer yes to every confirmation
+.RS
+May also be specified with the \fBMUNINN_YES\fR environment variable. 
+.RE
+.TP
+\fB\-\-overlap\fR \fI<OVERLAP>\fR
+A run still going when the next is due: skip it or queue one
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+skip
+.IP \(bu 2
+queue
+.RE
+.TP
+\fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
+Override the theme mode for this run
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+light
+.IP \(bu 2
+dark
+.IP \(bu 2
+system
+.RE
+.RS
+May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
+.RE
+.TP
+\fB\-\-catch\-up\fR \fI<CATCH_UP>\fR
+Missed runs (the scheduler was off): once, all (up to 100) or none
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+once
+.IP \(bu 2
+all
+.IP \(bu 2
+none
+.RE
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-\-max\-attempts\fR \fI<MAX_ATTEMPTS>\fR
+Tries per run (failures retry after 30 s, 1 min, 2 min, …)
+.TP
+\fB\-\-disabled\fR
+Add it switched off
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fINAME\fR>
+
+.TP
+[\fIRUN_EVERY\fR]
+The interval (1h, "2 days", "1 month", once); not with \-\-cron
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v2.22.3
+.SH SEE ALSO
+\fBmnnn\fR(1)

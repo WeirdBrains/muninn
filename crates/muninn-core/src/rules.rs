@@ -1125,8 +1125,19 @@ pub fn check(store: &Store, r: &Rule, a: &ActionRecord) -> Check {
     let on = if a.kind.starts_with("rule.") {
         None
     } else if a.kind == SCHEDULE {
-        // a schedule action is only for the rule it names
-        (r.spec.schedule.is_some() && a.params["rule"].as_str() == Some(r.id.as_str())).then(|| SCHEDULE.to_string())
+        // a schedule action naming a rule (legacy tick / dry-run): that rule only; a
+        // ruleset schedule (no `rule` param) matches via --on like any other kind
+        match a.params["rule"].as_str() {
+            Some(id) if id == r.id.as_str() => {
+                if r.spec.schedule.is_some() || r.spec.on.iter().any(|p| pattern_matches(p, SCHEDULE)) {
+                    Some(SCHEDULE.to_string())
+                } else {
+                    None
+                }
+            }
+            Some(_) => None,
+            None => r.spec.on.iter().find(|p| pattern_matches(p, SCHEDULE)).cloned(),
+        }
     } else {
         r.spec.on.iter().find(|p| pattern_matches(p, &a.kind)).cloned()
     };
@@ -1900,8 +1911,13 @@ pub fn parse_cron(s: &str) -> Result<Cron> {
 impl Cron {
     /// The first matching minute after `after` (epoch ms), within about four years.
     pub fn next_after(&self, after: i64) -> Option<i64> {
-        use chrono::{Datelike, Duration, Local, TimeZone, Timelike};
-        let start = Local.timestamp_millis_opt(after).earliest()?;
+        self.next_after_in(after, &chrono::Local)
+    }
+
+    /// [`Cron::next_after`] evaluated in zone `z` (UTC, a fixed offset, or local).
+    pub fn next_after_in<Z: chrono::TimeZone>(&self, after: i64, z: &Z) -> Option<i64> {
+        use chrono::{Datelike, Duration, Timelike};
+        let start = z.timestamp_millis_opt(after).earliest()?;
         let mut t = start.with_second(0)?.with_nanosecond(0)? + Duration::minutes(1);
         let end = start + Duration::days(366 * 4);
         while t < end {
@@ -2032,16 +2048,16 @@ pub fn tick(store: &Store, now: i64) -> Result<Vec<String>> {
     Ok(out)
 }
 
-/// The built-in cert expiry watcher's spec: every 6 hours, `cert-watch renew=30 notify=30,14,3`.
+/// The built-in cert expiry watcher's spec (its rule set's schedule runs it every 6 hours): `cert-watch renew=30 notify=30,14,3`.
 pub fn cert_watch_spec() -> crate::store::RuleSpec {
     crate::store::RuleSpec {
-        schedule: Some(crate::store::Schedule::Every(6 * 3_600_000)),
+        on: vec![SCHEDULE.into()],
         then: vec![Then::CertWatch { renew_days: 30, notify_days: vec![30, 14, 3] }],
         ..Default::default()
     }
 }
 
-/// Create the built-in `cert-expiry-watch` rule set once (when an org first gets a
+/// Create the built-in `cert-expiry-watch` rule, rule set and schedule once (when an org first gets a
 /// domain, a certificate or ACME). Removed or changed afterwards, it is left alone.
 pub fn ensure_cert_watch(store: &Store) -> Result<Option<Rule>> {
     if store.setting(CERT_WATCH_MADE)?.is_some() {
@@ -2059,6 +2075,8 @@ pub fn ensure_cert_watch(store: &Store) -> Result<Option<Rule>> {
         ..Default::default()
     })?;
     record(store, "rule.create", format!("create built-in rule {}", r.name), json!({ "rule": r.id, "name": r.name, "builtin": true }));
+    let (set, sch) = crate::schedule::schedule_rule(store, &r, &crate::store::Schedule::Every(6 * 3_600_000), CERT_WATCH)?;
+    record(store, "schedule.add", format!("add built-in schedule {} for rule set {}", sch.name, set.name), json!({ "schedule": sch.id, "ruleset": set.id, "builtin": true }));
     Ok(Some(r))
 }
 

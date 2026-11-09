@@ -136,3 +136,37 @@ fn the_rule_editor_takes_run_space() {
     assert_eq!(all[0].spec.then[0], crate::store::Then::RunSpace { space: sp.id, input: None });
     assert!(screen_text(&mut a).contains("run-space pair"));
 }
+
+#[test]
+fn rules_window_tabs_to_rule_sets_and_schedules() {
+    let (_t, mut a) = app();
+    let r = a
+        .store
+        .create_rule(&crate::store::NewRule {
+            name: "Say".into(),
+            spec: crate::store::RuleSpec { on: vec!["schedule".into()], then: vec![crate::store::Then::Status { text: "hi".into() }], ..Default::default() },
+            enabled: true,
+            ..Default::default()
+        })
+        .unwrap();
+    let set = a.store.create_ruleset("Morning", "", "standalone", None).unwrap();
+    a.store.add_ruleset_rule(&set.id, &r.id, None).unwrap();
+    let mut s = crate::store::ScheduleDef { name: "hourly".into(), target_kind: "ruleset".into(), ruleset_id: Some(set.id.clone()), overlap: "skip".into(), catch_up: "once".into(), max_attempts: 3, enabled: true, ..Default::default() };
+    crate::schedule::apply_timing(&mut s, &crate::schedule::Timing { run_every: Some("1h".into()), start_at: Some("+1 day".into()), ..Default::default() }, crate::store::now_ms()).unwrap();
+    a.store.save_schedule(&s).unwrap();
+    a.on_key(key(KeyCode::Char('R')));
+    a.on_key(key(KeyCode::Tab));
+    let text = screen_text(&mut a);
+    assert!(text.contains("Rule sets") && text.contains("Morning") && text.contains("1 rule(s)"), "{text}");
+    a.on_key(key(KeyCode::Char('r')));
+    assert!(a.rules.msg.as_ref().unwrap().0.contains("ran 1 rule(s)"), "{:?}", a.rules.msg);
+    a.on_key(key(KeyCode::Tab));
+    let text = screen_text(&mut a);
+    assert!(text.contains("Schedules") && text.contains("hourly") && text.contains("1 hour"), "{text}");
+    a.on_key(key(KeyCode::Char(' ')));
+    assert!(!a.store.find_schedule("hourly").unwrap().enabled);
+    a.on_key(key(KeyCode::Char('r')));
+    assert!(a.rules.msg.as_ref().unwrap().0.contains("success"), "{:?}", a.rules.msg);
+    a.on_key(key(KeyCode::Tab));
+    assert!(screen_text(&mut a).contains("Rules · when"));
+}

@@ -22,6 +22,7 @@ mod projects;
 mod reports;
 mod review;
 mod rules;
+mod schedules;
 mod searches;
 mod spaces;
 mod sync;
@@ -187,6 +188,9 @@ pub fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Journal(c) => journals::run(&ctx, c),
         Command::Report(c) => reports::run(&ctx, c),
         Command::Rule(c) => rules::run(&ctx, c),
+        Command::Ruleset(c) => schedules::ruleset(&ctx, c),
+        Command::Schedule(c) => schedules::schedule(&ctx, c),
+        Command::Scheduler(c) => schedules::scheduler(&ctx, c),
         Command::Model(c) => models::run(&ctx, c),
         Command::Code(c) => code::run(&ctx, c),
         Command::Spaces(c) => spaces::run(&ctx, c),

@@ -22,6 +22,7 @@ pub mod projects;
 pub mod reports;
 pub mod reviews;
 pub mod rules;
+pub mod schedules;
 pub mod searches;
 pub mod themes;
 
