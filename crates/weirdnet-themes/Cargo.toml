@@ -1,18 +1,19 @@
 [package]
 name = "weirdnet-themes"
-# Independent SemVer: not tied to the Muninn app's workspace version.
+# Its own SemVer, independent of the workspace version.
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.99"
 description = "Weirdnet themes: a TOML theme format with dark and light variants, 21 semantic colour roles, built-in palettes, contrast checks and optional ratatui colours."
 authors = ["Michael Christenson II <m3talsmith@gmail.com>"]
 license = "BSD-3-Clause"
+# Source lives in this monorepo until it gets a home of its own.
 repository = "https://github.com/WeirdBrains/muninn"
 readme = "README.md"
 keywords = ["theme", "colors", "toml", "terminal", "ratatui"]
 categories = ["gui", "command-line-interface"]
 include = ["src/**", "themes/*.toml", "README.md", "LICENSE"]
-# Not published: staged in the Muninn workspace until a publication decision.
+# Not published yet: staged in this workspace until a publication decision.
 publish = false
 
 [features]
