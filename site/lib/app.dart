@@ -57,9 +57,7 @@ class App extends StatelessComponent {
         h1(classes: 'sr-only', [Component.text('Muninn')]),
         div(classes: 'hero-shot', [pair(pairs.first, lazy: false)]),
         p(classes: 'tagline', [
-          Component.text(
-            'data goes in, your magic transforms it',
-          ),
+          Component.text('data goes in, your magic transforms it'),
         ]),
         nav(classes: 'links', [
           a(href: releases, classes: 'button primary', [

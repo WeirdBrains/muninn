@@ -11,8 +11,7 @@ void main() {
       title: 'Muninn',
       lang: 'en',
       meta: {
-        'description':
-            'Muninn: data goes in, your magic transforms it.',
+        'description': 'Muninn: data goes in, your magic transforms it.',
         'color-scheme': 'dark light',
       },
       head: [

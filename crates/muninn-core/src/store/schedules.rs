@@ -607,7 +607,12 @@ pub fn upgrade_2_25(c: &rusqlite::Connection) -> rusqlite::Result<()> {
         let set = new_id();
         c.execute(
             "INSERT INTO rulesets(id, name, description, owner_kind, enabled, created_at, updated_at) VALUES (?1, ?2, ?3, 'standalone', 1, ?4, ?4)",
-            params![set, uniq(if name == crate::rules::CERT_WATCH { name.clone() } else { format!("{name} (scheduled)") }), format!("rule {name}, scheduled (moved in 2.25)"), now],
+            params![
+                set,
+                uniq(if name == crate::rules::CERT_WATCH { name.clone() } else { format!("{name} (scheduled)") }),
+                format!("rule {name}, scheduled (moved in 2.25)"),
+                now
+            ],
         )?;
         c.execute("INSERT INTO ruleset_rules(ruleset_id, rule_id, position) VALUES (?1, ?2, 1)", params![set, id])?;
         let (run_every, every_ms, cron, next) = match &sched {

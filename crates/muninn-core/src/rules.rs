@@ -2076,7 +2076,12 @@ pub fn ensure_cert_watch(store: &Store) -> Result<Option<Rule>> {
     })?;
     record(store, "rule.create", format!("create built-in rule {}", r.name), json!({ "rule": r.id, "name": r.name, "builtin": true }));
     let (set, sch) = crate::schedule::schedule_rule(store, &r, &crate::store::Schedule::Every(6 * 3_600_000), CERT_WATCH)?;
-    record(store, "schedule.add", format!("add built-in schedule {} for rule set {}", sch.name, set.name), json!({ "schedule": sch.id, "ruleset": set.id, "builtin": true }));
+    record(
+        store,
+        "schedule.add",
+        format!("add built-in schedule {} for rule set {}", sch.name, set.name),
+        json!({ "schedule": sch.id, "ruleset": set.id, "builtin": true }),
+    );
     Ok(Some(r))
 }
 

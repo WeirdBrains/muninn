@@ -3,8 +3,8 @@
 //! space (data is piped into it and it runs) or the network (an exchange share, `mnnn net share`).
 mod create;
 pub use create::{
-    create_exchange_target, create_item, create_project_item, create_review_subject, create_target, create_then_share, parse_series_ref, CreateOpts,
-    Created, NetCreate,
+    CreateOpts, Created, NetCreate, create_exchange_target, create_item, create_project_item, create_review_subject, create_target,
+    create_then_share, parse_series_ref,
 };
 
 use crate::code::pipe::Source;

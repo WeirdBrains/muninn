@@ -28,7 +28,13 @@ pub fn ruleset(ctx: &Ctx, cmd: RulesetCommand) -> anyhow::Result<()> {
                 for r in sets {
                     let n = store.ruleset_rules(&r.id)?.len();
                     let s = store.schedules_using("ruleset_id", &r.id)?.len();
-                    println!("{}  {}{}  {n} rule(s), {s} schedule(s){}", crate::store::short(&r.id), r.name, if r.enabled { "" } else { " (off)" }, if r.owner_kind == "standalone" { String::new() } else { format!(", {}", r.owner_kind) });
+                    println!(
+                        "{}  {}{}  {n} rule(s), {s} schedule(s){}",
+                        crate::store::short(&r.id),
+                        r.name,
+                        if r.enabled { "" } else { " (off)" },
+                        if r.owner_kind == "standalone" { String::new() } else { format!(", {}", r.owner_kind) }
+                    );
                 }
             }
         }
@@ -55,7 +61,12 @@ pub fn ruleset(ctx: &Ctx, cmd: RulesetCommand) -> anyhow::Result<()> {
             for x in &found {
                 store.add_ruleset_rule(&r.id, &x.id, None)?;
             }
-            record(&store, "ruleset.create", format!("create rule set {}", r.name), json!({ "ruleset": r.id, "name": r.name, "rules": found.iter().map(|x| &x.id).collect::<Vec<_>>() }));
+            record(
+                &store,
+                "ruleset.create",
+                format!("create rule set {}", r.name),
+                json!({ "ruleset": r.id, "name": r.name, "rules": found.iter().map(|x| &x.id).collect::<Vec<_>>() }),
+            );
             ctx.io.info(format!("created rule set {} ({}) with {} rule(s)", r.name, crate::store::short(&r.id), found.len()));
         }
         RulesetCommand::Edit { ruleset, name, description, enable, disable } => {
@@ -78,14 +89,23 @@ pub fn ruleset(ctx: &Ctx, cmd: RulesetCommand) -> anyhow::Result<()> {
                     using.iter().map(|s| s.name.as_str()).collect::<Vec<_>>().join(", ")
                 );
             }
-            if !ctx.io.confirm(&format!("remove rule set {}{}?", r.name, if using.is_empty() { String::new() } else { format!(" and {} schedule(s)", using.len()) }))? {
+            if !ctx.io.confirm(&format!(
+                "remove rule set {}{}?",
+                r.name,
+                if using.is_empty() { String::new() } else { format!(" and {} schedule(s)", using.len()) }
+            ))? {
                 bail!("not removed");
             }
             for s in &using {
                 store.remove_schedule(&s.id)?;
             }
             store.remove_ruleset(&r.id)?;
-            record(&store, "ruleset.remove", format!("remove rule set {}", r.name), json!({ "ruleset": r.id, "name": r.name, "schedules": using.iter().map(|s| &s.id).collect::<Vec<_>>() }));
+            record(
+                &store,
+                "ruleset.remove",
+                format!("remove rule set {}", r.name),
+                json!({ "ruleset": r.id, "name": r.name, "schedules": using.iter().map(|s| &s.id).collect::<Vec<_>>() }),
+            );
             ctx.io.info(format!("removed rule set {} (its rules stay)", r.name));
         }
         RulesetCommand::Add { ruleset, rule, position } => {
@@ -93,7 +113,11 @@ pub fn ruleset(ctx: &Ctx, cmd: RulesetCommand) -> anyhow::Result<()> {
             let x = store.find_rule(&rule)?;
             store.add_ruleset_rule(&r.id, &x.id, position)?;
             record(&store, "ruleset.add", format!("add rule {} to rule set {}", x.name, r.name), json!({ "ruleset": r.id, "rule": x.id }));
-            ctx.io.info(format!("rule set {}: {}", r.name, store.ruleset_rules(&r.id)?.iter().map(|x| x.name.as_str()).collect::<Vec<_>>().join(", ")));
+            ctx.io.info(format!(
+                "rule set {}: {}",
+                r.name,
+                store.ruleset_rules(&r.id)?.iter().map(|x| x.name.as_str()).collect::<Vec<_>>().join(", ")
+            ));
         }
         RulesetCommand::Drop { ruleset, rule } => {
             let r = store.find_ruleset(&ruleset)?;
@@ -107,7 +131,8 @@ pub fn ruleset(ctx: &Ctx, cmd: RulesetCommand) -> anyhow::Result<()> {
         RulesetCommand::Run { ruleset, json } => {
             let r = store.find_ruleset(&ruleset)?;
             let aid = store.record_action(
-                &crate::store::NewAction::new(crate::rules::SCHEDULE, "cli", format!("run rule set {}", r.name)).params(json!({ "ruleset": r.id, "name": r.name, "manual": true })),
+                &crate::store::NewAction::new(crate::rules::SCHEDULE, "cli", format!("run rule set {}", r.name))
+                    .params(json!({ "ruleset": r.id, "name": r.name, "manual": true })),
             )?;
             let a = store.action(aid)?.ok_or_else(|| anyhow::anyhow!("action #{aid} is gone"))?;
             let res = schedule::run_ruleset(&store, &r.id, &a)?;
@@ -117,7 +142,11 @@ pub fn ruleset(ctx: &Ctx, cmd: RulesetCommand) -> anyhow::Result<()> {
                 for m in &res.messages {
                     ctx.io.info(m);
                 }
-                ctx.io.info(format!("ran {} rule(s){}", res.ran.len(), if res.failed.is_empty() { String::new() } else { format!(", failed: {}", res.failed.join(", ")) }));
+                ctx.io.info(format!(
+                    "ran {} rule(s){}",
+                    res.ran.len(),
+                    if res.failed.is_empty() { String::new() } else { format!(", failed: {}", res.failed.join(", ")) }
+                ));
             }
             if !res.failed.is_empty() {
                 bail!("{} rule(s) failed", res.failed.len());
@@ -194,7 +223,9 @@ fn apply(ctx: &Ctx, s: &mut ScheduleDef, mut t: Timing, now: i64) -> anyhow::Res
 
 fn print_schedule(store: &Store, s: &ScheduleDef) -> anyhow::Result<()> {
     let target = match s.target_kind.as_str() {
-        "ruleset" => format!("rule set {}", s.ruleset_id.as_deref().and_then(|id| store.ruleset(id).ok().flatten()).map_or("(removed)".into(), |r| r.name)),
+        "ruleset" => {
+            format!("rule set {}", s.ruleset_id.as_deref().and_then(|id| store.ruleset(id).ok().flatten()).map_or("(removed)".into(), |r| r.name))
+        }
         "connector" => format!(
             "connector {} → source {}",
             s.plugin_id.as_deref().and_then(|id| store.space(id).ok().flatten()).map_or("(removed)".into(), |x| x.name),
@@ -243,7 +274,12 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
                     policy(&mut s, &p)?;
                     apply(ctx, &mut s, timing(&t, run_every), now)?;
                     let s = store.save_schedule(&s)?;
-                    record(&store, "schedule.add", format!("add schedule {} for rule set {}", s.name, set.name), json!({ "schedule": s.id, "name": s.name, "ruleset": set.id }));
+                    record(
+                        &store,
+                        "schedule.add",
+                        format!("add schedule {} for rule set {}", s.name, set.name),
+                        json!({ "schedule": s.id, "name": s.name, "ruleset": set.id }),
+                    );
                     print_schedule(&store, &s)?;
                 }
                 (None, Some(plug)) => {
@@ -284,10 +320,15 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
             let mut s = ScheduleDef { name: "parse".into(), target_kind: "ruleset".into(), enabled: true, created_at: now, ..Default::default() };
             apply(ctx, &mut s, timing(&t, run_every), now)?;
             if json {
-                let next: Vec<i64> = std::iter::successors(Some(s.next_run_at), |x| schedule::step(&s, *x)).take_while(|x| s.ends_at.is_none_or(|e| *x < e)).take(5).collect();
+                let next: Vec<i64> = std::iter::successors(Some(s.next_run_at), |x| schedule::step(&s, *x))
+                    .take_while(|x| s.ends_at.is_none_or(|e| *x < e))
+                    .take(5)
+                    .collect();
                 println!(
                     "{}",
-                    serde_json::to_string_pretty(&json!({ "run_every": s.run_every, "every_ms": s.every_ms, "every_months": s.every_months, "cron": s.cron, "tz": s.tz, "start_at": s.start_at, "ends_at": s.ends_at, "next": next }))?
+                    serde_json::to_string_pretty(
+                        &json!({ "run_every": s.run_every, "every_ms": s.every_ms, "every_months": s.every_months, "cron": s.cron, "tz": s.tz, "start_at": s.start_at, "ends_at": s.ends_at, "next": next })
+                    )?
                 );
             } else {
                 for l in schedule::describe(&s) {
@@ -309,7 +350,12 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
                 ctx.io.info("no schedules (mnnn schedule add NAME 1h --ruleset SET)");
             } else {
                 for s in all {
-                    let when = s.cron.clone().map(|c| format!("cron {c}")).or(s.run_every.clone().map(|e| if e == "once" { e } else { format!("every {e}") })).unwrap_or_default();
+                    let when = s
+                        .cron
+                        .clone()
+                        .map(|c| format!("cron {c}"))
+                        .or(s.run_every.clone().map(|e| if e == "once" { e } else { format!("every {e}") }))
+                        .unwrap_or_default();
                     println!(
                         "{}  {}{}  {when}  next {}",
                         crate::store::short(&s.id),
@@ -345,7 +391,8 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
                 s.ends_at = None;
                 s.ends_at_input = None;
             }
-            let changes_timing = every.is_some() || t.cron.is_some() || t.start_at.is_some() || t.ends_at.is_some() || t.for_.is_some() || t.tz.is_some() || no_end;
+            let changes_timing =
+                every.is_some() || t.cron.is_some() || t.start_at.is_some() || t.ends_at.is_some() || t.for_.is_some() || t.tz.is_some() || no_end;
             if changes_timing {
                 let mut tm = timing(&t, every);
                 if tm.run_every.is_none() && tm.cron.is_none() {

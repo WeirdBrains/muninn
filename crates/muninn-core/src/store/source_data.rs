@@ -98,9 +98,8 @@ impl Store {
 
     /// A source's items for one schedule run (`host.pipe` over this run only).
     pub fn source_data_for_run(&self, source_id: &str, run_id: i64) -> Result<Vec<SourceData>> {
-        let mut st = self.conn.prepare(&format!(
-            "SELECT {COLS} FROM source_data WHERE source_id = ?1 AND run_id = ?2 ORDER BY received_at, rowid"
-        ))?;
+        let mut st =
+            self.conn.prepare(&format!("SELECT {COLS} FROM source_data WHERE source_id = ?1 AND run_id = ?2 ORDER BY received_at, rowid"))?;
         Ok(st.query_map(params![source_id, run_id], row)?.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 

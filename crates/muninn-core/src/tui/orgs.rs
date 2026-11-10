@@ -68,7 +68,9 @@ pub enum OAsk {
     AddResource,
     /// Create-then-share: kind for a new resource.
     NewResourceKind,
-    NewResourceName { kind: ShareKind },
+    NewResourceName {
+        kind: ShareKind,
+    },
     Browse,
     Apply,
     Join,

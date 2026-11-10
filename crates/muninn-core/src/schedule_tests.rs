@@ -52,7 +52,17 @@ fn dates() {
 }
 
 fn def(every: Option<&str>, start: Option<&str>, tz: Option<&str>) -> Result<ScheduleDef> {
-    let mut s = ScheduleDef { name: "x".into(), target_kind: "ruleset".into(), ruleset_id: Some("r".into()), overlap: "skip".into(), catch_up: "once".into(), max_attempts: 3, enabled: true, created_at: T0, ..Default::default() };
+    let mut s = ScheduleDef {
+        name: "x".into(),
+        target_kind: "ruleset".into(),
+        ruleset_id: Some("r".into()),
+        overlap: "skip".into(),
+        catch_up: "once".into(),
+        max_attempts: 3,
+        enabled: true,
+        created_at: T0,
+        ..Default::default()
+    };
     let t = Timing { run_every: every.map(str::to_string), start_at: start.map(str::to_string), tz: tz.map(str::to_string), ..Default::default() };
     apply_timing(&mut s, &t, T0)?;
     Ok(s)
@@ -86,7 +96,18 @@ fn once_and_past() {
     let e = def(Some("1 day"), Some("2026-11-01 09:00"), Some("UTC")).unwrap_err().to_string();
     assert!(e.contains("next-interval"), "{e}");
     let mut s = ScheduleDef { name: "x".into(), target_kind: "ruleset".into(), ruleset_id: Some("r".into()), ..Default::default() };
-    apply_timing(&mut s, &Timing { run_every: Some("1 day".into()), start_at: Some("2026-11-01 09:00".into()), tz: Some("UTC".into()), past_next: true, ..Default::default() }, T0).unwrap();
+    apply_timing(
+        &mut s,
+        &Timing {
+            run_every: Some("1 day".into()),
+            start_at: Some("2026-11-01 09:00".into()),
+            tz: Some("UTC".into()),
+            past_next: true,
+            ..Default::default()
+        },
+        T0,
+    )
+    .unwrap();
     assert_eq!(s.next_run_at, parse_when("2026-11-11 09:00", T0, Some("UTC")).unwrap());
     // run_every alone: right away
     assert_eq!(def(Some("1h"), None, None).unwrap().next_run_at, T0);
@@ -106,11 +127,25 @@ fn cron_in_zone() {
 fn setup() -> (Store, ScheduleDef) {
     let st = Store::open_in_memory().unwrap();
     let r = st
-        .create_rule(&NewRule { name: "say".into(), spec: RuleSpec { on: vec!["schedule".into()], then: vec![Then::Status { text: "hi".into() }], ..Default::default() }, enabled: true, ..Default::default() })
+        .create_rule(&NewRule {
+            name: "say".into(),
+            spec: RuleSpec { on: vec!["schedule".into()], then: vec![Then::Status { text: "hi".into() }], ..Default::default() },
+            enabled: true,
+            ..Default::default()
+        })
         .unwrap();
     let set = st.create_ruleset("daily", "", "standalone", None).unwrap();
     st.add_ruleset_rule(&set.id, &r.id, None).unwrap();
-    let mut s = ScheduleDef { name: "every hour".into(), target_kind: "ruleset".into(), ruleset_id: Some(set.id), overlap: "skip".into(), catch_up: "once".into(), max_attempts: 3, enabled: true, ..Default::default() };
+    let mut s = ScheduleDef {
+        name: "every hour".into(),
+        target_kind: "ruleset".into(),
+        ruleset_id: Some(set.id),
+        overlap: "skip".into(),
+        catch_up: "once".into(),
+        max_attempts: 3,
+        enabled: true,
+        ..Default::default()
+    };
     apply_timing(&mut s, &Timing { run_every: Some("1h".into()), ..Default::default() }, T0).unwrap();
     let s = st.save_schedule(&s).unwrap();
     (st, s)
@@ -145,7 +180,8 @@ fn catch_up_all_and_none() {
     assert_eq!(rep.queued.len(), 4);
     assert_eq!(rep.started.len(), 4); // one after another, up to WORKERS a tick
     // an open run with overlap skip: nothing more is queued
-    let id = st.insert_run(&ScheduleRun { schedule_id: s.id.clone(), status: "pending".into(), timestamp: T0, attempt: 1, ..Default::default() }).unwrap();
+    let id =
+        st.insert_run(&ScheduleRun { schedule_id: s.id.clone(), status: "pending".into(), timestamp: T0, attempt: 1, ..Default::default() }).unwrap();
     st.claim_run(id, "other", T0 + 3 * 3_600_000 + 25).unwrap();
     s = st.schedule(&s.id).unwrap().unwrap();
     s.next_run_at = T0 + 3 * 3_600_000 + 20;
@@ -261,7 +297,8 @@ fn failures_retry_and_abandon() {
     assert_eq!(backoff(2), 60_000);
     assert_eq!(backoff(20), 3_600_000);
     // a run stuck in running is abandoned after 2 minutes
-    let id = st.insert_run(&ScheduleRun { schedule_id: s.id.clone(), status: "pending".into(), timestamp: T0, attempt: 3, ..Default::default() }).unwrap();
+    let id =
+        st.insert_run(&ScheduleRun { schedule_id: s.id.clone(), status: "pending".into(), timestamp: T0, attempt: 3, ..Default::default() }).unwrap();
     st.claim_run(id, "dead", T0).unwrap();
     let rep = tick(&st, "t", T0 + ABANDON_MS + 1000).unwrap();
     assert!(rep.abandoned.contains(&id));
@@ -276,8 +313,6 @@ fn run_now_and_status() {
     assert_eq!(v["next"]["schedule"], "every hour");
     assert!(!describe(&s).is_empty());
 }
-
-
 
 #[test]
 fn connector_skip_message_names_pipe_and_ruleset() {

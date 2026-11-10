@@ -73,7 +73,10 @@ pub enum NAsk {
     Share(bool),
     /// Create-then-share: kind, then name.
     NewShareKind(bool),
-    NewShareName { one: bool, kind: ShareKind },
+    NewShareName {
+        one: bool,
+        kind: ShareKind,
+    },
     Setting(Setting),
 }
 
@@ -643,7 +646,14 @@ fn finish_ask(app: &mut App, kind: NAsk, v: String) {
                             app.refresh_history(true);
                             let new = v.iter().filter(|(_, n)| *n).count();
                             let to = if one { "this exchange" } else { "every exchange" };
-                            ok(app, if new > 0 { format!("created and shared {} {} with {to}", kind.label(), c.name) } else { format!("created {}; already shared", c.name) });
+                            ok(
+                                app,
+                                if new > 0 {
+                                    format!("created and shared {} {} with {to}", kind.label(), c.name)
+                                } else {
+                                    format!("created {}; already shared", c.name)
+                                },
+                            );
                         }
                         Err(e) => err(app, e.to_string()),
                     }
@@ -907,7 +917,9 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             );
         }
         (Tab::Shared, KeyCode::Char('a')) => ask(app, NAsk::Share(false), "Share with every exchange (kind name: journal Field notes)", ""),
-        (Tab::Shared, KeyCode::Char('n')) => ask(app, NAsk::NewShareKind(false), "New shared item kind (model, search, journal, project, report, code, space, pipeline)", ""),
+        (Tab::Shared, KeyCode::Char('n')) => {
+            ask(app, NAsk::NewShareKind(false), "New shared item kind (model, search, journal, project, report, code, space, pipeline)", "")
+        }
         (Tab::Shared, KeyCode::Char('d')) => {
             let Some(sh) = app.network.shares.get(app.network.sel).cloned() else { return };
             let with: Vec<String> = sh.exchange_id.clone().into_iter().collect();

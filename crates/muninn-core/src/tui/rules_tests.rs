@@ -144,15 +144,33 @@ fn rules_window_tabs_to_rule_sets_and_schedules() {
         .store
         .create_rule(&crate::store::NewRule {
             name: "Say".into(),
-            spec: crate::store::RuleSpec { on: vec!["schedule".into()], then: vec![crate::store::Then::Status { text: "hi".into() }], ..Default::default() },
+            spec: crate::store::RuleSpec {
+                on: vec!["schedule".into()],
+                then: vec![crate::store::Then::Status { text: "hi".into() }],
+                ..Default::default()
+            },
             enabled: true,
             ..Default::default()
         })
         .unwrap();
     let set = a.store.create_ruleset("Morning", "", "standalone", None).unwrap();
     a.store.add_ruleset_rule(&set.id, &r.id, None).unwrap();
-    let mut s = crate::store::ScheduleDef { name: "hourly".into(), target_kind: "ruleset".into(), ruleset_id: Some(set.id.clone()), overlap: "skip".into(), catch_up: "once".into(), max_attempts: 3, enabled: true, ..Default::default() };
-    crate::schedule::apply_timing(&mut s, &crate::schedule::Timing { run_every: Some("1h".into()), start_at: Some("+1 day".into()), ..Default::default() }, crate::store::now_ms()).unwrap();
+    let mut s = crate::store::ScheduleDef {
+        name: "hourly".into(),
+        target_kind: "ruleset".into(),
+        ruleset_id: Some(set.id.clone()),
+        overlap: "skip".into(),
+        catch_up: "once".into(),
+        max_attempts: 3,
+        enabled: true,
+        ..Default::default()
+    };
+    crate::schedule::apply_timing(
+        &mut s,
+        &crate::schedule::Timing { run_every: Some("1h".into()), start_at: Some("+1 day".into()), ..Default::default() },
+        crate::store::now_ms(),
+    )
+    .unwrap();
     a.store.save_schedule(&s).unwrap();
     a.on_key(key(KeyCode::Char('R')));
     a.on_key(key(KeyCode::Tab));

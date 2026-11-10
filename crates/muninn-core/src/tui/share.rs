@@ -1,8 +1,8 @@
 //! The Share action in the TUI: `S` (or the `[S share]` button) on a window with a selected
 //! shareable item opens a picker of every place that takes it.
-use super::modal::{Modal, PickKind};
 use super::App;
-use crate::share::{share, targets_for, TargetKind};
+use super::modal::{Modal, PickKind};
+use crate::share::{TargetKind, share, targets_for};
 use crate::store::ShareKind;
 use ratatui::crossterm::event::KeyCode;
 

@@ -590,10 +590,7 @@ pub fn pipe_picked(app: &mut App, row: &str) {
         };
         app.share_new_item = Some(kind);
         app.share_create_resume = Some(super::share::CreateResume::PipeAfter { kind_label: k.into() });
-        app.modal = Some(super::modal::Modal::prompt(
-            &format!("New {} name", kind.label()),
-            super::modal::PromptKind::ShareCreateItem,
-        ));
+        app.modal = Some(super::modal::Modal::prompt(&format!("New {} name", kind.label()), super::modal::PromptKind::ShareCreateItem));
         return;
     }
     app.modal = app.share_back.take().map(|b| *b);

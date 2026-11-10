@@ -286,7 +286,14 @@ fn live_call(store: &Store, method: &str, req: &Value) -> Result<Value> {
             let hash = crate::ingest::hash_bytes(&bytes);
             let id = store.add_source_data(
                 &source_id,
-                &NewSourceData { locator: &format!("connector:{run_id}:{name}"), name: &name, format: &format, content_hash: &hash, data: &bytes, run_id: Some(run_id) },
+                &NewSourceData {
+                    locator: &format!("connector:{run_id}:{name}"),
+                    name: &name,
+                    format: &format,
+                    content_hash: &hash,
+                    data: &bytes,
+                    run_id: Some(run_id),
+                },
             )?;
             LIVE.with(|x| {
                 let mut b = x.borrow_mut();
@@ -341,7 +348,12 @@ fn live_pipe(store: &Store) -> Result<Value> {
             let inserted: usize = r.landed.iter().map(|(_, n)| *n).sum();
             let sinks: Vec<String> = r.landed.iter().map(|(m, n)| format!("{m}:{n}")).collect();
             if !r.ok() {
-                let err = r.nodes.iter().find(|n| n.status != "ok").map(|n| n.error.clone().unwrap_or_else(|| n.status.clone())).unwrap_or_else(|| "pipeline failed".into());
+                let err = r
+                    .nodes
+                    .iter()
+                    .find(|n| n.status != "ok")
+                    .map(|n| n.error.clone().unwrap_or_else(|| n.status.clone()))
+                    .unwrap_or_else(|| "pipeline failed".into());
                 LIVE.with(|x| x.borrow_mut().as_mut().expect("live").warnings.push(format!("pipe: {err}")));
                 return Err(Error::invalid("pipe", err));
             }
@@ -437,10 +449,7 @@ pub fn state_key(schedule_id: &str) -> String {
 }
 
 pub fn load_state(store: &Store, schedule_id: &str) -> Result<Map<String, Value>> {
-    Ok(store
-        .setting(&state_key(schedule_id))?
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default())
+    Ok(store.setting(&state_key(schedule_id))?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default())
 }
 
 pub fn save_state(store: &Store, schedule_id: &str, state: &Map<String, Value>) -> Result<()> {

@@ -6,14 +6,14 @@
 use crate::code::{self, spaces};
 use crate::error::{Error, Result};
 use crate::model::{Duration, Symbol};
-use crate::net::{client, Node};
+use crate::net::{Node, client};
 use crate::store::ReviewKind;
 use crate::store::{CodeInput, Design, EntryFormat, ItemKind, Lang, NewAction, SearchSpec, ShareKind, SpaceKind, Store};
 use libp2p::identity::Keypair;
 use serde::Serialize;
 use serde_json::json;
 
-use super::{share, Shared, TargetKind};
+use super::{Shared, TargetKind, share};
 
 /// Options for creating an item or a target inline (minimal fields; same as the usual create).
 #[derive(Debug, Clone, Default)]

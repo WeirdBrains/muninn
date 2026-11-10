@@ -111,7 +111,12 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
             }
             if let Some(sc) = &schedule {
                 let (set, sch) = crate::schedule::schedule_rule(&store, &r, sc, &format!("{} (scheduled)", r.name))?;
-                record(&store, "schedule.add", format!("add schedule {} for rule set {}", sch.name, set.name), json!({ "schedule": sch.id, "ruleset": set.id }));
+                record(
+                    &store,
+                    "schedule.add",
+                    format!("add schedule {} for rule set {}", sch.name, set.name),
+                    json!({ "schedule": sch.id, "ruleset": set.id }),
+                );
                 ctx.io.warn(format!(
                     "--every/--cron on a rule are deprecated: made rule set `{}` and schedule `{}` ({}); next time use `mnnn schedule add`",
                     set.name,
@@ -175,7 +180,12 @@ pub fn run(ctx: &Ctx, cmd: RuleCommand) -> anyhow::Result<()> {
             let n = store.update_rule(&r.id, &c)?;
             if let Some(sc) = migrate {
                 let (set, sch) = crate::schedule::schedule_rule(&store, &n, &sc, &format!("{} (scheduled)", n.name))?;
-                record(&store, "schedule.add", format!("schedule {} for rule set {}", sch.name, set.name), json!({ "schedule": sch.id, "ruleset": set.id }));
+                record(
+                    &store,
+                    "schedule.add",
+                    format!("schedule {} for rule set {}", sch.name, set.name),
+                    json!({ "schedule": sch.id, "ruleset": set.id }),
+                );
                 ctx.io.warn(format!(
                     "--every/--cron on a rule are deprecated: rule set `{}`, schedule `{}` ({})",
                     set.name,

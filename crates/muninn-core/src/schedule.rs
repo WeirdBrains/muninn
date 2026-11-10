@@ -61,7 +61,15 @@ pub fn check_zone(tz: &str) -> Result<String> {
 fn civil(ms: i64, tz: Option<&str>) -> (i32, u32, u32, u32, u32, u32, u32) {
     if let Some(z) = tz.and_then(|t| zoned(ms, Some(t))).and_then(|z| z.into_zoned()) {
         let d = z.datetime();
-        return (d.year() as i32, d.month() as u32, d.day() as u32, d.hour() as u32, d.minute() as u32, d.second() as u32, (d.subsec_nanosecond() / 1_000_000) as u32);
+        return (
+            d.year() as i32,
+            d.month() as u32,
+            d.day() as u32,
+            d.hour() as u32,
+            d.minute() as u32,
+            d.second() as u32,
+            (d.subsec_nanosecond() / 1_000_000) as u32,
+        );
     }
     use chrono::{Datelike, TimeZone, Timelike};
     let d = chrono::Utc.timestamp_millis_opt(ms).single().unwrap_or_default();
@@ -118,8 +126,36 @@ pub struct Interval {
 }
 
 const TIME_WORDS: &[&str] = &[
-    "ago", "next", "last", "this", "now", "today", "tomorrow", "yesterday", "noon", "midnight", "am", "pm", "at", "on", "monday", "tuesday", "wednesday", "thursday", "friday",
-    "saturday", "sunday", "mon", "tue", "wed", "thu", "fri", "sat", "sun", "weekday", "weekdays",
+    "ago",
+    "next",
+    "last",
+    "this",
+    "now",
+    "today",
+    "tomorrow",
+    "yesterday",
+    "noon",
+    "midnight",
+    "am",
+    "pm",
+    "at",
+    "on",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+    "mon",
+    "tue",
+    "wed",
+    "thu",
+    "fri",
+    "sat",
+    "sun",
+    "weekday",
+    "weekdays",
 ];
 
 fn unit(u: &str) -> Option<(i64, i64)> {
@@ -174,7 +210,11 @@ pub fn parse_interval(s: &str) -> Result<Interval> {
     let mut any = false;
     while let Some(w) = words.next() {
         let lw = w.to_ascii_lowercase();
-        if TIME_WORDS.contains(&lw.as_str()) || lw.ends_with("am") && lw[..lw.len() - 2].parse::<u32>().is_ok() || lw.ends_with("pm") && lw[..lw.len() - 2].parse::<u32>().is_ok() || w.contains(':') {
+        if TIME_WORDS.contains(&lw.as_str())
+            || lw.ends_with("am") && lw[..lw.len() - 2].parse::<u32>().is_ok()
+            || lw.ends_with("pm") && lw[..lw.len() - 2].parse::<u32>().is_ok()
+            || w.contains(':')
+        {
             return Err(bad("that is a time, not an interval; put it in --start-at and give run_every as a length (1 day, 1w)"));
         }
         // a bare unit word: `hour` = 1 hour
@@ -298,7 +338,11 @@ pub fn cron_next(cron: &str, after: i64, tz: Option<&str>) -> Option<i64> {
 pub fn first_due(s: &ScheduleDef, now: i64) -> Option<i64> {
     match (s.start_at, &s.cron) {
         (Some(st), _) if st >= now => {
-            if s.cron.is_some() { cron_next(s.cron.as_deref()?, st - 1, s.tz.as_deref()) } else { Some(st) }
+            if s.cron.is_some() {
+                cron_next(s.cron.as_deref()?, st - 1, s.tz.as_deref())
+            } else {
+                Some(st)
+            }
         }
         (Some(st), None) => {
             if s.is_once() {
@@ -429,7 +473,10 @@ pub fn apply_timing(s: &mut ScheduleDef, t: &Timing, now: i64) -> Result<()> {
         Past::Yes { next: None } => {
             return Err(Error::invalid(
                 "start_at",
-                format!("{} is in the past; a one-off can only be corrected: give a new --start-at", show_time(s.start_at.unwrap_or(now), tz.as_deref())),
+                format!(
+                    "{} is in the past; a one-off can only be corrected: give a new --start-at",
+                    show_time(s.start_at.unwrap_or(now), tz.as_deref())
+                ),
             ));
         }
         Past::Yes { next: Some(n) } => {
@@ -451,7 +498,10 @@ pub fn apply_timing(s: &mut ScheduleDef, t: &Timing, now: i64) -> Result<()> {
         && s.next_run_at >= en
         && !s.is_once()
     {
-        return Err(Error::invalid("ends_at", format!("it ends ({}) before its first run ({})", show_time(en, tz.as_deref()), show_time(s.next_run_at, tz.as_deref()))));
+        return Err(Error::invalid(
+            "ends_at",
+            format!("it ends ({}) before its first run ({})", show_time(en, tz.as_deref()), show_time(s.next_run_at, tz.as_deref())),
+        ));
     }
     Ok(())
 }
@@ -567,9 +617,7 @@ pub fn tick(store: &Store, holder: &str, now: i64) -> Result<TickReport> {
     let last_holder = last_tick_holder(store)?;
     // Continuous only if *this* scheduler session wrote the last tick recently.
     // A quick restart (new holder) within ALIVE_GAP_MS must not inherit aliveness.
-    let alive = last_tick > 0
-        && last_holder.as_deref() == Some(holder)
-        && now.saturating_sub(last_tick) <= ALIVE_GAP_MS;
+    let alive = last_tick > 0 && last_holder.as_deref() == Some(holder) && now.saturating_sub(last_tick) <= ALIVE_GAP_MS;
     // due slots
     for mut s in store.schedules()? {
         if !s.enabled || s.next_run_at > now {
@@ -700,13 +748,7 @@ fn queue_due(store: &Store, s: &mut ScheduleDef, now: i64, last_tick: i64, alive
         if has_open && open.iter().any(|r| r.status == "pending") {
             break;
         }
-        store.insert_run(&ScheduleRun {
-            schedule_id: s.id.clone(),
-            status: "pending".into(),
-            timestamp: *due,
-            attempt: 1,
-            ..Default::default()
-        })?;
+        store.insert_run(&ScheduleRun { schedule_id: s.id.clone(), status: "pending".into(), timestamp: *due, attempt: 1, ..Default::default() })?;
         rep.queued.push(s.name.clone());
         if has_open {
             break;
@@ -733,14 +775,22 @@ fn retry(store: &Store, s: &ScheduleDef, r: &ScheduleRun, now: i64, rep: &mut Ti
     if s.ends_at.is_some_and(|e| not_before >= e) && !s.is_once() {
         return Ok(());
     }
-    let id = store.insert_run(&ScheduleRun { schedule_id: s.id.clone(), status: "pending".into(), timestamp: r.timestamp, attempt: r.attempt + 1, not_before, ..Default::default() })?;
+    let id = store.insert_run(&ScheduleRun {
+        schedule_id: s.id.clone(),
+        status: "pending".into(),
+        timestamp: r.timestamp,
+        attempt: r.attempt + 1,
+        not_before,
+        ..Default::default()
+    })?;
     rep.retries.push(id);
     Ok(())
 }
 
 /// Queue and run one run of `s` now (`schedule run-now`), outside its timing.
 pub fn run_now(store: &Store, s: &ScheduleDef, holder: &str, now: i64) -> Result<ScheduleRun> {
-    let id = store.insert_run(&ScheduleRun { schedule_id: s.id.clone(), status: "pending".into(), timestamp: now, attempt: 1, ..Default::default() })?;
+    let id =
+        store.insert_run(&ScheduleRun { schedule_id: s.id.clone(), status: "pending".into(), timestamp: now, attempt: 1, ..Default::default() })?;
     if !store.claim_run(id, holder, now)? {
         return Err(Error::invalid("schedule", "the run was claimed by another scheduler".to_string()));
     }
@@ -761,7 +811,9 @@ fn execute(store: &Store, s: &ScheduleDef, run_id: i64, holder: &str, now: i64) 
             }
             let mut p = base.clone();
             p["ruleset"] = set.id.clone().into();
-            let aid = store.record_action(&NewAction::new(crate::rules::SCHEDULE, ORIGIN, format!("schedule {} runs rule set {}", s.name, set.name)).params(p))?;
+            let aid = store.record_action(
+                &NewAction::new(crate::rules::SCHEDULE, ORIGIN, format!("schedule {} runs rule set {}", s.name, set.name)).params(p),
+            )?;
             let a = store.action(aid)?.ok_or_else(|| Error::invalid("action", "gone".to_string()))?;
             let res = run_ruleset(store, &set.id, &a)?;
             if !res.failed.is_empty() {
@@ -784,7 +836,12 @@ fn execute(store: &Store, s: &ScheduleDef, run_id: i64, holder: &str, now: i64) 
         Err(e) => {
             r.status = "failed".into();
             r.error = Some(e.to_string());
-            record(store, "schedule.fail", format!("schedule {} run #{run_id} failed: {e}", s.name), json!({ "schedule": s.id, "name": s.name, "run": run_id, "error": e.to_string() }));
+            record(
+                store,
+                "schedule.fail",
+                format!("schedule {} run #{run_id} failed: {e}", s.name),
+                json!({ "schedule": s.id, "name": s.name, "run": run_id, "error": e.to_string() }),
+            );
         }
     }
     store.update_run(&r)?;
@@ -806,12 +863,7 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
     crate::code::spaces::ready_main(store, &space).map_err(|e| Error::invalid("schedule", e.to_string()))?;
     let source_id = s.source_id.clone().ok_or_else(|| Error::invalid("schedule", "its source was removed".to_string()))?;
     let source = store.source_by_id(&source_id)?.ok_or_else(|| Error::invalid("schedule", "its source was removed".to_string()))?;
-    let last_success_at = store
-        .schedule_runs(&s.id)?
-        .into_iter()
-        .rev()
-        .find(|x| x.status == "success")
-        .map(|x| x.finished_at.unwrap_or(x.timestamp));
+    let last_success_at = store.schedule_runs(&s.id)?.into_iter().rev().find(|x| x.status == "success").map(|x| x.finished_at.unwrap_or(x.timestamp));
     let live = Live {
         schedule_id: s.id.clone(),
         schedule_name: s.name.clone(),
@@ -832,7 +884,8 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
         state: connector::load_state(store, &s.id)?,
     };
     let env = crate::code::CodeEnv::for_store(store)?;
-    let (info, live) = connector::live_run(live, || crate::code::spaces::run_connector(store, &env, ORIGIN, &space, &format!("schedule:{}", s.name), &mut |_| {}));
+    let (info, live) =
+        connector::live_run(live, || crate::code::spaces::run_connector(store, &env, ORIGIN, &space, &format!("schedule:{}", s.name), &mut |_| {}));
     let info = info?;
     let _ = connector::save_state(store, &s.id, &live.state);
     r.stored = live.stored;
@@ -857,12 +910,7 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
         // always record connector.run for history even when run_ruleset was skipped
         if live.ruleset_ran == 0 {
             let _ = store.record_action(
-                &NewAction::new(
-                    "connector.run",
-                    ORIGIN,
-                    format!("connector schedule {} run #{} ({msg})", s.name, r.id),
-                )
-                .params(json!({
+                &NewAction::new("connector.run", ORIGIN, format!("connector schedule {} run #{} ({msg})", s.name, r.id)).params(json!({
                     "schedule": s.id, "name": s.name, "run": r.id, "connector": plugin_id,
                     "stored": live.stored, "bytes": live.bytes, "inserted": live.inserted, "error": msg
                 })),
@@ -880,7 +928,12 @@ pub fn set_enabled(store: &Store, s: &mut ScheduleDef, on: bool, now: i64) -> Re
         if s.ends_at.is_some_and(|e| e <= now) {
             return Err(Error::invalid(
                 "schedule",
-                format!("{} ended {}; give a new end first (schedule edit {} --ends-at ... or --no-end)", s.name, show_time(s.ends_at.unwrap_or(now), s.tz.as_deref()), s.name),
+                format!(
+                    "{} ended {}; give a new end first (schedule edit {} --ends-at ... or --no-end)",
+                    s.name,
+                    show_time(s.ends_at.unwrap_or(now), s.tz.as_deref()),
+                    s.name
+                ),
             ));
         }
         s.next_run_at = first_due(s, now).ok_or_else(|| Error::invalid("schedule", format!("{} has no run left; give a new --start-at", s.name)))?;
@@ -897,7 +950,12 @@ pub fn holder(kind: &str) -> String {
 
 /// A rule's old-style `--every` / `--cron`, as a rule set (`set_name`, made when missing)
 /// holding the rule plus a schedule running it (the node's zone).
-pub fn schedule_rule(store: &Store, r: &crate::store::Rule, sched: &crate::store::Schedule, set_name: &str) -> Result<(crate::store::Ruleset, ScheduleDef)> {
+pub fn schedule_rule(
+    store: &Store,
+    r: &crate::store::Rule,
+    sched: &crate::store::Schedule,
+    set_name: &str,
+) -> Result<(crate::store::Ruleset, ScheduleDef)> {
     let set = match store.rulesets()?.into_iter().find(|x| x.name.eq_ignore_ascii_case(set_name)) {
         Some(x) => x,
         None => store.create_ruleset(set_name, &format!("rule {} on a schedule", r.name), "standalone", None)?,
@@ -934,16 +992,10 @@ pub fn schedule_rule(store: &Store, r: &crate::store::Rule, sched: &crate::store
     }
     let now = now_ms();
     let timing = match sched {
-        crate::store::Schedule::Every(ms) => Timing {
-            run_every: Some(long_form(0, *ms)),
-            past_next: s.start_at.is_some_and(|x| x < now),
-            ..Default::default()
-        },
-        crate::store::Schedule::Cron(c) => Timing {
-            cron: Some(c.clone()),
-            past_next: s.start_at.is_some_and(|x| x < now),
-            ..Default::default()
-        },
+        crate::store::Schedule::Every(ms) => {
+            Timing { run_every: Some(long_form(0, *ms)), past_next: s.start_at.is_some_and(|x| x < now), ..Default::default() }
+        }
+        crate::store::Schedule::Cron(c) => Timing { cron: Some(c.clone()), past_next: s.start_at.is_some_and(|x| x < now), ..Default::default() },
     };
     apply_timing(&mut s, &timing, now)?;
     let s = store.save_schedule(&s)?;
@@ -966,7 +1018,6 @@ pub fn unschedule_rule(store: &Store, r: &crate::store::Rule) -> Result<Vec<Stri
     }
     Ok(removed)
 }
-
 
 /// `scheduler status`: the lease and what is open or next.
 pub fn status(store: &Store, now: i64) -> Result<Value> {

@@ -212,9 +212,24 @@ fn rule_sets_and_schedules() {
     assert!(!o.status.success() && String::from_utf8_lossy(&o.stderr).contains("--past next-interval"), "{o:?}");
     let o = e.run(&["schedule", "add", "late", "once", "--ruleset", "Daily", "--start-at", "2020-01-01 09:00"]);
     assert!(!o.status.success() && String::from_utf8_lossy(&o.stderr).contains("corrected"));
-    let s = e.ok(&["schedule", "add", "late", "1 day", "--ruleset", "Daily", "--start-at", "2020-01-01 09:00", "--tz", "UTC", "--past", "next-interval"]);
+    let s =
+        e.ok(&["schedule", "add", "late", "1 day", "--ruleset", "Daily", "--start-at", "2020-01-01 09:00", "--tz", "UTC", "--past", "next-interval"]);
     assert!(s.contains("09:00:00Z"), "{s}");
-    e.ok(&["schedule", "add", "weekdays", "--ruleset", "Daily", "--cron", "0 9 * * 1-5", "--tz", "Europe/Oslo", "--for", "2 weeks", "--catch-up", "none"]);
+    e.ok(&[
+        "schedule",
+        "add",
+        "weekdays",
+        "--ruleset",
+        "Daily",
+        "--cron",
+        "0 9 * * 1-5",
+        "--tz",
+        "Europe/Oslo",
+        "--for",
+        "2 weeks",
+        "--catch-up",
+        "none",
+    ]);
     assert!(e.ok(&["schedule", "show", "weekdays"]).contains("cron `0 9 * * 1-5` in Europe/Oslo"));
     assert!(!e.run(&["schedule", "add", "bad", "1h", "--ruleset", "Daily", "--tz", "Nowhere/Land"]).status.success());
     e.ok(&["schedule", "add", "one", "once", "--ruleset", "Daily", "--start-at", "+1 hour"]);

@@ -185,15 +185,20 @@ fn fill_sums_skips_missing_dmg_and_setup_exes_but_not_tarballs() {
     assert!(!out.join("homebrew/Casks/muninn-app.rb").exists());
     assert!(!out.join(format!("winget/manifests/w/WeirdBrains/muninn/tui/{ver}")).exists());
     // everything there: every file, with the setup sums in the installer manifest
-    let extra =
-        [format!("muninn-{ver}-macos.dmg"), format!("muninn-{ver}-x86_64-windows-setup.exe"), format!("muninn-{ver}-aarch64-windows-setup.exe"), format!("muninn-app-{ver}-universal-apple-darwin.dmg")];
+    let extra = [
+        format!("muninn-{ver}-macos.dmg"),
+        format!("muninn-{ver}-x86_64-windows-setup.exe"),
+        format!("muninn-{ver}-aarch64-windows-setup.exe"),
+        format!("muninn-app-{ver}-universal-apple-darwin.dmg"),
+    ];
     names.extend(extra.iter().map(String::as_str));
     sums(&names);
     let o = run();
     assert!(o.status.success() && !String::from_utf8_lossy(&o.stderr).contains("warning"), "{}", String::from_utf8_lossy(&o.stderr));
     assert!(out.join("homebrew/Casks/muninn.rb").exists());
     assert!(out.join("homebrew/Casks/muninn-app.rb").exists());
-    let inst = std::fs::read_to_string(out.join(format!("winget/manifests/w/WeirdBrains/muninn/tui/{ver}/WeirdBrains.muninn.tui.installer.yaml"))).unwrap();
+    let inst =
+        std::fs::read_to_string(out.join(format!("winget/manifests/w/WeirdBrains/muninn/tui/{ver}/WeirdBrains.muninn.tui.installer.yaml"))).unwrap();
     assert!(inst.contains(&format!("{:064X}", 6)) && inst.contains(&format!("{:064X}", 7)), "{inst}");
     // a missing tarball still fails, naming it
     sums(&names[1..]);

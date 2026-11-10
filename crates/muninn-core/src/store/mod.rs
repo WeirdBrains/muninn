@@ -1180,8 +1180,10 @@ mod tests {
             Store::apply_key(&conn, Some(&key)).unwrap();
             let mut s = Store::wrap(conn);
             s.migrate_to(MIGRATIONS.len() - 1).unwrap();
-            let spec = |sched: &str| format!(r#"{{"version":1,"on":["import"],"if":[],"then":[{{"do":"status","text":"hi"}}],"related":false{sched}}}"#);
-            for (id, name, sp, last) in [("r1", "hourly", spec(r#","schedule":{"every":3600000}"#), Some(1_000i64)), ("r2", "plain", spec(""), None)] {
+            let spec =
+                |sched: &str| format!(r#"{{"version":1,"on":["import"],"if":[],"then":[{{"do":"status","text":"hi"}}],"related":false{sched}}}"#);
+            for (id, name, sp, last) in [("r1", "hourly", spec(r#","schedule":{"every":3600000}"#), Some(1_000i64)), ("r2", "plain", spec(""), None)]
+            {
                 s.conn
                     .execute(
                         "INSERT INTO rules(id, name, description, owner_kind, enabled, spec, created_at, updated_at, last_run_at) VALUES (?1, ?2, '', 'standalone', 1, ?3, 1, 1, ?4)",

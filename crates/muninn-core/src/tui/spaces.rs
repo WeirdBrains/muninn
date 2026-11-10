@@ -388,10 +388,8 @@ pub fn draw(app: &mut App, f: &mut Frame, r: Rect, hits: &mut Vec<(Rect, Hit)>) 
                 _ => "Code spaces · collections of code; the main runs".to_string(),
             });
             if st.list.is_empty() && st.plugins {
-                v.head.push(muted(
-                    &t,
-                    format!(" none yet: `mnnn plugins install PATH|CODE --kind {}`", st.kind.map(|k| k.as_str()).unwrap_or("KIND")),
-                ));
+                v.head
+                    .push(muted(&t, format!(" none yet: `mnnn plugins install PATH|CODE --kind {}`", st.kind.map(|k| k.as_str()).unwrap_or("KIND"))));
             }
             for (i, s) in st.list.iter().enumerate() {
                 let ok = spaces::approved(&app.store, s);
