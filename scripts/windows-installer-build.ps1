@@ -14,14 +14,33 @@ $ver = if ($env:VER) {
     if ($m) { $m.Matches.Groups[1].Value } else { "0.0.0" }
 }
 $dist = if ($env:DIST) { $env:DIST } else { "dist" }
-$work = "muninn-setup-$ver"
+# Absolute: ISCC resolves relative /D paths against the .iss file's folder.
+$work = Join-Path (Get-Location) "muninn-setup-$ver"
 $tmpDir = Join-Path $env:TEMP "muninn-installer-$ver"
 
 function Cleanup() {
     if (Test-Path $work) { Remove-Item -Recurse -Force $work }
     if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir }
 }
-trap { Cleanup; throw }
+# Report the real error (a bare `throw` here only says "ScriptHalted"), then fail.
+trap {
+    Write-Host "::error::$($_.Exception.GetType().FullName): $($_.Exception.Message)"
+    Write-Host $_.InvocationInfo.PositionMessage
+    if ($_.ScriptStackTrace) { Write-Host $_.ScriptStackTrace }
+    Cleanup
+    exit 1
+}
+
+# Run a native tool; fail with its output when it exits non-zero.
+function Invoke-Tool([string]$exe, [string[]]$toolArgs, [string]$what) {
+    $out = & $exe @toolArgs 2>&1
+    $code = $LASTEXITCODE
+    if ($code -ne 0) {
+        Write-Host ($out | Out-String)
+        throw "$what failed (exit $code): $exe $($toolArgs -join ' ')"
+    }
+    $out
+}
 
 New-Item -ItemType Directory -Force -Path "$work/out" | Out-Null
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
@@ -43,8 +62,7 @@ if (-not $iscc -or -not (Test-Path $iscc)) {
     }
 }
 if (-not $iscc -or -not (Test-Path $iscc)) {
-    Write-Error "Inno Setup ISCC.exe not found; install Inno Setup 6+ or set ISCC"
-    exit 1
+    throw "Inno Setup ISCC.exe not found; install Inno Setup 6+ or set ISCC"
 }
 Write-Host "ISCC: $iscc"
 Write-Host "Version: $ver"
@@ -52,8 +70,7 @@ Write-Host "Version: $ver"
 # Unzip release folders per architecture
 $zipFiles = Get-ChildItem -Path $dist -Filter "*-pc-windows-gnullvm.zip" -ErrorAction SilentlyContinue
 if ($zipFiles.Count -eq 0) {
-    Write-Error "No *-pc-windows-gnullvm.zip found in dist/"
-    exit 1
+    throw "No *-pc-windows-gnullvm.zip found in $dist"
 }
 
 foreach ($zip in $zipFiles) {
@@ -69,7 +86,26 @@ foreach ($zip in $zipFiles) {
 Copy-Item packaging\windows\muninn.iss -Destination "$work\" -Force
 Copy-Item packaging\windows\muninn-launch.cmd -Destination "$work\" -Force
 
-# Generate .ico from SVG using ImageMagick (installed on the runner).
+# Find ImageMagick: PATH, else its Program Files install dir (`winget install
+# ImageMagick.ImageMagick` installs it silently without adding it to PATH).
+$magick = $env:MAGICK
+if (-not $magick -or -not (Test-Path $magick)) {
+    $cmd = Get-Command magick.exe -ErrorAction SilentlyContinue
+    if ($cmd) {
+        $magick = $cmd.Source
+    } else {
+        $roots = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, "$env:LOCALAPPDATA\Programs") | Where-Object { $_ }
+        $found = @(foreach ($r in $roots) { Get-ChildItem -Path (Join-Path $r "ImageMagick*") -Directory -ErrorAction SilentlyContinue }) |
+            Where-Object { Test-Path (Join-Path $_.FullName "magick.exe") } | Sort-Object Name -Descending
+        if ($found.Count -gt 0) { $magick = Join-Path $found[0].FullName "magick.exe" }
+    }
+}
+if (-not $magick -or -not (Test-Path $magick)) {
+    throw "ImageMagick magick.exe not found on PATH or under Program Files; install ImageMagick 7 or set MAGICK"
+}
+Write-Host "magick: $magick"
+
+# Generate .ico from SVG (muninn.iss needs it).
 $icoPath = Join-Path $work "muninn.ico"
 $svg = "assets/icons/muninn.svg"
 $sizes = @(16, 24, 32, 48, 64, 128, 256)
@@ -78,12 +114,13 @@ foreach ($s in $sizes) {
     $pngFiles += Join-Path $tmpDir "$s.png"
 }
 for ($i = 0; $i -lt $sizes.Count; $i++) {
-    magick.exe -background none -density 384 $svg -resize "$($sizes[$i])x$($sizes[$i])" $pngFiles[$i] 2>$null
+    $sz = "$($sizes[$i])x$($sizes[$i])"
+    Invoke-Tool $magick @("-background", "none", "-density", "384", $svg, "-resize", $sz, $pngFiles[$i]) "magick ($sz png)" | Out-Null
+    if (-not (Test-Path $pngFiles[$i])) { throw "magick made no $($pngFiles[$i])" }
 }
-magick.exe $pngFiles -define icon:auto-generate=true $icoPath 2>$null
-if (-not (Test-Path $icoPath)) {
-    Write-Warning "Icon generation failed (will build without custom icon)"
-}
+Invoke-Tool $magick (@($pngFiles) + @("-define", "icon:auto-generate=true", $icoPath)) "magick (ico)" | Out-Null
+if (-not (Test-Path $icoPath)) { throw "magick made no $icoPath" }
+Write-Host "Icon: $icoPath"
 
 # Build installers for each architecture
 foreach ($arch in @("x86_64", "aarch64")) {
@@ -92,10 +129,13 @@ foreach ($arch in @("x86_64", "aarch64")) {
         Write-Host "Skipping ${arch}: no zip found"
         continue
     }
-    $exeSrc = Join-Path $srcDir "mnnn.exe"
-    if (-not (Test-Path $exeSrc)) {
-        Write-Error "mnnn.exe not found in $srcDir"
-        exit 1
+    # The zip holds one muninn-<ver>-<arch>-pc-windows-gnullvm folder.
+    if (-not (Test-Path (Join-Path $srcDir "mnnn.exe"))) {
+        $nested = @(Get-ChildItem -Path $srcDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName "mnnn.exe") })
+        if ($nested.Count -eq 1) { $srcDir = $nested[0].FullName }
+    }
+    if (-not (Test-Path (Join-Path $srcDir "mnnn.exe"))) {
+        throw "mnnn.exe not found in $srcDir"
     }
 
     Write-Host "Building installer for $arch..."
@@ -113,8 +153,7 @@ foreach ($arch in @("x86_64", "aarch64")) {
 
     & $iscc @params
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Inno Setup failed for $arch"
-        exit 1
+        throw "Inno Setup failed for $arch (exit $LASTEXITCODE)"
     }
 
     $outFile = Join-Path $work "out\muninn-$ver-$arch-windows-setup.exe"
@@ -122,8 +161,7 @@ foreach ($arch in @("x86_64", "aarch64")) {
         Copy-Item $outFile (Join-Path $dist (Split-Path $outFile -Leaf)) -Force
         Write-Host "  -> $(Split-Path $outFile -Leaf)"
     } else {
-        Write-Error "Installer not found at $outFile"
-        exit 1
+        throw "Installer not found at $outFile"
     }
 }
 
