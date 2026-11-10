@@ -4987,8 +4987,9 @@ class FakeApi implements MuninnApi {
     required String kind,
     String name = '',
   }) async {
-    if (what.trim().isEmpty)
+    if (what.trim().isEmpty) {
       throw 'give a library path or an existing code name';
+    }
     final n = name.trim().isEmpty ? what.trim() : name.trim();
     lastPluginInstall = '$kind:$n';
     pluginList = [
