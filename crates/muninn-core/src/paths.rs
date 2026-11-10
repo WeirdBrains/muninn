@@ -75,14 +75,55 @@ impl crate::theme::ThemeDirs for Paths {
     }
 }
 
-pub fn ensure_dir(d: &Path) -> Result<()> {
-    if !d.exists() {
-        fs::create_dir_all(d)?;
+/// Muninn's key-file layout for the keyring (`keys/envelope.toml`, `keys/service/`).
+impl crate::crypto::keyring::KeyFiles for Paths {
+    fn home(&self) -> PathBuf {
+        self.home.clone()
     }
-    set_mode(d, 0o700)
+    fn envelope(&self) -> PathBuf {
+        Paths::envelope(self)
+    }
+    fn service_keys_dir(&self) -> PathBuf {
+        Paths::service_keys_dir(self)
+    }
+    fn prepare(&self) -> Result<()> {
+        self.ensure()
+    }
+    fn ensure_dir(&self, dir: &Path) -> Result<()> {
+        ensure_dir(dir)
+    }
+    fn write_private(&self, path: &Path, bytes: &[u8]) -> Result<()> {
+        write_private(path, bytes)
+    }
 }
 
-/// Write a file atomically-ish with 0600 permissions.
+/// Muninn's database for the keyring: the storage engine does the SQLCipher work; opening
+/// through `Store` also creates and migrates Muninn's schema.
+impl crate::crypto::keyring::EncryptedDatabase for Paths {
+    fn database_exists(&self) -> bool {
+        self.db.exists()
+    }
+    fn encrypt_plaintext(&self, dek: &crate::crypto::Key32) -> Result<()> {
+        crate::store::engine::encrypt_plaintext_in_place(&self.db, &dek.0)
+    }
+    fn open_keyed(&self, dek: &crate::crypto::Key32) -> Result<()> {
+        crate::store::Store::open(&self.db, Some(&dek.0)).map(|_| ())
+    }
+    fn rekey_database(&self, old: &crate::crypto::Key32, new: &crate::crypto::Key32) -> Result<()> {
+        let store = crate::store::Store::open(&self.db, Some(&old.0))?;
+        store.conn.query_row("PRAGMA journal_mode = DELETE", [], |_| Ok(()))?;
+        store.rekey(&new.0)
+    }
+    fn remove_database(&self) {
+        let _ = fs::remove_file(&self.db);
+    }
+}
+
+/// Private folders and file modes are the storage engine's (re-exported for existing callers).
+pub use crate::store::engine::{ensure_dir, set_mode};
+
+/// Write a file atomically-ish with 0600 permissions. The `tmp-muninn` side file is Muninn's
+/// (backups skip it).
 pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
     if let Some(parent) = path.parent()
         && !parent.exists()
@@ -93,18 +134,6 @@ pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
     fs::write(&tmp, bytes)?;
     set_mode(&tmp, 0o600)?;
     fs::rename(&tmp, path)?;
-    Ok(())
-}
-
-#[cfg(unix)]
-pub fn set_mode(p: &Path, mode: u32) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(p, fs::Permissions::from_mode(mode))?;
-    Ok(())
-}
-
-#[cfg(not(unix))]
-pub fn set_mode(_p: &Path, _mode: u32) -> Result<()> {
     Ok(())
 }
 

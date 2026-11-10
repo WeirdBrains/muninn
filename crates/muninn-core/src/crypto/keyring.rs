@@ -3,11 +3,46 @@
 //! A random data key (DEK) keys SQLCipher. The DEK is stored wrapped twice: by the current
 //! service key and by a master-derived KEK. The service key itself is stored wrapped by the
 //! user's password (Argon2id). The master key, words and shards are never stored.
+//!
+//! This module owns every key format and operation (wrap, unwrap, rotate, rekey policy,
+//! recovery, export). It does not know the app's folder layout or its database: both come in
+//! through the two traits below, which the app implements (Muninn: `crate::paths::Paths`,
+//! over the storage engine in `crate::store::engine`). Storage only ever receives the raw DEK
+//! to apply, and opaque already-encrypted bytes to write.
 use super::*;
-use crate::paths::{Paths, write_private};
-use crate::store::{Store, now_ms};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// Where the key files live and how they are written (privately).
+pub trait KeyFiles {
+    /// The home shown in the not-initialized error.
+    fn home(&self) -> PathBuf;
+    fn envelope(&self) -> PathBuf;
+    fn service_keys_dir(&self) -> PathBuf;
+    /// Create the folders a first `init` needs.
+    fn prepare(&self) -> Result<()>;
+    fn ensure_dir(&self, dir: &Path) -> Result<()>;
+    /// Write already-encrypted (or public) bytes with private permissions.
+    fn write_private(&self, path: &Path, bytes: &[u8]) -> Result<()>;
+}
+
+/// The database the DEK keys. This module decides when to create, convert or rekey it; the
+/// implementation (the storage engine) does the work with the raw key it is handed.
+pub trait EncryptedDatabase {
+    fn database_exists(&self) -> bool;
+    /// Encrypt an existing plaintext database in place.
+    fn encrypt_plaintext(&self, dek: &Key32) -> Result<()>;
+    /// Open with the key, creating (and migrating) it if missing; fails on a wrong key.
+    fn open_keyed(&self, dek: &Key32) -> Result<()>;
+    /// Re-encrypt from `old` to `new`.
+    fn rekey_database(&self, old: &Key32, new: &Key32) -> Result<()>;
+    /// Delete a database a failed `init` created.
+    fn remove_database(&self);
+}
+
+fn now_ms() -> i64 {
+    chrono::Utc::now().timestamp_millis()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Envelope {
@@ -37,7 +72,7 @@ pub(crate) fn svc_aad(db_id: &str, v: u32) -> Vec<u8> {
 }
 
 impl Envelope {
-    pub fn load(paths: &Paths) -> Result<Option<Self>> {
+    pub fn load(paths: &(impl KeyFiles + ?Sized)) -> Result<Option<Self>> {
         let p = paths.envelope();
         if !p.exists() {
             return Ok(None);
@@ -45,20 +80,20 @@ impl Envelope {
         Ok(Some(toml::from_str(&std::fs::read_to_string(p)?)?))
     }
 
-    pub fn require(paths: &Paths) -> Result<Self> {
-        Self::load(paths)?.ok_or_else(|| Error::NotInitialized(paths.home.clone()))
+    pub fn require(paths: &(impl KeyFiles + ?Sized)) -> Result<Self> {
+        Self::load(paths)?.ok_or_else(|| Error::NotInitialized(paths.home()))
     }
 
-    pub fn save(&self, paths: &Paths) -> Result<()> {
-        write_private(&paths.envelope(), toml::to_string_pretty(self)?.as_bytes())
+    pub fn save(&self, paths: &(impl KeyFiles + ?Sized)) -> Result<()> {
+        paths.write_private(&paths.envelope(), toml::to_string_pretty(self)?.as_bytes())
     }
 }
 
-fn service_file(paths: &Paths, v: u32) -> std::path::PathBuf {
+fn service_file(paths: &(impl KeyFiles + ?Sized), v: u32) -> std::path::PathBuf {
     paths.service_keys_dir().join(format!("v{v}.toml"))
 }
 
-pub fn load_service_file(paths: &Paths, v: u32) -> Result<ServiceKeyFile> {
+pub fn load_service_file(paths: &(impl KeyFiles + ?Sized), v: u32) -> Result<ServiceKeyFile> {
     let p = service_file(paths, v);
     if !p.exists() {
         return Err(Error::Unlock(format!("service key v{v} is missing ({})", p.display())));
@@ -66,7 +101,7 @@ pub fn load_service_file(paths: &Paths, v: u32) -> Result<ServiceKeyFile> {
     Ok(toml::from_str(&std::fs::read_to_string(p)?)?)
 }
 
-pub fn service_files(paths: &Paths) -> Result<Vec<ServiceKeyFile>> {
+pub fn service_files(paths: &(impl KeyFiles + ?Sized)) -> Result<Vec<ServiceKeyFile>> {
     let mut v = Vec::new();
     if let Ok(rd) = std::fs::read_dir(paths.service_keys_dir()) {
         for e in rd.flatten() {
@@ -79,16 +114,16 @@ pub fn service_files(paths: &Paths) -> Result<Vec<ServiceKeyFile>> {
     Ok(v)
 }
 
-fn write_service_file(paths: &Paths, db_id: &str, v: u32, key: &Key32, password: &SecretString) -> Result<()> {
+fn write_service_file(paths: &(impl KeyFiles + ?Sized), db_id: &str, v: u32, key: &Key32, password: &SecretString) -> Result<()> {
     let f = ServiceKeyFile { version: v, created_at: now_ms(), retired: false, wrapped: Some(password_seal(password, &key.0, &svc_aad(db_id, v))?) };
-    write_private(&service_file(paths, v), toml::to_string_pretty(&f)?.as_bytes())
+    paths.write_private(&service_file(paths, v), toml::to_string_pretty(&f)?.as_bytes())
 }
 
-fn retire_service_file(paths: &Paths, v: u32) -> Result<()> {
+fn retire_service_file(paths: &(impl KeyFiles + ?Sized), v: u32) -> Result<()> {
     if let Ok(mut f) = load_service_file(paths, v) {
         f.retired = true;
         f.wrapped = None;
-        write_private(&service_file(paths, v), toml::to_string_pretty(&f)?.as_bytes())?;
+        paths.write_private(&service_file(paths, v), toml::to_string_pretty(&f)?.as_bytes())?;
     }
     Ok(())
 }
@@ -102,7 +137,7 @@ pub struct InitOutput {
 }
 
 /// Create master key, DEK, envelope and service key; encrypt (or create) the database.
-pub fn init(paths: &Paths, password: &SecretString) -> Result<InitOutput> {
+pub fn init(paths: &(impl KeyFiles + EncryptedDatabase + ?Sized), password: &SecretString) -> Result<InitOutput> {
     if paths.envelope().exists() {
         return Err(Error::invalid("keys", format!("already initialized ({})", paths.envelope().display())));
     }
@@ -111,7 +146,7 @@ pub fn init(paths: &Paths, password: &SecretString) -> Result<InitOutput> {
     if password.expose_secret().is_empty() {
         return Err(Error::invalid("password", "must not be empty"));
     }
-    paths.ensure()?;
+    paths.prepare()?;
     let master = Key32::random()?;
     let dek = Key32::random()?;
     let db_id = uuid::Uuid::new_v4().to_string();
@@ -120,11 +155,11 @@ pub fn init(paths: &Paths, password: &SecretString) -> Result<InitOutput> {
 
     // Encrypt an existing plaintext database in place, or create a new encrypted one.
     let mut migrated = false;
-    if paths.db.exists() {
-        encrypt_plain_db(&paths.db, &dek)?;
+    if paths.database_exists() {
+        paths.encrypt_plaintext(&dek)?;
         migrated = true;
     }
-    Store::open(&paths.db, Some(&dek.0))?;
+    paths.open_keyed(&dek)?;
 
     let finish = || -> Result<()> {
         write_service_file(paths, &db_id, 1, &svc, password)?;
@@ -141,7 +176,7 @@ pub fn init(paths: &Paths, password: &SecretString) -> Result<InitOutput> {
     if let Err(e) = finish() {
         // Undo a database this call created; its key is about to be lost.
         if !migrated {
-            let _ = std::fs::remove_file(&paths.db);
+            paths.remove_database();
         }
         let _ = std::fs::remove_file(service_file(paths, 1));
         return Err(e);
@@ -149,31 +184,8 @@ pub fn init(paths: &Paths, password: &SecretString) -> Result<InitOutput> {
     Ok(InitOutput { db_id, words: to_words(&master)?, shards: split_shards(&master)?, migrated_plain_db: migrated })
 }
 
-fn encrypt_plain_db(path: &Path, dek: &Key32) -> Result<()> {
-    let tmp = path.with_extension("encrypting");
-    if tmp.exists() {
-        std::fs::remove_file(&tmp)?;
-    }
-    {
-        let conn = rusqlite::Connection::open(path)?;
-        conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get::<_, i64>(0))
-            .map_err(|_| Error::Unlock("existing database is not a plaintext SQLite file".into()))?;
-        let mut lit = Zeroizing::new(format!("x'{}'", hex::encode(dek.0)));
-        conn.execute(&format!("ATTACH DATABASE ?1 AS enc KEY \"{}\"", lit.as_str()), [tmp.to_string_lossy()])?;
-        lit.zeroize();
-        conn.query_row("SELECT sqlcipher_export('enc')", [], |_| Ok(()))?;
-        conn.execute("DETACH DATABASE enc", [])?;
-    }
-    for ext in ["database-wal", "database-shm"] {
-        let _ = std::fs::remove_file(path.with_extension(ext));
-    }
-    std::fs::rename(&tmp, path)?;
-    crate::paths::set_mode(path, 0o600)?;
-    Ok(())
-}
-
 /// Unlock the DEK with the password-wrapped current service key.
-pub fn unlock_with_password(paths: &Paths, password: &SecretString) -> Result<Key32> {
+pub fn unlock_with_password(paths: &(impl KeyFiles + ?Sized), password: &SecretString) -> Result<Key32> {
     let env = Envelope::require(paths)?;
     let f = load_service_file(paths, env.service_version)?;
     let w = f.wrapped.ok_or_else(|| Error::Unlock("current service key is retired".into()))?;
@@ -182,14 +194,14 @@ pub fn unlock_with_password(paths: &Paths, password: &SecretString) -> Result<Ke
 }
 
 /// Unlock the DEK with the master key.
-pub fn unlock_with_master(paths: &Paths, master: &Key32) -> Result<Key32> {
+pub fn unlock_with_master(paths: &(impl KeyFiles + ?Sized), master: &Key32) -> Result<Key32> {
     let env = Envelope::require(paths)?;
     let kek = master_kek(master, &env.db_id)?;
     Key32::from_slice(&open(&kek, &env.master_wrap, DEK_AAD).map_err(|_| Error::Unlock("master key does not match this database".into()))?)
 }
 
 /// Rotate: derive service key v{n+1}, re-wrap the DEK, retire the old one.
-pub fn rotate(paths: &Paths, master: &Key32, password: &SecretString) -> Result<u32> {
+pub fn rotate(paths: &(impl KeyFiles + ?Sized), master: &Key32, password: &SecretString) -> Result<u32> {
     let mut env = Envelope::require(paths)?;
     let dek = unlock_with_master(paths, master)?;
     let old = env.service_version;
@@ -204,17 +216,13 @@ pub fn rotate(paths: &Paths, master: &Key32, password: &SecretString) -> Result<
 }
 
 /// Full rekey: new DEK, `PRAGMA rekey`, re-wrap by service key and master KEK.
-pub fn rekey(paths: &Paths, master: &Key32) -> Result<()> {
+pub fn rekey(paths: &(impl KeyFiles + EncryptedDatabase + ?Sized), master: &Key32) -> Result<()> {
     let mut env = Envelope::require(paths)?;
     let old = unlock_with_master(paths, master)?;
     let new = Key32::random()?;
-    {
-        let store = Store::open(&paths.db, Some(&old.0))?;
-        store.conn.query_row("PRAGMA journal_mode = DELETE", [], |_| Ok(()))?;
-        store.rekey(&new.0)?;
-    }
+    paths.rekey_database(&old, &new)?;
     // Verify before committing the new envelope.
-    Store::open(&paths.db, Some(&new.0))?;
+    paths.open_keyed(&new)?;
     let svc = service_key(master, &env.db_id, env.service_version)?;
     env.service_wrap = seal(&svc, &new.0, DEK_AAD)?;
     env.master_wrap = seal(&master_kek(master, &env.db_id)?, &new.0, DEK_AAD)?;
@@ -223,7 +231,7 @@ pub fn rekey(paths: &Paths, master: &Key32) -> Result<()> {
 }
 
 /// Recover access: verify the master, then re-wrap the current service key with a (new) password.
-pub fn recover(paths: &Paths, master: &Key32, new_password: &SecretString) -> Result<()> {
+pub fn recover(paths: &(impl KeyFiles + ?Sized), master: &Key32, new_password: &SecretString) -> Result<()> {
     let env = Envelope::require(paths)?;
     unlock_with_master(paths, master)?;
     let svc = service_key(master, &env.db_id, env.service_version)?;
@@ -231,7 +239,7 @@ pub fn recover(paths: &Paths, master: &Key32, new_password: &SecretString) -> Re
 }
 
 /// Verify a master key matches this database.
-pub fn verify_master(paths: &Paths, master: &Key32) -> Result<()> {
+pub fn verify_master(paths: &(impl KeyFiles + ?Sized), master: &Key32) -> Result<()> {
     unlock_with_master(paths, master).map(|_| ())
 }
 
@@ -256,13 +264,19 @@ impl ExportItem {
 }
 
 /// Write each item as its own age (password) file. Returns the written paths.
-pub fn export(paths: &Paths, master: &Key32, password: &SecretString, out: &Path, items: &[ExportItem]) -> Result<Vec<std::path::PathBuf>> {
+pub fn export(
+    paths: &(impl KeyFiles + ?Sized),
+    master: &Key32,
+    password: &SecretString,
+    out: &Path,
+    items: &[ExportItem],
+) -> Result<Vec<std::path::PathBuf>> {
     verify_master(paths, master)?;
-    crate::paths::ensure_dir(out)?;
+    paths.ensure_dir(out)?;
     let mut written = Vec::new();
     let mut put = |name: &str, data: &[u8]| -> Result<()> {
         let p = out.join(name);
-        write_private(&p, &age_encrypt(password, data)?)?;
+        paths.write_private(&p, &age_encrypt(password, data)?)?;
         written.push(p);
         Ok(())
     };
@@ -296,6 +310,74 @@ pub fn read_maybe_age(path: &Path, password: impl FnOnce() -> Result<SecretStrin
 mod tests {
     use super::*;
     use crate::model::{Bar, Duration, Symbol};
+    use crate::paths::Paths;
+    use crate::store::Store;
+
+    /// The keyring needs nothing but its two traits: a fake home (no app layout, no SQLCipher)
+    /// sees exactly the calls the key policy makes, with the DEK the envelope wraps.
+    #[test]
+    fn keyring_drives_storage_only_through_its_traits() {
+        use std::cell::RefCell;
+        struct Fake {
+            dir: PathBuf,
+            calls: RefCell<Vec<String>>,
+            keys: RefCell<Vec<[u8; 32]>>,
+        }
+        impl KeyFiles for Fake {
+            fn home(&self) -> PathBuf {
+                self.dir.clone()
+            }
+            fn envelope(&self) -> PathBuf {
+                self.dir.join("envelope.toml")
+            }
+            fn service_keys_dir(&self) -> PathBuf {
+                self.dir.join("service")
+            }
+            fn prepare(&self) -> Result<()> {
+                Ok(std::fs::create_dir_all(self.service_keys_dir())?)
+            }
+            fn ensure_dir(&self, d: &Path) -> Result<()> {
+                Ok(std::fs::create_dir_all(d)?)
+            }
+            fn write_private(&self, p: &Path, b: &[u8]) -> Result<()> {
+                Ok(std::fs::write(p, b)?)
+            }
+        }
+        impl EncryptedDatabase for Fake {
+            fn database_exists(&self) -> bool {
+                false
+            }
+            fn encrypt_plaintext(&self, _: &Key32) -> Result<()> {
+                unreachable!()
+            }
+            fn open_keyed(&self, k: &Key32) -> Result<()> {
+                self.calls.borrow_mut().push("open".into());
+                self.keys.borrow_mut().push(k.0);
+                Ok(())
+            }
+            fn rekey_database(&self, old: &Key32, new: &Key32) -> Result<()> {
+                self.calls.borrow_mut().push("rekey".into());
+                assert_eq!(self.keys.borrow().last(), Some(&old.0));
+                assert_ne!(old.0, new.0);
+                Ok(())
+            }
+            fn remove_database(&self) {
+                self.calls.borrow_mut().push("remove".into());
+            }
+        }
+        let t = tempfile::tempdir().unwrap();
+        let f = Fake { dir: t.path().join("k"), calls: Default::default(), keys: Default::default() };
+        let pw = SecretString::from("pw".to_string());
+        let out = init(&f, &pw).unwrap();
+        let dek = unlock_with_password(&f, &pw).unwrap();
+        assert_eq!(f.keys.borrow()[0], dek.0, "the database is opened with the DEK the envelope wraps");
+        let master = from_words(&out.words).unwrap();
+        rekey(&f, &master).unwrap();
+        let dek2 = unlock_with_password(&f, &pw).unwrap();
+        assert_eq!(*f.calls.borrow(), ["open", "rekey", "open"]);
+        assert_eq!(f.keys.borrow()[1], dek2.0);
+        assert!(f.envelope().exists() && !t.path().join("k").join("storage").exists());
+    }
 
     fn setup() -> (tempfile::TempDir, Paths) {
         let t = tempfile::tempdir().unwrap();

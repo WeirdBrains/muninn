@@ -7,6 +7,7 @@ use std::path::Path;
 pub mod archive;
 pub mod authors;
 pub mod code;
+pub mod engine;
 pub mod history;
 pub mod journals;
 pub mod live;
@@ -248,6 +249,9 @@ pub struct BarFilter {
     pub offset: Option<i64>,
 }
 
+/// How the storage engine names this database in errors ("wrong key or not a muninn database").
+const DB_KIND: &str = "muninn";
+
 pub struct Store {
     pub conn: Connection,
     /// Rule engine state for this connection (see [`crate::rules`]).
@@ -264,20 +268,7 @@ pub struct UpsertCounts {
 impl Store {
     /// Open (creating if needed) with an optional raw 256-bit SQLCipher key.
     pub fn open(path: &Path, key: Option<&[u8; 32]>) -> Result<Self> {
-        if let Some(parent) = path.parent() {
-            crate::paths::ensure_dir(parent)?;
-        }
-        let existed = path.exists();
-        let conn = Connection::open(path)?;
-        Self::apply_key(&conn, key)?;
-        conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        // Verify the key works.
-        conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get::<_, i64>(0))
-            .map_err(|e| Error::Unlock(format!("wrong key or not a muninn database ({e})")))?;
-        if !existed {
-            crate::paths::set_mode(path, 0o600)?;
-        }
-        let mut s = Self::wrap(conn);
+        let mut s = Self::wrap(engine::open(path, key, DB_KIND)?);
         s.migrate()?;
         s.finish_bars_upgrade()?;
         s.sync_ensure()?;
@@ -287,12 +278,7 @@ impl Store {
     /// Open an existing store read-only: no migrations, no writes (front ends that only display,
     /// such as the Flutter app's dashboard). Fails if the file is missing or the key is wrong.
     pub fn open_readonly(path: &Path, key: Option<&[u8; 32]>) -> Result<Self> {
-        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        Self::apply_key(&conn, key)?;
-        conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get::<_, i64>(0))
-            .map_err(|e| Error::Unlock(format!("wrong key or not a muninn database ({e})")))?;
-        Ok(Self::wrap(conn))
+        Ok(Self::wrap(engine::open_readonly(path, key, DB_KIND)?))
     }
 
     /// Bigger page cache for bulk reads (TUI loader connection).
@@ -322,24 +308,12 @@ impl Store {
     }
 
     pub fn apply_key(conn: &Connection, key: Option<&[u8; 32]>) -> Result<()> {
-        // Keep SQLCipher's own logging off stderr (wrong-key attempts are reported as errors by us).
-        let _ = conn.query_row("PRAGMA cipher_log_level = NONE", [], |_| Ok(()));
-        if let Some(k) = key {
-            let mut lit = format!("x'{}'", hex::encode(k));
-            let r = conn.pragma_update(None, "key", &lit);
-            zeroize::Zeroize::zeroize(&mut lit);
-            r?;
-        }
-        Ok(())
+        engine::apply_key(conn, key)
     }
 
     /// Re-encrypt the database with a new key (`PRAGMA rekey`).
     pub fn rekey(&self, new_key: &[u8; 32]) -> Result<()> {
-        let mut lit = format!("x'{}'", hex::encode(new_key));
-        let r = self.conn.pragma_update(None, "rekey", &lit);
-        zeroize::Zeroize::zeroize(&mut lit);
-        r?;
-        Ok(())
+        engine::rekey(&self.conn, new_key)
     }
 
     fn migrate(&mut self) -> Result<()> {
@@ -347,41 +321,33 @@ impl Store {
     }
 
     /// Apply migrations up to `upto` (tests build older schemas with this).
+    /// The schema and data upgrades are Muninn's; the runner is the storage engine's.
     fn migrate_to(&mut self, upto: usize) -> Result<()> {
-        self.conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
-        self.conn.execute_batch("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);")?;
-        let v: i64 = self.conn.query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
-        let tx = self.conn.transaction()?;
-        for (i, m) in MIGRATIONS.iter().enumerate().take(upto) {
-            let target = i as i64 + 1;
-            if v < target {
-                tx.execute_batch(m)?;
-                if std::ptr::eq(*m, models::MIGRATION_2_16) {
-                    models::upgrade_bars_2_16(&tx)?;
+        engine::migrate(&mut self.conn, MIGRATIONS, upto, |tx, i| {
+            let m = MIGRATIONS[i];
+            if std::ptr::eq(m, models::MIGRATION_2_16) {
+                models::upgrade_bars_2_16(tx)?;
+            }
+            if std::ptr::eq(m, schedules::MIGRATION) {
+                schedules::upgrade_2_25(tx)?;
+            }
+            if i == 0 {
+                for b in KNOWN_BASES {
+                    tx.execute("INSERT OR IGNORE INTO assets(name, is_quote) VALUES (?1, 0)", [b])?;
                 }
-                if std::ptr::eq(*m, schedules::MIGRATION) {
-                    schedules::upgrade_2_25(&tx)?;
+                for q in KNOWN_QUOTES {
+                    tx.execute("INSERT INTO assets(name, is_quote) VALUES (?1, 1) ON CONFLICT(name) DO UPDATE SET is_quote = 1", [q])?;
                 }
-                tx.execute("INSERT INTO schema_version(version) VALUES (?1)", [target])?;
-                if target == 1 {
-                    for b in KNOWN_BASES {
-                        tx.execute("INSERT OR IGNORE INTO assets(name, is_quote) VALUES (?1, 0)", [b])?;
-                    }
-                    for q in KNOWN_QUOTES {
-                        tx.execute("INSERT INTO assets(name, is_quote) VALUES (?1, 1) ON CONFLICT(name) DO UPDATE SET is_quote = 1", [q])?;
-                    }
-                    for (a, c) in KNOWN_ALIASES {
-                        tx.execute("INSERT OR IGNORE INTO asset_aliases(alias, canonical) VALUES (?1, ?2)", [a, c])?;
-                    }
+                for (a, c) in KNOWN_ALIASES {
+                    tx.execute("INSERT OR IGNORE INTO asset_aliases(alias, canonical) VALUES (?1, ?2)", [a, c])?;
                 }
             }
-        }
-        tx.commit()?;
-        Ok(())
+            Ok(())
+        })
     }
 
     pub fn schema_version(&self) -> Result<i64> {
-        Ok(self.conn.query_row("SELECT MAX(version) FROM schema_version", [], |r| r.get(0))?)
+        engine::schema_version(&self.conn)
     }
 
     // ---- sources ----
