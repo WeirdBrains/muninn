@@ -1,4 +1,4 @@
-# Solarized for Muninn. Palette from the published theme; roles map palette names (or "#rrggbb").
+# Solarized theme. Palette from the published theme; roles map palette names (or "#rrggbb").
 [meta]
 name = "solarized"
 display_name = "Solarized"

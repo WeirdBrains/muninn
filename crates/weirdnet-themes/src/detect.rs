@@ -8,12 +8,22 @@ pub fn system_variant() -> Variant {
 }
 
 /// Query the terminal background (OSC 11) when attached to a terminal.
+/// Without the `terminal-background` feature this is always `None`.
 pub fn terminal_variant() -> Option<Variant> {
     if !std::io::stdout().is_terminal() || !std::io::stdin().is_terminal() {
         return None;
     }
-    let luma = terminal_light::luma().ok()?;
-    Some(if luma < 0.5 { Variant::Dark } else { Variant::Light })
+    terminal_luma().map(|luma| if luma < 0.5 { Variant::Dark } else { Variant::Light })
+}
+
+#[cfg(feature = "terminal-background")]
+fn terminal_luma() -> Option<f32> {
+    terminal_light::luma().ok()
+}
+
+#[cfg(not(feature = "terminal-background"))]
+fn terminal_luma() -> Option<f32> {
+    None
 }
 
 fn run(cmd: &str, args: &[&str]) -> Option<String> {

@@ -39,7 +39,7 @@ Users never need Rust: release builds ship the compiled library.
   (see [Keybindings](#keybindings) below).
 - **Phone layout** (narrower than 720 px): bottom navigation (Home, Data, Projects, Net,
   More), 48 px+ targets, safe areas, theme as a bottom sheet; nothing is hover-only.
-- **Themes:** every theme from `assets/themes/*.toml` plus your own in `<home>/themes/`,
+- **Themes:** every theme from `crates/weirdnet-themes/themes/*.toml` plus your own in `<home>/themes/`,
   light, dark or system (Theme menu, or the palette button on phones). The app starts on
   the theme in `preferences.toml` and saves your choice there (`[theme]`, the same as
   `mnnn theme set` / `mnnn theme mode`), so the TUI and the app follow each other.

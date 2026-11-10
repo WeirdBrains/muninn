@@ -483,7 +483,7 @@ impl App {
             PromptKind::ThemeImport => {
                 let r = std::fs::read_to_string(forms::expand(input))
                     .map_err(crate::Error::from)
-                    .and_then(|s| crate::theme::ThemeFile::parse(&s))
+                    .and_then(|s| Ok(crate::theme::ThemeFile::parse(&s)?))
                     .and_then(|t| crate::theme::save(&self.paths, &t).map(|_| t.meta.name.clone()));
                 match r {
                     Ok(n) => {

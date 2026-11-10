@@ -1,4 +1,4 @@
-# One for Muninn. Palette from the published theme; roles map palette names (or "#rrggbb").
+# One theme. Palette from the published theme; roles map palette names (or "#rrggbb").
 [meta]
 name = "one"
 display_name = "One"

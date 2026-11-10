@@ -1,0 +1,33 @@
+[package]
+name = "weirdnet-themes"
+# Independent SemVer: not tied to the Muninn app's workspace version.
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Weirdnet themes: a TOML theme format with dark and light variants, 21 semantic colour roles, built-in palettes, contrast checks and optional ratatui colours."
+authors = ["Michael Christenson II <m3talsmith@gmail.com>"]
+license = "BSD-3-Clause"
+repository = "https://github.com/WeirdBrains/muninn"
+readme = "README.md"
+keywords = ["theme", "colors", "toml", "terminal", "ratatui"]
+categories = ["gui", "command-line-interface"]
+include = ["src/**", "themes/*.toml", "README.md", "LICENSE"]
+# Not published: staged in the Muninn workspace until a publication decision.
+publish = false
+
+[features]
+default = ["terminal-background"]
+# `Mode::System` also asks the terminal for its background (OSC 11) before the OS preference.
+terminal-background = ["dep:terminal-light"]
+# Resolve variants to ratatui colours by terminal colour depth.
+ratatui = ["dep:ratatui"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.9"
+thiserror = "2"
+terminal-light = { version = "1", optional = true }
+ratatui = { version = "0.30", optional = true, default-features = false }
+
+[dev-dependencies]
+tempfile = "3"

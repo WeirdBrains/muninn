@@ -1,4 +1,4 @@
-//! The shared themes (`assets/themes/*.toml`, plus any in `<home>/themes/`), resolved to hex roles.
+//! The shared themes (`crates/weirdnet-themes/themes/*.toml`, plus any in `<home>/themes/`), resolved to hex roles.
 use super::info::paths;
 use muninn_core::prefs::{Preferences, ThemeMode};
 use muninn_core::theme::{self, Variant};

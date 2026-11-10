@@ -155,9 +155,9 @@ assets = [
 strip = "symbols"
 
 [workspace]
-members = ["crates/muninn-core", "crates/muninn-ffi"]
-# plain `cargo build/test/clippy` at the root covers all three (not the vendored crate)
-default-members = [".", "crates/muninn-core", "crates/muninn-ffi"]
+members = ["crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes"]
+# plain `cargo build/test/clippy` at the root covers all of them (not the vendored crate)
+default-members = [".", "crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes"]
 exclude = ["vendor/python-ast"]
 
 [workspace.dependencies]

@@ -20,7 +20,7 @@ fn the_hero_is_the_raven_and_a_screenshot_with_no_block_letter_title() {
 #[test]
 fn the_site_uses_the_default_theme_colours() {
     let css = read("site/web/styles.css");
-    let theme: toml::Value = toml::from_str(&read("assets/themes/tokyo-night.toml")).unwrap();
+    let theme: toml::Value = toml::from_str(&read("crates/weirdnet-themes/themes/tokyo-night.toml")).unwrap();
     for (mode, block) in [("dark", css.split("@media").next().unwrap()), ("light", css.split("@media").nth(1).unwrap())] {
         let pal = &theme[mode]["palette"];
         for (var, name) in

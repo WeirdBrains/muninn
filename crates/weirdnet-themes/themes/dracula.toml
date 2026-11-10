@@ -1,4 +1,4 @@
-# Dracula for Muninn. Palette from the published theme; roles map palette names (or "#rrggbb").
+# Dracula theme. Palette from the published theme; roles map palette names (or "#rrggbb").
 [meta]
 name = "dracula"
 display_name = "Dracula"

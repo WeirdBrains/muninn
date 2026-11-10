@@ -1,6 +1,8 @@
-//! Terminal rendering of a theme (ratatui colors by color depth). The only part of the
-//! theme module that depends on ratatui.
+//! Terminal rendering of a theme: colour depth always; ratatui colours with the `ratatui`
+//! feature (the only part of the crate that depends on ratatui).
+#[cfg(feature = "ratatui")]
 use super::{VariantDef, dist, nearest_256};
+#[cfg(feature = "ratatui")]
 use ratatui::style::Color;
 
 /// Terminal color depth.
@@ -28,6 +30,7 @@ impl ColorDepth {
     }
 }
 
+#[cfg(feature = "ratatui")]
 const ANSI16: [(u8, u8, u8); 16] = [
     (0, 0, 0),
     (128, 0, 0),
@@ -47,6 +50,7 @@ const ANSI16: [(u8, u8, u8); 16] = [
     (255, 255, 255),
 ];
 
+#[cfg(feature = "ratatui")]
 pub fn to_color(c: (u8, u8, u8), depth: ColorDepth) -> Color {
     match depth {
         ColorDepth::TrueColor => Color::Rgb(c.0, c.1, c.2),
@@ -58,6 +62,7 @@ pub fn to_color(c: (u8, u8, u8), depth: ColorDepth) -> Color {
     }
 }
 
+#[cfg(feature = "ratatui")]
 /// A resolved variant ready for rendering.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Theme {
@@ -79,6 +84,7 @@ pub struct Theme {
     pub charts: [Color; 6],
 }
 
+#[cfg(feature = "ratatui")]
 impl Theme {
     pub fn from_variant(v: &VariantDef) -> Self {
         Self::from_variant_depth(v, ColorDepth::detect())

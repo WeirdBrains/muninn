@@ -4456,7 +4456,6 @@ dependencies = [
  "subsetter",
  "tar",
  "tempfile",
- "terminal-light",
  "thiserror 2.0.21",
  "time",
  "tokio",
@@ -4473,6 +4472,7 @@ dependencies = [
  "url",
  "uuid",
  "vsss-rs",
+ "weirdnet-themes",
  "x25519-dalek 2.0.1",
  "x509-parser",
  "zeroize",
@@ -8916,6 +8916,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
 dependencies = [
  "rustls-pki-types",
+]
+
+[[package]]
+name = "weirdnet-themes"
+version = "0.1.0"
+dependencies = [
+ "ratatui",
+ "serde",
+ "tempfile",
+ "terminal-light",
+ "thiserror 2.0.21",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]

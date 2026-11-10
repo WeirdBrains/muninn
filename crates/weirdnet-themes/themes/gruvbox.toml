@@ -1,4 +1,4 @@
-# Gruvbox for Muninn. Palette from the published theme; roles map palette names (or "#rrggbb").
+# Gruvbox theme. Palette from the published theme; roles map palette names (or "#rrggbb").
 [meta]
 name = "gruvbox"
 display_name = "Gruvbox"

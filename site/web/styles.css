@@ -1,4 +1,4 @@
-/* The Muninn theme (Tokyo Night, the app's default; assets/themes/tokyo-night.toml).
+/* The Muninn theme (Tokyo Night, the app's default; crates/weirdnet-themes/themes/tokyo-night.toml).
    Roles as in the TUI: header = blue, accent = magenta, muted = comment. A cargo test
    checks these colours against the theme file. */
 :root {

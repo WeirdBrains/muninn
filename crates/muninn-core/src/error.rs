@@ -45,3 +45,14 @@ impl Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Theme errors keep their messages and kinds.
+impl From<weirdnet_themes::ThemeError> for Error {
+    fn from(e: weirdnet_themes::ThemeError) -> Self {
+        match e {
+            weirdnet_themes::ThemeError::Invalid { what, msg } => Error::Invalid { what, msg },
+            weirdnet_themes::ThemeError::Io(e) => Error::Io(e),
+            weirdnet_themes::ThemeError::TomlSer(e) => Error::TomlSer(e),
+        }
+    }
+}

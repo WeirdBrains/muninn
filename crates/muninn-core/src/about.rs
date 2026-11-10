@@ -49,7 +49,7 @@ mod tests {
         let ofl = read("assets/fonts/LICENSE-OFL.txt");
         assert!(ofl.contains("SIL OPEN FONT LICENSE Version 1.1") && ofl.contains("Red Hat, Inc.") && ofl.contains("Google Corporation"));
         assert!(super::CREDITS[0].contains("Open Font License 1.1") && super::CREDITS[0].contains("Red Hat"));
-        for t in std::fs::read_dir(format!("{root}assets/themes")).unwrap() {
+        for t in std::fs::read_dir(format!("{root}crates/weirdnet-themes/themes")).unwrap() {
             let t: toml::Value = toml::from_str(&std::fs::read_to_string(t.unwrap().path()).unwrap()).unwrap();
             let name = t["meta"]["display_name"].as_str().unwrap();
             assert!(super::CREDITS[1].contains(name), "About credits lack the {name} palette");

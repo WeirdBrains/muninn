@@ -67,11 +67,18 @@ impl crate::theme::ThemeDirs for Paths {
     fn theme_dir(&self, name: &str) -> PathBuf {
         Paths::theme_dir(self, name)
     }
-    fn ensure_dir(&self, dir: &Path) -> Result<()> {
-        ensure_dir(dir)
+    fn ensure_dir(&self, dir: &Path) -> std::io::Result<()> {
+        ensure_dir(dir).map_err(into_io)
     }
-    fn write_private(&self, path: &Path, bytes: &[u8]) -> Result<()> {
-        write_private(path, bytes)
+    fn write_private(&self, path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+        write_private(path, bytes).map_err(into_io)
+    }
+}
+
+fn into_io(e: Error) -> std::io::Error {
+    match e {
+        Error::Io(e) => e,
+        e => std::io::Error::other(e.to_string()),
     }
 }
 
