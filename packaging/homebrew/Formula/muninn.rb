@@ -4,7 +4,7 @@
 class Muninn < Formula
   desc "Data goes in, your magic transforms it"
   homepage "https://github.com/WeirdBrains/muninn"
-  version "2.22.3"
+  version "2.23.0"
   license "BSD-3-Clause"
 
   base = "https://github.com/WeirdBrains/muninn/releases/download/v#{version}"

@@ -26,9 +26,9 @@ translated in process, so no Python install is needed. See
 
 ### Windows: setup.exe
 
-1. Download `muninn-2.22.3-x86_64-windows-setup.exe` (on an ARM PC,
-   `muninn-2.22.3-aarch64-windows-setup.exe`) from the
-   [v2.22.3 release](https://github.com/WeirdBrains/muninn/releases/tag/v2.22.3).
+1. Download `muninn-2.23.0-x86_64-windows-setup.exe` (on an ARM PC,
+   `muninn-2.23.0-aarch64-windows-setup.exe`) from the
+   [v2.23.0 release](https://github.com/WeirdBrains/muninn/releases/tag/v2.23.0).
 2. Run it. The installer is not code-signed yet, so Windows SmartScreen may warn
    "Windows protected your PC" (it does for unsigned downloads it hasn't seen often):
    click **More info**, then **Run anyway**. Nothing else is different about it.
@@ -37,7 +37,7 @@ translated in process, so no Python install is needed. See
    **Muninn** Start Menu entry that opens the TUI (setting up keys the first time).
 
 Open a **new** terminal (old ones keep the old `PATH`) and run `mnnn --version`.
-Silent install, e.g. for scripts: `muninn-2.22.3-x86_64-windows-setup.exe /VERYSILENT /SUPPRESSMSGBOXES`.
+Silent install, e.g. for scripts: `muninn-2.23.0-x86_64-windows-setup.exe /VERYSILENT /SUPPRESSMSGBOXES`.
 
 **Windows Firewall:** the first time Muninn starts its network node, Windows Defender
 Firewall asks whether `mnnn.exe` may communicate on private and public networks. That is
@@ -81,8 +81,8 @@ waits behind other windows). Give it a minute and look for the prompt (**More in
 
 ### macOS: dmg
 
-1. Download `muninn-2.22.3-macos.dmg` from the
-   [v2.22.3 release](https://github.com/WeirdBrains/muninn/releases/tag/v2.22.3). One
+1. Download `muninn-2.23.0-macos.dmg` from the
+   [v2.23.0 release](https://github.com/WeirdBrains/muninn/releases/tag/v2.23.0). One
    universal app runs on Apple silicon and Intel.
 2. Open the dmg and drag **Muninn** onto **Applications**.
 3. Muninn.app is not notarized, so the first time, **right-click** (or Control-click)
@@ -120,26 +120,26 @@ step 3 under [macOS: dmg](#macos-dmg). Uninstall: `brew uninstall muninn` (or
 
 Each release is built and checked locally, and its files are attached to its page under
 [GitHub Releases](https://github.com/WeirdBrains/muninn/releases). The latest is
-[v2.22.3](https://github.com/WeirdBrains/muninn/releases/tag/v2.22.3). Every release has
+[v2.23.0](https://github.com/WeirdBrains/muninn/releases/tag/v2.23.0). Every release has
 17 files:
 
-| File (v2.22.3) | For |
+| File (v2.23.0) | For |
 |---|---|
-| `muninn-2.22.3-x86_64-unknown-linux-gnu.tar.gz`, `muninn-2.22.3-aarch64-unknown-linux-gnu.tar.gz` | any Linux |
-| `muninn-2.22.3-x86_64-apple-darwin.tar.gz`, `muninn-2.22.3-aarch64-apple-darwin.tar.gz` | macOS (Intel, Apple silicon) |
-| `muninn_2.22.3-1_amd64.deb`, `muninn_2.22.3-1_arm64.deb` | Debian, Ubuntu |
-| `muninn-2.22.3-1.x86_64.rpm`, `muninn-2.22.3-1.aarch64.rpm` | Fedora, RHEL |
-| `muninn-bin-2.22.3-1-x86_64.pkg.tar.zst`, `muninn-bin-2.22.3-1-aarch64.pkg.tar.zst` | Arch Linux |
-| `muninn-2.22.3-x86_64-windows-setup.exe`, `muninn-2.22.3-aarch64-windows-setup.exe` | Windows installer (x64, arm64) |
-| `muninn-2.22.3-macos.dmg` | macOS Muninn.app (universal) |
-| `muninn-2.22.3-x86_64-pc-windows-gnullvm.zip`, `muninn-2.22.3-aarch64-pc-windows-gnullvm.zip` | Windows, portable (x64, arm64) |
-| `muninn-2.22.3-packaging.tar.gz` | the Homebrew formula and cask, Arch PKGBUILD and winget manifests, with this release's checksums filled in |
+| `muninn-2.23.0-x86_64-unknown-linux-gnu.tar.gz`, `muninn-2.23.0-aarch64-unknown-linux-gnu.tar.gz` | any Linux |
+| `muninn-2.23.0-x86_64-apple-darwin.tar.gz`, `muninn-2.23.0-aarch64-apple-darwin.tar.gz` | macOS (Intel, Apple silicon) |
+| `muninn_2.23.0-1_amd64.deb`, `muninn_2.23.0-1_arm64.deb` | Debian, Ubuntu |
+| `muninn-2.23.0-1.x86_64.rpm`, `muninn-2.23.0-1.aarch64.rpm` | Fedora, RHEL |
+| `muninn-bin-2.23.0-1-x86_64.pkg.tar.zst`, `muninn-bin-2.23.0-1-aarch64.pkg.tar.zst` | Arch Linux |
+| `muninn-2.23.0-x86_64-windows-setup.exe`, `muninn-2.23.0-aarch64-windows-setup.exe` | Windows installer (x64, arm64) |
+| `muninn-2.23.0-macos.dmg` | macOS Muninn.app (universal) |
+| `muninn-2.23.0-x86_64-pc-windows-gnullvm.zip`, `muninn-2.23.0-aarch64-pc-windows-gnullvm.zip` | Windows, portable (x64, arm64) |
+| `muninn-2.23.0-packaging.tar.gz` | the Homebrew formula and cask, Arch PKGBUILD and winget manifests, with this release's checksums filled in |
 | `SHA256SUMS` | checksums for all of the above |
 
 Download from the command line and check it, for example:
 
 ```sh
-ver=2.22.3
+ver=2.23.0
 base=https://github.com/WeirdBrains/muninn/releases/download/v$ver
 curl -LO $base/muninn-$ver-x86_64-unknown-linux-gnu.tar.gz -LO $base/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS      # macOS: shasum -a 256 --ignore-missing -c SHA256SUMS
@@ -147,7 +147,7 @@ sha256sum --ignore-missing -c SHA256SUMS      # macOS: shasum -a 256 --ignore-mi
 
 On Windows (PowerShell) see [Windows (portable zip)](#windows-portable-zip) below.
 
-(`gh release download v2.22.3` does the same if you have the GitHub CLI.) Muninn is
+(`gh release download v2.23.0` does the same if you have the GitHub CLI.) Muninn is
 BSD-3-Clause licensed; every package carries the `LICENSE`.
 
 Installing or uninstalling never touches your data in `~/.muninn` (or `MUNINN_HOME`);
@@ -157,10 +157,10 @@ delete that folder yourself to remove it.
 
 ```sh
 t=x86_64-unknown-linux-gnu     # or aarch64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin
-tar -xzf muninn-2.22.3-$t.tar.gz
+tar -xzf muninn-2.23.0-$t.tar.gz
 mkdir -p ~/.local/bin ~/.local/share/man/man1
-install -m755 muninn-2.22.3-$t/mnnn ~/.local/bin/mnnn
-cp muninn-2.22.3-$t/man/*.1 ~/.local/share/man/man1/
+install -m755 muninn-2.23.0-$t/mnnn ~/.local/bin/mnnn
+cp muninn-2.23.0-$t/man/*.1 ~/.local/share/man/man1/
 ```
 
 If `mnnn` is not found afterwards, `~/.local/bin` is not on your `PATH` (the default on
@@ -169,7 +169,7 @@ or `~/.bashrc` and open a new terminal.
 
 macOS: the binary is not notarized. Downloaded with `curl` it runs as is; downloaded in a
 browser, Gatekeeper blocks it ("cannot be opened"), so clear the flag first:
-`xattr -d com.apple.quarantine muninn-2.22.3-$t.tar.gz` (before extracting) or
+`xattr -d com.apple.quarantine muninn-2.23.0-$t.tar.gz` (before extracting) or
 `xattr -d com.apple.quarantine ~/.local/bin/mnnn`.
 
 Uninstall: remove `~/.local/bin/mnnn` and `~/.local/share/man/man1/mnnn*.1`.
@@ -186,11 +186,11 @@ makepkg -si            # builds the committed checkout, installs package "muninn
 **Prebuilt (`muninn-bin`, no Rust):** install the release's ready-made package:
 
 ```sh
-sudo pacman -U muninn-bin-2.22.3-1-x86_64.pkg.tar.zst     # or …-aarch64.pkg.tar.zst
+sudo pacman -U muninn-bin-2.23.0-1-x86_64.pkg.tar.zst     # or …-aarch64.pkg.tar.zst
 ```
 
 Or build it yourself from the release's PKGBUILD (`packaging/arch/PKGBUILD` in
-`muninn-2.22.3-packaging.tar.gz`, which has the checksums filled in) with `makepkg -si`. If
+`muninn-2.23.0-packaging.tar.gz`, which has the checksums filled in) with `makepkg -si`. If
 `muninn-bin` is in the AUR when you read this, `yay -S muninn-bin` or `paru -S muninn-bin`
 installs the same package.
 
@@ -208,7 +208,7 @@ installed it lints the package first; it is optional and never blocks the instal
 ## Debian / Ubuntu
 
 ```sh
-sudo apt install ./muninn_2.22.3-1_amd64.deb      # arm64: muninn_2.22.3-1_arm64.deb
+sudo apt install ./muninn_2.23.0-1_amd64.deb      # arm64: muninn_2.23.0-1_arm64.deb
 ```
 
 Needs Ubuntu 24.04+ or Debian 13+ (glibc 2.39); on Ubuntu 22.04 it installs but
@@ -218,7 +218,7 @@ Maintainers build it with `cargo deb` (`packaging/debian/README.md`).
 ## Fedora / RHEL
 
 ```sh
-sudo dnf install ./muninn-2.22.3-1.x86_64.rpm     # or muninn-2.22.3-1.aarch64.rpm
+sudo dnf install ./muninn-2.23.0-1.x86_64.rpm     # or muninn-2.23.0-1.aarch64.rpm
 ```
 
 Requires glibc (detected from the binary). Uninstall: `sudo dnf remove muninn`.
@@ -231,7 +231,7 @@ needed), download, check, unpack into `%LOCALAPPDATA%\Programs\Muninn` and add i
 user `PATH`:
 
 ```powershell
-$ver = "2.22.3"; $arch = "x86_64"     # or aarch64
+$ver = "2.23.0"; $arch = "x86_64"     # or aarch64
 $zip = "muninn-$ver-$arch-pc-windows-gnullvm.zip"
 $base = "https://github.com/WeirdBrains/muninn/releases/download/v$ver"
 curl.exe -LO "$base/$zip" -LO "$base/SHA256SUMS"

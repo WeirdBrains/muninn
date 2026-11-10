@@ -6,15 +6,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
-### Changed
-- Flutter app: Code and Plug menus; code-space collections (members, main, pin, migrate); plugin info, install and remove; rule-set membership and run; schedule preview with for / overlap / catch-up; + New… on project, org, and net share pickers; backup create; data filters, sort and coverage; theme edit, new, import and export; header size; MCP add; site announce; exchange offer and accept; shard-backup key restore; live send, host and join; pipe a code result
-- Create-then-share: net `--create-to` / **+ New exchange…** offers a key exchange; review `--create` for every ReviewKind; `project add --create result SERIES` (series must exist); FFI `share_create_*`
-- Scheduler liveness: continuous only when the same holder wrote the last tick within 120s (quick restart across a deadline is a miss, not a fire)
-- Scheduler: missed one-offs skip on restart after the deadline (daemon-alive vs cold gap), not a 60s grace; `rule edit --every/--cron` migrates onto schedules; `once` ends_at_input is `auto (once)`
-- 2.25 database migration: each project's rules become a rule set owned by the project; scheduled rules become rule set `NAME (scheduled)` plus a schedule (node's zone, next run from the last). `rule create --every/--cron` make a rule set and schedule (deprecated); `mnnn rule tick` runs `mnnn scheduler tick` (deprecated); the cert expiry watcher is a rule, rule set and schedule. New dependency: `parse_datetime`
-
-### Fixed
-- `cargo clippy --workspace --all-targets` is clean (tests/site.rs, muninn-ffi; no behavior change)
+## [2.23.0] - 2026-11-09
 
 ### Added
 - Ingest connector schedules (phase 4): `mnnn schedule add --plugin P --source S [--pipeline PL] [--connector-ruleset R]`; live `host.store_raw`/`pipe`/`run_ruleset`/`fetch`/`state_*` on schedule runs (main only); run fails if a configured pipe or rule set was never called; raw items keep `run_id`; per-schedule state; plugins remove refuses while a schedule uses the connector
@@ -38,14 +30,21 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - TUI: Code menu (Code spaces, Code, Migrate, Live pipes, Pipelines) and a Code spaces window
 
 ### Changed
+- Flutter app: Code and Plug menus; code-space collections (members, main, pin, migrate); plugin info, install and remove; rule-set membership and run; schedule preview with for / overlap / catch-up; + New… on project, org, and net share pickers; backup create; data filters, sort and coverage; theme edit, new, import and export; header size; MCP add; site announce; exchange offer and accept; shard-backup key restore; live send, host and join; pipe a code result
+- Create-then-share: net `--create-to` / **+ New exchange…** offers a key exchange; review `--create` for every ReviewKind; `project add --create result SERIES` (series must exist); FFI `share_create_*`
+- Scheduler liveness: continuous only when the same holder wrote the last tick within 120s (quick restart across a deadline is a miss, not a fire)
+- Scheduler: missed one-offs skip on restart after the deadline (daemon-alive vs cold gap), not a 60s grace; `rule edit --every/--cron` migrates onto schedules; `once` ends_at_input is `auto (once)`
+- 2.25 database migration: each project's rules become a rule set owned by the project; scheduled rules become rule set `NAME (scheduled)` plus a schedule (node's zone, next run from the last). `rule create --every/--cron` make a rule set and schedule (deprecated); `mnnn rule tick` runs `mnnn scheduler tick` (deprecated); the cert expiry watcher is a rule, rule set and schedule. New dependency: `parse_datetime`
 - TUI menu bar: File · View · Data · Proj · Code · Plug · Net · Orgs · Keys · Theme · Help (the long `Alt+letter` hint shows from about 100 columns)
 - The code table is now `code` (ids kept); menu bar labels shortened (File View Data Proj Code Net Orgs Keys Theme Help)
+- New tagline: "data goes in, your magic transforms it" (README, About, the app, the website and package descriptions)
+- The GitHub Actions release workflow now builds the Windows setup installers
+
+### Fixed
+- `cargo clippy --workspace --all-targets` is clean (tests/site.rs, muninn-ffi; no behavior change)
 
 ### Deprecated
 - `code:NAME` pipeline steps (one release; `mnnn migrate` rewrites them)
-
-### Changed
-- New tagline: "data goes in, your magic transforms it" (README, About, the app, the website and package descriptions)
 
 ## [2.22.3] - 2026-11-07
 
@@ -643,7 +642,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.22.3...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.23.0...HEAD
+[2.23.0]: https://github.com/WeirdBrains/muninn/compare/v2.22.3...v2.23.0
 [2.22.3]: https://github.com/WeirdBrains/muninn/compare/v2.22.0...v2.22.3
 [2.22.0]: https://github.com/WeirdBrains/muninn/compare/v2.21.0...v2.22.0
 [2.21.0]: https://github.com/WeirdBrains/muninn/compare/v2.20.1...v2.21.0

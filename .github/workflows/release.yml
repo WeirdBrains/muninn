@@ -214,3 +214,6 @@ jobs:
           body_path: notes.md
           files: dist/*
           fail_on_unmatched_files: true
+          # Immutable releases: stay a draft so the macOS dmg and package .sig files
+          # can be attached before it is published (assets are locked once published).
+          draft: true
