@@ -29,9 +29,17 @@ New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 # Find Inno Setup ISCC
 $iscc = $env:ISCC
 if (-not $iscc -or -not (Test-Path $iscc)) {
-    $paths = Get-ChildItem -Path "$env:LOCALAPPDATA\Programs\Inno Setup*" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending
-    if ($paths.Count -gt 0) {
-        $iscc = Join-Path $paths[0].FullName "ISCC.exe"
+    $cmd = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+    if ($cmd) {
+        $iscc = $cmd.Source
+    } else {
+        # winget installs per-user (LOCALAPPDATA) or per-machine (Program Files) depending on elevation.
+        $roots = @("$env:LOCALAPPDATA\Programs", ${env:ProgramFiles(x86)}, $env:ProgramFiles) | Where-Object { $_ }
+        $paths = @(foreach ($r in $roots) { Get-ChildItem -Path (Join-Path $r "Inno Setup*") -Directory -ErrorAction SilentlyContinue }) |
+            Where-Object { Test-Path (Join-Path $_.FullName "ISCC.exe") } | Sort-Object Name -Descending
+        if ($paths.Count -gt 0) {
+            $iscc = Join-Path $paths[0].FullName "ISCC.exe"
+        }
     }
 }
 if (-not $iscc -or -not (Test-Path $iscc)) {
@@ -70,7 +78,7 @@ foreach ($s in $sizes) {
     $pngFiles += Join-Path $tmpDir "$s.png"
 }
 for ($i = 0; $i -lt $sizes.Count; $i++) {
-    magick.exe -background none -density 384 $svg -resize "${sizes[$i]}x${sizes[$i]}" $pngFiles[$i] 2>$null
+    magick.exe -background none -density 384 $svg -resize "$($sizes[$i])x$($sizes[$i])" $pngFiles[$i] 2>$null
 }
 magick.exe $pngFiles -define icon:auto-generate=true $icoPath 2>$null
 if (-not (Test-Path $icoPath)) {
@@ -81,7 +89,7 @@ if (-not (Test-Path $icoPath)) {
 foreach ($arch in @("x86_64", "aarch64")) {
     $srcDir = Join-Path $work $arch
     if (-not (Test-Path $srcDir)) {
-        Write-Host "Skipping $arch: no zip found"
+        Write-Host "Skipping ${arch}: no zip found"
         continue
     }
     $exeSrc = Join-Path $srcDir "mnnn.exe"
