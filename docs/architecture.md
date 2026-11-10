@@ -11,6 +11,7 @@ Muninn is a cargo workspace; every front end is a thin layer over one library.
 | `site/` | the website (Jaspr) ([website](website.md)) |
 | `crates/weirdnet-themes` | the theme format, roles, built-in themes (`themes/*.toml`, shared by the TUI, the app and the site) and ratatui colours, as a reusable crate ([themes](themes.md)) |
 | `crates/weirdnet-storage` | SQLCipher open with a caller's raw key, rekey, plaintext conversion, migration runner, savepoints, snapshots, private files and the sync change log, as a reusable crate ([sync](sync.md), [encryption](encryption.md)) |
+| `crates/weirdnet-keys` | keys, recovery words, Shamir shards, HKDF and Argon2id, sealing, X25519 agreement, HMAC, the envelope keyring (init, unlock, rotate, rekey, recover, export), dark shards and age files, under label profiles, as a reusable crate ([encryption](encryption.md)) |
 
 - `mnnn` behaves exactly as before; the root package re-exports `muninn-core`, so
   `muninn::…` paths in tests still work.
@@ -31,7 +32,7 @@ table above and below:
 | Seam | Domain side (moves later) | Muninn side (stays) |
 | ---- | ---- | ---- |
 | Storage (extracted: `crates/weirdnet-storage`) | the crate: open with a raw key, key / rekey (verified on a fresh connection), plaintext-to-encrypted conversion (verified before it replaces the file), migration runner, savepoints, snapshots, private files and folders; its `sync` feature: the change log (triggers, log, agreed hashes, conflicts), row codec and hash, three-way decision | `Store`: schema (`MIGRATIONS`, including the sync tables), data upgrades, seed rows, queries; the synced-table registry (`store::sync::TABLES`), model tables, history import, the sync epoch and the order changes travel in; `Paths` names the `tmp-muninn` side file |
-| Keys | `crypto/keyring.rs` through its `KeyFiles` and `EncryptedDatabase` traits; it owns every key format and operation | `Paths` implements both traits (folder layout, SQLCipher work through the engine) |
+| Keys (extracted: `crates/weirdnet-keys`) | the crate: every key encryption, decryption, derivation, wrap, rotation, rekey (undone if its envelope cannot be saved), recovery, export and shard operation, on vetted crates; labels come from a `Profile` (`Profile::WEIRDNET` by default); the keyring reaches files and the database only through its `KeyFiles` and `EncryptedDatabase` traits | `crypto` keeps the old function names over `MUNINN_PROFILE` (Muninn's existing labels and envelope format 1, so existing homes, words, shards, exports and peers are unchanged); `Paths` implements both traits; protocol labels and message formats (exchange offers and answers, sync and message associated data, org sign-in headers) stay in `net` and `org` and call the crate's primitives; backup manifests and `--only` parsing stay in Muninn |
 | Themes (extracted: `crates/weirdnet-themes`) | the crate, through `ThemeDirs` and `Mode`; ratatui behind its `ratatui` feature | `theme` re-exports it and returns `crate::Error`; `Paths` implements `ThemeDirs`; `prefs::ThemeMode` converts into `Mode` |
 
 - The storage engine never derives, wraps or stores a key: it applies the raw key the
@@ -41,7 +42,7 @@ table above and below:
   peers, signatures or existing databases, so it only happens in a separately approved
   rollout with migration adapters, never as part of moving code.
 
-Extracted crates have their own SemVer (`weirdnet-themes` 0.1.0, `weirdnet-storage` 0.1.0),
+Extracted crates have their own SemVer (`weirdnet-themes` 0.1.0, `weirdnet-storage` 0.1.0, `weirdnet-keys` 0.1.0),
 depend on nothing in Muninn, and are `publish = false` until a publication decision; Muninn
 re-exports or wraps them so its paths (`muninn_core::theme::…`, `muninn_core::store::sync::Page`)
 and messages ("could not unlock the database: wrong key or not a muninn database …") stay the same.

@@ -22,7 +22,7 @@ use libp2p::PeerId;
 use libp2p::identity::{Keypair, PublicKey};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
-use x25519_dalek::{PublicKey as XPublic, StaticSecret};
+use weirdnet_keys::exchange::{self as kx, ExchangeSecret};
 use zeroize::Zeroizing;
 
 pub const OFFER_PREFIX: &str = "mnnn-x1-offer:";
@@ -146,9 +146,8 @@ fn public_key(b64key: &str, peer: &str) -> Result<PublicKey> {
     Ok(pk)
 }
 
-fn x_public(hexkey: &str) -> Result<XPublic> {
-    let b: [u8; 32] = hex::decode(hexkey).ok().and_then(|v| v.try_into().ok()).ok_or_else(|| Error::invalid("exchange", "bad exchange key"))?;
-    Ok(XPublic::from(b))
+fn x_public(hexkey: &str) -> Result<[u8; 32]> {
+    hex::decode(hexkey).ok().and_then(|v| v.try_into().ok()).ok_or_else(|| Error::invalid("exchange", "bad exchange key"))
 }
 
 impl Offer {
@@ -162,13 +161,13 @@ impl Offer {
         ttl_ms: i64,
     ) -> Result<(Offer, Zeroizing<[u8; 32]>)> {
         check_scope(&scope)?;
-        let secret = StaticSecret::random_from_rng(rand_core::OsRng);
+        let secret = ExchangeSecret::generate();
         let mut o = Offer {
             v: 1,
             id: uuid::Uuid::new_v4().simple().to_string(),
             peer: kp.public().to_peer_id().to_string(),
             key: b64().encode(kp.public().encode_protobuf()),
-            eph: hex::encode(XPublic::from(&secret).as_bytes()),
+            eph: hex::encode(secret.public()),
             addrs,
             label: label.to_string(),
             scope,
@@ -178,7 +177,7 @@ impl Offer {
         };
         let sig = kp.sign(&signed_bytes(OFFER_DOMAIN, &o)?).map_err(|e| Error::Crypto(e.to_string()))?;
         o.sig = b64().encode(sig);
-        Ok((o, Zeroizing::new(secret.to_bytes())))
+        Ok((o, secret.to_bytes()))
     }
 
     /// Check the signature, key and scope; returns the offerer's peer id.
@@ -219,14 +218,14 @@ impl Answer {
         if offer.peer == kp.public().to_peer_id().to_string() {
             return Err(Error::invalid("exchange", "this is this node's own offer; it is answered on the other node"));
         }
-        let secret = StaticSecret::random_from_rng(rand_core::OsRng);
+        let secret = ExchangeSecret::generate();
         let mut a = Answer {
             v: 1,
             offer: offer.id.clone(),
             offer_hash: offer.hash()?,
             peer: kp.public().to_peer_id().to_string(),
             key: b64().encode(kp.public().encode_protobuf()),
-            eph: hex::encode(XPublic::from(&secret).as_bytes()),
+            eph: hex::encode(secret.public()),
             addrs,
             label: label.to_string(),
             created: now,
@@ -234,11 +233,8 @@ impl Answer {
         };
         let sig = kp.sign(&signed_bytes(ANSWER_DOMAIN, &a)?).map_err(|e| Error::Crypto(e.to_string()))?;
         a.sig = b64().encode(sig);
-        let shared = secret.diffie_hellman(&x_public(&offer.eph)?);
-        if !shared.was_contributory() {
-            return Err(Error::invalid("exchange", "the offer's exchange key is invalid"));
-        }
-        let d = derive(shared.as_bytes(), offer, &a)?;
+        let shared = secret.agree(&x_public(&offer.eph)?).ok_or_else(|| Error::invalid("exchange", "the offer's exchange key is invalid"))?;
+        let d = derive(&shared, offer, &a)?;
         Ok((a, d))
     }
 
@@ -266,12 +262,9 @@ impl Answer {
     pub fn complete(&self, offer: &Offer, secret: &[u8]) -> Result<Derived> {
         self.verify(offer)?;
         let s: [u8; 32] = secret.try_into().map_err(|_| Error::Crypto("bad exchange secret".into()))?;
-        let secret = StaticSecret::from(s);
-        let shared = secret.diffie_hellman(&x_public(&self.eph)?);
-        if !shared.was_contributory() {
-            return Err(Error::invalid("exchange", "the answer's exchange key is invalid"));
-        }
-        derive(shared.as_bytes(), offer, self)
+        let secret = ExchangeSecret::from_bytes(s);
+        let shared = secret.agree(&x_public(&self.eph)?).ok_or_else(|| Error::invalid("exchange", "the answer's exchange key is invalid"))?;
+        derive(&shared, offer, self)
     }
 
     pub fn public_key(&self) -> Result<PublicKey> {
@@ -289,14 +282,10 @@ fn derive(dh: &[u8; 32], offer: &Offer, answer: &Answer) -> Result<Derived> {
     t.update(signed_bytes(OFFER_DOMAIN, offer)?);
     t.update(signed_bytes(ANSWER_DOMAIN, answer)?);
     let transcript = t.finalize();
-    let hk = hkdf::Hkdf::<sha2::Sha256>::new(Some(&transcript), dh);
-    let mut key = [0u8; 32];
-    hk.expand(KEY_INFO, &mut key).map_err(|e| Error::Crypto(e.to_string()))?;
-    let mut sas = [0u8; 8];
-    hk.expand(SAS_INFO, &mut sas).map_err(|e| Error::Crypto(e.to_string()))?;
+    let (key, sas) = kx::derive(dh, &transcript, KEY_INFO, SAS_INFO)?;
     let n = u64::from_be_bytes(sas) % 10_000_000_000;
     let code = format!("{:05}-{:05}", n / 100_000, n % 100_000);
-    Ok(Derived { key: Key32(key), short_code: code, fingerprint: super::identity::group(&hex::encode(&transcript[..8])) })
+    Ok(Derived { key, short_code: code, fingerprint: super::identity::group(&hex::encode(&transcript[..8])) })
 }
 
 /// A pasted token.

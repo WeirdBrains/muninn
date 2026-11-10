@@ -648,10 +648,6 @@ pub fn unshare(s: &Store, kind: ShareKind, key: &str, with: &[String], origin: &
 
 // ---------- dark shards ----------
 
-fn shard_aad(set: &str, index: u32) -> Vec<u8> {
-    format!("muninn/net/shard/v1|{set}|{index}").into_bytes()
-}
-
 /// Where the shards went.
 #[derive(Debug, Clone, Serialize)]
 pub struct Entrust {
@@ -690,15 +686,13 @@ pub fn entrust(
         return Err(Error::invalid("--to", "name at least two exchanges (different nodes)"));
     }
     let k = if threshold == 0 { n.div_ceil(2).max(2).min(n) } else { threshold };
-    let shards = crypto::split_shards_k(master, k, n)?;
-    let claim = crypto::shard_claim(password)?;
+    let (claim, sealed) = weirdnet_keys::dark::seal(&crypto::MUNINN_PROFILE, master, password, k, n)?;
     let mut placed = vec![];
     let mut set = String::new();
-    for (x, sh) in xs.iter().zip(shards.iter()) {
-        let (set_id, t, index) = crypto::shard_meta(sh)?;
+    for (x, d) in xs.iter().zip(sealed) {
+        let (set_id, t, index) = (d.set, d.threshold, d.index);
         set = set_id.clone();
-        let sealed = crypto::password_seal(password, sh.as_bytes(), &shard_aad(&set_id, index))?;
-        let blob = ShardBlob { set: set_id.clone(), index, threshold: t as u32, total: n as u32, blob: serde_json::to_string(&sealed)? };
+        let blob = ShardBlob { set: set_id.clone(), index, threshold: t as u32, total: n as u32, blob: serde_json::to_string(&d.sealed)? };
         match send(s, node, x, Req::ShardStore { shard: blob, claim: claim.clone() }, relays)? {
             Resp::Stored => {}
             _ => return Err(Error::Other(format!("{}: did not store the shard", x.title()))),
@@ -795,9 +789,11 @@ pub fn gather(
     let mut sources = vec![];
     for (b, who) in blobs.iter().filter(|(b, _)| b.set == set_id) {
         let sealed: crypto::PasswordSealed = serde_json::from_str(&b.blob).map_err(|_| Error::Crypto("a shard came back damaged".into()))?;
-        let plain =
-            crypto::password_open(password, &sealed, &shard_aad(&b.set, b.index)).map_err(|_| Error::Unlock("wrong shard password".into()))?;
-        texts.push(String::from_utf8(plain.to_vec()).map_err(|_| Error::Crypto("a shard came back damaged".into()))?);
+        let text = weirdnet_keys::dark::open(&crypto::MUNINN_PROFILE, password, &b.set, b.index, &sealed).map_err(|e| match e {
+            weirdnet_keys::KeysError::Unlock(_) => Error::Unlock("wrong shard password".into()),
+            _ => Error::Crypto("a shard came back damaged".into()),
+        })?;
+        texts.push(text.to_string());
         sources.push(who.clone());
     }
     let key = crypto::combine_shards(&texts)?;

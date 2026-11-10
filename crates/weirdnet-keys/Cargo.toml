@@ -1,0 +1,45 @@
+[package]
+name = "weirdnet-keys"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Weirdnet keys: 256-bit keys, BIP39 words, Shamir shards, HKDF and Argon2id derivation, XChaCha20-Poly1305 sealing, X25519 agreement, HMAC, an envelope keyring with rotation, rekey and recovery, dark-shard sealing and age exports, under versioned label profiles."
+authors = ["Michael Christenson II <m3talsmith@gmail.com>"]
+license = "BSD-3-Clause"
+# Source lives in this monorepo until it gets a home of its own.
+repository = "https://github.com/WeirdBrains/muninn"
+readme = "README.md"
+keywords = ["cryptography", "keyring", "shamir", "bip39", "envelope"]
+categories = ["cryptography"]
+include = ["src/**", "README.md", "SECURITY.md", "LICENSE"]
+publish = false
+
+[features]
+default = ["age"]
+# Password-encrypted (scrypt) age files: keyring exports and `read_maybe_age`.
+age = ["dep:age"]
+
+[dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+hex = "0.4"
+uuid = { version = "1", features = ["v4"] }
+zeroize = { version = "1", features = ["derive"] }
+secrecy = "0.10"
+getrandom = "0.2"
+rand_core = { version = "0.6", features = ["getrandom"] }
+blake3 = "1"
+sha2 = "0.10"
+hkdf = "0.12"
+hmac = "0.12"
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
+bip39 = "2"
+vsss-rs = { version = "5", features = ["std"] }
+age = { version = "0.11", optional = true }
+
+[dev-dependencies]
+tempfile = "3"

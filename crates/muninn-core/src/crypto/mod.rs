@@ -1,71 +1,52 @@
-//! Key material: master key, BIP39 words, Shamir shards, HKDF service keys, AEAD wrapping, password exports.
+//! Key material for Muninn: the `weirdnet-keys` operations under Muninn's own labels.
+//!
+//! Every encryption, derivation, wrap, split and export runs in `weirdnet-keys`. This
+//! module only fixes Muninn's existing labels ([`MUNINN_PROFILE`]) so existing databases,
+//! recovery words, shards, exports and peers keep working byte for byte, and keeps the
+//! function names and error kinds the rest of Muninn uses.
 pub mod keyring;
 
-use crate::error::{Error, Result};
-use chacha20poly1305::aead::{Aead, KeyInit, Payload};
-use chacha20poly1305::{XChaCha20Poly1305, XNonce};
-use secrecy::{ExposeSecret, SecretString};
-use serde::{Deserialize, Serialize};
-use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+use crate::error::Result;
+use secrecy::SecretString;
+use weirdnet_keys::{Profile, kdf, password, shards};
+use zeroize::Zeroizing;
 
-/// A 256-bit secret key, wiped on drop and never printed.
-#[derive(Clone, Zeroize, ZeroizeOnDrop, PartialEq, Eq)]
-pub struct Key32(pub [u8; 32]);
+pub use weirdnet_keys::{Key32, PasswordSealed, Sealed};
 
-impl std::fmt::Debug for Key32 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Key32(<redacted>)")
-    }
-}
-
-impl Key32 {
-    pub fn random() -> Result<Self> {
-        let mut k = [0u8; 32];
-        getrandom::getrandom(&mut k).map_err(|e| Error::Crypto(e.to_string()))?;
-        Ok(Key32(k))
-    }
-    pub fn from_slice(b: &[u8]) -> Result<Self> {
-        let a: [u8; 32] = b.try_into().map_err(|_| Error::Crypto("key must be 32 bytes".into()))?;
-        Ok(Key32(a))
-    }
-    pub fn hex(&self) -> Zeroizing<String> {
-        Zeroizing::new(hex::encode(self.0))
-    }
-    pub fn from_hex(s: &str) -> Result<Self> {
-        let b = Zeroizing::new(hex::decode(s.trim()).map_err(|e| Error::Crypto(format!("bad key hex: {e}")))?);
-        Self::from_slice(&b)
-    }
-}
+/// Muninn's labels, as they were before the extraction: envelope format 1 without a
+/// recorded profile, `muninn/...` HKDF infos and associated data, `muninn-shard-v1`
+/// shards, the `muninn/net/shard-claim/v1` claim salt and `muninn/net/shard/v1` dark-shard
+/// data. Changing any of these is a migration, not a refactor (see `compat_tests`).
+pub const MUNINN_PROFILE: Profile = Profile {
+    name: None,
+    envelope_format: 1,
+    label: "muninn",
+    shard_prefix: "muninn-shard-v1",
+    claim_salt: b"muninn/net/shard-claim/v1",
+    dark_shard_label: "muninn/net/shard/v1",
+};
 
 pub fn random_bytes<const N: usize>() -> Result<[u8; N]> {
-    let mut b = [0u8; N];
-    getrandom::getrandom(&mut b).map_err(|e| Error::Crypto(e.to_string()))?;
-    Ok(b)
+    Ok(weirdnet_keys::random_bytes()?)
 }
 
 // ---------- BIP39 ----------
 
 /// 24 words encoding the master key's 256 bits.
 pub fn to_words(master: &Key32) -> Result<Zeroizing<String>> {
-    let m = bip39::Mnemonic::from_entropy(&master.0).map_err(|e| Error::Crypto(e.to_string()))?;
-    Ok(Zeroizing::new(m.to_string()))
+    Ok(weirdnet_keys::words::to_words(master)?)
 }
 
 pub fn from_words(words: &str) -> Result<Key32> {
-    let norm = words.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase();
-    let m = bip39::Mnemonic::parse(&norm).map_err(|e| Error::Crypto(format!("invalid recovery words: {e}")))?;
-    if m.word_count() != 24 {
-        return Err(Error::Crypto(format!("expected 24 words, got {}", m.word_count())));
-    }
-    let e = Zeroizing::new(m.to_entropy());
-    Key32::from_slice(&e)
+    Ok(weirdnet_keys::words::from_words(words)?)
 }
 
 // ---------- Shamir 3-of-5 ----------
 
-pub const SHARD_THRESHOLD: usize = 3;
-pub const SHARD_COUNT: usize = 5;
-pub(crate) const SHARD_PREFIX: &str = "muninn-shard-v1";
+pub const SHARD_THRESHOLD: usize = shards::THRESHOLD;
+pub const SHARD_COUNT: usize = shards::COUNT;
+#[cfg(test)]
+pub(crate) const SHARD_PREFIX: &str = MUNINN_PROFILE.shard_prefix;
 
 /// Split the master key into 5 shards (any 3 recover it). Text form:
 /// `muninn-shard-v1:<set id>:<threshold>:<index>:<share hex>:<checksum>`.
@@ -75,184 +56,73 @@ pub fn split_shards(master: &Key32) -> Result<Vec<Zeroizing<String>>> {
 
 /// Split the master key into `n` shards, any `k` of which recover it (2 <= k <= n <= 255).
 pub fn split_shards_k(master: &Key32, k: usize, n: usize) -> Result<Vec<Zeroizing<String>>> {
-    if k < 2 || k > n || n > 255 {
-        return Err(Error::invalid("shards", format!("need 2 <= threshold <= shards <= 255 (got {k} of {n})")));
-    }
-    let set: [u8; 4] = random_bytes()?;
-    let set = hex::encode(set);
-    let shares = vsss_rs::Gf256::split_array(k, n, master.0, rand_core::OsRng).map_err(|e| Error::Crypto(format!("shard split failed: {e:?}")))?;
-    let mut out = Vec::with_capacity(n);
-    for (i, sh) in shares.into_iter().enumerate() {
-        let sh = Zeroizing::new(sh);
-        let body = format!("{SHARD_PREFIX}:{set}:{k}:{}:{}", i + 1, hex::encode(&*sh));
-        let chk = &blake3::hash(body.as_bytes()).to_hex()[..8];
-        out.push(Zeroizing::new(format!("{body}:{chk}")));
-    }
-    Ok(out)
+    Ok(shards::split(&MUNINN_PROFILE, master, k, n)?)
 }
 
 /// The set id, threshold and index of a shard (no secret parts).
 pub fn shard_meta(s: &str) -> Result<(String, usize, u32)> {
-    let p = parse_shard(s)?;
-    Ok((p.set, p.threshold, p.index))
-}
-
-struct ParsedShard {
-    set: String,
-    threshold: usize,
-    index: u32,
-    share: Zeroizing<Vec<u8>>,
-}
-
-fn parse_shard(s: &str) -> Result<ParsedShard> {
-    let s = s.trim();
-    let (body, chk) = s.rsplit_once(':').ok_or_else(|| Error::Crypto("malformed shard".into()))?;
-    if &blake3::hash(body.as_bytes()).to_hex()[..8] != chk {
-        return Err(Error::Crypto("shard checksum mismatch (typo or corrupted shard)".into()));
-    }
-    let p: Vec<&str> = body.split(':').collect();
-    if p.len() != 5 || p[0] != SHARD_PREFIX {
-        return Err(Error::Crypto("malformed shard".into()));
-    }
-    Ok(ParsedShard {
-        set: p[1].to_string(),
-        threshold: p[2].parse().map_err(|_| Error::Crypto("malformed shard threshold".into()))?,
-        index: p[3].parse().map_err(|_| Error::Crypto("malformed shard index".into()))?,
-        share: Zeroizing::new(hex::decode(p[4]).map_err(|_| Error::Crypto("malformed shard data".into()))?),
-    })
+    Ok(shards::meta(&MUNINN_PROFILE, s)?)
 }
 
 /// Combine at least 3 distinct shards from the same set.
 pub fn combine_shards(shards: &[String]) -> Result<Key32> {
-    let parsed: Vec<ParsedShard> = shards.iter().map(|s| parse_shard(s)).collect::<Result<_>>()?;
-    let first = parsed.first().ok_or_else(|| Error::Crypto("no shards given".into()))?;
-    if parsed.iter().any(|p| p.set != first.set) {
-        return Err(Error::Crypto("shards come from different sets and cannot be mixed".into()));
-    }
-    let mut idx: Vec<u32> = parsed.iter().map(|p| p.index).collect();
-    idx.sort_unstable();
-    idx.dedup();
-    if idx.len() < first.threshold {
-        return Err(Error::Crypto(format!("need at least {} distinct shards, got {}", first.threshold, idx.len())));
-    }
-    let mut seen = std::collections::HashSet::new();
-    let shares: Vec<Vec<u8>> = parsed.iter().filter(|p| seen.insert(p.index)).map(|p| p.share.to_vec()).collect();
-    let secret = Zeroizing::new(vsss_rs::Gf256::combine_array(&shares).map_err(|e| Error::Crypto(format!("shard combine failed: {e:?}")))?);
-    let mut shares = shares;
-    for s in shares.iter_mut() {
-        s.zeroize();
-    }
-    Key32::from_slice(&secret)
+    Ok(shards::combine(&MUNINN_PROFILE, shards)?)
 }
 
 // ---------- HKDF ----------
 
 pub(crate) fn hkdf(master: &Key32, salt: &[u8], info: &str) -> Result<Key32> {
-    let hk = hkdf::Hkdf::<sha2::Sha256>::new(Some(salt), &master.0);
-    let mut out = [0u8; 32];
-    hk.expand(info.as_bytes(), &mut out).map_err(|e| Error::Crypto(e.to_string()))?;
-    Ok(Key32(out))
+    Ok(kdf::hkdf(&master.0, Some(salt), info.as_bytes())?)
 }
 
 /// `HKDF-SHA256(master, salt = db_id, info = "muninn/service/v{n}")`.
 pub fn service_key(master: &Key32, db_id: &str, version: u32) -> Result<Key32> {
-    hkdf(master, db_id.as_bytes(), &format!("muninn/service/v{version}"))
+    Ok(kdf::service_key(&MUNINN_PROFILE, master, db_id, version)?)
 }
 
 /// Master-derived key-encryption key.
 pub fn master_kek(master: &Key32, db_id: &str) -> Result<Key32> {
-    hkdf(master, db_id.as_bytes(), "muninn/kek")
+    Ok(kdf::master_kek(&MUNINN_PROFILE, master, db_id)?)
 }
 
 // ---------- AEAD ----------
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Sealed {
-    pub nonce: String,
-    pub ct: String,
-}
-
 pub fn seal(key: &Key32, plaintext: &[u8], aad: &[u8]) -> Result<Sealed> {
-    let c = XChaCha20Poly1305::new((&key.0).into());
-    let nonce: [u8; 24] = random_bytes()?;
-    let ct = c.encrypt(XNonce::from_slice(&nonce), Payload { msg: plaintext, aad }).map_err(|_| Error::Crypto("encryption failed".into()))?;
-    Ok(Sealed { nonce: hex::encode(nonce), ct: hex::encode(ct) })
+    Ok(weirdnet_keys::seal(key, plaintext, aad)?)
 }
 
 pub fn open(key: &Key32, s: &Sealed, aad: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
-    let c = XChaCha20Poly1305::new((&key.0).into());
-    let nonce = hex::decode(&s.nonce).map_err(|_| Error::Crypto("bad nonce".into()))?;
-    if nonce.len() != 24 {
-        return Err(Error::Crypto("bad nonce".into()));
-    }
-    let ct = hex::decode(&s.ct).map_err(|_| Error::Crypto("bad ciphertext".into()))?;
-    c.decrypt(XNonce::from_slice(&nonce), Payload { msg: &ct, aad }).map(Zeroizing::new).map_err(|_| Error::Unlock("wrong key or password".into()))
+    Ok(weirdnet_keys::open(key, s, aad)?)
 }
 
 // ---------- password wrapping (Argon2id) ----------
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PasswordSealed {
-    pub kdf: String,
-    pub salt: String,
-    pub m_cost: u32,
-    pub t_cost: u32,
-    pub p_cost: u32,
-    #[serde(flatten)]
-    pub sealed: Sealed,
-}
-
-fn argon2_key(password: &SecretString, salt: &[u8], m: u32, t: u32, p: u32) -> Result<Key32> {
-    let params = argon2::Params::new(m, t, p, Some(32)).map_err(|e| Error::Crypto(e.to_string()))?;
-    let a = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
-    let mut out = [0u8; 32];
-    a.hash_password_into(password.expose_secret().as_bytes(), salt, &mut out).map_err(|e| Error::Crypto(e.to_string()))?;
-    Ok(Key32(out))
-}
-
 /// A tag derived from a password alone (Argon2id with a fixed salt): lets a custodian find
 /// the dark shards it holds for someone who lost everything but the shard password.
 pub fn shard_claim(password: &SecretString) -> Result<String> {
-    if password.expose_secret().is_empty() {
-        return Err(Error::invalid("password", "must not be empty"));
-    }
-    let k = argon2_key(password, b"muninn/net/shard-claim/v1", 19 * 1024, 2, 1)?;
-    Ok(hex::encode(blake3::keyed_hash(&k.0, b"claim").as_bytes()))
+    Ok(password::claim_tag(&MUNINN_PROFILE, password)?)
 }
 
 pub fn password_seal(password: &SecretString, plaintext: &[u8], aad: &[u8]) -> Result<PasswordSealed> {
-    if password.expose_secret().is_empty() {
-        return Err(Error::invalid("password", "must not be empty"));
-    }
-    let salt: [u8; 16] = random_bytes()?;
-    let (m, t, p) = (19 * 1024, 2, 1);
-    let k = argon2_key(password, &salt, m, t, p)?;
-    Ok(PasswordSealed { kdf: "argon2id".into(), salt: hex::encode(salt), m_cost: m, t_cost: t, p_cost: p, sealed: seal(&k, plaintext, aad)? })
+    Ok(weirdnet_keys::password_seal(password, plaintext, aad)?)
 }
 
 pub fn password_open(password: &SecretString, s: &PasswordSealed, aad: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
-    let salt = hex::decode(&s.salt).map_err(|_| Error::Crypto("bad salt".into()))?;
-    let k = argon2_key(password, &salt, s.m_cost, s.t_cost, s.p_cost)?;
-    open(&k, &s.sealed, aad).map_err(|_| Error::Unlock("wrong password".into()))
+    Ok(weirdnet_keys::password_open(password, s, aad)?)
 }
 
 // ---------- age exports ----------
 
-const AGE_WORK_FACTOR: u8 = 16;
-
 pub fn age_encrypt(password: &SecretString, plaintext: &[u8]) -> Result<Vec<u8>> {
-    let mut r = age::scrypt::Recipient::new(password.clone());
-    r.set_work_factor(AGE_WORK_FACTOR);
-    age::encrypt(&r, plaintext).map_err(|e| Error::Crypto(format!("age: {e}")))
+    Ok(weirdnet_keys::agefile::encrypt(password, plaintext)?)
 }
 
 pub fn age_decrypt(password: &SecretString, ct: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
-    let id = age::scrypt::Identity::new(password.clone());
-    age::decrypt(&id, ct).map(Zeroizing::new).map_err(|e| Error::Unlock(format!("could not decrypt export (wrong password?): {e}")))
+    Ok(weirdnet_keys::agefile::decrypt(password, ct)?)
 }
 
 pub fn is_age(bytes: &[u8]) -> bool {
-    bytes.starts_with(b"age-encryption.org/")
+    weirdnet_keys::agefile::is_age(bytes)
 }
 
 #[cfg(test)]

@@ -165,9 +165,8 @@ impl Store {
         if self.mcp_clients()?.iter().any(|c| c.name.eq_ignore_ascii_case(&name)) {
             return Err(Error::invalid("client name", format!("`{name}` exists (`mnnn mcp client remove {name}` first)")));
         }
-        let mut b = [0u8; 32];
-        getrandom::getrandom(&mut b).map_err(|e| Error::Crypto(e.to_string()))?;
-        let token = format!("mnnn_mcp_{}", hex::encode(b));
+        let b = zeroize::Zeroizing::new(crate::crypto::random_bytes::<32>()?);
+        let token = format!("mnnn_mcp_{}", hex::encode(*b));
         let c = McpClient { id: new_id(), name, role, created_at: now_ms(), last_seen_at: None, revoked_at: None };
         self.conn.execute(
             "INSERT INTO mcp_clients(id, name, role, token_hash, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",

@@ -83,7 +83,7 @@ fn key_derivation_labels() {
     let m = Key32([7u8; 32]);
     assert_eq!(crypto::service_key(&m, "db-1", 3).unwrap().0, hkdf_raw(&m.0, b"db-1", b"muninn/service/v3"));
     assert_eq!(crypto::master_kek(&m, "db-1").unwrap().0, hkdf_raw(&m.0, b"db-1", b"muninn/kek"));
-    assert_eq!(crypto::keyring::DEK_AAD, b"muninn/dek");
+    assert_eq!(crypto::keyring::dek_aad(), b"muninn/dek");
     assert_eq!(crypto::keyring::svc_aad("db-1", 2), b"muninn/service-key/db-1/v2");
 }
 
@@ -162,4 +162,74 @@ fn app_identifiers() {
     assert_eq!(crate::org::host::GRPC_SERVICE, "muninn.org.v1.Org");
     assert_eq!(crate::org::host::SESSION_COOKIE, "muninn_session");
     assert_eq!(crate::paths::DB_FILE, "muninn.database");
+}
+
+/// Key files written by the pre-extraction keyring (f123f855; synthetic, see the fixture
+/// README) open with today's code, and the envelope and service files save back unchanged.
+#[test]
+fn keys_written_before_the_extraction_still_open() {
+    use crate::crypto::keyring::{self, Envelope, KeyFiles};
+    macro_rules! fx {
+        ($f:literal) => {
+            include_str!(concat!("compat_fixtures/keys-f123f855/", $f))
+        };
+    }
+    macro_rules! fxb {
+        ($f:literal) => {
+            include_bytes!(concat!("compat_fixtures/keys-f123f855/", $f))
+        };
+    }
+    let t = tempfile::tempdir().unwrap();
+    let paths = crate::paths::Paths::resolve(Some(t.path().join("h")), None).unwrap();
+    paths.ensure().unwrap();
+    std::fs::create_dir_all(KeyFiles::service_keys_dir(&paths)).unwrap();
+    std::fs::write(KeyFiles::envelope(&paths), fx!("envelope.toml")).unwrap();
+    std::fs::write(KeyFiles::service_keys_dir(&paths).join("v1.toml"), fx!("service-v1.toml")).unwrap();
+    std::fs::write(KeyFiles::service_keys_dir(&paths).join("v2.toml"), fx!("service-v2.toml")).unwrap();
+
+    let pw = SecretString::from("fixture-pw".to_string());
+    let dek = Key32::from_hex(fx!("dek.hex")).unwrap();
+    assert_eq!(keyring::unlock_with_password(&paths, &pw).unwrap(), dek);
+    assert!(keyring::unlock_with_password(&paths, &SecretString::from("fixture-pw!".to_string())).is_err());
+    let master = crypto::from_words(fx!("words.txt")).unwrap();
+    assert_eq!(keyring::unlock_with_master(&paths, &master).unwrap(), dek);
+    let v1 = keyring::load_service_file(&paths, 1).unwrap();
+    assert!(v1.retired && v1.wrapped.is_none());
+
+    let shards: Vec<String> = fx!("shards.txt").lines().map(str::to_string).collect();
+    assert_eq!(shards.len(), 5);
+    assert_eq!(crypto::combine_shards(&[shards[0].clone(), shards[2].clone(), shards[4].clone()]).unwrap(), master);
+    assert_eq!(keyring::recover_master(&paths, &shards[1..4]).unwrap(), master);
+    assert!(crypto::combine_shards(&shards[..2]).is_err());
+
+    let spw = SecretString::from("fixture-shard-pw".to_string());
+    assert_eq!(crypto::shard_claim(&spw).unwrap(), fx!("claim.txt"));
+    let dark: serde_json::Value = serde_json::from_str(fx!("dark-shard.json")).unwrap();
+    let sealed: crypto::PasswordSealed = serde_json::from_str(dark["blob"].as_str().unwrap()).unwrap();
+    let (set, index) = (dark["set"].as_str().unwrap(), dark["index"].as_u64().unwrap() as u32);
+    assert_eq!(*weirdnet_keys::dark::open(&crypto::MUNINN_PROFILE, &spw, set, index, &sealed).unwrap(), shards[0]);
+
+    let epw = SecretString::from("fixture-export-pw".to_string());
+    assert_eq!(Key32::from_hex(std::str::from_utf8(&crypto::age_decrypt(&epw, fxb!("master.key.age")).unwrap()).unwrap()).unwrap(), master);
+    let exported: Vec<String> = [&fxb!("shard-1.age")[..], fxb!("shard-2.age"), fxb!("shard-3.age")]
+        .iter()
+        .map(|b| String::from_utf8(crypto::age_decrypt(&epw, b).unwrap().to_vec()).unwrap())
+        .collect();
+    assert_eq!(crypto::combine_shards(&exported).unwrap(), master);
+
+    assert_eq!(
+        crate::org::host::sign_with(&Key32([7u8; 32]), "x-fixture", "POST", "/api/v1/thing", b"{\"a\":1}", 1_700_000_000_000),
+        fx!("org-sig.txt")
+    );
+
+    // written back byte for byte (no profile field appears)
+    Envelope::require(&paths).unwrap().save(&paths).unwrap();
+    assert_eq!(std::fs::read_to_string(KeyFiles::envelope(&paths)).unwrap(), fx!("envelope.toml"));
+    for (v, want) in [(1, fx!("service-v1.toml")), (2, fx!("service-v2.toml"))] {
+        assert_eq!(toml::to_string_pretty(&keyring::load_service_file(&paths, v).unwrap()).unwrap(), want);
+    }
+    // and today's operations keep working on it
+    assert_eq!(keyring::rotate(&paths, &master, &pw).unwrap(), 3);
+    assert_eq!(keyring::unlock_with_password(&paths, &pw).unwrap(), dek);
+    assert!(!std::fs::read_to_string(KeyFiles::envelope(&paths)).unwrap().contains("profile"));
 }

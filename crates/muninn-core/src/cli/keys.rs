@@ -132,7 +132,7 @@ pub fn run(ctx: &Ctx, cmd: KeysCommand) -> anyhow::Result<()> {
             let items: Vec<ExportItem> = if only.is_empty() {
                 vec![ExportItem::Master, ExportItem::Words, ExportItem::Service, ExportItem::Shards]
             } else {
-                only.iter().map(|s| ExportItem::parse(s)).collect::<crate::Result<_>>()?
+                only.iter().map(|s| keyring::parse_export_item(s)).collect::<crate::Result<_>>()?
             };
             let has_master = items.contains(&ExportItem::Master) || items.contains(&ExportItem::Words);
             if has_master && items.contains(&ExportItem::Shards) {

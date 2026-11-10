@@ -71,3 +71,21 @@ impl From<weirdnet_themes::ThemeError> for Error {
         }
     }
 }
+
+/// Key errors keep Muninn's messages and kinds ("could not unlock the database: wrong
+/// password", "muninn keys are not initialized in …", and so on).
+impl From<weirdnet_keys::KeysError> for Error {
+    fn from(e: weirdnet_keys::KeysError) -> Self {
+        use weirdnet_keys::KeysError as K;
+        match e {
+            K::Crypto(m) => Error::Crypto(m),
+            K::Unlock(m) => Error::Unlock(m),
+            K::Invalid { what, msg } => Error::Invalid { what, msg },
+            K::NotInitialized(p) => Error::NotInitialized(p),
+            K::Io(e) => Error::Io(e),
+            K::TomlDe(e) => Error::TomlDe(e),
+            K::TomlSer(e) => Error::TomlSer(e),
+            K::Json(e) => Error::Json(e),
+        }
+    }
+}

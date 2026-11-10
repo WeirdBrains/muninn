@@ -37,22 +37,15 @@ blake3 = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 # `date -d` style times for schedules (start_at, ends_at); approved by Michael (Q-T3)
 parse_datetime = "0.17"
-bip39 = "2"
-vsss-rs = { version = "5", features = ["std"] }
-argon2 = "0.5"
-hkdf = "0.12"
 sha2 = "0.10"
-chacha20poly1305 = "0.10"
-age = "0.11"
 zeroize = { version = "1", features = ["derive"] }
 secrecy = "0.10"
-getrandom = "0.2"
-rand_core = { version = "0.6", features = ["getrandom"] }
 hex = "0.4"
 base64 = "0.22"
 ratatui = "0.30"
 weirdnet-themes = { version = "0.1.0", path = "../weirdnet-themes", features = ["ratatui"] }
 weirdnet-storage = { version = "0.1.0", path = "../weirdnet-storage" }
+weirdnet-keys = { version = "0.1.0", path = "../weirdnet-keys" }
 crossterm = "0.29"
 rpassword = "7"
 dirs = "6"
@@ -78,7 +71,6 @@ libloading = "0.8"
 libp2p = { version = "0.57", default-features = false, features = ["tokio", "tcp", "quic", "dns", "noise", "yamux", "mdns", "kad", "identify", "ping", "relay", "dcutr", "autonat", "request-response", "cbor", "macros", "ed25519"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util"] }
 futures = "0.3"
-x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
 # Organization hosting (2.7): HTTPS (HTML, JSON and unary gRPC) with hyper and rustls,
 # self-signed certificates with rcgen, Let's Encrypt (ACME) with instant-acme.
 hyper = { version = "1", features = ["server", "http1", "http2"] }
@@ -91,7 +83,6 @@ rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs", "
 time = "0.3"
 instant-acme = "0.8"
 prost = { version = "0.14", features = ["derive"] }
-hmac = "0.12"
 x509-parser = "0.18"
 tonic = { version = "0.14", default-features = false, features = ["transport", "codegen", "router"] }
 tonic-prost = "0.14"
@@ -103,6 +94,9 @@ tower = { version = "0.5", features = ["util"] }
 [dev-dependencies]
 # A gRPC (HTTP/2) client for the hosting tests.
 hyper = { version = "1", features = ["client", "http2"] }
+# Independent oracles for the golden key-format tests (compat_tests).
+argon2 = "0.5"
+hkdf = "0.12"
 
 [build-dependencies]
 protox = "0.10.0"

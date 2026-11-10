@@ -84,6 +84,11 @@ fn into_io(e: Error) -> std::io::Error {
 
 /// Muninn's key-file layout for the keyring (`keys/envelope.toml`, `keys/service/`).
 impl crate::crypto::keyring::KeyFiles for Paths {
+    type Error = Error;
+    /// Existing Muninn homes keep their labels and formats.
+    fn profile(&self) -> weirdnet_keys::Profile {
+        crate::crypto::MUNINN_PROFILE
+    }
     fn home(&self) -> PathBuf {
         self.home.clone()
     }

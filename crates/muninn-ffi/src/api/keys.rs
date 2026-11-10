@@ -226,7 +226,7 @@ pub fn keys_export(
     let items: Vec<ExportItem> = if only.is_empty() {
         vec![ExportItem::Master, ExportItem::Words, ExportItem::Service, ExportItem::Shards]
     } else {
-        only.iter().map(|s| ExportItem::parse(s)).collect::<muninn_core::Result<_>>()?
+        only.iter().map(|s| keyring::parse_export_item(s)).collect::<muninn_core::Result<_>>()?
     };
     let has_master = items.contains(&ExportItem::Master) || items.contains(&ExportItem::Words);
     if has_master && items.contains(&ExportItem::Shards) && !confirm_combined {

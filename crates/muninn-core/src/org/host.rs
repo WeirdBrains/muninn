@@ -18,7 +18,6 @@ use crate::error::{Error, Result};
 use crate::prefs::{AcmePrefs, HostingPrefs};
 use crate::store::{Store, now_ms};
 use bytes::Bytes;
-use hmac::{Hmac, Mac};
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full, Limited, StreamBody};
 use hyper::body::{Frame, Incoming};
@@ -43,6 +42,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
+use weirdnet_keys::mac::HmacSha256;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 type Body = BoxBody<Bytes, Infallible>;
@@ -68,25 +68,23 @@ fn acme_err(e: impl std::fmt::Display) -> Error {
 // ---------------------------------------------------------------------------------------
 // Member signatures
 
-fn web_key(k: &Key32) -> Zeroizing<[u8; 32]> {
-    let mut out = Zeroizing::new([0u8; 32]);
-    hkdf::Hkdf::<Sha256>::new(None, &k.0).expand(WEB_INFO, out.as_mut()).expect("32 bytes is a valid HKDF length");
-    out
+fn web_key(k: &Key32) -> Key32 {
+    weirdnet_keys::kdf::hkdf(&k.0, None, WEB_INFO).expect("32 bytes is a valid HKDF length")
 }
 
 fn canonical(method: &str, path: &str, ts: i64, body: &[u8]) -> Vec<u8> {
     format!("{}\n{}\n{}\n{}", method.to_ascii_uppercase(), path, ts, hex::encode(Sha256::digest(body))).into_bytes()
 }
 
-fn mac(k: &Key32) -> Hmac<Sha256> {
-    <Hmac<Sha256> as Mac>::new_from_slice(web_key(k).as_ref()).expect("HMAC takes any key size")
+fn mac(k: &Key32) -> HmacSha256 {
+    HmacSha256::new(&web_key(k).0)
 }
 
 /// The `Authorization` value for a request signed with an exchange key.
 pub fn sign_with(key: &Key32, exchange: &str, method: &str, path: &str, body: &[u8], ts: i64) -> String {
     let mut m = mac(key);
     m.update(&canonical(method, path, ts, body));
-    format!("Muninn exchange={exchange}, ts={ts}, sig={}", hex::encode(m.finalize().into_bytes()))
+    format!("Muninn exchange={exchange}, ts={ts}, sig={}", hex::encode(m.finalize()))
 }
 
 /// The `Authorization` value a member of `org` (an org joined here) sends with a request.
@@ -151,8 +149,7 @@ impl Sessions {
     /// A new session id (64 hex characters) for a member of the org at `slug`.
     pub fn open(&mut self, exchange: &str, slug: &str, now: i64) -> Zeroizing<String> {
         self.live.retain(|_, x| x.until > now);
-        let mut raw = Zeroizing::new([0u8; 32]);
-        getrandom::getrandom(raw.as_mut()).expect("system randomness");
+        let raw = Zeroizing::new(crate::crypto::random_bytes::<32>().expect("system randomness"));
         let id = Zeroizing::new(hex::encode(raw.as_ref()));
         self.live.insert(Sha256::digest(id.as_bytes()).into(), Session { exchange: exchange.into(), slug: slug.into(), until: now + SESSION_MS });
         id
@@ -230,7 +227,9 @@ pub fn verify(
     let key = s.exchange_key(&a.exchange).ok().flatten().ok_or("unknown key exchange")?;
     let mut m = mac(&key);
     m.update(&canonical(method, path, a.ts, body));
-    m.verify_slice(&a.sig).map_err(|_| "bad signature")?;
+    if !m.verify(&a.sig) {
+        return Err("bad signature");
+    }
     if !replay.fresh(&a.sig, now) {
         return Err("signature already used");
     }

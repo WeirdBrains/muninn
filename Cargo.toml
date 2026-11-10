@@ -43,17 +43,9 @@ rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl",
 uuid = { version = "1", features = ["v4"] }
 blake3 = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
-bip39 = "2"
-vsss-rs = { version = "5", features = ["std"] }
-argon2 = "0.5"
-hkdf = "0.12"
 sha2 = "0.10"
-chacha20poly1305 = "0.10"
-age = "0.11"
 zeroize = { version = "1", features = ["derive"] }
 secrecy = "0.10"
-getrandom = "0.2"
-rand_core = { version = "0.6", features = ["getrandom"] }
 hex = "0.4"
 base64 = "0.22"
 ratatui = "0.30"
@@ -83,7 +75,6 @@ libloading = "0.8"
 libp2p = { version = "0.57", default-features = false, features = ["tokio", "tcp", "quic", "dns", "noise", "yamux", "mdns", "kad", "identify", "ping", "relay", "dcutr", "autonat", "request-response", "cbor", "macros", "ed25519"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util"] }
 futures = "0.3"
-x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
 # Organization hosting (2.7): HTTPS (HTML, JSON and unary gRPC) with hyper and rustls,
 # self-signed certificates with rcgen, Let's Encrypt (ACME) with instant-acme.
 hyper = { version = "1", features = ["server", "http1", "http2"] }
@@ -96,7 +87,6 @@ rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs", "
 time = "0.3"
 instant-acme = "0.8"
 prost = { version = "0.14", features = ["derive"] }
-hmac = "0.12"
 x509-parser = "0.18"
 tonic = { version = "0.14", default-features = false, features = ["transport", "codegen", "router"] }
 tonic-prost = "0.14"
@@ -155,9 +145,9 @@ assets = [
 strip = "symbols"
 
 [workspace]
-members = ["crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage"]
+members = ["crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage", "crates/weirdnet-keys"]
 # plain `cargo build/test/clippy` at the root covers all of them (not the vendored crate)
-default-members = [".", "crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage"]
+default-members = [".", "crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage", "crates/weirdnet-keys"]
 exclude = ["vendor/python-ast"]
 
 [workspace.dependencies]
