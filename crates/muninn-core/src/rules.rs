@@ -3,6 +3,11 @@
 //! command-line syntax for conditions and then-actions is parsed and printed here so the
 //! CLI and the TUI share it. See `docs/rules.md`.
 //!
+//! The syntax, comparison, schedules, templates, matching and loop protection are
+//! [`weirdnet_rules`]'; this module is Muninn's side of it: the action catalog, the
+//! then-actions (parsing, printing, planning and running them), what fields and
+//! "related" mean for a recorded action, and recording runs in the history.
+//!
 //! Loop protection: actions of kind `rule.*` never trigger rules; a rule already running
 //! in the current chain is not started again; chains stop at [`MAX_DEPTH`] rules and one
 //! outermost action starts at most [`MAX_RUNS`] runs. Blocked runs are recorded as
@@ -13,15 +18,17 @@
 use crate::error::{Error, Result};
 use crate::export::files::{OutFormat, Target};
 use crate::store::Store;
-use crate::store::{ActionRecord, ApplyOpts, Condition, FieldOp, ItemKind, ItemRef, Model, NewAction, Op, OwnerKind, Rule, Then};
-use serde::Serialize;
+use crate::store::{ActionRecord, ApplyOpts, Condition, FieldOp, ItemKind, ItemRef, Model, NewAction, OwnerKind, Rule, Then};
 use serde_json::{Value, json};
 use std::path::PathBuf;
+use weirdnet_rules::compare::path;
+use weirdnet_rules::engine as eng;
 
-/// Most rules in one chain (a rule whose action triggers a rule whose action triggers …).
-pub const MAX_DEPTH: usize = 3;
-/// Most rule runs started by one outermost action.
-pub const MAX_RUNS: u32 = 50;
+pub use weirdnet_rules::compare::compare;
+pub use weirdnet_rules::engine::{Check, CondCheck, MAX_DEPTH, MAX_RUNS, RunResult, SCHEDULE};
+pub use weirdnet_rules::schedule::{Cron, on_text, schedule_text};
+pub use weirdnet_rules::syntax::{condition_text, quote, split_list};
+
 /// Origin of actions taken by rules.
 pub const ORIGIN: &str = "rule";
 
@@ -341,146 +348,33 @@ const NET_SHARE: &[&str] = &["kind: item kind", "item: item id", "name: item nam
 pub const COMMON_FIELDS: &[&str] =
     &["kind: action kind", "summary: what happened", "origin: cli, tui, rule or mcp", "author: author name", "action: action number"];
 
-fn pattern_matches(p: &str, kind: &str) -> bool {
-    let p = p.trim();
-    p == "*" || p == kind || p.strip_suffix(".*").is_some_and(|pre| kind.starts_with(&format!("{pre}.")) || kind == pre)
+fn kinds() -> Vec<&'static str> {
+    EVENTS.iter().map(|e| e.kind).collect()
 }
+
+const SEE_EVENTS: &str = " (see `mnnn rule events`)";
 
 /// Check an `--on` pattern against the event catalog.
 pub fn check_pattern(p: &str) -> Result<String> {
-    let p = p.trim();
-    if p.is_empty() {
-        return Err(Error::invalid("--on", "is empty"));
-    }
-    if EVENTS.iter().any(|e| pattern_matches(p, e.kind)) {
-        Ok(p.to_string())
-    } else {
-        Err(Error::invalid("--on", format!("`{p}` matches no action kind (see `mnnn rule events`)")))
-    }
+    Ok(weirdnet_rules::syntax::check_pattern(p, &kinds(), SEE_EVENTS)?)
 }
 
 /// `--on import,journal.*` and repeated flags both work.
 pub fn parse_on(v: &[String]) -> Result<Vec<String>> {
-    v.iter().flat_map(|s| s.split([',', ' '])).filter(|s| !s.trim().is_empty()).map(check_pattern).collect()
+    Ok(weirdnet_rules::syntax::parse_on(v, &kinds(), SEE_EVENTS)?)
 }
 
 // ---------------------------------------------------------------------------- syntax
 
-/// Split `a; b; "c;d"` on semicolons outside quotes (the TUI takes lists on one line).
-pub fn split_list(s: &str) -> Vec<String> {
-    let mut out = vec![];
-    let mut cur = String::new();
-    let mut q: Option<char> = None;
-    for c in s.chars() {
-        match (q, c) {
-            (None, '"' | '\'') => {
-                q = Some(c);
-                cur.push(c)
-            }
-            (Some(o), c) if c == o => {
-                q = None;
-                cur.push(c)
-            }
-            (None, ';') => out.push(std::mem::take(&mut cur)),
-            _ => cur.push(c),
-        }
-    }
-    out.push(cur);
-    out.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()
-}
-
 /// A word, and whether it was `key=value` written without quotes before the `=`.
 pub(crate) fn tokenize(s: &str) -> Result<Vec<(String, Option<String>)>> {
-    let mut out = vec![];
-    let mut it = s.chars().peekable();
-    loop {
-        while it.peek().is_some_and(|c| c.is_whitespace()) {
-            it.next();
-        }
-        if it.peek().is_none() {
-            break;
-        }
-        let mut w = String::new();
-        let mut key = None;
-        let mut quoted_any = false;
-        while let Some(&c) = it.peek() {
-            if c.is_whitespace() {
-                break;
-            }
-            it.next();
-            match c {
-                '"' | '\'' => {
-                    quoted_any = true;
-                    let mut closed = false;
-                    for d in it.by_ref() {
-                        if d == c {
-                            closed = true;
-                            break;
-                        }
-                        w.push(d);
-                    }
-                    if !closed {
-                        return Err(Error::invalid("then", format!("unclosed {c} in `{s}`")));
-                    }
-                }
-                '=' if key.is_none() && !quoted_any && !w.is_empty() && w.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') => {
-                    key = Some(std::mem::take(&mut w))
-                }
-                c => w.push(c),
-            }
-        }
-        out.push(match key {
-            Some(k) => (k, Some(w)),
-            None => (w, None),
-        });
-    }
-    Ok(out)
+    Ok(weirdnet_rules::syntax::tokenize(s)?)
 }
 
-/// Parse `FIELD OP VALUE`, e.g. `inserted > 0`, `format=pdf`, `title ~ "btc halving"`.
+/// Parse `FIELD OP VALUE`, e.g. `inserted > 0`, `format=pdf`, `title ~ "btc halving"`, and
+/// `mcp:SERVER/TOOL(args).path` fields.
 pub fn parse_condition(s: &str) -> Result<Condition> {
-    let s = s.trim();
-    let end = if s.starts_with("mcp:") {
-        // mcp:SERVER/TOOL(args).path: the arguments may hold any character but `)`
-        let open = s.find('(');
-        let from = match (open, s.find(')')) {
-            (Some(o), Some(c)) if o < s.find(char::is_whitespace).unwrap_or(s.len()) => c + 1,
-            _ => 4,
-        };
-        from + s[from..].find(|c: char| !(c.is_ascii_alphanumeric() || "_.-:/".contains(c))).unwrap_or(s.len() - from)
-    } else {
-        s.find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')).unwrap_or(s.len())
-    };
-    let field = &s[..end];
-    if field.is_empty() {
-        return Err(Error::invalid("--if", format!("`{s}`: start with a field, e.g. `inserted > 0`")));
-    }
-    let rest = s[end..].trim_start();
-    let Some(op) = Op::ALL.into_iter().find(|o| rest.starts_with(o.as_str())) else {
-        return Err(Error::invalid("--if", format!("`{s}`: expected an operator (= != ~ !~ > >= < <= ? !?)")));
-    };
-    let mut value = rest[op.as_str().len()..].trim().to_string();
-    if value.len() >= 2 && (value.starts_with('"') && value.ends_with('"') || value.starts_with('\'') && value.ends_with('\'')) {
-        value = value[1..value.len() - 1].to_string();
-    }
-    if op.unary() != value.is_empty() {
-        return Err(Error::invalid("--if", format!("`{s}`: {}", if op.unary() { "`?` and `!?` take no value" } else { "missing a value" })));
-    }
-    Ok(Condition { field: field.to_string(), op, value })
-}
-
-pub fn condition_text(c: &Condition) -> String {
-    if c.op.unary() { format!("{} {}", c.field, c.op.as_str()) } else { format!("{} {} {}", c.field, c.op.as_str(), quote(&c.value)) }
-}
-
-pub(crate) fn quote(s: &str) -> String {
-    if !s.is_empty() && !s.contains(|c: char| c.is_whitespace() || "\"';=".contains(c)) {
-        s.to_string()
-    } else if s.contains('"') {
-        format!("'{s}'")
-    } else {
-        format!("\"{s}\"")
-    }
+    Ok(weirdnet_rules::syntax::parse_condition_with(s, &["mcp:"])?)
 }
 
 /// Parse one then-action, resolving names to ids:
@@ -905,27 +799,10 @@ pub fn home(store: &Store, r: &Rule) -> String {
 
 /// One line about a rule: `on import → 2 actions, on`.
 pub fn brief(r: &Rule) -> String {
-    let n = r.spec.then.len();
-    let when = match (&r.spec.schedule, r.spec.on.is_empty()) {
-        (Some(s), true) => schedule_text(s),
-        (Some(s), false) => format!("{}, on {}", schedule_text(s), r.spec.on.join(", ")),
-        (None, _) => format!("on {}", r.spec.on.join(", ")),
-    };
-    format!("{when} → {n} action{}{}", if n == 1 { "" } else { "s" }, if r.enabled { "" } else { " (off)" })
+    eng::brief(r)
 }
 
 // ---------------------------------------------------------------------------- matching
-
-fn path<'a>(mut v: &'a Value, p: &str) -> Option<&'a Value> {
-    for k in p.split('.').filter(|k| !k.is_empty()) {
-        v = match v {
-            Value::Object(m) => m.get(k)?,
-            Value::Array(a) => a.get(k.parse::<usize>().ok()?)?,
-            _ => return None,
-        };
-    }
-    (!v.is_null()).then_some(v)
-}
 
 /// The value of a field on an action: `kind`, `summary`, `origin`, `author`, `action`,
 /// `before.X`/`after.X`, otherwise a params path (`inserted`, `spec.query`, `params.x`).
@@ -999,78 +876,6 @@ pub fn parse_mcp_field(f: &str) -> Option<(String, String, Value, String)> {
     Some((server.into(), tool.into(), crate::mcp::client::args_from_pairs(&pairs), rest.trim_start_matches('.').into()))
 }
 
-fn text(v: &Value) -> String {
-    match v {
-        Value::String(s) => s.clone(),
-        o => o.to_string(),
-    }
-}
-
-fn num(v: &Value) -> Option<f64> {
-    match v {
-        Value::Number(n) => n.as_f64(),
-        Value::String(s) => s.trim().parse().ok(),
-        Value::Bool(b) => Some(*b as u8 as f64),
-        _ => None,
-    }
-}
-
-fn glob(p: &str, s: &str) -> bool {
-    let parts: Vec<&str> = p.split('*').collect();
-    if parts.len() == 1 {
-        return p == s;
-    }
-    let mut rest = s;
-    for (i, part) in parts.iter().enumerate() {
-        if i == 0 {
-            let Some(r) = rest.strip_prefix(part) else { return false };
-            rest = r;
-        } else if i == parts.len() - 1 {
-            return rest.ends_with(part);
-        } else {
-            let Some(at) = rest.find(part) else { return false };
-            rest = &rest[at + part.len()..];
-        }
-    }
-    true
-}
-
-fn scalar_eq(v: &Value, want: &str) -> bool {
-    match (num(v), want.trim().parse::<f64>()) {
-        (Some(a), Ok(b)) if !matches!(v, Value::Bool(_)) => a == b,
-        _ => glob(&want.to_lowercase(), &text(v).to_lowercase()),
-    }
-}
-
-/// Does `actual` (absent: `None`) satisfy `op value`?
-pub fn compare(actual: Option<&Value>, op: Op, want: &str) -> bool {
-    let Some(v) = actual else { return matches!(op, Op::Missing | Op::Ne | Op::NotContains) };
-    let contains = |v: &Value| text(v).to_lowercase().contains(&want.to_lowercase());
-    let order = |v: &Value| -> Option<std::cmp::Ordering> {
-        let v = match v {
-            Value::Array(a) => Value::from(a.len()),
-            o => o.clone(),
-        };
-        match (num(&v), want.trim().parse::<f64>()) {
-            (Some(a), Ok(b)) => a.partial_cmp(&b),
-            _ => Some(text(&v).to_lowercase().cmp(&want.to_lowercase())),
-        }
-    };
-    let arr = v.as_array();
-    match op {
-        Op::Exists => true,
-        Op::Missing => false,
-        Op::Eq => arr.map_or_else(|| scalar_eq(v, want), |a| a.iter().any(|x| scalar_eq(x, want))),
-        Op::Ne => arr.map_or_else(|| !scalar_eq(v, want), |a| !a.iter().any(|x| scalar_eq(x, want))),
-        Op::Contains => arr.map_or_else(|| contains(v), |a| a.iter().any(contains)),
-        Op::NotContains => arr.map_or_else(|| !contains(v), |a| !a.iter().any(contains)),
-        Op::Gt => order(v).is_some_and(|o| o.is_gt()),
-        Op::Ge => order(v).is_some_and(|o| o.is_ge()),
-        Op::Lt => order(v).is_some_and(|o| o.is_lt()),
-        Op::Le => order(v).is_some_and(|o| o.is_le()),
-    }
-}
-
 /// Ids the action is about (journal, search, report, project, item ref, …).
 fn mentions(a: &ActionRecord) -> Vec<String> {
     ["journal", "search", "report", "project", "ref", "entry", "model", "record"]
@@ -1099,64 +904,8 @@ pub fn is_related(store: &Store, r: &Rule, a: &ActionRecord) -> bool {
 }
 
 /// How a rule fares against one action (`mnnn rule test`).
-#[derive(Debug, Clone, Serialize)]
-pub struct Check {
-    pub rule: String,
-    pub name: String,
-    pub action: i64,
-    pub kind: String,
-    pub enabled: bool,
-    /// The `--on` pattern that matched.
-    pub on: Option<String>,
-    /// `None` when the rule is not `--related`.
-    pub related: Option<bool>,
-    pub conditions: Vec<CondCheck>,
-    pub matched: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct CondCheck {
-    pub condition: String,
-    pub actual: Option<Value>,
-    pub ok: bool,
-}
-
 pub fn check(store: &Store, r: &Rule, a: &ActionRecord) -> Check {
-    let on = if a.kind.starts_with("rule.") {
-        None
-    } else if a.kind == SCHEDULE {
-        // a schedule action naming a rule (legacy tick / dry-run): that rule only; a
-        // ruleset schedule (no `rule` param) matches via --on like any other kind
-        match a.params["rule"].as_str() {
-            Some(id) if id == r.id.as_str() => {
-                if r.spec.schedule.is_some() || r.spec.on.iter().any(|p| pattern_matches(p, SCHEDULE)) {
-                    Some(SCHEDULE.to_string())
-                } else {
-                    None
-                }
-            }
-            Some(_) => None,
-            None => r.spec.on.iter().find(|p| pattern_matches(p, SCHEDULE)).cloned(),
-        }
-    } else {
-        r.spec.on.iter().find(|p| pattern_matches(p, &a.kind)).cloned()
-    };
-    let related = r.spec.related.then(|| is_related(store, r, a));
-    let conditions: Vec<CondCheck> = r
-        .spec
-        .when
-        .iter()
-        .map(|c| {
-            // an MCP data source is only asked when the rule could run
-            if c.field.starts_with("mcp:") && (on.is_none() || related == Some(false)) {
-                return CondCheck { condition: condition_text(c), ok: false, actual: None };
-            }
-            let actual = field_value(store, a, &c.field);
-            CondCheck { condition: condition_text(c), ok: compare(actual.as_ref(), c.op, &c.value), actual }
-        })
-        .collect();
-    let matched = on.is_some() && related != Some(false) && conditions.iter().all(|c| c.ok);
-    Check { rule: r.id.clone(), name: r.name.clone(), action: a.id, kind: a.kind.clone(), enabled: r.enabled, on, related, conditions, matched }
+    eng::check(&Host(store), r, a)
 }
 
 // ---------------------------------------------------------------------------- templates
@@ -1164,33 +913,7 @@ pub fn check(store: &Store, r: &Rule, a: &ActionRecord) -> Check {
 /// Fill `{kind} {summary} {origin} {author} {action} {rule} {date} {time} {now}` and
 /// `{FIELD}` (any field, e.g. `{inserted}`, `{params.out}`); unknown ones stay as written.
 pub fn expand(store: &Store, r: &Rule, a: &ActionRecord, t: &str) -> String {
-    let now = chrono::Local::now();
-    let mut out = String::new();
-    let mut rest = t;
-    while let Some(i) = rest.find('{') {
-        out.push_str(&rest[..i]);
-        let after = &rest[i + 1..];
-        let Some(j) = after.find('}') else {
-            out.push_str(&rest[i..]);
-            return out;
-        };
-        let key = &after[..j];
-        let v = match key {
-            "rule" => Some(r.name.clone()),
-            "date" => Some(now.format("%Y-%m-%d").to_string()),
-            "time" => Some(now.format("%H%M%S").to_string()),
-            "now" => Some(now.format("%Y-%m-%d %H:%M").to_string()),
-            k if !k.is_empty() && !k.contains(char::is_whitespace) => field_value(store, a, k).map(|v| text(&v)),
-            _ => None,
-        };
-        match v {
-            Some(v) => out.push_str(&v),
-            None => out.push_str(&rest[i..i + j + 2]),
-        }
-        rest = &after[j + 1..];
-    }
-    out.push_str(rest);
-    out
+    weirdnet_rules::template::expand(t, &chrono::Local::now(), &r.name, |k| field_value(store, a, k))
 }
 
 // ---------------------------------------------------------------------------- running
@@ -1707,311 +1430,160 @@ pub fn last_trigger(store: &Store) -> Result<Option<ActionRecord>> {
 
 /// Called by [`Store::record_action`] after every action.
 pub(crate) fn after_action(store: &Store, id: i64) {
-    let rt = &store.rules_rt;
-    if rt.off.get() {
+    if store.rules_rt.off.get() {
         return;
     }
     let Ok(Some(a)) = store.action(id) else { return };
-    if a.kind.starts_with("rule.") {
-        return;
-    }
-    let chain = rt.chain.borrow().clone();
-    if chain.is_empty() {
-        rt.budget.set(MAX_RUNS);
-    }
-    let rules = match store.enabled_rules() {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::warn!("could not read rules: {e}");
-            return;
-        }
-    };
-    for r in rules {
-        if !check(store, &r, &a).matched {
-            continue;
-        }
-        let blocked = if chain.contains(&r.id) {
-            Some(format!("loop: {} is already running for this action", r.name))
-        } else if chain.len() >= MAX_DEPTH {
-            Some(format!("too deep: {MAX_DEPTH} rules already ran in a chain"))
-        } else if rt.budget.get() == 0 {
-            Some(format!("limit: {MAX_RUNS} rule runs for one action"))
-        } else {
-            None
-        };
-        match blocked {
-            Some(why) => block(store, &r, &a, &why),
-            None => {
-                rt.budget.set(rt.budget.get() - 1);
-                run(store, &r, &a);
-            }
-        }
-    }
-}
-
-fn block(store: &Store, r: &Rule, a: &ActionRecord, why: &str) {
-    tracing::warn!("rule {} not run on #{} {}: {why}", r.name, a.id, a.kind);
-    record(
-        store,
-        "rule.run",
-        format!("rule {} blocked on #{} {}: {why}", r.name, a.id, a.kind),
-        json!({ "rule": r.id, "name": r.name, "trigger": a.id, "trigger_kind": a.kind, "status": "blocked", "messages": [why] }),
-    );
-    let _ = store.note_rule_run(&r.id, "blocked");
-    if store.rules_rt.echo.get() {
-        eprintln!("rule {}: blocked ({why})", r.name);
-    }
-}
-
-/// The outcome of one run.
-#[derive(Debug, Clone, Serialize)]
-pub struct RunResult {
-    pub action: Option<i64>,
-    pub status: String,
-    pub messages: Vec<String>,
+    eng::dispatch(&Host(store), &a);
 }
 
 /// Run a rule's then-actions for an action (it is recorded as `rule.run`, a parent of
 /// whatever the then-actions record).
 pub fn run(store: &Store, r: &Rule, a: &ActionRecord) -> RunResult {
-    let rt = &store.rules_rt;
-    let base = json!({ "rule": r.id, "name": r.name, "trigger": a.id, "trigger_kind": a.kind });
-    let mut params = base.clone();
-    params["status"] = "running".into();
-    let run_id = store.record_action(&NewAction::new("rule.run", ORIGIN, format!("rule {} on #{} {}", r.name, a.id, a.kind)).params(params)).ok();
-    rt.chain.borrow_mut().push(r.id.clone());
-    let mut results = vec![];
-    let mut messages = vec![];
-    let mut failed = false;
-    for t in &r.spec.then {
-        match exec(store, r, a, t) {
-            Ok(m) => {
-                results.push(json!({ "do": t.verb(), "ok": true, "message": m }));
-                messages.push(m);
+    eng::run(&Host(store), r, a)
+}
+
+impl eng::Rule for Rule {
+    type Then = Then;
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn enabled(&self) -> bool {
+        self.enabled
+    }
+    fn spec(&self) -> &crate::store::RuleSpec {
+        &self.spec
+    }
+    fn created_at(&self) -> i64 {
+        self.created_at
+    }
+    fn last_run_at(&self) -> Option<i64> {
+        self.last_run_at
+    }
+}
+
+impl eng::Event for ActionRecord {
+    fn id(&self) -> i64 {
+        self.id
+    }
+    fn kind(&self) -> &str {
+        &self.kind
+    }
+    fn param(&self, key: &str) -> Option<&Value> {
+        self.params.get(key)
+    }
+}
+
+/// The store as the rule engine's host: rules from the rules table, fields from the action
+/// history, runs recorded as `rule.run` actions.
+struct Host<'a>(&'a Store);
+
+fn run_params(r: &Rule, a: &ActionRecord) -> Value {
+    json!({ "rule": r.id, "name": r.name, "trigger": a.id, "trigger_kind": a.kind })
+}
+
+impl eng::Host for Host<'_> {
+    type Rule = Rule;
+    type Event = ActionRecord;
+    type Error = Error;
+
+    fn runtime(&self) -> &eng::Runtime {
+        &self.0.rules_rt.engine
+    }
+    fn enabled_rules(&self) -> Result<Vec<Rule>> {
+        self.0.enabled_rules()
+    }
+    fn field(&self, _r: &Rule, a: &ActionRecord, field: &str) -> Option<Value> {
+        field_value(self.0, a, field)
+    }
+    /// An MCP data source is only asked when the rule could run.
+    fn deferred(&self, field: &str) -> bool {
+        field.starts_with("mcp:")
+    }
+    fn is_related(&self, r: &Rule, a: &ActionRecord) -> bool {
+        is_related(self.0, r, a)
+    }
+    fn begin_run(&self, r: &Rule, a: &ActionRecord) -> Option<i64> {
+        let mut params = run_params(r, a);
+        params["status"] = "running".into();
+        self.0.record_action(&NewAction::new("rule.run", ORIGIN, format!("rule {} on #{} {}", r.name, a.id, a.kind)).params(params)).ok()
+    }
+    fn exec(&self, r: &Rule, a: &ActionRecord, t: &Then) -> Result<String> {
+        exec(self.0, r, a, t)
+    }
+    fn finish_run(&self, r: &Rule, a: &ActionRecord, run: &eng::Run) {
+        let store = self.0;
+        if let Some(id) = run.action {
+            let mut p = run_params(r, a);
+            p["status"] = run.status.into();
+            p["results"] = run.results.clone().into();
+            p["messages"] = run.messages.clone().into();
+            let summary = format!("rule {} on #{} {}: {}", r.name, a.id, a.kind, run.messages.join("; "));
+            if let Err(e) = store.update_action(id, &summary, &p) {
+                tracing::warn!("could not record the run of rule {}: {e}", r.name);
             }
-            Err(e) => {
-                failed = true;
-                let m = format!("{} failed: {e}", t.verb());
-                results.push(json!({ "do": t.verb(), "ok": false, "error": e.to_string() }));
-                messages.push(m);
+        }
+        let _ = store.note_rule_run(&r.id, run.status);
+        if store.rules_rt.echo.get() {
+            for m in &run.messages {
+                eprintln!("rule {}: {m}", r.name);
             }
         }
     }
-    rt.chain.borrow_mut().pop();
-    let status = if failed { "failed" } else { "ok" };
-    if let Some(id) = run_id {
-        let mut p = base;
-        p["status"] = status.into();
-        p["results"] = results.into();
-        p["messages"] = messages.clone().into();
-        let summary = format!("rule {} on #{} {}: {}", r.name, a.id, a.kind, messages.join("; "));
-        if let Err(e) = store.update_action(id, &summary, &p) {
-            tracing::warn!("could not record the run of rule {}: {e}", r.name);
+    fn blocked(&self, r: &Rule, a: &ActionRecord, why: &str) {
+        let store = self.0;
+        tracing::warn!("rule {} not run on #{} {}: {why}", r.name, a.id, a.kind);
+        record(
+            store,
+            "rule.run",
+            format!("rule {} blocked on #{} {}: {why}", r.name, a.id, a.kind),
+            json!({ "rule": r.id, "name": r.name, "trigger": a.id, "trigger_kind": a.kind, "status": "blocked", "messages": [why] }),
+        );
+        let _ = store.note_rule_run(&r.id, "blocked");
+        if store.rules_rt.echo.get() {
+            eprintln!("rule {}: blocked ({why})", r.name);
         }
     }
-    let _ = store.note_rule_run(&r.id, status);
-    if rt.echo.get() {
-        for m in &messages {
-            eprintln!("rule {}: {m}", r.name);
-        }
+    fn rules_unavailable(&self, e: &Error) {
+        tracing::warn!("could not read rules: {e}");
     }
-    RunResult { action: run_id, status: status.into(), messages }
 }
 
 // ---------------------------------------------------------------------------- schedules
 
-/// The action kind a scheduled rule runs on (it names the rule; no other rule reacts).
-pub const SCHEDULE: &str = "schedule";
 /// The built-in certificate expiry watcher (a scheduled rule set; edit or remove it freely).
 pub const CERT_WATCH: &str = "cert-expiry-watch";
 const CERT_WATCH_MADE: &str = "rules.builtin.cert-expiry-watch";
 
 /// `--every 6h`: a number and s, m, h, d or w (at least a minute).
 pub fn parse_every(s: &str) -> Result<crate::store::Schedule> {
-    let t = s.trim().to_ascii_lowercase();
-    let split = t.find(|c: char| !c.is_ascii_digit()).unwrap_or(t.len());
-    let (n, u) = t.split_at(split);
-    let n: i64 = n.parse().map_err(|_| Error::invalid("--every", format!("`{s}`: like 30m, 6h, 1d")))?;
-    let unit = match u.trim() {
-        "s" | "sec" | "secs" => 1_000,
-        "m" | "min" | "mins" => 60_000,
-        "h" | "hr" | "hrs" | "" => 3_600_000,
-        "d" | "day" | "days" => 86_400_000,
-        "w" | "week" | "weeks" => 7 * 86_400_000,
-        _ => return Err(Error::invalid("--every", format!("`{s}`: use s, m, h, d or w"))),
-    };
-    let ms = n.saturating_mul(unit);
-    if ms < 60_000 {
-        return Err(Error::invalid("--every", "at least a minute"));
-    }
-    Ok(crate::store::Schedule::Every(ms))
+    Ok(weirdnet_rules::schedule::parse_every(s)?)
 }
 
-/// A five-field cron expression (minute hour day-of-month month day-of-week; `*`, lists,
-/// ranges and `/steps`; Sunday is 0 or 7), in local time.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Cron {
-    min: Vec<bool>,
-    hour: Vec<bool>,
-    dom: Vec<bool>,
-    month: Vec<bool>,
-    dow: Vec<bool>,
-    dom_any: bool,
-    dow_any: bool,
-}
-
-fn cron_field(f: &str, lo: u32, hi: u32, what: &str) -> Result<Vec<bool>> {
-    let bad = || Error::invalid("--cron", format!("`{f}` is not a valid {what} ({lo}-{hi}, *, a-b, */n, lists)"));
-    let mut v = vec![false; hi as usize + 1];
-    for part in f.split(',') {
-        let (range, step) = match part.split_once('/') {
-            Some((r, s)) => (r, s.parse::<u32>().ok().filter(|s| *s > 0).ok_or_else(bad)?),
-            None => (part, 1),
-        };
-        let (a, b) = if range == "*" {
-            (lo, hi)
-        } else if let Some((a, b)) = range.split_once('-') {
-            (a.parse().map_err(|_| bad())?, b.parse().map_err(|_| bad())?)
-        } else {
-            let a: u32 = range.parse().map_err(|_| bad())?;
-            (a, if part.contains('/') { hi } else { a })
-        };
-        if a < lo || b > hi || a > b {
-            return Err(bad());
-        }
-        let mut i = a;
-        while i <= b {
-            v[i as usize] = true;
-            i += step;
-        }
-    }
-    Ok(v)
-}
-
+/// A five-field cron expression, in local time (see [`Cron`]).
 pub fn parse_cron(s: &str) -> Result<Cron> {
-    let f: Vec<&str> = s.split_whitespace().collect();
-    if f.len() != 5 {
-        return Err(Error::invalid("--cron", format!("`{s}`: five fields, minute hour day month weekday (like \"0 3 * * *\")")));
-    }
-    let mut dow = cron_field(f[4], 0, 7, "weekday")?;
-    if dow[7] {
-        dow[0] = true;
-    }
-    Ok(Cron {
-        min: cron_field(f[0], 0, 59, "minute")?,
-        hour: cron_field(f[1], 0, 23, "hour")?,
-        dom: cron_field(f[2], 1, 31, "day")?,
-        month: cron_field(f[3], 1, 12, "month")?,
-        dow,
-        dom_any: f[2] == "*",
-        dow_any: f[4] == "*",
-    })
-}
-
-impl Cron {
-    /// The first matching minute after `after` (epoch ms), within about four years.
-    pub fn next_after(&self, after: i64) -> Option<i64> {
-        self.next_after_in(after, &chrono::Local)
-    }
-
-    /// [`Cron::next_after`] evaluated in zone `z` (UTC, a fixed offset, or local).
-    pub fn next_after_in<Z: chrono::TimeZone>(&self, after: i64, z: &Z) -> Option<i64> {
-        use chrono::{Datelike, Duration, Timelike};
-        let start = z.timestamp_millis_opt(after).earliest()?;
-        let mut t = start.with_second(0)?.with_nanosecond(0)? + Duration::minutes(1);
-        let end = start + Duration::days(366 * 4);
-        while t < end {
-            if !self.month[t.month() as usize] {
-                t = (t + Duration::days(1)).with_hour(0)?.with_minute(0)?;
-                continue;
-            }
-            let dom = self.dom[t.day() as usize];
-            let dow = self.dow[t.weekday().num_days_from_sunday() as usize];
-            let day_ok = match (self.dom_any, self.dow_any) {
-                (true, true) => true,
-                (false, true) => dom,
-                (true, false) => dow,
-                (false, false) => dom || dow,
-            };
-            if !day_ok {
-                t = (t + Duration::days(1)).with_hour(0)?.with_minute(0)?;
-                continue;
-            }
-            if !self.hour[t.hour() as usize] {
-                t = (t + Duration::hours(1)).with_minute(0)?;
-                continue;
-            }
-            if self.min[t.minute() as usize] {
-                return Some(t.timestamp_millis());
-            }
-            t += Duration::minutes(1);
-        }
-        None
-    }
+    Ok(weirdnet_rules::schedule::parse_cron(s)?)
 }
 
 /// `--every` and `--cron` (at most one) into a schedule.
 pub fn parse_schedule(every: Option<&str>, cron: Option<&str>) -> Result<Option<crate::store::Schedule>> {
-    match (every, cron) {
-        (Some(_), Some(_)) => Err(Error::invalid("schedule", "give --every or --cron, not both")),
-        (Some(e), None) => parse_every(e).map(Some),
-        (None, Some(c)) => {
-            parse_cron(c)?;
-            Ok(Some(crate::store::Schedule::Cron(c.split_whitespace().collect::<Vec<_>>().join(" "))))
-        }
-        (None, None) => Ok(None),
-    }
-}
-
-/// `every 6h`, `cron "0 3 * * *"`.
-pub fn schedule_text(s: &crate::store::Schedule) -> String {
-    match s {
-        crate::store::Schedule::Every(ms) => {
-            let ms = *ms;
-            let (n, u) = [(7 * 86_400_000, "w"), (86_400_000, "d"), (3_600_000, "h"), (60_000, "m"), (1_000, "s")]
-                .iter()
-                .find(|(u, _)| ms % u == 0)
-                .map(|(u, n)| (ms / u, *n))
-                .unwrap_or((ms, "ms"));
-            format!("every {n}{u}")
-        }
-        crate::store::Schedule::Cron(c) => format!("cron \"{c}\""),
-    }
+    Ok(weirdnet_rules::schedule::parse_schedule(every, cron)?)
 }
 
 /// When a scheduled rule runs next (`None`: it has no schedule, or a cron that never fires).
 /// Every: an interval after its last run, at once if it never ran. Cron: the first time
 /// after its last run (or its creation).
 pub fn next_run(r: &Rule) -> Option<i64> {
-    match r.spec.schedule.as_ref()? {
-        crate::store::Schedule::Every(ms) => Some(r.last_run_at.map_or(r.created_at, |l| l + ms)),
-        crate::store::Schedule::Cron(c) => parse_cron(c).ok()?.next_after(r.last_run_at.unwrap_or(r.created_at)),
-    }
+    eng::next_run(r)
 }
 
 /// The TUI's "On" field: action kinds, or a schedule (`every 6h`, `cron "0 3 * * *"`)
 /// optionally followed by `; KINDS`.
 pub fn parse_on_text(s: &str) -> Result<(Vec<String>, Option<crate::store::Schedule>)> {
-    let t = s.trim();
-    let low = t.to_ascii_lowercase();
-    if !(low.starts_with("every ") || low.starts_with("cron ")) {
-        return Ok((parse_on(&[t.to_string()])?, None));
-    }
-    let (sched, kinds) = t.split_once(';').unwrap_or((t, ""));
-    let (word, arg) = sched.trim().split_once(' ').unwrap_or((sched, ""));
-    let arg = arg.trim().trim_matches('"');
-    let schedule = if word.eq_ignore_ascii_case("every") { parse_schedule(Some(arg), None)? } else { parse_schedule(None, Some(arg))? };
-    let on = if kinds.trim().is_empty() { vec![] } else { parse_on(&[kinds.to_string()])? };
-    Ok((on, schedule))
-}
-
-/// A spec's "On" in the form [`parse_on_text`] reads.
-pub fn on_text(spec: &crate::store::RuleSpec) -> String {
-    match &spec.schedule {
-        Some(s) if spec.on.is_empty() => schedule_text(s),
-        Some(s) => format!("{}; {}", schedule_text(s), spec.on.join(", ")),
-        None => spec.on.join(", "),
-    }
+    Ok(weirdnet_rules::schedule::parse_on_text(s, &kinds(), SEE_EVENTS)?)
 }
 
 /// The `schedule` action for a rule, not recorded (for `rule test`/`dry-run`).
@@ -2036,7 +1608,7 @@ pub fn schedule_action(r: &Rule) -> ActionRecord {
 pub fn tick(store: &Store, now: i64) -> Result<Vec<String>> {
     let mut out = vec![];
     for r in store.enabled_rules()? {
-        if r.spec.schedule.is_none() || next_run(&r).is_none_or(|t| t > now) {
+        if !eng::due(&r, now) {
             continue;
         }
         // mark it first so a failing run does not repeat every minute
@@ -2092,7 +1664,9 @@ mod schedule_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::store::Op;
     use crate::store::{EntryFormat, NewRule, RuleSpec, SearchSpec};
+    use weirdnet_rules::syntax::matches_kind as pattern_matches;
 
     fn act(s: &Store, kind: &str, params: Value) -> ActionRecord {
         let id = s.record_action(&NewAction::new(kind, "cli", format!("did {kind}")).params(params)).unwrap();
@@ -2461,5 +2035,53 @@ mod tests {
         let r = rule(&s, "import", &[], &["run-space s0"]);
         let a = act(&s, "import", json!({}));
         assert!(exec(&s, &r, &a, &r.spec.then[0]).is_err());
+    }
+
+    /// Rule specs written before the engine moved to weirdnet-rules read back the same
+    /// and write the same bytes (the `rules.spec` column is unchanged).
+    #[test]
+    fn specs_written_before_the_extraction_round_trip() {
+        let v1 = concat!(
+            r#"{"version":1,"on":["import","journal.*"],"if":[{"field":"inserted","op":">=","value":"10"},{"field":"out","op":"!?","value":""}],"#,
+            r#""then":[{"do":"status","text":"imported {inserted}"},{"do":"run_search","search":null},"#,
+            r#"{"do":"add_to_project","project":null,"item":{"kind":"subject"}},"#,
+            r#"{"do":"record_update","model":null,"id":null,"where":[{"field":"price","op":"<","value":"3"}],"values":{"price":"{close}"}},"#,
+            r#"{"do":"cert_watch","renew_days":30,"notify_days":[30,14,3]},"#,
+            r#"{"do":"mcp","server":"fake","tool":"price","args":{"Symbol":"{summary}"}}],"#,
+            r#""related":true,"schedule":{"every":21600000}}"#
+        );
+        let spec: crate::store::RuleSpec = serde_json::from_str(v1).unwrap();
+        assert_eq!(spec.then.len(), 6);
+        assert_eq!(spec.schedule, Some(crate::store::Schedule::Every(21_600_000)));
+        assert_eq!(serde_json::to_string(&spec).unwrap(), v1);
+        let s = Store::open_in_memory().unwrap();
+        let r = s.create_rule(&NewRule { name: "old".into(), spec: spec.clone(), enabled: true, ..Default::default() }).unwrap();
+        let stored: String = s.conn.query_row("SELECT spec FROM rules WHERE id = ?1", [&r.id], |x| x.get(0)).unwrap();
+        assert_eq!(stored, v1);
+        assert_eq!(s.find_rule("old").unwrap().spec, spec);
+        assert_eq!(brief(&r), "every 6h, on import, journal.* → 6 actions");
+        assert_eq!(cert_watch_spec(), serde_json::from_str(r#"{"on":["schedule"],"then":[{"do":"cert_watch"}]}"#).unwrap());
+    }
+
+    /// The engine runs then-actions, but whether one may happen is still Muninn's: an
+    /// unapproved MCP tool is refused inside the run, which fails and says how to allow it.
+    #[test]
+    fn permission_checks_stay_with_the_then_actions() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = Store::open_in_memory().unwrap();
+        let cmd = crate::mcp::client::tests::fake_server(dir.path());
+        s.add_mcp_server("fake", "stdio", &cmd.to_string_lossy(), &[], "", &Default::default()).unwrap();
+        let r = rule(&s, "import", &[], &["mcp fake price Symbol=BTC", "status after"]);
+        act(&s, "import", json!({}));
+        let r = s.find_rule(&r.name).unwrap();
+        assert_eq!((r.runs, r.last_status.as_deref()), (1, Some("failed")));
+        let run = &s.rule_runs(&r.id, 1).unwrap()[0];
+        assert_eq!(run.params["status"], "failed");
+        assert_eq!(run.params["results"][0]["do"], "mcp");
+        assert_eq!(run.params["results"][0]["ok"], false);
+        assert!(run.params["messages"][0].as_str().unwrap().starts_with("mcp failed: "), "{}", run.params["messages"]);
+        assert!(run.params["results"][0]["error"].as_str().unwrap().contains("mnnn mcp approve fake price"));
+        assert_eq!(run.params["results"][1], json!({ "do": "status", "ok": true, "message": "after" }), "the rest still ran");
+        assert!(s.actions_of_kind("mcp.call").unwrap().iter().all(|c| c.params["ok"] != true), "nothing was called");
     }
 }

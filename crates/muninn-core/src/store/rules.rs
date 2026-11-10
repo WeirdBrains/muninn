@@ -15,7 +15,14 @@ use super::{Store, now_ms};
 use crate::error::{Error, Result};
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
+
+/// The reusable parts of a rule (conditions, operators, schedules, the versioned spec) are
+/// [`weirdnet_rules`]'; the then-actions, owners and the table are Muninn's.
+pub use weirdnet_rules::{Condition, Op, SPEC_VERSION, Schedule};
+
+/// When a rule runs and what it does (the spec JSON is unchanged since version 1).
+pub type RuleSpec = weirdnet_rules::RuleSpec<Then>;
 
 pub const MIGRATION: &str = r#"
 CREATE TABLE rules (
@@ -35,9 +42,6 @@ CREATE TABLE rules (
 );
 CREATE INDEX rules_owner ON rules(owner_kind, owner_id);
 "#;
-
-/// Spec version written by this Muninn.
-pub const SPEC_VERSION: u32 = 1;
 
 /// What a rule belongs to (projects hold rules as items, see the module docs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -68,62 +72,6 @@ impl OwnerKind {
             _ => OwnerKind::Standalone,
         }
     }
-}
-
-/// How a condition compares.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Op {
-    #[serde(rename = "=")]
-    Eq,
-    #[serde(rename = "!=")]
-    Ne,
-    #[serde(rename = "~")]
-    Contains,
-    #[serde(rename = "!~")]
-    NotContains,
-    #[serde(rename = ">")]
-    Gt,
-    #[serde(rename = ">=")]
-    Ge,
-    #[serde(rename = "<")]
-    Lt,
-    #[serde(rename = "<=")]
-    Le,
-    #[serde(rename = "?")]
-    Exists,
-    #[serde(rename = "!?")]
-    Missing,
-}
-
-impl Op {
-    /// Longest first, so `>=` is not read as `>`.
-    pub const ALL: [Op; 10] = [Op::Ne, Op::NotContains, Op::Ge, Op::Le, Op::Missing, Op::Eq, Op::Contains, Op::Gt, Op::Lt, Op::Exists];
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Op::Eq => "=",
-            Op::Ne => "!=",
-            Op::Contains => "~",
-            Op::NotContains => "!~",
-            Op::Gt => ">",
-            Op::Ge => ">=",
-            Op::Lt => "<",
-            Op::Le => "<=",
-            Op::Exists => "?",
-            Op::Missing => "!?",
-        }
-    }
-    pub fn unary(self) -> bool {
-        matches!(self, Op::Exists | Op::Missing)
-    }
-}
-
-/// `field op value`, e.g. `inserted > 0`, `format = pdf`, `summary ~ btc`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Condition {
-    pub field: String,
-    pub op: Op,
-    #[serde(default)]
-    pub value: String,
 }
 
 /// What a then-action adds to a project.
@@ -328,43 +276,10 @@ impl Then {
     }
 }
 
-fn spec_version() -> u32 {
-    SPEC_VERSION
-}
-
-/// When a rule runs and what it does.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RuleSpec {
-    #[serde(default = "spec_version")]
-    pub version: u32,
-    /// Action kinds (`import`, `journal.*`, `*`); any one matching is enough.
-    pub on: Vec<String>,
-    /// All must hold.
-    #[serde(default, rename = "if")]
-    pub when: Vec<Condition>,
-    pub then: Vec<Then>,
-    /// Only for actions about where the rule lives (its journal, live search or projects).
-    #[serde(default)]
-    pub related: bool,
-    /// Run on a schedule as well (2.16): the node runs it with a `schedule` action.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub schedule: Option<Schedule>,
-}
-
-impl Default for RuleSpec {
-    fn default() -> Self {
-        Self { version: SPEC_VERSION, on: vec![], when: vec![], then: vec![], related: false, schedule: None }
+impl weirdnet_rules::ThenAction for Then {
+    fn verb(&self) -> &'static str {
+        Then::verb(self)
     }
-}
-
-/// When a scheduled rule runs: every so often (`--every 6h`) or at cron times
-/// (`--cron "0 3 * * *"`, local time). See [`crate::rules::next_run`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Schedule {
-    /// Milliseconds between runs.
-    Every(i64),
-    Cron(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -417,12 +332,12 @@ pub struct RuleChange {
     pub spec: Option<RuleSpec>,
 }
 
-/// Per-connection state of the rule engine: the rules running now (loop protection), the
-/// run budget of the current outermost action, and whether messages go to stderr.
+/// Per-connection state of the rule engine: the engine's own (the rules running now and the
+/// run budget of the current outermost action, for loop protection), whether messages go to
+/// stderr, and whether rules are off.
 #[derive(Debug, Default)]
 pub struct RuleRuntime {
-    pub(crate) chain: RefCell<Vec<String>>,
-    pub(crate) budget: Cell<u32>,
+    pub(crate) engine: weirdnet_rules::engine::Runtime,
     pub(crate) echo: Cell<bool>,
     pub(crate) off: Cell<bool>,
     /// An org host serves from this node (scheduled runs say so; see [`crate::org::tls::watch`]).

@@ -125,7 +125,7 @@ impl Store {
         let author = self.setting("current_author")?;
         let s = |v: &Option<Value>| v.as_ref().map(|v| v.to_string());
         // actions taken by a rule carry the chain of rules that led to them (provenance)
-        let chain = self.rules_rt.chain.borrow().clone();
+        let chain = self.rules_rt.engine.chain();
         let mut params = a.params.clone();
         if !chain.is_empty() {
             if !params.is_object() {

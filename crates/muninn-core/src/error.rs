@@ -89,3 +89,12 @@ impl From<weirdnet_keys::KeysError> for Error {
         }
     }
 }
+
+/// Rule syntax errors keep their messages ("invalid --if: …", "invalid --cron: …").
+impl From<weirdnet_rules::RulesError> for Error {
+    fn from(e: weirdnet_rules::RulesError) -> Self {
+        match e {
+            weirdnet_rules::RulesError::Invalid { what, msg } => Error::Invalid { what, msg },
+        }
+    }
+}

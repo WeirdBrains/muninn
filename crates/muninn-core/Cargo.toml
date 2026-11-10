@@ -46,6 +46,7 @@ ratatui = "0.30"
 weirdnet-themes = { version = "0.1.0", path = "../weirdnet-themes", features = ["ratatui"] }
 weirdnet-storage = { version = "0.1.0", path = "../weirdnet-storage" }
 weirdnet-keys = { version = "0.1.0", path = "../weirdnet-keys" }
+weirdnet-rules = { version = "0.1.0", path = "../weirdnet-rules" }
 crossterm = "0.29"
 rpassword = "7"
 dirs = "6"

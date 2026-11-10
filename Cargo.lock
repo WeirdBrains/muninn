@@ -4456,6 +4456,7 @@ dependencies = [
  "url",
  "uuid",
  "weirdnet-keys",
+ "weirdnet-rules",
  "weirdnet-storage",
  "weirdnet-themes",
  "x509-parser",
@@ -8927,6 +8928,17 @@ dependencies = [
  "vsss-rs",
  "x25519-dalek 2.0.1",
  "zeroize",
+]
+
+[[package]]
+name = "weirdnet-rules"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

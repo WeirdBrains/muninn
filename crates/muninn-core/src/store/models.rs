@@ -1107,7 +1107,7 @@ impl Store {
         }
         let version = m.version + 1;
         let author = self.current_author_id()?;
-        let rule = self.rules_rt.chain.borrow().last().cloned();
+        let rule = self.rules_rt.engine.chain().last().cloned();
         self.atomic("model_apply", || -> Result<()> {
             self.rebuild(m, to, version, &rows)?;
             let now = now_ms();

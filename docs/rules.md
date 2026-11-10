@@ -195,12 +195,14 @@ rules and the rules owned by its journals, live searches and models. Imported ru
 A rule is stored as JSON (`mnnn rule show --json`):
 
 ```json
-{"version": 1, "on": ["import"], "if": [{"field": "inserted", "op": ">", "value": 0}],
+{"version": 1, "on": ["import"], "if": [{"field": "inserted", "op": ">", "value": "0"}],
  "then": [{"do": "status", "text": "{inserted} new bars"}]}
 ```
 
 A scheduled rule adds `"schedule": {"every": 21600000}` (milliseconds) or
-`{"cron": "0 3 * * *"}`; rules without one read as before. The version and the `do` tags
+`{"cron": "0 3 * * *"}`; rules without one read as before. Cron times are local wall-clock
+times: on the night clocks go forward a time in the skipped hour does not run, and on the
+night they go back a time in the repeated hour runs once, the first time it comes. The version and the `do` tags
 leave room for new triggers and then-actions without changing existing rules.
 
 See also: [action history](history.md), [projects](projects.md).
