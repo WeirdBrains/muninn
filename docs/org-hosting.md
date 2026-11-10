@@ -64,7 +64,7 @@ certificates by itself (checked every minute; due when a third of the life is le
 which is about 30 days for a 90-day certificate) and picks up domains and certificates
 set from another process within a minute. Failures notify (`notify`, `about =
 cert.renew`) and retry with backoff: an hour, doubling, at most a day. Your own
-certificates are not renewed by Muninn; the [expiry watcher](rules.md#scheduled-rule-sets)
+certificates are not renewed by Muninn; the [expiry watcher](rules.md#the-cert-expiry-watcher)
 reminds you.
 
 ## Paths
