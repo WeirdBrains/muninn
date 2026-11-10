@@ -65,7 +65,7 @@ pub fn from_words(words: &str) -> Result<Key32> {
 
 pub const SHARD_THRESHOLD: usize = 3;
 pub const SHARD_COUNT: usize = 5;
-const SHARD_PREFIX: &str = "muninn-shard-v1";
+pub(crate) const SHARD_PREFIX: &str = "muninn-shard-v1";
 
 /// Split the master key into 5 shards (any 3 recover it). Text form:
 /// `muninn-shard-v1:<set id>:<threshold>:<index>:<share hex>:<checksum>`.

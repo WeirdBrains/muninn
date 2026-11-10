@@ -30,9 +30,9 @@ pub struct ServiceKeyFile {
     pub wrapped: Option<PasswordSealed>,
 }
 
-const DEK_AAD: &[u8] = b"muninn/dek";
+pub(crate) const DEK_AAD: &[u8] = b"muninn/dek";
 
-fn svc_aad(db_id: &str, v: u32) -> Vec<u8> {
+pub(crate) fn svc_aad(db_id: &str, v: u32) -> Vec<u8> {
     format!("muninn/service-key/{db_id}/v{v}").into_bytes()
 }
 

@@ -51,11 +51,11 @@ pub fn load_or_create(store: &Store) -> Result<(User, Keypair)> {
     Ok((u, kp))
 }
 
-fn cert_bytes(user: &str, peer: &str, at: i64) -> Vec<u8> {
+pub(crate) fn cert_bytes(user: &str, peer: &str, at: i64) -> Vec<u8> {
     format!("{CERT}\n{user}\n{peer}\n{at}").into_bytes()
 }
 
-fn revoke_bytes(user: &str, peer: &str, at: i64) -> Vec<u8> {
+pub(crate) fn revoke_bytes(user: &str, peer: &str, at: i64) -> Vec<u8> {
     format!("{REVOKE}\n{user}\n{peer}\n{at}").into_bytes()
 }
 

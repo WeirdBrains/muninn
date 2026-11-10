@@ -27,9 +27,11 @@ use zeroize::Zeroizing;
 
 pub const OFFER_PREFIX: &str = "mnnn-x1-offer:";
 pub const ANSWER_PREFIX: &str = "mnnn-x1-answer:";
-const OFFER_DOMAIN: &[u8] = b"muninn/net/offer/v1";
-const ANSWER_DOMAIN: &[u8] = b"muninn/net/answer/v1";
-const TRANSCRIPT_DOMAIN: &[u8] = b"muninn/net/exchange/v1";
+pub(crate) const OFFER_DOMAIN: &[u8] = b"muninn/net/offer/v1";
+pub(crate) const ANSWER_DOMAIN: &[u8] = b"muninn/net/answer/v1";
+pub(crate) const TRANSCRIPT_DOMAIN: &[u8] = b"muninn/net/exchange/v1";
+pub(crate) const KEY_INFO: &[u8] = b"muninn/net/exchange/v1/key";
+pub(crate) const SAS_INFO: &[u8] = b"muninn/net/exchange/v1/sas";
 /// Offers are good for a week unless asked otherwise.
 pub const DEFAULT_TTL_MS: i64 = 7 * 24 * 3600 * 1000;
 
@@ -289,9 +291,9 @@ fn derive(dh: &[u8; 32], offer: &Offer, answer: &Answer) -> Result<Derived> {
     let transcript = t.finalize();
     let hk = hkdf::Hkdf::<sha2::Sha256>::new(Some(&transcript), dh);
     let mut key = [0u8; 32];
-    hk.expand(b"muninn/net/exchange/v1/key", &mut key).map_err(|e| Error::Crypto(e.to_string()))?;
+    hk.expand(KEY_INFO, &mut key).map_err(|e| Error::Crypto(e.to_string()))?;
     let mut sas = [0u8; 8];
-    hk.expand(b"muninn/net/exchange/v1/sas", &mut sas).map_err(|e| Error::Crypto(e.to_string()))?;
+    hk.expand(SAS_INFO, &mut sas).map_err(|e| Error::Crypto(e.to_string()))?;
     let n = u64::from_be_bytes(sas) % 10_000_000_000;
     let code = format!("{:05}-{:05}", n / 100_000, n % 100_000);
     Ok(Derived { key: Key32(key), short_code: code, fingerprint: super::identity::group(&hex::encode(&transcript[..8])) })

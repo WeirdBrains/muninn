@@ -30,3 +30,6 @@ pub mod share;
 pub mod store;
 pub mod theme;
 pub mod tui;
+
+#[cfg(test)]
+mod compat_tests;

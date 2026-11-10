@@ -80,7 +80,7 @@ fn save_state(s: &Store, peer: &str, st: &State) -> Result<()> {
 }
 
 /// The key sync pages are sealed with: only nodes holding the user's key have it.
-fn sync_key(s: &Store) -> Result<Key32> {
+pub(crate) fn sync_key(s: &Store) -> Result<Key32> {
     let (u, kp) = super::user::load_or_create(s)?;
     let ed = kp.try_into_ed25519().map_err(|_| Error::Crypto("user key is not ed25519".into()))?;
     let bytes = zeroize::Zeroizing::new(ed.to_bytes());
@@ -88,7 +88,7 @@ fn sync_key(s: &Store) -> Result<Key32> {
     crypto::hkdf(&ikm, u.id.as_bytes(), "muninn/sync/v1/key")
 }
 
-fn aad(peer: &str) -> Vec<u8> {
+pub(crate) fn aad(peer: &str) -> Vec<u8> {
     format!("muninn/sync/v1|{peer}").into_bytes()
 }
 

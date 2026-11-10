@@ -13,6 +13,8 @@ pub const PROTOCOL: &str = "/muninn/net/1";
 pub const KAD_PROTOCOL: &str = "/muninn/kad/1";
 /// The Kademlia key relays provide.
 pub const RELAY_KEY: &str = "/muninn/relay/1";
+/// libp2p identify protocol id.
+pub const IDENTIFY_PROTOCOL: &str = "/muninn/id/1";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Wire {

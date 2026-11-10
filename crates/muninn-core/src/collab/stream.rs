@@ -28,6 +28,9 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::server::Connected;
 use tonic::{Request, Response, Status, Streaming};
 
+/// The authority of live-stream gRPC requests (the transport is libp2p TLS; this is only the URI).
+pub(crate) const GRPC_AUTHORITY: &str = "http://muninn.live";
+
 /// The stream listener's default TCP port (the node's is 4741).
 pub const DEFAULT_PORT: u16 = 4742;
 /// Overrides the setting (`stream` or `poll`).
@@ -372,7 +375,7 @@ impl StreamTransport {
         for a in addrs {
             let (cfg, a2) = (cfg.clone(), a.clone());
             let r = rt.block_on(async move {
-                let ep = tonic::transport::Endpoint::from_static("http://muninn.live").connect_timeout(CONNECT_TIMEOUT);
+                let ep = tonic::transport::Endpoint::from_static(GRPC_AUTHORITY).connect_timeout(CONNECT_TIMEOUT);
                 let ch = tokio::time::timeout(
                     CONNECT_TIMEOUT * 2,
                     ep.connect_with_connector(tower::service_fn(move |_| {

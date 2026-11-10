@@ -6,7 +6,7 @@
 //! The swarm runs on its own thread with a small Tokio runtime. [`Node`] is a blocking
 //! handle (the CLI and TUI are synchronous): requests wait for their answer. Requests
 //! that come in are answered by a [`Handler`] on Tokio's blocking pool.
-use super::proto::{KAD_PROTOCOL, PROTOCOL, RELAY_KEY, Wire, WireResp};
+use super::proto::{IDENTIFY_PROTOCOL, KAD_PROTOCOL, PROTOCOL, RELAY_KEY, Wire, WireResp};
 use crate::error::{Error, Result};
 use futures::StreamExt;
 use libp2p::core::muxing::StreamMuxerBox;
@@ -148,8 +148,9 @@ fn behaviour(key: &Keypair, relay_client: relay::client::Behaviour, cfg: &NodeCo
     // A relay with explicit external addresses announces only those, not every
     // interface it listens on (private VPC and loopback ones are useless to clients).
     let hide = cfg.relay_server && !cfg.external.is_empty();
-    let identify =
-        identify::Behaviour::new(identify::Config::new("/muninn/id/1".into(), key.public()).with_agent_version(agent).with_hide_listen_addrs(hide));
+    let identify = identify::Behaviour::new(
+        identify::Config::new(IDENTIFY_PROTOCOL.into(), key.public()).with_agent_version(agent).with_hide_listen_addrs(hide),
+    );
     let mut kcfg = kad::Config::new(StreamProtocol::new(KAD_PROTOCOL));
     kcfg.set_query_timeout(Duration::from_secs(30));
     let kad = kad::Behaviour::with_config(peer, MemoryStore::new(peer), kcfg);
