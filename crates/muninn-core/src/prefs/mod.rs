@@ -22,6 +22,16 @@ impl std::fmt::Display for ThemeMode {
     }
 }
 
+impl From<ThemeMode> for crate::theme::Mode {
+    fn from(m: ThemeMode) -> Self {
+        match m {
+            ThemeMode::Light => Self::Light,
+            ThemeMode::Dark => Self::Dark,
+            ThemeMode::System => Self::System,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThemePrefs {
     pub name: String,

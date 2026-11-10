@@ -1,12 +1,37 @@
 //! Themes: `themes/<name>/interface.toml` with `[meta]`, `[dark]` and `[light]` variants.
 pub mod detect;
 
+mod term;
+
 use crate::error::{Error, Result};
-use crate::paths::{Paths, ensure_dir, write_private};
-use crate::prefs::ThemeMode;
-use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+pub use term::{ColorDepth, Theme, to_color};
+
+/// Where themes live and how they are written. The app implements it (Muninn: `crate::paths::Paths`),
+/// so this module owns no home-directory layout or file-permission policy.
+pub trait ThemeDirs {
+    /// The folder holding one `<name>/interface.toml` per theme.
+    fn themes_dir(&self) -> PathBuf;
+    fn theme_dir(&self, name: &str) -> PathBuf {
+        self.themes_dir().join(name)
+    }
+    /// Create a folder (private where the platform supports it).
+    fn ensure_dir(&self, dir: &Path) -> Result<()>;
+    /// Write a file (private where the platform supports it).
+    fn write_private(&self, path: &Path, bytes: &[u8]) -> Result<()>;
+}
+
+/// Light, dark, or follow the system. The app's preference type converts into it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Mode {
+    Light,
+    Dark,
+    #[default]
+    System,
+}
 
 /// Semantic roles every variant must define.
 pub const ROLES: [&str; 21] = [
@@ -249,51 +274,7 @@ pub fn contrast_warnings(v: &VariantDef) -> Vec<String> {
     out
 }
 
-/// Terminal color depth.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ColorDepth {
-    TrueColor,
-    Ansi256,
-    Ansi16,
-}
-
-impl ColorDepth {
-    pub fn detect() -> Self {
-        let ct = std::env::var("COLORTERM").unwrap_or_default().to_ascii_lowercase();
-        if ct.contains("truecolor") || ct.contains("24bit") {
-            return ColorDepth::TrueColor;
-        }
-        let term = std::env::var("TERM").unwrap_or_default();
-        if term == "linux" || term.contains("16color") || term == "xterm" || term == "vt100" {
-            ColorDepth::Ansi16
-        } else if term.contains("256") {
-            ColorDepth::Ansi256
-        } else {
-            ColorDepth::TrueColor
-        }
-    }
-}
-
-const ANSI16: [(u8, u8, u8); 16] = [
-    (0, 0, 0),
-    (128, 0, 0),
-    (0, 128, 0),
-    (128, 128, 0),
-    (0, 0, 128),
-    (128, 0, 128),
-    (0, 128, 128),
-    (192, 192, 192),
-    (128, 128, 128),
-    (255, 0, 0),
-    (0, 255, 0),
-    (255, 255, 0),
-    (0, 0, 255),
-    (255, 0, 255),
-    (0, 255, 255),
-    (255, 255, 255),
-];
-
-fn dist(a: (u8, u8, u8), b: (u8, u8, u8)) -> i32 {
+pub(crate) fn dist(a: (u8, u8, u8), b: (u8, u8, u8)) -> i32 {
     let d = |x: u8, y: u8| (x as i32 - y as i32).pow(2);
     d(a.0, b.0) + d(a.1, b.1) + d(a.2, b.2)
 }
@@ -311,93 +292,33 @@ pub fn nearest_256(c: (u8, u8, u8)) -> u8 {
     if dist(c, (gv, gv, gv)) < dist(c, cube) { 232 + gi2 } else { cube_i as u8 }
 }
 
-pub fn to_color(c: (u8, u8, u8), depth: ColorDepth) -> Color {
-    match depth {
-        ColorDepth::TrueColor => Color::Rgb(c.0, c.1, c.2),
-        ColorDepth::Ansi256 => Color::Indexed(nearest_256(c)),
-        ColorDepth::Ansi16 => {
-            let i = ANSI16.iter().enumerate().min_by_key(|(_, a)| dist(c, **a)).map(|(i, _)| i).unwrap_or(7);
-            Color::Indexed(i as u8)
-        }
-    }
-}
-
-/// A resolved variant ready for rendering.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Theme {
-    pub bg: Color,
-    pub fg: Color,
-    pub muted: Color,
-    pub border: Color,
-    pub border_focus: Color,
-    pub selection_bg: Color,
-    pub selection_fg: Color,
-    pub accent: Color,
-    pub header: Color,
-    pub up: Color,
-    pub down: Color,
-    pub warning: Color,
-    pub error: Color,
-    pub success: Color,
-    pub info: Color,
-    pub charts: [Color; 6],
-}
-
-impl Theme {
-    pub fn from_variant(v: &VariantDef) -> Self {
-        Self::from_variant_depth(v, ColorDepth::detect())
-    }
-
-    pub fn from_variant_depth(v: &VariantDef, depth: ColorDepth) -> Self {
-        let c = |r: &str| to_color(v.resolve(r).unwrap_or((128, 128, 128)), depth);
-        Theme {
-            bg: c("bg"),
-            fg: c("fg"),
-            muted: c("muted"),
-            border: c("border"),
-            border_focus: c("border_focus"),
-            selection_bg: c("selection_bg"),
-            selection_fg: c("selection_fg"),
-            accent: c("accent"),
-            header: c("header"),
-            up: c("up"),
-            down: c("down"),
-            warning: c("warning"),
-            error: c("error"),
-            success: c("success"),
-            info: c("info"),
-            charts: [c("chart_1"), c("chart_2"), c("chart_3"), c("chart_4"), c("chart_5"), c("chart_6")],
-        }
-    }
-}
-
 pub fn builtin(name: &str) -> Option<ThemeFile> {
     BUILTINS.iter().find(|(n, _)| *n == name).and_then(|(_, t)| ThemeFile::parse(t).ok())
 }
 
 /// Write built-in themes to `themes/<name>/` when missing.
-pub fn materialize(paths: &Paths) -> Result<()> {
+pub fn materialize(paths: &(impl ThemeDirs + ?Sized)) -> Result<()> {
     for (name, text) in BUILTINS {
         let dir = paths.theme_dir(name);
         if !dir.join("interface.toml").exists() {
-            ensure_dir(&dir)?;
-            ensure_dir(&dir.join("assets"))?;
-            write_private(&dir.join("interface.toml"), text.as_bytes())?;
+            paths.ensure_dir(&dir)?;
+            paths.ensure_dir(&dir.join("assets"))?;
+            paths.write_private(&dir.join("interface.toml"), text.as_bytes())?;
         }
     }
     Ok(())
 }
 
 /// Restore the shipped version of a built-in theme.
-pub fn reset(paths: &Paths, name: &str) -> Result<()> {
+pub fn reset(paths: &(impl ThemeDirs + ?Sized), name: &str) -> Result<()> {
     let (_, text) = BUILTINS.iter().find(|(n, _)| *n == name).ok_or_else(|| Error::invalid("theme", format!("`{name}` is not a built-in theme")))?;
     let dir = paths.theme_dir(name);
-    ensure_dir(&dir)?;
-    ensure_dir(&dir.join("assets"))?;
-    write_private(&dir.join("interface.toml"), text.as_bytes())
+    paths.ensure_dir(&dir)?;
+    paths.ensure_dir(&dir.join("assets"))?;
+    paths.write_private(&dir.join("interface.toml"), text.as_bytes())
 }
 
-pub fn load(paths: &Paths, name: &str) -> Result<ThemeFile> {
+pub fn load(paths: &(impl ThemeDirs + ?Sized), name: &str) -> Result<ThemeFile> {
     let p = paths.theme_dir(name).join("interface.toml");
     if !p.exists() {
         return builtin(name).ok_or_else(|| Error::invalid("theme", format!("`{name}` not found in {}", paths.themes_dir().display())));
@@ -405,16 +326,16 @@ pub fn load(paths: &Paths, name: &str) -> Result<ThemeFile> {
     ThemeFile::parse(&std::fs::read_to_string(&p)?).map_err(|e| Error::invalid("theme", format!("{}: {e}", p.display())))
 }
 
-pub fn save(paths: &Paths, t: &ThemeFile) -> Result<()> {
+pub fn save(paths: &(impl ThemeDirs + ?Sized), t: &ThemeFile) -> Result<()> {
     t.validate()?;
     let dir = paths.theme_dir(&t.meta.name);
-    ensure_dir(&dir)?;
-    ensure_dir(&dir.join("assets"))?;
-    write_private(&dir.join("interface.toml"), t.to_toml()?.as_bytes())
+    paths.ensure_dir(&dir)?;
+    paths.ensure_dir(&dir.join("assets"))?;
+    paths.write_private(&dir.join("interface.toml"), t.to_toml()?.as_bytes())
 }
 
 /// Theme folder names, built-ins first in their fixed order.
-pub fn list(paths: &Paths) -> Result<Vec<String>> {
+pub fn list(paths: &(impl ThemeDirs + ?Sized)) -> Result<Vec<String>> {
     let mut v: Vec<String> = BUILTINS.iter().map(|(n, _)| n.to_string()).collect();
     let mut extra = vec![];
     if let Ok(rd) = std::fs::read_dir(paths.themes_dir()) {
@@ -431,16 +352,16 @@ pub fn list(paths: &Paths) -> Result<Vec<String>> {
 }
 
 /// Resolve the active variant from a mode.
-pub fn resolve_variant(mode: ThemeMode) -> Variant {
-    match mode {
-        ThemeMode::Dark => Variant::Dark,
-        ThemeMode::Light => Variant::Light,
-        ThemeMode::System => detect::system_variant(),
+pub fn resolve_variant(mode: impl Into<Mode>) -> Variant {
+    match mode.into() {
+        Mode::Dark => Variant::Dark,
+        Mode::Light => Variant::Light,
+        Mode::System => detect::system_variant(),
     }
 }
 
 /// Load the active theme; falls back to the default if the configured one is broken.
-pub fn active(paths: &Paths, name: &str) -> (ThemeFile, Option<String>) {
+pub fn active(paths: &(impl ThemeDirs + ?Sized), name: &str) -> (ThemeFile, Option<String>) {
     match load(paths, name) {
         Ok(t) => (t, None),
         Err(e) => (builtin(DEFAULT_THEME).expect("default theme is valid"), Some(e.to_string())),
@@ -508,8 +429,32 @@ mod tests {
         assert_eq!(ThemeFile::parse(&s).unwrap(), t);
     }
 
+    /// A caller with its own layout: nothing here needs the app's `Paths`.
+    #[test]
+    fn theme_dirs_is_the_only_storage_contract() {
+        struct Dir(PathBuf);
+        impl ThemeDirs for Dir {
+            fn themes_dir(&self) -> PathBuf {
+                self.0.clone()
+            }
+            fn ensure_dir(&self, d: &Path) -> Result<()> {
+                Ok(std::fs::create_dir_all(d)?)
+            }
+            fn write_private(&self, p: &Path, b: &[u8]) -> Result<()> {
+                Ok(std::fs::write(p, b)?)
+            }
+        }
+        let tmp = tempfile::tempdir().unwrap();
+        let d = Dir(tmp.path().join("t"));
+        materialize(&d).unwrap();
+        assert_eq!(list(&d).unwrap().len(), BUILTINS.len());
+        assert_eq!(load(&d, "nord").unwrap().meta.name, "nord");
+        assert_eq!(resolve_variant(Mode::Light), Variant::Light);
+    }
+
     #[test]
     fn materialize_and_list() {
+        use crate::paths::Paths;
         let tmp = tempfile::tempdir().unwrap();
         let p = Paths::resolve(Some(tmp.path().to_path_buf()), None).unwrap();
         p.ensure().unwrap();

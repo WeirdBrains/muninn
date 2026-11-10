@@ -60,6 +60,21 @@ impl Paths {
     }
 }
 
+impl crate::theme::ThemeDirs for Paths {
+    fn themes_dir(&self) -> PathBuf {
+        Paths::themes_dir(self)
+    }
+    fn theme_dir(&self, name: &str) -> PathBuf {
+        Paths::theme_dir(self, name)
+    }
+    fn ensure_dir(&self, dir: &Path) -> Result<()> {
+        ensure_dir(dir)
+    }
+    fn write_private(&self, path: &Path, bytes: &[u8]) -> Result<()> {
+        write_private(path, bytes)
+    }
+}
+
 pub fn ensure_dir(d: &Path) -> Result<()> {
     if !d.exists() {
         fs::create_dir_all(d)?;
