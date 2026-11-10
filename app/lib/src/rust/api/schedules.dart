@@ -178,6 +178,30 @@ Future<ScheduleInfo> scheduleEdit({
   clearEnds: clearEnds,
 );
 
+/// `mnnn schedule parse`: what the timing means, without saving. [runs_remaining]
+/// is `no end`, a count, or `10000+` when a cron end is far away.
+Future<SchedulePreview> scheduleParse({
+  String? runEvery,
+  String? cron,
+  String? startAt,
+  String? endsAt,
+  String? for_,
+  String? tz,
+  required bool pastNext,
+}) => RustLib.instance.api.crateApiSchedulesScheduleParse(
+  runEvery: runEvery,
+  cron: cron,
+  startAt: startAt,
+  endsAt: endsAt,
+  for_: for_,
+  tz: tz,
+  pastNext: pastNext,
+);
+
+/// `mnnn ruleset run NAME` (records a manual schedule action, then runs the set).
+Future<List<String>> rulesetRun({required String ruleset}) =>
+    RustLib.instance.api.crateApiSchedulesRulesetRun(ruleset: ruleset);
+
 /// `mnnn schedule remove KEY`.
 Future<String> scheduleRemove({required String key}) =>
     RustLib.instance.api.crateApiSchedulesScheduleRemove(key: key);
@@ -298,6 +322,24 @@ class ScheduleInfo {
           catchUp == other.catchUp &&
           maxAttempts == other.maxAttempts &&
           describe == other.describe;
+}
+
+class SchedulePreview {
+  final List<String> lines;
+  final String runsRemaining;
+
+  const SchedulePreview({required this.lines, required this.runsRemaining});
+
+  @override
+  int get hashCode => lines.hashCode ^ runsRemaining.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SchedulePreview &&
+          runtimeType == other.runtimeType &&
+          lines == other.lines &&
+          runsRemaining == other.runsRemaining;
 }
 
 class ScheduleRunInfo {

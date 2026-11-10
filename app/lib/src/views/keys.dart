@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
 import 'keys_dialogs.dart';
+import 'shared_actions.dart';
 
 class KeysView extends ConsumerWidget {
   const KeysView({super.key});
@@ -16,13 +17,25 @@ class KeysView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final m = context.muninn;
-    return ref.watch(keysStatusProvider).when(
+    return ref
+        .watch(keysStatusProvider)
+        .when(
           loading: () => const LinearProgressIndicator(),
-          error: (e, _) => Padding(padding: const EdgeInsets.all(16), child: Text('$e', style: TextStyle(color: m.error))),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('$e', style: TextStyle(color: m.error)),
+          ),
           data: (s) => ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-              Text('Keys', style: TextStyle(color: m.header, fontWeight: FontWeight.w800, fontSize: 16)),
+              Text(
+                'Keys',
+                style: TextStyle(
+                  color: m.header,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
               const SizedBox(height: 12),
               if (!s.initialized) ...[
                 Text(
@@ -48,17 +61,56 @@ class KeysView extends ConsumerWidget {
                 for (final k in s.services)
                   Padding(
                     padding: const EdgeInsets.only(left: 8, bottom: 4),
-                    child: Text('v${k.version}  ${k.retired ? 'retired' : 'active'}', style: TextStyle(color: m.fg)),
+                    child: Text(
+                      'v${k.version}  ${k.retired ? 'retired' : 'active'}',
+                      style: TextStyle(color: m.fg),
+                    ),
                   ),
                 const SizedBox(height: 16),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  OutlinedButton(key: const ValueKey('keys-rotate'), onPressed: () => showKeysRotateDialog(context, ref), child: const Text('Rotate service key')),
-                  OutlinedButton(key: const ValueKey('keys-rekey'), onPressed: () => showKeysRekeyDialog(context, ref), child: const Text('Rekey database')),
-                  OutlinedButton(key: const ValueKey('keys-export'), onPressed: () => showKeysExportDialog(context, ref), child: const Text('Export…')),
-                  OutlinedButton(key: const ValueKey('keys-recover-words'), onPressed: () => showKeysRecoverWordsDialog(context, ref), child: const Text('Recover from words')),
-                  OutlinedButton(key: const ValueKey('keys-recover-shards'), onPressed: () => showKeysRecoverShardsDialog(context, ref), child: const Text('Recover from shards')),
-                  OutlinedButton(key: const ValueKey('keys-reissue'), onPressed: () => showKeysReissueShardsDialog(context, ref), child: const Text('Re-issue shards')),
-                ]),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton(
+                      key: const ValueKey('keys-rotate'),
+                      onPressed: () => showKeysRotateDialog(context, ref),
+                      child: const Text('Rotate service key'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('keys-rekey'),
+                      onPressed: () => showKeysRekeyDialog(context, ref),
+                      child: const Text('Rekey database'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('keys-export'),
+                      onPressed: () => showKeysExportDialog(context, ref),
+                      child: const Text('Export…'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('keys-recover-words'),
+                      onPressed: () => showKeysRecoverWordsDialog(context, ref),
+                      child: const Text('Recover from words'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('keys-recover-shards'),
+                      onPressed: () =>
+                          showKeysRecoverShardsDialog(context, ref),
+                      child: const Text('Recover from shards'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('keys-shard-backup'),
+                      onPressed: () =>
+                          showShardBackupRestoreDialog(context, ref),
+                      child: const Text('Restore from a shard backup'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('keys-reissue'),
+                      onPressed: () =>
+                          showKeysReissueShardsDialog(context, ref),
+                      child: const Text('Re-issue shards'),
+                    ),
+                  ],
+                ),
               ],
               const SizedBox(height: 24),
               Text(
@@ -78,8 +130,13 @@ Widget _row(MuninnColors m, String key, String label, String value) {
       key: ValueKey(key),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 140, child: Text(label, style: TextStyle(color: m.muted))),
-        Expanded(child: Text(value, style: TextStyle(color: m.fg))),
+        SizedBox(
+          width: 140,
+          child: Text(label, style: TextStyle(color: m.muted)),
+        ),
+        Expanded(
+          child: Text(value, style: TextStyle(color: m.fg)),
+        ),
       ],
     ),
   );

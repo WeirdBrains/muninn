@@ -13,6 +13,7 @@ import '../state.dart';
 import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 import 'orgs_dialogs.dart';
+import 'shared_actions.dart';
 import 'orgs_rest.dart';
 import 'unlock.dart';
 
@@ -145,6 +146,16 @@ class _HostBar extends ConsumerWidget {
                       key: const ValueKey('org-host-stop'),
                       onPressed: () => orgHostStop(context, ref),
                       child: const Text('Stop site'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('org-announce-open'),
+                      onPressed: () => showOrgAnnounceDialog(context, ref),
+                      child: const Text('Announce…'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('org-announced-open'),
+                      onPressed: () => showAnnouncedSitesDialog(context, ref),
+                      child: const Text('Announced sites…'),
                     ),
                     FilterChip(
                       key: const ValueKey('org-host-autostart'),

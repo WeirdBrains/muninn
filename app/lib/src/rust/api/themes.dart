@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `resolve`
+// These functions are ignored because they are not marked as `pub`: `draft_of`, `resolve`, `resolved_roles`, `variant_of`
 
 /// Theme names: built-ins first, then the user's own from `<home>/themes/`.
 Future<List<String>> listThemes({String? home}) =>
@@ -34,6 +34,35 @@ ThemeData? builtinTheme({required String name, required String variant}) =>
 /// The theme `mnnn` would use, from `preferences.toml` (never created or rewritten here).
 Future<ThemeChoice> currentTheme({String? home}) =>
     RustLib.instance.api.crateApiThemesCurrentTheme(home: home);
+
+/// The theme as the editor shows it (built-in or `<home>/themes/`).
+Future<ThemeDraft> themeDraft({String? home, required String name}) =>
+    RustLib.instance.api.crateApiThemesThemeDraft(home: home, name: name);
+
+/// Write a theme under `<home>/themes/<name>/`. Both variants must list every role as `#rrggbb`.
+Future<void> themeSaveDraft({
+  String? home,
+  required String name,
+  required String displayName,
+  required String base,
+  required List<ThemeRole> dark,
+  required List<ThemeRole> light,
+}) => RustLib.instance.api.crateApiThemesThemeSaveDraft(
+  home: home,
+  name: name,
+  displayName: displayName,
+  base: base,
+  dark: dark,
+  light: light,
+);
+
+/// Theme ▸ Import…: parse a theme file and save it. Returns the theme name.
+Future<String> themeImportToml({String? home, required String text}) =>
+    RustLib.instance.api.crateApiThemesThemeImportToml(home: home, text: text);
+
+/// Theme ▸ Export…: the theme file as TOML. Bytes are written by the app.
+Future<String> themeExportToml({String? home, required String name}) =>
+    RustLib.instance.api.crateApiThemesThemeExportToml(home: home, name: name);
 
 /// The configured theme and mode (`light`, `dark`, `system`) from preferences, read-only.
 class ThemeChoice {
@@ -81,6 +110,44 @@ class ThemeData {
           displayName == other.displayName &&
           variant == other.variant &&
           roles == other.roles;
+}
+
+/// Both variants, every role resolved to `#rrggbb`, for Theme ▸ Edit / New.
+class ThemeDraft {
+  final String name;
+  final String displayName;
+
+  /// Theme this one was copied from, or empty.
+  final String base;
+  final List<ThemeRole> dark;
+  final List<ThemeRole> light;
+
+  const ThemeDraft({
+    required this.name,
+    required this.displayName,
+    required this.base,
+    required this.dark,
+    required this.light,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^
+      displayName.hashCode ^
+      base.hashCode ^
+      dark.hashCode ^
+      light.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ThemeDraft &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          displayName == other.displayName &&
+          base == other.base &&
+          dark == other.dark &&
+          light == other.light;
 }
 
 /// One resolved colour role, e.g. `header` = `#7aa2f7`.

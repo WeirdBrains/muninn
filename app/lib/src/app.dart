@@ -30,6 +30,9 @@ class _MuninnAppState extends ConsumerState<MuninnApp>
         ref.read(timeRangeProvider.notifier).state = s.range;
         ref.read(selectedDatasetProvider.notifier).state = s.dataset;
         try {
+          ref.read(dataFiltersProvider.notifier).state = await api
+              .sidebarFilters();
+          ref.read(headerModeProvider.notifier).state = await api.headerMode();
           ref.read(historyOpenProvider.notifier).state = await api
               .historyOpen();
         } catch (_) {
@@ -48,6 +51,12 @@ class _MuninnAppState extends ConsumerState<MuninnApp>
       });
       ref.listenManual(timeRangeProvider, (a, b) {
         if (a != b) save(() => api.saveTimeRange(b));
+      });
+      ref.listenManual(dataFiltersProvider, (a, b) {
+        if (a != b) save(() => api.saveSidebarFilters(b));
+      });
+      ref.listenManual(headerModeProvider, (a, b) {
+        if (a != b) save(() => api.saveHeaderMode(b));
       });
       ref.listenManual(selectedDatasetProvider, (a, b) {
         if (a != b) save(() => api.saveDataset(b));

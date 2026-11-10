@@ -55,6 +55,85 @@ pub fn current_theme(home: Option<String>) -> anyhow::Result<ThemeChoice> {
     Ok(ThemeChoice { name: prefs.theme.name, mode: mode.into() })
 }
 
+/// Both variants, every role resolved to `#rrggbb`, for Theme ▸ Edit / New.
+pub struct ThemeDraft {
+    pub name: String,
+    pub display_name: String,
+    /// Theme this one was copied from, or empty.
+    pub base: String,
+    pub dark: Vec<ThemeRole>,
+    pub light: Vec<ThemeRole>,
+}
+
+fn draft_of(t: &theme::ThemeFile) -> ThemeDraft {
+    ThemeDraft {
+        name: t.meta.name.clone(),
+        display_name: t.display_name(),
+        base: t.meta.base.clone().unwrap_or_default(),
+        dark: resolved_roles(t, "dark"),
+        light: resolved_roles(t, "light"),
+    }
+}
+
+fn resolved_roles(t: &theme::ThemeFile, variant: &str) -> Vec<ThemeRole> {
+    let v = if variant == "light" { Variant::Light } else { Variant::Dark };
+    let def = t.variant(v);
+    theme::ROLES.iter().filter_map(|r| def.resolve(r).map(|c| ThemeRole { role: (*r).to_string(), hex: theme::to_hex(c) })).collect()
+}
+
+/// The theme as the editor shows it (built-in or `<home>/themes/`).
+pub fn theme_draft(home: Option<String>, name: String) -> anyhow::Result<ThemeDraft> {
+    Ok(draft_of(&theme::load(&paths(home)?, &name)?))
+}
+
+fn variant_of(roles: &[ThemeRole]) -> anyhow::Result<theme::VariantDef> {
+    let mut v = theme::VariantDef::default();
+    for r in roles {
+        let hex = r.hex.trim();
+        if theme::parse_hex(hex).is_none() {
+            anyhow::bail!("role {} must be #rrggbb", r.role);
+        }
+        v.roles.insert(r.role.clone(), hex.to_ascii_lowercase());
+    }
+    Ok(v)
+}
+
+/// Write a theme under `<home>/themes/<name>/`. Both variants must list every role as `#rrggbb`.
+pub fn theme_save_draft(
+    home: Option<String>,
+    name: String,
+    display_name: String,
+    base: String,
+    dark: Vec<ThemeRole>,
+    light: Vec<ThemeRole>,
+) -> anyhow::Result<()> {
+    let file = theme::ThemeFile {
+        meta: theme::Meta {
+            name,
+            display_name: if display_name.is_empty() { None } else { Some(display_name) },
+            author: None,
+            base: if base.is_empty() { None } else { Some(base) },
+        },
+        dark: variant_of(&dark)?,
+        light: variant_of(&light)?,
+    };
+    theme::save(&paths(home)?, &file)?;
+    Ok(())
+}
+
+/// Theme ▸ Import…: parse a theme file and save it. Returns the theme name.
+pub fn theme_import_toml(home: Option<String>, text: String) -> anyhow::Result<String> {
+    let t = theme::ThemeFile::parse(&text)?;
+    let name = t.meta.name.clone();
+    theme::save(&paths(home)?, &t)?;
+    Ok(name)
+}
+
+/// Theme ▸ Export…: the theme file as TOML. Bytes are written by the app.
+pub fn theme_export_toml(home: Option<String>, name: String) -> anyhow::Result<String> {
+    Ok(theme::load(&paths(home)?, &name)?.to_toml()?)
+}
+
 pub(crate) fn resolve(t: &theme::ThemeFile, variant: &str) -> ThemeData {
     let v = if variant == "light" { Variant::Light } else { Variant::Dark };
     let def = t.variant(v);
@@ -100,5 +179,21 @@ mod tests {
         let c = current_theme(Some(home.path().display().to_string())).unwrap();
         assert_eq!(c.name, "tokyo-night");
         assert!(!home.path().join("preferences.toml").exists());
+    }
+
+    #[test]
+    fn draft_round_trip_saves_a_copy() {
+        let home = tempfile::tempdir().unwrap();
+        let h = Some(home.path().display().to_string());
+        let d = theme_draft(h.clone(), "nord".into()).unwrap();
+        let bg = d.dark.iter().find(|r| r.role == "bg").unwrap().hex.clone();
+        assert!(bg.starts_with('#'));
+        theme_save_draft(h.clone(), "nord-mine".into(), "Nord mine".into(), "nord".into(), d.dark, d.light).unwrap();
+        let again = theme_draft(h.clone(), "nord-mine".into()).unwrap();
+        assert_eq!(again.base, "nord");
+        assert_eq!(again.dark.iter().find(|r| r.role == "bg").unwrap().hex, bg);
+        let toml = theme_export_toml(h.clone(), "nord-mine".into()).unwrap();
+        let imported = theme_import_toml(h, toml.replace("nord-mine", "nord-copy")).unwrap();
+        assert_eq!(imported, "nord-copy");
     }
 }

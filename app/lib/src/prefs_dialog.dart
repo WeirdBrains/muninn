@@ -23,6 +23,7 @@ class PreferencesDialog extends ConsumerWidget {
     final names = ref.watch(themeNamesProvider).value ?? const <String>[];
     final sel = ref.watch(themeSelectionProvider);
     final range = ref.watch(timeRangeProvider);
+    final header = ref.watch(headerModeProvider);
     final dataset = ref.watch(selectedDatasetProvider);
     return AlertDialog(
       title: Row(
@@ -89,6 +90,22 @@ class PreferencesDialog extends ConsumerWidget {
                       ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Header',
+                style: TextStyle(color: m.header, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'auto', label: Text('Auto')),
+                  ButtonSegment(value: 'compact', label: Text('Compact')),
+                  ButtonSegment(value: 'large', label: Text('Large')),
+                ],
+                selected: {header},
+                onSelectionChanged: (s) =>
+                    ref.read(headerModeProvider.notifier).state = s.first,
               ),
               const SizedBox(height: 16),
               Text(

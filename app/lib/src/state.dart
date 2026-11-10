@@ -74,6 +74,32 @@ final overviewProvider = FutureProvider<Overview?>((ref) {
 /// The global time range: like `T` in the TUI it scopes every view.
 final timeRangeProvider = StateProvider<TimeRange>((ref) => TimeRange.all);
 
+/// Sidebar filters other than the time range (Data ▸ Filters / Sort).
+final dataFiltersProvider = StateProvider<DataFilters>(
+  (ref) => const DataFilters(),
+);
+
+/// TUI header size (`auto`, `compact`, `large`), from preferences.
+final headerModeProvider = StateProvider<String>((ref) => 'auto');
+
+/// Shift+X / Data ▸ Filters ▸ Clear all: time range and the other sidebar filters.
+void clearDataFilters(WidgetRef ref) {
+  ref.read(timeRangeProvider.notifier).state = TimeRange.all;
+  ref.read(dataFiltersProvider.notifier).state = const DataFilters();
+}
+
+/// Price ranges for the active metric, empty unless a price filter is set.
+final metricSpansProvider =
+    FutureProvider<Map<String, ({double min, double max})>>((ref) async {
+      final f = ref.watch(dataFiltersProvider);
+      if (!f.priceActive || !ref.watch(unlockedProvider)) return const {};
+      final range = ref.watch(timeRangeProvider);
+      final rows = await ref
+          .watch(apiProvider)
+          .metricSpans(f.priceMetric, range);
+      return {for (final r in rows) r.key: (min: r.min, max: r.max)};
+    });
+
 /// The dataset shown in the Data view (by [Dataset.key]).
 final selectedDatasetProvider = StateProvider<String?>((ref) => null);
 
@@ -452,6 +478,7 @@ enum ProjectPane {
   reports,
   models,
   code,
+  spaces,
   pipes,
   pipelines,
   plugins,
@@ -572,7 +599,23 @@ final pluginKindFilterProvider = StateProvider<String?>((ref) => null);
 
 final pluginsProvider = FutureProvider<List<PluginInfo>?>((ref) {
   if (!ref.watch(unlockedProvider)) return Future.value(null);
-  return ref.watch(apiProvider).pluginsList(kind: ref.watch(pluginKindFilterProvider));
+  return ref
+      .watch(apiProvider)
+      .pluginsList(kind: ref.watch(pluginKindFilterProvider));
+});
+
+final collectionsProvider = FutureProvider<List<CollectionInfo>?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).collectionsList();
+});
+
+final migratePendingProvider = FutureProvider<int?>((ref) {
+  if (!ref.watch(unlockedProvider)) return Future.value(null);
+  return ref.watch(apiProvider).migratePending();
+});
+
+final migrateOfferedProvider = FutureProvider<bool>((ref) {
+  return ref.watch(apiProvider).migrateOffered();
 });
 
 final rulesetsProvider = FutureProvider<List<RulesetInfo>?>((ref) {
@@ -623,6 +666,9 @@ void refreshProjectExtras(WidgetRef ref) {
   ref.invalidate(pipelinesProvider);
   ref.invalidate(rulesProvider);
   ref.invalidate(pluginsProvider);
+  ref.invalidate(collectionsProvider);
+  ref.invalidate(migratePendingProvider);
+  ref.invalidate(migrateOfferedProvider);
   ref.invalidate(rulesetsProvider);
   ref.invalidate(schedulesProvider);
   ref.invalidate(reviewsProvider);

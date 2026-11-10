@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
+import 'create_then_share.dart';
 
 void _snack(BuildContext context, String msg, {bool error = false}) {
   if (!context.mounted) {
@@ -256,6 +257,15 @@ Future<void> showNetShareDialog(BuildContext context, WidgetRef ref) async {
     return;
   }
   final (kind, item, withWhom) = result;
+  if (kind == '__create__') {
+    await showCreateThenShareDialog(
+      context,
+      ref,
+      kind: item.isEmpty ? 'journal' : item,
+      target: 'net',
+    );
+    return;
+  }
   final withPeers = withWhom.trim().isEmpty
       ? const <String>[]
       : [withWhom.trim()];
@@ -477,6 +487,11 @@ class _ShareDialogState extends State<_ShareDialog> {
         ),
       ),
       actions: [
+        TextButton(
+          key: const ValueKey('net-share-new'),
+          onPressed: () => Navigator.pop(context, ('__create__', _kind, '')),
+          child: const Text('+ New…'),
+        ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),

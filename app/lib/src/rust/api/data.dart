@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_source_of`, `add_symbol_of`, `data_item`, `export_source_data_of`, `list_aliases_of`, `list_source_data_of`, `list_sources_of`, `list_symbols_of`, `open_write`, `open`, `overview_of`, `project_series_of`, `query_of`, `remove_source_of`, `rename_source_of`, `source_info`
+// These functions are ignored because they are not marked as `pub`: `add_source_of`, `add_symbol_of`, `data_item`, `export_source_data_of`, `list_aliases_of`, `list_source_data_of`, `list_sources_of`, `list_symbols_of`, `open_write`, `open`, `overview_of`, `price_metric`, `project_series_of`, `query_of`, `remove_source_of`, `rename_source_of`, `source_info`
 
 /// Unlock with the Muninn password. The key stays in Rust; Dart never sees it.
 Future<void> unlock({String? home, required String password}) =>
@@ -102,6 +102,33 @@ Future<SymbolInfo> addSymbol({
   aliases: aliases,
 );
 
+/// `mnnn` coverage listing: expected bars between first and last, minus those stored.
+Future<List<CoverageRow>> coverage() =>
+    RustLib.instance.api.crateApiDataCoverage();
+
+/// Price ranges for the sidebar price filter (TUI Data ▸ Filters ▸ Price).
+Future<List<MetricSpan>> metricSpans({
+  required String metric,
+  PlatformInt64? from,
+  PlatformInt64? to,
+}) => RustLib.instance.api.crateApiDataMetricSpans(
+  metric: metric,
+  from: from,
+  to: to,
+);
+
+/// File ▸ Backup ▸ Create (`mnnn backup create`). An empty password leaves the archive unencrypted;
+/// the database inside stays encrypted. Restoring stays on the command line, as in the TUI.
+Future<String> backupCreate({
+  String? home,
+  required String outDir,
+  required String password,
+}) => RustLib.instance.api.crateApiDataBackupCreate(
+  home: home,
+  outDir: outDir,
+  password: password,
+);
+
 /// An asset alias (`alias XBT -> BTC` on `mnnn symbols list`).
 class AliasInfo {
   final String alias;
@@ -160,6 +187,50 @@ class BarPoint {
           volume == other.volume;
 }
 
+/// One series in Data ▸ Coverage & gaps (TUI coverage window).
+class CoverageRow {
+  final String source;
+  final String symbol;
+  final String duration;
+  final PlatformInt64 bars;
+  final PlatformInt64 missing;
+  final String first;
+  final String last;
+
+  const CoverageRow({
+    required this.source,
+    required this.symbol,
+    required this.duration,
+    required this.bars,
+    required this.missing,
+    required this.first,
+    required this.last,
+  });
+
+  @override
+  int get hashCode =>
+      source.hashCode ^
+      symbol.hashCode ^
+      duration.hashCode ^
+      bars.hashCode ^
+      missing.hashCode ^
+      first.hashCode ^
+      last.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CoverageRow &&
+          runtimeType == other.runtimeType &&
+          source == other.source &&
+          symbol == other.symbol &&
+          duration == other.duration &&
+          bars == other.bars &&
+          missing == other.missing &&
+          first == other.first &&
+          last == other.last;
+}
+
 /// One stored series: source, symbol and bar duration, with its extent.
 class DatasetSummary {
   final String source;
@@ -206,6 +277,28 @@ class DatasetSummary {
           count == other.count &&
           first == other.first &&
           last == other.last;
+}
+
+/// Min and max of a price metric for one series, inside the time range.
+class MetricSpan {
+  /// `source:BASE/QUOTE:duration_s`, the same key the app uses for a dataset.
+  final String key;
+  final double min;
+  final double max;
+
+  const MetricSpan({required this.key, required this.min, required this.max});
+
+  @override
+  int get hashCode => key.hashCode ^ min.hashCode ^ max.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MetricSpan &&
+          runtimeType == other.runtimeType &&
+          key == other.key &&
+          min == other.min &&
+          max == other.max;
 }
 
 /// Everything the dashboard shows.

@@ -12,6 +12,7 @@ import '../state.dart';
 import '../theme/muninn_theme.dart';
 import '../workspace.dart';
 import 'create_then_share.dart';
+import 'shared_actions.dart';
 import 'frame_tile.dart';
 
 void _ok(BuildContext context, String msg, {Color? color}) {
@@ -183,6 +184,10 @@ class CodeSpacesPane extends ConsumerWidget {
                           PopupMenuItem(value: 'open', child: Text('Open…')),
                           PopupMenuItem(value: 'run', child: Text('Run')),
                           PopupMenuItem(
+                            value: 'pipe',
+                            child: Text('Pipe result…'),
+                          ),
+                          PopupMenuItem(
                             value: 'result',
                             child: Text('Result tile…'),
                           ),
@@ -196,10 +201,7 @@ class CodeSpacesPane extends ConsumerWidget {
                             value: 'give',
                             child: Text('Give to org…'),
                           ),
-                          PopupMenuItem(
-                            value: 'share',
-                            child: Text('Share…'),
-                          ),
+                          PopupMenuItem(value: 'share', child: Text('Share…')),
                           PopupMenuItem(
                             value: 'export',
                             child: Text('Export…'),
@@ -232,6 +234,8 @@ Future<void> _codeAction(
         if (ok == true) refreshProjectExtras(ref);
       case 'result':
         openCodeResultTile(ref, c);
+      case 'pipe':
+        await showCodePipeDialog(context, ref, c);
       case 'run':
         if (!c.approved &&
             !await _confirm(
@@ -1622,7 +1626,10 @@ Future<void> _shareCodeSpace(
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctl.text.trim()),
             child: const Text('Share'),
@@ -1633,22 +1640,21 @@ Future<void> _shareCodeSpace(
   );
   if (withWhom == null || !context.mounted) return;
   if (withWhom == '__create_then__') {
-    await showCreateThenShareDialog(
-      context,
-      ref,
-      kind: 'space',
-      item: c.name,
-    );
+    await showCreateThenShareDialog(context, ref, kind: 'space', item: c.name);
     return;
   }
   final peers = withWhom.isEmpty ? const <String>[] : [withWhom];
   try {
-    final msg = await ref.read(apiProvider).netShare('space', c.name, withPeers: peers);
+    final msg = await ref
+        .read(apiProvider)
+        .netShare('space', c.name, withPeers: peers);
     if (context.mounted) _ok(context, msg);
   } catch (e) {
     // Some builds use kind "code" for spaces.
     try {
-      final msg = await ref.read(apiProvider).netShare('code', c.name, withPeers: peers);
+      final msg = await ref
+          .read(apiProvider)
+          .netShare('code', c.name, withPeers: peers);
       if (context.mounted) _ok(context, msg);
     } catch (e2) {
       if (context.mounted) _ok(context, '$e2', color: m.error);
@@ -1662,7 +1668,9 @@ Future<void> _exportSpace(
   CodeSpaceInfo c,
 ) async {
   final m = context.muninn;
-  final path = await FilePicker.platform.saveFile(fileName: '${c.name}.space.json');
+  final path = await FilePicker.platform.saveFile(
+    fileName: '${c.name}.space.json',
+  );
   if (path == null || !context.mounted) return;
   try {
     final msg = await ref.read(apiProvider).spaceExport(c.id, path);
@@ -1688,4 +1696,3 @@ Future<void> _importSpace(BuildContext context, WidgetRef ref) async {
     if (context.mounted) _ok(context, '$e', color: m.error);
   }
 }
-

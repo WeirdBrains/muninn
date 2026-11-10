@@ -96,6 +96,146 @@ class TimeRange {
   int get hashCode => Object.hash(from, to);
 }
 
+/// Sidebar filters besides the time range (Data ▸ Filters / Sort), shared with the TUI.
+class DataFilters {
+  const DataFilters({
+    this.sources = const [],
+    this.symbols = const [],
+    this.durations = const [],
+    this.years = const [],
+    this.priceMetric = 'close',
+    this.priceMin,
+    this.priceMax,
+    this.sort = 'year',
+    this.desc = false,
+  });
+  final List<String> sources, symbols, durations;
+  final List<int> years;
+  final String priceMetric, sort;
+  final double? priceMin, priceMax;
+  final bool desc;
+
+  static const priceMetrics = [
+    'open',
+    'high',
+    'low',
+    'close',
+    'typical',
+    'median',
+    'ohlc avg',
+    'vwap',
+  ];
+
+  bool get priceActive => priceMin != null || priceMax != null;
+
+  static int yearOf(int ms) =>
+      DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true).year;
+
+  /// A series is shown when every active filter matches (TUI sidebar `rows`).
+  bool matches(Dataset d, ({double min, double max})? span) {
+    if (sources.isNotEmpty && !sources.contains(d.source)) return false;
+    if (symbols.isNotEmpty && !symbols.contains(d.symbol)) return false;
+    if (durations.isNotEmpty && !durations.contains(d.duration)) return false;
+    if (years.isNotEmpty) {
+      final a = yearOf(d.first);
+      final b = yearOf(d.last);
+      if (!years.any((y) => y >= a && y <= b)) return false;
+    }
+    if (priceActive) {
+      if (span == null) return false;
+      if (priceMin != null && span.max < priceMin!) return false;
+      if (priceMax != null && span.min > priceMax!) return false;
+    }
+    return true;
+  }
+
+  int compare(Dataset a, Dataset b) {
+    var c = sort == 'name'
+        ? a.symbol.compareTo(b.symbol)
+        : yearOf(a.first).compareTo(yearOf(b.first));
+    if (sort != 'name' && c == 0) {
+      c = yearOf(a.last).compareTo(yearOf(b.last));
+    }
+    if (c == 0) c = a.symbol.compareTo(b.symbol);
+    if (c == 0) c = a.source.compareTo(b.source);
+    if (c == 0) c = a.durationS.compareTo(b.durationS);
+    return desc ? -c : c;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is DataFilters &&
+      _same(sources, other.sources) &&
+      _same(symbols, other.symbols) &&
+      _same(durations, other.durations) &&
+      _same(years, other.years) &&
+      priceMetric == other.priceMetric &&
+      priceMin == other.priceMin &&
+      priceMax == other.priceMax &&
+      sort == other.sort &&
+      desc == other.desc;
+
+  static bool _same<T>(List<T> a, List<T> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    Object.hashAll(sources),
+    Object.hashAll(symbols),
+    Object.hashAll(durations),
+    Object.hashAll(years),
+    priceMetric,
+    priceMin,
+    priceMax,
+    sort,
+    desc,
+  );
+}
+
+/// One row of Data ▸ Coverage & gaps.
+class CoverageInfo {
+  const CoverageInfo({
+    required this.source,
+    required this.symbol,
+    required this.duration,
+    required this.bars,
+    required this.missing,
+    required this.first,
+    required this.last,
+  });
+  final String source, symbol, duration, first, last;
+  final int bars, missing;
+}
+
+/// Min/max of a price metric for one dataset key.
+class MetricSpanInfo {
+  const MetricSpanInfo({
+    required this.key,
+    required this.min,
+    required this.max,
+  });
+  final String key;
+  final double min, max;
+}
+
+/// A theme opened in Theme ▸ Edit current… / New from current….
+class ThemeEdit {
+  const ThemeEdit({
+    required this.name,
+    required this.displayName,
+    this.base = '',
+    required this.dark,
+    required this.light,
+  });
+  final String name, displayName, base;
+  final Map<String, String> dark, light;
+}
+
 class BarPoint {
   const BarPoint({
     required this.ts,
@@ -612,7 +752,6 @@ class CodeRunResult {
   final int writes, ms;
 }
 
-
 /// Plugin = a code space listed by kind (`mnnn plugins list`).
 class PluginInfo {
   const PluginInfo({
@@ -625,6 +764,109 @@ class PluginInfo {
   });
   final String name, kind, lang, main;
   final bool approved, enabled;
+}
+
+/// A code space: a collection of code (`mnnn spaces list`).
+class CollectionInfo {
+  const CollectionInfo({
+    required this.id,
+    required this.name,
+    this.description = '',
+    this.kind = 'analysis',
+    this.enabled = true,
+    this.approved = false,
+    this.main = '',
+    this.members = 0,
+    this.unreviewed = 0,
+    this.pinBroken = 0,
+  });
+  final String id, name, description, kind, main;
+  final bool enabled, approved;
+  final int members, unreviewed, pinBroken;
+}
+
+class SpaceMemberInfo {
+  const SpaceMemberInfo({
+    required this.codeId,
+    required this.codeName,
+    this.alias = '',
+    this.lang = '',
+    this.main = false,
+    this.pinned = false,
+    this.pinBroken = false,
+    this.unreviewed = false,
+  });
+  final String codeId, codeName, alias, lang;
+  final bool main, pinned, pinBroken, unreviewed;
+}
+
+class MigrateLine {
+  const MigrateLine({
+    required this.code,
+    required this.space,
+    this.kind = '',
+    this.renamed = false,
+    this.approved = false,
+    this.why = '',
+  });
+  final String code, space, kind, why;
+  final bool renamed, approved;
+}
+
+class MigrateSkip {
+  const MigrateSkip({required this.code, this.why = ''});
+  final String code, why;
+}
+
+class MigrateReport {
+  const MigrateReport({
+    this.created = const [],
+    this.skipped = const [],
+    this.pipelines = const [],
+    this.backup = '',
+    this.dryRun = false,
+  });
+  final List<MigrateLine> created;
+  final List<MigrateSkip> skipped;
+  final List<String> pipelines;
+  final String backup;
+  final bool dryRun;
+}
+
+class PluginDetail {
+  const PluginDetail({
+    required this.name,
+    this.kind = '',
+    this.lang = '',
+    this.main = '',
+    this.library = '',
+    this.declared = '',
+    this.members = 0,
+    this.approved = false,
+    this.enabled = true,
+    this.usedBy = const [],
+    this.problem = '',
+  });
+  final String name, kind, lang, main, library, declared, problem;
+  final int members;
+  final bool approved, enabled;
+  final List<String> usedBy;
+}
+
+class CollectionRun {
+  const CollectionRun({
+    this.status = '',
+    this.error = '',
+    this.lines = const [],
+  });
+  final String status, error;
+  final List<String> lines;
+}
+
+class SchedulePreview {
+  const SchedulePreview({this.lines = const [], this.runsRemaining = ''});
+  final List<String> lines;
+  final String runsRemaining;
 }
 
 class RulesetInfo {
@@ -660,7 +902,15 @@ class ScheduleInfo {
     this.maxAttempts = 3,
     this.describe = const [],
   });
-  final String id, name, targetKind, target, runEvery, cron, tz, overlap, catchUp;
+  final String id,
+      name,
+      targetKind,
+      target,
+      runEvery,
+      cron,
+      tz,
+      overlap,
+      catchUp;
   final int startAt, endsAt, nextRunAt, maxAttempts;
   final bool enabled;
   final List<String> describe;
@@ -830,6 +1080,47 @@ class McpClientInfo {
   final String id, name, role;
   final int createdAt, lastSeenAt;
   final bool revoked;
+}
+
+/// A client just added. [token] is shown once and is not stored after the dialog closes.
+class McpClientAdded {
+  const McpClientAdded({
+    required this.name,
+    required this.role,
+    required this.token,
+  });
+  final String name, role, token;
+}
+
+/// An offer or answer shown once. Empty when the other side already received it.
+class ExchangeOnce {
+  const ExchangeOnce({
+    required this.summary,
+    this.token = '',
+    this.shortCode = '',
+    this.answer = '',
+  });
+  final String summary, token, shortCode, answer;
+}
+
+/// A site a peer announced.
+class AnnouncedSiteInfo {
+  const AnnouncedSiteInfo({
+    required this.peer,
+    required this.slug,
+    this.name = '',
+    this.urls = const [],
+    this.open = false,
+  });
+  final String peer, slug, name;
+  final List<String> urls;
+  final bool open;
+}
+
+/// Somewhere a code unit's last result can go (`>`).
+class PipeTargetInfo {
+  const PipeTargetInfo({required this.kind, required this.name});
+  final String kind, name;
 }
 
 class McpToolInfo {
@@ -1741,6 +2032,35 @@ abstract class MuninnApi {
   Future<void> saveTimeRange(TimeRange range);
   Future<void> saveDataset(String? key);
 
+  /// Sidebar source, symbol, period, year, price and sort (`[tui.sidebar]`).
+  Future<DataFilters> sidebarFilters();
+  Future<void> saveSidebarFilters(DataFilters filters);
+
+  /// TUI header size: `auto`, `compact` or `large`.
+  Future<String> headerMode();
+  Future<void> saveHeaderMode(String mode);
+
+  /// Data ▸ Coverage & gaps.
+  Future<List<CoverageInfo>> coverage();
+
+  /// Price ranges used by Data ▸ Filters ▸ Price.
+  Future<List<MetricSpanInfo>> metricSpans(String metric, TimeRange range);
+
+  /// File ▸ Backup ▸ Create. An empty password leaves the archive unencrypted.
+  Future<String> backupCreate(String outDir, {String password = ''});
+
+  /// Theme ▸ Edit / New / Import / Export. Colours are `#rrggbb`.
+  Future<ThemeEdit> themeDraft(String name);
+  Future<void> themeSave({
+    required String name,
+    required String displayName,
+    required String base,
+    required Map<String, String> dark,
+    required Map<String, String> light,
+  });
+  Future<String> themeImport(String toml);
+  Future<String> themeExport(String name);
+
   /// Named workspace layouts in `[tui.layouts]`, shared with the TUI.
   Future<List<String>> savedLayouts();
   Future<String> saveNamedLayout(String name, String json);
@@ -2218,11 +2538,21 @@ abstract class MuninnApi {
   Future<String> mcpClientRole(String client, String role);
   Future<String> mcpClientRevoke(String client, {bool revoke = true});
   Future<String> mcpRemoveClient(String client);
+  Future<String> mcpAddServer(
+    String name, {
+    String url = '',
+    String command = '',
+    String token = '',
+  });
+  Future<McpClientAdded> mcpAddClient(String name, {String role = 'read'});
 
-  /// TUI `W` messages and live sessions (listing what the store holds).
+  /// TUI `W` messages and live sessions.
   Future<List<PeerMessageInfo>> peerMessages({String? peer});
   Future<String> peerMessagesMarkRead({String? peer});
   Future<List<LiveSessionInfo>> liveSessions();
+  Future<String> collabSend(String peer, String text);
+  Future<String> collabHost(String peer, String kind, String key);
+  Future<String> collabJoin(String peer, String session);
   Future<String> pipelineExport(
     String pipeline,
     String path, {
@@ -2421,6 +2751,16 @@ abstract class MuninnApi {
     bool import = false,
   });
 
+  /// `mnnn net exchange create`. The raw token is empty when it was delivered.
+  Future<ExchangeOnce> netExchangeOffer({
+    String label = '',
+    String peer = '',
+    int hours = 0,
+  });
+
+  /// `mnnn net exchange accept`. The answer is empty when it was delivered.
+  Future<ExchangeOnce> netExchangeAccept(String token, {String label = ''});
+
   /// `mnnn net shard list` / TUI Dark shards. Sealed blobs stay in Rust.
   Future<NetShards> netShards();
   Future<String> netShardEntrust({
@@ -2432,6 +2772,15 @@ abstract class MuninnApi {
   });
   Future<String> netShardCheck(String shardPassword);
   Future<String> netShardDrop(String id);
+
+  /// `mnnn net shard restore`. A backup file is how this works when the database will not open.
+  Future<String> netShardRestore({
+    String backup = '',
+    String backupPassword = '',
+    required String shardPassword,
+    required String newPassword,
+    List<String> peers = const [],
+  });
 
   /// `mnnn net search` / TUI Network search… (a saved live search here and on peers).
   Future<List<NetSearchOrigin>> netSearch(
@@ -2597,6 +2946,8 @@ abstract class MuninnApi {
   Future<String> orgMirror(String org);
   Future<List<OrgSyncCodeItem>> orgSyncCode(String org);
   Future<String> orgSignIn(String org, String site);
+  Future<List<String>> orgAnnounce({String org = '', bool closed = false});
+  Future<List<AnnouncedSiteInfo>> orgAnnounced();
 
   Future<String> orgEndpointAdd(
     String org,
@@ -2622,10 +2973,50 @@ abstract class MuninnApi {
   Future<String> orgCodeServe(String org, String space);
   Future<String> orgCodeStop(String org, String space);
 
-
   /// Plugins by kind (`mnnn plugins list [--kind]`).
   Future<List<PluginInfo>> pluginsList({String? kind});
   Future<String> pluginSetEnabled(String name, bool enabled);
+  Future<PluginDetail> pluginInfo(String name);
+  Future<String> pluginInstall(
+    String what, {
+    required String kind,
+    String name = '',
+  });
+  Future<List<PipeTargetInfo>> codePipeTargets(String space);
+  Future<String> codePipeTo(String space, String kind, String name);
+
+  /// Code spaces as collections (`mnnn spaces`).
+  Future<List<CollectionInfo>> collectionsList({String? kind});
+  Future<List<SpaceMemberInfo>> collectionMembers(String space);
+  Future<CollectionInfo> collectionCreate(
+    String name, {
+    String description = '',
+    required String kind,
+    required String main,
+  });
+  Future<String> collectionAdd(
+    String space,
+    String code, {
+    String? alias,
+    bool pin = false,
+  });
+  Future<String> collectionRemoveCode(String space, String code);
+  Future<String> collectionSetMain(String space, String code);
+  Future<String> collectionPin(String space, String code, {required bool on});
+  Future<String> collectionApprove(String space);
+  Future<String> collectionSetEnabled(String space, bool enabled);
+  Future<String> collectionRemove(String space);
+  Future<CollectionRun> collectionRun(String space);
+  Future<int> migratePending();
+  Future<bool> migrateOffered();
+  Future<void> migrateDismiss();
+  Future<MigrateReport> migrateRun({
+    List<String> codes = const [],
+    String? kind,
+    bool dryRun = true,
+    bool rewritePipelines = true,
+    bool backup = true,
+  });
 
   /// Code space export/import (`mnnn spaces export|import`).
   Future<String> spaceExport(String space, String path);
@@ -2634,11 +3025,34 @@ abstract class MuninnApi {
 
   /// Rule sets and schedules (`mnnn ruleset` / `mnnn schedule`).
   Future<List<RulesetInfo>> rulesetsList();
-  Future<RulesetInfo> rulesetCreate(String name, {String description = '', List<String> rules = const []});
-  Future<RulesetInfo> rulesetEdit(String ruleset, {String? name, String? description, bool? enable});
+  Future<RulesetInfo> rulesetCreate(
+    String name, {
+    String description = '',
+    List<String> rules = const [],
+  });
+  Future<RulesetInfo> rulesetEdit(
+    String ruleset, {
+    String? name,
+    String? description,
+    bool? enable,
+  });
   Future<String> rulesetRemove(String ruleset, {bool force = false});
-  Future<RulesetInfo> rulesetAddRule(String ruleset, String rule, {int? position});
+  Future<RulesetInfo> rulesetAddRule(
+    String ruleset,
+    String rule, {
+    int? position,
+  });
   Future<RulesetInfo> rulesetDropRule(String ruleset, String rule);
+  Future<List<String>> rulesetRun(String ruleset);
+  Future<SchedulePreview> scheduleParse({
+    String? runEvery,
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+    bool pastNext = false,
+  });
 
   Future<List<ScheduleInfo>> schedulesList();
   Future<List<ScheduleRunInfo>> scheduleRuns(String key);
@@ -2730,7 +3144,11 @@ abstract class MuninnApi {
     String? format,
     String? query,
   });
-  Future<ShareCreated> shareCreateProjectItem(String kind, String name, {String description = ''});
+  Future<ShareCreated> shareCreateProjectItem(
+    String kind,
+    String name, {
+    String description = '',
+  });
 
   /// `mnnn keys status`: database id, path and service-key versions. No key material.
   Future<KeysStatus> keysStatus();

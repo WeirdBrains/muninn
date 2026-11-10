@@ -21,6 +21,39 @@ Future<String> peerMessagesMarkRead({String? peer}) =>
 Future<List<LiveSessionInfo>> liveSessions() =>
     RustLib.instance.api.crateApiCollabLiveSessions();
 
+/// Send a message to a peer (`mnnn peers` message).
+Future<String> collabSend({
+  String? home,
+  required String peer,
+  required String text,
+}) => RustLib.instance.api.crateApiCollabCollabSend(
+  home: home,
+  peer: peer,
+  text: text,
+);
+
+/// Host a live session and invite one peer. The running node answers guests.
+Future<String> collabHost({
+  required String peer,
+  required String kind,
+  required String key,
+}) => RustLib.instance.api.crateApiCollabCollabHost(
+  peer: peer,
+  kind: kind,
+  key: key,
+);
+
+/// Join a live session a peer invited you to.
+Future<String> collabJoin({
+  String? home,
+  required String peer,
+  required String sessionId,
+}) => RustLib.instance.api.crateApiCollabCollabJoin(
+  home: home,
+  peer: peer,
+  sessionId: sessionId,
+);
+
 class LiveSessionInfo {
   final String id;
   final String kind;

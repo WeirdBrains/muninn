@@ -137,7 +137,7 @@ struct HostedDriver {
 
 static HOSTED: LazyLock<Mutex<Option<HostedDriver>>> = LazyLock::new(|| Mutex::new(None));
 
-fn prefs_of(home: &Path) -> Preferences {
+pub(crate) fn prefs_of(home: &Path) -> Preferences {
     std::fs::read_to_string(home.join("preferences.toml")).ok().and_then(|s| toml::from_str(&s).ok()).unwrap_or_default()
 }
 
@@ -1199,6 +1199,107 @@ fn exchange_restore_of(s: &Store, file: &str, password: &str, confirm_replace: b
 pub fn net_exchange_restore(home: Option<String>, file: String, password: String, confirm_replace: bool) -> anyhow::Result<String> {
     let _ = home;
     exchange_restore_of(&open_write()?, &file, &password, confirm_replace)
+}
+
+/// An offer or answer token, shown once. Empty when it was already delivered.
+pub struct ExchangeToken {
+    pub summary: String,
+    pub token: String,
+    pub short_code: String,
+    pub answer: String,
+}
+
+fn offer_token(c: client::Created) -> ExchangeToken {
+    let sent = matches!(c.delivered, Some(Ok(_)));
+    let summary = match &c.delivered {
+        Some(Ok(_)) => format!("offer {} sent; the other side accepts it", c.exchange.short_id()),
+        Some(Err(e)) => format!("could not send the offer ({e}); pass this token on instead"),
+        None => format!("give this offer to the other side (offer {})", c.exchange.short_id()),
+    };
+    ExchangeToken { summary, token: if sent { String::new() } else { c.token }, short_code: String::new(), answer: String::new() }
+}
+
+/// `mnnn net exchange create`. The raw token comes back only when it was not delivered.
+pub fn net_exchange_offer(home: Option<String>, label: String, peer: String, hours: i64) -> anyhow::Result<ExchangeToken> {
+    let p = super::info::paths(home.clone())?;
+    let store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let kp = identity::load_or_create(&store)?;
+    let my = local::my_label(&store, &prefs.net);
+    let addrs = local::offer_addrs(&p.home, &store, None);
+    let ttl = if hours <= 0 { client::DEFAULT_TTL_MS } else { hours.saturating_mul(3_600_000) };
+    let peer = peer.trim();
+    if peer.is_empty() {
+        return Ok(offer_token(client::create(&store, None, &kp, label.trim(), &my, addrs, None, ttl, &prefs.net.relays, ORIGIN)?));
+    }
+    let held = crate::hold::hold_node(home)?;
+    Ok(offer_token(client::create(&store, Some(held.node()), &kp, label.trim(), &my, addrs, Some(peer), ttl, &prefs.net.relays, ORIGIN)?))
+}
+
+/// `mnnn net exchange accept`. The answer token comes back only when it was not delivered.
+pub fn net_exchange_accept(home: Option<String>, token: String, label: String) -> anyhow::Result<ExchangeToken> {
+    let token = token.trim();
+    if token.is_empty() {
+        anyhow::bail!("paste the offer or answer token");
+    }
+    let p = super::info::paths(home.clone())?;
+    let store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let kp = identity::load_or_create(&store)?;
+    let my = local::my_label(&store, &prefs.net);
+    let addrs = local::offer_addrs(&p.home, &store, None);
+    let held = crate::hold::hold_node(home)?;
+    let a = client::accept(&store, Some(held.node()), &kp, token, label.trim(), &my, addrs, ORIGIN)?;
+    let sent = matches!(a.delivered, Some(Ok(_)));
+    let mut summary = format!("key exchange with {} complete", a.exchange.title());
+    if let Some(Err(e)) = &a.delivered {
+        summary = format!("{summary}; could not reach the offerer ({e})");
+    }
+    let answer = match &a.answer {
+        Some(ans) if !sent => ans.clone(),
+        _ => String::new(),
+    };
+    Ok(ExchangeToken { summary, token: String::new(), short_code: a.exchange.short_code.unwrap_or_default(), answer })
+}
+
+/// `mnnn net shard restore`. Rebuilds the master key from peers and sets a new password.
+/// A backup file is how this works when the database itself will not open.
+#[allow(clippy::too_many_arguments)]
+pub fn net_shard_restore(
+    home: Option<String>,
+    backup: String,
+    backup_password: String,
+    shard_password: String,
+    new_password: String,
+    peers: Vec<String>,
+) -> anyhow::Result<String> {
+    if shard_password.is_empty() {
+        anyhow::bail!("give the shard password");
+    }
+    if new_password.is_empty() {
+        anyhow::bail!("give the new Muninn password");
+    }
+    let p = super::info::paths(home.clone())?;
+    let prefs = prefs_of(&p.home);
+    let shard_pw = SecretString::from(shard_password);
+    let (key, g) = if backup.trim().is_empty() {
+        let store = open_write()?;
+        let held = crate::hold::hold_node(home)?;
+        client::gather(&store, held.node(), &shard_pw, None, &peers, &prefs.net.relays, ORIGIN)?
+    } else {
+        let bytes = std::fs::read(backup.trim()).map_err(|e| anyhow::anyhow!("{}: {e}", backup.trim()))?;
+        let bpw = SecretString::from(backup_password);
+        let scratch = net::backup::scratch(&bytes, &bpw)?;
+        let kp = identity::load_or_create(&scratch)?;
+        let label = local::my_label(&scratch, &prefs.net);
+        let svc = net::backup::scratch(&bytes, &bpw)?;
+        let node = local::ephemeral(&kp, svc, &label, &prefs.net)?;
+        client::gather(&scratch, &node, &shard_pw, None, &peers, &prefs.net.relays, ORIGIN)?
+    };
+    muninn_core::crypto::keyring::verify_master(&p, &key)
+        .map_err(|e| anyhow::anyhow!("the shards rebuilt a key that does not open this database ({e})"))?;
+    muninn_core::crypto::keyring::recover(&p, &key, &SecretString::from(new_password))?;
+    Ok(format!("master key restored from {} shard(s) (set {}) held by {}; new password set", g.got, g.set, g.from.join(", ")))
 }
 
 #[cfg(test)]

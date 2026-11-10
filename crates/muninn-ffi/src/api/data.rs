@@ -3,7 +3,7 @@
 //! the store read-only (no migrations). Import and export open it for writes.
 use super::info::paths;
 use muninn_core::crypto::Key32;
-use muninn_core::model::{Duration, Symbol};
+use muninn_core::model::{Duration, PriceMetric, Symbol};
 use muninn_core::store::{BarFilter, NewAction, Store};
 use serde_json::json;
 use std::path::PathBuf;
@@ -369,6 +369,85 @@ pub fn add_symbol(symbol: String, aliases: Vec<String>) -> anyhow::Result<Symbol
         &NewAction::new("symbol.add", "app", format!("add symbol {}", info.symbol)).params(json!({ "symbol": info.symbol, "aliases": aliases })),
     );
     Ok(info)
+}
+
+/// One series in Data ▸ Coverage & gaps (TUI coverage window).
+pub struct CoverageRow {
+    pub source: String,
+    pub symbol: String,
+    pub duration: String,
+    pub bars: i64,
+    pub missing: i64,
+    pub first: String,
+    pub last: String,
+}
+
+/// `mnnn` coverage listing: expected bars between first and last, minus those stored.
+pub fn coverage() -> anyhow::Result<Vec<CoverageRow>> {
+    Ok(open()?
+        .series()?
+        .into_iter()
+        .map(|x| {
+            let missing = x.missing();
+            CoverageRow {
+                source: x.source,
+                symbol: x.symbol.display(),
+                duration: x.duration.to_string(),
+                bars: x.count,
+                missing,
+                first: muninn_core::ingest::time::fmt_ts(x.first),
+                last: muninn_core::ingest::time::fmt_ts(x.last),
+            }
+        })
+        .collect())
+}
+
+/// Min and max of a price metric for one series, inside the time range.
+pub struct MetricSpan {
+    /// `source:BASE/QUOTE:duration_s`, the same key the app uses for a dataset.
+    pub key: String,
+    pub min: f64,
+    pub max: f64,
+}
+
+fn price_metric(s: &str) -> anyhow::Result<PriceMetric> {
+    PriceMetric::ALL
+        .into_iter()
+        .find(|m| m.label() == s)
+        .ok_or_else(|| anyhow::anyhow!("price metric must be open, high, low, close, typical, median, ohlc avg or vwap"))
+}
+
+/// Price ranges for the sidebar price filter (TUI Data ▸ Filters ▸ Price).
+pub fn metric_spans(metric: String, from: Option<i64>, to: Option<i64>) -> anyhow::Result<Vec<MetricSpan>> {
+    let m = price_metric(&metric)?;
+    let s = open()?;
+    let mut out = Vec::new();
+    for series in s.series()? {
+        let f = BarFilter {
+            source: Some(series.source.clone()),
+            symbol: Some(series.symbol.clone()),
+            duration: Some(series.duration),
+            from,
+            to,
+            ..Default::default()
+        };
+        if let Some((min, max)) = s.metric_range(&f, m)? {
+            out.push(MetricSpan { key: format!("{}:{}/{}:{}", series.source, series.symbol.base, series.symbol.quote, series.duration.0), min, max });
+        }
+    }
+    Ok(out)
+}
+
+/// File ▸ Backup ▸ Create (`mnnn backup create`). An empty password leaves the archive unencrypted;
+/// the database inside stays encrypted. Restoring stays on the command line, as in the TUI.
+pub fn backup_create(home: Option<String>, out_dir: String, password: String) -> anyhow::Result<String> {
+    let p = paths(home)?;
+    let g = SESSION.lock().unwrap_or_else(|e| e.into_inner());
+    let (db, key) = g.as_ref().ok_or_else(|| anyhow::anyhow!("locked: unlock with the Muninn password first"))?;
+    let store = Store::open(db, Some(&key.0))?;
+    let pw = if password.is_empty() { None } else { Some(secrecy::SecretString::from(password)) };
+    let written = muninn_core::backup::create(&p, &store, key, std::path::Path::new(&out_dir), pw.as_ref())?;
+    Ok(written.display().to_string())
 }
 
 #[cfg(test)]

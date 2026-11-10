@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `check_relay_addr`, `config_of`, `connections_of`, `edit_prefs`, `exchange_export_of`, `exchange_info`, `exchange_restore_of`, `exchange_restore_peek_of`, `exchanges_of`, `hosted_node`, `invite_info`, `invite_of`, `invites_of`, `link_of`, `master_from_key_file`, `net_overview_of`, `parse_kind`, `peers_of`, `prefs_of`, `reap_hosted`, `relays_of`, `request_info`, `shards_of`, `share_of`, `shared_of`, `status_of`, `stop_of`, `unshare_of`
+// These functions are ignored because they are not marked as `pub`: `check_relay_addr`, `config_of`, `connections_of`, `edit_prefs`, `exchange_export_of`, `exchange_info`, `exchange_restore_of`, `exchange_restore_peek_of`, `exchanges_of`, `hosted_node`, `invite_info`, `invite_of`, `invites_of`, `link_of`, `master_from_key_file`, `net_overview_of`, `offer_token`, `parse_kind`, `peers_of`, `prefs_of`, `reap_hosted`, `relays_of`, `request_info`, `shards_of`, `share_of`, `shared_of`, `status_of`, `stop_of`, `unshare_of`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `HostedDriver`
 
 /// `mnnn net status` and `mnnn net peers`. The store is opened read-only.
@@ -286,6 +286,77 @@ Future<String> netExchangeRestore({
   password: password,
   confirmReplace: confirmReplace,
 );
+
+/// `mnnn net exchange create`. The raw token comes back only when it was not delivered.
+Future<ExchangeToken> netExchangeOffer({
+  String? home,
+  required String label,
+  required String peer,
+  required PlatformInt64 hours,
+}) => RustLib.instance.api.crateApiNetNetExchangeOffer(
+  home: home,
+  label: label,
+  peer: peer,
+  hours: hours,
+);
+
+/// `mnnn net exchange accept`. The answer token comes back only when it was not delivered.
+Future<ExchangeToken> netExchangeAccept({
+  String? home,
+  required String token,
+  required String label,
+}) => RustLib.instance.api.crateApiNetNetExchangeAccept(
+  home: home,
+  token: token,
+  label: label,
+);
+
+/// `mnnn net shard restore`. Rebuilds the master key from peers and sets a new password.
+/// A backup file is how this works when the database itself will not open.
+Future<String> netShardRestore({
+  String? home,
+  required String backup,
+  required String backupPassword,
+  required String shardPassword,
+  required String newPassword,
+  required List<String> peers,
+}) => RustLib.instance.api.crateApiNetNetShardRestore(
+  home: home,
+  backup: backup,
+  backupPassword: backupPassword,
+  shardPassword: shardPassword,
+  newPassword: newPassword,
+  peers: peers,
+);
+
+/// An offer or answer token, shown once. Empty when it was already delivered.
+class ExchangeToken {
+  final String summary;
+  final String token;
+  final String shortCode;
+  final String answer;
+
+  const ExchangeToken({
+    required this.summary,
+    required this.token,
+    required this.shortCode,
+    required this.answer,
+  });
+
+  @override
+  int get hashCode =>
+      summary.hashCode ^ token.hashCode ^ shortCode.hashCode ^ answer.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExchangeToken &&
+          runtimeType == other.runtimeType &&
+          summary == other.summary &&
+          token == other.token &&
+          shortCode == other.shortCode &&
+          answer == other.answer;
+}
 
 /// `mnnn net config` / TUI Net ▸ Settings… (plus CLI extras the TUI page does not list).
 class NetConfig {

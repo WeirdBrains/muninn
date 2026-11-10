@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
+import 'shared_actions.dart';
 
 void _ok(BuildContext context, String msg, {Color? color}) {
   ScaffoldMessenger.of(context)
@@ -25,8 +26,25 @@ class McpPane extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         Text(
-          'External MCP servers (their tools and approvals) and the clients allowed to call this node. Tokens and credential values stay in Rust. Adding a server or client is `mnnn mcp add` / `mnnn mcp client add`.',
+          'External MCP servers (their tools and approvals) and the clients allowed to call this node. Tokens and credential values stay in Rust. A new client token is shown once.',
           style: TextStyle(color: m.muted),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton(
+              key: const ValueKey('mcp-add-server-open'),
+              onPressed: () => showMcpAddServerDialog(context, ref),
+              child: const Text('Add server…'),
+            ),
+            OutlinedButton(
+              key: const ValueKey('mcp-add-client-open'),
+              onPressed: () => showMcpAddClientDialog(context, ref),
+              child: const Text('Add client…'),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Text('Servers', style: TextStyle(color: m.header, fontSize: 16)),
@@ -36,10 +54,7 @@ class McpPane extends ConsumerWidget {
           data: (items) {
             final all = items ?? const <McpServerInfo>[];
             if (all.isEmpty) {
-              return Text(
-                'No MCP servers (`mnnn mcp add NAME --url URL` or `-- COMMAND`).',
-                style: TextStyle(color: m.muted),
-              );
+              return Text('No MCP servers.', style: TextStyle(color: m.muted));
             }
             return Column(
               children: [
@@ -57,10 +72,7 @@ class McpPane extends ConsumerWidget {
           data: (items) {
             final all = items ?? const <McpClientInfo>[];
             if (all.isEmpty) {
-              return Text(
-                'No MCP clients (`mnnn mcp client add NAME`).',
-                style: TextStyle(color: m.muted),
-              );
+              return Text('No MCP clients.', style: TextStyle(color: m.muted));
             }
             return Column(
               children: [

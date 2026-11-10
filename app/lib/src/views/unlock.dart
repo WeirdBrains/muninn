@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state.dart';
 import '../workspace.dart';
 import '../theme/muninn_theme.dart';
+import 'keys_dialogs.dart';
+import 'shared_actions.dart';
 
 class UnlockCard extends ConsumerStatefulWidget {
   const UnlockCard({super.key});
@@ -45,31 +47,69 @@ class _UnlockCardState extends ConsumerState<UnlockCard> {
 
   @override
   Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Unlock to browse (read-only)', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _c,
-              obscureText: true,
-              autofillHints: const [AutofillHints.password],
-              decoration: const InputDecoration(labelText: 'Muninn password', border: OutlineInputBorder()),
-              onSubmitted: (_) => _go(),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Unlock to browse (read-only)',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _c,
+            obscureText: true,
+            autofillHints: const [AutofillHints.password],
+            decoration: const InputDecoration(
+              labelText: 'Muninn password',
+              border: OutlineInputBorder(),
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(_error!, style: TextStyle(color: context.muninn.error)),
+            onSubmitted: (_) => _go(),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: TextStyle(color: context.muninn.error)),
+          ],
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: _busy ? null : _go,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: _busy
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Unlock'),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              TextButton(
+                key: const ValueKey('unlock-recover-words'),
+                onPressed: () => showKeysRecoverWordsDialog(context, ref),
+                child: const Text('Recover from words'),
+              ),
+              TextButton(
+                key: const ValueKey('unlock-recover-shards'),
+                onPressed: () => showKeysRecoverShardsDialog(context, ref),
+                child: const Text('Recover from shards'),
+              ),
+              TextButton(
+                key: const ValueKey('unlock-shard-backup'),
+                onPressed: () => showShardBackupRestoreDialog(context, ref),
+                child: const Text('Restore from a shard backup'),
+              ),
             ],
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: _busy ? null : _go,
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              child: _busy ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Unlock'),
-            ),
-          ]),
-        ),
-      );
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Shows [child] when unlocked, else the unlock card.
@@ -77,7 +117,11 @@ class Unlocked extends ConsumerWidget {
   const Unlocked({super.key, required this.child});
   final Widget child;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => ref.watch(unlockedProvider)
+  Widget build(BuildContext context, WidgetRef ref) =>
+      ref.watch(unlockedProvider)
       ? child
-      : ListView(padding: const EdgeInsets.all(16), children: const [UnlockCard()]);
+      : ListView(
+          padding: const EdgeInsets.all(16),
+          children: const [UnlockCard()],
+        );
 }

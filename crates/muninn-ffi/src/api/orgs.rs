@@ -1574,6 +1574,75 @@ pub fn org_sign_in(org: String, site: String) -> anyhow::Result<String> {
     Ok(format!("{site}{path}?auth={}", host::query_escape(&h)))
 }
 
+/// A site a peer announced.
+pub struct AnnouncedSite {
+    pub peer: String,
+    pub slug: String,
+    pub name: String,
+    pub urls: Vec<String>,
+    pub open: bool,
+}
+
+/// Sites peers have announced (`mnnn org announced`).
+pub fn org_announced() -> anyhow::Result<Vec<AnnouncedSite>> {
+    let store = open()?;
+    let mut out = Vec::new();
+    for (a, c) in org::announce::received(&store)? {
+        out.push(AnnouncedSite { peer: a.peer, slug: c.slug, name: c.name, urls: c.urls, open: c.open });
+    }
+    Ok(out)
+}
+
+fn announce_lines(name: &str, r: &org::announce::Report) -> Vec<String> {
+    if let Some(why) = &r.skipped {
+        return vec![format!("{name} not announced: {why}")];
+    }
+    let mut v = Vec::new();
+    if !r.sent.is_empty() {
+        v.push(format!("{name} announced to {}", r.sent.join(", ")));
+    }
+    for (to, e) in &r.failed {
+        v.push(format!("{name}: {to} did not hear it: {e}"));
+    }
+    if v.is_empty() {
+        v.push(format!("{name}: nothing to tell"));
+    }
+    v
+}
+
+/// `mnnn org announce`. An empty org announces every hosted org. `closed` announces the site as shut.
+pub fn org_announce(home: Option<String>, org_key: String, closed: bool) -> anyhow::Result<Vec<String>> {
+    let p = paths(home.clone())?;
+    let running = host::running(&p.home);
+    if running.is_none() && !closed {
+        anyhow::bail!("the site is not running; start it, or announce it closed");
+    }
+    let store = open_write()?;
+    let prefs = prefs_of(&p.home);
+    let addr = running.map(|f| f.addr).unwrap_or_default();
+    let held = crate::hold::hold_node(home)?;
+    let key = org_key.trim();
+    let orgs: Vec<Org> = if key.is_empty() { store.orgs()?.into_iter().filter(|o| o.hosted).collect() } else { vec![store.find_org(key)?] };
+    if orgs.is_empty() {
+        anyhow::bail!("no org is hosted");
+    }
+    let mut lines = Vec::new();
+    for o in orgs {
+        let u = org::announce::urls(
+            &store,
+            &o,
+            &org::announce::bind_of(&addr, &prefs.hosting.bind),
+            org::announce::port_of(&addr, prefs.hosting.port),
+            &prefs.hosting.names,
+            &prefs.net.external_addresses,
+        )?;
+        let c = org::announce::card(&store, &o, u, !closed)?;
+        let r = org::announce::announce(&store, held.node(), &o, &c, &prefs.net.relays)?;
+        lines.extend(announce_lines(&o.name, &r));
+    }
+    Ok(lines)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -167,6 +167,55 @@ pub fn mcp_remove_client(client: String) -> anyhow::Result<String> {
     Ok(format!("removed {}", c.name))
 }
 
+/// A client just added. `token` is shown once and is not stored in Dart.
+pub struct McpClientAdded {
+    pub name: String,
+    pub role: String,
+    pub token: String,
+}
+
+pub(crate) fn mcp_add_server_of(store: &Store, name: &str, url: &str, command: &str, token: &str) -> anyhow::Result<String> {
+    let mut sec = muninn_core::store::Secrets::default();
+    if !token.is_empty() {
+        sec.headers.insert("Authorization".into(), format!("Bearer {}", token.trim()));
+    }
+    let s = if !url.trim().is_empty() {
+        store.add_mcp_server(name.trim(), "http", "", &[], url.trim(), &sec)?
+    } else {
+        let mut parts = command.split_whitespace();
+        let Some(cmd) = parts.next() else {
+            anyhow::bail!("give a URL, or the server command");
+        };
+        let args: Vec<String> = parts.map(str::to_string).collect();
+        store.add_mcp_server(name.trim(), "stdio", cmd, &args, "", &sec)?
+    };
+    store.note_action(
+        &NewAction::new("mcp.server.add", ORIGIN, format!("add MCP server {} ({})", s.name, s.transport))
+            .params(json!({ "server": s.id, "name": s.name, "transport": s.transport, "credentials": s.secrets.names() })),
+    );
+    Ok(format!("added MCP server {} ({})", s.name, s.transport))
+}
+
+/// `mnnn mcp add`. The bearer token is stored in Rust and does not come back.
+pub fn mcp_add_server(name: String, url: String, command: String, token: String) -> anyhow::Result<String> {
+    mcp_add_server_of(&open_write()?, &name, &url, &command, &token)
+}
+
+pub(crate) fn mcp_add_client_of(store: &Store, name: &str, role: &str) -> anyhow::Result<McpClientAdded> {
+    let role = if role.trim().is_empty() { "read" } else { role.trim() };
+    let (c, token) = store.add_mcp_client(name.trim(), McpRole::parse(role)?)?;
+    store.note_action(
+        &NewAction::new("mcp.client.add", ORIGIN, format!("add MCP client {} ({})", c.name, c.role.as_str()))
+            .params(json!({ "client": c.name, "role": c.role.as_str() })),
+    );
+    Ok(McpClientAdded { name: c.name, role: c.role.as_str().into(), token })
+}
+
+/// `mnnn mcp client add`. The token is returned once; it is not logged.
+pub fn mcp_add_client(name: String, role: String) -> anyhow::Result<McpClientAdded> {
+    mcp_add_client_of(&open_write()?, &name, &role)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,5 +247,20 @@ mod tests {
         let list_blob = format!("{:?}", clients);
         assert!(!list_blob.contains(&token), "{list_blob}");
         let _ = (srv, c, blob);
+    }
+
+    #[test]
+    fn add_server_and_client_keep_the_token_out_of_the_listing() {
+        let s = Store::open_in_memory().unwrap();
+        let added = mcp_add_server_of(&s, "docs", "https://example.com/mcp", "", "tok").unwrap();
+        assert!(added.contains("docs"));
+        assert!(mcp_add_server_of(&s, "local", "", "", "").is_err());
+        let client = mcp_add_client_of(&s, "editor", "read").unwrap();
+        assert_eq!(client.role, "read");
+        assert!(!client.token.is_empty());
+        let listed = mcp_servers_of(&s).unwrap();
+        assert!(listed[0].credentials.iter().any(|c| c.contains("Authorization")));
+        assert!(!format!("{listed:?}").contains("tok"));
+        assert!(!format!("{:?}", mcp_clients_of(&s).unwrap()).contains(&client.token));
     }
 }

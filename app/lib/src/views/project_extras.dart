@@ -15,6 +15,32 @@ import '../theme/muninn_theme.dart';
 import '../time_range.dart';
 import 'journal_extras.dart';
 
+Future<String?> _askName(BuildContext context, String title) {
+  final c = TextEditingController();
+  final m = context.muninn;
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: m.bg,
+      title: Text(title, style: TextStyle(color: m.header)),
+      content: TextField(
+        controller: c,
+        decoration: const InputDecoration(labelText: 'Name'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, c.text),
+          child: const Text('Create'),
+        ),
+      ],
+    ),
+  );
+}
+
 void _ok(BuildContext context, String msg, {Color? color}) {
   ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
@@ -2447,7 +2473,16 @@ class _AddProjectItemDialogState extends ConsumerState<_AddProjectItemDialog> {
   bool running = false;
   String? error;
 
-  static const kinds = ['journal', 'search', 'report', 'rule', 'model', 'code'];
+  static const kinds = [
+    'journal',
+    'search',
+    'report',
+    'rule',
+    'model',
+    'code',
+    'space',
+    'pipeline',
+  ];
 
   @override
   void dispose() {
@@ -2523,6 +2558,35 @@ class _AddProjectItemDialogState extends ConsumerState<_AddProjectItemDialog> {
               key: const ValueKey('project-add-key'),
               controller: keyCtl,
               decoration: const InputDecoration(labelText: 'Name or id'),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const ValueKey('project-add-new'),
+                onPressed: running
+                    ? null
+                    : () async {
+                        final name = await _askName(context, 'New $kind');
+                        if (name == null ||
+                            name.trim().isEmpty ||
+                            !context.mounted) {
+                          return;
+                        }
+                        try {
+                          final created = await ref
+                              .read(apiProvider)
+                              .shareCreateProjectItem(kind, name.trim());
+                          setState(
+                            () => keyCtl.text = created.itemName.isEmpty
+                                ? name.trim()
+                                : created.itemName,
+                          );
+                        } catch (e) {
+                          setState(() => error = e.toString());
+                        }
+                      },
+                child: Text('+ New $kind…'),
+              ),
             ),
             if (error != null) ...[
               const SizedBox(height: 12),

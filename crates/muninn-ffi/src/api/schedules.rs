@@ -445,6 +445,81 @@ pub fn schedule_edit(
     Ok(info(&store, &s))
 }
 
+pub struct SchedulePreview {
+    pub lines: Vec<String>,
+    pub runs_remaining: String,
+}
+
+/// `mnnn schedule parse`: what the timing means, without saving. [runs_remaining]
+/// is `no end`, a count, or `10000+` when a cron end is far away.
+#[allow(clippy::too_many_arguments)]
+pub fn schedule_parse(
+    run_every: Option<String>,
+    cron: Option<String>,
+    start_at: Option<String>,
+    ends_at: Option<String>,
+    for_: Option<String>,
+    tz: Option<String>,
+    past_next: bool,
+) -> anyhow::Result<SchedulePreview> {
+    let now = muninn_core::store::now_ms();
+    let mut s =
+        muninn_core::store::ScheduleDef { name: "parse".into(), target_kind: "ruleset".into(), enabled: true, created_at: now, ..Default::default() };
+    schedule::apply_timing(&mut s, &timing_of(run_every, cron, start_at, ends_at, for_, tz, past_next), now)?;
+    let mut lines = schedule::describe(&s);
+    let mut t = s.next_run_at;
+    for _ in 0..3 {
+        let Some(n) = schedule::step(&s, t).filter(|n| s.ends_at.is_none_or(|e| *n < e)) else { break };
+        lines.push(format!("then   {}", schedule::show_time(n, s.tz.as_deref())));
+        t = n;
+    }
+    let runs_remaining = match s.ends_at {
+        None => "no end".into(),
+        Some(en) => {
+            let mut n = 0i64;
+            let mut cur = Some(s.next_run_at);
+            let mut capped = false;
+            while let Some(t) = cur.filter(|t| *t < en) {
+                n += 1;
+                if n >= 10_000 {
+                    capped = true;
+                    break;
+                }
+                cur = schedule::step(&s, t);
+            }
+            if capped { "10000+".into() } else { n.to_string() }
+        }
+    };
+    if s.is_once() {
+        lines.push("ends   auto (once)".into());
+    } else if s.ends_at.is_some() {
+        lines.push(format!("runs remaining: {runs_remaining}"));
+    }
+    Ok(SchedulePreview { lines, runs_remaining })
+}
+
+/// `mnnn ruleset run NAME` (records a manual schedule action, then runs the set).
+pub fn ruleset_run(ruleset: String) -> anyhow::Result<Vec<String>> {
+    let store = open_write()?;
+    let r = store.find_ruleset(&ruleset)?;
+    let aid = store.record_action(
+        &NewAction::new(muninn_core::rules::SCHEDULE, ORIGIN, format!("run rule set {}", r.name))
+            .params(json!({ "ruleset": r.id, "name": r.name, "manual": true })),
+    )?;
+    let a = store.action(aid)?.ok_or_else(|| anyhow::anyhow!("action #{aid} is gone"))?;
+    let res = schedule::run_ruleset(&store, &r.id, &a)?;
+    let mut lines = res.messages;
+    lines.push(format!(
+        "ran {} rule(s){}",
+        res.ran.len(),
+        if res.failed.is_empty() { String::new() } else { format!(", failed: {}", res.failed.join(", ")) }
+    ));
+    if !res.failed.is_empty() {
+        anyhow::bail!(lines.join("\n"));
+    }
+    Ok(lines)
+}
+
 /// `mnnn schedule remove KEY`.
 pub fn schedule_remove(key: String) -> anyhow::Result<String> {
     let store = open_write()?;

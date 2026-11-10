@@ -28,11 +28,12 @@ Users never need Rust: release builds ship the compiled library.
 ## What it does
 
 - **Header:** the raven (themed) and the big MUNINN wordmark, as on the website.
-- **Desktop menus:** File, View, Data, Projects, Net, Orgs, Keys, Theme, Help, like the TUI.
+  Preferences sets the size to auto, compact or large (`[tui] header`, shared with the TUI).
+- **Desktop menus:** File, View, Data, Projects, Code, Plug, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
-  File ▸ Import…, Export…, Preferences… and Quit are wired, as is Projects ▸ New project… /
-  Live searches… / Journals… / New journal… / Reports… / Import archive… / Code spaces… / Pipes (live)… / Pipelines… / Plugins (by kind)… / Rules… / Rule sets… / Schedules… / Reviews… / Notifications… / Create then share… and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Nodes / Peers / Peers, messages & live / MCP / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site, Keys ▸ Status… plus Initialize, Rotate,
-  Rekey, Export, Recover and Re-issue shards, and Data ▸ Sources… / Symbols…. Help ▸ Topics / Search / Keybindings open the
+  File ▸ Import…, Export…, Backup ▸ Create… (Restore stays `mnnn backup restore`), Preferences… and Quit are wired, as is Projects ▸ New project… /
+  Live searches… / Journals… / New journal… / Reports… / Code spaces… / Rules… / Rule sets… / Schedules… / Reviews… / Notifications… / Create then share…, Code ▸ Code… / Code spaces… / Migrate… / Live pipes… / Pipelines…, Plug ▸ Parsers / Transforms / Analysis / Ingest connectors / All plugins / Install plugin…, and Net ▸ Status / Start / Stop / Settings / Connections / Invite or connect / Offer token… / Accept token… / Nodes / Peers / Peers, messages & live / MCP / Relays / Shared / Network search / Broadcast / Dark shards, Orgs ▸ Organizations… / New organization… / Join… / Apply… / Browse… / Certificates… / Let's Encrypt… / Start site / Stop site / Announce site… / Announced sites…, Keys ▸ Status… plus Initialize, Rotate,
+  Rekey, Export, Recover (words, shards, or a shard backup) and Re-issue shards, and Data ▸ Sources… / Symbols… / Filters / Sort / Coverage & gaps…. Theme ▸ Edit current…, New from current…, Import… and Export… edit both variants. Help ▸ Topics / Search / Keybindings open the
   same embedded docs as `mnnn help` and the TUI.
   Keyboard shortcuts match the [TUI](keybindings.md) for every action the app has
   (see [Keybindings](#keybindings) below).
@@ -79,9 +80,11 @@ Users never need Rust: release builds ship the compiled library.
 - **Time range:** as in the TUI it applies to every view. The chips above every section
   show it (`from …` / `to …`, × removes an end); click **Time range**, press `T`, or use
   **Data ▸ Filters ▸ Time range…** to open the picker: a date and a time (UTC) for
-  *from* and *to*, either end left open. **Clear** (or **Data ▸ Filters ▸ Clear time
-  range**, or `X`) shows everything. Datasets with no bars in the range are hidden. The range is
-  saved as the TUI's sidebar filter (`[tui.sidebar.filters]` from/to), so it is shared.
+  *from* and *to*, either end left open. The same Filters menu sets source, symbol,
+  price, period and year, **Sort** sets year or name and asc/desc, and
+  **Coverage & gaps…** lists missing bars. **Clear all** (or `X`) clears the time
+  range and those filters. Datasets that do not match are hidden. The filters are
+  saved as the TUI's sidebar filter (`[tui.sidebar]`), so they are shared.
 - **Saved state:** the theme, the time range and the dataset open in Data
   (`[app] dataset`) are restored on launch. Locking keeps the dataset; it shows again
   after the next unlock. Reading never creates `preferences.toml`; the first change does.
@@ -123,14 +126,26 @@ Users never need Rust: release builds ship the compiled library.
   copy`). **Export** writes PDF, Word, HTML, LaTeX, text or JSON to a path
   (`mnnn journal export`); **Import journal** reads a JSON export (`mnnn journal
   import`); **Print** saves a PDF and can send it to `lp`/`lpr` (`mnnn journal
-  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (`mnnn search save|edit`, TUI `w`), apply a series search to Data (TUI Enter), and rename, fork or delete it (`mnnn search fork|remove`). Shift+F opens Live searches, matching the TUI's `F`. Applying a journals or records search opens a found-views list (TUI Enter on those targets); a series search still applies to Data. Tapping a found record opens the Models pane on that model and record (TUI Data ▸ Model designer… / `D`). The Models pane creates designs, adds, edits, drops and reorders fields as a draft, restores a dropped field with the same id (TUI `u`), imports and exports templates (`builtin:bars` or a `.template.json` file), creates, edits, deletes and bulk-updates records, previews and applies migrations (with confirmation when values would be lost), discards a draft, shows version history and rollback, and attaches, tests, dry-runs or runs model-owned rules on the last history action (`mnnn model` / `mnnn rule create --model`). **Reports** create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI `v` / `mnnn report preview`) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI `E` / `mnnn report export`). File bytes stay in Rust. **Code spaces** list, create
+  print` / TUI `P`). File bytes stay in Rust. **Searches** save a live search (query, target and the full sidebar filters: sources, symbols, periods, years, time range, price, sort), refine or overwrite one (`mnnn search save|edit`, TUI `w`), apply a series search to Data (TUI Enter), and rename, fork or delete it (`mnnn search fork|remove`). Shift+F opens Live searches, matching the TUI's `F`. Applying a journals or records search opens a found-views list (TUI Enter on those targets); a series search still applies to Data. Tapping a found record opens the Models pane on that model and record (TUI Data ▸ Model designer… / `D`). The Models pane creates designs, adds, edits, drops and reorders fields as a draft, restores a dropped field with the same id (TUI `u`), imports and exports templates (`builtin:bars` or a `.template.json` file), creates, edits, deletes and bulk-updates records, previews and applies migrations (with confirmation when values would be lost), discards a draft, shows version history and rollback, and attaches, tests, dry-runs or runs model-owned rules on the last history action (`mnnn model` / `mnnn rule create --model`). **Reports** create (optionally attached to a project), rename, describe and delete reports, add, edit, move or remove text, records, authors, journal, project, series, code and model sections, preview a report as text (TUI `v` / `mnnn report preview`) and export PDF, Word, HTML, LaTeX, text, JSON or CSV to a path (TUI `E` / `mnnn report export`). File bytes stay in Rust.   **Code** (Code ▸ Code…) lists single code units: create
   (from a language template, another space or a built-in parser), edit source and
   input, approve, check, build, run and remove (`mnnn code` / TUI Code, `C`).
+  **Code spaces** (Code ▸ Code spaces…, and the Spaces chip) are collections:
+  a kind, a main and members (`mnnn spaces`). Open a space for its members
+  (make main, pin or unpin, add or remove code), approve the line-up, enable
+  or disable, run the main, or remove the space (its code stays). **Migrate…**
+  (and the banner the first time code is not in a space) shows a dry run, then
+  writes a backup and creates the spaces (`mnnn migrate`). Unclear kinds are
+  skipped unless you set one. Later dismisses the banner. **Plug** lists the
+  same spaces by kind, with Info… (`mnnn plugins info`) and enable or disable.
+  **Install plugin…** takes a library path or an existing code name
+  (`mnnn plugins install`); **Remove** drops the plugin unless a schedule
+  still uses it.
   Built-in parsers can be listed and installed (`mnnn code parsers --install`).
   **Give to org…** (the TUI Code window `g`) assigns a space to an organization
-  you own (`mnnn org resource add`); members pull it with Sync code. Piping a
-  prior step into a space (`>`) and writing the plugin SDK stay
-  in the TUI or CLI. **Result tile…** (TUI `T`) opens a Data workspace tile (`code:SPACE`) with the space’s latest run as a table. **Pipes** show live
+  you own (`mnnn org resource add`); members pull it with Sync code. **Pipe result…**
+  sends that code unit's last run into another code unit, a code space, a journal,
+  a model, a project, an org, or the network (`>`). Writing the plugin SDK stays
+  in the CLI. **Result tile…** (TUI `T`) opens a Data workspace tile (`code:SPACE`) with the space’s latest run as a table. **Pipes** show live
   and recent runs from history (the TUI Pipes window) and run a pipe
   (`mnnn pipe SOURCE STEP… [--to TARGET]`). Source `-` is standard input: paste
   the text or choose a file (Rust reads the bytes), with the CLI's `--format`
@@ -174,17 +189,20 @@ Users never need Rust: release builds ship the compiled library.
   entrust from a key file, check that gathered shards restore this database's key,
   drop a held shard), MCP servers and clients (`mnnn mcp` / TUI Net ▸ MCP…: list
   servers and clients, show a server's tools, approve or withdraw a tool, change a
-  client's role, revoke, restore or remove; tokens and credential values stay in
-  Rust, and adding a server or client stays `mnnn mcp add` / `mnnn mcp client add`),
-  and Peers, messages & live (TUI `W`: list stored conversations and live sessions,
-  mark messages read). Sending a message or hosting/joining a live session needs the
-  node worker and stays in the TUI. The node identity, exchange offer/answer tokens, shard blobs
-  and the master key stay in Rust. Short codes and fingerprints are meant to be read
-  aloud, as in the TUI. On a phone the node uses the same platform-secure app sandbox
-  the store already uses. Creating or accepting a raw exchange token
-  (the hidden CLI; the TUI and app use invite links instead), and restoring a key
-  from shards or a backup when this database cannot open (`mnnn net shard` /
-  `mnnn keys recover`) stay in the CLI.
+  client's role, revoke, restore or remove, and add a server or client — `mnnn mcp add`
+  / `mnnn mcp client add`; a bearer token stays in Rust and a new client token is
+  shown once), and Peers, messages & live (TUI `W`: list stored conversations and
+  live sessions, mark messages read, send a message, host a live session and join
+  one you were invited to). Sending, hosting and joining use the running node when
+  this app started it, otherwise a short-lived node. The node identity, exchange
+  offer/answer tokens, shard blobs and the master key stay in Rust. Short codes and
+  fingerprints are meant to be read aloud, as in the TUI. On a phone the node uses
+  the same platform-secure app sandbox the store already uses. **Offer token…** and
+  **Accept token…** are `mnnn net exchange create|accept`; the raw token or answer
+  is shown once when it was not delivered. Restoring a key from words, from shards
+  you hold, or from a shard backup when this database cannot open is on the unlock
+  card and on Keys (`mnnn keys recover` / `mnnn net shard restore`). Words are not
+  printed.
 - **Orgs:** list and detail like `mnnn org list` / `mnnn org show` (and the TUI's
   Organizations and Joined pages), plus the write flows those surfaces already have:
   create (`mnnn org create` / New organization), edit (name, slug, description,
@@ -214,10 +232,14 @@ Users never need Rust: release builds ship the compiled library.
   / `mnnn org call`). **Org projects** attach, detach and add a member
   (`mnnn org project`). **Code serve** lists spaces this node runs for the org and
   can start or stop one (`mnnn org code`). **Sign in** mints a one-time browser
-  link to a joined org's site (`mnnn org sign-in`, valid five minutes). Announcing
-  sites and listing announced `sites` stay in the TUI or CLI.
+  link to a joined org's site (`mnnn org sign-in`, valid five minutes). **Announce…**
+  tells peers about a hosted site, or every hosted site, including a closed
+  announcement when the site is not running (`mnnn org announce`). **Announced sites…**
+  lists what peers have announced.
 - **Keys:** status like `mnnn keys status`, plus the write flows the CLI provides
-  (Initialize, Rotate, Rekey, Export, Recover from words or shards, Re-issue shards).
+  (Initialize, Rotate, Rekey, Export, Recover from words or shards, restore from a
+  shard backup, Re-issue shards). The same recover actions are on the unlock card,
+  so they work when the database will not open.
   It uses the same data dir as the store (on a phone, the platform-secure app sandbox;
   on desktop, the TUI home). Status shows whether keys are initialized, the database id,
   the database path, the current service-key version, and each on-disk service key as
@@ -264,13 +286,13 @@ when a hardware keyboard is attached.
 | key | action |
 |-----|--------|
 | `T` | time range picker |
-| `X` | clear the time range (the TUI's "clear all" filters; the app's filter is the time range) |
+| `X` | clear every sidebar filter, including the time range |
 | F5 | refresh |
 | `?`, F1 | Help for the current section (the embedded docs) |
 | `i` | File ▸ Import… |
 | `P` | Projects |
 | `K` | Net status |
-| `W` | Peers, messages & live (stored messages and sessions; sending and joining stay in the TUI) |
+| `W` | Peers, messages & live (stored messages and sessions, plus send, host and join) |
 | `G` | Organizations |
 | `C` | Code spaces (Shift+C; lowercase `c` on the chart still toggles candles) |
 | `E` | Pipelines (Shift+E; lowercase `e` on the chart still toggles the envelope) |

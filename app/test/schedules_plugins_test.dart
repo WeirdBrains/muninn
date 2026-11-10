@@ -60,7 +60,7 @@ void main() {
   testWidgets('Plugins menu lists by kind', (t) async {
     final (_, c) = await pump(t);
     await unlock(t);
-    await t.tap(find.text('Projects'));
+    await t.tap(find.text('Plug'));
     await t.pumpAndSettle();
     await t.ensureVisible(find.text('Parsers…'));
     await t.tap(find.text('Parsers…'));

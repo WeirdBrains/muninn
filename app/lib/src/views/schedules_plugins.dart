@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
+import 'shared_actions.dart';
 
 void _ok(BuildContext context, String msg, {Color? color}) {
   ScaffoldMessenger.of(context)
@@ -105,13 +106,24 @@ class PluginsPane extends ConsumerWidget {
             ],
           ),
         ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton(
+            key: const ValueKey('plugin-install-open'),
+            onPressed: () => showPluginInstallDialog(context, ref),
+            child: const Text('Install plugin…'),
+          ),
+        ),
+        const SizedBox(height: 8),
         Text(
-          'Plugins are code spaces by kind (TUI Plugins menu). Enable or disable them here; open Code spaces to edit source.',
+          'Plugins are code spaces by kind. Install one from a library or an existing code name, then review and approve it. A schedule that uses a plugin refuses removal.',
           style: TextStyle(color: m.muted),
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: ref.watch(pluginsProvider).when(
+          child: ref
+              .watch(pluginsProvider)
+              .when(
                 loading: () => const LinearProgressIndicator(),
                 error: (e, _) => Text('$e', style: TextStyle(color: m.error)),
                 data: (items) {
@@ -159,10 +171,43 @@ class PluginsPane extends ConsumerWidget {
                                     ),
                                   );
                                   refreshProjectExtras(ref);
+                                } else if (v == 'info') {
+                                  final d = await ref
+                                      .read(apiProvider)
+                                      .pluginInfo(p.name);
+                                  if (context.mounted) {
+                                    await _showLines(context, d.name, [
+                                      'kind ${d.kind}',
+                                      'main ${d.main} (${d.lang})',
+                                      if (d.library.isNotEmpty)
+                                        'library ${d.library}',
+                                      if (d.declared.isNotEmpty)
+                                        'declares ${d.declared}',
+                                      '${d.members} member(s)',
+                                      d.approved ? 'approved' : 'not approved',
+                                      d.enabled ? 'enabled' : 'disabled',
+                                      'used by: ${d.usedBy.isEmpty ? 'nothing yet' : d.usedBy.join(', ')}',
+                                      if (d.problem.isNotEmpty)
+                                        'problem: ${d.problem}',
+                                    ]);
+                                  }
                                 } else if (v == 'open') {
-                                  ref
-                                      .read(projectPaneProvider.notifier)
-                                      .state = ProjectPane.code;
+                                  ref.read(projectPaneProvider.notifier).state =
+                                      ProjectPane.spaces;
+                                } else if (v == 'remove') {
+                                  if (!context.mounted) return;
+                                  if (!await _confirm(
+                                    context,
+                                    'Remove plugin',
+                                    'Remove ${p.name}? A schedule that uses it will refuse.',
+                                  )) {
+                                    return;
+                                  }
+                                  final msg = await ref
+                                      .read(apiProvider)
+                                      .collectionRemove(p.name);
+                                  refreshProjectExtras(ref);
+                                  if (context.mounted) _ok(context, msg);
                                 }
                               } catch (e) {
                                 if (context.mounted) {
@@ -172,8 +217,12 @@ class PluginsPane extends ConsumerWidget {
                             },
                             itemBuilder: (_) => [
                               const PopupMenuItem(
+                                value: 'info',
+                                child: Text('Info…'),
+                              ),
+                              const PopupMenuItem(
                                 value: 'open',
-                                child: Text('Open in Code…'),
+                                child: Text('Open members…'),
                               ),
                               if (!p.enabled)
                                 const PopupMenuItem(
@@ -190,6 +239,10 @@ class PluginsPane extends ConsumerWidget {
                                   value: 'schedule',
                                   child: Text('Schedule…'),
                                 ),
+                              const PopupMenuItem(
+                                value: 'remove',
+                                child: Text('Remove'),
+                              ),
                             ],
                           ),
                         ),
@@ -224,7 +277,9 @@ class RulesetsPane extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: ref.watch(rulesetsProvider).when(
+          child: ref
+              .watch(rulesetsProvider)
+              .when(
                 loading: () => const LinearProgressIndicator(),
                 error: (e, _) => Text('$e', style: TextStyle(color: m.error)),
                 data: (items) {
@@ -241,9 +296,7 @@ class RulesetsPane extends ConsumerWidget {
                         ListTile(
                           key: ValueKey('ruleset-${r.id}'),
                           contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            '${r.name}${r.enabled ? '' : ' (off)'}',
-                          ),
+                          title: Text('${r.name}${r.enabled ? '' : ' (off)'}'),
                           subtitle: Text(
                             [
                               r.ownerKind,
@@ -257,10 +310,9 @@ class RulesetsPane extends ConsumerWidget {
                             onSelected: (v) async {
                               try {
                                 if (v == 'enable' || v == 'disable') {
-                                  await ref.read(apiProvider).rulesetEdit(
-                                        r.id,
-                                        enable: v == 'enable',
-                                      );
+                                  await ref
+                                      .read(apiProvider)
+                                      .rulesetEdit(r.id, enable: v == 'enable');
                                   refreshProjectExtras(ref);
                                 } else if (v == 'remove') {
                                   if (!await _confirm(
@@ -275,6 +327,24 @@ class RulesetsPane extends ConsumerWidget {
                                       .rulesetRemove(r.id, force: true);
                                   refreshProjectExtras(ref);
                                   if (context.mounted) _ok(context, msg);
+                                } else if (v == 'rules') {
+                                  await showDialog<void>(
+                                    context: context,
+                                    builder: (ctx) =>
+                                        _RulesetRulesDialog(set: r),
+                                  );
+                                  refreshProjectExtras(ref);
+                                } else if (v == 'run') {
+                                  final lines = await ref
+                                      .read(apiProvider)
+                                      .rulesetRun(r.id);
+                                  if (context.mounted) {
+                                    await _showLines(
+                                      context,
+                                      'Run ${r.name}',
+                                      lines,
+                                    );
+                                  }
                                 } else if (v == 'schedule') {
                                   await showDialog<bool>(
                                     context: context,
@@ -294,6 +364,14 @@ class RulesetsPane extends ConsumerWidget {
                               PopupMenuItem(
                                 value: r.enabled ? 'disable' : 'enable',
                                 child: Text(r.enabled ? 'Disable' : 'Enable'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'rules',
+                                child: Text('Rules…'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'run',
+                                child: Text('Run'),
                               ),
                               const PopupMenuItem(
                                 value: 'schedule',
@@ -349,7 +427,9 @@ class SchedulesPane extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: ref.watch(schedulesProvider).when(
+          child: ref
+              .watch(schedulesProvider)
+              .when(
                 loading: () => const LinearProgressIndicator(),
                 error: (e, _) => Text('$e', style: TextStyle(color: m.error)),
                 data: (items) {
@@ -366,9 +446,7 @@ class SchedulesPane extends ConsumerWidget {
                         ListTile(
                           key: ValueKey('schedule-${s.id}'),
                           contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            '${s.name}${s.enabled ? '' : ' (off)'}',
-                          ),
+                          title: Text('${s.name}${s.enabled ? '' : ' (off)'}'),
                           subtitle: Text(
                             [
                               '${s.targetKind} ${s.target}',
@@ -394,8 +472,7 @@ class SchedulesPane extends ConsumerWidget {
                               ),
                               PopupMenuItem(
                                 value: s.enabled ? 'disable' : 'enable',
-                                child:
-                                    Text(s.enabled ? 'Disable' : 'Enable'),
+                                child: Text(s.enabled ? 'Disable' : 'Enable'),
                               ),
                               const PopupMenuItem(
                                 value: 'remove',
@@ -471,11 +548,7 @@ Future<void> _scheduleAction(
         await ref.read(apiProvider).scheduleSetEnabled(s.id, v == 'enable');
         refreshProjectExtras(ref);
       case 'remove':
-        if (!await _confirm(
-          context,
-          'Remove schedule',
-          'Remove ${s.name}?',
-        )) {
+        if (!await _confirm(context, 'Remove schedule', 'Remove ${s.name}?')) {
           return;
         }
         final msg = await ref.read(apiProvider).scheduleRemove(s.id);
@@ -484,6 +557,167 @@ Future<void> _scheduleAction(
     }
   } catch (e) {
     if (context.mounted) _ok(context, '$e', color: m.error);
+  }
+}
+
+Future<void> _showLines(
+  BuildContext context,
+  String title,
+  List<String> lines,
+) async {
+  final m = context.muninn;
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: m.bg,
+      title: Text(title, style: TextStyle(color: m.header)),
+      content: SingleChildScrollView(
+        child: Text(lines.isEmpty ? '(no output)' : lines.join('\n')),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _RulesetRulesDialog extends ConsumerStatefulWidget {
+  const _RulesetRulesDialog({required this.set});
+  final RulesetInfo set;
+  @override
+  ConsumerState<_RulesetRulesDialog> createState() =>
+      _RulesetRulesDialogState();
+}
+
+class _RulesetRulesDialogState extends ConsumerState<_RulesetRulesDialog> {
+  late List<String> _rules = List.of(widget.set.rules);
+  final _add = TextEditingController();
+  var _busy = false;
+
+  @override
+  void dispose() {
+    _add.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    final all = await ref.read(apiProvider).rulesetsList();
+    RulesetInfo? cur;
+    for (final r in all) {
+      if (r.id == widget.set.id) cur = r;
+    }
+    if (cur != null && mounted) setState(() => _rules = List.of(cur!.rules));
+  }
+
+  Future<void> _go(Future<void> Function() call) async {
+    final m = context.muninn;
+    setState(() => _busy = true);
+    try {
+      await call();
+      await _reload();
+    } catch (e) {
+      if (mounted) _ok(context, '$e', color: m.error);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.muninn;
+    return AlertDialog(
+      backgroundColor: m.bg,
+      title: Text(
+        '${widget.set.name} · rules',
+        style: TextStyle(color: m.header),
+      ),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < _rules.length; i++)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_rules[i]),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Earlier',
+                      onPressed: _busy || i == 0
+                          ? null
+                          : () => _go(() async {
+                              await ref
+                                  .read(apiProvider)
+                                  .rulesetAddRule(
+                                    widget.set.id,
+                                    _rules[i],
+                                    position: i,
+                                  );
+                            }),
+                      icon: const Icon(Icons.arrow_upward),
+                    ),
+                    IconButton(
+                      tooltip: 'Later',
+                      onPressed: _busy || i == _rules.length - 1
+                          ? null
+                          : () => _go(() async {
+                              await ref
+                                  .read(apiProvider)
+                                  .rulesetAddRule(
+                                    widget.set.id,
+                                    _rules[i],
+                                    position: i + 2,
+                                  );
+                            }),
+                      icon: const Icon(Icons.arrow_downward),
+                    ),
+                    IconButton(
+                      tooltip: 'Drop',
+                      onPressed: _busy
+                          ? null
+                          : () => _go(() async {
+                              await ref
+                                  .read(apiProvider)
+                                  .rulesetDropRule(widget.set.id, _rules[i]);
+                            }),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+            TextField(
+              key: const ValueKey('ruleset-add-rule'),
+              controller: _add,
+              decoration: const InputDecoration(labelText: 'Add rule (name)'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+        TextButton(
+          onPressed: _busy
+              ? null
+              : () => _go(() async {
+                  final name = _add.text.trim();
+                  if (name.isEmpty) return;
+                  await ref
+                      .read(apiProvider)
+                      .rulesetAddRule(widget.set.id, name);
+                  _add.clear();
+                }),
+          child: const Text('Add'),
+        ),
+      ],
+    );
   }
 }
 
@@ -553,7 +787,9 @@ class _RulesetFormDialogState extends ConsumerState<_RulesetFormDialog> {
                         .map((s) => s.trim())
                         .where((s) => s.isNotEmpty)
                         .toList();
-                    await ref.read(apiProvider).rulesetCreate(
+                    await ref
+                        .read(apiProvider)
+                        .rulesetCreate(
                           _name.text.trim(),
                           description: _description.text.trim(),
                           rules: rules,
@@ -595,9 +831,16 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
   late final TextEditingController _repeat;
   late final TextEditingController _cron;
   late final TextEditingController _endsAt;
+  late final TextEditingController _for;
   late final TextEditingController _tz;
+  late final TextEditingController _pipeline;
+  late final TextEditingController _ruleset;
+  late final TextEditingController _options;
   var _targetKind = 'ruleset';
   var _mode = 'every'; // every | cron | once
+  var _overlap = 'skip';
+  var _catchUp = 'once';
+  var _preview = '';
   var _busy = false;
 
   @override
@@ -616,6 +859,9 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
       _target = TextEditingController(text: e?.target ?? '');
     }
     _source = TextEditingController();
+    _pipeline = TextEditingController();
+    _ruleset = TextEditingController();
+    _options = TextEditingController();
     _startAt = TextEditingController();
     _repeat = TextEditingController(
       text: (e?.runEvery.isNotEmpty == true && e!.runEvery != 'once')
@@ -624,7 +870,12 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
     );
     _cron = TextEditingController(text: e?.cron ?? '');
     _endsAt = TextEditingController();
-    _tz = TextEditingController(text: e?.tz.isNotEmpty == true ? e!.tz : 'local');
+    _for = TextEditingController();
+    _overlap = e?.overlap.isNotEmpty == true ? e!.overlap : 'skip';
+    _catchUp = e?.catchUp.isNotEmpty == true ? e!.catchUp : 'once';
+    _tz = TextEditingController(
+      text: e?.tz.isNotEmpty == true ? e!.tz : 'local',
+    );
     if (e != null) {
       if (e.cron.isNotEmpty) {
         _mode = 'cron';
@@ -645,7 +896,11 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
     _repeat.dispose();
     _cron.dispose();
     _endsAt.dispose();
+    _for.dispose();
     _tz.dispose();
+    _pipeline.dispose();
+    _ruleset.dispose();
+    _options.dispose();
     super.dispose();
   }
 
@@ -659,15 +914,24 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
         _ => null,
       };
       final cron = _mode == 'cron' ? _cron.text.trim() : null;
-      final startAt =
-          _startAt.text.trim().isEmpty ? null : _startAt.text.trim();
+      final startAt = _startAt.text.trim().isEmpty
+          ? null
+          : _startAt.text.trim();
       final endsAt = _endsAt.text.trim().isEmpty ? null : _endsAt.text.trim();
+      final for_ = _for.text.trim().isEmpty ? null : _for.text.trim();
       final tz = _tz.text.trim().isEmpty ? null : _tz.text.trim();
+      final options = _options.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
 
       if (widget.existing == null) {
         // Past-start prompt for new schedules.
         if (startAt != null && !pastNext) {
-          final check = await ref.read(apiProvider).schedulePastStart(
+          final check = await ref
+              .read(apiProvider)
+              .schedulePastStart(
                 runEvery: runEvery,
                 cron: cron,
                 startAt: startAt,
@@ -688,7 +952,9 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
             return;
           }
         }
-        await ref.read(apiProvider).scheduleAdd(
+        await ref
+            .read(apiProvider)
+            .scheduleAdd(
               name: _name.text.trim(),
               runEvery: runEvery,
               ruleset: _targetKind == 'ruleset' ? _target.text.trim() : null,
@@ -696,22 +962,37 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
               source: _targetKind == 'connector'
                   ? (_source.text.trim().isEmpty ? null : _source.text.trim())
                   : null,
+              pipeline: _pipeline.text.trim().isEmpty
+                  ? null
+                  : _pipeline.text.trim(),
+              connectorRuleset: _ruleset.text.trim().isEmpty
+                  ? null
+                  : _ruleset.text.trim(),
+              options: options,
               cron: cron,
               startAt: startAt,
               endsAt: endsAt,
+              for_: for_,
               tz: tz,
               pastNext: pastNext,
+              overlap: _overlap,
+              catchUp: _catchUp,
             );
       } else {
-        await ref.read(apiProvider).scheduleEdit(
+        await ref
+            .read(apiProvider)
+            .scheduleEdit(
               widget.existing!.id,
               name: _name.text.trim(),
               runEvery: runEvery,
               cron: cron,
               startAt: startAt,
               endsAt: endsAt,
+              for_: for_,
               tz: tz,
               pastNext: pastNext,
+              overlap: _overlap,
+              catchUp: _catchUp,
             );
       }
       if (mounted) Navigator.pop(context, true);
@@ -725,7 +1006,7 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
         );
         if (useNext) {
           await _save(pastNext: true);
-            return;
+          return;
         }
       }
       if (mounted) _ok(context, msg, color: m.error);
@@ -760,10 +1041,7 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
                   key: const ValueKey('schedule-target-kind'),
                   initialValue: _targetKind,
                   items: const [
-                    DropdownMenuItem(
-                      value: 'ruleset',
-                      child: Text('Rule set'),
-                    ),
+                    DropdownMenuItem(value: 'ruleset', child: Text('Rule set')),
                     DropdownMenuItem(
                       value: 'connector',
                       child: Text('Ingest connector'),
@@ -782,23 +1060,37 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
                         : 'Connector (plugin) name',
                   ),
                 ),
-                if (_targetKind == 'connector')
+                if (_targetKind == 'connector') ...[
                   TextField(
                     key: const ValueKey('schedule-source'),
                     controller: _source,
+                    decoration: const InputDecoration(labelText: 'Source name'),
+                  ),
+                  TextField(
+                    controller: _pipeline,
                     decoration: const InputDecoration(
-                      labelText: 'Source name',
+                      labelText: 'Pipeline (optional)',
                     ),
                   ),
+                  TextField(
+                    controller: _ruleset,
+                    decoration: const InputDecoration(
+                      labelText: 'Rule set the connector calls (optional)',
+                    ),
+                  ),
+                  TextField(
+                    controller: _options,
+                    decoration: const InputDecoration(
+                      labelText: 'Options key=value, comma-separated',
+                    ),
+                  ),
+                ],
               ],
               DropdownButtonFormField<String>(
                 key: const ValueKey('schedule-mode'),
                 initialValue: _mode,
                 items: const [
-                  DropdownMenuItem(
-                    value: 'every',
-                    child: Text('Repeat every'),
-                  ),
+                  DropdownMenuItem(value: 'every', child: Text('Repeat every')),
                   DropdownMenuItem(value: 'cron', child: Text('Cron')),
                   DropdownMenuItem(value: 'once', child: Text('Once')),
                 ],
@@ -828,7 +1120,7 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
                   labelText: 'Start at (tomorrow 9am, next monday…)',
                 ),
               ),
-              if (_mode != 'once')
+              if (_mode != 'once') ...[
                 TextField(
                   key: const ValueKey('schedule-ends'),
                   controller: _endsAt,
@@ -836,17 +1128,102 @@ class _ScheduleFormDialogState extends ConsumerState<_ScheduleFormDialog> {
                     labelText: 'Ends at (optional)',
                   ),
                 ),
+                TextField(
+                  key: const ValueKey('schedule-for'),
+                  controller: _for,
+                  decoration: const InputDecoration(
+                    labelText: 'Or for (2 weeks)',
+                  ),
+                ),
+              ] else
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('Ends at'),
+                  subtitle: Text('auto (once)'),
+                ),
+              DropdownButtonFormField<String>(
+                initialValue: _overlap,
+                items: const [
+                  DropdownMenuItem(value: 'skip', child: Text('Overlap: skip')),
+                  DropdownMenuItem(
+                    value: 'queue',
+                    child: Text('Overlap: queue'),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _overlap = v ?? 'skip'),
+                decoration: const InputDecoration(labelText: 'Overlap'),
+              ),
+              DropdownButtonFormField<String>(
+                initialValue: _catchUp,
+                items: const [
+                  DropdownMenuItem(
+                    value: 'once',
+                    child: Text('Catch up: once'),
+                  ),
+                  DropdownMenuItem(value: 'all', child: Text('Catch up: all')),
+                  DropdownMenuItem(
+                    value: 'none',
+                    child: Text('Catch up: none'),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _catchUp = v ?? 'once'),
+                decoration: const InputDecoration(labelText: 'Catch up'),
+              ),
               TextField(
                 controller: _tz,
                 decoration: const InputDecoration(
                   labelText: 'Time zone (local or IANA)',
                 ),
               ),
+              if (_preview.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _preview,
+                    key: const ValueKey('schedule-preview'),
+                  ),
+                ),
             ],
           ),
         ),
       ),
       actions: [
+        TextButton(
+          key: const ValueKey('schedule-preview-btn'),
+          onPressed: _busy
+              ? null
+              : () async {
+                  try {
+                    final runEvery = switch (_mode) {
+                      'once' => 'once',
+                      'every' => _repeat.text.trim(),
+                      _ => null,
+                    };
+                    final p = await ref
+                        .read(apiProvider)
+                        .scheduleParse(
+                          runEvery: runEvery,
+                          cron: _mode == 'cron' ? _cron.text.trim() : null,
+                          startAt: _startAt.text.trim().isEmpty
+                              ? null
+                              : _startAt.text.trim(),
+                          endsAt: _endsAt.text.trim().isEmpty
+                              ? null
+                              : _endsAt.text.trim(),
+                          for_: _for.text.trim().isEmpty
+                              ? null
+                              : _for.text.trim(),
+                          tz: _tz.text.trim().isEmpty ? null : _tz.text.trim(),
+                        );
+                    if (mounted) {
+                      setState(() => _preview = p.lines.join('\n'));
+                    }
+                  } catch (e) {
+                    if (mounted) setState(() => _preview = '$e');
+                  }
+                },
+          child: const Text('Preview'),
+        ),
         TextButton(
           onPressed: _busy ? null : () => Navigator.pop(context, false),
           child: const Text('Cancel'),

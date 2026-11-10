@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `apply_pipe_format`, `approve_if_needed`, `approve_pipe_spaces`, `chunk_frames`, `code_spaces_of`, `edge_spec`, `frame_cell`, `graph_lines`, `hash16`, `latest_pipe_frame_of`, `live_pipes_of`, `node_spec`, `nonempty`, `parse_lang`, `pipe_result`, `pipe_run_of`, `pipeline_end_in_model_of`, `pipeline_info`, `pipeline_monitor_of`, `pipeline_run_of`, `pipeline_run_once`, `pipeline_tee_of`, `pipelines_of`, `plugins_of`, `run_result`, `scope_label`, `source_from`, `space_info`, `stdin_body`, `strs`
+// These functions are ignored because they are not marked as `pub`: `apply_pipe_format`, `approve_if_needed`, `approve_pipe_spaces`, `chunk_frames`, `code_pipe_targets_of`, `code_pipe_to_of`, `code_spaces_of`, `edge_spec`, `frame_cell`, `graph_lines`, `hash16`, `latest_pipe_frame_of`, `live_pipes_of`, `node_spec`, `nonempty`, `parse_lang`, `pipe_result`, `pipe_run_of`, `pipeline_end_in_model_of`, `pipeline_info`, `pipeline_monitor_of`, `pipeline_run_of`, `pipeline_run_once`, `pipeline_tee_of`, `pipelines_of`, `plugin_install_of`, `plugins_of`, `run_result`, `scope_label`, `source_from`, `space_info`, `stdin_body`, `strs`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`, `fmt`
 
 /// `mnnn code list` / TUI Code spaces….
@@ -247,6 +247,32 @@ Future<String> pluginSetEnabled({
 }) => RustLib.instance.api.crateApiCodePluginSetEnabled(
   name: name,
   enabled: enabled,
+);
+
+/// `mnnn plugins install PATH|CODE --kind KIND`.
+Future<String> pluginInstall({
+  required String what,
+  required String kind,
+  required String name,
+}) => RustLib.instance.api.crateApiCodePluginInstall(
+  what: what,
+  kind: kind,
+  name: name,
+);
+
+/// Targets for piping a code unit's last result onward.
+Future<List<PipeTarget>> codePipeTargets({required String space}) =>
+    RustLib.instance.api.crateApiCodeCodePipeTargets(space: space);
+
+/// Pipe the code unit's last result into another code unit, a code space, or a save (`>`).
+Future<String> codePipeTo({
+  required String space,
+  required String kind,
+  required String name,
+}) => RustLib.instance.api.crateApiCodeCodePipeTo(
+  space: space,
+  kind: kind,
+  name: name,
 );
 
 class CodeParserInfo {
@@ -527,6 +553,25 @@ class PipeRunResult {
           hops == other.hops &&
           saved == other.saved &&
           lines == other.lines;
+}
+
+/// One place the last run of a code unit can go (`>` in the TUI Code window).
+class PipeTarget {
+  final String kind;
+  final String name;
+
+  const PipeTarget({required this.kind, required this.name});
+
+  @override
+  int get hashCode => kind.hashCode ^ name.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PipeTarget &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          name == other.name;
 }
 
 class PipelineInfo {

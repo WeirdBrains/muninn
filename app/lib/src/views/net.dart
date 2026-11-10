@@ -12,6 +12,7 @@ import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
 import 'net_collab.dart';
+import 'shared_actions.dart';
 import 'net_mcp.dart';
 import '../time_range.dart';
 import 'net_dialogs.dart';
@@ -1140,7 +1141,7 @@ class _ExchangesPane extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 Text(
-                  'Key exchanges (Nodes). Invite tokens stay in Rust. Short codes are meant to be read aloud. Export or restore writes an age-encrypted backup; keys stay in Rust.',
+                  'Key exchanges (Nodes). An offer or answer token is shown once when it was not delivered. Short codes are meant to be read aloud. Export or restore writes an age-encrypted backup; keys stay in Rust.',
                   style: TextStyle(color: m.muted),
                 ),
                 const SizedBox(height: 12),
@@ -1153,6 +1154,16 @@ class _ExchangesPane extends ConsumerWidget {
                           showNetInviteOrConnectDialog(context, ref),
                       icon: const Icon(Icons.link),
                       label: const Text('Invite or connect…'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('net-exchange-offer-open'),
+                      onPressed: () => showExchangeOfferDialog(context, ref),
+                      child: const Text('Offer token…'),
+                    ),
+                    OutlinedButton(
+                      key: const ValueKey('net-exchange-accept-open'),
+                      onPressed: () => showExchangeAcceptDialog(context, ref),
+                      child: const Text('Accept token…'),
                     ),
                     OutlinedButton(
                       key: const ValueKey('net-exchange-export'),
@@ -1416,7 +1427,7 @@ class _ShardsPane extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 Text(
-                  'Dark shards split your master key across trusted nodes. The key file and shard password stay in Rust; sealed blobs never leave it. Restoring a key when this database cannot open stays in the CLI.',
+                  'Dark shards split your master key across trusted nodes. The key file and shard password stay in Rust; sealed blobs never leave it. A backup file restores the key when this database will not open.',
                   style: TextStyle(color: m.muted),
                 ),
                 const SizedBox(height: 12),
@@ -1424,6 +1435,12 @@ class _ShardsPane extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    OutlinedButton(
+                      key: const ValueKey('net-shard-backup'),
+                      onPressed: () =>
+                          showShardBackupRestoreDialog(context, ref),
+                      child: const Text('Restore from backup…'),
+                    ),
                     FilledButton.icon(
                       key: const ValueKey('net-shard-entrust'),
                       onPressed: () => showNetShardEntrustDialog(context, ref),

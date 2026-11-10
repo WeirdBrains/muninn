@@ -7,7 +7,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ## [Unreleased]
 
 ### Changed
-- Flutter app: FRB bindings for share/schedules/plugins; Plugins-by-kind, rule sets, schedules (new/edit form), code space share/export/import, create-then-share pickers
+- Flutter app: Code and Plug menus; code-space collections (members, main, pin, migrate); plugin info, install and remove; rule-set membership and run; schedule preview with for / overlap / catch-up; + New… on project, org, and net share pickers; backup create; data filters, sort and coverage; theme edit, new, import and export; header size; MCP add; site announce; exchange offer and accept; shard-backup key restore; live send, host and join; pipe a code result
 - Create-then-share: net `--create-to` / **+ New exchange…** offers a key exchange; review `--create` for every ReviewKind; `project add --create result SERIES` (series must exist); FFI `share_create_*`
 - Scheduler liveness: continuous only when the same holder wrote the last tick within 120s (quick restart across a deadline is a miss, not a fire)
 - Scheduler: missed one-offs skip on restart after the deadline (daemon-alive vs cold gap), not a 60s grace; `rule edit --every/--cron` migrates onto schedules; `once` ends_at_input is `auto (once)`

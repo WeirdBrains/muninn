@@ -1,5 +1,4 @@
-/// TUI `W`: stored peer messages and live sessions. Sending a message or
-/// joining a live session needs the node worker and stays in the TUI.
+/// TUI `W`: stored peer messages and live sessions, plus send, host and join.
 library;
 
 import 'package:flutter/material.dart';
@@ -8,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme/muninn_theme.dart';
+import 'shared_actions.dart';
 
 void _ok(BuildContext context, String msg, {Color? color}) {
   ScaffoldMessenger.of(context)
@@ -26,8 +26,30 @@ class CollabPane extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         Text(
-          'Peers, messages and live sessions (TUI W). This lists what the store already holds. Sending a message or hosting/joining a live session needs the node worker and stays in the TUI.',
+          'Peers, messages and live sessions. Sending, hosting and joining use the running node when it is up, otherwise a short-lived one.',
           style: TextStyle(color: m.muted),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton(
+              key: const ValueKey('collab-send-open'),
+              onPressed: () => showCollabSendDialog(context, ref),
+              child: const Text('Send…'),
+            ),
+            OutlinedButton(
+              key: const ValueKey('collab-host-open'),
+              onPressed: () => showCollabHostDialog(context, ref),
+              child: const Text('Host live…'),
+            ),
+            OutlinedButton(
+              key: const ValueKey('collab-join-open'),
+              onPressed: () => showCollabJoinDialog(context, ref),
+              child: const Text('Join live…'),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Row(

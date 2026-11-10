@@ -77,6 +77,8 @@ class DatasetList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final m = context.muninn;
     final range = ref.watch(timeRangeProvider);
+    final filters = ref.watch(dataFiltersProvider);
+    final spans = ref.watch(metricSpansProvider).value ?? const {};
     final sel = ref.watch(selectedDatasetProvider);
     return ref
         .watch(overviewProvider)
@@ -85,14 +87,17 @@ class DatasetList extends ConsumerWidget {
           error: (e, _) => Text('$e', style: TextStyle(color: m.error)),
           data: (o) {
             final all = o?.datasets ?? const <Dataset>[];
-            final shown = all.where((d) => d.overlaps(range)).toList();
+            final shown = all.where((d) {
+              if (!d.overlaps(range)) return false;
+              return filters.matches(d, spans[d.key]);
+            }).toList()..sort(filters.compare);
             if (shown.isEmpty) {
               return Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
                   all.isEmpty
                       ? 'No bars yet: `mnnn ingest path DIR`'
-                      : 'No dataset has bars in this time range',
+                      : 'No dataset matches these filters',
                   style: TextStyle(color: m.muted),
                 ),
               );

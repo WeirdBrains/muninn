@@ -8,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'about_dialog.dart';
-import 'api.dart';
 import 'io_dialogs.dart';
 import 'shortcuts.dart';
 import 'logo.dart';
@@ -17,6 +16,10 @@ import 'state.dart';
 import 'theme/muninn_theme.dart';
 import 'time_range.dart';
 import 'views/catalog.dart';
+import 'views/backup.dart';
+import 'views/collections.dart';
+import 'views/filters.dart';
+import 'views/theme_editor.dart';
 import 'views/project_compute.dart';
 import 'views/schedules_plugins.dart';
 import 'views/create_then_share.dart';
@@ -31,6 +34,7 @@ import 'views/orgs_dialogs.dart';
 import 'views/orgs_rest.dart';
 import 'views/keys.dart';
 import 'views/keys_dialogs.dart';
+import 'views/shared_actions.dart';
 import 'views/net_dialogs.dart';
 import 'views/project_extras.dart';
 import 'views/projects.dart';
@@ -39,6 +43,13 @@ import 'tiling_extras.dart';
 
 /// Widths below this use the phone layout.
 const phoneBreakpoint = 720.0;
+
+/// TUI header size. `auto` is compact on a phone and large on a wide window.
+bool headerCompact(String mode, {required bool phone}) => switch (mode) {
+  'compact' => true,
+  'large' => false,
+  _ => phone,
+};
 
 class AppShell extends ConsumerWidget {
   const AppShell({super.key});
@@ -49,9 +60,14 @@ class AppShell extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, c) {
         final phone = c.maxWidth < phoneBreakpoint;
+        final compact = headerCompact(
+          ref.watch(headerModeProvider),
+          phone: phone,
+        );
         final body = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const MigrateBanner(),
             const RangeBar(),
             Expanded(child: sectionView(section)),
           ],
@@ -60,11 +76,11 @@ class AppShell extends ConsumerWidget {
           return MuninnShortcuts(
             child: Scaffold(
               appBar: AppBar(
-                toolbarHeight: 64,
-                title: const FittedBox(
+                toolbarHeight: compact ? 64 : 96,
+                title: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: _Brand(compact: true),
+                  child: _Brand(compact: compact),
                 ),
                 actions: [
                   PopupMenuButton<String>(
@@ -75,6 +91,8 @@ class AppShell extends ConsumerWidget {
                       if (v == 'export') showExportDialog(context, ref);
                       if (v == 'prefs') showPreferencesDialog(context, ref);
                       if (v == 'lock') lockStore(ref);
+                      if (v == 'backup') showBackupCreate(context, ref);
+                      if (v == 'restore') showBackupRestore(context);
                     },
                     itemBuilder: (_) => const [
                       PopupMenuItem(value: 'import', child: Text('Import…')),
@@ -84,6 +102,11 @@ class AppShell extends ConsumerWidget {
                         child: Text('Preferences…'),
                       ),
                       PopupMenuItem(value: 'lock', child: Text('Lock')),
+                      PopupMenuItem(value: 'backup', child: Text('Backup…')),
+                      PopupMenuItem(
+                        value: 'restore',
+                        child: Text('Restore backup…'),
+                      ),
                     ],
                   ),
                   IconButton(
@@ -137,7 +160,7 @@ class AppShell extends ConsumerWidget {
             body: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _Header(),
+                _Header(compact: compact),
                 const MuninnMenuBar(),
                 Expanded(child: body),
               ],
@@ -170,7 +193,8 @@ Widget sectionView(Section s) => switch (s) {
 
 /// The website's bombastic header: the raven and a huge gradient wordmark.
 class _Header extends ConsumerWidget {
-  const _Header();
+  const _Header({required this.compact});
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -183,7 +207,7 @@ class _Header extends ConsumerWidget {
         ),
         border: Border(bottom: BorderSide(color: m.border)),
       ),
-      child: const _Brand(compact: false),
+      child: _Brand(compact: compact),
     );
   }
 }
@@ -257,12 +281,13 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
       String label,
       List<Widget> children, {
       MenuController? controller,
+      String? accelerator,
     }) => SubmenuButton(
       controller: controller,
       menuChildren: children,
       child: DefaultTextStyle.merge(
         style: const TextStyle(fontWeight: FontWeight.w600),
-        child: MenuAcceleratorLabel('&$label'),
+        child: MenuAcceleratorLabel(accelerator ?? '&$label'),
       ),
     );
     final names = ref.watch(themeNamesProvider).value ?? const <String>[];
@@ -278,6 +303,13 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
             const SingleActivator(LogicalKeyboardKey.keyI),
           ),
           item('Export…', () => showExportDialog(context, ref)),
+          SubmenuButton(
+            menuChildren: [
+              item('Create…', () => showBackupCreate(context, ref)),
+              item('Restore…', () => showBackupRestore(context)),
+            ],
+            child: const Text('Backup'),
+          ),
           item('Preferences…', () => showPreferencesDialog(context, ref)),
           item(
             'Authors…',
@@ -484,6 +516,8 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           item('Datasets', () => go(Section.data)),
           SubmenuButton(
             menuChildren: [
+              item('Source…', () => showSourceFilter(context, ref)),
+              item('Symbol…', () => showSymbolFilter(context, ref)),
               MenuItemButton(
                 shortcut: const SingleActivator(
                   LogicalKeyboardKey.keyT,
@@ -492,15 +526,29 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
                 onPressed: () => showTimeRangePicker(context, ref),
                 child: const Text('Time range…'),
               ),
+              item('Price…', () => showPriceFilter(context, ref)),
+              item('Period…', () => showPeriodFilter(context, ref)),
+              item('Year…', () => showYearFilter(context, ref)),
               item(
-                'Clear time range',
-                () =>
-                    ref.read(timeRangeProvider.notifier).state = TimeRange.all,
+                'Clear all',
+                () => clearDataFilters(ref),
                 const SingleActivator(LogicalKeyboardKey.keyX, shift: true),
               ),
             ],
             child: const Text('Filters'),
           ),
+          SubmenuButton(
+            menuChildren: [
+              item('Year', () => setSort(ref, sort: 'year')),
+              item('Name', () => setSort(ref, sort: 'name')),
+              item('Asc/Desc', () {
+                final cur = ref.read(dataFiltersProvider);
+                setSort(ref, desc: !cur.desc);
+              }),
+            ],
+            child: const Text('Sort'),
+          ),
+          item('Coverage & gaps…', () => showCoverage(context, ref)),
           item('Sources…', () => showSourcesDialog(context, ref)),
           item('Symbols…', () => showSymbolsDialog(context, ref)),
           item('Models…', () {
@@ -538,21 +586,9 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           item('New report…', () => showNewReportDialog(context, ref)),
           item('Import archive…', () => showImportProjectDialog(context, ref)),
           item('Code spaces…', () {
-            ref.read(projectPaneProvider.notifier).state = ProjectPane.code;
-            go(Section.projects);
-          }, const SingleActivator(LogicalKeyboardKey.keyC, shift: true)),
-          item('New code space…', () => showNewCodeSpaceDialog(context, ref)),
-          item('Pipes (live)…', () {
-            ref.read(projectPaneProvider.notifier).state = ProjectPane.pipes;
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.spaces;
             go(Section.projects);
           }),
-          item('Run a pipe…', () => showRunPipeDialog(context, ref)),
-          item('Pipelines…', () {
-            ref.read(projectPaneProvider.notifier).state =
-                ProjectPane.pipelines;
-            go(Section.projects);
-          }, const SingleActivator(LogicalKeyboardKey.keyE, shift: true)),
-          item('New pipeline…', () => showNewPipelineDialog(context, ref)),
           item('Rules…', () {
             ref.read(projectPaneProvider.notifier).state = ProjectPane.rules;
             go(Section.projects);
@@ -564,19 +600,18 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           }),
           item('New rule set…', () => showNewRulesetDialog(context, ref)),
           item('Schedules…', () {
-            ref.read(projectPaneProvider.notifier).state = ProjectPane.schedules;
+            ref.read(projectPaneProvider.notifier).state =
+                ProjectPane.schedules;
             go(Section.projects);
           }),
           item('New schedule…', () => showNewScheduleDialog(context, ref)),
-          item('Create then share…', () => showCreateThenShareDialog(context, ref)),
-          item('+ New review subject…', () => showCreateReviewSubjectDialog(context, ref)),
-          item('Plugins…', () => showPluginsPane(context, ref)),
-          item('Parsers…', () => showPluginsPane(context, ref, kind: 'parser')),
-          item('Transforms…', () => showPluginsPane(context, ref, kind: 'transform')),
-          item('Analysis…', () => showPluginsPane(context, ref, kind: 'analysis')),
           item(
-            'Ingest connectors…',
-            () => showPluginsPane(context, ref, kind: 'ingest-connector'),
+            'Create then share…',
+            () => showCreateThenShareDialog(context, ref),
+          ),
+          item(
+            '+ New review subject…',
+            () => showCreateReviewSubjectDialog(context, ref),
           ),
           item('Reviews…', () {
             ref.read(projectPaneProvider.notifier).state = ProjectPane.reviews;
@@ -593,6 +628,47 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
             () => showSendNotificationDialog(context, ref),
           ),
         ]),
+        menu('Code', [
+          item('Code…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.code;
+            go(Section.projects);
+          }, const SingleActivator(LogicalKeyboardKey.keyC, shift: true)),
+          item('New code…', () => showNewCodeSpaceDialog(context, ref)),
+          item('Code spaces…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.spaces;
+            go(Section.projects);
+          }),
+          item('New code space…', () => showNewCollectionDialog(context, ref)),
+          item('Migrate…', () => showMigrateDialog(context, ref)),
+          item('Live pipes…', () {
+            ref.read(projectPaneProvider.notifier).state = ProjectPane.pipes;
+            go(Section.projects);
+          }),
+          item('Run a pipe…', () => showRunPipeDialog(context, ref)),
+          item('Pipelines…', () {
+            ref.read(projectPaneProvider.notifier).state =
+                ProjectPane.pipelines;
+            go(Section.projects);
+          }, const SingleActivator(LogicalKeyboardKey.keyE, shift: true)),
+          item('New pipeline…', () => showNewPipelineDialog(context, ref)),
+        ]),
+        menu('Plug', [
+          item('Parsers…', () => showPluginsPane(context, ref, kind: 'parser')),
+          item(
+            'Transforms…',
+            () => showPluginsPane(context, ref, kind: 'transform'),
+          ),
+          item(
+            'Analysis…',
+            () => showPluginsPane(context, ref, kind: 'analysis'),
+          ),
+          item(
+            'Ingest connectors…',
+            () => showPluginsPane(context, ref, kind: 'ingest-connector'),
+          ),
+          item('All plugins…', () => showPluginsPane(context, ref)),
+          item('Install plugin…', () => showPluginInstallDialog(context, ref)),
+        ], accelerator: 'P&lug'),
         menu('Net', [
           item('Status…', () {
             ref.read(netPaneProvider.notifier).state = NetPane.node;
@@ -616,6 +692,8 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
             'Invite or connect…',
             () => showNetInviteOrConnectDialog(context, ref),
           ),
+          item('Offer token…', () => showExchangeOfferDialog(context, ref)),
+          item('Accept token…', () => showExchangeAcceptDialog(context, ref)),
           item('Nodes…', () {
             ref.read(netPaneProvider.notifier).state = NetPane.exchanges;
             go(Section.net);
@@ -672,6 +750,11 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
           item('Let\'s Encrypt…', () => showOrgNodeAcmeDialog(context, ref)),
           item('Start site', () => orgHostStart(context, ref)),
           item('Stop site', () => orgHostStop(context, ref)),
+          item('Announce site…', () => showOrgAnnounceDialog(context, ref)),
+          item(
+            'Announced sites…',
+            () => showAnnouncedSitesDialog(context, ref),
+          ),
         ]),
         menu('Keys', [
           item('Status…', () => go(Section.keys)),
@@ -689,6 +772,10 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
               item(
                 'From shards',
                 () => showKeysRecoverShardsDialog(context, ref),
+              ),
+              item(
+                'From a shard backup',
+                () => showShardBackupRestoreDialog(context, ref),
               ),
             ],
             child: const Text('Recover'),
@@ -721,6 +808,14 @@ class _MuninnMenuBarState extends ConsumerState<MuninnMenuBar> {
                   ref.read(themeSelectionProvider.notifier).setMode(mode),
               child: Text('Mode: $mode'),
             ),
+          const Divider(),
+          item('Edit current…', () => showThemeEditor(context, ref)),
+          item(
+            'New from current…',
+            () => showThemeEditor(context, ref, saveAs: true),
+          ),
+          item('Import…', () => importTheme(context, ref)),
+          item('Export…', () => exportTheme(context, ref)),
         ]),
         menu('Help', [
           item(

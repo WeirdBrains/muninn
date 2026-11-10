@@ -482,14 +482,68 @@ Future<void> showOrgAddResourceDialog(
   WidgetRef ref,
   OrgInfo org,
 ) async {
+  final kindCtl = TextEditingController(text: 'journal');
+  final nameCtl = TextEditingController();
   final v = await showDialog<String>(
     context: context,
-    builder: (ctx) => const _FieldDialog(
-      title: 'Give the org',
-      hint: 'kind name (e.g. journal Field notes)',
-      keyName: 'org-add-resource',
-    ),
+    builder: (ctx) {
+      final m = ctx.muninn;
+      return AlertDialog(
+        backgroundColor: m.bg,
+        title: Text('Give the org', style: TextStyle(color: m.header)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: kindCtl,
+              decoration: const InputDecoration(labelText: 'Kind'),
+            ),
+            TextField(
+              key: const ValueKey('org-add-resource'),
+              controller: nameCtl,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              final k = kindCtl.text.trim();
+              final n = nameCtl.text.trim();
+              if (k.isEmpty || n.isEmpty) return;
+              try {
+                final created = await ref
+                    .read(apiProvider)
+                    .shareCreateItem(k, n);
+                if (ctx.mounted) {
+                  Navigator.pop(
+                    ctx,
+                    '${created.createdItemKind} ${created.createdItemName}',
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) _snack(context, '$e', error: true);
+              }
+            },
+            child: const Text('+ New…'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              ctx,
+              '${kindCtl.text.trim()} ${nameCtl.text.trim()}',
+            ),
+            child: const Text('Add'),
+          ),
+        ],
+      );
+    },
   );
+  kindCtl.dispose();
+  nameCtl.dispose();
   if (v == null || v.trim().isEmpty || !context.mounted) {
     return;
   }

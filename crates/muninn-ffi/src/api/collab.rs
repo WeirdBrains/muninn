@@ -1,8 +1,13 @@
 //! Peers, messages and live sessions (`mnnn peers` / TUI `W`). Exchange tokens stay
-//! in Rust. Sending a message or joining a live session needs the node worker and
-//! stays in the TUI; this lists what the store already holds.
-use super::data::open;
+//! in Rust. Sending, hosting and joining use the hosted node when the app started
+//! one, otherwise a short-lived node, the same way the TUI does.
+use super::data::{open, open_write};
+use crate::hold::hold_node;
+use muninn_core::collab::{self, msg as cmsg, peers as cpeers, session, wire};
+use muninn_core::net::identity;
 use muninn_core::store::Store;
+
+const ORIGIN: &str = "app";
 
 pub struct PeerMessageInfo {
     pub id: String,
@@ -79,6 +84,70 @@ pub fn peer_messages_mark_read(peer: Option<String>) -> anyhow::Result<String> {
 /// TUI `W` Live: sessions this node hosts or joined.
 pub fn live_sessions() -> anyhow::Result<Vec<LiveSessionInfo>> {
     live_sessions_of(&open()?)
+}
+
+/// Send a message to a peer (`mnnn peers` message).
+pub fn collab_send(home: Option<String>, peer: String, text: String) -> anyhow::Result<String> {
+    let text = text.trim();
+    if text.is_empty() {
+        anyhow::bail!("write the message");
+    }
+    let peer = peer.trim();
+    if peer.is_empty() {
+        anyhow::bail!("name the peer");
+    }
+    let store = open_write()?;
+    let held = hold_node(home)?;
+    let kp = identity::load_or_create(&store)?;
+    let x = wire::exchange_to(&store, peer, None)?;
+    let mode = collab::stream::mode(&held.prefs.net);
+    let t = wire::open(&store, held.node(), &x, &held.prefs.net.relays, mode);
+    let me = kp.public().to_peer_id().to_string();
+    let m = cmsg::send(&store, t.as_ref(), &x, &me, &held.label, None, text, ORIGIN)?;
+    Ok(if m.delivered_at.is_some() {
+        format!("delivered to {}", x.title())
+    } else {
+        format!("kept: {} is not reachable now; the running node keeps trying", x.title())
+    })
+}
+
+/// Host a live session and invite one peer. The running node answers guests.
+pub fn collab_host(peer: String, kind: String, key: String) -> anyhow::Result<String> {
+    let peer = peer.trim().to_string();
+    if peer.is_empty() {
+        anyhow::bail!("name the peer");
+    }
+    if kind.trim().is_empty() || key.trim().is_empty() {
+        anyhow::bail!("give the kind and the name (journal Notes, project Lab, code alpha)");
+    }
+    let store = open_write()?;
+    let kp = identity::load_or_create(&store)?;
+    let me = kp.public().to_peer_id().to_string();
+    let ls = session::host(&store, ORIGIN, &me, kind.trim(), key.trim(), std::slice::from_ref(&peer))?;
+    Ok(format!("hosting {} {} live (the running node answers guests)", ls.kind, ls.title))
+}
+
+/// Join a live session a peer invited you to.
+pub fn collab_join(home: Option<String>, peer: String, session_id: String) -> anyhow::Result<String> {
+    let peer = peer.trim();
+    let id = session_id.trim();
+    if peer.is_empty() || id.is_empty() {
+        anyhow::bail!("name the peer and the session");
+    }
+    let store = open_write()?;
+    let held = hold_node(home)?;
+    let x = wire::exchange_to(&store, peer, None)?;
+    let mode = collab::stream::mode(&held.prefs.net);
+    let relays = &held.prefs.net.relays;
+    let t = wire::open(&store, held.node(), &x, relays, mode);
+    let offers = cpeers::offers(t.as_ref())?;
+    if !offers["live"].as_array().into_iter().flatten().any(|o| o["session"] == id) {
+        anyhow::bail!("{} has not invited you to {id}", x.title());
+    }
+    let ls = session::joined(&store, id, peer, &x.id, &serde_json::json!({}))?;
+    let _ = session::sync_with(&store, &ls, vec![], |b| t.live(b))?;
+    let title = if ls.title.is_empty() { id.to_string() } else { ls.title.clone() };
+    Ok(format!("joined {} {title}", ls.kind))
 }
 
 #[cfg(test)]

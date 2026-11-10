@@ -198,7 +198,7 @@ class _MuninnShortcutsState extends ConsumerState<MuninnShortcuts> {
       return KeyEventResult.handled;
     }
     if (ch == 'X' || (key == LogicalKeyboardKey.keyX && shift)) {
-      ref.read(timeRangeProvider.notifier).state = TimeRange.all;
+      clearDataFilters(ref);
       return KeyEventResult.handled;
     }
     if (ch == 'P' || (key == LogicalKeyboardKey.keyP && shift)) {

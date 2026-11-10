@@ -237,6 +237,81 @@ class FakeApi implements MuninnApi {
   Future<List<ProjectSeries>> projectSeries(String projectId) async =>
       List<ProjectSeries>.from(seriesByProject[projectId] ?? const []);
 
+  DataFilters filters = const DataFilters();
+  String header = 'auto';
+  String? lastBackupDir;
+  String? lastSavedTheme;
+  String themeToml = 'name = "copy"\n';
+
+  @override
+  Future<DataFilters> sidebarFilters() async => filters;
+
+  @override
+  Future<void> saveSidebarFilters(DataFilters filters) async {
+    this.filters = filters;
+  }
+
+  @override
+  Future<String> headerMode() async => header;
+
+  @override
+  Future<void> saveHeaderMode(String mode) async {
+    header = mode;
+  }
+
+  @override
+  Future<List<CoverageInfo>> coverage() async => const [
+    CoverageInfo(
+      source: 'coinbase',
+      symbol: 'BTC/USD',
+      duration: '5m',
+      bars: 288,
+      missing: 0,
+      first: '2024-01-01 00:00:00',
+      last: '2024-01-01 23:55:00',
+    ),
+  ];
+
+  @override
+  Future<List<MetricSpanInfo>> metricSpans(
+    String metric,
+    TimeRange range,
+  ) async => const [
+    MetricSpanInfo(key: 'coinbase:BTC/USD:300', min: 10, max: 20),
+    MetricSpanInfo(key: 'binance:ETH/USDT:3600', min: 100, max: 200),
+  ];
+
+  @override
+  Future<String> backupCreate(String outDir, {String password = ''}) async {
+    lastBackupDir = outDir;
+    return '$outDir/muninn-backup.tar.zst';
+  }
+
+  @override
+  Future<ThemeEdit> themeDraft(String name) async => ThemeEdit(
+    name: name,
+    displayName: name,
+    dark: const {'bg': '#1a1b26', 'fg': '#c0caf5'},
+    light: const {'bg': '#eceff4', 'fg': '#2e3440'},
+  );
+
+  @override
+  Future<void> themeSave({
+    required String name,
+    required String displayName,
+    required String base,
+    required Map<String, String> dark,
+    required Map<String, String> light,
+  }) async {
+    lastSavedTheme = name;
+  }
+
+  @override
+  Future<String> themeImport(String toml) async => 'imported';
+
+  @override
+  Future<String> themeExport(String name) async => themeToml;
+
   @override
   Future<Project> createProject(String name, {String description = ''}) async {
     if (projectError != null) throw projectError!;
@@ -2426,6 +2501,54 @@ class FakeApi implements MuninnApi {
     return '${revoke ? "revoked" : "restored"} $client';
   }
 
+  String? lastMcpAdd;
+  String? lastPluginInstall;
+  String? lastPipe;
+  String? lastAnnounce;
+  String? lastOffer;
+  String? lastAccept;
+  String? lastShardRestore;
+  String? lastCollab;
+
+  @override
+  Future<String> mcpAddServer(
+    String name, {
+    String url = '',
+    String command = '',
+    String token = '',
+  }) async {
+    if (name.trim().isEmpty) throw 'give a name';
+    if (url.trim().isEmpty && command.trim().isEmpty) {
+      throw 'give a URL, or the server command';
+    }
+    lastMcpAdd = name;
+    mcpServerList = [
+      ...mcpServerList,
+      McpServerInfo(
+        id: name,
+        name: name,
+        transport: url.trim().isEmpty ? 'stdio' : 'http',
+        url: url,
+        command: command,
+        credentials: token.isEmpty ? const [] : const ['header Authorization'],
+      ),
+    ];
+    return 'added MCP server $name';
+  }
+
+  @override
+  Future<McpClientAdded> mcpAddClient(
+    String name, {
+    String role = 'read',
+  }) async {
+    lastMcpAdd = name;
+    mcpClientList = [
+      ...mcpClientList,
+      McpClientInfo(id: name, name: name, role: role),
+    ];
+    return McpClientAdded(name: name, role: role, token: 'client-token-$name');
+  }
+
   @override
   Future<String> mcpRemoveClient(String client) async {
     extraCalls.add('mcp-remove-client:$client');
@@ -2474,6 +2597,35 @@ class FakeApi implements MuninnApi {
   Future<List<LiveSessionInfo>> liveSessions() async => liveSessionList;
 
   @override
+  Future<String> collabSend(String peer, String text) async {
+    if (text.trim().isEmpty) throw 'write the message';
+    lastCollab = 'send:$peer';
+    return 'delivered to $peer';
+  }
+
+  @override
+  Future<String> collabHost(String peer, String kind, String key) async {
+    lastCollab = 'host:$peer:$kind:$key';
+    liveSessionList = [
+      ...liveSessionList,
+      LiveSessionInfo(
+        id: 's-$key',
+        kind: kind,
+        title: key,
+        role: 'host',
+        status: 'open',
+      ),
+    ];
+    return 'hosting $kind $key live';
+  }
+
+  @override
+  Future<String> collabJoin(String peer, String session) async {
+    lastCollab = 'join:$peer:$session';
+    return 'joined $session';
+  }
+
+  @override
   Future<String> pipelineExport(
     String pipeline,
     String path, {
@@ -2507,6 +2659,11 @@ class FakeApi implements MuninnApi {
   List<RulesetInfo> rulesetList = [];
   List<ScheduleInfo> scheduleList = [];
   List<PluginInfo> pluginList = [];
+  List<CollectionInfo> collectionList = [];
+  List<SpaceMemberInfo> memberList = [];
+  int migratePendingCount = 0;
+  bool migrateWasOffered = false;
+  MigrateReport migrateReport = const MigrateReport(dryRun: true);
   List<ScheduleRunInfo> scheduleRunList = [];
 
   List<ReviewInfo> reviewList = [];
@@ -3677,6 +3834,47 @@ class FakeApi implements MuninnApi {
   }
 
   @override
+  Future<ExchangeOnce> netExchangeOffer({
+    String label = '',
+    String peer = '',
+    int hours = 0,
+  }) async {
+    lastOffer = '$label:$peer:$hours';
+    return ExchangeOnce(
+      summary: 'give this offer to the other side',
+      token: 'offer-token',
+    );
+  }
+
+  @override
+  Future<ExchangeOnce> netExchangeAccept(
+    String token, {
+    String label = '',
+  }) async {
+    if (token.trim().isEmpty) throw 'paste the offer or answer token';
+    lastAccept = token;
+    return const ExchangeOnce(
+      summary: 'key exchange complete',
+      shortCode: '42',
+      answer: 'answer-token',
+    );
+  }
+
+  @override
+  Future<String> netShardRestore({
+    String backup = '',
+    String backupPassword = '',
+    required String shardPassword,
+    required String newPassword,
+    List<String> peers = const [],
+  }) async {
+    if (shardPassword.isEmpty) throw 'give the shard password';
+    if (newPassword.isEmpty) throw 'give the new Muninn password';
+    lastShardRestore = backup;
+    return 'master key restored; new password set';
+  }
+
+  @override
   Future<List<NetSearchOrigin>> netSearch(
     String saved, {
     List<String> only = const [],
@@ -4368,6 +4566,26 @@ class FakeApi implements MuninnApi {
   }
 
   @override
+  Future<List<String>> orgAnnounce({
+    String org = '',
+    bool closed = false,
+  }) async {
+    lastAnnounce = '$org:$closed';
+    return ['${org.isEmpty ? 'every hosted org' : org} announced'];
+  }
+
+  @override
+  Future<List<AnnouncedSiteInfo>> orgAnnounced() async => const [
+    AnnouncedSiteInfo(
+      peer: 'ben',
+      slug: 'lab',
+      name: 'Lab',
+      urls: ['https://lab.example'],
+      open: true,
+    ),
+  ];
+
+  @override
   Future<String> orgEndpointAdd(
     String org,
     String name,
@@ -4757,7 +4975,40 @@ class FakeApi implements MuninnApi {
   Future<List<PluginInfo>> pluginsList({String? kind}) async {
     final all = List.of(pluginList);
     if (kind == null || kind.isEmpty) return all;
-    return [for (final p in all) if (p.kind == kind) p];
+    return [
+      for (final p in all)
+        if (p.kind == kind) p,
+    ];
+  }
+
+  @override
+  Future<String> pluginInstall(
+    String what, {
+    required String kind,
+    String name = '',
+  }) async {
+    if (what.trim().isEmpty)
+      throw 'give a library path or an existing code name';
+    final n = name.trim().isEmpty ? what.trim() : name.trim();
+    lastPluginInstall = '$kind:$n';
+    pluginList = [
+      ...pluginList,
+      PluginInfo(name: n, kind: kind, main: what.trim()),
+    ];
+    return 'installed plugin $n ($kind); review and approve it';
+  }
+
+  @override
+  Future<List<PipeTargetInfo>> codePipeTargets(String space) async => const [
+    PipeTargetInfo(kind: 'journal', name: 'notes'),
+    PipeTargetInfo(kind: 'space', name: 'alpha-space'),
+    PipeTargetInfo(kind: 'net', name: 'all exchanges'),
+  ];
+
+  @override
+  Future<String> codePipeTo(String space, String kind, String name) async {
+    lastPipe = '$space>$kind:$name';
+    return 'piped $space into $name';
   }
 
   @override
@@ -4777,12 +5028,121 @@ class FakeApi implements MuninnApi {
   }
 
   @override
-  Future<String> spaceExport(String space, String path) async =>
-      'wrote $path';
+  Future<PluginDetail> pluginInfo(String name) async {
+    final p = pluginList.firstWhere(
+      (p) => p.name == name,
+      orElse: () => throw 'no plugin $name',
+    );
+    return PluginDetail(
+      name: p.name,
+      kind: p.kind,
+      lang: p.lang,
+      main: p.main,
+      approved: p.approved,
+      enabled: p.enabled,
+      members: 1,
+    );
+  }
 
   @override
-  Future<List<String>> spaceImportPlan(String path, {String? name}) async =>
-      ['would import from $path'];
+  Future<List<CollectionInfo>> collectionsList({String? kind}) async {
+    if (kind == null || kind.isEmpty) return List.of(collectionList);
+    return [
+      for (final c in collectionList)
+        if (c.kind == kind) c,
+    ];
+  }
+
+  @override
+  Future<List<SpaceMemberInfo>> collectionMembers(String space) async =>
+      List.of(memberList);
+
+  @override
+  Future<CollectionInfo> collectionCreate(
+    String name, {
+    String description = '',
+    required String kind,
+    required String main,
+  }) async {
+    final c = CollectionInfo(
+      id: 'sp-${collectionList.length + 1}',
+      name: name,
+      description: description,
+      kind: kind,
+      main: main,
+      members: 1,
+    );
+    collectionList.add(c);
+    return c;
+  }
+
+  @override
+  Future<String> collectionAdd(
+    String space,
+    String code, {
+    String? alias,
+    bool pin = false,
+  }) async => 'added $code to $space';
+
+  @override
+  Future<String> collectionRemoveCode(String space, String code) async =>
+      'removed $code from $space';
+
+  @override
+  Future<String> collectionSetMain(String space, String code) async =>
+      '$code is the main of $space';
+
+  @override
+  Future<String> collectionPin(
+    String space,
+    String code, {
+    required bool on,
+  }) async => '${on ? 'pinned' : 'unpinned'} $code in $space';
+
+  @override
+  Future<String> collectionApprove(String space) async => 'approved $space';
+
+  @override
+  Future<String> collectionSetEnabled(String space, bool enabled) async =>
+      '${enabled ? 'enabled' : 'disabled'} code space $space';
+
+  @override
+  Future<String> collectionRemove(String space) async {
+    collectionList.removeWhere((c) => c.id == space || c.name == space);
+    return 'removed code space $space';
+  }
+
+  @override
+  Future<CollectionRun> collectionRun(String space) async =>
+      CollectionRun(status: 'ok', lines: ['ran $space']);
+
+  @override
+  Future<int> migratePending() async => migratePendingCount;
+
+  @override
+  Future<bool> migrateOffered() async => migrateWasOffered;
+
+  @override
+  Future<void> migrateDismiss() async {
+    migrateWasOffered = true;
+  }
+
+  @override
+  Future<MigrateReport> migrateRun({
+    List<String> codes = const [],
+    String? kind,
+    bool dryRun = true,
+    bool rewritePipelines = true,
+    bool backup = true,
+  }) async => migrateReport;
+
+  @override
+  Future<String> spaceExport(String space, String path) async => 'wrote $path';
+
+  @override
+  Future<List<String>> spaceImportPlan(String path, {String? name}) async => [
+    'would import from $path',
+  ];
 
   @override
   Future<String> spaceImport(String path, {String? name}) async =>
@@ -4814,7 +5174,9 @@ class FakeApi implements MuninnApi {
     String? description,
     bool? enable,
   }) async {
-    final i = rulesetList.indexWhere((r) => r.id == ruleset || r.name == ruleset);
+    final i = rulesetList.indexWhere(
+      (r) => r.id == ruleset || r.name == ruleset,
+    );
     if (i < 0) throw 'no ruleset $ruleset';
     final r = rulesetList[i];
     final n = RulesetInfo(
@@ -4842,7 +5204,9 @@ class FakeApi implements MuninnApi {
     String rule, {
     int? position,
   }) async {
-    final i = rulesetList.indexWhere((r) => r.id == ruleset || r.name == ruleset);
+    final i = rulesetList.indexWhere(
+      (r) => r.id == ruleset || r.name == ruleset,
+    );
     if (i < 0) throw 'no ruleset $ruleset';
     final r = rulesetList[i];
     final rules = List<String>.of(r.rules)..add(rule);
@@ -4861,7 +5225,9 @@ class FakeApi implements MuninnApi {
 
   @override
   Future<RulesetInfo> rulesetDropRule(String ruleset, String rule) async {
-    final i = rulesetList.indexWhere((r) => r.id == ruleset || r.name == ruleset);
+    final i = rulesetList.indexWhere(
+      (r) => r.id == ruleset || r.name == ruleset,
+    );
     if (i < 0) throw 'no ruleset $ruleset';
     final r = rulesetList[i];
     final rules = List<String>.of(r.rules)..remove(rule);
@@ -4877,6 +5243,29 @@ class FakeApi implements MuninnApi {
     rulesetList[i] = n;
     return n;
   }
+
+  @override
+  Future<List<String>> rulesetRun(String ruleset) async => ['ran $ruleset'];
+
+  @override
+  Future<SchedulePreview> scheduleParse({
+    String? runEvery,
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+    bool pastNext = false,
+  }) async => SchedulePreview(
+    lines: [
+      if (runEvery == 'once') 'once at ${startAt ?? ''}',
+      if (runEvery != null && runEvery != 'once') 'every $runEvery',
+      if (cron != null) 'cron `$cron`',
+      if (for_ != null) 'for $for_',
+      'runs remaining: ${endsAt == null && for_ == null ? 'no end' : '3'}',
+    ],
+    runsRemaining: endsAt == null && for_ == null ? 'no end' : '3',
+  );
 
   @override
   Future<List<ScheduleInfo>> schedulesList() async => List.of(scheduleList);
@@ -4929,8 +5318,7 @@ class FakeApi implements MuninnApi {
     String? endsAt,
     String? for_,
     String? tz,
-  }) async =>
-      'ok';
+  }) async => 'ok';
 
   @override
   Future<ScheduleInfo> scheduleAdd({
@@ -5028,16 +5416,15 @@ class FakeApi implements MuninnApi {
     String? main,
     String? format,
     String? query,
-  }) async =>
-      ShareCreated(
-        createdItemKind: kind,
-        createdItemId: 'new-$name',
-        createdItemName: name,
-        summary: 'created $kind $name',
-        itemId: 'new-$name',
-        itemName: name,
-        newShare: true,
-      );
+  }) async => ShareCreated(
+    createdItemKind: kind,
+    createdItemId: 'new-$name',
+    createdItemName: name,
+    summary: 'created $kind $name',
+    itemId: 'new-$name',
+    itemName: name,
+    newShare: true,
+  );
 
   @override
   Future<ShareCreated> shareCreateThen({
@@ -5057,18 +5444,17 @@ class FakeApi implements MuninnApi {
     String? query,
     String? peer,
     int? hours,
-  }) async =>
-      ShareCreated(
-        createdItemKind: createItem ? kind : '',
-        createdItemName: createItem ? item : '',
-        createdToKind: createTo != null ? target : '',
-        createdToName: createTo ?? '',
-        summary: 'shared $item to $target',
-        itemName: item,
-        target: target,
-        to: createTo ?? (to.isEmpty ? '' : to.first),
-        newShare: true,
-      );
+  }) async => ShareCreated(
+    createdItemKind: createItem ? kind : '',
+    createdItemName: createItem ? item : '',
+    createdToKind: createTo != null ? target : '',
+    createdToName: createTo ?? '',
+    summary: 'shared $item to $target',
+    itemName: item,
+    target: target,
+    to: createTo ?? (to.isEmpty ? '' : to.first),
+    newShare: true,
+  );
 
   @override
   Future<ShareCreated> shareCreateReviewSubject(
@@ -5080,30 +5466,28 @@ class FakeApi implements MuninnApi {
     String? model,
     String? format,
     String? query,
-  }) async =>
-      ShareCreated(
-        createdItemKind: kind,
-        createdItemId: 'rev-$name',
-        createdItemName: name,
-        summary: 'created $kind $name',
-        itemId: 'rev-$name',
-        itemName: name,
-        newShare: true,
-      );
+  }) async => ShareCreated(
+    createdItemKind: kind,
+    createdItemId: 'rev-$name',
+    createdItemName: name,
+    summary: 'created $kind $name',
+    itemId: 'rev-$name',
+    itemName: name,
+    newShare: true,
+  );
 
   @override
   Future<ShareCreated> shareCreateProjectItem(
     String kind,
     String name, {
     String description = '',
-  }) async =>
-      ShareCreated(
-        createdItemKind: kind,
-        createdItemId: 'pi-$name',
-        createdItemName: name,
-        summary: 'created $kind $name',
-        itemId: 'pi-$name',
-        itemName: name,
-        newShare: true,
-      );
+  }) async => ShareCreated(
+    createdItemKind: kind,
+    createdItemId: 'pi-$name',
+    createdItemName: name,
+    summary: 'created $kind $name',
+    itemId: 'pi-$name',
+    itemName: name,
+    newShare: true,
+  );
 }

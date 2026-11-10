@@ -49,7 +49,8 @@ class _CreateThenShareDialog extends ConsumerStatefulWidget {
       _CreateThenShareDialogState();
 }
 
-class _CreateThenShareDialogState extends ConsumerState<_CreateThenShareDialog> {
+class _CreateThenShareDialogState
+    extends ConsumerState<_CreateThenShareDialog> {
   static const kinds = [
     'model',
     'search',
@@ -131,7 +132,9 @@ class _CreateThenShareDialogState extends ConsumerState<_CreateThenShareDialog> 
                 key: const ValueKey('cts-item'),
                 controller: _item,
                 decoration: InputDecoration(
-                  labelText: _createItem ? 'New item name' : 'Existing name or id',
+                  labelText: _createItem
+                      ? 'New item name'
+                      : 'Existing name or id',
                 ),
               ),
               DropdownButtonFormField<String>(
@@ -147,9 +150,7 @@ class _CreateThenShareDialogState extends ConsumerState<_CreateThenShareDialog> 
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(
-                  _target == 'net'
-                      ? '+ New exchange…'
-                      : '+ New $_target…',
+                  _target == 'net' ? '+ New exchange…' : '+ New $_target…',
                 ),
                 value: _createDest,
                 onChanged: (v) => setState(() => _createDest = v),
@@ -193,7 +194,9 @@ class _CreateThenShareDialogState extends ConsumerState<_CreateThenShareDialog> 
               : () async {
                   setState(() => _busy = true);
                   try {
-                    final created = await ref.read(apiProvider).shareCreateThen(
+                    final created = await ref
+                        .read(apiProvider)
+                        .shareCreateThen(
                           kind: _kind,
                           item: _item.text.trim(),
                           target: _target,
@@ -202,9 +205,7 @@ class _CreateThenShareDialogState extends ConsumerState<_CreateThenShareDialog> 
                               : [_to.text.trim()],
                           note: _note.text.trim(),
                           createItem: _createItem,
-                          createTo: _createDest
-                              ? _createTo.text.trim()
-                              : null,
+                          createTo: _createDest ? _createTo.text.trim() : null,
                         );
                     if (context.mounted) Navigator.pop(context, created);
                   } catch (e) {
@@ -278,18 +279,24 @@ Future<void> showCreateReviewSubjectDialog(
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () async {
               try {
-                final c = await ref.read(apiProvider).shareCreateReviewSubject(
+                final c = await ref
+                    .read(apiProvider)
+                    .shareCreateReviewSubject(
                       kind,
                       name.text.trim(),
                       journal: journal.text.trim().isEmpty
                           ? null
                           : journal.text.trim(),
-                      model:
-                          model.text.trim().isEmpty ? null : model.text.trim(),
+                      model: model.text.trim().isEmpty
+                          ? null
+                          : model.text.trim(),
                       body: body.text.trim().isEmpty ? null : body.text.trim(),
                     );
                 if (ctx.mounted) Navigator.pop(ctx, c);

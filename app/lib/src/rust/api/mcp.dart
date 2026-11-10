@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `client_info`, `find_client`, `find_server`, `mcp_clients_of`, `mcp_servers_of`, `server_info`
+// These functions are ignored because they are not marked as `pub`: `client_info`, `find_client`, `find_server`, `mcp_add_client_of`, `mcp_add_server_of`, `mcp_clients_of`, `mcp_servers_of`, `server_info`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
 
 /// TUI Net ▸ MCP… servers tab (`mnnn mcp list`).
@@ -53,6 +53,50 @@ Future<String> mcpClientRevoke({
 /// TUI `d` on a client (`mnnn mcp client remove`).
 Future<String> mcpRemoveClient({required String client}) =>
     RustLib.instance.api.crateApiMcpMcpRemoveClient(client: client);
+
+/// `mnnn mcp add`. The bearer token is stored in Rust and does not come back.
+Future<String> mcpAddServer({
+  required String name,
+  required String url,
+  required String command,
+  required String token,
+}) => RustLib.instance.api.crateApiMcpMcpAddServer(
+  name: name,
+  url: url,
+  command: command,
+  token: token,
+);
+
+/// `mnnn mcp client add`. The token is returned once; it is not logged.
+Future<McpClientAdded> mcpAddClient({
+  required String name,
+  required String role,
+}) => RustLib.instance.api.crateApiMcpMcpAddClient(name: name, role: role);
+
+/// A client just added. `token` is shown once and is not stored in Dart.
+class McpClientAdded {
+  final String name;
+  final String role;
+  final String token;
+
+  const McpClientAdded({
+    required this.name,
+    required this.role,
+    required this.token,
+  });
+
+  @override
+  int get hashCode => name.hashCode ^ role.hashCode ^ token.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is McpClientAdded &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          role == other.role &&
+          token == other.token;
+}
 
 class McpClientInfo {
   final String id;

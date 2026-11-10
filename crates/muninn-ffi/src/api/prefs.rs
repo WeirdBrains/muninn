@@ -3,9 +3,11 @@
 //! and the open dataset (`[app]`). Reading never creates the file; each setter loads,
 //! changes one thing and saves, like the TUI.
 use super::info::paths;
+use muninn_core::model::PriceMetric;
 use muninn_core::paths::Paths;
-use muninn_core::prefs::{Preferences, ThemeMode};
+use muninn_core::prefs::{HeaderMode, Preferences, ThemeMode};
 use muninn_core::theme;
+use muninn_core::tui::sidebar::{PriceFilter, SortBy};
 
 /// What the app restores on launch.
 pub struct SavedState {
@@ -74,6 +76,82 @@ pub fn save_dataset(home: Option<String>, key: Option<String>) -> anyhow::Result
     update(home, |p| p.app.dataset = key)
 }
 
+/// Sidebar filters other than the time range (Data ▸ Filters / Sort), shared with the TUI.
+pub struct SidebarState {
+    pub sources: Vec<String>,
+    pub symbols: Vec<String>,
+    pub durations: Vec<String>,
+    pub years: Vec<i32>,
+    /// `open`, `high`, `low`, `close`, `typical`, `median`, `ohlc avg` or `vwap`.
+    pub price_metric: String,
+    pub price_min: Option<f64>,
+    pub price_max: Option<f64>,
+    /// `year` or `name`.
+    pub sort: String,
+    pub desc: bool,
+}
+
+fn metric_of(s: &str) -> PriceMetric {
+    PriceMetric::ALL.into_iter().find(|m| m.label() == s).unwrap_or(PriceMetric::Close)
+}
+
+/// Read `[tui.sidebar]` except `from`/`to` (those stay on [`saved_state`] / [`save_time_range`]).
+pub fn sidebar_state(home: Option<String>) -> anyhow::Result<SidebarState> {
+    let p = read(&paths(home)?);
+    let s = &p.tui.sidebar;
+    let f = &s.filters;
+    Ok(SidebarState {
+        sources: f.sources.iter().cloned().collect(),
+        symbols: f.symbols.iter().cloned().collect(),
+        durations: f.durations.iter().cloned().collect(),
+        years: f.years.iter().copied().collect(),
+        price_metric: f.price.metric.label().into(),
+        price_min: f.price.min,
+        price_max: f.price.max,
+        sort: match s.sort {
+            SortBy::Name => "name",
+            SortBy::Year => "year",
+        }
+        .into(),
+        desc: s.desc,
+    })
+}
+
+/// Write `[tui.sidebar]` filters and sort. The time range is left as it is.
+pub fn save_sidebar_state(home: Option<String>, state: SidebarState) -> anyhow::Result<()> {
+    update(home, |p| {
+        p.tui.sidebar.sort = if state.sort == "name" { SortBy::Name } else { SortBy::Year };
+        p.tui.sidebar.desc = state.desc;
+        let f = &mut p.tui.sidebar.filters;
+        f.sources = state.sources.into_iter().collect();
+        f.symbols = state.symbols.into_iter().collect();
+        f.durations = state.durations.into_iter().collect();
+        f.years = state.years.into_iter().collect();
+        f.price = PriceFilter { metric: metric_of(&state.price_metric), min: state.price_min, max: state.price_max };
+    })
+}
+
+/// TUI header size: `auto`, `compact` or `large` (Preferences).
+pub fn header_mode(home: Option<String>) -> anyhow::Result<String> {
+    let p = read(&paths(home)?);
+    Ok(match p.tui.header {
+        HeaderMode::Compact => "compact",
+        HeaderMode::Large => "large",
+        HeaderMode::Auto => "auto",
+    }
+    .into())
+}
+
+pub fn save_header_mode(home: Option<String>, mode: String) -> anyhow::Result<()> {
+    let m = match mode.as_str() {
+        "compact" => HeaderMode::Compact,
+        "large" => HeaderMode::Large,
+        "auto" => HeaderMode::Auto,
+        _ => anyhow::bail!("header must be auto, compact or large"),
+    };
+    update(home, |p| p.tui.header = m)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,6 +177,32 @@ mod tests {
         let p = Preferences::load_or_create(&paths(home.clone()).unwrap()).unwrap();
         assert_eq!(p.theme.name, "nord");
         assert_eq!(p.tui.sidebar.filters.from, Some(1_704_067_200_000));
+
+        let side = sidebar_state(home.clone()).unwrap();
+        assert!(side.sources.is_empty() && side.sort == "year" && !side.desc);
+        save_sidebar_state(
+            home.clone(),
+            SidebarState {
+                sources: vec!["coinbase".into()],
+                symbols: vec!["BTC/USD".into()],
+                durations: vec!["5m".into()],
+                years: vec![2024],
+                price_metric: "high".into(),
+                price_min: Some(1.0),
+                price_max: None,
+                sort: "name".into(),
+                desc: true,
+            },
+        )
+        .unwrap();
+        let side = sidebar_state(home.clone()).unwrap();
+        assert_eq!(side.sources, vec!["coinbase"]);
+        assert_eq!((side.sort.as_str(), side.desc, side.price_metric.as_str(), side.years), ("name", true, "high", vec![2024]));
+        assert_eq!(saved_state(home.clone()).unwrap().from, Some(1_704_067_200_000), "sidebar save keeps the time range");
+        assert_eq!(header_mode(home.clone()).unwrap(), "auto");
+        save_header_mode(home.clone(), "compact".into()).unwrap();
+        assert_eq!(header_mode(home.clone()).unwrap(), "compact");
+        assert!(save_header_mode(home.clone(), "huge".into()).is_err());
 
         assert!(save_theme(home.clone(), "no-such-theme".into()).is_err());
         assert!(save_theme_mode(home.clone(), "sepia".into()).is_err());

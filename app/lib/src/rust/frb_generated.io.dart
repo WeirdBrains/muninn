@@ -28,6 +28,7 @@ import 'api/rules.dart';
 import 'api/schedules.dart';
 import 'api/searches.dart';
 import 'api/share.dart';
+import 'api/spaces.dart';
 import 'api/themes.dart';
 
 import 'dart:async';
@@ -57,6 +58,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AliasInfo dco_decode_alias_info(dynamic raw);
+
+  @protected
+  AnnouncedSite dco_decode_announced_site(dynamic raw);
 
   @protected
   AuthorInfo dco_decode_author_info(dynamic raw);
@@ -95,6 +99,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RevealHandle dco_decode_box_autoadd_reveal_handle(dynamic raw);
 
   @protected
+  SidebarState dco_decode_box_autoadd_sidebar_state(dynamic raw);
+
+  @protected
   ThemeData dco_decode_box_autoadd_theme_data(dynamic raw);
 
   @protected
@@ -113,6 +120,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CodeSpaceInfo dco_decode_code_space_info(dynamic raw);
 
   @protected
+  CollectionInfo dco_decode_collection_info(dynamic raw);
+
+  @protected
+  CollectionRun dco_decode_collection_run(dynamic raw);
+
+  @protected
+  CoverageRow dco_decode_coverage_row(dynamic raw);
+
+  @protected
   DataDirInfo dco_decode_data_dir_info(dynamic raw);
 
   @protected
@@ -123,6 +139,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   EntryInfo dco_decode_entry_info(dynamic raw);
+
+  @protected
+  ExchangeToken dco_decode_exchange_token(dynamic raw);
 
   @protected
   ExportOutcome dco_decode_export_outcome(dynamic raw);
@@ -147,6 +166,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HistoryRow dco_decode_history_row(dynamic raw);
+
+  @protected
+  int dco_decode_i_32(dynamic raw);
 
   @protected
   PlatformInt64 dco_decode_i_64(dynamic raw);
@@ -185,6 +207,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<AliasInfo> dco_decode_list_alias_info(dynamic raw);
 
   @protected
+  List<AnnouncedSite> dco_decode_list_announced_site(dynamic raw);
+
+  @protected
   List<AuthorInfo> dco_decode_list_author_info(dynamic raw);
 
   @protected
@@ -195,6 +220,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<CodeSpaceInfo> dco_decode_list_code_space_info(dynamic raw);
+
+  @protected
+  List<CollectionInfo> dco_decode_list_collection_info(dynamic raw);
+
+  @protected
+  List<CoverageRow> dco_decode_list_coverage_row(dynamic raw);
 
   @protected
   List<DatasetSummary> dco_decode_list_dataset_summary(dynamic raw);
@@ -251,6 +282,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<McpToolInfo> dco_decode_list_mcp_tool_info(dynamic raw);
+
+  @protected
+  List<MemberInfo> dco_decode_list_member_info(dynamic raw);
+
+  @protected
+  List<MetricSpan> dco_decode_list_metric_span(dynamic raw);
+
+  @protected
+  List<MigrateLine> dco_decode_list_migrate_line(dynamic raw);
+
+  @protected
+  List<MigrateSkip> dco_decode_list_migrate_skip(dynamic raw);
 
   @protected
   List<ModelInfo> dco_decode_list_model_info(dynamic raw);
@@ -345,6 +388,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<PeerMessageInfo> dco_decode_list_peer_message_info(dynamic raw);
 
   @protected
+  List<PipeTarget> dco_decode_list_pipe_target(dynamic raw);
+
+  @protected
   List<PipelineInfo> dco_decode_list_pipeline_info(dynamic raw);
 
   @protected
@@ -352,6 +398,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<PluginInfo> dco_decode_list_plugin_info(dynamic raw);
+
+  @protected
+  Int32List dco_decode_list_prim_i_32_strict(dynamic raw);
 
   @protected
   Int64List dco_decode_list_prim_i_64_strict(dynamic raw);
@@ -435,6 +484,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LiveSessionInfo dco_decode_live_session_info(dynamic raw);
 
   @protected
+  McpClientAdded dco_decode_mcp_client_added(dynamic raw);
+
+  @protected
   McpClientInfo dco_decode_mcp_client_info(dynamic raw);
 
   @protected
@@ -442,6 +494,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   McpToolInfo dco_decode_mcp_tool_info(dynamic raw);
+
+  @protected
+  MemberInfo dco_decode_member_info(dynamic raw);
+
+  @protected
+  MetricSpan dco_decode_metric_span(dynamic raw);
+
+  @protected
+  MigrateLine dco_decode_migrate_line(dynamic raw);
+
+  @protected
+  MigrateReport dco_decode_migrate_report(dynamic raw);
+
+  @protected
+  MigrateSkip dco_decode_migrate_skip(dynamic raw);
 
   @protected
   ModelImportPlanInfo dco_decode_model_import_plan_info(dynamic raw);
@@ -635,6 +702,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PipeRunResult dco_decode_pipe_run_result(dynamic raw);
 
   @protected
+  PipeTarget dco_decode_pipe_target(dynamic raw);
+
+  @protected
   PipelineInfo dco_decode_pipeline_info(dynamic raw);
 
   @protected
@@ -645,6 +715,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PipelineRunResult dco_decode_pipeline_run_result(dynamic raw);
+
+  @protected
+  PluginDetail dco_decode_plugin_detail(dynamic raw);
 
   @protected
   PluginInfo dco_decode_plugin_info(dynamic raw);
@@ -704,6 +777,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ScheduleInfo dco_decode_schedule_info(dynamic raw);
 
   @protected
+  SchedulePreview dco_decode_schedule_preview(dynamic raw);
+
+  @protected
   ScheduleRunInfo dco_decode_schedule_run_info(dynamic raw);
 
   @protected
@@ -719,6 +795,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ShareCreated dco_decode_share_created(dynamic raw);
 
   @protected
+  SidebarState dco_decode_sidebar_state(dynamic raw);
+
+  @protected
   SourceDataItem dco_decode_source_data_item(dynamic raw);
 
   @protected
@@ -732,6 +811,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ThemeData dco_decode_theme_data(dynamic raw);
+
+  @protected
+  ThemeDraft dco_decode_theme_draft(dynamic raw);
 
   @protected
   ThemeRole dco_decode_theme_role(dynamic raw);
@@ -762,6 +844,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AliasInfo sse_decode_alias_info(SseDeserializer deserializer);
+
+  @protected
+  AnnouncedSite sse_decode_announced_site(SseDeserializer deserializer);
 
   @protected
   AuthorInfo sse_decode_author_info(SseDeserializer deserializer);
@@ -808,6 +893,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SidebarState sse_decode_box_autoadd_sidebar_state(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ThemeData sse_decode_box_autoadd_theme_data(SseDeserializer deserializer);
 
   @protected
@@ -826,6 +916,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CodeSpaceInfo sse_decode_code_space_info(SseDeserializer deserializer);
 
   @protected
+  CollectionInfo sse_decode_collection_info(SseDeserializer deserializer);
+
+  @protected
+  CollectionRun sse_decode_collection_run(SseDeserializer deserializer);
+
+  @protected
+  CoverageRow sse_decode_coverage_row(SseDeserializer deserializer);
+
+  @protected
   DataDirInfo sse_decode_data_dir_info(SseDeserializer deserializer);
 
   @protected
@@ -836,6 +935,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   EntryInfo sse_decode_entry_info(SseDeserializer deserializer);
+
+  @protected
+  ExchangeToken sse_decode_exchange_token(SseDeserializer deserializer);
 
   @protected
   ExportOutcome sse_decode_export_outcome(SseDeserializer deserializer);
@@ -860,6 +962,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HistoryRow sse_decode_history_row(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
@@ -904,6 +1009,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<AliasInfo> sse_decode_list_alias_info(SseDeserializer deserializer);
 
   @protected
+  List<AnnouncedSite> sse_decode_list_announced_site(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<AuthorInfo> sse_decode_list_author_info(SseDeserializer deserializer);
 
   @protected
@@ -918,6 +1028,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<CodeSpaceInfo> sse_decode_list_code_space_info(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<CollectionInfo> sse_decode_list_collection_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<CoverageRow> sse_decode_list_coverage_row(SseDeserializer deserializer);
 
   @protected
   List<DatasetSummary> sse_decode_list_dataset_summary(
@@ -994,6 +1112,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<McpToolInfo> sse_decode_list_mcp_tool_info(SseDeserializer deserializer);
+
+  @protected
+  List<MemberInfo> sse_decode_list_member_info(SseDeserializer deserializer);
+
+  @protected
+  List<MetricSpan> sse_decode_list_metric_span(SseDeserializer deserializer);
+
+  @protected
+  List<MigrateLine> sse_decode_list_migrate_line(SseDeserializer deserializer);
+
+  @protected
+  List<MigrateSkip> sse_decode_list_migrate_skip(SseDeserializer deserializer);
 
   @protected
   List<ModelInfo> sse_decode_list_model_info(SseDeserializer deserializer);
@@ -1128,6 +1258,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<PipeTarget> sse_decode_list_pipe_target(SseDeserializer deserializer);
+
+  @protected
   List<PipelineInfo> sse_decode_list_pipeline_info(
     SseDeserializer deserializer,
   );
@@ -1139,6 +1272,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<PluginInfo> sse_decode_list_plugin_info(SseDeserializer deserializer);
+
+  @protected
+  Int32List sse_decode_list_prim_i_32_strict(SseDeserializer deserializer);
 
   @protected
   Int64List sse_decode_list_prim_i_64_strict(SseDeserializer deserializer);
@@ -1244,6 +1380,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LiveSessionInfo sse_decode_live_session_info(SseDeserializer deserializer);
 
   @protected
+  McpClientAdded sse_decode_mcp_client_added(SseDeserializer deserializer);
+
+  @protected
   McpClientInfo sse_decode_mcp_client_info(SseDeserializer deserializer);
 
   @protected
@@ -1251,6 +1390,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   McpToolInfo sse_decode_mcp_tool_info(SseDeserializer deserializer);
+
+  @protected
+  MemberInfo sse_decode_member_info(SseDeserializer deserializer);
+
+  @protected
+  MetricSpan sse_decode_metric_span(SseDeserializer deserializer);
+
+  @protected
+  MigrateLine sse_decode_migrate_line(SseDeserializer deserializer);
+
+  @protected
+  MigrateReport sse_decode_migrate_report(SseDeserializer deserializer);
+
+  @protected
+  MigrateSkip sse_decode_migrate_skip(SseDeserializer deserializer);
 
   @protected
   ModelImportPlanInfo sse_decode_model_import_plan_info(
@@ -1466,6 +1620,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PipeRunResult sse_decode_pipe_run_result(SseDeserializer deserializer);
 
   @protected
+  PipeTarget sse_decode_pipe_target(SseDeserializer deserializer);
+
+  @protected
   PipelineInfo sse_decode_pipeline_info(SseDeserializer deserializer);
 
   @protected
@@ -1480,6 +1637,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PipelineRunResult sse_decode_pipeline_run_result(
     SseDeserializer deserializer,
   );
+
+  @protected
+  PluginDetail sse_decode_plugin_detail(SseDeserializer deserializer);
 
   @protected
   PluginInfo sse_decode_plugin_info(SseDeserializer deserializer);
@@ -1539,6 +1699,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ScheduleInfo sse_decode_schedule_info(SseDeserializer deserializer);
 
   @protected
+  SchedulePreview sse_decode_schedule_preview(SseDeserializer deserializer);
+
+  @protected
   ScheduleRunInfo sse_decode_schedule_run_info(SseDeserializer deserializer);
 
   @protected
@@ -1554,6 +1717,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ShareCreated sse_decode_share_created(SseDeserializer deserializer);
 
   @protected
+  SidebarState sse_decode_sidebar_state(SseDeserializer deserializer);
+
+  @protected
   SourceDataItem sse_decode_source_data_item(SseDeserializer deserializer);
 
   @protected
@@ -1567,6 +1733,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ThemeData sse_decode_theme_data(SseDeserializer deserializer);
+
+  @protected
+  ThemeDraft sse_decode_theme_draft(SseDeserializer deserializer);
 
   @protected
   ThemeRole sse_decode_theme_role(SseDeserializer deserializer);
@@ -1587,9 +1756,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_decode_unit(SseDeserializer deserializer);
 
   @protected
-  int sse_decode_i_32(SseDeserializer deserializer);
-
-  @protected
   void sse_encode_AnyhowException(
     AnyhowException self,
     SseSerializer serializer,
@@ -1603,6 +1769,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_alias_info(AliasInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_announced_site(AnnouncedSite self, SseSerializer serializer);
 
   @protected
   void sse_encode_author_info(AuthorInfo self, SseSerializer serializer);
@@ -1662,6 +1831,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_sidebar_state(
+    SidebarState self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_theme_data(
     ThemeData self,
     SseSerializer serializer,
@@ -1686,6 +1861,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_code_space_info(CodeSpaceInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_collection_info(
+    CollectionInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_collection_run(CollectionRun self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_coverage_row(CoverageRow self, SseSerializer serializer);
+
+  @protected
   void sse_encode_data_dir_info(DataDirInfo self, SseSerializer serializer);
 
   @protected
@@ -1702,6 +1889,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_entry_info(EntryInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_exchange_token(ExchangeToken self, SseSerializer serializer);
 
   @protected
   void sse_encode_export_outcome(ExportOutcome self, SseSerializer serializer);
@@ -1726,6 +1916,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_history_row(HistoryRow self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
@@ -1785,6 +1978,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_announced_site(
+    List<AnnouncedSite> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_author_info(
     List<AuthorInfo> self,
     SseSerializer serializer,
@@ -1802,6 +2001,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_code_space_info(
     List<CodeSpaceInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_collection_info(
+    List<CollectionInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_coverage_row(
+    List<CoverageRow> self,
     SseSerializer serializer,
   );
 
@@ -1910,6 +2121,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_mcp_tool_info(
     List<McpToolInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_member_info(
+    List<MemberInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_metric_span(
+    List<MetricSpan> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_migrate_line(
+    List<MigrateLine> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_migrate_skip(
+    List<MigrateSkip> self,
     SseSerializer serializer,
   );
 
@@ -2091,6 +2326,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_pipe_target(
+    List<PipeTarget> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_pipeline_info(
     List<PipelineInfo> self,
     SseSerializer serializer,
@@ -2105,6 +2346,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_plugin_info(
     List<PluginInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_i_32_strict(
+    Int32List self,
     SseSerializer serializer,
   );
 
@@ -2262,6 +2509,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_mcp_client_added(
+    McpClientAdded self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_mcp_client_info(McpClientInfo self, SseSerializer serializer);
 
   @protected
@@ -2269,6 +2522,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_mcp_tool_info(McpToolInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_member_info(MemberInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_metric_span(MetricSpan self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_migrate_line(MigrateLine self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_migrate_report(MigrateReport self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_migrate_skip(MigrateSkip self, SseSerializer serializer);
 
   @protected
   void sse_encode_model_import_plan_info(
@@ -2544,6 +2812,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_pipe_run_result(PipeRunResult self, SseSerializer serializer);
 
   @protected
+  void sse_encode_pipe_target(PipeTarget self, SseSerializer serializer);
+
+  @protected
   void sse_encode_pipeline_info(PipelineInfo self, SseSerializer serializer);
 
   @protected
@@ -2563,6 +2834,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     PipelineRunResult self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_plugin_detail(PluginDetail self, SseSerializer serializer);
 
   @protected
   void sse_encode_plugin_info(PluginInfo self, SseSerializer serializer);
@@ -2634,6 +2908,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_schedule_info(ScheduleInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_schedule_preview(
+    SchedulePreview self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_schedule_run_info(
     ScheduleRunInfo self,
     SseSerializer serializer,
@@ -2655,6 +2935,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_share_created(ShareCreated self, SseSerializer serializer);
 
   @protected
+  void sse_encode_sidebar_state(SidebarState self, SseSerializer serializer);
+
+  @protected
   void sse_encode_source_data_item(
     SourceDataItem self,
     SseSerializer serializer,
@@ -2673,6 +2956,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_theme_data(ThemeData self, SseSerializer serializer);
 
   @protected
+  void sse_encode_theme_draft(ThemeDraft self, SseSerializer serializer);
+
+  @protected
   void sse_encode_theme_role(ThemeRole self, SseSerializer serializer);
 
   @protected
@@ -2689,9 +2975,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer);
 }
 
 // Section: wire_class

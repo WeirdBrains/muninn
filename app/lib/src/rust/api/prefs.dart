@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `mode_name`, `read`, `update`
+// These functions are ignored because they are not marked as `pub`: `metric_of`, `mode_name`, `read`, `update`
 
 /// The saved theme, mode, time range and dataset (read-only).
 Future<SavedState> savedState({String? home}) =>
@@ -35,6 +35,24 @@ Future<void> saveTimeRange({
 /// The dataset open in the Data view (`source:BASE/QUOTE:duration_s`), or `None`.
 Future<void> saveDataset({String? home, String? key}) =>
     RustLib.instance.api.crateApiPrefsSaveDataset(home: home, key: key);
+
+/// Read `[tui.sidebar]` except `from`/`to` (those stay on [`saved_state`] / [`save_time_range`]).
+Future<SidebarState> sidebarState({String? home}) =>
+    RustLib.instance.api.crateApiPrefsSidebarState(home: home);
+
+/// Write `[tui.sidebar]` filters and sort. The time range is left as it is.
+Future<void> saveSidebarState({String? home, required SidebarState state}) =>
+    RustLib.instance.api.crateApiPrefsSaveSidebarState(
+      home: home,
+      state: state,
+    );
+
+/// TUI header size: `auto`, `compact` or `large` (Preferences).
+Future<String> headerMode({String? home}) =>
+    RustLib.instance.api.crateApiPrefsHeaderMode(home: home);
+
+Future<void> saveHeaderMode({String? home, required String mode}) =>
+    RustLib.instance.api.crateApiPrefsSaveHeaderMode(home: home, mode: mode);
 
 /// What the app restores on launch.
 class SavedState {
@@ -72,4 +90,60 @@ class SavedState {
           from == other.from &&
           to == other.to &&
           dataset == other.dataset;
+}
+
+/// Sidebar filters other than the time range (Data ▸ Filters / Sort), shared with the TUI.
+class SidebarState {
+  final List<String> sources;
+  final List<String> symbols;
+  final List<String> durations;
+  final Int32List years;
+
+  /// `open`, `high`, `low`, `close`, `typical`, `median`, `ohlc avg` or `vwap`.
+  final String priceMetric;
+  final double? priceMin;
+  final double? priceMax;
+
+  /// `year` or `name`.
+  final String sort;
+  final bool desc;
+
+  const SidebarState({
+    required this.sources,
+    required this.symbols,
+    required this.durations,
+    required this.years,
+    required this.priceMetric,
+    this.priceMin,
+    this.priceMax,
+    required this.sort,
+    required this.desc,
+  });
+
+  @override
+  int get hashCode =>
+      sources.hashCode ^
+      symbols.hashCode ^
+      durations.hashCode ^
+      years.hashCode ^
+      priceMetric.hashCode ^
+      priceMin.hashCode ^
+      priceMax.hashCode ^
+      sort.hashCode ^
+      desc.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SidebarState &&
+          runtimeType == other.runtimeType &&
+          sources == other.sources &&
+          symbols == other.symbols &&
+          durations == other.durations &&
+          years == other.years &&
+          priceMetric == other.priceMetric &&
+          priceMin == other.priceMin &&
+          priceMax == other.priceMax &&
+          sort == other.sort &&
+          desc == other.desc;
 }

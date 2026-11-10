@@ -28,6 +28,7 @@ import 'rust/api/reviews.dart' as r_reviews;
 import 'rust/api/rules.dart' as r_rules;
 import 'rust/api/schedules.dart' as r_sched;
 import 'rust/api/share.dart' as r_share;
+import 'rust/api/spaces.dart' as r_spaces;
 import 'rust/api/searches.dart' as r_searches;
 import 'rust/api/themes.dart' as r_themes;
 
@@ -103,6 +104,126 @@ class FfiMuninnApi implements MuninnApi {
   @override
   Future<void> saveDataset(String? key) =>
       r_prefs.saveDataset(home: home, key: key);
+
+  @override
+  Future<DataFilters> sidebarFilters() async {
+    final s = await r_prefs.sidebarState(home: home);
+    return DataFilters(
+      sources: s.sources,
+      symbols: s.symbols,
+      durations: s.durations,
+      years: s.years.toList(),
+      priceMetric: s.priceMetric,
+      priceMin: s.priceMin,
+      priceMax: s.priceMax,
+      sort: s.sort,
+      desc: s.desc,
+    );
+  }
+
+  @override
+  Future<void> saveSidebarFilters(DataFilters f) => r_prefs.saveSidebarState(
+    home: home,
+    state: r_prefs.SidebarState(
+      sources: f.sources,
+      symbols: f.symbols,
+      durations: f.durations,
+      years: Int32List.fromList(f.years),
+      priceMetric: f.priceMetric,
+      priceMin: f.priceMin,
+      priceMax: f.priceMax,
+      sort: f.sort,
+      desc: f.desc,
+    ),
+  );
+
+  @override
+  Future<String> headerMode() => r_prefs.headerMode(home: home);
+
+  @override
+  Future<void> saveHeaderMode(String mode) =>
+      r_prefs.saveHeaderMode(home: home, mode: mode);
+
+  @override
+  Future<List<CoverageInfo>> coverage() async {
+    final rows = await r_data.coverage();
+    return [
+      for (final r in rows)
+        CoverageInfo(
+          source: r.source,
+          symbol: r.symbol,
+          duration: r.duration,
+          bars: r.bars.toInt(),
+          missing: r.missing.toInt(),
+          first: r.first,
+          last: r.last,
+        ),
+    ];
+  }
+
+  @override
+  Future<List<MetricSpanInfo>> metricSpans(
+    String metric,
+    TimeRange range,
+  ) async {
+    final rows = await r_data.metricSpans(
+      metric: metric,
+      from: range.from == null ? null : PlatformInt64Util.from(range.from!),
+      to: range.to == null ? null : PlatformInt64Util.from(range.to!),
+    );
+    return [
+      for (final r in rows) MetricSpanInfo(key: r.key, min: r.min, max: r.max),
+    ];
+  }
+
+  @override
+  Future<String> backupCreate(String outDir, {String password = ''}) =>
+      r_data.backupCreate(home: home, outDir: outDir, password: password);
+
+  @override
+  Future<ThemeEdit> themeDraft(String name) async {
+    final d = await r_themes.themeDraft(home: home, name: name);
+    Map<String, String> roles(List<r_themes.ThemeRole> list) => {
+      for (final r in list) r.role: r.hex,
+    };
+    return ThemeEdit(
+      name: d.name,
+      displayName: d.displayName,
+      base: d.base,
+      dark: roles(d.dark),
+      light: roles(d.light),
+    );
+  }
+
+  @override
+  Future<void> themeSave({
+    required String name,
+    required String displayName,
+    required String base,
+    required Map<String, String> dark,
+    required Map<String, String> light,
+  }) => r_themes.themeSaveDraft(
+    home: home,
+    name: name,
+    displayName: displayName,
+    base: base,
+    dark: [
+      for (final e in dark.entries)
+        r_themes.ThemeRole(role: e.key, hex: e.value),
+    ],
+    light: [
+      for (final e in light.entries)
+        r_themes.ThemeRole(role: e.key, hex: e.value),
+    ],
+  );
+
+  @override
+  Future<String> themeImport(String toml) =>
+      r_themes.themeImportToml(home: home, text: toml);
+
+  @override
+  Future<String> themeExport(String name) =>
+      r_themes.themeExportToml(home: home, name: name);
 
   @override
   Future<List<String>> savedLayouts() => r_layouts.savedLayouts(home: home);
@@ -1544,6 +1665,24 @@ class FfiMuninnApi implements MuninnApi {
       r_mcp.mcpRemoveClient(client: client);
 
   @override
+  Future<String> mcpAddServer(
+    String name, {
+    String url = '',
+    String command = '',
+    String token = '',
+  }) =>
+      r_mcp.mcpAddServer(name: name, url: url, command: command, token: token);
+
+  @override
+  Future<McpClientAdded> mcpAddClient(
+    String name, {
+    String role = 'read',
+  }) async {
+    final c = await r_mcp.mcpAddClient(name: name, role: role);
+    return McpClientAdded(name: c.name, role: c.role, token: c.token);
+  }
+
+  @override
   Future<List<PeerMessageInfo>> peerMessages({String? peer}) async => [
     for (final m in await r_collab.peerMessages(peer: peer))
       PeerMessageInfo(
@@ -1578,6 +1717,18 @@ class FfiMuninnApi implements MuninnApi {
         updatedAt: s.updatedAt.toInt(),
       ),
   ];
+
+  @override
+  Future<String> collabSend(String peer, String text) =>
+      r_collab.collabSend(home: home, peer: peer, text: text);
+
+  @override
+  Future<String> collabHost(String peer, String kind, String key) =>
+      r_collab.collabHost(peer: peer, kind: kind, key: key);
+
+  @override
+  Future<String> collabJoin(String peer, String session) =>
+      r_collab.collabJoin(home: home, peer: peer, sessionId: session);
 
   @override
   Future<String> pipelineExport(
@@ -2380,6 +2531,60 @@ class FfiMuninnApi implements MuninnApi {
       r_net.netShardDrop(home: home, id: id);
 
   @override
+  Future<ExchangeOnce> netExchangeOffer({
+    String label = '',
+    String peer = '',
+    int hours = 0,
+  }) async {
+    final t = await r_net.netExchangeOffer(
+      home: home,
+      label: label,
+      peer: peer,
+      hours: PlatformInt64Util.from(hours),
+    );
+    return ExchangeOnce(
+      summary: t.summary,
+      token: t.token,
+      shortCode: t.shortCode,
+      answer: t.answer,
+    );
+  }
+
+  @override
+  Future<ExchangeOnce> netExchangeAccept(
+    String token, {
+    String label = '',
+  }) async {
+    final t = await r_net.netExchangeAccept(
+      home: home,
+      token: token,
+      label: label,
+    );
+    return ExchangeOnce(
+      summary: t.summary,
+      token: t.token,
+      shortCode: t.shortCode,
+      answer: t.answer,
+    );
+  }
+
+  @override
+  Future<String> netShardRestore({
+    String backup = '',
+    String backupPassword = '',
+    required String shardPassword,
+    required String newPassword,
+    List<String> peers = const [],
+  }) => r_net.netShardRestore(
+    home: home,
+    backup: backup,
+    backupPassword: backupPassword,
+    shardPassword: shardPassword,
+    newPassword: newPassword,
+    peers: peers,
+  );
+
+  @override
   Future<List<NetSearchOrigin>> netSearch(
     String saved, {
     List<String> only = const [],
@@ -2843,6 +3048,22 @@ class FfiMuninnApi implements MuninnApi {
       r_orgs.orgSignIn(org: org, site: site);
 
   @override
+  Future<List<String>> orgAnnounce({String org = '', bool closed = false}) =>
+      r_orgs.orgAnnounce(home: home, orgKey: org, closed: closed);
+
+  @override
+  Future<List<AnnouncedSiteInfo>> orgAnnounced() async => [
+    for (final s in await r_orgs.orgAnnounced())
+      AnnouncedSiteInfo(
+        peer: s.peer,
+        slug: s.slug,
+        name: s.name,
+        urls: s.urls,
+        open: s.open,
+      ),
+  ];
+
+  @override
   Future<String> orgEndpointAdd(
     String org,
     String name,
@@ -3143,6 +3364,175 @@ class FfiMuninnApi implements MuninnApi {
       r_code.pluginSetEnabled(name: name, enabled: enabled);
 
   @override
+  Future<String> pluginInstall(
+    String what, {
+    required String kind,
+    String name = '',
+  }) => r_code.pluginInstall(what: what, kind: kind, name: name);
+
+  @override
+  Future<List<PipeTargetInfo>> codePipeTargets(String space) async => [
+    for (final t in await r_code.codePipeTargets(space: space))
+      PipeTargetInfo(kind: t.kind, name: t.name),
+  ];
+
+  @override
+  Future<String> codePipeTo(String space, String kind, String name) =>
+      r_code.codePipeTo(space: space, kind: kind, name: name);
+
+  CollectionInfo _collection(r_spaces.CollectionInfo c) => CollectionInfo(
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    kind: c.kind,
+    enabled: c.enabled,
+    approved: c.approved,
+    main: c.main,
+    members: c.members.toInt(),
+    unreviewed: c.unreviewed.toInt(),
+    pinBroken: c.pinBroken.toInt(),
+  );
+
+  @override
+  Future<PluginDetail> pluginInfo(String name) async {
+    final p = await r_spaces.pluginInfo(name: name);
+    return PluginDetail(
+      name: p.name,
+      kind: p.kind,
+      lang: p.lang,
+      main: p.main,
+      library: p.library_,
+      declared: p.declared,
+      members: p.members.toInt(),
+      approved: p.approved,
+      enabled: p.enabled,
+      usedBy: p.usedBy,
+      problem: p.problem,
+    );
+  }
+
+  @override
+  Future<List<CollectionInfo>> collectionsList({String? kind}) async => [
+    for (final c in await r_spaces.collectionsList(kind: kind)) _collection(c),
+  ];
+
+  @override
+  Future<List<SpaceMemberInfo>> collectionMembers(String space) async => [
+    for (final m in await r_spaces.collectionMembers(space: space))
+      SpaceMemberInfo(
+        codeId: m.codeId,
+        codeName: m.codeName,
+        alias: m.alias,
+        lang: m.lang,
+        main: m.main,
+        pinned: m.pinned,
+        pinBroken: m.pinBroken,
+        unreviewed: m.unreviewed,
+      ),
+  ];
+
+  @override
+  Future<CollectionInfo> collectionCreate(
+    String name, {
+    String description = '',
+    required String kind,
+    required String main,
+  }) async => _collection(
+    await r_spaces.collectionCreate(
+      name: name,
+      description: description,
+      kind: kind,
+      main: main,
+    ),
+  );
+
+  @override
+  Future<String> collectionAdd(
+    String space,
+    String code, {
+    String? alias,
+    bool pin = false,
+  }) =>
+      r_spaces.collectionAdd(space: space, code: code, alias: alias, pin: pin);
+
+  @override
+  Future<String> collectionRemoveCode(String space, String code) =>
+      r_spaces.collectionRemoveCode(space: space, code: code);
+
+  @override
+  Future<String> collectionSetMain(String space, String code) =>
+      r_spaces.collectionSetMain(space: space, code: code);
+
+  @override
+  Future<String> collectionPin(String space, String code, {required bool on}) =>
+      r_spaces.collectionPin(space: space, code: code, on_: on);
+
+  @override
+  Future<String> collectionApprove(String space) =>
+      r_spaces.collectionApprove(space: space);
+
+  @override
+  Future<String> collectionSetEnabled(String space, bool enabled) =>
+      r_spaces.collectionSetEnabled(space: space, enabled: enabled);
+
+  @override
+  Future<String> collectionRemove(String space) =>
+      r_spaces.collectionRemove(space: space);
+
+  @override
+  Future<CollectionRun> collectionRun(String space) async {
+    final r = await r_spaces.collectionRun(space: space);
+    return CollectionRun(status: r.status, error: r.error, lines: r.lines);
+  }
+
+  @override
+  Future<int> migratePending() async =>
+      (await r_spaces.migratePending()).toInt();
+
+  @override
+  Future<bool> migrateOffered() => r_spaces.migrateOffered(home: home);
+
+  @override
+  Future<void> migrateDismiss() => r_spaces.migrateDismiss(home: home);
+
+  @override
+  Future<MigrateReport> migrateRun({
+    List<String> codes = const [],
+    String? kind,
+    bool dryRun = true,
+    bool rewritePipelines = true,
+    bool backup = true,
+  }) async {
+    final r = await r_spaces.migrateRun(
+      home: home,
+      codes: codes,
+      kind: kind,
+      dryRun: dryRun,
+      rewritePipelines: rewritePipelines,
+      backup: backup,
+    );
+    return MigrateReport(
+      created: [
+        for (final c in r.created)
+          MigrateLine(
+            code: c.code,
+            space: c.space,
+            kind: c.kind,
+            renamed: c.renamed,
+            approved: c.approved,
+            why: c.why,
+          ),
+      ],
+      skipped: [
+        for (final s in r.skipped) MigrateSkip(code: s.code, why: s.why),
+      ],
+      pipelines: r.pipelines,
+      backup: r.backup,
+      dryRun: r.dryRun,
+    );
+  }
+
+  @override
   Future<String> spaceExport(String space, String path) =>
       r_code.spaceExport(space: space, path: path);
 
@@ -3164,12 +3554,13 @@ class FfiMuninnApi implements MuninnApi {
     String name, {
     String description = '',
     List<String> rules = const [],
-  }) async =>
-      _ruleset(await r_sched.rulesetCreate(
-        name: name,
-        description: description,
-        rules: rules,
-      ));
+  }) async => _ruleset(
+    await r_sched.rulesetCreate(
+      name: name,
+      description: description,
+      rules: rules,
+    ),
+  );
 
   @override
   Future<RulesetInfo> rulesetEdit(
@@ -3177,13 +3568,14 @@ class FfiMuninnApi implements MuninnApi {
     String? name,
     String? description,
     bool? enable,
-  }) async =>
-      _ruleset(await r_sched.rulesetEdit(
-        ruleset: ruleset,
-        name: name,
-        description: description,
-        enable: enable,
-      ));
+  }) async => _ruleset(
+    await r_sched.rulesetEdit(
+      ruleset: ruleset,
+      name: name,
+      description: description,
+      enable: enable,
+    ),
+  );
 
   @override
   Future<String> rulesetRemove(String ruleset, {bool force = false}) =>
@@ -3194,16 +3586,43 @@ class FfiMuninnApi implements MuninnApi {
     String ruleset,
     String rule, {
     int? position,
-  }) async =>
-      _ruleset(await r_sched.rulesetAddRule(
-        ruleset: ruleset,
-        rule: rule,
-        position: position,
-      ));
+  }) async => _ruleset(
+    await r_sched.rulesetAddRule(
+      ruleset: ruleset,
+      rule: rule,
+      position: position,
+    ),
+  );
 
   @override
   Future<RulesetInfo> rulesetDropRule(String ruleset, String rule) async =>
       _ruleset(await r_sched.rulesetDropRule(ruleset: ruleset, rule: rule));
+
+  @override
+  Future<List<String>> rulesetRun(String ruleset) =>
+      r_sched.rulesetRun(ruleset: ruleset);
+
+  @override
+  Future<SchedulePreview> scheduleParse({
+    String? runEvery,
+    String? cron,
+    String? startAt,
+    String? endsAt,
+    String? for_,
+    String? tz,
+    bool pastNext = false,
+  }) async {
+    final p = await r_sched.scheduleParse(
+      runEvery: runEvery,
+      cron: cron,
+      startAt: startAt,
+      endsAt: endsAt,
+      for_: for_,
+      tz: tz,
+      pastNext: pastNext,
+    );
+    return SchedulePreview(lines: p.lines, runsRemaining: p.runsRemaining);
+  }
 
   @override
   Future<List<ScheduleInfo>> schedulesList() async => [
@@ -3234,15 +3653,14 @@ class FfiMuninnApi implements MuninnApi {
     String? endsAt,
     String? for_,
     String? tz,
-  }) =>
-      r_sched.schedulePastStart(
-        runEvery: runEvery,
-        cron: cron,
-        startAt: startAt,
-        endsAt: endsAt,
-        for_: for_,
-        tz: tz,
-      );
+  }) => r_sched.schedulePastStart(
+    runEvery: runEvery,
+    cron: cron,
+    startAt: startAt,
+    endsAt: endsAt,
+    for_: for_,
+    tz: tz,
+  );
 
   @override
   Future<ScheduleInfo> scheduleAdd({
@@ -3264,28 +3682,30 @@ class FfiMuninnApi implements MuninnApi {
     String? catchUp,
     int? maxAttempts,
     bool disabled = false,
-  }) async =>
-      _schedule(await r_sched.scheduleAdd(
-        name: name,
-        runEvery: runEvery,
-        ruleset: ruleset,
-        plugin: plugin,
-        source: source,
-        pipeline: pipeline,
-        connectorRuleset: connectorRuleset,
-        options: options,
-        cron: cron,
-        startAt: startAt,
-        endsAt: endsAt,
-        for_: for_,
-        tz: tz,
-        pastNext: pastNext,
-        overlap: overlap,
-        catchUp: catchUp,
-        maxAttempts:
-            maxAttempts == null ? null : PlatformInt64Util.from(maxAttempts),
-        disabled: disabled,
-      ));
+  }) async => _schedule(
+    await r_sched.scheduleAdd(
+      name: name,
+      runEvery: runEvery,
+      ruleset: ruleset,
+      plugin: plugin,
+      source: source,
+      pipeline: pipeline,
+      connectorRuleset: connectorRuleset,
+      options: options,
+      cron: cron,
+      startAt: startAt,
+      endsAt: endsAt,
+      for_: for_,
+      tz: tz,
+      pastNext: pastNext,
+      overlap: overlap,
+      catchUp: catchUp,
+      maxAttempts: maxAttempts == null
+          ? null
+          : PlatformInt64Util.from(maxAttempts),
+      disabled: disabled,
+    ),
+  );
 
   @override
   Future<ScheduleInfo> scheduleEdit(
@@ -3302,23 +3722,25 @@ class FfiMuninnApi implements MuninnApi {
     String? catchUp,
     int? maxAttempts,
     bool clearEnds = false,
-  }) async =>
-      _schedule(await r_sched.scheduleEdit(
-        key: key,
-        name: name,
-        runEvery: runEvery,
-        cron: cron,
-        startAt: startAt,
-        endsAt: endsAt,
-        for_: for_,
-        tz: tz,
-        pastNext: pastNext,
-        overlap: overlap,
-        catchUp: catchUp,
-        maxAttempts:
-            maxAttempts == null ? null : PlatformInt64Util.from(maxAttempts),
-        clearEnds: clearEnds,
-      ));
+  }) async => _schedule(
+    await r_sched.scheduleEdit(
+      key: key,
+      name: name,
+      runEvery: runEvery,
+      cron: cron,
+      startAt: startAt,
+      endsAt: endsAt,
+      for_: for_,
+      tz: tz,
+      pastNext: pastNext,
+      overlap: overlap,
+      catchUp: catchUp,
+      maxAttempts: maxAttempts == null
+          ? null
+          : PlatformInt64Util.from(maxAttempts),
+      clearEnds: clearEnds,
+    ),
+  );
 
   @override
   Future<String> scheduleRemove(String key) => r_sched.scheduleRemove(key: key);
@@ -3334,18 +3756,19 @@ class FfiMuninnApi implements MuninnApi {
     String? main,
     String? format,
     String? query,
-  }) async =>
-      _share(await r_share.shareCreateItem(
-        kind: kind,
-        name: name,
-        description: description,
-        lang: lang,
-        codeFrom: codeFrom,
-        spaceKind: spaceKind,
-        main: main,
-        format: format,
-        query: query,
-      ));
+  }) async => _share(
+    await r_share.shareCreateItem(
+      kind: kind,
+      name: name,
+      description: description,
+      lang: lang,
+      codeFrom: codeFrom,
+      spaceKind: spaceKind,
+      main: main,
+      format: format,
+      query: query,
+    ),
+  );
 
   @override
   Future<ShareCreated> shareCreateThen({
@@ -3365,25 +3788,26 @@ class FfiMuninnApi implements MuninnApi {
     String? query,
     String? peer,
     int? hours,
-  }) async =>
-      _share(await r_share.shareCreateThen(
-        kind: kind,
-        item: item,
-        target: target,
-        to: to,
-        note: note,
-        createItem: createItem,
-        createTo: createTo,
-        description: description,
-        lang: lang,
-        codeFrom: codeFrom,
-        spaceKind: spaceKind,
-        main: main,
-        format: format,
-        query: query,
-        peer: peer,
-        hours: hours == null ? null : BigInt.from(hours),
-      ));
+  }) async => _share(
+    await r_share.shareCreateThen(
+      kind: kind,
+      item: item,
+      target: target,
+      to: to,
+      note: note,
+      createItem: createItem,
+      createTo: createTo,
+      description: description,
+      lang: lang,
+      codeFrom: codeFrom,
+      spaceKind: spaceKind,
+      main: main,
+      format: format,
+      query: query,
+      peer: peer,
+      hours: hours == null ? null : BigInt.from(hours),
+    ),
+  );
 
   @override
   Future<ShareCreated> shareCreateReviewSubject(
@@ -3395,30 +3819,31 @@ class FfiMuninnApi implements MuninnApi {
     String? model,
     String? format,
     String? query,
-  }) async =>
-      _share(await r_share.shareCreateReviewSubject(
-        kind: kind,
-        name: name,
-        description: description,
-        journal: journal,
-        body: body,
-        model: model,
-        format: format,
-        query: query,
-      ));
+  }) async => _share(
+    await r_share.shareCreateReviewSubject(
+      kind: kind,
+      name: name,
+      description: description,
+      journal: journal,
+      body: body,
+      model: model,
+      format: format,
+      query: query,
+    ),
+  );
 
   @override
   Future<ShareCreated> shareCreateProjectItem(
     String kind,
     String name, {
     String description = '',
-  }) async =>
-      _share(await r_share.shareCreateProjectItem(
-        kind: kind,
-        name: name,
-        description: description,
-      ));
-
+  }) async => _share(
+    await r_share.shareCreateProjectItem(
+      kind: kind,
+      name: name,
+      description: description,
+    ),
+  );
 }
 
 OrgOverview _orgOverview(r_orgs.OrgOverview o) => OrgOverview(

@@ -1066,6 +1066,118 @@ pub fn plugin_set_enabled(name: String, enabled: bool) -> anyhow::Result<String>
     Ok(format!("{} plugin {}", if enabled { "enabled" } else { "disabled" }, s.name))
 }
 
+pub(crate) fn plugin_install_of(store: &Store, what: &str, kind: &str, name: &str) -> anyhow::Result<String> {
+    let kind = muninn_core::store::SpaceKind::from_arg(kind.trim())?;
+    let what = what.trim();
+    if what.is_empty() {
+        anyhow::bail!("give a library path or an existing code name");
+    }
+    let path = std::path::Path::new(what);
+    let c = if path.is_file() || what.contains(std::path::MAIN_SEPARATOR) {
+        let abs = std::fs::canonicalize(path).map_err(|e| anyhow::anyhow!("{what}: {e}"))?;
+        let stem = abs.file_stem().and_then(|s| s.to_str()).unwrap_or("plugin").trim_start_matches("lib").to_string();
+        let cname = if name.trim().is_empty() { stem } else { name.trim().to_string() };
+        code::create(store, ORIGIN, &cname, "", muninn_core::store::Lang::Plugin, &abs.to_string_lossy(), Default::default())?
+    } else {
+        store.find_code_space(what)?
+    };
+    let sname = if name.trim().is_empty() { c.name.clone() } else { name.trim().to_string() };
+    let s = code::spaces::create(store, ORIGIN, &sname, "", kind, &c)?;
+    store.note_action(
+        &NewAction::new("plugins.install", ORIGIN, format!("install plugin {} ({})", s.name, s.kind.as_str()))
+            .params(json!({ "space": s.id, "code": c.id, "kind": s.kind.as_str() })),
+    );
+    Ok(format!("installed plugin {} ({}, main {}); review and approve it", s.name, s.kind.as_str(), c.name))
+}
+
+/// `mnnn plugins install PATH|CODE --kind KIND`.
+pub fn plugin_install(what: String, kind: String, name: String) -> anyhow::Result<String> {
+    plugin_install_of(&open_write()?, &what, &kind, &name)
+}
+
+/// One place the last run of a code unit can go (`>` in the TUI Code window).
+pub struct PipeTarget {
+    pub kind: String,
+    pub name: String,
+}
+
+pub(crate) fn code_pipe_targets_of(store: &Store, space: &str) -> anyhow::Result<Vec<PipeTarget>> {
+    let c = store.find_code_space(space.trim())?;
+    let mut out = Vec::new();
+    for x in store.code_spaces()? {
+        if x.id != c.id {
+            out.push(PipeTarget { kind: "code".into(), name: x.name });
+        }
+    }
+    for s in store.spaces()? {
+        out.push(PipeTarget { kind: "space".into(), name: s.name });
+    }
+    for j in store.journals()? {
+        out.push(PipeTarget { kind: "journal".into(), name: j.name });
+    }
+    for m in store.models()? {
+        if !m.is_bars() && m.version > 0 {
+            out.push(PipeTarget { kind: "model".into(), name: m.name });
+        }
+    }
+    for p in store.projects()? {
+        out.push(PipeTarget { kind: "project".into(), name: p.name });
+    }
+    for o in store.orgs()? {
+        out.push(PipeTarget { kind: "org".into(), name: o.slug });
+    }
+    out.push(PipeTarget { kind: "net".into(), name: "all exchanges".into() });
+    Ok(out)
+}
+
+/// Targets for piping a code unit's last result onward.
+pub fn code_pipe_targets(space: String) -> anyhow::Result<Vec<PipeTarget>> {
+    code_pipe_targets_of(&open()?, &space)
+}
+
+pub(crate) fn code_pipe_to_of(store: &Store, space: &str, kind: &str, name: &str) -> anyhow::Result<String> {
+    let c = store.find_code_space(space.trim())?;
+    let info = c.last_run.clone().ok_or_else(|| anyhow::anyhow!("run {} first", c.name))?;
+    let frame = code::pipe::output(&c, &info)?;
+    let kind = kind.trim();
+    let name = name.trim();
+    let env = CodeEnv::for_store(store)?;
+    if kind == "code" {
+        let next = store.find_code_space(name)?;
+        let mut logs = Vec::new();
+        let piped =
+            code::pipe::run(store, &env, ORIGIN, &code::pipe::Source::Frame(frame), &[code::pipe::Step::Code(next.id.clone())], &[], &mut |l| {
+                logs.push(l.to_string());
+            })?;
+        let status = piped.runs.into_iter().next_back().map(|(_, i)| i.status).unwrap_or_else(|| "ok".into());
+        return Ok(format!("piped {} into {} ({status})", c.name, next.name));
+    }
+    if kind == "space" {
+        let next = store.find_space(name)?;
+        if !code::spaces::approved(store, &next) {
+            anyhow::bail!("approve {} first, then pipe into it", next.name);
+        }
+        let mut logs = Vec::new();
+        let info = code::spaces::run(store, &env, ORIGIN, &next, Some(frame), "the app", &mut |l| logs.push(l.to_string()))?;
+        return Ok(format!("piped {} into code space {} ({})", c.name, next.name, info.status));
+    }
+    let sink = match kind {
+        "journal" => code::pipe::Sink::Journal(name.into()),
+        "project" => code::pipe::Sink::Project(name.into(), None),
+        "org" => code::pipe::Sink::Org(name.into(), None),
+        "net" => code::pipe::Sink::Net(None, None),
+        "model" => code::pipe::Sink::Model(name.into()),
+        _ => anyhow::bail!("pipe into code, space, journal, model, project, org or net"),
+    };
+    let made = code::pipe::save(store, ORIGIN, &sink, &frame, Some((&c, &info)), &format!("code:{} | tee {}", c.name, sink.text()))?;
+    Ok(format!("saved the result of {} to {} ({made})", c.name, sink.text()))
+}
+
+/// Pipe the code unit's last result into another code unit, a code space, or a save (`>`).
+pub fn code_pipe_to(space: String, kind: String, name: String) -> anyhow::Result<String> {
+    code_pipe_to_of(&open_write()?, &space, &kind, &name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1081,6 +1193,13 @@ mod tests {
         assert!(plugins_of(&s, Some("analysis")).unwrap().is_empty());
         assert_eq!(plugins_of(&s, None).unwrap()[0].lang, "math");
         assert!(plugins_of(&s, Some("nope")).is_err());
+        let msg = plugin_install_of(&s, "p", "analysis", "pa").unwrap();
+        assert!(msg.contains("installed plugin pa"));
+        assert!(msg.contains("review and approve"));
+        let targets = code_pipe_targets_of(&s, "p").unwrap();
+        assert!(targets.iter().any(|t| t.kind == "space" && t.name == "pp"));
+        assert!(targets.iter().any(|t| t.kind == "net"));
+        assert!(code_pipe_to_of(&s, "p", "journal", "notes").unwrap_err().to_string().contains("run p first"));
     }
 
     #[test]

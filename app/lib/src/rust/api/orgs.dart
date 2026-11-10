@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `announcement`, `cert_acme_org_of`, `cert_clear_of`, `cert_info_of`, `cert_overview_of`, `cert_set_of`, `create_of`, `create_role_of`, `domain_add_of`, `domain_remove_of`, `domains_of`, `edit_of`, `edit_prefs`, `edit_role_of`, `endpoint_add_of`, `endpoint_remove_of`, `invitation`, `joined_of`, `member_reject_of`, `member_role_of`, `mine_of`, `node_cert_of`, `org_overview_of`, `ours_running`, `prefs_of`, `project_add_of`, `project_member_of`, `project_remove_of`, `reap_site`, `remove_of`, `remove_role_of`, `resource_add_of`, `resource_archive_of`, `resource_publish_of`, `resource_release_of`, `role_info`, `role_named`, `served_of`, `site_status`, `template_add_asset_of`, `template_build_of`, `template_info`, `template_preview_of`, `template_remove_asset_of`, `template_remove_of`, `template_save_of`, `template_show_of`, `templates_of`
+// These functions are ignored because they are not marked as `pub`: `announce_lines`, `announcement`, `cert_acme_org_of`, `cert_clear_of`, `cert_info_of`, `cert_overview_of`, `cert_set_of`, `create_of`, `create_role_of`, `domain_add_of`, `domain_remove_of`, `domains_of`, `edit_of`, `edit_prefs`, `edit_role_of`, `endpoint_add_of`, `endpoint_remove_of`, `invitation`, `joined_of`, `member_reject_of`, `member_role_of`, `mine_of`, `node_cert_of`, `org_overview_of`, `ours_running`, `prefs_of`, `project_add_of`, `project_member_of`, `project_remove_of`, `reap_site`, `remove_of`, `remove_role_of`, `resource_add_of`, `resource_archive_of`, `resource_publish_of`, `resource_release_of`, `role_info`, `role_named`, `served_of`, `site_status`, `template_add_asset_of`, `template_build_of`, `template_info`, `template_preview_of`, `template_remove_asset_of`, `template_remove_of`, `template_save_of`, `template_show_of`, `templates_of`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `HostedSite`
 
 /// `mnnn org list` plus the fields `mnnn org show` prints for orgs this node owns.
@@ -491,6 +491,57 @@ Future<List<OrgSyncCodeItem>> orgSyncCode({
 /// `mnnn org sign-in`: a one-time browser link (valid five minutes). The signing key stays in Rust.
 Future<String> orgSignIn({required String org, required String site}) =>
     RustLib.instance.api.crateApiOrgsOrgSignIn(org: org, site: site);
+
+/// Sites peers have announced (`mnnn org announced`).
+Future<List<AnnouncedSite>> orgAnnounced() =>
+    RustLib.instance.api.crateApiOrgsOrgAnnounced();
+
+/// `mnnn org announce`. An empty org announces every hosted org. `closed` announces the site as shut.
+Future<List<String>> orgAnnounce({
+  String? home,
+  required String orgKey,
+  required bool closed,
+}) => RustLib.instance.api.crateApiOrgsOrgAnnounce(
+  home: home,
+  orgKey: orgKey,
+  closed: closed,
+);
+
+/// A site a peer announced.
+class AnnouncedSite {
+  final String peer;
+  final String slug;
+  final String name;
+  final List<String> urls;
+  final bool open;
+
+  const AnnouncedSite({
+    required this.peer,
+    required this.slug,
+    required this.name,
+    required this.urls,
+    required this.open,
+  });
+
+  @override
+  int get hashCode =>
+      peer.hashCode ^
+      slug.hashCode ^
+      name.hashCode ^
+      urls.hashCode ^
+      open.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AnnouncedSite &&
+          runtimeType == other.runtimeType &&
+          peer == other.peer &&
+          slug == other.slug &&
+          name == other.name &&
+          urls == other.urls &&
+          open == other.open;
+}
 
 class OrgBrowseItem {
   final String name;
