@@ -32,9 +32,9 @@ void main() {
   testWidgets('Code spaces menu creates a space, not a placeholder', (t) async {
     final (api, c) = await pump(t);
     await unlock(t);
-    await t.tap(find.text('Projects'));
+    await t.tap(find.text('Code'));
     await t.pumpAndSettle();
-    await t.tap(find.text('Code spaces…'));
+    await t.tap(find.text('Code…'));
     await t.pumpAndSettle();
     expect(c.read(projectPaneProvider), ProjectPane.code);
     expect(find.textContaining('Coming to the app'), findsNothing);
@@ -61,9 +61,9 @@ void main() {
   testWidgets('Pipes menu lists none then runs a pipe', (t) async {
     final (api, c) = await pump(t);
     await unlock(t);
-    await t.tap(find.text('Projects'));
+    await t.tap(find.text('Code'));
     await t.pumpAndSettle();
-    await t.tap(find.text('Pipes (live)…'));
+    await t.tap(find.text('Live pipes…'));
     await t.pumpAndSettle();
     expect(c.read(projectPaneProvider), ProjectPane.pipes);
     expect(find.textContaining('Coming to the app'), findsNothing);
@@ -84,7 +84,7 @@ void main() {
   testWidgets('Pipelines menu creates a graph, not a placeholder', (t) async {
     final (api, c) = await pump(t);
     await unlock(t);
-    await t.tap(find.text('Projects'));
+    await t.tap(find.text('Code'));
     await t.pumpAndSettle();
     await t.tap(find.text('Pipelines…'));
     await t.pumpAndSettle();
@@ -114,9 +114,9 @@ void main() {
     final (api, _) = await pump(t);
     api.codeList = const [CodeSpaceInfo(id: 'c1', shortId: 'c1', name: 'calc')];
     await unlock(t);
-    await t.tap(find.text('Projects'));
+    await t.tap(find.text('Code'));
     await t.pumpAndSettle();
-    await t.tap(find.text('Code spaces…'));
+    await t.tap(find.text('Code…'));
     await t.pumpAndSettle();
     await t.tap(find.byType(PopupMenuButton<String>));
     await t.pumpAndSettle();
@@ -133,9 +133,9 @@ void main() {
   ) async {
     final (api, _) = await pump(t);
     await unlock(t);
-    await t.tap(find.text('Projects'));
+    await t.tap(find.text('Code'));
     await t.pumpAndSettle();
-    await t.tap(find.text('Pipes (live)…'));
+    await t.tap(find.text('Live pipes…'));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('pipe-run')));
     await t.pumpAndSettle();
@@ -187,7 +187,7 @@ void main() {
       ),
     ];
     await unlock(t);
-    await t.tap(find.text('Projects'));
+    await t.tap(find.text('Code'));
     await t.pumpAndSettle();
     await t.tap(find.text('Pipelines…'));
     await t.pumpAndSettle();
