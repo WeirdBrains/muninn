@@ -52,6 +52,7 @@ hex = "0.4"
 base64 = "0.22"
 ratatui = "0.30"
 weirdnet-themes = { version = "0.1.0", path = "../weirdnet-themes", features = ["ratatui"] }
+weirdnet-storage = { version = "0.1.0", path = "../weirdnet-storage" }
 crossterm = "0.29"
 rpassword = "7"
 dirs = "6"

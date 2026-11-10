@@ -11,15 +11,17 @@
 //! Node-local things never sync: identities, exchanges, peers, shards, settings,
 //! import runs, and a few columns (exchange ids, the user's key, run counters).
 //! Bars sync on request only (`mnnn sync bars`). See `docs/sync.md`.
+//!
+//! The log, row codec, agreed hashes, conflicts and the three-way decision are the
+//! `weirdnet-storage` change log; the table registry, model tables, history import, epoch
+//! and the order changes travel in are Muninn's.
 use super::models::{BARS, Model, q};
 use super::{Store, new_id, now_ms};
 use crate::error::{Error, Result};
-use base64::Engine;
-use rusqlite::types::{Value, ValueRef};
-use rusqlite::{OptionalExtension, params, params_from_iter};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use rusqlite::{OptionalExtension, params};
+use weirdnet_storage::sync::{self as log, Backfill, Table, Verdict, alike, row_time};
+
+pub use weirdnet_storage::sync::{Applied, Change, Conflict, Page, Row, row_hash};
 
 pub const MIGRATION: &str = r#"
 CREATE TABLE sync_log (
@@ -104,166 +106,15 @@ pub fn model_key(id: &str) -> String {
     format!("model:{id}")
 }
 
-/// A row as it travels: column → value (blobs as `{"$b": base64}`).
-pub type Row = BTreeMap<String, serde_json::Value>;
-
-/// One changed row: as it is now, or `None` when it was deleted.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Change {
-    pub seq: i64,
-    pub tbl: String,
-    pub pk: serde_json::Value,
-    pub row: Option<Row>,
-    pub at: i64,
-    /// The hash the sender last agreed on with the asker for this row (outer `None`: never).
-    /// Lets the asker see the sender already had its version, so no conflict.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seen: Option<Option<String>>,
-}
-
-/// A page of changes after a cursor.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Page {
-    /// Changes if this differs from what the cursor was taken under (start over).
-    pub epoch: String,
-    pub changes: Vec<Change>,
-    /// The cursor to ask from next.
-    pub next: i64,
-    pub more: bool,
-}
-
-/// What applying a page did.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Applied {
-    pub taken: usize,
-    pub deleted: usize,
-    pub kept: usize,
-    pub same: usize,
-    pub conflicts: usize,
-    /// History entries taken (not counted as changes: syncing them makes more history).
-    #[serde(default)]
-    pub history: usize,
-}
-
-impl Applied {
-    pub fn add(&mut self, o: &Applied) {
-        self.taken += o.taken;
-        self.deleted += o.deleted;
-        self.kept += o.kept;
-        self.same += o.same;
-        self.conflicts += o.conflicts;
-        self.history += o.history;
-    }
-    pub fn changed(&self) -> usize {
-        self.taken + self.deleted
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Conflict {
-    pub id: String,
-    pub tbl: String,
-    pub pk: String,
-    pub peer: String,
-    /// "mine" or "theirs": which row is in the table now.
-    pub kept: String,
-    pub mine: Option<String>,
-    pub theirs: Option<String>,
-    pub reason: String,
-    pub created_at: i64,
-    pub resolved_at: Option<i64>,
-    pub resolution: Option<String>,
-}
-
 const EPOCH: &str = "sync.epoch";
-
-/// A table resolved for reading and writing.
-struct Target {
-    table: String,
-    pk: Vec<String>,
-    cols: Vec<String>,
-    local: &'static [&'static str],
-}
-
-fn now_sql() -> &'static str {
-    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)"
-}
-
-fn value_json(v: ValueRef) -> serde_json::Value {
-    match v {
-        ValueRef::Null => serde_json::Value::Null,
-        ValueRef::Integer(i) => i.into(),
-        ValueRef::Real(f) => serde_json::Number::from_f64(f).map(serde_json::Value::Number).unwrap_or(serde_json::Value::Null),
-        ValueRef::Text(t) => String::from_utf8_lossy(t).into_owned().into(),
-        ValueRef::Blob(b) => serde_json::json!({ "$b": base64::engine::general_purpose::STANDARD.encode(b) }),
-    }
-}
-
-fn json_value(v: &serde_json::Value) -> Value {
-    match v {
-        serde_json::Value::Null => Value::Null,
-        serde_json::Value::Bool(b) => Value::Integer(*b as i64),
-        serde_json::Value::Number(n) => match n.as_i64() {
-            Some(i) => Value::Integer(i),
-            None => Value::Real(n.as_f64().unwrap_or(0.0)),
-        },
-        serde_json::Value::String(s) => Value::Text(s.clone()),
-        serde_json::Value::Object(o) => match o.get("$b").and_then(|b| b.as_str()) {
-            Some(b) => Value::Blob(base64::engine::general_purpose::STANDARD.decode(b).unwrap_or_default()),
-            None => Value::Text(v.to_string()),
-        },
-        serde_json::Value::Array(_) => Value::Text(v.to_string()),
-    }
-}
-
-/// The hash a row is compared by (local columns are not part of it).
-pub fn row_hash(row: &Row) -> String {
-    let b = serde_json::to_vec(row).unwrap_or_default();
-    hex::encode(&Sha256::digest(&b)[..16])
-}
-
-/// The same row but for its times and blanks (one side empty, the other set).
-fn alike(a: &Row, b: &Row) -> bool {
-    let skip = |k: &str| matches!(k, "created_at" | "updated_at" | "_created_at" | "_updated_at");
-    let blank = |v: Option<&serde_json::Value>| v.is_none_or(|v| v.is_null() || v.as_str() == Some(""));
-    a.keys().chain(b.keys()).filter(|k| !skip(k)).all(|k| {
-        let (x, y) = (a.get(k), b.get(k));
-        x == y || blank(x) || blank(y)
-    })
-}
-
-/// When a row was last changed, for picking the newer one in a conflict.
-fn row_time(row: &Row) -> i64 {
-    for c in ["updated_at", "_updated_at", "created_at", "_created_at", "added_at", "issued_at", "stored_at"] {
-        if let Some(t) = row.get(c).and_then(|v| v.as_i64()) {
-            return t;
-        }
-    }
-    0
-}
 
 impl Store {
     fn sync_ready(&self) -> Result<bool> {
         self.table_exists("sync_log")
     }
 
-    fn columns(&self, table: &str) -> Result<(Vec<String>, Vec<String>)> {
-        let mut st = self.conn.prepare(&format!("PRAGMA table_info({})", q(table)))?;
-        let mut cols = vec![];
-        let mut pk: Vec<(i64, String)> = vec![];
-        for r in st.query_map([], |r| Ok((r.get::<_, String>(1)?, r.get::<_, i64>(5)?)))? {
-            let (c, k) = r?;
-            if k > 0 {
-                pk.push((k, c.clone()));
-            }
-            cols.push(c);
-        }
-        pk.sort();
-        Ok((cols, pk.into_iter().map(|(_, c)| c).collect()))
-    }
-
     /// The table a log key stands for here, if this node has it.
-    fn target(&self, key: &str) -> Result<Option<Target>> {
+    fn target(&self, key: &str) -> Result<Option<Table>> {
         let (table, local): (String, &'static [&'static str]) = if let Some(id) = key.strip_prefix("model:") {
             if id == BARS {
                 return Ok(None);
@@ -278,14 +129,7 @@ impl Store {
                 None => return Ok(None),
             }
         };
-        if !self.table_exists(&table)? {
-            return Ok(None);
-        }
-        let (cols, pk) = self.columns(&table)?;
-        if pk.is_empty() {
-            return Ok(None);
-        }
-        Ok(Some(Target { table, pk, cols, local }))
+        Ok(Table::resolve(&self.conn, &table, local)?)
     }
 
     /// Make sure every synced table logs its changes (new model tables included); a
@@ -300,39 +144,21 @@ impl Store {
                 keys.push(model_key(&m.id));
             }
         }
+        let skip_bars = format!("id <> '{BARS}'");
         for key in keys {
             let Some(t) = self.target(&key)? else { continue };
-            let has: i64 = self.conn.query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?1 AND name LIKE 'sync\\_%' ESCAPE '\\'",
-                [&t.table],
-                |r| r.get(0),
-            )?;
+            let has = log::trigger_count(&self.conn, &t.name)?;
             if has >= 3 {
                 continue;
             }
-            let tag: String = key.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
-            let lit = key.replace('\'', "''");
-            let pk = |side: &str| t.pk.iter().map(|c| format!("{side}.{}", q(c))).collect::<Vec<_>>().join(", ");
-            let tq = q(&t.table);
-            let now = now_sql();
-            let mut sql = String::new();
-            for (n, ev, side, del) in [("ai", "INSERT", "NEW", 0), ("au", "UPDATE", "NEW", 0), ("ad", "DELETE", "OLD", 1)] {
-                sql.push_str(&format!(
-                    "DROP TRIGGER IF EXISTS {name}; CREATE TRIGGER {name} AFTER {ev} ON {tq} BEGIN \
-                     DELETE FROM sync_log WHERE tbl = '{lit}' AND pk = json_array({p}); \
-                     INSERT INTO sync_log(tbl, pk, deleted, at) VALUES ('{lit}', json_array({p}), {del}, {now}); END;",
-                    name = q(&format!("sync_{tag}_{n}")),
-                    p = pk(side),
-                ));
-            }
-            if key.starts_with("model:") || key == "models" || has == 0 {
-                let plain = t.pk.iter().map(|c| q(c)).collect::<Vec<_>>().join(", ");
-                let skip = if key == "models" { format!(" WHERE id <> '{BARS}'") } else { String::new() };
-                sql.push_str(&format!(
-                    "INSERT OR IGNORE INTO sync_log(tbl, pk, deleted, at) SELECT '{lit}', json_array({plain}), 0, {now} FROM {tq}{skip};"
-                ));
-            }
-            self.conn.execute_batch(&sql)?;
+            let backfill = if key == "models" {
+                Backfill::Where(&skip_bars)
+            } else if key.starts_with("model:") || has == 0 {
+                Backfill::All
+            } else {
+                Backfill::None
+            };
+            log::log_table(&self.conn, &key, &t, backfill)?;
         }
         Ok(())
     }
@@ -347,68 +173,20 @@ impl Store {
         Ok(e)
     }
 
-    fn pk_where(t: &Target, pk: &serde_json::Value) -> Result<(String, Vec<Value>)> {
-        let vals = pk.as_array().ok_or_else(|| Error::invalid("sync", "bad key"))?;
-        if vals.len() != t.pk.len() {
-            return Err(Error::invalid("sync", "key does not fit the table"));
-        }
-        let w = t.pk.iter().enumerate().map(|(i, c)| format!("{} IS ?{}", q(c), i + 1)).collect::<Vec<_>>().join(" AND ");
-        Ok((w, vals.iter().map(json_value).collect()))
+    fn read_row(&self, t: &Table, pk: &serde_json::Value) -> Result<Option<Row>> {
+        Ok(log::read_row(&self.conn, t, pk)?)
     }
 
-    fn read_row(&self, t: &Target, pk: &serde_json::Value) -> Result<Option<Row>> {
-        let (w, vals) = Self::pk_where(t, pk)?;
-        let cols: Vec<&String> = t.cols.iter().filter(|c| !t.local.contains(&c.as_str())).collect();
-        let sel = cols.iter().map(|c| q(c)).collect::<Vec<_>>().join(", ");
-        let sql = format!("SELECT {sel} FROM {} WHERE {w}", q(&t.table));
-        Ok(self
-            .conn
-            .query_row(&sql, params_from_iter(vals), |r| {
-                let mut row = Row::new();
-                for (i, c) in cols.iter().enumerate() {
-                    row.insert((*c).clone(), value_json(r.get_ref(i)?));
-                }
-                Ok(row)
-            })
-            .optional()?)
-    }
-
-    fn write_row(&self, t: &Target, pk: &serde_json::Value, row: Option<&Row>) -> Result<()> {
-        let (w, vals) = Self::pk_where(t, pk)?;
-        let Some(row) = row else {
-            self.conn.execute(&format!("DELETE FROM {} WHERE {w}", q(&t.table)), params_from_iter(vals))?;
-            return Ok(());
-        };
-        let cols: Vec<&String> = t.cols.iter().filter(|c| !t.local.contains(&c.as_str()) && row.contains_key(*c)).collect();
-        let exists: i64 =
-            self.conn.query_row(&format!("SELECT COUNT(*) FROM {} WHERE {w}", q(&t.table)), params_from_iter(vals.clone()), |r| r.get(0))?;
-        let args: Vec<Value> = cols.iter().map(|c| json_value(&row[*c])).collect();
-        if exists > 0 {
-            let set: Vec<&&String> = cols.iter().filter(|c| !t.pk.contains(c)).collect();
-            if set.is_empty() {
-                return Ok(());
-            }
-            let n = vals.len();
-            let sets = set.iter().enumerate().map(|(i, c)| format!("{} = ?{}", q(c), n + i + 1)).collect::<Vec<_>>().join(", ");
-            let mut all = vals;
-            all.extend(set.iter().map(|c| json_value(&row[**c])));
-            self.conn.execute(&format!("UPDATE {} SET {sets} WHERE {w}", q(&t.table)), params_from_iter(all))?;
-        } else {
-            let names = cols.iter().map(|c| q(c)).collect::<Vec<_>>().join(", ");
-            let marks = (1..=cols.len()).map(|i| format!("?{i}")).collect::<Vec<_>>().join(", ");
-            self.conn.execute(&format!("INSERT INTO {}({names}) VALUES ({marks})", q(&t.table)), params_from_iter(args))?;
-        }
-        Ok(())
+    fn write_row(&self, t: &Table, pk: &serde_json::Value, row: Option<&Row>) -> Result<()> {
+        Ok(log::write_row(&self.conn, t, pk, row)?)
     }
 
     /// The changes after `cursor` (at most `limit`, about `max_bytes`), as they are now, for `asker`.
     pub fn sync_changes(&self, asker: &str, cursor: i64, limit: usize, max_bytes: usize) -> Result<Page> {
         self.sync_ensure()?;
         let epoch = self.sync_epoch()?;
-        let mut st = self.conn.prepare("SELECT seq, tbl, pk, deleted, at FROM sync_log WHERE seq > ?1 ORDER BY seq LIMIT ?2")?;
-        let rows: Vec<(i64, String, String, i64, i64)> = st
-            .query_map(params![cursor, limit as i64 + 1], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))?
-            .collect::<rusqlite::Result<_>>()?;
+        let rows: Vec<(i64, String, String, i64, i64)> =
+            log::log_after(&self.conn, cursor, limit + 1)?.into_iter().map(|e| (e.seq, e.tbl, e.pk, e.deleted as i64, e.at)).collect();
         let mut more = rows.len() > limit;
         let mut page = Page { epoch, next: cursor, ..Default::default() };
         let mut bytes = 0usize;
@@ -426,8 +204,7 @@ impl Store {
             {
                 sent_models.push(id.to_string());
                 let mpk = serde_json::json!([id]);
-                let mseq: Option<i64> =
-                    self.conn.query_row("SELECT seq FROM sync_log WHERE tbl = 'models' AND pk = ?1", [mpk.to_string()], |r| r.get(0)).optional()?;
+                let mseq = log::log_seq(&self.conn, "models", &mpk.to_string())?;
                 if mseq.is_some_and(|m| m > seq)
                     && let Some(t) = self.target("models")?
                 {
@@ -466,30 +243,17 @@ impl Store {
     }
 
     fn base(&self, peer: &str, tbl: &str, pk: &str) -> Result<Option<Option<String>>> {
-        Ok(self
-            .conn
-            .query_row("SELECT hash FROM sync_base WHERE peer = ?1 AND tbl = ?2 AND pk = ?3", params![peer, tbl, pk], |r| {
-                r.get::<_, Option<String>>(0)
-            })
-            .optional()?)
+        Ok(log::base(&self.conn, peer, tbl, pk)?)
     }
 
     fn set_base(&self, peer: &str, tbl: &str, pk: &str, hash: Option<&str>) -> Result<()> {
-        self.conn.execute(
-            "INSERT INTO sync_base(peer, tbl, pk, hash) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(peer, tbl, pk) DO UPDATE SET hash = excluded.hash",
-            params![peer, tbl, pk, hash],
-        )?;
-        Ok(())
+        Ok(log::set_base(&self.conn, peer, tbl, pk, hash)?)
     }
 
     #[allow(clippy::too_many_arguments)]
     fn note_conflict(&self, tbl: &str, pk: &str, peer: &str, kept: &str, mine: Option<&Row>, theirs: Option<&Row>, reason: &str) -> Result<()> {
-        let j = |r: Option<&Row>| r.map(|r| serde_json::to_string(r).unwrap_or_default());
-        self.conn.execute(
-            "INSERT INTO sync_conflicts(id, tbl, pk, peer, kept, mine, theirs, reason, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![new_id(), tbl, pk, peer, kept, j(mine), j(theirs), reason, now_ms()],
-        )?;
-        Ok(())
+        let id = new_id();
+        Ok(log::note_conflict(&self.conn, log::NewConflict { id: &id, tbl, pk, peer, kept, mine, theirs, reason, at: now_ms() })?)
     }
 
     /// Add (or update) an action of `peer` to this node's history under a local id.
@@ -545,7 +309,7 @@ impl Store {
     }
 
     /// Write a row taken from a linked node; models also get their table.
-    fn take(&self, t: &Target, c: &Change) -> Result<()> {
+    fn take(&self, t: &Table, c: &Change) -> Result<()> {
         if c.tbl != "models" {
             return self.write_row(t, &c.pk, c.row.as_ref());
         }
@@ -593,8 +357,8 @@ impl Store {
         self.sync_ensure()?;
         let mut out = Applied::default();
         // parents may come after their children: keys are checked by the other node
-        self.conn.execute_batch("PRAGMA foreign_keys = OFF; SAVEPOINT sync_apply")?;
-        let r = (|| -> Result<()> {
+        self.conn.execute_batch("PRAGMA foreign_keys = OFF")?;
+        let r = self.atomic("sync_apply", || -> Result<()> {
             let mut order: Vec<&Change> = page.changes.iter().filter(|c| c.tbl == "models").collect();
             order.extend(page.changes.iter().filter(|c| c.tbl != "models"));
             for c in order {
@@ -618,13 +382,10 @@ impl Store {
                 }
                 let base = self.base(peer, &c.tbl, &pk)?.flatten();
                 // they already had my version when they changed it: theirs is newer
-                let seen_mine = c.seen.as_ref().is_some_and(|h| *h == lh);
-                let step = if lh == base || seen_mine {
-                    "take"
-                } else if rh == base {
-                    "keep"
-                } else {
-                    "conflict"
+                let step = match log::decide(lh.as_deref(), rh.as_deref(), base.as_deref(), c.seen.as_ref().map(|h| h.as_deref())) {
+                    Verdict::Take => "take",
+                    Verdict::Keep => "keep",
+                    Verdict::Same | Verdict::Conflict => "conflict",
                 };
                 match step {
                     "take" => {
@@ -656,17 +417,8 @@ impl Store {
                         }
                     }
                     _ => {
-                        let theirs_wins = match (&mine, &c.row) {
-                            (None, Some(_)) => true,
-                            (Some(_), None) => false,
-                            (Some(a), Some(b)) => (row_time(b), rh.clone()) > (row_time(a), lh.clone()),
-                            (None, None) => false,
-                        };
-                        let reason = match (&mine, &c.row) {
-                            (None, _) => "deleted here, changed there",
-                            (_, None) => "changed here, deleted there",
-                            _ => "changed on both nodes",
-                        };
+                        let theirs_wins = log::theirs_win(mine.as_ref(), c.row.as_ref());
+                        let reason = log::conflict_reason(mine.as_ref(), c.row.as_ref());
                         if theirs_wins {
                             if let Err(e) = self.sp("sync_row", || self.take(&t, c)) {
                                 self.note_conflict(&c.tbl, &pk, peer, "mine", mine.as_ref(), c.row.as_ref(), &format!("could not apply: {e}"))?;
@@ -684,50 +436,18 @@ impl Store {
                 self.set_base(peer, &c.tbl, &pk, rh.as_deref())?;
             }
             Ok(())
-        })();
-        let end = match &r {
-            Ok(()) => self.conn.execute_batch("RELEASE sync_apply"),
-            Err(_) => self.conn.execute_batch("ROLLBACK TO sync_apply; RELEASE sync_apply"),
-        };
+        });
         self.conn.execute_batch("PRAGMA foreign_keys = ON")?;
         r?;
-        end?;
         Ok(out)
     }
 
     fn sp(&self, name: &str, f: impl FnOnce() -> Result<()>) -> Result<()> {
-        self.conn.execute_batch(&format!("SAVEPOINT {name}"))?;
-        match f() {
-            Ok(()) => Ok(self.conn.execute_batch(&format!("RELEASE {name}"))?),
-            Err(e) => {
-                let _ = self.conn.execute_batch(&format!("ROLLBACK TO {name}; RELEASE {name}"));
-                Err(e)
-            }
-        }
+        self.atomic(name, f)
     }
 
     pub fn sync_conflicts(&self, all: bool) -> Result<Vec<Conflict>> {
-        let mut st = self.conn.prepare(&format!(
-            "SELECT id, tbl, pk, peer, kept, mine, theirs, reason, created_at, resolved_at, resolution FROM sync_conflicts {} ORDER BY created_at DESC",
-            if all { "" } else { "WHERE resolved_at IS NULL" }
-        ))?;
-        Ok(st
-            .query_map([], |r| {
-                Ok(Conflict {
-                    id: r.get(0)?,
-                    tbl: r.get(1)?,
-                    pk: r.get(2)?,
-                    peer: r.get(3)?,
-                    kept: r.get(4)?,
-                    mine: r.get(5)?,
-                    theirs: r.get(6)?,
-                    reason: r.get(7)?,
-                    created_at: r.get(8)?,
-                    resolved_at: r.get(9)?,
-                    resolution: r.get(10)?,
-                })
-            })?
-            .collect::<rusqlite::Result<_>>()?)
+        Ok(log::conflicts(&self.conn, all)?)
     }
 
     pub fn sync_conflict(&self, key: &str) -> Result<Conflict> {
@@ -758,13 +478,13 @@ impl Store {
             })?;
             resolution = format!("took {}", if c.kept == "mine" { "theirs" } else { "mine" });
         }
-        self.conn.execute("UPDATE sync_conflicts SET resolved_at = ?2, resolution = ?3 WHERE id = ?1", params![c.id, now_ms(), resolution])?;
+        log::mark_resolved(&self.conn, &c.id, now_ms(), &resolution)?;
         self.sync_conflict(&c.id)
     }
 
     /// How many changes are waiting in the log after a cursor (for status).
     pub fn sync_pending(&self, cursor: i64) -> Result<i64> {
-        Ok(self.conn.query_row("SELECT COUNT(*) FROM sync_log WHERE seq > ?1", [cursor], |r| r.get(0))?)
+        Ok(log::pending(&self.conn, cursor)?)
     }
 }
 
@@ -799,6 +519,30 @@ mod tests {
 
     fn name(s: &Store, id: &str) -> Option<String> {
         s.conn.query_row("SELECT name FROM journals WHERE id = ?1", [id], |r| r.get(0)).optional().unwrap()
+    }
+
+    #[test]
+    fn the_change_log_is_the_storage_engines_byte_for_byte() {
+        let s = Store::open_in_memory().unwrap();
+        let c = rusqlite::Connection::open_in_memory().unwrap();
+        c.execute_batch(weirdnet_storage::sync::SCHEMA).unwrap();
+        let sql = |conn: &rusqlite::Connection, kind: &str, name: &str| -> String {
+            conn.query_row("SELECT sql FROM sqlite_master WHERE type = ?1 AND name = ?2", [kind, name], |r| r.get(0)).unwrap()
+        };
+        for t in ["sync_log", "sync_base", "sync_conflicts"] {
+            assert_eq!(sql(&s.conn, "table", t), sql(&c, "table", t));
+        }
+        // trigger names and bodies as Muninn has always made them (existing databases keep theirs)
+        assert_eq!(
+            sql(&s.conn, "trigger", "sync_journals_ai"),
+            "CREATE TRIGGER \"sync_journals_ai\" AFTER INSERT ON \"journals\" BEGIN DELETE FROM sync_log WHERE tbl = 'journals' AND pk = json_array(NEW.\"id\"); \
+             INSERT INTO sync_log(tbl, pk, deleted, at) VALUES ('journals', json_array(NEW.\"id\"), 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); END"
+        );
+        assert_eq!(
+            sql(&s.conn, "trigger", "sync_journals_ad"),
+            "CREATE TRIGGER \"sync_journals_ad\" AFTER DELETE ON \"journals\" BEGIN DELETE FROM sync_log WHERE tbl = 'journals' AND pk = json_array(OLD.\"id\"); \
+             INSERT INTO sync_log(tbl, pk, deleted, at) VALUES ('journals', json_array(OLD.\"id\"), 1, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); END"
+        );
     }
 
     #[test]

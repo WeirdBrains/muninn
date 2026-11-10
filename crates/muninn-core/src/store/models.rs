@@ -1108,8 +1108,7 @@ impl Store {
         let version = m.version + 1;
         let author = self.current_author_id()?;
         let rule = self.rules_rt.chain.borrow().last().cloned();
-        self.conn.execute_batch("SAVEPOINT model_apply")?;
-        let r = (|| -> Result<()> {
+        self.atomic("model_apply", || -> Result<()> {
             self.rebuild(m, to, version, &rows)?;
             let now = now_ms();
             self.conn.execute(
@@ -1121,14 +1120,7 @@ impl Store {
                 params![m.id, version, serde_json::to_string(to)?, serde_json::to_string(&plan.steps)?, opts.note, rule, author, now],
             )?;
             Ok(())
-        })();
-        match r {
-            Ok(()) => self.conn.execute_batch("RELEASE model_apply")?,
-            Err(e) => {
-                let _ = self.conn.execute_batch("ROLLBACK TO model_apply; RELEASE model_apply");
-                return Err(e);
-            }
-        }
+        })?;
         // the new table logs its changes for linked nodes
         self.sync_ensure()?;
         Ok((self.model_or_err(&m.id)?, plan))
@@ -1298,20 +1290,12 @@ impl Store {
         }
         let m = self.model_or_err(BARS)?;
         let design = m.design.clone().with_builtins();
-        self.conn.execute_batch("SAVEPOINT bars_upgrade")?;
-        let r = (|| -> Result<()> {
+        self.atomic("bars_upgrade", || -> Result<()> {
             let rows = self.raw_rows_from("_mx_bars_upgrade", &design, "")?;
             self.rebuild_bars_table(&Model { design: design.clone(), ..m.clone() }, &design, None, &rows)?;
             self.conn.execute_batch("DROP TABLE _mx_bars_upgrade")?;
             Ok(())
-        })();
-        match r {
-            Ok(()) => Ok(self.conn.execute_batch("RELEASE bars_upgrade")?),
-            Err(e) => {
-                let _ = self.conn.execute_batch("ROLLBACK TO bars_upgrade; RELEASE bars_upgrade");
-                Err(e)
-            }
-        }
+        })
     }
 
     /// bars: copy the values of built-in fields given another type into a stored column
@@ -1395,8 +1379,7 @@ impl Store {
                 format!("removing {} deletes its {rows} record(s)", m.name)
             }));
         }
-        self.conn.execute_batch("SAVEPOINT model_remove")?;
-        let r = (|| -> Result<()> {
+        self.atomic("model_remove", || -> Result<()> {
             if !m.is_bars() {
                 self.conn.execute_batch(&format!("DROP TABLE IF EXISTS {}", q(&m.table())))?;
             }
@@ -1415,14 +1398,7 @@ impl Store {
                 self.conn.execute("DELETE FROM models WHERE id = ?1", [&m.id])?;
             }
             Ok(())
-        })();
-        match r {
-            Ok(()) => self.conn.execute_batch("RELEASE model_remove")?,
-            Err(e) => {
-                let _ = self.conn.execute_batch("ROLLBACK TO model_remove; RELEASE model_remove");
-                return Err(e);
-            }
-        }
+        })?;
         Ok((m, rows))
     }
 }

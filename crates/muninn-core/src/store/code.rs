@@ -351,17 +351,7 @@ impl Store {
 
     /// Run `f` all-or-nothing (bulk writes of a plugin).
     pub(crate) fn code_atomic<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<T> {
-        self.conn.execute_batch("SAVEPOINT muninn_code")?;
-        match f() {
-            Ok(v) => {
-                self.conn.execute_batch("RELEASE muninn_code")?;
-                Ok(v)
-            }
-            Err(e) => {
-                let _ = self.conn.execute_batch("ROLLBACK TO muninn_code; RELEASE muninn_code");
-                Err(e)
-            }
-        }
+        self.atomic("muninn_code", f)
     }
 
     /// Remove a code space; it leaves projects and reports point at nothing.

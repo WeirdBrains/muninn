@@ -111,37 +111,37 @@ impl crate::crypto::keyring::EncryptedDatabase for Paths {
         self.db.exists()
     }
     fn encrypt_plaintext(&self, dek: &crate::crypto::Key32) -> Result<()> {
-        crate::store::engine::encrypt_plaintext_in_place(&self.db, &dek.0)
+        Ok(weirdnet_storage::encrypt_plaintext_in_place(&self.db, &dek.0)?)
     }
     fn open_keyed(&self, dek: &crate::crypto::Key32) -> Result<()> {
         crate::store::Store::open(&self.db, Some(&dek.0)).map(|_| ())
     }
     fn rekey_database(&self, old: &crate::crypto::Key32, new: &crate::crypto::Key32) -> Result<()> {
-        let store = crate::store::Store::open(&self.db, Some(&old.0))?;
-        store.conn.query_row("PRAGMA journal_mode = DELETE", [], |_| Ok(()))?;
-        store.rekey(&new.0)
+        // the engine leaves WAL mode before rekeying
+        crate::store::Store::open(&self.db, Some(&old.0))?.rekey(&new.0)
     }
     fn remove_database(&self) {
         let _ = fs::remove_file(&self.db);
     }
 }
 
-/// Private folders and file modes are the storage engine's (re-exported for existing callers).
-pub use crate::store::engine::{ensure_dir, set_mode};
+/// Muninn's side-file extension for private writes (backups skip it).
+pub const SIDE_EXT: &str = "tmp-muninn";
 
-/// Write a file atomically-ish with 0600 permissions. The `tmp-muninn` side file is Muninn's
-/// (backups skip it).
+/// Create a folder (and parents) and make it private (0700 on Unix): the storage engine's.
+pub fn ensure_dir(d: &Path) -> Result<()> {
+    Ok(weirdnet_storage::files::ensure_dir(d)?)
+}
+
+/// Set Unix permission bits (no-op elsewhere): the storage engine's.
+pub fn set_mode(p: &Path, mode: u32) -> Result<()> {
+    Ok(weirdnet_storage::files::set_mode(p, mode)?)
+}
+
+/// Write a file with 0600 permissions through a private `tmp-muninn` side file renamed into
+/// place: the storage engine's private write, with Muninn's side-file name.
 pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
-    if let Some(parent) = path.parent()
-        && !parent.exists()
-    {
-        fs::create_dir_all(parent)?;
-    }
-    let tmp = path.with_extension("tmp-muninn");
-    fs::write(&tmp, bytes)?;
-    set_mode(&tmp, 0o600)?;
-    fs::rename(&tmp, path)?;
-    Ok(())
+    Ok(weirdnet_storage::files::write_private_with(path, bytes, SIDE_EXT)?)
 }
 
 #[cfg(test)]
@@ -165,6 +165,7 @@ mod tests {
             write_private(&p.preferences(), b"x").unwrap();
             let m = fs::metadata(p.preferences()).unwrap().permissions().mode() & 0o777;
             assert_eq!(m, 0o600);
+            assert!(!p.preferences().with_extension(SIDE_EXT).exists());
         }
     }
 }

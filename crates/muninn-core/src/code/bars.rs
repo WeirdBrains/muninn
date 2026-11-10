@@ -408,25 +408,14 @@ pub fn create_record(s: &Store, m: &Model, values: &Map<String, Value>) -> Resul
             core.insert(key.to_string(), crate::store::models::coerce(f, d.clone())?);
         }
     }
-    s.conn.execute_batch("SAVEPOINT bar_create")?;
-    let r = (|| -> Result<String> {
+    s.atomic("bar_create", || -> Result<String> {
         let id = create(s, m, &core)?;
         check_unique(s, m, &core)?;
         if !rest.is_empty() {
             s.update_stored(m, std::slice::from_ref(&id), &rest)?;
         }
         Ok(id)
-    })();
-    match r {
-        Ok(id) => {
-            s.conn.execute_batch("RELEASE bar_create")?;
-            Ok(id)
-        }
-        Err(e) => {
-            let _ = s.conn.execute_batch("ROLLBACK TO bar_create; RELEASE bar_create");
-            Err(e)
-        }
-    }
+    })
 }
 
 /// Delete bars by id (their stored fields go with them); returns how many.

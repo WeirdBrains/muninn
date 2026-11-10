@@ -7,7 +7,7 @@
 //! This module owns every key format and operation (wrap, unwrap, rotate, rekey policy,
 //! recovery, export). It does not know the app's folder layout or its database: both come in
 //! through the two traits below, which the app implements (Muninn: `crate::paths::Paths`,
-//! over the storage engine in `crate::store::engine`). Storage only ever receives the raw DEK
+//! over the `weirdnet-storage` engine). Storage only ever receives the raw DEK
 //! to apply, and opaque already-encrypted bytes to write.
 use super::*;
 use serde::{Deserialize, Serialize};

@@ -10,6 +10,7 @@ Muninn is a cargo workspace; every front end is a thin layer over one library.
 | `app/` | the Flutter app for desktop and mobile ([Flutter app](flutter-app.md)) |
 | `site/` | the website (Jaspr) ([website](website.md)) |
 | `crates/weirdnet-themes` | the theme format, roles, built-in themes (`themes/*.toml`, shared by the TUI, the app and the site) and ratatui colours, as a reusable crate ([themes](themes.md)) |
+| `crates/weirdnet-storage` | SQLCipher open with a caller's raw key, rekey, plaintext conversion, migration runner, savepoints, snapshots, private files and the sync change log, as a reusable crate ([sync](sync.md), [encryption](encryption.md)) |
 
 - `mnnn` behaves exactly as before; the root package re-exports `muninn-core`, so
   `muninn::…` paths in tests still work.
@@ -29,7 +30,7 @@ table above and below:
 
 | Seam | Domain side (moves later) | Muninn side (stays) |
 | ---- | ---- | ---- |
-| Storage engine | `store/engine.rs`: open with a raw key, key / rekey pragmas, plaintext-to-encrypted conversion, migration runner, private modes | `Store`: schema (`MIGRATIONS`), data upgrades, seed rows, queries |
+| Storage (extracted: `crates/weirdnet-storage`) | the crate: open with a raw key, key / rekey (verified on a fresh connection), plaintext-to-encrypted conversion (verified before it replaces the file), migration runner, savepoints, snapshots, private files and folders; its `sync` feature: the change log (triggers, log, agreed hashes, conflicts), row codec and hash, three-way decision | `Store`: schema (`MIGRATIONS`, including the sync tables), data upgrades, seed rows, queries; the synced-table registry (`store::sync::TABLES`), model tables, history import, the sync epoch and the order changes travel in; `Paths` names the `tmp-muninn` side file |
 | Keys | `crypto/keyring.rs` through its `KeyFiles` and `EncryptedDatabase` traits; it owns every key format and operation | `Paths` implements both traits (folder layout, SQLCipher work through the engine) |
 | Themes (extracted: `crates/weirdnet-themes`) | the crate, through `ThemeDirs` and `Mode`; ratatui behind its `ratatui` feature | `theme` re-exports it and returns `crate::Error`; `Paths` implements `ThemeDirs`; `prefs::ThemeMode` converts into `Mode` |
 
@@ -40,6 +41,7 @@ table above and below:
   peers, signatures or existing databases, so it only happens in a separately approved
   rollout with migration adapters, never as part of moving code.
 
-Extracted crates have their own SemVer (`weirdnet-themes` 0.1.0), depend on nothing in
-Muninn, and are `publish = false` until a publication decision; Muninn re-exports them so
-its paths (`muninn_core::theme::…`) and messages stay the same.
+Extracted crates have their own SemVer (`weirdnet-themes` 0.1.0, `weirdnet-storage` 0.1.0),
+depend on nothing in Muninn, and are `publish = false` until a publication decision; Muninn
+re-exports or wraps them so its paths (`muninn_core::theme::…`, `muninn_core::store::sync::Page`)
+and messages ("could not unlock the database: wrong key or not a muninn database …") stay the same.

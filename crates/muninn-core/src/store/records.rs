@@ -535,15 +535,7 @@ impl Store {
         if m.is_bars() {
             let (core, _) = crate::code::bars::split(m, values)?;
             if !core.is_empty() {
-                self.conn.execute_batch("SAVEPOINT bars_update")?;
-                let r = ids.iter().try_for_each(|id| crate::code::bars::update_record(self, m, id, values).map(|_| ()));
-                match r {
-                    Ok(()) => self.conn.execute_batch("RELEASE bars_update")?,
-                    Err(e) => {
-                        let _ = self.conn.execute_batch("ROLLBACK TO bars_update; RELEASE bars_update");
-                        return Err(e);
-                    }
-                }
+                self.atomic("bars_update", || ids.iter().try_for_each(|id| crate::code::bars::update_record(self, m, id, values).map(|_| ())))?;
                 return Ok(ids.len());
             }
         }
@@ -575,8 +567,7 @@ impl Store {
             let set: Vec<String> = given.iter().enumerate().map(|(i, (f, _))| format!("{} = ?{}", q(&f.name), i + 5)).collect();
             format!("UPDATE {t} SET _version = ?2, _updated_at = ?3, _author = ?4, {} WHERE id = ?1", set.join(", "))
         };
-        self.conn.execute_batch("SAVEPOINT record_update")?;
-        let r = (|| -> Result<usize> {
+        self.atomic("record_update", || -> Result<usize> {
             let mut st = self.conn.prepare(&sql)?;
             let mut n = 0;
             for id in ids {
@@ -586,17 +577,7 @@ impl Store {
                 n += st.execute(params_from_iter(args)).map_err(|e| friendly(e, m))?;
             }
             Ok(n)
-        })();
-        match r {
-            Ok(n) => {
-                self.conn.execute_batch("RELEASE record_update")?;
-                Ok(n)
-            }
-            Err(e) => {
-                let _ = self.conn.execute_batch("ROLLBACK TO record_update; RELEASE record_update");
-                Err(e)
-            }
-        }
+        })
     }
 
     /// Records elsewhere referring to these: (model name, count).

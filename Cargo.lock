@@ -4472,6 +4472,7 @@ dependencies = [
  "url",
  "uuid",
  "vsss-rs",
+ "weirdnet-storage",
  "weirdnet-themes",
  "x25519-dalek 2.0.1",
  "x509-parser",
@@ -8916,6 +8917,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
 dependencies = [
  "rustls-pki-types",
+]
+
+[[package]]
+name = "weirdnet-storage"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "hex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.21",
+ "zeroize",
 ]
 
 [[package]]

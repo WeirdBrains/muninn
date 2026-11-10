@@ -1,13 +1,14 @@
-//! SQLite / SQLCipher storage: schema, migrations, queries, upsert.
+//! Muninn's schema, migrations, queries and upsert, on the `weirdnet-storage` engine
+//! (keyed open, rekey, migration runner, savepoints, snapshots, change log).
 use crate::error::{Error, Result};
 use crate::model::{Bar, BarId, Duration, KNOWN_ALIASES, KNOWN_BASES, KNOWN_QUOTES, Source, StoredBar, Symbol};
-use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use std::path::Path;
+use weirdnet_storage as engine;
 
 pub mod archive;
 pub mod authors;
 pub mod code;
-pub mod engine;
 pub mod history;
 pub mod journals;
 pub mod live;
@@ -291,7 +292,7 @@ impl Store {
     }
 
     pub fn open_in_memory() -> Result<Self> {
-        let mut s = Self::wrap(Connection::open_in_memory()?);
+        let mut s = Self::wrap(engine::open_in_memory()?);
         s.migrate()?;
         s.finish_bars_upgrade()?;
         s.sync_ensure()?;
@@ -300,20 +301,16 @@ impl Store {
 
     /// Open an arbitrary SQLite file read-only (service ingest).
     pub fn open_readonly_raw(path: &Path, key: Option<&str>) -> Result<Connection> {
-        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI)?;
-        if let Some(k) = key {
-            conn.pragma_update(None, "key", k)?;
-        }
-        Ok(conn)
+        Ok(engine::open_foreign_readonly(path, key)?)
     }
 
     pub fn apply_key(conn: &Connection, key: Option<&[u8; 32]>) -> Result<()> {
-        engine::apply_key(conn, key)
+        Ok(engine::apply_key(conn, key)?)
     }
 
-    /// Re-encrypt the database with a new key (`PRAGMA rekey`).
+    /// Re-encrypt the database with a new key (`PRAGMA rekey`, in rollback-journal mode).
     pub fn rekey(&self, new_key: &[u8; 32]) -> Result<()> {
-        engine::rekey(&self.conn, new_key)
+        Ok(engine::rekey(&self.conn, new_key)?)
     }
 
     fn migrate(&mut self) -> Result<()> {
@@ -347,7 +344,7 @@ impl Store {
     }
 
     pub fn schema_version(&self) -> Result<i64> {
-        engine::schema_version(&self.conn)
+        Ok(engine::schema_version(&self.conn)?)
     }
 
     // ---- sources ----
@@ -501,14 +498,19 @@ impl Store {
 
     /// Start an all-or-nothing unit (one input file). Nests with `upsert_bars`.
     pub fn begin_atomic(&self) -> Result<()> {
-        Ok(self.conn.execute_batch("SAVEPOINT muninn_file")?)
+        Ok(engine::begin(&self.conn, "muninn_file")?)
     }
     pub fn commit_atomic(&self) -> Result<()> {
-        Ok(self.conn.execute_batch("RELEASE muninn_file")?)
+        Ok(engine::release(&self.conn, "muninn_file")?)
     }
     /// Undo everything since `begin_atomic` (bars, series_stats, ingest run).
     pub fn rollback_atomic(&self) -> Result<()> {
-        Ok(self.conn.execute_batch("ROLLBACK TO muninn_file; RELEASE muninn_file")?)
+        Ok(engine::rollback(&self.conn, "muninn_file")?)
+    }
+
+    /// Run `f` all-or-nothing in a named savepoint (nests).
+    pub(crate) fn atomic<T>(&self, name: &str, f: impl FnOnce() -> Result<T>) -> Result<T> {
+        engine::savepoint(&self.conn, name, f)
     }
 
     /// Like `upsert_bars`; calls `on_rows(n)` every 4096 rows written (progress).
@@ -696,18 +698,7 @@ impl Store {
 
     /// Online backup to `dest`, keyed with the same key (stays encrypted).
     pub fn backup_to(&self, dest: &Path, key: Option<&[u8; 32]>) -> Result<()> {
-        if dest.exists() {
-            std::fs::remove_file(dest)?;
-        }
-        let mut dst = Connection::open(dest)?;
-        Self::apply_key(&dst, key)?;
-        {
-            let b = rusqlite::backup::Backup::new(&self.conn, &mut dst)?;
-            b.run_to_completion(1024, std::time::Duration::from_millis(0), None)?;
-        }
-        drop(dst);
-        crate::paths::set_mode(dest, 0o600)?;
-        Ok(())
+        Ok(engine::snapshot_to(&self.conn, dest, key)?)
     }
 }
 
@@ -717,6 +708,26 @@ mod tests {
 
     fn bar(ts: i64) -> Bar {
         Bar { ts, open: 1.0, high: 2.0, low: 0.5, close: 1.5, volume: 3.0, flags: 0 }
+    }
+
+    #[test]
+    fn storage_errors_keep_muninn_messages() {
+        let t = tempfile::tempdir().unwrap();
+        let p = t.path().join("storage").join("muninn.database");
+        Store::open(&p, Some(&[1u8; 32])).unwrap();
+        let e = Store::open(&p, Some(&[2u8; 32])).err().unwrap();
+        assert!(matches!(e, Error::Unlock(_)));
+        assert!(e.to_string().starts_with("could not unlock the database: wrong key or not a muninn database ("), "{e}");
+        let e = Error::from(weirdnet_storage::StorageError::NotPlaintext);
+        assert_eq!(e.to_string(), "could not unlock the database: existing database is not a plaintext SQLite file");
+        let e = Error::from(weirdnet_storage::StorageError::invalid("sync", "bad key"));
+        assert_eq!(e.to_string(), "invalid sync: bad key");
+        // a snapshot stays encrypted under the same key and is private
+        let s = Store::open(&p, Some(&[1u8; 32])).unwrap();
+        let snap = t.path().join("snap.database");
+        s.backup_to(&snap, Some(&[1u8; 32])).unwrap();
+        assert!(Store::open_readonly(&snap, Some(&[2u8; 32])).is_err());
+        assert!(Store::open_readonly(&snap, Some(&[1u8; 32])).is_ok());
     }
 
     #[test]

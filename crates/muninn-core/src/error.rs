@@ -46,6 +46,21 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Storage errors keep Muninn's messages and kinds ("could not unlock the database: wrong key
+/// or not a muninn database (…)", SQLite and I/O errors as they were).
+impl From<weirdnet_storage::StorageError> for Error {
+    fn from(e: weirdnet_storage::StorageError) -> Self {
+        use weirdnet_storage::StorageError as S;
+        match e {
+            e @ (S::WrongKey { .. } | S::NotPlaintext | S::NotEncrypted | S::RekeyFailed | S::NoCipher) => Error::Unlock(e.to_string()),
+            S::Invalid { what, msg } => Error::Invalid { what, msg },
+            S::Io(e) => Error::Io(e),
+            S::Sqlite(e) => Error::Sqlite(e),
+            S::Json(e) => Error::Json(e),
+        }
+    }
+}
+
 /// Theme errors keep their messages and kinds.
 impl From<weirdnet_themes::ThemeError> for Error {
     fn from(e: weirdnet_themes::ThemeError) -> Self {
