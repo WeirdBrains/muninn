@@ -11,6 +11,9 @@
 //! | `python` | typed Python → ruff parser → python-ast → Rust → cdylib |
 //! | `plugin` | a library built elsewhere (the source is its path) |
 //!
+//! Checking, generating, building, caching, loading and trust hashing are
+//! [`weirdnet_code_spaces`], under [`MUNINN`] (Muninn's SDK, ABI v1 symbols, hash domains and
+//! messages, so hashes, build keys, generated code and cached plugins stay as they were).
 //! Builds are cached by content hash under `MUNINN_HOME/code/plugins`, and loaded with
 //! `libloading` after an ABI check. Building needs a Rust toolchain (`cargo`); Muninn itself
 //! does not: without one, compiled languages report how to get it, and prebuilt plugins
@@ -25,15 +28,12 @@ pub mod abi;
 pub mod bars;
 pub mod connector;
 pub mod host;
-pub mod math;
+pub use weirdnet_code_spaces::{math, polars, pyconv, python};
 pub mod migrate;
 pub mod parsers;
 pub mod pipe;
 pub mod pipeline;
 pub mod png;
-pub mod polars;
-pub mod pyconv;
-pub mod python;
 pub mod space_share;
 pub mod spaces;
 pub mod view;
@@ -41,9 +41,9 @@ pub mod view;
 use crate::error::{Error, Result};
 use crate::store::{CodeChange, CodeInput, CodeSpace, Lang, NewAction, RunInfo, Store, now_ms};
 use serde_json::{Value, json};
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
+use weirdnet_code_spaces as cs;
 
 /// Bumped when generated code changes (invalidates cached builds).
 pub const CODEGEN: u32 = 1;
@@ -62,34 +62,35 @@ pub const SDK_FILES: &[(&str, &str)] = &[
     ("README.md", include_str!("../../../../plugin/muninn-plugin/README.md")),
 ];
 
-fn hex16(h: blake3::Hash) -> String {
-    h.to_hex()[..32].to_string()
-}
+/// Muninn's code-space profile: the `muninn-plugin` SDK (ABI v1, `muninn_plugin_*`
+/// symbols), its hash domains, generated crate names and messages. Weirdnet's own default
+/// (`weirdnet-plugin`, ABI v2) is a separately approved rollout; until then Muninn builds and
+/// loads v1 plugins only, exactly as before.
+pub const MUNINN: cs::Profile = cs::Profile {
+    app: "Muninn",
+    sdk_package: "muninn-plugin",
+    sdk_crate: "muninn_plugin",
+    sdk_version: SDK_VERSION,
+    sdk_files: SDK_FILES,
+    abi_version: abi::ABI_VERSION,
+    symbols: ["muninn_plugin_abi", "muninn_plugin_info", "muninn_plugin_run"],
+    trust_domain: b"muninn-code-trust\0",
+    lineup_domain: b"muninn-space-lineup\0",
+    crate_prefix: "mnnn_code_",
+    codegen: CODEGEN,
+    cargo_env: "MUNINN_CARGO",
+    cargo_hint: "Install Rust from https://rustup.rs, or set MUNINN_CARGO to cargo; prebuilt plugins run without it (`--lang plugin`). See docs/code-spaces.md",
+    math_help: " (see `mnnn code help math`)",
+};
 
 /// Hash of the embedded SDK.
 pub fn sdk_hash() -> String {
-    let mut h = blake3::Hasher::new();
-    for (n, c) in SDK_FILES {
-        h.update(n.as_bytes());
-        h.update(&[0]);
-        h.update(c.as_bytes());
-        h.update(&[0]);
-    }
-    hex16(h.finalize())
+    cs::sdk_hash(&MUNINN)
 }
 
 /// Write the SDK crate into `dir` (for `mnnn code sdk` and builds).
 pub fn write_sdk(dir: &Path) -> Result<()> {
-    for (n, c) in SDK_FILES {
-        let p = dir.join(n);
-        if let Some(parent) = p.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        if std::fs::read_to_string(&p).ok().as_deref() != Some(*c) {
-            std::fs::write(&p, c)?;
-        }
-    }
-    Ok(())
+    Ok(cs::write_sdk(&MUNINN, dir)?)
 }
 
 static HOME: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
@@ -128,26 +129,22 @@ impl CodeEnv {
         }
     }
 
+    /// The same directories for [`weirdnet_code_spaces`].
+    pub fn spaces(&self) -> cs::Env {
+        cs::Env::new(&self.root, &self.target)
+    }
     pub fn sdk_dir(&self) -> PathBuf {
-        self.root.join("sdk").join(format!("muninn-plugin-{}", &sdk_hash()[..12]))
+        self.spaces().sdk_dir(&MUNINN)
     }
     pub fn build_dir(&self, key: &str) -> PathBuf {
-        self.root.join("build").join(key)
+        self.spaces().build_dir(key)
     }
     pub fn plugins_dir(&self) -> PathBuf {
-        self.root.join("plugins")
+        self.spaces().plugins_dir()
     }
     /// The cached library of a build key.
     pub fn plugin_path(&self, key: &str) -> PathBuf {
-        self.plugins_dir().join(format!("{key}.{}", std::env::consts::DLL_EXTENSION))
-    }
-}
-
-fn plugin_file(source: &str) -> PathBuf {
-    let s = source.trim();
-    match s.strip_prefix("~/") {
-        Some(rest) => dirs::home_dir().map(|h| h.join(rest)).unwrap_or_else(|| PathBuf::from(s)),
-        None => PathBuf::from(s),
+        self.spaces().plugin_path(key)
     }
 }
 
@@ -157,242 +154,40 @@ pub fn trust_hash(space: &CodeSpace) -> Result<String> {
 }
 
 pub fn trust_hash_of(lang: Lang, source: &str) -> Result<String> {
-    let mut h = blake3::Hasher::new();
-    h.update(b"muninn-code-trust\0");
-    h.update(lang.as_str().as_bytes());
-    h.update(&[0]);
-    if lang == Lang::Plugin {
-        let p = plugin_file(source);
-        let bytes = std::fs::read(&p).map_err(|e| Error::invalid("plugin", format!("{}: {e}", p.display())))?;
-        h.update(&bytes);
-    } else {
-        h.update(source.as_bytes());
-    }
-    Ok(hex16(h.finalize()))
+    Ok(cs::trust_hash_of(&MUNINN, lang, source)?)
 }
 
 /// The cache key of a build.
 pub fn build_key(lang: Lang, source: &str) -> String {
-    let mut h = blake3::Hasher::new();
-    h.update(
-        format!("abi{}|sdk{}|codegen{CODEGEN}|{}|{}-{}\0", abi::ABI_VERSION, sdk_hash(), lang.as_str(), std::env::consts::ARCH, std::env::consts::OS)
-            .as_bytes(),
-    );
-    h.update(
-        match lang {
-            Lang::Polars => polars::DEPENDENCY,
-            Lang::Python => python::DEPENDENCY,
-            _ => "",
-        }
-        .as_bytes(),
-    );
-    h.update(&[0]);
-    h.update(source.as_bytes());
-    hex16(h.finalize())
+    cs::build_key(&MUNINN, lang, source)
 }
 
 /// The cargo to build with: `MUNINN_CARGO` or `cargo` on the PATH, checked by running it.
 pub fn cargo() -> Result<PathBuf> {
-    let c = std::env::var_os("MUNINN_CARGO").filter(|c| !c.is_empty()).map(PathBuf::from).unwrap_or_else(|| PathBuf::from("cargo"));
-    match std::process::Command::new(&c).arg("--version").output() {
-        Ok(o) if o.status.success() => Ok(c),
-        _ => Err(Error::missing(
-            "Rust toolchain",
-            format!(
-                "code spaces in math, polars, rust and python compile to plugins with cargo ({} not found). Install Rust from https://rustup.rs, or set MUNINN_CARGO to cargo; prebuilt plugins run without it (`--lang plugin`). See docs/code-spaces.md",
-                c.display()
-            ),
-        )),
-    }
+    Ok(cs::cargo(&MUNINN)?)
 }
 
 /// Check a source without building: the language's own checks (a prebuilt plugin is
 /// copied into the cache and loaded, never loaded in place).
 pub fn check(env: &CodeEnv, lang: Lang, source: &str) -> Result<Vec<String>> {
-    Ok(match lang {
-        Lang::Math => {
-            let p = math::parse(source)?;
-            let fields: Vec<String> = p.fields().into_iter().collect();
-            vec![format!("{} formula(s); input fields used: {}", p.lines.len(), if fields.is_empty() { "none".into() } else { fields.join(", ") })]
-        }
-        Lang::Polars => {
-            let p = polars::parse(source)?;
-            vec![format!("{} step(s); expressions are checked by the compiler at build time", p.steps.len())]
-        }
-        Lang::Python => {
-            let p = python::parse(source)?;
-            let public: Vec<&str> = p.funcs.iter().filter(|f| !f.name.starts_with('_')).map(|f| f.name.as_str()).collect();
-            pyconv::to_rust(source, "user.py").map_err(|e| Error::invalid("python", e))?;
-            vec![format!("columns: {}", public.join(", "))]
-        }
-        Lang::Rust => {
-            if !source.contains("fn run") {
-                return Err(Error::invalid("rust", "define `pub fn run(host: &Host) -> Result<View>` (with `use muninn_plugin::prelude::*;`)"));
-            }
-            vec!["defines run; the compiler checks the rest at build time".into()]
-        }
-        Lang::Plugin => {
-            let p = plugin_file(source);
-            let l = load(&build(env, lang, source, &mut |_| {})?.path)?;
-            vec![format!("{}: ABI {} ({})", p.display(), abi::ABI_VERSION, l.info)]
-        }
-    })
+    Ok(cs::check(&MUNINN, &env.spaces(), lang, source)?)
 }
 
 /// A built plugin.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Built {
-    pub path: PathBuf,
-    pub key: String,
-    /// Already built (nothing compiled).
-    pub cached: bool,
-}
-
-fn manifest(key: &str, sdk: &Path, extra: &str) -> String {
-    format!(
-        "[package]\nname = \"mnnn_code_{key}\"\nversion = \"0.1.0\"\nedition = \"2021\"\npublish = false\n\n[lib]\ncrate-type = [\"cdylib\"]\npath = \"src/lib.rs\"\n\n[dependencies]\nmuninn-plugin = {{ path = {:?} }}\n{extra}\n\n[profile.release]\nopt-level = 3\ndebug = false\n\n[workspace]\n",
-        sdk.display().to_string()
-    )
-}
-
-/// Write the crate of a source; returns the extra dependencies line.
-fn generate(lang: Lang, source: &str, dir: &Path) -> Result<()> {
-    let src = dir.join("src");
-    std::fs::create_dir_all(&src)?;
-    let (user, extra) = match lang {
-        Lang::Math => (math::generate(source)?, ""),
-        Lang::Polars => (polars::generate(source)?, polars::DEPENDENCY),
-        Lang::Rust => {
-            if !source.contains("fn run") {
-                return Err(Error::invalid("rust", "define `pub fn run(host: &Host) -> Result<View>`"));
-            }
-            (source.to_string(), "")
-        }
-        Lang::Python => {
-            let user = python::generate(source)?;
-            let py = python::transpile(source, dir)?;
-            std::fs::write(src.join("py.rs"), py)?;
-            (user, python::DEPENDENCY)
-        }
-        Lang::Plugin => return Err(Error::invalid("plugin", "prebuilt plugins are not compiled")),
-    };
-    std::fs::write(src.join("user.rs"), user)?;
-    std::fs::write(
-        src.join("lib.rs"),
-        format!("#![allow(unused, clippy::all)]\nmod user;\nmuninn_plugin::plugin!(user::run, {:?});\n", lang.as_str()),
-    )?;
-    let key = dir.file_name().and_then(|n| n.to_str()).unwrap_or("x");
-    std::fs::write(dir.join("Cargo.toml"), manifest(key, &dir.join("../../sdk").join(sdk_dir_name()), extra))?;
-    Ok(())
-}
-
-fn sdk_dir_name() -> String {
-    format!("muninn-plugin-{}", &sdk_hash()[..12])
-}
-
-fn copy_in(from: &Path, to: &Path) -> Result<()> {
-    let dir = to.parent().unwrap_or(Path::new("."));
-    std::fs::create_dir_all(dir)?;
-    let tmp = dir.join(format!(".{}.tmp{}", to.file_name().and_then(|n| n.to_str()).unwrap_or("plugin"), std::process::id()));
-    std::fs::copy(from, &tmp)?;
-    std::fs::rename(&tmp, to)?;
-    Ok(())
-}
+pub use cs::Built;
 
 /// Build (or find in the cache) the plugin of a source. Cached libraries are content
 /// addressed and replaced by rename, never rewritten, so a loaded one stays valid. `log` gets cargo's output lines.
 pub fn build(env: &CodeEnv, lang: Lang, source: &str, log: &mut dyn FnMut(&str)) -> Result<Built> {
-    if lang == Lang::Plugin {
-        let p = plugin_file(source);
-        let key = trust_hash_of(lang, source)?;
-        let out = env.plugin_path(&key);
-        let cached = out.exists();
-        if !cached {
-            copy_in(&p, &out)?;
-        }
-        return Ok(Built { path: out, key, cached });
-    }
-    let key = build_key(lang, source);
-    let out = env.plugin_path(&key);
-    if out.exists() {
-        return Ok(Built { path: out, key, cached: true });
-    }
-    let cargo = cargo()?;
-    write_sdk(&env.sdk_dir())?;
-    let dir = env.build_dir(&key);
-    generate(lang, source, &dir)?;
-    log(&format!("building {} code ({key})…", lang.as_str()));
-    let mut child = std::process::Command::new(&cargo)
-        .args(["build", "--release", "--color", "never", "--manifest-path"])
-        .arg(dir.join("Cargo.toml"))
-        .env("CARGO_TARGET_DIR", &env.target)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| Error::missing("Rust toolchain", format!("could not run {}: {e}", cargo.display())))?;
-    let mut lines = vec![];
-    if let Some(err) = child.stderr.take() {
-        use std::io::BufRead;
-        for l in std::io::BufReader::new(err).lines().map_while(std::result::Result::ok) {
-            log(&l);
-            lines.push(l);
-        }
-    }
-    let status = child.wait()?;
-    if !status.success() {
-        let tail = lines.len().saturating_sub(80);
-        return Err(Error::Other(format!("build failed (lines refer to the generated crate in {}):\n{}", dir.display(), lines[tail..].join("\n"))));
-    }
-    let lib = env.target.join("release").join(format!("{}mnnn_code_{key}{}", std::env::consts::DLL_PREFIX, std::env::consts::DLL_SUFFIX));
-    copy_in(&lib, &out)?;
-    log(&format!("built {}", out.display()));
-    Ok(Built { path: out, key, cached: false })
+    Ok(cs::build(&MUNINN, &env.spaces(), lang, source, log)?)
 }
 
 /// A loaded plugin.
-#[derive(Clone, Copy)]
-pub struct Loaded {
-    pub run: abi::PluginRun,
-    pub info: &'static str,
-}
-
-impl std::fmt::Debug for Loaded {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Loaded({})", self.info)
-    }
-}
-
-type Libraries = Mutex<HashMap<PathBuf, Loaded>>;
-static LOADED: OnceLock<Libraries> = OnceLock::new();
+pub use cs::Loaded;
 
 /// Load a plugin (once per process; libraries stay loaded) after checking its ABI.
 pub fn load(path: &Path) -> Result<Loaded> {
-    let map = LOADED.get_or_init(Default::default);
-    let mut map = map.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(l) = map.get(path) {
-        return Ok(*l);
-    }
-    let bad = |m: String| Error::invalid("plugin", format!("{}: {m}", path.display()));
-    // SAFETY: loading runs the library's initializers; the owner approved this code (see
-    // the trust notes above). The library is never unloaded, so its symbols stay valid.
-    let lib: &'static libloading::Library = Box::leak(Box::new(unsafe { libloading::Library::new(path) }.map_err(|e| bad(e.to_string()))?));
-    let loaded = unsafe {
-        let abi_fn = lib.get::<abi::PluginAbi>(abi::SYM_ABI).map_err(|_| bad("not a Muninn plugin (no muninn_plugin_abi)".into()))?;
-        let v = abi_fn();
-        if v != abi::ABI_VERSION {
-            return Err(bad(format!(
-                "built for plugin ABI {v}; this Muninn speaks ABI {} — rebuild it against muninn-plugin {SDK_VERSION}",
-                abi::ABI_VERSION
-            )));
-        }
-        let info_fn = lib.get::<abi::PluginInfo>(abi::SYM_INFO).map_err(|_| bad("no muninn_plugin_info".into()))?;
-        let info = std::str::from_utf8(info_fn().as_bytes()).map_err(|_| bad("info is not UTF-8".into()))?;
-        let run = *lib.get::<abi::PluginRun>(abi::SYM_RUN).map_err(|_| bad("no muninn_plugin_run".into()))?;
-        Loaded { run, info }
-    };
-    map.insert(path.to_path_buf(), loaded);
-    Ok(loaded)
+    Ok(cs::load(&MUNINN, path)?)
 }
 
 thread_local! {
@@ -420,7 +215,7 @@ pub fn declared_kind(c: &CodeSpace) -> Option<String> {
 
 /// Whether a code space can run as it is (approved for its current source).
 pub fn approved(space: &CodeSpace) -> bool {
-    trust_hash(space).ok().is_some_and(|h| space.approved_hash.as_deref() == Some(h.as_str()))
+    cs::approved(&MUNINN, space.lang, &space.source, space.approved_hash.as_deref())
 }
 
 fn need_approval(space: &CodeSpace) -> Error {
@@ -644,9 +439,8 @@ fn run_inner(
     r.input = input;
     r.named = NAMED.with(|n| std::mem::take(&mut *n.borrow_mut()));
     r.options = OPTIONS.with(|o| std::mem::take(&mut *o.borrow_mut()));
-    let table = r.table();
-    // SAFETY: an approved plugin with a checked ABI; `table` and `r` outlive the call.
-    let code = unsafe { (plugin.run)(&table) };
+    // an approved plugin with a checked ABI, with `r` as its host
+    let code = cs::run(&MUNINN, &plugin, &mut r);
     let ms = t.elapsed().as_millis() as u64;
     let mut logs = std::mem::take(&mut r.logs);
     logs.extend(r.notes.iter().map(|n| format!("note: {n}")));

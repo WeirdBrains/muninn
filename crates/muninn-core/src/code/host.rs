@@ -1,17 +1,15 @@
-//! The host side of the plugin ABI: the table a plugin gets (`MnHost`) and the methods it
-//! can call. Requests and replies are JSON; see `docs/code-spaces.md` for each method.
+//! The host side of the plugin ABI: the methods a plugin can call (the table it gets is
+//! built by [`weirdnet_code_spaces::run`] over [`Run`]). Requests and replies are JSON; see `docs/code-spaces.md` for each method.
 //!
 //! Writes a plugin makes go through the store like any other front end (fields are checked
 //! and converted, refs resolved) and are recorded in the history with origin `code`, after
 //! the run's own `code.run` action. Bulk writes (`update_each`, `create_many`) are
 //! all-or-nothing and one history entry each.
-use super::abi::{CALL_ERROR, CALL_OK, MnBuf, MnHost, MnStr};
 use super::view::ResultView;
 use crate::designer::{self as d, Act};
 use crate::error::{Error, Result};
 use crate::store::{CodeSpace, Model, NewAction, RecordQuery, Store};
 use serde_json::{Map, Value, json};
-use std::ffi::c_void;
 
 /// History origin of what a plugin does.
 pub const ORIGIN: &str = "code";
@@ -73,11 +71,6 @@ pub struct Run<'a> {
 impl<'a> Run<'a> {
     pub fn new(store: &'a Store, space: &'a CodeSpace) -> Self {
         Run { store, space, logs: vec![], result: None, notes: vec![], error: None, writes: 0, input: None, named: vec![], options: Map::new() }
-    }
-
-    /// The table to hand to `muninn_plugin_run` (valid while `self` is).
-    pub fn table(&mut self) -> MnHost {
-        MnHost { abi_version: super::abi::ABI_VERSION, ctx: self as *mut Run as *mut c_void, call: host_call, free: host_free }
     }
 
     fn note(&mut self, a: Act) {
@@ -376,48 +369,18 @@ pub fn load(s: &Store, req: &Value) -> Result<Value> {
     Ok(json!({ "model": m.name, "fields": fields, "ids": ids, "columns": columns, "groups": groups }))
 }
 
-fn reply(out: *mut MnBuf, s: String) {
-    let b = s.into_bytes().into_boxed_slice();
-    let len = b.len();
-    let ptr = Box::into_raw(b) as *mut u8;
-    // SAFETY: `out` is the plugin's buffer for this call.
-    unsafe { *out = MnBuf { ptr, len, cap: len } };
-}
-
-/// `MnHost::call`.
-unsafe extern "C" fn host_call(ctx: *mut c_void, method: MnStr, request: MnStr, out: *mut MnBuf) -> i32 {
-    if ctx.is_null() || out.is_null() {
-        return CALL_ERROR;
-    }
-    // SAFETY: the plugin passes back the ctx we gave it, and lends the strings for this call.
-    let (run, method, request) = unsafe { (&mut *(ctx as *mut Run), method.as_bytes(), request.as_bytes()) };
-    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<String> {
-        let method = std::str::from_utf8(method).map_err(|_| Error::invalid("host method", "not UTF-8"))?;
-        let text = std::str::from_utf8(request).map_err(|_| Error::invalid("request", "not UTF-8"))?;
-        let req: Value =
-            if text.trim().is_empty() { Value::Null } else { serde_json::from_str(text).map_err(|e| Error::invalid("request", e.to_string()))? };
-        Ok(run.call(method, req)?.to_string())
-    }));
-    match res {
-        Ok(Ok(s)) => {
-            reply(out, s);
-            CALL_OK
-        }
-        Ok(Err(e)) => {
-            reply(out, e.to_string());
-            CALL_ERROR
-        }
-        Err(_) => {
-            reply(out, "the host failed on this call".into());
-            CALL_ERROR
-        }
-    }
-}
-
-/// `MnHost::free`.
-unsafe extern "C" fn host_free(_ctx: *mut c_void, buf: MnBuf) {
-    if !buf.ptr.is_null() {
-        // SAFETY: made by `reply` from a boxed slice of exactly `len` bytes.
-        drop(unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.ptr, buf.len)) });
+/// A run's host methods for [`weirdnet_code_spaces::run`] (which builds the host table, the
+/// ABI's `call` and `free`, catches panics and checks UTF-8): requests and replies are JSON.
+impl weirdnet_code_spaces::Host for Run<'_> {
+    fn call(&mut self, method: &str, request: &str) -> std::result::Result<String, String> {
+        let res = (|| -> Result<String> {
+            let req: Value = if request.trim().is_empty() {
+                Value::Null
+            } else {
+                serde_json::from_str(request).map_err(|e| Error::invalid("request", e.to_string()))?
+            };
+            Ok(Run::call(self, method, req)?.to_string())
+        })();
+        res.map_err(|e| e.to_string())
     }
 }

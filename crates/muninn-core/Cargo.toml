@@ -15,12 +15,6 @@ name = "muninn_core"
 path = "src/lib.rs"
 
 [dependencies]
-# Python code spaces: parsed in pure Rust (ruff, pinned) and translated with the vendored
-# python-ast code generation (no pyo3, no libpython); see vendor/python-ast/VENDORED.md
-ruff_python_parser = "=0.0.20"
-ruff_python_ast = "=0.0.20"
-ruff_text_size = "=0.0.20"
-python-ast = { workspace = true }
 clap = { version = "4.6", features = ["env", "string", "unicode", "derive", "cargo"] }
 clap_mangen = "0.2"
 polars = { version = "0.55", features = ["lazy", "csv", "json", "parquet", "dtype-datetime", "strings", "temporal"] }
@@ -47,6 +41,8 @@ weirdnet-themes = { version = "0.1.0", path = "../weirdnet-themes", features = [
 weirdnet-storage = { version = "0.1.0", path = "../weirdnet-storage" }
 weirdnet-keys = { version = "0.1.0", path = "../weirdnet-keys" }
 weirdnet-rules = { version = "0.1.0", path = "../weirdnet-rules" }
+# Code spaces (math, Polars, Rust and Python through the vendored python-ast, native plugins)
+weirdnet-code-spaces = { version = "0.1.0", path = "../weirdnet-code-spaces", features = ["math", "polars", "python", "native-plugins"] }
 crossterm = "0.29"
 rpassword = "7"
 dirs = "6"

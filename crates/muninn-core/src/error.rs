@@ -46,6 +46,20 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Code-space errors keep Muninn's messages and kinds (invalid sources and plugins, a missing
+/// toolchain, build failures as they were).
+impl From<weirdnet_code_spaces::SpacesError> for Error {
+    fn from(e: weirdnet_code_spaces::SpacesError) -> Self {
+        use weirdnet_code_spaces::SpacesError as S;
+        match e {
+            S::Invalid { what, msg } => Error::Invalid { what, msg },
+            S::Missing { what, hint } => Error::Missing { what, hint },
+            S::Build(m) => Error::Other(m),
+            S::Io(e) => Error::Io(e),
+        }
+    }
+}
+
 /// Storage errors keep Muninn's messages and kinds ("could not unlock the database: wrong key
 /// or not a muninn database (…)", SQLite and I/O errors as they were).
 impl From<weirdnet_storage::StorageError> for Error {

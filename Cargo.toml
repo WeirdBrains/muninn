@@ -23,12 +23,6 @@ path = "src/lib.rs"
 
 [dependencies]
 muninn-core = { path = "crates/muninn-core" }
-# Python code spaces: parsed in pure Rust (ruff, pinned) and translated with the vendored
-# python-ast code generation (no pyo3, no libpython); see vendor/python-ast/VENDORED.md
-ruff_python_parser = "=0.0.20"
-ruff_python_ast = "=0.0.20"
-ruff_text_size = "=0.0.20"
-python-ast = { workspace = true }
 clap = { version = "4.6", features = ["env", "string", "unicode", "derive", "cargo"] }
 clap_mangen = "0.2"
 polars = { version = "0.55", features = ["lazy", "csv", "json", "parquet", "dtype-datetime", "strings", "temporal"] }
@@ -145,13 +139,10 @@ assets = [
 strip = "symbols"
 
 [workspace]
-members = ["crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage", "crates/weirdnet-keys", "crates/weirdnet-rules"]
-# plain `cargo build/test/clippy` at the root covers all of them (not the vendored crate)
-default-members = [".", "crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage", "crates/weirdnet-keys", "crates/weirdnet-rules"]
-exclude = ["vendor/python-ast"]
-
-[workspace.dependencies]
-python-ast = { path = "vendor/python-ast" }
+members = ["crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage", "crates/weirdnet-keys", "crates/weirdnet-rules", "crates/weirdnet-code-spaces"]
+# plain `cargo build/test/clippy` at the root covers all of them (crates/weirdnet-plugin, the
+# plugin SDK, is its own workspace like plugin/muninn-plugin: plugins build it standalone)
+default-members = [".", "crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage", "crates/weirdnet-keys", "crates/weirdnet-rules", "crates/weirdnet-code-spaces"]
 
 [workspace.package]
 version = "2.23.0"

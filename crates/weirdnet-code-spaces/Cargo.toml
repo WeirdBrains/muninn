@@ -1,0 +1,61 @@
+[package]
+name = "weirdnet-code-spaces"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Weirdnet code spaces: math, Polars, Rust and typed Python sources compiled into plugins against the weirdnet-plugin SDK, content-addressed builds, ABI-checked loading, trust hashes and space line-ups, under an application profile."
+authors = ["Michael Christenson II <m3talsmith@gmail.com>"]
+# The crate is BSD-3-Clause; src/python_ast is python-ast 1.1.0 (Apache-2.0), see
+# src/python_ast/VENDORED.md and src/python_ast/LICENSE-APACHE.
+license = "BSD-3-Clause AND Apache-2.0"
+# Source lives in this monorepo until it gets a home of its own.
+repository = "https://github.com/WeirdBrains/muninn"
+readme = "README.md"
+keywords = ["plugin", "codegen", "python", "polars", "sandbox"]
+categories = ["development-tools", "compilers"]
+include = ["src/**", "sdk/**", "tests/**", "README.md", "LICENSE"]
+publish = false
+
+[features]
+default = ["math", "native-plugins"]
+math = []
+polars = ["math"]
+python = [
+    "math",
+    "dep:ruff_python_parser", "dep:ruff_python_ast", "dep:ruff_text_size",
+    "dep:anyhow", "dep:anyhow-tracing", "dep:litrs", "dep:num-derive", "dep:num-traits",
+    "dep:proc-macro2", "dep:unicode-ident", "dep:quote", "dep:regex", "dep:syn",
+    "dep:to_tokenstream", "dep:tracing",
+]
+# Running cargo and loading built libraries (desktop platforms).
+native-plugins = ["dep:libloading"]
+
+[dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive", "rc"] }
+blake3 = "1"
+dirs = "6"
+libloading = { version = "0.8", optional = true }
+# Python: parsed in pure Rust (ruff, pinned) into the vendored python-ast (src/python_ast)
+ruff_python_parser = { version = "=0.0.20", optional = true }
+ruff_python_ast = { version = "=0.0.20", optional = true }
+ruff_text_size = { version = "=0.0.20", optional = true }
+anyhow = { version = "1.0", optional = true }
+anyhow-tracing = { version = "0.2", optional = true }
+litrs = { version = "1.0", optional = true }
+num-derive = { version = "0.4", optional = true }
+num-traits = { version = "0.2", optional = true }
+proc-macro2 = { version = "1.0", optional = true }
+unicode-ident = { version = "1", optional = true }
+quote = { version = "1.0", optional = true }
+regex = { version = "1.10", optional = true }
+syn = { version = "2.0", optional = true }
+to_tokenstream = { version = "0.1.3", optional = true }
+tracing = { version = "0.1", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+# src/python_ast keeps its upstream unit tests behind a cfg nothing sets (see VENDORED.md)
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(python_ast_upstream_tests)", "cfg(docsrs)"] }

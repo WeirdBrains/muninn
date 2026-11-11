@@ -214,7 +214,7 @@ def spread(high: float, low: float) -> float:
 The source is parsed by `ruff_python_parser` (pure Rust, pinned to 0.0.20) and turned
 into Rust by the code generator of [python-ast](https://crates.io/crates/python-ast) 1.1.0,
 the engine behind Rython, vendored without its pyo3 parser (Apache-2.0, see
-`vendor/python-ast`). Muninn never embeds Python or links libpython; `mnnn code check`
+`crates/weirdnet-code-spaces/src/python_ast`). Muninn never embeds Python or links libpython; `mnnn code check`
 catches unsupported Python before a build.
 
 ## Prebuilt plugins

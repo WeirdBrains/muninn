@@ -4348,15 +4348,11 @@ dependencies = [
  "postgres",
  "postgres-native-tls",
  "prost",
- "python-ast",
  "ratatui",
  "rcgen 0.14.10",
  "redis",
  "reqwest",
  "rpassword",
- "ruff_python_ast",
- "ruff_python_parser",
- "ruff_text_size",
  "rusqlite",
  "rustls",
  "secrecy",
@@ -4422,15 +4418,11 @@ dependencies = [
  "postgres-native-tls",
  "prost",
  "protox",
- "python-ast",
  "ratatui",
  "rcgen 0.14.10",
  "redis",
  "reqwest",
  "rpassword",
- "ruff_python_ast",
- "ruff_python_parser",
- "ruff_text_size",
  "rusqlite",
  "rustls",
  "secrecy",
@@ -4455,6 +4447,7 @@ dependencies = [
  "ttf-parser",
  "url",
  "uuid",
+ "weirdnet-code-spaces",
  "weirdnet-keys",
  "weirdnet-rules",
  "weirdnet-storage",
@@ -6353,26 +6346,6 @@ name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
-
-[[package]]
-name = "python-ast"
-version = "1.1.0"
-dependencies = [
- "anyhow",
- "anyhow-tracing",
- "litrs",
- "num-derive",
- "num-traits",
- "proc-macro2",
- "quote",
- "regex",
- "serde",
- "syn 2.0.119",
- "thiserror 2.0.21",
- "to_tokenstream",
- "tracing",
- "unicode-ident",
-]
 
 [[package]]
 name = "quick-xml"
@@ -8901,6 +8874,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
 dependencies = [
  "rustls-pki-types",
+]
+
+[[package]]
+name = "weirdnet-code-spaces"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "anyhow-tracing",
+ "blake3",
+ "dirs",
+ "libloading",
+ "litrs",
+ "num-derive",
+ "num-traits",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
+ "serde",
+ "syn 2.0.119",
+ "tempfile",
+ "thiserror 2.0.21",
+ "to_tokenstream",
+ "tracing",
+ "unicode-ident",
 ]
 
 [[package]]

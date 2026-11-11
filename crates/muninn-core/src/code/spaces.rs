@@ -10,85 +10,8 @@ use crate::store::{CodeSpace, NewAction, Space, SpaceKind, SpaceMember, Store};
 use serde_json::{Value, json};
 use std::cell::RefCell;
 
-/// The deepest chain of spaces calling spaces.
-pub const MAX_DEPTH: usize = 8;
-
-/// What main declares it calls.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct Imports {
-    /// Member aliases.
-    pub code: Vec<String>,
-    /// Space names (`space:NAME`, or the NAME of `space:NAME as ALIAS`).
-    pub spaces: Vec<String>,
-    /// (the name main calls it by, the space): `space:NAME` calls NAME, and
-    /// `space:NAME as ALIAS` calls ALIAS (what a renamed import keeps main calling).
-    pub space_aliases: Vec<(String, String)>,
-}
-
-/// One `@imports` part: `space:NAME [as ALIAS]` as (NAME, ALIAS).
-fn space_part(part: &str) -> Option<(String, Option<String>)> {
-    let (k, n) = part.split_once(':')?;
-    if !k.trim().eq_ignore_ascii_case("space") || n.trim().is_empty() {
-        return None;
-    }
-    let n = n.trim();
-    match n.split_once(" as ") {
-        Some((t, a)) if !t.trim().is_empty() && !a.trim().is_empty() => Some((t.trim().to_string(), Some(a.trim().to_string()))),
-        _ => Some((n.to_string(), None)),
-    }
-}
-
-fn header(line: &str) -> Option<(usize, usize)> {
-    let i = line.find("@imports")?;
-    let start = i + "@imports".len();
-    let rest = &line[start..];
-    let trimmed = rest.trim_end();
-    let body = trimmed.trim_end_matches("*/").trim_end_matches("-->").trim_end();
-    Some((start, start + body.len()))
-}
-
-/// Read main's `@imports` header lines (`// @imports a, b, space:other`).
-pub fn imports(source: &str) -> Imports {
-    let mut out = Imports::default();
-    for line in source.lines() {
-        let Some((a, b)) = header(line) else { continue };
-        for part in line[a..b].split(',').map(str::trim).filter(|p| !p.is_empty()) {
-            match space_part(part) {
-                Some((n, alias)) => {
-                    out.space_aliases.push((alias.unwrap_or_else(|| n.clone()), n.clone()));
-                    out.spaces.push(n);
-                }
-                None => out.code.push(part.to_string()),
-            }
-        }
-    }
-    out
-}
-
-/// `source` with space `from` imported as `to` instead (`space:from` becomes
-/// `space:to as from`, so main still calls it `from`); None when it doesn't import it.
-pub fn rename_space_import(source: &str, from: &str, to: &str) -> Option<String> {
-    let mut changed = false;
-    let lines: Vec<String> = source
-        .split_inclusive('\n')
-        .map(|line| {
-            let Some((a, b)) = header(line) else { return line.to_string() };
-            let parts: Vec<String> = line[a..b]
-                .split(',')
-                .map(|part| match space_part(part.trim()) {
-                    Some((n, alias)) if n.eq_ignore_ascii_case(from) => {
-                        changed = true;
-                        let alias = alias.unwrap_or(n);
-                        if alias.eq_ignore_ascii_case(to) { format!(" space:{to}") } else { format!(" space:{to} as {alias}") }
-                    }
-                    _ => part.to_string(),
-                })
-                .collect();
-            format!("{}{}{}", &line[..a], parts.join(","), &line[b..])
-        })
-        .collect();
-    changed.then(|| lines.concat())
-}
+use weirdnet_code_spaces::spaces as cs;
+pub use weirdnet_code_spaces::spaces::{Imports, MAX_DEPTH, imports, rename_space_import};
 
 fn main_of(store: &Store, s: &Space) -> Result<CodeSpace> {
     store.code_space(&s.main_code_id)?.ok_or_else(|| Error::invalid("space", format!("{}: its main code is missing", s.name)))
@@ -97,24 +20,14 @@ fn main_of(store: &Store, s: &Space) -> Result<CodeSpace> {
 /// The line-up hash: main, kind, the members (alias, code, pin) and the spaces main imports.
 pub fn lineup_hash(store: &Store, s: &Space) -> Result<String> {
     let main = main_of(store, s)?;
-    let mut ms: Vec<(String, String, String)> =
-        store.space_members(&s.id)?.into_iter().map(|m| (m.alias.to_lowercase(), m.code_id, m.pin_hash.unwrap_or_default())).collect();
-    ms.sort();
-    let mut sp: Vec<String> = imports(&main.source).spaces.iter().map(|x| x.to_lowercase()).collect();
-    sp.sort();
-    sp.dedup();
-    let mut h = blake3::Hasher::new();
-    h.update(b"muninn-space-lineup\0");
-    h.update(main.id.as_bytes());
-    h.update(&[0]);
-    h.update(s.kind.as_str().as_bytes());
-    for (a, c, p) in &ms {
-        h.update(format!("\0m{a}\0{c}\0{p}").as_bytes());
-    }
-    for x in &sp {
-        h.update(format!("\0s{x}").as_bytes());
-    }
-    Ok(h.finalize().to_hex()[..32].to_string())
+    let ms = store.space_members(&s.id)?;
+    let lineup = cs::Lineup {
+        main_id: &main.id,
+        kind: s.kind.as_str(),
+        members: ms.iter().map(|m| (m.alias.as_str(), m.code_id.as_str(), m.pin_hash.as_deref().unwrap_or_default())).collect(),
+        main_source: &main.source,
+    };
+    Ok(cs::lineup_hash(&super::MUNINN, &lineup))
 }
 
 /// Approved for its current line-up.
@@ -147,26 +60,26 @@ pub fn members(store: &Store, s: &Space) -> Result<Vec<MemberState>> {
     Ok(v)
 }
 
+/// The stored spaces, for the cycle check.
+struct Graph<'a>(&'a Store);
+
+impl cs::Graph for Graph<'_> {
+    type Space = Space;
+    type Error = Error;
+    fn name<'s>(&self, s: &'s Space) -> &'s str {
+        &s.name
+    }
+    fn main_source(&self, s: &Space) -> Result<String> {
+        Ok(main_of(self.0, s)?.source)
+    }
+    fn find(&self, name: &str) -> Option<Space> {
+        self.0.find_space(name).ok()
+    }
+}
+
 /// Refuse loops through main's `space:` imports (a → b → a), and chains deeper than 8.
 pub fn check_cycles(store: &Store, s: &Space) -> Result<()> {
-    fn walk(store: &Store, s: &Space, path: &mut Vec<String>) -> Result<()> {
-        if path.iter().any(|p| p.eq_ignore_ascii_case(&s.name)) {
-            path.push(s.name.clone());
-            return Err(Error::invalid("space", format!("a cycle of spaces: {}", path.join(" → "))));
-        }
-        if path.len() >= MAX_DEPTH {
-            return Err(Error::invalid("space", format!("spaces call spaces more than {MAX_DEPTH} deep: {} → {}", path.join(" → "), s.name)));
-        }
-        path.push(s.name.clone());
-        let main = main_of(store, s)?;
-        for n in imports(&main.source).spaces {
-            let t = store.find_space(&n).map_err(|_| Error::invalid("space", format!("{}: main imports space:{n}, which doesn't exist", s.name)))?;
-            walk(store, &t, path)?;
-        }
-        path.pop();
-        Ok(())
-    }
-    walk(store, s, &mut vec![])
+    cs::check_cycles(&Graph(store), s)
 }
 
 /// The line-up is sound: declared code imports are members, imported spaces exist, are
