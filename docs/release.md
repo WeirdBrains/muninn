@@ -33,7 +33,26 @@ releases are made.
    `homebrew/Casks/muninn.rb` and `homebrew/Casks/muninn-app.rb` into
    [WeirdBrains/homebrew-tap](https://github.com/WeirdBrains/homebrew-tap) and push; copy
    `winget/manifests/w/WeirdBrains/muninn/tui/X.Y.Z` into a fork of microsoft/winget-pkgs,
-   run `winget validate --manifest` on Windows, and open a PR.
+   run `winget validate --manifest` on Windows, and open a PR. Then publish the
+   prebuilt TUI Arch package `muninn-bin` to TAUR (not the Flutter `muninn-app`
+   recipe, which stays local-only):
+
+   ```sh
+   scripts/publish-taur.sh --dry-run X.Y.Z   # build and check the recipe archive
+   scripts/publish-taur.sh X.Y.Z             # then upload it
+   ```
+
+   Run it only after the GitHub release is published: it refuses a draft release. It
+   downloads the release's packaging tarball (or takes `dist/muninn-X.Y.Z-packaging.tar.gz`
+   as a second argument), checks the PKGBUILD's `sha256sums_*` against the release's
+   `SHA256SUMS` and the downloaded Linux tarballs, writes `.SRCINFO` with
+   `makepkg --printsrcinfo` and checks its name, version, sources and sums, packs
+   `PKGBUILD` and `.SRCINFO`, and runs `taurctl pkg upload <archive> --org WeirdBrains -y`.
+   It does nothing when TAUR already has that version and refuses if `muninn-bin` belongs
+   to another organization. Sign in with `taurctl login` first if needed; the script uses
+   the signed-in taurctl session and never reads or prints the token. It needs `gh`,
+   `makepkg` (Arch) and `taurctl`. `packaging/arch/test-publish-taur.sh` checks it with
+   stub tools (CI runs it).
 
 The release is named `Muninn vX.Y.Z` and its notes are the version's `CHANGELOG.md`
 section (`scripts/release-notes.sh X.Y.Z`). Write each bullet as the feature plus how to
@@ -52,7 +71,8 @@ scripts/sync-release-notes.sh --latest             # every release (or list tags
 pushes to `main` and pull requests.
 
 After publishing, the packaging tarball's files are what get submitted to
-microsoft/winget-pkgs, the Homebrew tap and the AUR.
+microsoft/winget-pkgs, the Homebrew tap and TAUR (`muninn-bin` via
+`scripts/publish-taur.sh` / `taurctl pkg upload`).
 
 ## Local checks
 

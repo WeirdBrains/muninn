@@ -24,6 +24,8 @@ jobs:
       - run: cargo test --locked
       - name: Arch build-local.sh installs with or without namcap (stubbed)
         run: packaging/arch/test-build-local.sh
+      - name: publish-taur.sh checks sums, .SRCINFO, draft and TAUR state (stubbed)
+        run: packaging/arch/test-publish-taur.sh
 
   # The website (site/, Jaspr). Separate from the Rust build and the release: Dart is
   # installed here, in the runner, only.
@@ -36,7 +38,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dart-lang/setup-dart@v1
         with:
-          sdk: stable
+          # The Dart in Flutter 3.47.9 (the app job). build_web_compilers 4.8.5 needs < 3.14.
+          sdk: 3.13.7
       - run: dart pub get
       - run: dart pub global activate jaspr_cli 0.23.5
       - run: dart format --output=none --set-exit-if-changed lib tool

@@ -205,3 +205,24 @@ fn fill_sums_skips_missing_dmg_and_setup_exes_but_not_tarballs() {
     let o = run();
     assert!(!o.status.success() && String::from_utf8_lossy(&o.stderr).contains("x86_64-unknown-linux-gnu.tar.gz is not in"), "{o:?}");
 }
+
+#[test]
+fn muninn_bin_pkgbuild_source_urls_are_host_independent() {
+    // $CARCH in source_x86_64/source_aarch64 expands to the host in `makepkg --printsrcinfo`,
+    // so a TAUR/.SRCINFO upload would point both arches at one tarball.
+    let pb = read("packaging/arch/muninn-bin/PKGBUILD");
+    assert!(pb.contains(r#"source_x86_64=("$url/releases/download/v$pkgver/muninn-$pkgver-x86_64-unknown-linux-gnu.tar.gz")"#), "{pb}");
+    assert!(pb.contains(r#"source_aarch64=("$url/releases/download/v$pkgver/muninn-$pkgver-aarch64-unknown-linux-gnu.tar.gz")"#), "{pb}");
+    assert!(!pb.lines().any(|l| l.starts_with("source_") && l.contains("$CARCH")), "source_* arrays must not use $CARCH");
+    let sh = read("scripts/publish-taur.sh");
+    for needle in
+        ["taurctl pkg upload", "--org \"$org\"", "org=WeirdBrains", "muninn-bin", "--dry-run", "makepkg --printsrcinfo", "SHA256SUMS", "isDraft"]
+    {
+        assert!(sh.contains(needle), "scripts/publish-taur.sh should contain {needle}");
+    }
+    assert!(
+        !sh.contains("git push") && !sh.contains("gh release create") && !sh.contains("git tag"),
+        "publish-taur.sh must not push git or make releases"
+    );
+    assert!(read(".github/workflows/ci.yml").contains("packaging/arch/test-publish-taur.sh"));
+}
