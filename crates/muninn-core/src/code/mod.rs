@@ -97,7 +97,13 @@ static HOME: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
 
 /// Tell the library where `MUNINN_HOME` is (front ends call this once; rules use it).
 pub fn set_home(home: &Path) {
-    *HOME.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner()) = Some(home.to_path_buf());
+    replace_home(Some(home));
+}
+
+/// Set (or with `None` unset) the home [`set_home`] sets, returning the one before, so a
+/// caller that changes it for a while can put it back.
+pub fn replace_home(home: Option<&Path>) -> Option<PathBuf> {
+    std::mem::replace(&mut *HOME.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner()), home.map(Path::to_path_buf))
 }
 
 /// Where code spaces are built and cached.

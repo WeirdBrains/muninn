@@ -859,7 +859,9 @@ fn tui_cancel_keeps_finished_files_and_discards_current() {
     let d = tempfile::tempdir().unwrap();
     let fx = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).join("tests/fixtures");
     std::fs::copy(fx.join("ETHUSDT_5m.csv"), d.path().join("ADAUSDT_5m.csv")).unwrap();
-    big_csv(&d.path().join("SOLUSDT_5m.csv"), 3_000_000);
+    big_csv(&d.path().join("SOLUSDT_5m.csv"), 300_000);
+    // the second file's read stops after its first chunk until the cancel is in
+    let held = crate::ingest::progress::hold::hold(&d.path().join("SOLUSDT_5m.csv"));
     a.on_key(key(KeyCode::Char('i')));
     a.import.cd(d.path().to_path_buf());
     a.on_key(key(KeyCode::Char('a')));
@@ -867,17 +869,9 @@ fn tui_cancel_keeps_finished_files_and_discards_current() {
     a.on_key(key(KeyCode::Char('i')));
     assert!(a.import.running());
     let t0 = std::time::Instant::now();
-    // wait until the big file is being stored
-    loop {
-        screen_text(&mut a);
-        if let import::Phase::Running(r) = &a.import.phase
-            && r.progress.file_index.load(std::sync::atomic::Ordering::Relaxed) == 1
-        {
-            break;
-        }
-        assert!(t0.elapsed().as_secs() < 60);
-        std::thread::sleep(std::time::Duration::from_millis(5));
-    }
+    assert!(held.reached(), "the second file is being read");
+    let import::Phase::Running(r) = &a.import.phase else { panic!("not running") };
+    assert_eq!(r.progress.file_index.load(std::sync::atomic::Ordering::Relaxed), 1);
     assert!(screen_text(&mut a).contains("[Cancel]"));
     a.on_key(key(KeyCode::Esc)); // asks first
     let s = screen_text(&mut a);
@@ -887,6 +881,7 @@ fn tui_cancel_keeps_finished_files_and_discards_current() {
     a.on_key(key(KeyCode::Char('c')));
     a.on_key(key(KeyCode::Char('y')));
     assert!(screen_text(&mut a).contains("Cancelling"));
+    held.release();
     while a.import.running() && t0.elapsed().as_secs() < 60 {
         screen_text(&mut a);
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -997,7 +992,9 @@ fn places_are_visible_clickable_and_bookmarkable() {
 fn cancel_with_new_source_leaves_no_artifacts_and_is_recorded() {
     let (_t, mut a) = app();
     let d = tempfile::tempdir().unwrap();
-    big_csv(&d.path().join("SOLUSDT_5m.csv"), 3_000_000);
+    big_csv(&d.path().join("SOLUSDT_5m.csv"), 300_000);
+    // the file's read stops after its first chunk until the cancel is in
+    let held = crate::ingest::progress::hold::hold(&d.path().join("SOLUSDT_5m.csv"));
     let recent_before = a.prefs.tui.import_recent.clone();
     a.on_key(key(KeyCode::Char('i')));
     a.import.cd(d.path().to_path_buf());
@@ -1005,18 +1002,10 @@ fn cancel_with_new_source_leaves_no_artifacts_and_is_recorded() {
     a.on_key(key(KeyCode::Char('a')));
     a.on_key(key(KeyCode::Char('i')));
     let t0 = std::time::Instant::now();
-    // wait until the file is being read
-    loop {
-        if let import::Phase::Running(r) = &a.import.phase
-            && r.progress.file_read.load(std::sync::atomic::Ordering::Relaxed) > 0
-        {
-            break;
-        }
-        assert!(t0.elapsed().as_secs() < 60 && a.import.running());
-        std::thread::yield_now();
-    }
+    assert!(held.reached(), "the file is being read");
     a.on_key(key(KeyCode::Char('c')));
     a.on_key(key(KeyCode::Char('y')));
+    held.release();
     while a.import.running() && t0.elapsed().as_secs() < 60 {
         screen_text(&mut a);
         std::thread::sleep(std::time::Duration::from_millis(10));

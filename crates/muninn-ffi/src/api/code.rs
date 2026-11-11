@@ -1263,11 +1263,73 @@ mod tests {
         assert!(code::parsers::BUILTINS.iter().any(|b| b.name == "parse-csv" || b.name.contains("csv") || b.name.contains("to-bars")));
     }
 
-    fn with_code_home() -> std::path::PathBuf {
-        let home = std::env::temp_dir().join(format!("muninn-ffi-code-home-{}", std::process::id()));
-        std::fs::create_dir_all(&home).unwrap();
-        muninn_core::code::set_home(&home);
-        home
+    /// The code home is process-wide: tests that change it take turns.
+    fn home_turn() -> std::sync::MutexGuard<'static, ()> {
+        static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        TURN.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// A code home for one test, in a temp dir. Dropping it (also while a panic unwinds) puts
+    /// the home before back, removes the dir, then gives up the turn, in that order.
+    struct CodeHome {
+        before: Option<std::path::PathBuf>,
+        dir: tempfile::TempDir,
+        _turn: std::sync::MutexGuard<'static, ()>,
+    }
+
+    impl CodeHome {
+        /// A new home in a temp dir, set while `turn` is held.
+        fn new(turn: std::sync::MutexGuard<'static, ()>) -> CodeHome {
+            let dir = tempfile::tempdir().unwrap();
+            let before = muninn_core::code::replace_home(Some(dir.path()));
+            CodeHome { before, dir, _turn: turn }
+        }
+        fn path(&self) -> &std::path::Path {
+            self.dir.path()
+        }
+    }
+
+    impl Drop for CodeHome {
+        fn drop(&mut self) {
+            muninn_core::code::replace_home(self.before.as_deref());
+        }
+    }
+
+    fn with_code_home() -> CodeHome {
+        CodeHome::new(home_turn())
+    }
+
+    #[test]
+    fn a_code_home_puts_back_the_home_that_was_set_before_it() {
+        let turn = home_turn();
+        let outer = tempfile::tempdir().unwrap();
+        let original = muninn_core::code::replace_home(Some(outer.path()));
+        let inner = CodeHome::new(turn);
+        let path = inner.path().to_path_buf();
+        assert_eq!(inner.before.as_deref(), Some(outer.path()));
+        drop(inner); // puts the outer home back, removes its dir, then gives up the turn
+        let _turn = home_turn();
+        assert!(!path.exists(), "the inner home dir is gone");
+        assert!(outer.path().is_dir(), "the outer home is left alone");
+        let now = muninn_core::code::replace_home(original.as_deref());
+        assert_eq!(now.as_deref(), Some(outer.path()), "the outer home is set again");
+    }
+
+    #[test]
+    fn a_code_home_is_put_back_and_removed_even_when_a_test_panics() {
+        let path = std::panic::catch_unwind(|| {
+            let home = with_code_home();
+            std::panic::panic_any(home.path().to_path_buf());
+        })
+        .unwrap_err()
+        .downcast::<std::path::PathBuf>()
+        .unwrap();
+        assert!(!path.exists(), "the home dir was removed while unwinding");
+        // the turn is free again even though the panic poisoned it, and the home before is back
+        let _turn = home_turn();
+        let now = muninn_core::code::replace_home(None);
+        muninn_core::code::replace_home(now.as_deref());
+        assert_eq!(now, None, "no home is left set after the test");
     }
 
     #[test]

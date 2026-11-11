@@ -280,12 +280,89 @@ pub fn read_counted(path: &std::path::Path, progress: Option<Arc<Progress>>) -> 
             break;
         }
         out.extend_from_slice(&buf[..n]);
+        #[cfg(test)]
+        if out.len() == n {
+            hold::first_chunk(path);
+        }
     }
     drop(r);
     if let Some(p) = &progress {
         p.set_phase(Phase::Parse);
     }
     Ok(out)
+}
+
+/// Test builds only: a test that cancels in the middle of a file holds that file's read
+/// after its first chunk, cancels, then lets it go, so the cancel lands mid-file every time
+/// (the file being small or the machine fast doesn't matter). Real reads never wait.
+#[cfg(test)]
+pub mod hold {
+    use std::path::{Path, PathBuf};
+    use std::sync::{Arc, Condvar, Mutex};
+    use std::time::Duration;
+
+    #[derive(Default)]
+    struct State {
+        reached: bool,
+        released: bool,
+    }
+    type Slot = Arc<(Mutex<State>, Condvar)>;
+    static HELD: Mutex<Vec<(PathBuf, Slot)>> = Mutex::new(Vec::new());
+    /// Nothing waits longer than this (a broken test fails instead of hanging).
+    const LIMIT: Duration = Duration::from_secs(60);
+
+    fn key(p: &Path) -> PathBuf {
+        std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
+    }
+
+    /// Holds reads of one file; dropping it (also when the test panics) lets them go.
+    pub struct Hold {
+        path: PathBuf,
+        slot: Slot,
+    }
+
+    /// Hold the next read of `path` once its first chunk is in.
+    pub fn hold(path: &Path) -> Hold {
+        let slot = Slot::default();
+        let path = key(path);
+        HELD.lock().unwrap_or_else(|e| e.into_inner()).push((path.clone(), slot.clone()));
+        Hold { path, slot }
+    }
+
+    impl Hold {
+        /// Wait until the file's read has its first chunk and is held (false after the limit).
+        pub fn reached(&self) -> bool {
+            let (m, c) = &*self.slot;
+            let g = m.lock().unwrap_or_else(|e| e.into_inner());
+            let (g, _) = c.wait_timeout_while(g, LIMIT, |s| !s.reached).unwrap_or_else(|e| e.into_inner());
+            g.reached
+        }
+        /// Let the read go on.
+        pub fn release(&self) {
+            let (m, c) = &*self.slot;
+            m.lock().unwrap_or_else(|e| e.into_inner()).released = true;
+            c.notify_all();
+        }
+    }
+
+    impl Drop for Hold {
+        fn drop(&mut self) {
+            self.release();
+            HELD.lock().unwrap_or_else(|e| e.into_inner()).retain(|(p, s)| !(p == &self.path && Arc::ptr_eq(s, &self.slot)));
+        }
+    }
+
+    /// Called by `read_counted` after a file's first chunk: waits there if a test holds it.
+    pub(super) fn first_chunk(path: &Path) {
+        let path = key(path);
+        let slot = HELD.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(p, _)| *p == path).map(|(_, s)| s.clone());
+        let Some(slot) = slot else { return };
+        let (m, c) = &*slot;
+        let mut g = m.lock().unwrap_or_else(|e| e.into_inner());
+        g.reached = true;
+        c.notify_all();
+        let _ = c.wait_timeout_while(g, LIMIT, |s| !s.released);
+    }
 }
 
 #[cfg(test)]
