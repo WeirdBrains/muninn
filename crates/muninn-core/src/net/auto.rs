@@ -16,7 +16,7 @@
 //! flagged ([`impostor`]) instead of being taken for it. The short code is still derived
 //! and can be compared with `mnnn net exchange verify` (advanced) for extra assurance.
 use super::client::{self, Accepted};
-use super::exchange::{self, Token};
+use super::exchange::{self, OfferExt, Token};
 use super::node::Node;
 use super::proto::{Wire, WireResp};
 use super::service;

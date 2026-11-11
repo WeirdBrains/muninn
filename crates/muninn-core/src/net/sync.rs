@@ -6,6 +6,7 @@
 //! top of the exchange key.
 use super::client;
 use super::node::Node;
+use super::profile::MUNINN;
 use super::proto::{Req, Resp};
 use crate::crypto::{self, Key32, Sealed};
 use crate::error::{Error, Result};
@@ -82,14 +83,11 @@ fn save_state(s: &Store, peer: &str, st: &State) -> Result<()> {
 /// The key sync pages are sealed with: only nodes holding the user's key have it.
 pub(crate) fn sync_key(s: &Store) -> Result<Key32> {
     let (u, kp) = super::user::load_or_create(s)?;
-    let ed = kp.try_into_ed25519().map_err(|_| Error::Crypto("user key is not ed25519".into()))?;
-    let bytes = zeroize::Zeroizing::new(ed.to_bytes());
-    let ikm = Key32::from_slice(&bytes[..32])?;
-    crypto::hkdf(&ikm, u.id.as_bytes(), "muninn/sync/v1/key")
+    Ok(MUNINN.sync_key(&kp, &u.id)?)
 }
 
 pub(crate) fn aad(peer: &str) -> Vec<u8> {
-    format!("muninn/sync/v1|{peer}").into_bytes()
+    MUNINN.sync_aad(peer)
 }
 
 /// Is this peer one of my user's nodes (certified and not revoked)?

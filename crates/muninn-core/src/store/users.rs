@@ -73,24 +73,9 @@ impl User {
     }
 }
 
-/// A node linked to a user: the user's signature over the node's peer id.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct UserNode {
-    pub user_id: String,
-    pub peer_id: String,
-    pub label: String,
-    pub cert: Vec<u8>,
-    pub issued_at: i64,
-    pub revoked_at: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub revocation: Option<Vec<u8>>,
-}
-
-impl UserNode {
-    pub fn active(&self) -> bool {
-        self.revoked_at.is_none()
-    }
-}
+/// A node linked to a user: the user's signature over the node's peer id (the format is
+/// weirdnet-net's; the table is Muninn's).
+pub use weirdnet_net::user::NodeCert as UserNode;
 
 /// A connection to another user, trusted or not.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

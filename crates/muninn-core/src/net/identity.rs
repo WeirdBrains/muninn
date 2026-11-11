@@ -1,50 +1,38 @@
 //! This node's identity: an Ed25519 keypair made on first use and kept only inside the
-//! encrypted database (so it is in backups and never written in plaintext).
+//! encrypted database (so it is in backups and never written in plaintext). The logic is
+//! weirdnet-net's ([`weirdnet_net::identity`]); the store keeps the bytes.
 use crate::error::{Error, Result};
 use crate::store::Store;
 use libp2p::PeerId;
-use libp2p::identity::{Keypair, PublicKey};
-use sha2::Digest;
+use libp2p::identity::Keypair;
+use weirdnet_net::identity::{self as wid, IdentityStore};
+use zeroize::Zeroizing;
+
+pub use weirdnet_net::identity::{fingerprint, group};
+
+impl IdentityStore for Store {
+    type Error = Error;
+    fn node_identity(&self) -> Result<Option<(Zeroizing<Vec<u8>>, String)>> {
+        Store::node_identity(self)
+    }
+    fn init_node_identity(&self, keypair: &[u8], peer: &str) -> Result<()> {
+        Store::init_node_identity(self, keypair, peer)
+    }
+}
 
 /// The node's keypair, created (and stored) the first time it is needed.
 pub fn load_or_create(store: &Store) -> Result<Keypair> {
-    if let Some((bytes, _)) = store.node_identity()? {
-        return Keypair::from_protobuf_encoding(&bytes).map_err(|e| Error::Crypto(format!("node identity: {e}")));
-    }
-    let kp = Keypair::generate_ed25519();
-    let bytes = zeroize::Zeroizing::new(kp.to_protobuf_encoding().map_err(|e| Error::Crypto(format!("node identity: {e}")))?);
-    store.init_node_identity(&bytes, &kp.public().to_peer_id().to_string())?;
-    // whoever stored first wins
-    let (bytes, _) = store.node_identity()?.ok_or_else(|| Error::Crypto("node identity: not stored".into()))?;
-    Keypair::from_protobuf_encoding(&bytes).map_err(|e| Error::Crypto(format!("node identity: {e}")))
+    wid::load_or_create(store)
 }
 
 /// The node's peer id if it has an identity yet.
 pub fn peer_id(store: &Store) -> Result<Option<PeerId>> {
-    Ok(match store.node_identity()? {
-        Some((_, p)) => Some(p.parse().map_err(|_| Error::Crypto("node identity: bad peer id".into()))?),
-        None => None,
-    })
+    wid::peer_id(store)
 }
 
 /// The fingerprint of the stored identity, if the node has one. Does not create a key.
 pub fn fingerprint_of(store: &Store) -> Result<Option<String>> {
-    let Some((bytes, _)) = store.node_identity()? else {
-        return Ok(None);
-    };
-    let kp = Keypair::from_protobuf_encoding(&bytes).map_err(|e| Error::Crypto(format!("node identity: {e}")))?;
-    Ok(Some(fingerprint(&kp.public())))
-}
-
-/// A short, readable fingerprint of a public key: `3f2a 9c1d 77e0 41b8 aa02`.
-pub fn fingerprint(key: &PublicKey) -> String {
-    let h = sha2::Sha256::digest(key.encode_protobuf());
-    group(&hex::encode(&h[..10]))
-}
-
-/// `abcd1234` → `abcd 1234`.
-pub fn group(hex: &str) -> String {
-    hex.as_bytes().chunks(4).map(|c| String::from_utf8_lossy(c).to_string()).collect::<Vec<_>>().join(" ")
+    wid::fingerprint_of(store)
 }
 
 #[cfg(test)]

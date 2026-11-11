@@ -1,371 +1,116 @@
-//! Key exchanges: authenticated X25519 Diffie-Hellman between two node identities.
-//!
-//! The offerer signs an *offer* (its node key, a fresh X25519 public key, where to reach it,
-//! the scope and an expiry) with its Ed25519 node identity. The answerer checks the
-//! signature, signs an *answer* bound to the offer's hash with its own fresh X25519 key,
-//! and both compute the same secret:
-//!
-//! ```text
-//! transcript = SHA-256("muninn/net/exchange/v1" ‖ offer ‖ answer)      (both signed)
-//! key        = HKDF-SHA256(ikm = X25519(a, B), salt = transcript, info = ".../key")
-//! short code = HKDF(..., info = ".../sas") as ten digits, 12345-67890
-//! ```
-//!
-//! Both people compare the short code (or the fingerprint) out of band to rule out a
-//! man in the middle; `mnnn net exchange verify` records that they matched. Tokens are
-//! `mnnn-x1-offer:` / `mnnn-x1-answer:` and base64url JSON, safe to paste anywhere: they
-//! hold only public keys and signatures.
-use crate::crypto::Key32;
-use crate::error::{Error, Result};
-use base64::Engine;
+//! Key exchanges and invitations, through weirdnet-net with Muninn's profile
+//! ([`MUNINN`]): authenticated X25519 between two node identities, signed offers and
+//! answers, a short code to compare, tokens (`mnnn-x1-offer:` / `mnnn-x1-answer:`) and
+//! links (`muninn://join/…`, `muninn://answer/…`), and messages sealed under the exchange
+//! key. The formats and the derivation are the crate's (see `weirdnet_net::exchange`); the
+//! labels are Muninn's, unchanged, so they interoperate with v2.23.0 and earlier nodes. What
+//! each scope grants (orgs, reviews, links) is Muninn's policy.
+use super::profile::MUNINN;
+use crate::crypto::{Key32, Sealed};
+use crate::error::Result;
 use libp2p::PeerId;
-use libp2p::identity::{Keypair, PublicKey};
-use serde::{Deserialize, Serialize};
-use sha2::Digest;
-use weirdnet_keys::exchange::{self as kx, ExchangeSecret};
+use libp2p::identity::Keypair;
 use zeroize::Zeroizing;
 
-pub const OFFER_PREFIX: &str = "mnnn-x1-offer:";
-pub const ANSWER_PREFIX: &str = "mnnn-x1-answer:";
-pub(crate) const OFFER_DOMAIN: &[u8] = b"muninn/net/offer/v1";
-pub(crate) const ANSWER_DOMAIN: &[u8] = b"muninn/net/answer/v1";
-pub(crate) const TRANSCRIPT_DOMAIN: &[u8] = b"muninn/net/exchange/v1";
-pub(crate) const KEY_INFO: &[u8] = b"muninn/net/exchange/v1/key";
-pub(crate) const SAS_INFO: &[u8] = b"muninn/net/exchange/v1/sas";
-/// Offers are good for a week unless asked otherwise.
-pub const DEFAULT_TTL_MS: i64 = 7 * 24 * 3600 * 1000;
+pub use weirdnet_net::exchange::{Answer, DEFAULT_TTL_MS, Derived, Offer, Token, normalize_code};
+pub use weirdnet_net::profile::{link_scope, node_scope, scope_kind};
 
-/// What an exchange is for: `node` (two nodes), `organization` (2.7, a membership) or
-/// `resource` (2.8, a review link: `as: review` names the review). Older nodes refuse the
-/// newer kinds instead of misreading them.
-pub fn node_scope() -> serde_json::Value {
-    serde_json::json!({ "kind": "node" })
-}
+pub const OFFER_PREFIX: &str = MUNINN.offer_prefix;
+pub const ANSWER_PREFIX: &str = MUNINN.answer_prefix;
+#[cfg(test)]
+pub(crate) const OFFER_DOMAIN: &[u8] = MUNINN.offer_domain.as_bytes();
+#[cfg(test)]
+pub(crate) const ANSWER_DOMAIN: &[u8] = MUNINN.answer_domain.as_bytes();
+#[cfg(test)]
+pub(crate) const TRANSCRIPT_DOMAIN: &[u8] = MUNINN.transcript_domain.as_bytes();
+#[cfg(test)]
+pub(crate) const KEY_INFO: &[u8] = MUNINN.key_info.as_bytes();
+#[cfg(test)]
+pub(crate) const SAS_INFO: &[u8] = MUNINN.sas_info.as_bytes();
+/// Links carry offers (invitations) and answers.
+pub const JOIN_LINK: &str = MUNINN.join_link;
+pub const ANSWER_LINK: &str = MUNINN.answer_link;
 
-/// 2.10: a node asking to be linked to the user of the node it connects to.
-pub fn link_scope() -> serde_json::Value {
-    serde_json::json!({ "kind": "link" })
-}
-
-/// The kind of an exchange scope (`node`, `link`, `organization`, `resource`).
-pub fn scope_kind(scope: &serde_json::Value) -> &str {
-    scope.get("kind").and_then(|k| k.as_str()).unwrap_or("")
-}
-
-fn check_scope(scope: &serde_json::Value) -> Result<()> {
-    match scope.get("kind").and_then(|k| k.as_str()) {
-        Some("node") => Ok(()),
-        // 2.10: the offering node asks to act for the answering node's user
-        Some("link") => Ok(()),
-        // a membership: `as` is `apply` (an applicant's offer to the org's node) or `invite`
-        Some("organization") => {
-            let org = scope.get("org").and_then(|v| v.as_str()).unwrap_or("");
-            let how = scope.get("as").and_then(|v| v.as_str()).unwrap_or("");
-            if org.is_empty() || org.len() > 64 || !matches!(how, "apply" | "invite") {
-                return Err(Error::invalid("exchange", "an organization exchange names the org and whether it applies or invites"));
-            }
-            Ok(())
-        }
-        // a review link: one reviewer's way into one review on the author's node
-        Some("resource") => {
-            let review = scope.get("review").and_then(|v| v.as_str()).unwrap_or("");
-            let how = scope.get("as").and_then(|v| v.as_str()).unwrap_or("");
-            if review.is_empty() || review.len() > 64 || how != "review" {
-                return Err(Error::invalid("exchange", "a resource exchange names the review it is a link to (newer Muninn?)"));
-            }
-            Ok(())
-        }
-        _ => Err(Error::invalid("exchange", "unknown scope")),
-    }
-}
-
-/// A signed offer.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Offer {
-    pub v: u8,
-    /// The exchange id (the same on both sides).
-    pub id: String,
-    pub peer: String,
-    /// The offerer's node public key (protobuf, base64url).
-    pub key: String,
-    /// Its fresh X25519 public key (hex).
-    pub eph: String,
-    pub addrs: Vec<String>,
-    pub label: String,
-    pub scope: serde_json::Value,
-    pub created: i64,
-    pub expires: i64,
-    #[serde(default)]
-    pub sig: String,
-}
-
-/// A signed answer to an offer.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Answer {
-    pub v: u8,
-    /// The offer's exchange id.
-    pub offer: String,
-    /// SHA-256 of the signed offer (hex).
-    pub offer_hash: String,
-    pub peer: String,
-    pub key: String,
-    pub eph: String,
-    pub addrs: Vec<String>,
-    pub label: String,
-    pub created: i64,
-    #[serde(default)]
-    pub sig: String,
-}
-
-/// What both sides derive.
-pub struct Derived {
-    pub key: Key32,
-    /// `12345-67890`.
-    pub short_code: String,
-    /// The transcript's first 8 bytes, grouped: `ab12 cd34 ef56 7890`.
-    pub fingerprint: String,
-}
-
-fn b64() -> base64::engine::GeneralPurpose {
-    base64::engine::general_purpose::URL_SAFE_NO_PAD
-}
-
-fn signed_bytes<T: Serialize>(domain: &[u8], t: &T) -> Result<Vec<u8>> {
-    let mut v = domain.to_vec();
-    v.push(0);
-    v.extend(serde_json::to_vec(t)?);
-    Ok(v)
-}
-
-fn public_key(b64key: &str, peer: &str) -> Result<PublicKey> {
-    let raw = b64().decode(b64key).map_err(|_| Error::invalid("exchange", "bad node key"))?;
-    let pk = PublicKey::try_decode_protobuf(&raw).map_err(|_| Error::invalid("exchange", "bad node key"))?;
-    if pk.to_peer_id().to_string() != peer {
-        return Err(Error::invalid("exchange", "the node key does not match the peer id"));
-    }
-    Ok(pk)
-}
-
-fn x_public(hexkey: &str) -> Result<[u8; 32]> {
-    hex::decode(hexkey).ok().and_then(|v| v.try_into().ok()).ok_or_else(|| Error::invalid("exchange", "bad exchange key"))
-}
-
-impl Offer {
+/// Offers under Muninn's profile.
+pub trait OfferExt: Sized {
     /// A new offer and its X25519 secret (kept until the answer arrives).
-    pub fn new(
-        kp: &Keypair,
-        label: &str,
-        addrs: Vec<String>,
-        scope: serde_json::Value,
-        now: i64,
-        ttl_ms: i64,
-    ) -> Result<(Offer, Zeroizing<[u8; 32]>)> {
-        check_scope(&scope)?;
-        let secret = ExchangeSecret::generate();
-        let mut o = Offer {
-            v: 1,
-            id: uuid::Uuid::new_v4().simple().to_string(),
-            peer: kp.public().to_peer_id().to_string(),
-            key: b64().encode(kp.public().encode_protobuf()),
-            eph: hex::encode(secret.public()),
-            addrs,
-            label: label.to_string(),
-            scope,
-            created: now,
-            expires: now + ttl_ms.max(60_000),
-            sig: String::new(),
-        };
-        let sig = kp.sign(&signed_bytes(OFFER_DOMAIN, &o)?).map_err(|e| Error::Crypto(e.to_string()))?;
-        o.sig = b64().encode(sig);
-        Ok((o, secret.to_bytes()))
-    }
-
+    fn new(kp: &Keypair, label: &str, addrs: Vec<String>, scope: serde_json::Value, now: i64, ttl_ms: i64) -> Result<(Self, Zeroizing<[u8; 32]>)>;
     /// Check the signature, key and scope; returns the offerer's peer id.
-    pub fn verify(&self, now: i64) -> Result<PeerId> {
-        if self.v != 1 {
-            return Err(Error::invalid("exchange", format!("offer version {} is not supported", self.v)));
-        }
-        check_scope(&self.scope)?;
-        let pk = public_key(&self.key, &self.peer)?;
-        let sig = b64().decode(&self.sig).map_err(|_| Error::invalid("exchange", "bad signature"))?;
-        let unsigned = Offer { sig: String::new(), ..self.clone() };
-        if !pk.verify(&signed_bytes(OFFER_DOMAIN, &unsigned)?, &sig) {
-            return Err(Error::invalid("exchange", "the offer's signature does not verify"));
-        }
-        if now > self.expires {
-            return Err(Error::invalid("exchange", "the offer has expired; ask for a new one"));
-        }
-        Ok(pk.to_peer_id())
-    }
-
-    pub fn public_key(&self) -> Result<PublicKey> {
-        public_key(&self.key, &self.peer)
-    }
-
+    fn verify(&self, now: i64) -> Result<PeerId>;
     /// SHA-256 of the signed offer.
-    pub fn hash(&self) -> Result<String> {
-        Ok(hex::encode(sha2::Sha256::digest(signed_bytes(OFFER_DOMAIN, self)?)))
-    }
+    fn hash(&self) -> Result<String>;
+    fn token(&self) -> Result<String>;
+}
 
-    pub fn token(&self) -> Result<String> {
-        Ok(format!("{OFFER_PREFIX}{}", b64().encode(serde_json::to_vec(self)?)))
+impl OfferExt for Offer {
+    fn new(kp: &Keypair, label: &str, addrs: Vec<String>, scope: serde_json::Value, now: i64, ttl_ms: i64) -> Result<(Offer, Zeroizing<[u8; 32]>)> {
+        Ok(MUNINN.offer(kp, label, addrs, scope, now, ttl_ms)?)
+    }
+    fn verify(&self, now: i64) -> Result<PeerId> {
+        Ok(MUNINN.verify_offer(self, now)?)
+    }
+    fn hash(&self) -> Result<String> {
+        Ok(MUNINN.offer_hash(self)?)
+    }
+    fn token(&self) -> Result<String> {
+        Ok(MUNINN.offer_token(self)?)
     }
 }
 
-impl Answer {
-    /// Answer an offer (after [`Offer::verify`]): the answer and the derived key.
-    pub fn new(kp: &Keypair, offer: &Offer, label: &str, addrs: Vec<String>, now: i64) -> Result<(Answer, Derived)> {
-        if offer.peer == kp.public().to_peer_id().to_string() {
-            return Err(Error::invalid("exchange", "this is this node's own offer; it is answered on the other node"));
-        }
-        let secret = ExchangeSecret::generate();
-        let mut a = Answer {
-            v: 1,
-            offer: offer.id.clone(),
-            offer_hash: offer.hash()?,
-            peer: kp.public().to_peer_id().to_string(),
-            key: b64().encode(kp.public().encode_protobuf()),
-            eph: hex::encode(secret.public()),
-            addrs,
-            label: label.to_string(),
-            created: now,
-            sig: String::new(),
-        };
-        let sig = kp.sign(&signed_bytes(ANSWER_DOMAIN, &a)?).map_err(|e| Error::Crypto(e.to_string()))?;
-        a.sig = b64().encode(sig);
-        let shared = secret.agree(&x_public(&offer.eph)?).ok_or_else(|| Error::invalid("exchange", "the offer's exchange key is invalid"))?;
-        let d = derive(&shared, offer, &a)?;
-        Ok((a, d))
-    }
-
+/// Answers under Muninn's profile.
+pub trait AnswerExt: Sized {
+    /// Answer an offer (after [`OfferExt::verify`]): the answer and the derived key.
+    fn new(kp: &Keypair, offer: &Offer, label: &str, addrs: Vec<String>, now: i64) -> Result<(Self, Derived)>;
     /// Check the answer against our offer; returns the answerer's peer id.
-    pub fn verify(&self, offer: &Offer) -> Result<PeerId> {
-        if self.v != 1 {
-            return Err(Error::invalid("exchange", format!("answer version {} is not supported", self.v)));
-        }
-        if self.offer != offer.id || self.offer_hash != offer.hash()? {
-            return Err(Error::invalid("exchange", "the answer is for a different offer"));
-        }
-        let pk = public_key(&self.key, &self.peer)?;
-        let sig = b64().decode(&self.sig).map_err(|_| Error::invalid("exchange", "bad signature"))?;
-        let unsigned = Answer { sig: String::new(), ..self.clone() };
-        if !pk.verify(&signed_bytes(ANSWER_DOMAIN, &unsigned)?, &sig) {
-            return Err(Error::invalid("exchange", "the answer's signature does not verify"));
-        }
-        if self.peer == offer.peer {
-            return Err(Error::invalid("exchange", "an offer cannot be answered by the node that made it"));
-        }
-        Ok(pk.to_peer_id())
-    }
-
+    fn verify(&self, offer: &Offer) -> Result<PeerId>;
     /// The offerer's side: the key from its secret and the answer.
-    pub fn complete(&self, offer: &Offer, secret: &[u8]) -> Result<Derived> {
-        self.verify(offer)?;
-        let s: [u8; 32] = secret.try_into().map_err(|_| Error::Crypto("bad exchange secret".into()))?;
-        let secret = ExchangeSecret::from_bytes(s);
-        let shared = secret.agree(&x_public(&self.eph)?).ok_or_else(|| Error::invalid("exchange", "the answer's exchange key is invalid"))?;
-        derive(&shared, offer, self)
-    }
-
-    pub fn public_key(&self) -> Result<PublicKey> {
-        public_key(&self.key, &self.peer)
-    }
-
-    pub fn token(&self) -> Result<String> {
-        Ok(format!("{ANSWER_PREFIX}{}", b64().encode(serde_json::to_vec(self)?)))
-    }
+    fn complete(&self, offer: &Offer, secret: &[u8]) -> Result<Derived>;
+    fn token(&self) -> Result<String>;
 }
 
-fn derive(dh: &[u8; 32], offer: &Offer, answer: &Answer) -> Result<Derived> {
-    let mut t = sha2::Sha256::new();
-    t.update(TRANSCRIPT_DOMAIN);
-    t.update(signed_bytes(OFFER_DOMAIN, offer)?);
-    t.update(signed_bytes(ANSWER_DOMAIN, answer)?);
-    let transcript = t.finalize();
-    let (key, sas) = kx::derive(dh, &transcript, KEY_INFO, SAS_INFO)?;
-    let n = u64::from_be_bytes(sas) % 10_000_000_000;
-    let code = format!("{:05}-{:05}", n / 100_000, n % 100_000);
-    Ok(Derived { key, short_code: code, fingerprint: super::identity::group(&hex::encode(&transcript[..8])) })
+impl AnswerExt for Answer {
+    fn new(kp: &Keypair, offer: &Offer, label: &str, addrs: Vec<String>, now: i64) -> Result<(Answer, Derived)> {
+        Ok(MUNINN.answer(kp, offer, label, addrs, now)?)
+    }
+    fn verify(&self, offer: &Offer) -> Result<PeerId> {
+        Ok(MUNINN.verify_answer(self, offer)?)
+    }
+    fn complete(&self, offer: &Offer, secret: &[u8]) -> Result<Derived> {
+        Ok(MUNINN.complete(self, offer, secret)?)
+    }
+    fn token(&self) -> Result<String> {
+        Ok(MUNINN.answer_token(self)?)
+    }
 }
-
-/// A pasted token.
-#[derive(Debug, Clone)]
-pub enum Token {
-    Offer(Offer),
-    Answer(Answer),
-}
-
-/// Read an offer or answer token (whitespace and line breaks are ignored).
-/// Links carry offers (invitations) and answers: `muninn://join/…` and `muninn://answer/…`.
-pub const JOIN_LINK: &str = "muninn://join/";
-pub const ANSWER_LINK: &str = "muninn://answer/";
 
 /// The link form of a token (what the user passes on: one address, nothing to verify).
 pub fn link(token: &str) -> String {
-    if let Some(b) = token.strip_prefix(OFFER_PREFIX) {
-        format!("{JOIN_LINK}{b}")
-    } else if let Some(b) = token.strip_prefix(ANSWER_PREFIX) {
-        format!("{ANSWER_LINK}{b}")
-    } else {
-        token.to_string()
-    }
+    MUNINN.link(token)
 }
 
 /// A token from a link or a token (whitespace and line breaks dropped).
 pub fn unlink(input: &str) -> String {
-    let s: String = input.split_whitespace().collect();
-    if let Some(b) = s.strip_prefix(JOIN_LINK) {
-        format!("{OFFER_PREFIX}{}", b.trim_end_matches('/'))
-    } else if let Some(b) = s.strip_prefix(ANSWER_LINK) {
-        format!("{ANSWER_PREFIX}{}", b.trim_end_matches('/'))
-    } else {
-        s
-    }
+    MUNINN.unlink(input)
 }
 
 /// Does this look like a token or a link (rather than an id or a name)?
 pub fn is_token(input: &str) -> bool {
-    let t = input.trim();
-    t.starts_with("mnnn-x1-") || t.starts_with("muninn://")
+    MUNINN.is_token(input)
 }
 
+/// Read an offer or answer token, or its link (whitespace and line breaks are ignored).
 pub fn parse_token(s: &str) -> Result<Token> {
-    let s: String = unlink(s);
-    let (body, offer) = if let Some(b) = s.strip_prefix(OFFER_PREFIX) {
-        (b, true)
-    } else if let Some(b) = s.strip_prefix(ANSWER_PREFIX) {
-        (b, false)
-    } else {
-        return Err(Error::invalid("token", format!("not an exchange token (they start with `{OFFER_PREFIX}` or `{ANSWER_PREFIX}`)")));
-    };
-    let raw = b64().decode(body).map_err(|_| Error::invalid("token", "damaged (base64)"))?;
-    Ok(if offer {
-        Token::Offer(serde_json::from_slice(&raw).map_err(|e| Error::invalid("token", format!("damaged ({e})")))?)
-    } else {
-        Token::Answer(serde_json::from_slice(&raw).map_err(|e| Error::invalid("token", format!("damaged ({e})")))?)
-    })
+    Ok(MUNINN.parse_token(s)?)
 }
 
-/// Normalize a typed short code (`1234567890`, `12345 67890`) to `12345-67890`.
-pub fn normalize_code(s: &str) -> String {
-    let d: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
-    if d.len() == 10 { format!("{}-{}", &d[..5], &d[5..]) } else { s.trim().to_string() }
+/// Seal a message for the other side of an exchange (the exchange and both peer ids are
+/// bound as associated data).
+pub fn seal_msg(key: &Key32, exchange: &str, from: &PeerId, to: &PeerId, plaintext: &[u8]) -> Result<Sealed> {
+    Ok(MUNINN.seal_msg(key, exchange, from, to, plaintext)?)
 }
 
-// ---------- sealed messages ----------
-
-fn aad(exchange: &str, from: &PeerId, to: &PeerId) -> Vec<u8> {
-    format!("muninn/net/msg/v1|{exchange}|{from}|{to}").into_bytes()
-}
-
-/// Seal a message for the other side of an exchange (XChaCha20-Poly1305 under the
-/// exchange key; the exchange and both peer ids are bound as associated data).
-pub fn seal_msg(key: &Key32, exchange: &str, from: &PeerId, to: &PeerId, plaintext: &[u8]) -> Result<crate::crypto::Sealed> {
-    crate::crypto::seal(key, plaintext, &aad(exchange, from, to))
-}
-
-pub fn open_msg(key: &Key32, exchange: &str, from: &PeerId, to: &PeerId, s: &crate::crypto::Sealed) -> Result<Zeroizing<Vec<u8>>> {
-    crate::crypto::open(key, s, &aad(exchange, from, to)).map_err(|_| Error::Crypto("a message failed to authenticate".into()))
+pub fn open_msg(key: &Key32, exchange: &str, from: &PeerId, to: &PeerId, s: &Sealed) -> Result<Zeroizing<Vec<u8>>> {
+    Ok(MUNINN.open_msg(key, exchange, from, to, s)?)
 }
 
 #[cfg(test)]
@@ -410,7 +155,7 @@ mod tests {
         assert!(bad.verify(1_000).is_err());
         // someone else's key under the offerer's id
         let mut bad = offer.clone();
-        bad.key = b64().encode(b.public().encode_protobuf());
+        bad.key = base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, b.public().encode_protobuf());
         assert!(bad.verify(1_000).is_err());
         assert!(offer.verify(1_000 + 61_000).unwrap_err().to_string().contains("expired"));
         assert!(Offer::new(&a, "", vec![], serde_json::json!({"kind": "organization"}), 0, 60_000).is_err());

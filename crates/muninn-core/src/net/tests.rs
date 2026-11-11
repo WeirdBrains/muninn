@@ -51,7 +51,7 @@ impl Peer {
             label: self.label.clone(),
             ..Default::default()
         };
-        self.node = Some(Node::start(self.kp.clone(), cfg, Arc::new(svc)).unwrap());
+        self.node = Some(super::node::start(self.kp.clone(), cfg, Arc::new(svc)).unwrap());
     }
 
     fn node(&self) -> &Node {

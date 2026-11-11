@@ -4455,6 +4455,7 @@ dependencies = [
  "uuid",
  "weirdnet-code-spaces",
  "weirdnet-keys",
+ "weirdnet-net",
  "weirdnet-pipelines",
  "weirdnet-render",
  "weirdnet-rules",
@@ -8937,6 +8938,25 @@ dependencies = [
  "uuid",
  "vsss-rs",
  "x25519-dalek 2.0.1",
+ "zeroize",
+]
+
+[[package]]
+name = "weirdnet-net"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "futures",
+ "hex",
+ "libp2p",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "uuid",
+ "weirdnet-keys",
  "zeroize",
 ]
 

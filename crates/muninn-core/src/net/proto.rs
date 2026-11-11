@@ -1,20 +1,22 @@
-//! What nodes say to each other over `/muninn/net/1` (request-response, CBOR).
+//! What nodes say to each other over `/muninn/net/1` (request-response, CBOR). These are
+//! Muninn's types, carried by weirdnet-net's node; their serialized form is unchanged.
 //!
 //! Only a few things travel in the open: `Hello` (a label and capabilities), offers and
 //! answers (public keys and signatures), org listings and polls for an answer. Everything else is a [`Req`] / [`Resp`] sealed
 //! under the exchange key ([`Wire::Sealed`]), and the receiver checks that the
 //! Noise-authenticated peer is the exchange's peer before opening it.
+use super::profile::MUNINN;
 use crate::crypto::Sealed;
 use crate::live::Found;
 use crate::store::{SearchSpec, ShareKind};
 use serde::{Deserialize, Serialize};
 
-pub const PROTOCOL: &str = "/muninn/net/1";
-pub const KAD_PROTOCOL: &str = "/muninn/kad/1";
+pub const PROTOCOL: &str = MUNINN.protocol;
+pub const KAD_PROTOCOL: &str = MUNINN.kad;
 /// The Kademlia key relays provide.
-pub const RELAY_KEY: &str = "/muninn/relay/1";
+pub const RELAY_KEY: &str = MUNINN.relay_key;
 /// libp2p identify protocol id.
-pub const IDENTIFY_PROTOCOL: &str = "/muninn/id/1";
+pub const IDENTIFY_PROTOCOL: &str = MUNINN.identify;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Wire {
@@ -103,15 +105,8 @@ pub struct Item {
     pub data: Vec<u8>,
 }
 
-/// A sealed shard as stored and returned.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ShardBlob {
-    pub set: String,
-    pub index: u32,
-    pub threshold: u32,
-    pub total: u32,
-    pub blob: String,
-}
+/// A sealed shard as stored and returned (opaque to the network; weirdnet-net's type).
+pub use weirdnet_net::shard::ShardBlob;
 
 /// Requests inside an exchange.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -235,6 +230,24 @@ pub enum Resp {
     Collab {
         resp: crate::collab::wire::CollabResp,
     },
+}
+
+impl weirdnet_net::sealed::Envelope for Wire {
+    fn sealed(exchange: String, sealed: Sealed) -> Self {
+        Wire::Sealed { exchange, sealed }
+    }
+}
+
+impl weirdnet_net::sealed::Reply for WireResp {
+    fn sealed(sealed: Sealed) -> Self {
+        WireResp::Sealed { sealed }
+    }
+    fn into_sealed(self) -> std::result::Result<Sealed, Self> {
+        match self {
+            WireResp::Sealed { sealed } => Ok(sealed),
+            other => Err(other),
+        }
+    }
 }
 
 /// Bytes as base64 in JSON (sealed payloads are JSON).

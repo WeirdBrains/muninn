@@ -69,12 +69,6 @@ pub fn combine_shards(shards: &[String]) -> Result<Key32> {
     Ok(shards::combine(&MUNINN_PROFILE, shards)?)
 }
 
-// ---------- HKDF ----------
-
-pub(crate) fn hkdf(master: &Key32, salt: &[u8], info: &str) -> Result<Key32> {
-    Ok(kdf::hkdf(&master.0, Some(salt), info.as_bytes())?)
-}
-
 /// `HKDF-SHA256(master, salt = db_id, info = "muninn/service/v{n}")`.
 pub fn service_key(master: &Key32, db_id: &str, version: u32) -> Result<Key32> {
     Ok(kdf::service_key(&MUNINN_PROFILE, master, db_id, version)?)

@@ -4,8 +4,9 @@
 //! our own open offers; everything else must arrive sealed under the key of an active
 //! exchange whose peer is the Noise-authenticated sender, and only reaches what is shared
 //! over that exchange.
-use super::exchange::{self, Token};
+use super::exchange::{self, AnswerExt, OfferExt, Token};
 use super::node::{Handler, Sighting};
+use super::profile::MUNINN;
 use super::proto::{Item, Req, Resp, ShardBlob, SharedItem, Wire, WireResp};
 use crate::error::{Error, Result};
 use crate::live::Found;
@@ -50,7 +51,7 @@ impl Service {
     fn wire(&self, from: &PeerId, req: Wire) -> Result<WireResp> {
         match req {
             Wire::Hello => {
-                Ok(WireResp::Hello { label: self.label.clone(), agent: format!("muninn/{}", env!("CARGO_PKG_VERSION")), caps: vec!["muninn".into()] })
+                Ok(WireResp::Hello { label: self.label.clone(), agent: MUNINN.agent(env!("CARGO_PKG_VERSION"), ""), caps: vec![MUNINN.name.into()] })
             }
             Wire::Offer { token } => self.with(|s| incoming_offer(s, from, &token)).map(|msg| WireResp::Ok { msg }),
             Wire::Answer { token } => self.with(|s| incoming_answer(s, from, &token)).map(|msg| WireResp::Ok { msg }),
@@ -60,38 +61,32 @@ impl Service {
                 self.with(|s| super::auto::poll_in(s, from, &exchange)).map(|(status, answer)| WireResp::Poll { status, answer })
             }
             Wire::Connect { token } => self.with(|s| super::auto::connect_in(s, from, &token, &self.label, self.accept_anyone)),
+            // weirdnet-net opens it only for a known, active exchange whose peer is the
+            // Noise-authenticated sender; what the request may reach is decided here
             Wire::Sealed { exchange, sealed } => self.with(|s| {
-                let x = s.exchange(&exchange)?.ok_or_else(|| Error::invalid("exchange", "unknown exchange"))?;
-                if !x.status.active() {
-                    return Err(Error::invalid("exchange", "this exchange is not active (revoked or never completed)"));
-                }
-                if x.peer_id.as_deref() != Some(&from.to_string()) {
-                    return Err(Error::invalid("exchange", "this exchange belongs to another node"));
-                }
-                let key = s.exchange_key(&x.id)?.ok_or_else(|| Error::invalid("exchange", "no key"))?;
-                let plain = exchange::open_msg(&key, &x.id, from, &self.local, &sealed)?;
-                let req: Req = serde_json::from_slice(&plain).map_err(|e| Error::invalid("request", e.to_string()))?;
-                let done = match req {
-                    Req::Org { org, req } => crate::org::net::serve(s, &x, from, &org, req),
-                    Req::Review { review, req } => crate::review::net::serve(s, &x, from, &review, req),
-                    Req::Collab { req } => {
-                        crate::collab::wire::serve(s, &x, &from.to_string(), &self.local.to_string(), req).map(|resp| Resp::Collab { resp })
-                    }
-                    req => answer(s, &x, from, req, &self.label),
-                };
-                let resp = match done {
-                    Ok(r) => r,
-                    Err(e) => Resp::Error { msg: e.to_string() },
-                };
-                let out = serde_json::to_vec(&resp)?;
-                let sealed = exchange::seal_msg(&key, &x.id, &self.local, from, &out)?;
+                let sealed = weirdnet_net::sealed::serve(&MUNINN, s, &self.local, from, &exchange, &sealed, |s, x, plain| {
+                    let req: Req = serde_json::from_slice(plain).map_err(|e| Error::invalid("request", e.to_string()))?;
+                    let done = match req {
+                        Req::Org { org, req } => crate::org::net::serve(s, x, from, &org, req),
+                        Req::Review { review, req } => crate::review::net::serve(s, x, from, &review, req),
+                        Req::Collab { req } => {
+                            crate::collab::wire::serve(s, x, &from.to_string(), &self.local.to_string(), req).map(|resp| Resp::Collab { resp })
+                        }
+                        req => answer(s, x, from, req, &self.label),
+                    };
+                    let resp = match done {
+                        Ok(r) => r,
+                        Err(e) => Resp::Error { msg: e.to_string() },
+                    };
+                    Ok(serde_json::to_vec(&resp)?)
+                })?;
                 Ok(WireResp::Sealed { sealed })
             }),
         }
     }
 }
 
-impl Handler for Service {
+impl Handler<Wire, WireResp> for Service {
     fn request(&self, from: &PeerId, req: Wire) -> WireResp {
         match self.wire(from, req) {
             Ok(r) => r,
@@ -104,6 +99,24 @@ impl Handler for Service {
             st.upsert_net_peer(&s.peer.to_string(), None, &s.addrs, s.caps.as_deref(), s.agent.as_deref(), s.source)?;
             Ok(())
         });
+    }
+}
+
+/// Where weirdnet-net's sealed messaging looks exchanges up.
+impl weirdnet_net::sealed::Exchanges for Store {
+    type Exchange = Exchange;
+    type Error = Error;
+    fn exchange(&self, id: &str) -> Result<Option<Exchange>> {
+        Store::exchange(self, id)
+    }
+    fn active(x: &Exchange) -> bool {
+        x.status.active()
+    }
+    fn peer(x: &Exchange) -> Option<&str> {
+        x.peer_id.as_deref()
+    }
+    fn key(&self, x: &Exchange) -> Result<Option<crate::crypto::Key32>> {
+        self.exchange_key(&x.id)
     }
 }
 

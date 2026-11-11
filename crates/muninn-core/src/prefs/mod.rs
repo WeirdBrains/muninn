@@ -368,6 +368,8 @@ impl NetPrefs {
             memory: false,
             label: label.to_string(),
             external: self.external()?,
+            // `net::node::start` puts Muninn's version in
+            version: String::new(),
         })
     }
 }

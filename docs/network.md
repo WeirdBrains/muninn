@@ -12,6 +12,12 @@ item. A node you do not know asks before it is connected.
 
 ## The node
 
+The node, key exchanges, invitations, sealed messaging, node identities and user
+certificates come from the `weirdnet-net` crate in this repository, run with Muninn's own
+identifiers (`/muninn/net/1`, `mnnn-x1-` tokens, `muninn://` links), so Muninn nodes talk to
+earlier versions exactly as before. What peers may ask for, and everything they reach, is
+decided by Muninn.
+
 Built on libp2p: TCP and QUIC, Noise encryption, Yamux, mDNS on the local network,
 Kademlia for the wide network, identify, ping, AutoNAT, relays (client and server) with
 DCUtR hole punching, and Muninn's own request-response protocol `/muninn/net/1`

@@ -2,27 +2,25 @@
 //! user certifies each node it links (a signature over the node's peer id) and can revoke
 //! it later; peers check these signatures before treating a node as acting for a user.
 //! The signing key never leaves the user's own nodes. See `docs/users.md`.
+//!
+//! The certificate format, card checks and grant checks are weirdnet-net's
+//! ([`weirdnet_net::user`]) under Muninn's profile; keeping users, connections and trust,
+//! and recording history, are Muninn's.
+use super::profile::MUNINN;
 use crate::error::{Error, Result};
 use crate::store::Store;
 use crate::store::users::{User, UserNode};
 use libp2p::identity::{Keypair, PublicKey};
-use sha2::Digest;
 
-const CERT: &str = "muninn-node-cert/1";
-const REVOKE: &str = "muninn-node-revoke/1";
-
-/// The user id of a public key: 32 hex characters of its SHA-256.
-pub fn user_id(key: &PublicKey) -> String {
-    hex::encode(&sha2::Sha256::digest(key.encode_protobuf())[..16])
-}
+pub use weirdnet_net::user::{Card, user_id};
 
 fn decode(bytes: &[u8]) -> Result<Keypair> {
-    Keypair::from_protobuf_encoding(bytes).map_err(|e| Error::Crypto(format!("user identity: {e}")))
+    Ok(weirdnet_net::user::decode_keypair(bytes)?)
 }
 
 /// A user's public key from its stored bytes.
 pub fn public_key(u: &User) -> Result<PublicKey> {
-    PublicKey::try_decode_protobuf(&u.public_key).map_err(|e| Error::Crypto(format!("user key: {e}")))
+    Ok(weirdnet_net::user::decode_public(&u.public_key)?)
 }
 
 /// This node's own user and its signing key, made on first use (labelled after the
@@ -51,37 +49,30 @@ pub fn load_or_create(store: &Store) -> Result<(User, Keypair)> {
     Ok((u, kp))
 }
 
+#[cfg(test)]
 pub(crate) fn cert_bytes(user: &str, peer: &str, at: i64) -> Vec<u8> {
-    format!("{CERT}\n{user}\n{peer}\n{at}").into_bytes()
+    MUNINN.cert_bytes(user, peer, at)
 }
 
+#[cfg(test)]
 pub(crate) fn revoke_bytes(user: &str, peer: &str, at: i64) -> Vec<u8> {
-    format!("{REVOKE}\n{user}\n{peer}\n{at}").into_bytes()
+    MUNINN.revoke_bytes(user, peer, at)
 }
 
 /// The user's certificate for a node.
 pub fn certify(kp: &Keypair, user: &str, peer: &str, label: &str) -> Result<UserNode> {
-    let at = crate::store::now_ms();
-    let cert = kp.sign(&cert_bytes(user, peer, at)).map_err(|e| Error::Crypto(format!("certify: {e}")))?;
-    Ok(UserNode { user_id: user.into(), peer_id: peer.into(), label: label.into(), cert, issued_at: at, revoked_at: None, revocation: None })
+    Ok(MUNINN.certify(kp, user, peer, label, crate::store::now_ms())?)
 }
 
 /// The user's signed revocation of a node.
 pub fn revoke(kp: &Keypair, user: &str, peer: &str) -> Result<(i64, Vec<u8>)> {
     let at = crate::store::now_ms();
-    Ok((at, kp.sign(&revoke_bytes(user, peer, at)).map_err(|e| Error::Crypto(format!("revoke: {e}")))?))
+    Ok((at, MUNINN.revoke(kp, user, peer, at)?))
 }
 
 /// Check a certificate (and its revocation, if any) against the user's key.
 pub fn verify(key: &PublicKey, n: &UserNode) -> bool {
-    if user_id(key) != n.user_id || !key.verify(&cert_bytes(&n.user_id, &n.peer_id, n.issued_at), &n.cert) {
-        return false;
-    }
-    match (n.revoked_at, &n.revocation) {
-        (None, None) => true,
-        (Some(at), Some(sig)) => key.verify(&revoke_bytes(&n.user_id, &n.peer_id, at), sig),
-        _ => false,
-    }
+    MUNINN.verify_cert(key, n)
 }
 
 /// Store a certificate after checking it; also remembers the user.
@@ -94,31 +85,6 @@ pub fn accept_cert(store: &Store, label: &str, key: &PublicKey, n: &UserNode) ->
 }
 
 // ---------- cards: how nodes tell each other whom they act for ----------
-
-/// What a node says about its user over an exchange: the user's public key and the
-/// certificates (and revocations) of the user's nodes. Holds no secret.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Card {
-    pub id: String,
-    pub label: String,
-    pub key: Vec<u8>,
-    pub nodes: Vec<UserNode>,
-}
-
-impl Card {
-    /// A short fingerprint of what the card says (to re-introduce only after a change).
-    pub fn digest(&self) -> String {
-        let mut h = sha2::Sha256::new();
-        h.update(self.id.as_bytes());
-        h.update(self.label.as_bytes());
-        for n in &self.nodes {
-            h.update(n.peer_id.as_bytes());
-            h.update(n.issued_at.to_le_bytes());
-            h.update(n.revoked_at.unwrap_or(0).to_le_bytes());
-        }
-        hex::encode(&h.finalize()[..8])
-    }
-}
 
 /// This node's card (making its user on first use).
 pub fn my_card(store: &Store) -> Result<Card> {
@@ -139,13 +105,7 @@ pub enum Met {
 /// certificate for that very peer. Every certificate that verifies is kept (revocations
 /// too); another user becomes an (untrusted) connection.
 pub fn take_card(store: &Store, from_peer: &str, card: &Card, origin: &str) -> Result<Met> {
-    let key = PublicKey::try_decode_protobuf(&card.key).map_err(|e| Error::Crypto(format!("user key: {e}")))?;
-    if user_id(&key) != card.id {
-        return Err(Error::Crypto("user card: the id does not match the key".into()));
-    }
-    if !card.nodes.iter().any(|n| n.peer_id == from_peer && n.user_id == card.id && n.active() && verify(&key, n)) {
-        return Err(Error::Crypto("user card: no valid certificate for the sending node".into()));
-    }
+    let key = MUNINN.check_card(from_peer, card)?;
     // a node revoked here stays revoked, whatever it says now
     if store.user_nodes(&card.id)?.iter().any(|n| n.peer_id == from_peer && !n.active()) {
         return Err(Error::Crypto("user card: the sending node was revoked by its user".into()));
@@ -280,18 +240,8 @@ pub fn link_grant(store: &Store, peer: &str, label: &str, origin: &str) -> Resul
 /// Become the user of a grant (on the node being linked). The node's earlier user is
 /// kept as a known user without its key.
 pub fn adopt(store: &Store, from_peer: &str, card: &Card, keypair: &[u8], origin: &str) -> Result<User> {
-    let kp = decode(keypair)?;
-    if user_id(&kp.public()) != card.id || kp.public().encode_protobuf() != card.key {
-        return Err(Error::Crypto("link: the key does not match the user".into()));
-    }
     let me = super::identity::peer_id(store)?.map(|p| p.to_string()).unwrap_or_default();
-    let key = kp.public();
-    if !card.nodes.iter().any(|n| n.peer_id == me && n.active() && verify(&key, n)) {
-        return Err(Error::Crypto("link: no certificate for this node".into()));
-    }
-    if !card.nodes.iter().any(|n| n.peer_id == from_peer && n.active() && verify(&key, n)) {
-        return Err(Error::Crypto("link: the approving node is not the user's".into()));
-    }
+    let key = MUNINN.check_grant(&me, from_peer, card, keypair)?.public();
     let old = store.self_user()?;
     if old.as_ref().is_some_and(|o| o.id == card.id) {
         return Ok(old.expect("checked"));

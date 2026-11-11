@@ -159,8 +159,11 @@ impl Hosted {
             return Err(crate::error::Error::Other(format!("a node is already running here (pid {}); `mnnn net stop` stops it", f.pid)));
         }
         let cfg = prefs.node_config(label)?;
-        let node =
-            Node::start(kp.clone(), cfg, Arc::new(Service::new(service, kp.public().to_peer_id(), label).accept_anyone(prefs.accept_anyone())))?;
+        let node = super::node::start(
+            kp.clone(),
+            cfg,
+            Arc::new(Service::new(service, kp.public().to_peer_id(), label).accept_anyone(prefs.accept_anyone())),
+        )?;
         // a stale stop request must not stop the new node
         stop_requested(home);
         // let addresses settle
@@ -285,8 +288,9 @@ pub fn ephemeral(kp: &Keypair, service: Store, label: &str, prefs: &NetPrefs) ->
         memory: false,
         label: label.to_string(),
         external: vec![],
+        version: String::new(),
     };
-    Node::start(kp.clone(), cfg, Arc::new(Service::new(service, kp.public().to_peer_id(), label).accept_anyone(prefs.accept_anyone())))
+    super::node::start(kp.clone(), cfg, Arc::new(Service::new(service, kp.public().to_peer_id(), label).accept_anyone(prefs.accept_anyone())))
 }
 
 #[cfg(test)]

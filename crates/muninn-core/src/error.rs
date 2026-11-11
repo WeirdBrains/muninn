@@ -104,6 +104,21 @@ impl From<weirdnet_keys::KeysError> for Error {
     }
 }
 
+/// Network errors keep Muninn's messages and kinds ("network: …" stays an `Other`, bad
+/// tokens and offers stay `Invalid`, signatures and sealed messages `Crypto`).
+impl From<weirdnet_net::NetError> for Error {
+    fn from(e: weirdnet_net::NetError) -> Self {
+        use weirdnet_net::NetError as N;
+        match e {
+            N::Invalid { what, msg } => Error::Invalid { what, msg },
+            N::Crypto(m) => Error::Crypto(m),
+            N::Network(m) => Error::Other(format!("network: {m}")),
+            N::Keys(k) => k.into(),
+            N::Json(e) => Error::Json(e),
+        }
+    }
+}
+
 /// Pipeline graph and frame errors keep their messages ("invalid pipeline: …", "invalid input: …").
 impl From<weirdnet_pipelines::PipelineError> for Error {
     fn from(e: weirdnet_pipelines::PipelineError) -> Self {
