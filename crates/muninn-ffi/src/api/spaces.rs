@@ -2,6 +2,7 @@
 //! (`mnnn plugins info`). Code units stay on [`super::code`].
 use super::data::{open, open_write};
 use super::info::paths;
+use muninn_core::code::pipeline::GraphExt as _;
 use muninn_core::code::{self, CodeEnv, migrate, spaces};
 use muninn_core::store::{Space, SpaceKind, Store};
 use serde_json::json;

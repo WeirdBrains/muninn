@@ -1,6 +1,7 @@
 //! `mnnn spaces` (collections of code) and `mnnn migrate`. Thin over
 //! [`crate::code::spaces`] and [`crate::code::migrate`].
 use super::{Ctx, MigrateArgs, SpacesCommand};
+use crate::code::pipeline::GraphExt as _;
 use crate::code::{self, migrate, spaces};
 use crate::store::{CodeSpace, Space, SpaceKind, Store};
 use anyhow::anyhow;

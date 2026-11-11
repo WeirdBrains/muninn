@@ -1,0 +1,1589 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "src",
+        "kind": "source",
+        "source": "search:usdt",
+        "tees": [
+          "journal:Raw",
+          "model:Keep"
+        ]
+      },
+      {
+        "id": "in",
+        "kind": "source",
+        "source": "-"
+      },
+      {
+        "id": "std",
+        "kind": "source",
+        "source": "-"
+      },
+      {
+        "id": "d",
+        "kind": "source",
+        "source": "source:raw"
+      },
+      {
+        "id": "q",
+        "kind": "source",
+        "source": "bars where close > 1 limit 5"
+      },
+      {
+        "id": "j",
+        "kind": "source",
+        "source": "journal:Notes"
+      },
+      {
+        "id": "c",
+        "kind": "code",
+        "space": "fast?x=1"
+      },
+      {
+        "id": "sp",
+        "kind": "space",
+        "name": "smooth"
+      },
+      {
+        "id": "v",
+        "kind": "view",
+        "view": "chart",
+        "columns": [
+          "close",
+          "open"
+        ]
+      },
+      {
+        "id": "t",
+        "kind": "view",
+        "view": "table"
+      },
+      {
+        "id": "f",
+        "kind": "filter",
+        "search": "big"
+      },
+      {
+        "id": "out",
+        "kind": "sink",
+        "model": "Out"
+      },
+      {
+        "id": "o2",
+        "kind": "sink",
+        "model": "Out2"
+      }
+    ],
+    "edges": [
+      {
+        "from": "src",
+        "to": "c"
+      },
+      {
+        "from": "c",
+        "to": "v",
+        "as": "prices"
+      },
+      {
+        "from": "in",
+        "to": "sp"
+      },
+      {
+        "from": "d",
+        "to": "f"
+      },
+      {
+        "from": "q",
+        "to": "t"
+      },
+      {
+        "from": "v",
+        "to": "out"
+      },
+      {
+        "from": "sp",
+        "to": "out",
+        "as": "two"
+      },
+      {
+        "from": "f",
+        "to": "o2"
+      },
+      {
+        "from": "t",
+        "to": "o2"
+      },
+      {
+        "from": "j",
+        "to": "o2"
+      },
+      {
+        "from": "std",
+        "to": "out"
+      }
+    ]
+  },
+  "graph_text": "{\"nodes\":[{\"id\":\"src\",\"kind\":\"source\",\"source\":\"search:usdt\",\"tees\":[\"journal:Raw\",\"model:Keep\"]},{\"id\":\"in\",\"kind\":\"source\",\"source\":\"-\"},{\"id\":\"std\",\"kind\":\"source\",\"source\":\"-\"},{\"id\":\"d\",\"kind\":\"source\",\"source\":\"source:raw\"},{\"id\":\"q\",\"kind\":\"source\",\"source\":\"bars where close > 1 limit 5\"},{\"id\":\"j\",\"kind\":\"source\",\"source\":\"journal:Notes\"},{\"id\":\"c\",\"kind\":\"code\",\"space\":\"fast?x=1\"},{\"id\":\"sp\",\"kind\":\"space\",\"name\":\"smooth\"},{\"id\":\"v\",\"kind\":\"view\",\"view\":\"chart\",\"columns\":[\"close\",\"open\"]},{\"id\":\"t\",\"kind\":\"view\",\"view\":\"table\"},{\"id\":\"f\",\"kind\":\"filter\",\"search\":\"big\"},{\"id\":\"out\",\"kind\":\"sink\",\"model\":\"Out\"},{\"id\":\"o2\",\"kind\":\"sink\",\"model\":\"Out2\"}],\"edges\":[{\"from\":\"src\",\"to\":\"c\"},{\"from\":\"c\",\"to\":\"v\",\"as\":\"prices\"},{\"from\":\"in\",\"to\":\"sp\"},{\"from\":\"d\",\"to\":\"f\"},{\"from\":\"q\",\"to\":\"t\"},{\"from\":\"v\",\"to\":\"out\"},{\"from\":\"sp\",\"to\":\"out\",\"as\":\"two\"},{\"from\":\"f\",\"to\":\"o2\"},{\"from\":\"t\",\"to\":\"o2\"},{\"from\":\"j\",\"to\":\"o2\"},{\"from\":\"std\",\"to\":\"out\"}]}",
+  "texts": [
+    [
+      "src",
+      "search:usdt",
+      [
+        "journal:Raw",
+        "model:Keep"
+      ]
+    ],
+    [
+      "in",
+      "-",
+      []
+    ],
+    [
+      "std",
+      "-",
+      []
+    ],
+    [
+      "d",
+      "source:raw",
+      []
+    ],
+    [
+      "q",
+      "source:bars where close > 1 limit 5",
+      []
+    ],
+    [
+      "j",
+      "journal:Notes",
+      []
+    ],
+    [
+      "c",
+      "code:fast?x=1",
+      []
+    ],
+    [
+      "sp",
+      "space:smooth",
+      []
+    ],
+    [
+      "v",
+      "view:chart:close,open",
+      []
+    ],
+    [
+      "t",
+      "view:table",
+      []
+    ],
+    [
+      "f",
+      "filter:big",
+      []
+    ],
+    [
+      "out",
+      "model:Out",
+      []
+    ],
+    [
+      "o2",
+      "model:Out2",
+      []
+    ]
+  ],
+  "reparsed": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "order": [
+    "src",
+    "in",
+    "std",
+    "d",
+    "q",
+    "j",
+    "c",
+    "sp",
+    "f",
+    "t",
+    "v",
+    "o2",
+    "out"
+  ],
+  "ups_downs": [
+    [
+      "src",
+      0,
+      1
+    ],
+    [
+      "in",
+      0,
+      1
+    ],
+    [
+      "std",
+      0,
+      1
+    ],
+    [
+      "d",
+      0,
+      1
+    ],
+    [
+      "q",
+      0,
+      1
+    ],
+    [
+      "j",
+      0,
+      1
+    ],
+    [
+      "c",
+      1,
+      1
+    ],
+    [
+      "sp",
+      1,
+      1
+    ],
+    [
+      "v",
+      1,
+      1
+    ],
+    [
+      "t",
+      1,
+      1
+    ],
+    [
+      "f",
+      1,
+      1
+    ],
+    [
+      "out",
+      3,
+      0
+    ],
+    [
+      "o2",
+      3,
+      0
+    ]
+  ],
+  "spaces": [
+    "smooth"
+  ],
+  "code_spaces": [
+    "fast"
+  ],
+  "sinks": [
+    "Out",
+    "Out2"
+  ],
+  "removed": [
+    true,
+    false,
+    12,
+    9
+  ],
+  "parse_errors": [
+    [
+      [
+        "x"
+      ],
+      [],
+      "invalid pipeline: `x`: a node is ID=KIND (src=search:usdt)"
+    ],
+    [
+      [
+        "a b=search:x"
+      ],
+      [],
+      "invalid pipeline: `a b` is not a node id (letters, digits, - and _)"
+    ],
+    [
+      [
+        "a>b=search:x"
+      ],
+      [],
+      "invalid pipeline: `a>b` is not a node id (letters, digits, - and _)"
+    ],
+    [
+      [
+        "=search:x"
+      ],
+      [],
+      "invalid pipeline: `` is not a node id (letters, digits, - and _)"
+    ],
+    [
+      [
+        "x=nothing:1"
+      ],
+      [],
+      "invalid pipeline: `nothing:1`: a node is search:/journal:/source:…/- , space:, code:, view:, filter: or model:"
+    ],
+    [
+      [
+        "x=nothing"
+      ],
+      [],
+      "invalid pipeline: `nothing`: a node is search:/journal:/source:…/- , space:, code:, view:, filter: or model:"
+    ],
+    [
+      [
+        "x=view:pie"
+      ],
+      [],
+      "invalid pipeline: view `pie`: table or chart"
+    ],
+    [
+      [
+        "x=code:"
+      ],
+      [],
+      "invalid pipeline: `code:` needs a value"
+    ],
+    [
+      [
+        "x=view:"
+      ],
+      [],
+      "invalid pipeline: `view:` needs a value"
+    ],
+    [
+      [
+        "x=search:"
+      ],
+      [],
+      "invalid input: `search:` needs a name"
+    ],
+    [
+      [
+        "x=source:"
+      ],
+      [],
+      "invalid pipeline: `source:` needs a value"
+    ],
+    [
+      [
+        "x=search:a+bogus:1"
+      ],
+      [],
+      "invalid pipe: `bogus:1`: a target is journal:NAME, model:NAME, project:NAME[/JOURNAL], org:ORG[/JOURNAL] or net[:EXCHANGE][/JOURNAL]"
+    ],
+    [
+      [
+        "x=search:a+model:"
+      ],
+      [],
+      "invalid pipe: `model:`: a target is journal:NAME, model:NAME, project:NAME[/JOURNAL], org:ORG[/JOURNAL] or net[:EXCHANGE][/JOURNAL]"
+    ],
+    [
+      [],
+      [
+        "a"
+      ],
+      "invalid pipeline: `a`: an edge is FROM>TO[:NAME] (or A>B>C)"
+    ],
+    [
+      [],
+      [
+        "a>"
+      ],
+      "invalid pipeline: `a>`: an edge is FROM>TO[:NAME] (or A>B>C)"
+    ],
+    [
+      [],
+      [
+        ">b"
+      ],
+      "invalid pipeline: `>b`: an edge is FROM>TO[:NAME] (or A>B>C)"
+    ],
+    [
+      [],
+      [
+        "a>>b"
+      ],
+      "invalid pipeline: `a>>b`: an edge is FROM>TO[:NAME] (or A>B>C)"
+    ]
+  ],
+  "checks": {
+    "valid": [],
+    "twice": 0,
+    "broken": [
+      "edge zz>b: no node `zz`",
+      "edge b>yy: no node `yy`",
+      "node `b` feeds itself",
+      "invalid pipeline: a cycle through b, c, e, loop1, loop2",
+      "source `a` has inputs",
+      "model table `c` must be a leaf (nothing after it)",
+      "`lone` gets no data (connect a source to it)",
+      "`lone` is a leaf: every leaf is a model table (add model:NAME after it)"
+    ],
+    "nothing": [
+      "no source node (search:, journal:, source:… or -)",
+      "no model table to end in (a model:NAME node)"
+    ],
+    "steps_only": [
+      "no source node (search:, journal:, source:… or -)",
+      "no model table to end in (a model:NAME node)",
+      "`a` gets no data (connect a source to it)",
+      "`a` is a leaf: every leaf is a model table (add model:NAME after it)"
+    ],
+    "names": [
+      "`a`: invalid live search: `nope` not found (see `mnnn search list`)",
+      "`b`: invalid journal: `nope` not found (see `mnnn journal list`)",
+      "`c` gets no data (connect a source to it)",
+      "`c`: invalid code space: `nope` not found (see `mnnn code list`)",
+      "`d` gets no data (connect a source to it)",
+      "`d`: invalid code space: `nope` not found (see `mnnn spaces list`)",
+      "`e`: invalid source: no source `nope`",
+      "`x`: invalid code space: `nope2` not found (see `mnnn code list`)",
+      "`y`: invalid code space: `nope3` not found (see `mnnn spaces list`)",
+      "`z`: invalid live search: `nope` not found (see `mnnn search list`)",
+      "`m`: invalid model: `nope` not found (see `mnnn model list`)"
+    ]
+  },
+  "run": {
+    "nodes": [
+      {
+        "id": "in",
+        "node": "-",
+        "status": "ok",
+        "rows_in": 0,
+        "rows_out": 3,
+        "ms": 0,
+        "saved": [
+          "journal:Raw → ENTRY"
+        ]
+      },
+      {
+        "id": "v",
+        "node": "view:table:x",
+        "status": "ok",
+        "rows_in": 3,
+        "rows_out": 3,
+        "ms": 0
+      },
+      {
+        "id": "u",
+        "node": "view:chart",
+        "status": "ok",
+        "rows_in": 3,
+        "rows_out": 3,
+        "ms": 0
+      },
+      {
+        "id": "a",
+        "node": "code:raw",
+        "status": "waiting approval",
+        "rows_in": 3,
+        "rows_out": 0,
+        "ms": 0,
+        "error": "confirmation required: code space raw is new and runs as native code with your rights; review it (`mnnn code show raw`) and approve it (`mnnn code approve raw`) (re-run with -y/--yes to confirm)"
+      },
+      {
+        "id": "out",
+        "node": "model:Out",
+        "status": "ok",
+        "rows_in": 6,
+        "rows_out": 6,
+        "ms": 0
+      },
+      {
+        "id": "side",
+        "node": "model:Side",
+        "status": "skipped",
+        "rows_in": 0,
+        "rows_out": 0,
+        "ms": 0,
+        "error": "an upstream node did not finish"
+      }
+    ],
+    "landed": [
+      [
+        "Out",
+        6
+      ]
+    ],
+    "ok": false,
+    "frames": [
+      [
+        "in",
+        {
+          "model": "stdin",
+          "fields": [
+            {
+              "name": "x",
+              "type": "real"
+            },
+            {
+              "name": "y",
+              "type": "text"
+            }
+          ],
+          "ids": [
+            "0",
+            "1",
+            "2"
+          ],
+          "columns": {
+            "x": [
+              1,
+              2,
+              3
+            ],
+            "y": [
+              "a",
+              "b",
+              "bb"
+            ]
+          },
+          "groups": []
+        }
+      ],
+      [
+        "out",
+        {
+          "model": "pipeline:gold:out",
+          "fields": [
+            {
+              "name": "x",
+              "type": "real"
+            },
+            {
+              "name": "y",
+              "type": "text"
+            }
+          ],
+          "ids": [
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ],
+          "columns": {
+            "x": [
+              1,
+              2,
+              3,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              null,
+              null,
+              null,
+              "a",
+              "b",
+              "bb"
+            ]
+          },
+          "groups": []
+        }
+      ],
+      [
+        "u",
+        {
+          "model": "stdin",
+          "fields": [
+            {
+              "name": "x",
+              "type": "real"
+            },
+            {
+              "name": "y",
+              "type": "text"
+            }
+          ],
+          "ids": [
+            "0",
+            "1",
+            "2"
+          ],
+          "columns": {
+            "x": [
+              1,
+              2,
+              3
+            ],
+            "y": [
+              "a",
+              "b",
+              "bb"
+            ]
+          },
+          "groups": []
+        }
+      ],
+      [
+        "v",
+        {
+          "model": "stdin",
+          "fields": [
+            {
+              "name": "x",
+              "type": "real"
+            },
+            {
+              "name": "y",
+              "type": "text"
+            }
+          ],
+          "ids": [
+            "0",
+            "1",
+            "2"
+          ],
+          "columns": {
+            "x": [
+              1,
+              2,
+              3
+            ]
+          },
+          "groups": []
+        }
+      ]
+    ],
+    "log": [
+      "note: code:raw is deprecated (it runs one code); use space:NAME (`mnnn migrate` makes spaces)",
+      "out: 6 records"
+    ],
+    "no_stdin": [
+      [
+        "in",
+        "error",
+        "invalid pipeline: `in` reads standard input: pipe data in (`… | mnnn pipeline run NAME -`)"
+      ],
+      [
+        "v",
+        "skipped",
+        "an upstream node did not finish"
+      ],
+      [
+        "u",
+        "skipped",
+        "an upstream node did not finish"
+      ],
+      [
+        "a",
+        "skipped",
+        "an upstream node did not finish"
+      ],
+      [
+        "out",
+        "skipped",
+        "an upstream node did not finish"
+      ],
+      [
+        "side",
+        "skipped",
+        "an upstream node did not finish"
+      ]
+    ],
+    "no_stdin_log": [],
+    "draft": "invalid pipeline: gold is a draft from a peer: review it, then approve it (`mnnn pipeline approve gold`)",
+    "invalid": "invalid pipeline: bad is not valid: no model table to end in (a model:NAME node); `a` is a leaf: every leaf is a model table (add model:NAME after it)",
+    "actions": [
+      [
+        "pipe.start",
+        "test",
+        "pipeline gold",
+        {
+          "token": "TOKEN",
+          "plan": [
+            "in (-)",
+            "v (view:table:x)",
+            "u (view:chart)",
+            "a (code:raw)",
+            "out (model:Out)",
+            "side (model:Side)"
+          ],
+          "pipeline": "gold",
+          "views": [
+            "view:gold/v",
+            "view:gold/u"
+          ]
+        }
+      ],
+      [
+        "journal.entry.create",
+        "test",
+        "pipe result into journal Raw",
+        {
+          "journal": "JOURNAL",
+          "entry": "ENTRY",
+          "pipe": "pipeline gold · in"
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · in: 3 rows",
+        {
+          "token": "TOKEN",
+          "i": 0,
+          "hop": "in (-)",
+          "rows": 3,
+          "rows_in": 0,
+          "columns": [
+            "x",
+            "y"
+          ],
+          "saved": [
+            "journal:Raw → ENTRY"
+          ],
+          "status": "ok",
+          "state": "ok",
+          "error": null
+        }
+      ],
+      [
+        "pipe.frame",
+        "test",
+        "view:gold/v output",
+        {
+          "key": "view:gold/v",
+          "frame": {
+            "model": "stdin",
+            "fields": [
+              {
+                "name": "x",
+                "type": "real"
+              },
+              {
+                "name": "y",
+                "type": "text"
+              }
+            ],
+            "ids": [
+              "0",
+              "1",
+              "2"
+            ],
+            "columns": {
+              "x": [
+                1,
+                2,
+                3
+              ]
+            },
+            "groups": []
+          }
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · v: 3 rows",
+        {
+          "token": "TOKEN",
+          "i": 1,
+          "hop": "v (view:table:x)",
+          "rows": 3,
+          "rows_in": 3,
+          "columns": [
+            "x"
+          ],
+          "saved": [],
+          "status": "ok",
+          "state": "ok",
+          "error": null
+        }
+      ],
+      [
+        "pipe.frame",
+        "test",
+        "view:gold/u output",
+        {
+          "key": "view:gold/u",
+          "frame": {
+            "model": "stdin",
+            "fields": [
+              {
+                "name": "x",
+                "type": "real"
+              },
+              {
+                "name": "y",
+                "type": "text"
+              }
+            ],
+            "ids": [
+              "0",
+              "1",
+              "2"
+            ],
+            "columns": {
+              "x": [
+                1,
+                2,
+                3
+              ],
+              "y": [
+                "a",
+                "b",
+                "bb"
+              ]
+            },
+            "groups": []
+          }
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · u: 3 rows",
+        {
+          "token": "TOKEN",
+          "i": 2,
+          "hop": "u (view:chart)",
+          "rows": 3,
+          "rows_in": 3,
+          "columns": [
+            "x",
+            "y"
+          ],
+          "saved": [],
+          "status": "ok",
+          "state": "ok",
+          "error": null
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · a: confirmation required: code space raw is new and runs as native code with your rights; review it (`mnnn code show raw`) and approve it (`mnnn code approve raw`) (re-run with -y/--yes to confirm)",
+        {
+          "token": "TOKEN",
+          "i": 3,
+          "hop": "a (code:raw)",
+          "rows": 0,
+          "rows_in": 3,
+          "columns": [],
+          "saved": [],
+          "status": "error",
+          "state": "waiting approval",
+          "error": "confirmation required: code space raw is new and runs as native code with your rights; review it (`mnnn code show raw`) and approve it (`mnnn code approve raw`) (re-run with -y/--yes to confirm)"
+        }
+      ],
+      [
+        "record.create",
+        "test",
+        "pipe 6 records into out",
+        {
+          "model": "MODEL-Out",
+          "count": 6,
+          "pipe": "pipeline gold"
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · out: 6 rows",
+        {
+          "token": "TOKEN",
+          "i": 4,
+          "hop": "out (model:Out)",
+          "rows": 6,
+          "rows_in": 6,
+          "columns": [
+            "x",
+            "y"
+          ],
+          "saved": [],
+          "status": "ok",
+          "state": "ok",
+          "error": null
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · side: an upstream node did not finish",
+        {
+          "token": "TOKEN",
+          "i": 5,
+          "hop": "side (model:Side)",
+          "rows": 0,
+          "rows_in": 0,
+          "columns": [],
+          "saved": [],
+          "status": "error",
+          "state": "skipped",
+          "error": "an upstream node did not finish"
+        }
+      ],
+      [
+        "pipe.run",
+        "test",
+        "pipeline gold ran with errors",
+        {
+          "token": "TOKEN",
+          "pipeline": "gold",
+          "hops": [
+            "in (-)",
+            "v (view:table:x)",
+            "u (view:chart)",
+            "a (code:raw)",
+            "out (model:Out)",
+            "side (model:Side)"
+          ],
+          "saved": [
+            "model:Out → 6 records"
+          ],
+          "nodes": [
+            {
+              "id": "in",
+              "node": "-",
+              "status": "ok",
+              "rows_in": 0,
+              "rows_out": 3,
+              "ms": 0,
+              "saved": [
+                "journal:Raw → ENTRY"
+              ]
+            },
+            {
+              "id": "v",
+              "node": "view:table:x",
+              "status": "ok",
+              "rows_in": 3,
+              "rows_out": 3,
+              "ms": 0
+            },
+            {
+              "id": "u",
+              "node": "view:chart",
+              "status": "ok",
+              "rows_in": 3,
+              "rows_out": 3,
+              "ms": 0
+            },
+            {
+              "id": "a",
+              "node": "code:raw",
+              "status": "waiting approval",
+              "rows_in": 3,
+              "rows_out": 0,
+              "ms": 0,
+              "error": "confirmation required: code space raw is new and runs as native code with your rights; review it (`mnnn code show raw`) and approve it (`mnnn code approve raw`) (re-run with -y/--yes to confirm)"
+            },
+            {
+              "id": "out",
+              "node": "model:Out",
+              "status": "ok",
+              "rows_in": 6,
+              "rows_out": 6,
+              "ms": 0
+            },
+            {
+              "id": "side",
+              "node": "model:Side",
+              "status": "skipped",
+              "rows_in": 0,
+              "rows_out": 0,
+              "ms": 0,
+              "error": "an upstream node did not finish"
+            }
+          ]
+        }
+      ],
+      [
+        "pipe.start",
+        "test",
+        "pipeline gold",
+        {
+          "token": "TOKEN",
+          "plan": [
+            "in (-)",
+            "v (view:table:x)",
+            "u (view:chart)",
+            "a (code:raw)",
+            "out (model:Out)",
+            "side (model:Side)"
+          ],
+          "pipeline": "gold",
+          "views": [
+            "view:gold/v",
+            "view:gold/u"
+          ]
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · in: invalid pipeline: `in` reads standard input: pipe data in (`… | mnnn pipeline run NAME -`)",
+        {
+          "token": "TOKEN",
+          "i": 0,
+          "hop": "in (-)",
+          "rows": 0,
+          "rows_in": 0,
+          "columns": [],
+          "saved": [],
+          "status": "error",
+          "state": "error",
+          "error": "invalid pipeline: `in` reads standard input: pipe data in (`… | mnnn pipeline run NAME -`)"
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · v: an upstream node did not finish",
+        {
+          "token": "TOKEN",
+          "i": 1,
+          "hop": "v (view:table:x)",
+          "rows": 0,
+          "rows_in": 0,
+          "columns": [],
+          "saved": [],
+          "status": "error",
+          "state": "skipped",
+          "error": "an upstream node did not finish"
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · u: an upstream node did not finish",
+        {
+          "token": "TOKEN",
+          "i": 2,
+          "hop": "u (view:chart)",
+          "rows": 0,
+          "rows_in": 0,
+          "columns": [],
+          "saved": [],
+          "status": "error",
+          "state": "skipped",
+          "error": "an upstream node did not finish"
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · a: an upstream node did not finish",
+        {
+          "token": "TOKEN",
+          "i": 3,
+          "hop": "a (code:raw)",
+          "rows": 0,
+          "rows_in": 0,
+          "columns": [],
+          "saved": [],
+          "status": "error",
+          "state": "skipped",
+          "error": "an upstream node did not finish"
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · out: an upstream node did not finish",
+        {
+          "token": "TOKEN",
+          "i": 4,
+          "hop": "out (model:Out)",
+          "rows": 0,
+          "rows_in": 0,
+          "columns": [],
+          "saved": [],
+          "status": "error",
+          "state": "skipped",
+          "error": "an upstream node did not finish"
+        }
+      ],
+      [
+        "pipe.hop",
+        "test",
+        "pipeline gold · side: an upstream node did not finish",
+        {
+          "token": "TOKEN",
+          "i": 5,
+          "hop": "side (model:Side)",
+          "rows": 0,
+          "rows_in": 0,
+          "columns": [],
+          "saved": [],
+          "status": "error",
+          "state": "skipped",
+          "error": "an upstream node did not finish"
+        }
+      ],
+      [
+        "pipe.run",
+        "test",
+        "pipeline gold ran with errors",
+        {
+          "token": "TOKEN",
+          "pipeline": "gold",
+          "hops": [
+            "in (-)",
+            "v (view:table:x)",
+            "u (view:chart)",
+            "a (code:raw)",
+            "out (model:Out)",
+            "side (model:Side)"
+          ],
+          "saved": [],
+          "nodes": [
+            {
+              "id": "in",
+              "node": "-",
+              "status": "error",
+              "rows_in": 0,
+              "rows_out": 0,
+              "ms": 0,
+              "error": "invalid pipeline: `in` reads standard input: pipe data in (`… | mnnn pipeline run NAME -`)"
+            },
+            {
+              "id": "v",
+              "node": "view:table:x",
+              "status": "skipped",
+              "rows_in": 0,
+              "rows_out": 0,
+              "ms": 0,
+              "error": "an upstream node did not finish"
+            },
+            {
+              "id": "u",
+              "node": "view:chart",
+              "status": "skipped",
+              "rows_in": 0,
+              "rows_out": 0,
+              "ms": 0,
+              "error": "an upstream node did not finish"
+            },
+            {
+              "id": "a",
+              "node": "code:raw",
+              "status": "skipped",
+              "rows_in": 0,
+              "rows_out": 0,
+              "ms": 0,
+              "error": "an upstream node did not finish"
+            },
+            {
+              "id": "out",
+              "node": "model:Out",
+              "status": "skipped",
+              "rows_in": 0,
+              "rows_out": 0,
+              "ms": 0,
+              "error": "an upstream node did not finish"
+            },
+            {
+              "id": "side",
+              "node": "model:Side",
+              "status": "skipped",
+              "rows_in": 0,
+              "rows_out": 0,
+              "ms": 0,
+              "error": "an upstream node did not finish"
+            }
+          ]
+        }
+      ]
+    ]
+  },
+  "frames": {
+    "rows": {
+      "model": "a",
+      "fields": [
+        {
+          "name": "x",
+          "type": "real"
+        },
+        {
+          "name": "y",
+          "type": "text"
+        },
+        {
+          "name": "z",
+          "type": "text"
+        }
+      ],
+      "ids": [
+        "0",
+        "1"
+      ],
+      "columns": {
+        "x": [
+          1,
+          2
+        ],
+        "y": [
+          "p",
+          null
+        ],
+        "z": [
+          null,
+          true
+        ]
+      },
+      "groups": []
+    },
+    "union1": {
+      "model": "a",
+      "fields": [
+        {
+          "name": "x",
+          "type": "real"
+        },
+        {
+          "name": "y",
+          "type": "text"
+        },
+        {
+          "name": "z",
+          "type": "text"
+        }
+      ],
+      "ids": [
+        "0",
+        "1"
+      ],
+      "columns": {
+        "x": [
+          1,
+          2
+        ],
+        "y": [
+          "p",
+          null
+        ],
+        "z": [
+          null,
+          true
+        ]
+      },
+      "groups": []
+    },
+    "union2": {
+      "model": "u",
+      "fields": [
+        {
+          "name": "x",
+          "type": "real"
+        },
+        {
+          "name": "y",
+          "type": "text"
+        },
+        {
+          "name": "z",
+          "type": "text"
+        }
+      ],
+      "ids": [
+        "0",
+        "1",
+        "2"
+      ],
+      "columns": {
+        "x": [
+          1,
+          2,
+          3.5
+        ],
+        "y": [
+          "p",
+          null,
+          "q"
+        ],
+        "z": [
+          null,
+          true,
+          null
+        ]
+      },
+      "groups": []
+    },
+    "union0": {
+      "model": "u",
+      "fields": [],
+      "ids": [],
+      "columns": {},
+      "groups": []
+    },
+    "filter": {
+      "model": "a",
+      "fields": [
+        {
+          "name": "x",
+          "type": "real"
+        },
+        {
+          "name": "y",
+          "type": "text"
+        },
+        {
+          "name": "z",
+          "type": "text"
+        }
+      ],
+      "ids": [
+        "1"
+      ],
+      "columns": {
+        "x": [
+          2
+        ],
+        "y": [
+          null
+        ],
+        "z": [
+          true
+        ]
+      },
+      "groups": []
+    },
+    "tail": [
+      {
+        "model": "a",
+        "fields": [
+          {
+            "name": "x",
+            "type": "real"
+          },
+          {
+            "name": "y",
+            "type": "text"
+          },
+          {
+            "name": "z",
+            "type": "text"
+          }
+        ],
+        "ids": [
+          "1"
+        ],
+        "columns": {
+          "x": [
+            2
+          ],
+          "y": [
+            null
+          ],
+          "z": [
+            true
+          ]
+        },
+        "groups": []
+      },
+      {
+        "model": "a",
+        "fields": [
+          {
+            "name": "x",
+            "type": "real"
+          },
+          {
+            "name": "y",
+            "type": "text"
+          },
+          {
+            "name": "z",
+            "type": "text"
+          }
+        ],
+        "ids": [
+          "0",
+          "1"
+        ],
+        "columns": {
+          "x": [
+            1,
+            2
+          ],
+          "y": [
+            "p",
+            null
+          ],
+          "z": [
+            null,
+            true
+          ]
+        },
+        "groups": []
+      },
+      {
+        "columns": {
+          "c": [
+            2,
+            3
+          ]
+        },
+        "groups": []
+      }
+    ],
+    "csv_line": [
+      [
+        "a",
+        "b"
+      ],
+      [
+        "a,b",
+        "c"
+      ],
+      [
+        "x",
+        "he said \"no\"",
+        ""
+      ],
+      [
+        ""
+      ],
+      [
+        "a"
+      ]
+    ],
+    "read": [
+      {
+        "model": "csv",
+        "fields": [
+          {
+            "name": "name",
+            "type": "text"
+          },
+          {
+            "name": "n",
+            "type": "text"
+          },
+          {
+            "name": "note",
+            "type": "text"
+          }
+        ],
+        "ids": [
+          "0",
+          "1",
+          "2"
+        ],
+        "columns": {
+          "name": [
+            "Smith, J",
+            "Lee",
+            "Ox"
+          ],
+          "n": [
+            1.0,
+            2.5,
+            "x1"
+          ],
+          "note": [
+            "say \"hi\"",
+            null,
+            "|pipe|"
+          ]
+        },
+        "groups": []
+      },
+      {
+        "model": "json",
+        "fields": [
+          {
+            "name": "a",
+            "type": "real"
+          },
+          {
+            "name": "b",
+            "type": "text"
+          }
+        ],
+        "ids": [
+          "0",
+          "1"
+        ],
+        "columns": {
+          "a": [
+            1,
+            null
+          ],
+          "b": [
+            null,
+            "x"
+          ]
+        },
+        "groups": []
+      },
+      {
+        "model": "nd",
+        "fields": [
+          {
+            "name": "a",
+            "type": "real"
+          },
+          {
+            "name": "c",
+            "type": "real"
+          }
+        ],
+        "ids": [
+          "0",
+          "1"
+        ],
+        "columns": {
+          "a": [
+            1,
+            2
+          ],
+          "c": [
+            null,
+            null
+          ]
+        },
+        "groups": []
+      },
+      {
+        "columns": {
+          "k": [
+            1
+          ]
+        },
+        "ids": [
+          "0"
+        ],
+        "model": "as is"
+      }
+    ],
+    "read_errors": [
+      "invalid input: expected objects, got 1",
+      "invalid input: JSON: expected ident at line 1 column 3",
+      "invalid input: NDJSON: expected ident at line 1 column 2"
+    ],
+    "markdown": [
+      "| name | n | note |\n|---|---|---|\n| Smith, J | 1.0 | say \"hi\" |\n| Lee | 2.5 |  |\n\n… 1 more rows\n",
+      "| x | y | z |\n|---|---|---|\n| 1 | p |  |\n| 2 |  | true |\n",
+      "(no columns)\n"
+    ]
+  }
+}

@@ -44,6 +44,7 @@ weirdnet-rules = { version = "0.1.0", path = "../weirdnet-rules" }
 # Code spaces (math, Polars, Rust and Python through the vendored python-ast, native plugins)
 weirdnet-code-spaces = { version = "0.1.0", path = "../weirdnet-code-spaces", features = ["math", "polars", "python", "native-plugins"] }
 weirdnet-render = { version = "0.1.0", path = "../weirdnet-render" }
+weirdnet-pipelines = { version = "0.1.0", path = "../weirdnet-pipelines" }
 crossterm = "0.29"
 rpassword = "7"
 dirs = "6"

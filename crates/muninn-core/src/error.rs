@@ -104,6 +104,15 @@ impl From<weirdnet_keys::KeysError> for Error {
     }
 }
 
+/// Pipeline graph and frame errors keep their messages ("invalid pipeline: …", "invalid input: …").
+impl From<weirdnet_pipelines::PipelineError> for Error {
+    fn from(e: weirdnet_pipelines::PipelineError) -> Self {
+        match e {
+            weirdnet_pipelines::PipelineError::Invalid { what, msg } => Error::Invalid { what, msg },
+        }
+    }
+}
+
 /// Rule syntax errors keep their messages ("invalid --if: …", "invalid --cron: …").
 impl From<weirdnet_rules::RulesError> for Error {
     fn from(e: weirdnet_rules::RulesError) -> Self {

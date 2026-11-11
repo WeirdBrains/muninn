@@ -1,5 +1,6 @@
 //! `mnnn pipeline …`.
 use super::{Ctx, PipelineCommand};
+use crate::code::pipeline::GraphExt as _;
 use crate::code::{self, CodeEnv, pipeline as pl};
 use crate::store::{NewAction, Store};
 use serde_json::{Value, json};

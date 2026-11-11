@@ -1,4 +1,5 @@
 //! Running live searches against the data stored now. See `docs/live-searches.md`.
+use crate::code::pipeline::GraphExt as _;
 use crate::store::{BarFilter, Entry, Journal, SearchSpec, SearchTarget, SeriesInfo, Store};
 use crate::tui::sidebar::{self, SidebarPrefs};
 use serde::{Deserialize, Serialize};

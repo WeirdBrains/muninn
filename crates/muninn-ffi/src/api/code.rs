@@ -3,6 +3,7 @@
 //! hashes stay grounded in Rust; Dart sees names, source text the user wrote, status
 //! and logs.
 use super::data::{open, open_write};
+use muninn_core::code::pipeline::GraphExt as _;
 use muninn_core::code::{self, CodeEnv, pipeline as pl};
 use muninn_core::store::{CodeChange, CodeScope, CodeSpace, Lang, NewAction, Store, pipelines::Pipeline};
 use serde_json::json;

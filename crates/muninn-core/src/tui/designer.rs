@@ -4,6 +4,7 @@
 //! through the history like any other run), monitored, exported and imported.
 use super::workspace::{Ask, Typed, View, ask_key, draw_view, muted, row_style};
 use super::{App, Hit};
+use crate::code::pipeline::GraphExt as _;
 use crate::code::pipeline::{self as pl, Graph, NodeKind};
 use crate::code::{self, CodeEnv};
 use crate::store::Store;

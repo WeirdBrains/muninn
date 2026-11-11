@@ -13,6 +13,9 @@ use super::{CodeEnv, host};
 use crate::error::{Error, Result};
 use crate::store::{CodeInput, CodeSpace, NewAction, RunInfo, SearchSpec, SearchTarget, Store};
 use serde_json::{Map, Value, json};
+use weirdnet_pipelines::frame::columns_frame as col_frame;
+/// Frame helpers (`weirdnet-pipelines`), here under their old paths.
+pub use weirdnet_pipelines::frame::{csv_line, filter_rows, markdown, rows_frame, tail};
 
 /// Where a pipe's data comes from.
 #[derive(Debug, Clone, PartialEq)]
@@ -174,15 +177,6 @@ pub fn data_frame_items(store: &Store, source_name: &str, items: &[crate::store:
         items.iter().map(|i| i.id.clone()).collect(),
         vec![],
     ))
-}
-
-fn col_frame(name: &str, cols: Vec<(&str, &str, Vec<Value>)>, ids: Vec<String>, groups: Vec<Value>) -> Value {
-    let fields: Vec<Value> = cols.iter().map(|(n, t, _)| json!({ "name": n, "type": t })).collect();
-    let mut columns = Map::new();
-    for (n, _, v) in cols {
-        columns.insert(n.to_string(), Value::Array(v));
-    }
-    json!({ "model": name, "fields": fields, "ids": ids, "columns": columns, "groups": groups })
 }
 
 /// A rule's triggering action as a one-row frame: `action`, `id`, `summary`, then each
@@ -349,19 +343,6 @@ pub fn output(c: &CodeSpace, info: &RunInfo) -> Result<Value> {
     Ok(view_frame(&v, &format!("code:{}", c.name)))
 }
 
-/// Rows of a frame, kept where `keep(row)` holds.
-pub fn filter_rows(f: &Value, keep: &dyn Fn(&Map<String, Value>) -> bool) -> Value {
-    let cols = f.get("columns").and_then(Value::as_object).cloned().unwrap_or_default();
-    let n = f.get("ids").and_then(Value::as_array).map(Vec::len).unwrap_or(0);
-    let rows: Vec<usize> =
-        (0..n).filter(|i| keep(&cols.iter().map(|(k, v)| (k.clone(), v.get(*i).cloned().unwrap_or(Value::Null))).collect())).collect();
-    let mut out = f.clone();
-    out["ids"] = Value::Array(rows.iter().map(|i| f["ids"][*i].clone()).collect());
-    out["columns"] = Value::Object(cols.iter().map(|(k, v)| (k.clone(), Value::Array(rows.iter().map(|i| v[*i].clone()).collect()))).collect());
-    out["groups"] = json!([]);
-    out
-}
-
 /// A frame filtered by a live search: its text (fuzzy, over the row's values) and the
 /// conditions of a records search.
 pub fn search_filter(f: &Value, spec: &SearchSpec) -> Value {
@@ -524,30 +505,15 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, src: &Source, steps: &[St
 
 type HopFn<'a> = dyn Fn(usize, &str, &Option<Value>, Option<&str>, std::time::Instant) + 'a;
 
+/// Data from outside (standard input) as a frame: a frame as is, a JSON array of objects,
+/// NDJSON (one object a line) or CSV with a header row. Numbers read as numbers.
+#[cfg(test)]
+pub fn read_data(text: &str, name: &str) -> Result<Value> {
+    Ok(weirdnet_pipelines::frame::read_data(text, name)?)
+}
+
 /// Rows a `pipe.frame` record keeps (the last ones): enough for a live tile.
 pub const FRAME_ROWS: usize = 500;
-
-/// The last rows of a frame (and its groups dropped): what a tile shows live.
-pub fn tail(f: &Value, keep: usize) -> Value {
-    let n = f.get("ids").and_then(Value::as_array).map(Vec::len).unwrap_or_else(|| {
-        f.get("columns").and_then(Value::as_object).and_then(|c| c.values().next()).and_then(Value::as_array).map(Vec::len).unwrap_or(0)
-    });
-    if n <= keep {
-        return f.clone();
-    }
-    let from = n - keep;
-    let mut out = f.clone();
-    if let Some(ids) = f.get("ids").and_then(Value::as_array) {
-        out["ids"] = Value::Array(ids[from..].to_vec());
-    }
-    if let Some(cols) = f.get("columns").and_then(Value::as_object) {
-        out["columns"] = Value::Object(
-            cols.iter().map(|(k, v)| (k.clone(), Value::Array(v.as_array().map(|a| a[from.min(a.len())..].to_vec()).unwrap_or_default()))).collect(),
-        );
-    }
-    out["groups"] = json!([]);
-    out
-}
 
 /// Record a step's output (`pipe.frame`, the last [`FRAME_ROWS`] rows) so tiles showing
 /// it (`code:NAME`, `view:PIPELINE/NODE`) update in any TUI on the same home.
@@ -642,108 +608,6 @@ fn run_hops(
     }
     out.frame = cur;
     Ok(())
-}
-
-/// Data from outside (standard input) as a frame: a frame as is, a JSON array of objects,
-/// NDJSON (one object a line) or CSV with a header row. Numbers read as numbers.
-#[cfg(test)]
-pub fn read_data(text: &str, name: &str) -> Result<Value> {
-    let t = text.trim_start();
-    let rows: Vec<Map<String, Value>> = if t.starts_with('[') {
-        let v: Vec<Value> = serde_json::from_str(t).map_err(|e| Error::invalid("input", format!("JSON: {e}")))?;
-        v.into_iter().map(obj).collect::<Result<_>>()?
-    } else if t.starts_with('{') {
-        if let Ok(v) = serde_json::from_str::<Value>(t)
-            && v.get("columns").is_some()
-        {
-            return Ok(v);
-        }
-        t.lines()
-            .filter(|l| !l.trim().is_empty())
-            .map(|l| serde_json::from_str(l).map_err(|e| Error::invalid("input", format!("NDJSON: {e}"))).and_then(obj))
-            .collect::<Result<_>>()?
-    } else {
-        let mut lines = t.lines().filter(|l| !l.trim().is_empty());
-        let head = csv_line(lines.next().unwrap_or_default());
-        lines.map(|l| head.iter().cloned().zip(csv_line(l).into_iter().map(|c| cell(&c))).collect()).collect()
-    };
-    Ok(rows_frame(name, &rows))
-}
-
-#[cfg(test)]
-fn obj(v: Value) -> Result<Map<String, Value>> {
-    match v {
-        Value::Object(m) => Ok(m),
-        o => Err(Error::invalid("input", format!("expected objects, got {o}"))),
-    }
-}
-
-#[cfg(test)]
-fn cell(s: &str) -> Value {
-    match s.trim().parse::<f64>() {
-        Ok(n) if n.is_finite() => json!(n),
-        _ if s.is_empty() => Value::Null,
-        _ => json!(s),
-    }
-}
-
-/// One CSV line (quotes, `""` inside quotes).
-pub fn csv_line(l: &str) -> Vec<String> {
-    let (mut out, mut cur, mut q) = (vec![], String::new(), false);
-    let mut it = l.trim_end_matches('\r').chars().peekable();
-    while let Some(c) = it.next() {
-        match c {
-            '"' if q && it.peek() == Some(&'"') => {
-                cur.push('"');
-                it.next();
-            }
-            '"' => q = !q,
-            ',' if !q => out.push(std::mem::take(&mut cur)),
-            c => cur.push(c),
-        }
-    }
-    out.push(cur);
-    out
-}
-
-/// Rows of objects as a frame (columns in first-seen order).
-pub fn rows_frame(name: &str, rows: &[Map<String, Value>]) -> Value {
-    let mut names: Vec<String> = vec![];
-    for r in rows {
-        for k in r.keys() {
-            if !names.contains(k) {
-                names.push(k.clone());
-            }
-        }
-    }
-    let cols = names
-        .iter()
-        .map(|n| {
-            let v: Vec<Value> = rows.iter().map(|r| r.get(n).cloned().unwrap_or(Value::Null)).collect();
-            let t = if v.iter().all(|x| x.is_number() || x.is_null()) { "real" } else { "text" };
-            (n.as_str(), t, v)
-        })
-        .collect();
-    col_frame(name, cols, (0..rows.len()).map(|i| i.to_string()).collect(), vec![])
-}
-
-/// The frame as a Markdown table (at most `max` rows).
-pub fn markdown(f: &Value, max: usize) -> String {
-    let cols = f.get("columns").and_then(Value::as_object).cloned().unwrap_or_default();
-    let names: Vec<&String> = cols.keys().filter(|k| !k.starts_with('_')).collect();
-    let n = f.get("ids").and_then(Value::as_array).map(Vec::len).unwrap_or(0);
-    if names.is_empty() {
-        return "(no columns)\n".into();
-    }
-    let mut s = format!("| {} |\n|{}\n", names.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(" | "), "---|".repeat(names.len()));
-    for i in 0..n.min(max) {
-        let cells: Vec<String> = names.iter().map(|k| crate::designer::value_text(&cols[*k][i]).replace('|', "\\|")).collect();
-        s += &format!("| {} |\n", cells.join(" | "));
-    }
-    if n > max {
-        s += &format!("\n… {} more rows\n", n - max);
-    }
-    s
 }
 
 /// Save a frame (a side branch of a pipe): a journal entry or new records.

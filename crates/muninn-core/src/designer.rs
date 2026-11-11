@@ -165,11 +165,7 @@ pub fn parse_fields(store: &Store, model: &Model, s: &str) -> Result<Vec<Field>>
 
 /// A value for people (strings without quotes).
 pub fn value_text(v: &Value) -> String {
-    match v {
-        Value::Null => String::new(),
-        Value::String(s) => s.clone(),
-        o => o.to_string(),
-    }
+    weirdnet_pipelines::frame::cell_text(v)
 }
 
 /// Apply field changes to a design, in order.

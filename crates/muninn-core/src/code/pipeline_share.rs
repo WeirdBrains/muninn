@@ -1,5 +1,6 @@
 //! Pipeline files: export a pipeline with its code (by trust hash) and its sink models
 //! (by name, optionally with their templates embedded), and import one with a plan first.
+use super::GraphExt as _;
 use super::{Graph, NodeKind};
 use crate::code::{trust_hash, trust_hash_of};
 use crate::error::{Error, Result};
