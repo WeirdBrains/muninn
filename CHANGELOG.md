@@ -6,6 +6,18 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.24.0] - 2026-11-11
+
+### Added
+- Weirdnet crates: storage, keys, themes, rules, code spaces and the plugin SDK, pipelines, chart rendering and networking now live in reusable workspace crates (`weirdnet-storage`, `weirdnet-keys`, `weirdnet-themes`, `weirdnet-rules`, `weirdnet-code-spaces`, `weirdnet-plugin`, `weirdnet-pipelines`, `weirdnet-render`, `weirdnet-net`; not on crates.io yet). Database, file, wire, signature and key formats are unchanged and pinned by golden tests: nothing to migrate
+- Arch: `muninn-bin` goes to TAUR as part of the release (`scripts/publish-taur.sh X.Y.Z`, after the GitHub release is published); its sources name each architecture, so `.SRCINFO` is right on any host
+
+### Changed
+- Network invitations (connect, poll, settle, crossing offers, trust on first use) run in `weirdnet-net` behind host traits; Muninn's accept policy, 50-offer limit, messages and wire format are unchanged
+
+### Fixed
+- The TUI import-cancel tests are deterministic; the website CI job pins Dart 3.13.7
+
 ## [2.23.0] - 2026-11-09
 
 ### Added
@@ -642,7 +654,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.23.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.24.0...HEAD
+[2.24.0]: https://github.com/WeirdBrains/muninn/compare/v2.23.0...v2.24.0
 [2.23.0]: https://github.com/WeirdBrains/muninn/compare/v2.22.3...v2.23.0
 [2.22.3]: https://github.com/WeirdBrains/muninn/compare/v2.22.0...v2.22.3
 [2.22.0]: https://github.com/WeirdBrains/muninn/compare/v2.21.0...v2.22.0
