@@ -50,11 +50,9 @@ pub fn parse_ts(s: &str) -> Option<i64> {
     None
 }
 
+/// Data timestamps in UTC, as code-space result views show them.
 pub fn fmt_ts(ms: i64) -> String {
-    match Utc.timestamp_millis_opt(ms) {
-        chrono::LocalResult::Single(d) => d.format("%Y-%m-%d %H:%M:%S").to_string(),
-        _ => ms.to_string(),
-    }
+    weirdnet_code_spaces::view::fmt_ts(ms)
 }
 
 /// Wall-clock moments (when a peer was seen, a node started, an invite expires)

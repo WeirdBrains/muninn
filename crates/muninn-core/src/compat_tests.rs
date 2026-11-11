@@ -245,6 +245,25 @@ fn code_spaces_formats_before_the_extraction() {
     assert_eq!(serde_json::to_string(&Lang::ALL).unwrap(), r#"["math","polars","rust","python","plugin"]"#);
 }
 
+/// Result views moved to weirdnet-code-spaces: Muninn's number and time formatting and the
+/// stored view JSON are what the pre-extraction code produced (goldens from fb250d19).
+#[test]
+fn result_views_and_formatting_before_the_extraction() {
+    use crate::code::view::ResultView;
+    let nums = [0.0, 3.0, -2.0, 42000.5, 0.00012, 1.0 / 3.0, 1e15, 1e16, 999.999999999, -1234.5678, f64::NAN, f64::INFINITY];
+    let want = ["0", "3", "-2", "42000.50", "0.00012", "0.33333333", "1000000000000000.00", "10000000000000000.00", "1000", "-1234.57", "NaN", "inf"];
+    assert_eq!(nums.map(crate::export::docs::num), want.map(str::to_string));
+    let ts = [0i64, 1_700_000_000_123, -1, i64::MAX];
+    let want = ["1970-01-01 00:00:00", "2023-11-14 22:13:20", "1969-12-31 23:59:59", "9223372036854775807"];
+    assert_eq!(ts.map(crate::ingest::time::fmt_ts), want.map(str::to_string));
+    let stored = r#"{"kind":"tiles","title":"t","dir":"below","tiles":[{"kind":"table","title":"","columns":["a"],"rows":[[1.5]]},{"kind":"chart","title":"c","x":{"name":"timestamp","time":true,"values":[0.0,60000.0]},"series":[{"name":"a","values":[1.0,null]}]},{"kind":"text","title":"","text":"x"}]}"#;
+    let v: ResultView = serde_json::from_str(stored).unwrap();
+    assert_eq!(serde_json::to_string(&v).unwrap(), stored, "a stored view reads and writes back the same");
+    assert_eq!(v.leaves()[1].as_table().1[1], vec!["1970-01-01 00:01:00".to_string(), String::new()]);
+    let e = crate::error::Error::from(ResultView::from_plugin(serde_json::json!({"kind": "pie"})).unwrap_err()).to_string();
+    assert_eq!(e, "invalid result: not a view: unknown variant `pie`, expected one of `table`, `chart`, `text`, `tiles`");
+}
+
 /// App-owned identifiers (they stay Muninn's; pinned so a crate move does not rename them).
 #[test]
 fn app_identifiers() {

@@ -20,6 +20,9 @@ application's data through host methods.
   over the application's spaces (`spaces::Graph`).
 - **Host**: `Host` is the application's methods; `run` hands a loaded plugin a host table
   over it.
+- **Result views** (`view`): the table, chart, text and tiles a plugin returns, parsed,
+  checked and cut to their limits, with table, chart, text-line and sparkline conversions;
+  PNG charts with the `png` feature. Drawing them in a UI is the application's.
 
 Everything that names the application or SDK comes from a `Profile`: `WEIRDNET` (SDK
 `weirdnet-plugin`, ABI 2), or an application's own, so it keeps its hashes, generated code

@@ -43,14 +43,7 @@ pub fn day(ms: i64) -> String {
 
 /// A price or amount without noise (`42000.5`, `0.00012`).
 pub fn num(v: f64) -> String {
-    if v.is_finite() && v.fract() == 0.0 && v.abs() < 1e15 {
-        format!("{v:.0}")
-    } else if v.abs() >= 1000.0 {
-        format!("{v:.2}")
-    } else {
-        let s = format!("{v:.8}");
-        s.trim_end_matches('0').trim_end_matches('.').to_string()
-    }
+    weirdnet_code_spaces::view::num(v)
 }
 
 /// A report's code space: by id (or, for sections made before 2.5, by name).

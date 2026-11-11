@@ -5,8 +5,8 @@
 //! by content, loaded after an ABI check and approved by a trust hash.
 //!
 //! What stays with the application: where code spaces are stored, who may approve them,
-//! the host methods a plugin calls (its data) and running a loaded plugin with a host
-//! table. Everything here is parameterized by a [`Profile`] (the SDK, symbol names, hash
+//! the host methods a plugin calls (its data) and how a result view is drawn ([`view`]
+//! parses, checks and converts it). Everything here is parameterized by a [`Profile`] (the SDK, symbol names, hash
 //! domains and the names messages use); [`WEIRDNET`] is the default.
 //!
 //! ```ignore
@@ -20,8 +20,8 @@
 //! ```
 //!
 //! Features: `math` (default), `polars`, `python` (each adds its language; Python needs no
-//! libpython), and `native-plugins` (default: running cargo and loading libraries, so
-//! desktop only).
+//! libpython), `native-plugins` (default: running cargo and loading libraries, so desktop
+//! only), and `png` (charts of result views as PNG).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 /// The plugin C ABI (version 2 for [`WEIRDNET`]): the SDK's own `abi.rs`. Version 1 has the
@@ -33,6 +33,8 @@ pub mod host;
 pub mod lang;
 #[cfg(feature = "math")]
 pub mod math;
+#[cfg(feature = "png")]
+pub mod png;
 #[cfg(feature = "polars")]
 pub mod polars;
 #[cfg(feature = "python")]
@@ -43,6 +45,7 @@ pub mod python;
 #[allow(clippy::all, unused, unexpected_cfgs, deprecated)]
 mod python_ast;
 pub mod spaces;
+pub mod view;
 
 pub use error::{Result, SpacesError};
 pub use host::Host;
