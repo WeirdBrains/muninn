@@ -129,3 +129,13 @@ fn one_reachable_circuit_per_relay() {
     assert!(!shareable(&docker) && !shareable(&fe80));
     assert!(shareable(&"/ip4/127.0.0.1/tcp/1".parse().unwrap()) && shareable(&"/ip4/172.16.0.1/tcp/1".parse().unwrap()));
 }
+
+/// An IPv6 link-local address (`/ip6/fe80…`).
+pub fn link_local(a: &str) -> bool {
+    a.strip_prefix("/ip6/").is_some_and(|r| r.get(..4).is_some_and(|p| p.eq_ignore_ascii_case("fe80")))
+}
+
+/// Docker's default bridge networks (172.17/16, 172.18/16): unreachable from other hosts.
+pub fn docker_bridge(a: &str) -> bool {
+    a.strip_prefix("/ip4/172.").is_some_and(|r| r.starts_with("17.") || r.starts_with("18."))
+}

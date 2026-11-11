@@ -15,6 +15,12 @@ response types, its own storage and its own policy; the crate brings the wire.
   direction.
 - `sealed`: send a sealed request through the application's envelope and open the answer
   (`call`), and answer one only for the exchange's own, Noise-authenticated peer (`serve`).
+- `invite`: invitation automation over the application's records (`Host`) and messages
+  (`Ask`, `Say`): `connect` (hello, then an offer delivered and answered on the spot or kept
+  for the owner), answering on arrival when the host's `decide` says so, `poll` and
+  `settle` for kept offers and undelivered answers, crossing offers settled on one exchange,
+  trust on first use (`known`, `pinned`, `impostor`, names resolving to the pinned node),
+  relay addresses for a peer and the addresses fit for invite links.
 - `identity`, `user`, `sync`, `shard`, `addr`: node identities through an `IdentityStore`,
   user certificates, revocations, cards and link grants, the linked-node sync key, dark-shard
   blobs as custodians carry them, and address helpers.

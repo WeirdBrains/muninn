@@ -115,6 +115,7 @@ impl From<weirdnet_net::NetError> for Error {
             N::Network(m) => Error::Other(format!("network: {m}")),
             N::Keys(k) => k.into(),
             N::Json(e) => Error::Json(e),
+            N::Other(m) => Error::Other(m),
         }
     }
 }

@@ -1,11 +1,10 @@
 //! Our side: making and accepting exchanges, asking peers for what they share, searching
 //! across the network and dark shards. The CLI and TUI call these; every change is
 //! recorded in the action history.
-use super::exchange::{self, Answer, AnswerExt, Offer, OfferExt, Token};
-use super::node::{Node, addr_peer, parse_addrs, shareable};
+use super::exchange::{self, Offer, OfferExt};
+use super::node::Node;
 use super::profile::MUNINN;
 use super::proto::{Item, Req, Resp, ShardBlob, SharedItem, Wire, WireResp};
-use super::service;
 use crate::crypto::{self, Key32};
 use crate::error::{Error, Result};
 use crate::live::Found;
@@ -34,64 +33,15 @@ pub fn no_node() -> Error {
 
 /// Addresses we know for a peer: from sightings, its exchange tokens, and through relays.
 pub fn peer_addrs(s: &Store, peer: &str, relays: &[String]) -> Vec<Multiaddr> {
-    let mut v: Vec<String> = s.net_peer(peer).ok().flatten().map(|p| p.addrs).unwrap_or_default();
-    if let Ok(xs) = s.exchanges() {
-        for x in xs.into_iter().filter(|x| x.peer_id.as_deref() == Some(peer)) {
-            let tokens = [Some(x.offer.clone()), x.answer.clone()];
-            for t in tokens.into_iter().flatten() {
-                match exchange::parse_token(&t) {
-                    Ok(Token::Offer(o)) if o.peer == peer => v.extend(o.addrs),
-                    Ok(Token::Answer(a)) if a.peer == peer => v.extend(a.addrs),
-                    _ => {}
-                }
-            }
-        }
-    }
-    let Ok(pid) = peer.parse::<PeerId>() else { return vec![] };
-    let mut out: Vec<Multiaddr> = vec![];
-    for a in parse_addrs(&v) {
-        // drop a trailing /p2p/ of the same peer; libp2p adds it
-        let a = match addr_peer(&a) {
-            Some(p) if p == pid => {
-                let mut a = a;
-                a.pop();
-                a
-            }
-            Some(_) if !a.iter().any(|p| p == Protocol::P2pCircuit) => continue,
-            _ => a,
-        };
-        if !out.contains(&a) {
-            out.push(a);
-        }
-    }
-    let configured: Vec<Multiaddr> = parse_addrs(relays).into_iter().filter(|r| addr_peer(r).is_some()).collect();
-    for r in &configured {
-        let c = r.clone().with(Protocol::P2pCircuit);
-        if !out.contains(&c) {
-            out.push(c);
-        }
-    }
-    one_circuit_per_relay(out.into_iter().filter(shareable).collect(), &configured)
+    weirdnet_net::invite::peer_addrs(&MUNINN, s, peer, relays)
 }
 
+#[cfg(test)]
 pub(crate) use weirdnet_net::addr::one_circuit_per_relay;
 
 /// A peer by full address (`…/p2p/ID`), peer id, or a known peer's label or short id.
 pub fn resolve(s: &Store, target: &str, relays: &[String]) -> Result<(PeerId, Vec<Multiaddr>)> {
-    let t = target.trim();
-    if t.starts_with('/') {
-        let a: Multiaddr = t.parse().map_err(|e| Error::invalid("address", format!("{t}: {e}")))?;
-        let p = addr_peer(&a).ok_or_else(|| Error::invalid("address", "needs the peer id at the end (…/p2p/12D3Koo…)"))?;
-        let mut v = vec![a];
-        v.extend(peer_addrs(s, &p.to_string(), relays));
-        return Ok((p, v));
-    }
-    let peer = match t.parse::<PeerId>() {
-        Ok(p) => p.to_string(),
-        Err(_) => s.find_net_peer(t)?.peer_id,
-    };
-    let p: PeerId = peer.parse().map_err(|_| Error::invalid("peer", "bad peer id"))?;
-    Ok((p, peer_addrs(s, &peer, relays)))
+    weirdnet_net::invite::resolve_addr(&MUNINN, s, target, relays)
 }
 
 /// Say hello to a peer: its label and capabilities, remembered.
@@ -223,94 +173,8 @@ pub fn accept(
             st => return Err(Error::invalid("exchange", format!("already {}", st.as_str()))),
         }
     };
-    match exchange::parse_token(&token)? {
-        Token::Answer(a) => {
-            let x = service::complete_offer(s, &a, &token)?;
-            if !label.is_empty() {
-                s.label_exchange(&x.id, label)?;
-            }
-            let x = s.exchange(&x.id)?.unwrap_or(x);
-            record(
-                s,
-                origin,
-                "net.exchange.complete",
-                format!("key exchange with {} complete", x.title()),
-                serde_json::json!({ "exchange": x.id, "peer": x.peer_id, "fingerprint": x.fingerprint }),
-            );
-            Ok(Accepted { exchange: x, answer: None, delivered: None })
-        }
-        Token::Offer(o) => {
-            let from = o.verify(now_ms())?;
-            if let Some(x) = s.exchange(&o.id)?
-                && x.status != ExchangeStatus::Incoming
-            {
-                return Err(Error::invalid("exchange", format!("this offer was already {}", x.status.as_str())));
-            }
-            let (a, d) = Answer::new(kp, &o, my_label, addrs, now_ms())?;
-            let atoken = a.token()?;
-            if s.exchange(&o.id)?.is_none() {
-                s.insert_exchange(
-                    &NewExchange {
-                        id: o.id.clone(),
-                        label: label.to_string(),
-                        role: "answerer".into(),
-                        status: Some(ExchangeStatus::Incoming),
-                        peer_id: Some(o.peer.clone()),
-                        peer_label: o.label.clone(),
-                        scope: o.scope.clone(),
-                        offer: token.clone(),
-                        expires_at: Some(o.expires),
-                    },
-                    None,
-                )?;
-            } else if !label.is_empty() {
-                s.label_exchange(&o.id, label)?;
-            }
-            let x = s.complete_exchange(&o.id, &o.peer, &o.label, &atoken, &d.key, &d.short_code, &d.fingerprint)?;
-            s.upsert_net_peer(&o.peer, Some(&o.label), &o.addrs, None, None, "exchange")?;
-            crate::org::net::answered(s, &x)?;
-            crate::review::net::answered(s, &x)?;
-            let mut refused: Option<String> = None;
-            let delivered = node.map(|n| {
-                let addrs = peer_addrs(s, &from.to_string(), &[]);
-                match n.request(from, &addrs, Wire::Answer { token: atoken.clone() }) {
-                    Ok(WireResp::Ok { msg }) => Ok(msg),
-                    Ok(WireResp::Error { msg }) => {
-                        refused = Some(msg.clone());
-                        Err(msg)
-                    }
-                    Ok(_) => Err("unexpected answer".into()),
-                    Err(e) => Err(super::auto::plain(&e.to_string())),
-                }
-            });
-            if matches!(delivered, Some(Ok(_))) {
-                s.mark_answer_delivered(&x.id)?;
-            }
-            record(
-                s,
-                origin,
-                "net.exchange.accept",
-                format!("key exchange with {} accepted", x.title()),
-                serde_json::json!({ "exchange": x.id, "peer": x.peer_id, "fingerprint": x.fingerprint, "delivered": delivered.as_ref().map(|d| d.is_ok()) }),
-            );
-            // their node turned the answer down (a revoked, used or unknown invite): it is over
-            let x = match refused {
-                Some(_) => {
-                    let x = s.set_exchange_status(&x.id, ExchangeStatus::Revoked, Some("peer"))?;
-                    record(
-                        s,
-                        origin,
-                        "net.exchange.revoke",
-                        format!("{} turned the invite down", x.title()),
-                        serde_json::json!({ "exchange": x.id, "peer": x.peer_id, "by": "peer" }),
-                    );
-                    x
-                }
-                None => x,
-            };
-            Ok(Accepted { exchange: x, answer: Some(atoken), delivered })
-        }
-    }
+    let a = weirdnet_net::invite::accept_token(&MUNINN, s, node, kp, &token, label, my_label, addrs, origin)?;
+    Ok(Accepted { exchange: a.exchange, answer: a.answer, delivered: a.delivered })
 }
 
 /// Record that the short codes matched.

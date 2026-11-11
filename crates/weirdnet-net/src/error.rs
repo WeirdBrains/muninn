@@ -16,6 +16,9 @@ pub enum NetError {
     Keys(#[from] weirdnet_keys::KeysError),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    /// Something in the host's records that should not happen (a damaged or missing entry).
+    #[error("{0}")]
+    Other(String),
 }
 
 impl NetError {

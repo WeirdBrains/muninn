@@ -13,7 +13,8 @@ item. A node you do not know asks before it is connected.
 ## The node
 
 The node, key exchanges, invitations, sealed messaging, node identities and user
-certificates come from the `weirdnet-net` crate in this repository, run with Muninn's own
+certificates come from the `weirdnet-net` crate in this repository (so does the automation that
+delivers, answers, polls and settles requests), run with Muninn's own
 identifiers (`/muninn/net/1`, `mnnn-x1-` tokens, `muninn://` links), so Muninn nodes talk to
 earlier versions exactly as before. What peers may ask for, and everything they reach, is
 decided by Muninn.

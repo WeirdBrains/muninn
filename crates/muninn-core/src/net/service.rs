@@ -4,19 +4,17 @@
 //! our own open offers; everything else must arrive sealed under the key of an active
 //! exchange whose peer is the Noise-authenticated sender, and only reaches what is shared
 //! over that exchange.
-use super::exchange::{self, AnswerExt, OfferExt, Token};
+use super::exchange;
 use super::node::{Handler, Sighting};
 use super::profile::MUNINN;
 use super::proto::{Item, Req, Resp, ShardBlob, SharedItem, Wire, WireResp};
 use crate::error::{Error, Result};
 use crate::live::Found;
-use crate::store::{Exchange, ExchangeStatus, Held, ItemKind, NewAction, NewExchange, SearchTarget, Share, ShareKind, Store, now_ms};
+use crate::store::{Exchange, ExchangeStatus, Held, ItemKind, NewAction, SearchTarget, Share, ShareKind, Store, now_ms};
 use libp2p::PeerId;
 use std::collections::HashSet;
 use std::sync::Mutex;
 
-/// At most this many incoming offers are kept.
-const MAX_INCOMING: usize = 50;
 /// Sealed shards are small; anything bigger is refused.
 const MAX_SHARD_BLOB: usize = 16 * 1024;
 /// At most this many shards are held per peer.
@@ -124,87 +122,20 @@ fn record(s: &Store, kind: &str, summary: String, params: serde_json::Value) {
     s.note_action(&NewAction::new(kind, "network", summary).params(params));
 }
 
-/// A peer delivered an offer: keep it as incoming (replacing an earlier copy).
+/// A peer delivered an offer: keep it as incoming (replacing an earlier copy). Org
+/// applications are checked first; at most `MAX_INCOMING` wait (see [`super::invite`]).
 pub fn incoming_offer(s: &Store, from: &PeerId, token: &str) -> Result<String> {
-    let Token::Offer(o) = exchange::parse_token(token)? else {
-        return Err(Error::invalid("token", "expected an offer"));
-    };
-    let p = o.verify(now_ms())?;
-    if p != *from {
-        return Err(Error::invalid("exchange", "the offer was sent by a different node than the one that signed it"));
-    }
-    if let Some(x) = s.exchange(&o.id)? {
-        return Ok(format!("already known ({})", x.status.as_str()));
-    }
-    crate::org::net::check_application(s, &o)?;
-    let incoming = s.exchanges()?.into_iter().filter(|x| x.status == ExchangeStatus::Incoming).count();
-    if incoming >= MAX_INCOMING {
-        return Err(Error::invalid("exchange", "too many pending offers on this node"));
-    }
-    let x = s.insert_exchange(
-        &NewExchange {
-            id: o.id.clone(),
-            label: String::new(),
-            role: "answerer".into(),
-            status: Some(ExchangeStatus::Incoming),
-            peer_id: Some(o.peer.clone()),
-            peer_label: o.label.clone(),
-            scope: o.scope.clone(),
-            offer: token.split_whitespace().collect(),
-            expires_at: Some(o.expires),
-        },
-        None,
-    )?;
-    s.upsert_net_peer(&o.peer, Some(&o.label), &o.addrs, None, None, "exchange")?;
-    if let Some(msg) = crate::org::net::applied(s, &o, &x)? {
-        return Ok(msg);
-    }
-    record(
-        s,
-        "net.exchange.incoming",
-        format!("key exchange offered by {} ({})", x.title(), super::short_peer_id(from)),
-        serde_json::json!({ "exchange": x.id, "peer": o.peer, "label": o.label }),
-    );
-    Ok("offer received; it waits to be accepted".into())
+    weirdnet_net::invite::incoming_offer(&MUNINN, s, from, token)
 }
 
 /// A peer delivered the answer to one of our offers: complete it.
 pub fn incoming_answer(s: &Store, from: &PeerId, token: &str) -> Result<String> {
-    let Token::Answer(a) = exchange::parse_token(token)? else {
-        return Err(Error::invalid("token", "expected an answer"));
-    };
-    if a.peer != from.to_string() {
-        return Err(Error::invalid("exchange", "the answer was sent by a different node than the one that signed it"));
-    }
-    let x = complete_offer(s, &a, token)?;
-    record(
-        s,
-        "net.exchange.complete",
-        format!("key exchange with {} complete", x.title()),
-        serde_json::json!({ "exchange": x.id, "peer": x.peer_id, "fingerprint": x.fingerprint }),
-    );
-    Ok("exchange complete".into())
+    weirdnet_net::invite::incoming_answer(&MUNINN, s, from, token)
 }
 
 /// Complete our offer with an answer (from the network or pasted).
 pub fn complete_offer(s: &Store, a: &exchange::Answer, token: &str) -> Result<Exchange> {
-    let x = s.exchange(&a.offer)?.ok_or_else(|| Error::invalid("exchange", "this answer is for an offer this node did not make"))?;
-    if x.role != "offerer" {
-        return Err(Error::invalid("exchange", "this answer is for an offer this node did not make"));
-    }
-    if x.status != ExchangeStatus::Offered {
-        return Err(Error::invalid("exchange", format!("the exchange is already {}", x.status.as_str())));
-    }
-    let Token::Offer(o) = exchange::parse_token(&x.offer)? else {
-        return Err(Error::Other("stored offer is damaged".into()));
-    };
-    let secret = s.exchange_secret(&x.id)?.ok_or_else(|| Error::Other("the offer's secret is gone".into()))?;
-    let d = a.complete(&o, &secret)?;
-    let x = s.complete_exchange(&x.id, &a.peer, &a.label, &token.split_whitespace().collect::<String>(), &d.key, &d.short_code, &d.fingerprint)?;
-    s.upsert_net_peer(&a.peer, Some(&a.label), &a.addrs, None, None, "exchange")?;
-    crate::org::net::answered(s, &x)?;
-    crate::review::net::answered(s, &x)?;
-    Ok(x)
+    weirdnet_net::invite::complete_offer(&MUNINN, s, a, token)
 }
 
 /// Journals and models reachable through what is shared over an exchange.

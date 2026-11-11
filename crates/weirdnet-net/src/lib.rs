@@ -3,6 +3,7 @@ pub mod addr;
 mod error;
 pub mod exchange;
 pub mod identity;
+pub mod invite;
 pub mod node;
 pub mod profile;
 pub mod sealed;

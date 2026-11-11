@@ -100,20 +100,11 @@ pub fn offer_addrs(home: &Path, store: &Store, node: Option<&Node>) -> Vec<Strin
             None => super::client::my_addrs(store, None),
         },
     };
-    let keep: Vec<libp2p::Multiaddr> = super::node::parse_addrs(&all).into_iter().filter(super::node::shareable).collect();
-    let mut v: Vec<String> = super::client::one_circuit_per_relay(keep, &[]).iter().map(|a| a.to_string()).collect();
-    v.retain(|a| !link_local(a) && !docker(a));
-    v
+    weirdnet_net::invite::offer_addrs(&all)
 }
 
-fn link_local(a: &str) -> bool {
-    a.strip_prefix("/ip6/").is_some_and(|r| r.get(..4).is_some_and(|p| p.eq_ignore_ascii_case("fe80")))
-}
-
-/// Docker's default bridge networks (172.17/16, 172.18/16): unreachable from other hosts.
-fn docker(a: &str) -> bool {
-    a.strip_prefix("/ip4/172.").is_some_and(|r| r.starts_with("17.") || r.starts_with("18."))
-}
+#[cfg(test)]
+use weirdnet_net::addr::{docker_bridge as docker, link_local};
 
 #[cfg(test)]
 #[test]

@@ -10,6 +10,7 @@ pub mod broadcast;
 pub mod client;
 pub mod exchange;
 pub mod identity;
+pub mod invite;
 pub mod local;
 pub mod node;
 pub mod profile;

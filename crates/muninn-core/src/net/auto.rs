@@ -16,58 +16,21 @@
 //! flagged ([`impostor`]) instead of being taken for it. The short code is still derived
 //! and can be compared with `mnnn net exchange verify` (advanced) for extra assurance.
 use super::client::{self, Accepted};
-use super::exchange::{self, OfferExt, Token};
+use super::exchange::{self, Token};
 use super::node::Node;
-use super::proto::{Wire, WireResp};
-use super::service;
+use super::profile::MUNINN;
+use super::proto::WireResp;
 use crate::error::{Error, Result};
-use crate::store::{Exchange, ExchangeStatus, NewAction, NewExchange, Store, now_ms};
+use crate::store::{Exchange, ExchangeStatus, NewAction, Store, now_ms};
 use libp2p::identity::Keypair;
 use libp2p::{Multiaddr, PeerId};
-use serde::Serialize;
+use weirdnet_net::invite::{self, Said};
 
-/// Where a connection (or a membership, or a review link) stands, in words.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LinkStatus {
-    /// Asked; the other side has to accept (or an owner to approve).
-    Pending,
-    /// They asked us; it waits for our yes or no.
-    Requested,
-    /// Keys exchanged: the two nodes talk.
-    Connected,
-    /// Ended here or by them, or turned down.
-    Ended,
-    /// It did not work (the reason is given).
-    Failed,
-}
-
-impl LinkStatus {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            LinkStatus::Pending => "pending",
-            LinkStatus::Requested => "requested",
-            LinkStatus::Connected => "connected",
-            LinkStatus::Ended => "ended",
-            LinkStatus::Failed => "failed",
-        }
-    }
-}
+pub use weirdnet_net::invite::LinkStatus;
 
 /// The status of an exchange, as the user sees it.
 pub fn status_of(x: &Exchange) -> LinkStatus {
-    match x.status {
-        ExchangeStatus::Offered => {
-            if x.expires_at.is_some_and(|e| e < now_ms()) {
-                LinkStatus::Ended
-            } else {
-                LinkStatus::Pending
-            }
-        }
-        ExchangeStatus::Incoming => LinkStatus::Requested,
-        ExchangeStatus::Complete | ExchangeStatus::Verified => LinkStatus::Connected,
-        ExchangeStatus::Revoked => LinkStatus::Ended,
-    }
+    invite::status_of(x)
 }
 
 /// What an exchange is for, in a word: `node`, `org NAME`, `review TITLE`.
@@ -81,30 +44,8 @@ pub fn purpose(x: &Exchange) -> String {
     }
 }
 
-/// The result of an action that needed a key exchange.
-#[derive(Debug, Clone, Serialize)]
-pub struct Link {
-    pub status: LinkStatus,
-    /// The peer's name (label, else its short id).
-    pub peer: String,
-    pub peer_id: Option<String>,
-    pub exchange: Option<Exchange>,
-    /// One plain line: what happened or what it waits for.
-    pub detail: String,
-    /// Set when the node uses a name another known node has (see [`impostor`]).
-    pub warning: Option<String>,
-}
-
-impl Link {
-    /// `connected to ben`, `pending: …`, `failed: …` and a warning line, if any.
-    pub fn lines(&self) -> Vec<String> {
-        let mut v = vec![format!("{}: {}", self.status.as_str(), self.detail)];
-        if let Some(w) = &self.warning {
-            v.push(format!("warning: {w}"));
-        }
-        v
-    }
-}
+/// The result of an action that needed a key exchange (see `weirdnet_net::invite::Link`).
+pub type Link = invite::Link<Exchange>;
 
 fn record(s: &Store, origin: &str, kind: &str, summary: String, params: serde_json::Value) {
     s.note_action(&NewAction::new(kind, origin, summary).params(params));
@@ -113,48 +54,17 @@ fn record(s: &Store, origin: &str, kind: &str, summary: String, params: serde_js
 /// Whether a key exchange with this node was ever completed (and not ended by us): its key
 /// is pinned here.
 pub fn known(s: &Store, peer: &str) -> bool {
-    s.exchanges()
-        .map(|xs| xs.iter().any(|x| x.peer_id.as_deref() == Some(peer) && x.answer.is_some() && x.revoked_by.as_deref() != Some("me")))
-        .unwrap_or(false)
-}
-
-/// Pinned: any completed exchange with the node, whoever ended it.
-fn pinned(s: &Store, peer: &str) -> bool {
-    s.exchanges().map(|xs| xs.iter().any(|x| x.peer_id.as_deref() == Some(peer) && x.answer.is_some())).unwrap_or(false)
+    invite::known(s, peer)
 }
 
 /// A warning when `peer` calls itself by the name of another node whose key is pinned here.
 pub fn impostor(s: &Store, peer: &str, label: &str) -> Option<String> {
-    let l = label.trim();
-    if l.is_empty() || pinned(s, peer) {
-        return None;
-    }
-    let xs = s.exchanges().ok()?;
-    let other = xs.iter().find(|x| {
-        x.answer.is_some()
-            && x.peer_id.as_deref().is_some_and(|p| p != peer)
-            && (x.peer_label.eq_ignore_ascii_case(l) || x.label.eq_ignore_ascii_case(l))
-    })?;
-    Some(format!(
-        "this node calls itself {l}, but its key is not the one of the {l} you know ({}); it is a different node",
-        super::short_peer_id(&other.peer_id.as_deref().unwrap_or_default().parse().unwrap_or(PeerId::random()))
-    ))
+    invite::impostor(s, peer, label)
 }
 
 /// A peer by address, id, or name; a name prefers the node whose key is pinned.
 pub fn resolve(s: &Store, target: &str, relays: &[String]) -> Result<(PeerId, Vec<Multiaddr>)> {
-    let t = target.trim();
-    if !t.starts_with('/') && t.parse::<PeerId>().is_err() {
-        let all = s.net_peers()?;
-        let named: Vec<_> = all.iter().filter(|p| p.label.eq_ignore_ascii_case(t)).collect();
-        if named.len() > 1
-            && let Some(p) = named.iter().find(|p| pinned(s, &p.peer_id))
-        {
-            let pid: PeerId = p.peer_id.parse().map_err(|_| Error::invalid("peer", "bad peer id"))?;
-            return Ok((pid, client::peer_addrs(s, &p.peer_id, relays)));
-        }
-    }
-    client::resolve(s, target, relays)
+    invite::resolve(&MUNINN, s, target, relays)
 }
 
 /// The node-scoped exchange we have with a peer: active first, else pending either way.
@@ -164,12 +74,7 @@ pub fn node_link(s: &Store, peer: &str) -> Result<Option<Exchange>> {
 
 /// The exchange of one scope kind (`node`, `link`) we have with a peer.
 pub fn kind_link(s: &Store, peer: &str, kind: &str) -> Result<Option<Exchange>> {
-    let xs: Vec<Exchange> =
-        s.exchanges()?.into_iter().filter(|x| x.peer_id.as_deref() == Some(peer) && exchange::scope_kind(&x.scope) == kind).collect();
-    let pick = |f: &dyn Fn(&Exchange) -> bool| xs.iter().find(|x| f(x)).cloned();
-    Ok(pick(&|x| x.status.active())
-        .or_else(|| pick(&|x| x.status == ExchangeStatus::Incoming))
-        .or_else(|| pick(&|x| status_of(x) == LinkStatus::Pending)))
+    invite::kind_link(s, peer, kind)
 }
 
 /// The exchange to share over for a key (an exchange, or a peer): active, or still pending
@@ -184,68 +89,18 @@ pub fn link_for(s: &Store, key: &str) -> Result<Exchange> {
     })
 }
 
-fn title_of(s: &Store, peer: &PeerId) -> String {
-    s.net_peer(&peer.to_string()).ok().flatten().map(|p| p.label).filter(|l| !l.is_empty()).unwrap_or_else(|| super::short_peer_id(peer))
-}
-
 /// What delivering an offer gave.
-#[allow(clippy::large_enum_variant)]
-pub enum Delivered {
-    /// The peer answered on the spot; the exchange is complete here.
-    Answered(Exchange),
-    /// The peer keeps it for its owner (the message says so).
-    Kept(String),
-}
+pub type Delivered = invite::Delivered<Exchange>;
 
 /// Carry one of our offers to its peer: `Connect` (2.9), falling back to `Offer` for an
 /// older node. An answer that comes back completes the exchange here.
 pub fn deliver(s: &Store, node: &Node, peer: PeerId, addrs: &[Multiaddr], token: &str) -> std::result::Result<Delivered, String> {
-    let r = match node.request(peer, addrs, Wire::Connect { token: token.to_string() }) {
-        Ok(WireResp::Error { msg }) if msg.contains("unknown variant") || msg.contains("Connect") => {
-            node.request(peer, addrs, Wire::Offer { token: token.to_string() })
-        }
-        Err(e) if e.to_string().contains("decode") || e.to_string().contains("variant") => {
-            node.request(peer, addrs, Wire::Offer { token: token.to_string() })
-        }
-        r => r,
-    };
-    match r {
-        Ok(WireResp::Answered { token: t }) => {
-            let Ok(Token::Answer(a)) = exchange::parse_token(&t) else { return Err("the peer sent back something that is not an answer".into()) };
-            if a.peer != peer.to_string() {
-                return Err("the answer was signed by a different node".into());
-            }
-            match service::complete_offer(s, &a, &t) {
-                Ok(x) => {
-                    record(
-                        s,
-                        "network",
-                        "net.exchange.complete",
-                        format!("key exchange with {} complete", x.title()),
-                        serde_json::json!({ "exchange": x.id, "peer": x.peer_id, "auto": true }),
-                    );
-                    Ok(Delivered::Answered(x))
-                }
-                Err(e) => Err(e.to_string()),
-            }
-        }
-        Ok(WireResp::Ok { msg }) => Ok(Delivered::Kept(msg)),
-        Ok(WireResp::Error { msg }) => Err(msg),
-        Ok(_) => Err("unexpected answer".into()),
-        Err(e) => Err(plain(&e.to_string())),
-    }
+    invite::deliver(&MUNINN, s, node, peer, addrs, token)
 }
 
 /// Network errors in plain words.
 pub fn plain(e: &str) -> String {
-    let l = e.to_ascii_lowercase();
-    if l.contains("timeout") || l.contains("timed out") {
-        "the node did not answer in time (is it running and reachable?)".into()
-    } else if l.contains("dial") || l.contains("unreachable") || l.contains("no addresses") || l.contains("connection refused") {
-        "could not reach the node (is it running? check the address, or add a relay)".into()
-    } else {
-        e.trim_start_matches("network: ").to_string()
-    }
+    invite::plain(e)
 }
 
 /// Connect to a node: say hello, then make a key exchange with it unless there is one.
@@ -304,66 +159,9 @@ fn connect_as(
         }
         _ => target.to_string(),
     };
-    let target = target.as_str();
-    let (p, dial) = resolve(s, target, relays)?;
-    let pid = p.to_string();
-    let fail = |detail: String| Link {
-        status: LinkStatus::Failed,
-        peer: title_of(s, &p),
-        peer_id: Some(pid.clone()),
-        exchange: None,
-        detail,
-        warning: None,
-    };
-    // hello: is it there, and what does it call itself
-    let hello = match node.request(p, &dial, Wire::Hello) {
-        Ok(WireResp::Hello { label: l, agent, .. }) => {
-            let reach: Vec<String> =
-                dial.iter().filter(|a| !a.iter().any(|x| x == libp2p::multiaddr::Protocol::P2pCircuit)).map(|a| a.to_string()).collect();
-            let name = label.map(str::to_string).filter(|x| !x.is_empty());
-            let warning = impostor(s, &pid, &l);
-            s.upsert_net_peer(&pid, name.as_deref().or(Some(&l)), &reach, None, Some(&agent), "manual")?;
-            warning
-        }
-        Ok(WireResp::Error { msg }) => return Ok(fail(msg)),
-        Ok(_) => return Ok(fail("that node does not speak Muninn".into())),
-        Err(e) => return Ok(fail(plain(&e.to_string()))),
-    };
-    let peer = title_of(s, &p);
-    let link = |status, exchange: Option<Exchange>, detail: String| Link {
-        status,
-        peer: peer.clone(),
-        peer_id: Some(pid.clone()),
-        exchange,
-        detail,
-        warning: hello.clone(),
-    };
-    match kind_link(s, &pid, kind)? {
-        Some(x) if x.status.active() => return Ok(link(LinkStatus::Connected, Some(x), format!("already connected to {peer}"))),
-        // they asked first: connecting is our yes
-        Some(x) if x.status == ExchangeStatus::Incoming => {
-            let a = accept(s, Some(node), kp, &x.id, my_label, addrs, origin)?;
-            return Ok(a);
-        }
-        Some(x) => {
-            // our earlier request: carry it again
-            return Ok(match deliver(s, node, p, &dial, &x.offer) {
-                Ok(Delivered::Answered(x)) => link(LinkStatus::Connected, Some(x), format!("connected to {peer}")),
-                Ok(Delivered::Kept(_)) => link(LinkStatus::Pending, Some(x), format!("waiting for {peer} to accept")),
-                Err(e) => link(LinkStatus::Failed, Some(x), e),
-            });
-        }
-        None => {}
-    }
     let scope = if kind == "link" { exchange::link_scope() } else { exchange::node_scope() };
-    let x = offer_to(s, kp, &pid, scope, label.unwrap_or(""), my_label, addrs, client::DEFAULT_TTL_MS, origin)?;
-    Ok(match deliver(s, node, p, &dial, &x.offer) {
-        Ok(Delivered::Answered(x)) => link(LinkStatus::Connected, Some(x), format!("connected to {peer}")),
-        Ok(Delivered::Kept(_)) => link(LinkStatus::Pending, Some(x), format!("waiting for {peer} to accept")),
-        Err(e) => {
-            let _ = s.set_exchange_status(&x.id, ExchangeStatus::Revoked, Some("me"));
-            link(LinkStatus::Failed, Some(x), e)
-        }
+    invite::connect(&MUNINN, s, node, kp, &target, label, my_label, addrs, relays, origin, scope, client::DEFAULT_TTL_MS, |x, addrs| {
+        accept(s, Some(node), kp, &x.id, my_label, addrs, origin)
     })
 }
 
@@ -380,30 +178,7 @@ pub fn offer_to(
     ttl_ms: i64,
     origin: &str,
 ) -> Result<Exchange> {
-    let (offer, secret) = exchange::Offer::new(kp, my_label, addrs, scope, now_ms(), ttl_ms)?;
-    let token = offer.token()?;
-    let x = s.insert_exchange(
-        &NewExchange {
-            id: offer.id.clone(),
-            label: label.to_string(),
-            role: "offerer".into(),
-            status: Some(ExchangeStatus::Offered),
-            peer_id: Some(peer.to_string()),
-            peer_label: String::new(),
-            scope: offer.scope.clone(),
-            offer: token,
-            expires_at: Some(offer.expires),
-        },
-        Some(&secret[..]),
-    )?;
-    record(
-        s,
-        origin,
-        "net.exchange.create",
-        "key exchange requested".to_string(),
-        serde_json::json!({ "exchange": x.id, "peer": peer, "auto": true }),
-    );
-    Ok(x)
+    invite::offer_to(&MUNINN, s, kp, peer, scope, label, my_label, addrs, ttl_ms, origin)
 }
 
 /// Accept a request (an incoming exchange, by id, peer name or peer id): answer it and
@@ -573,78 +348,27 @@ pub fn link_fetch(s: &Store, node: &Node, x: &Exchange, my_label: &str, relays: 
 /// node connection and the peer is known here, has a request of ours open, or anyone is
 /// accepted. Memberships and review links always wait for the owner.
 pub fn connect_in(s: &Store, from: &PeerId, token: &str, my_label: &str, accept_anyone: bool) -> Result<WireResp> {
-    let msg = service::incoming_offer(s, from, token)?;
-    let Token::Offer(o) = exchange::parse_token(token)? else { return Err(Error::invalid("token", "expected an offer")) };
-    let Some(x) = s.exchange(&o.id)? else { return Ok(WireResp::Ok { msg }) };
-    if x.status.active() && x.role == "answerer" {
-        // asked again: the same answer
-        if let Some(a) = x.answer.clone() {
-            s.mark_answer_delivered(&x.id)?;
-            return Ok(WireResp::Answered { token: a });
-        }
-    }
-    if x.status != ExchangeStatus::Incoming {
-        return Ok(WireResp::Ok { msg });
-    }
-    let peer = from.to_string();
-    let node_scope = o.scope.get("kind").and_then(|k| k.as_str()) == Some("node");
-    let ours = s
-        .exchanges()?
-        .into_iter()
-        .filter(|y| {
-            y.id != x.id
-                && y.peer_id.as_deref() == Some(&peer)
-                && y.status == ExchangeStatus::Offered
-                && y.scope.get("kind").and_then(|k| k.as_str()) == Some("node")
-        })
-        .collect::<Vec<_>>();
-    let already = s.active_exchanges_with(&peer)?.into_iter().any(|y| y.scope.get("kind").and_then(|k| k.as_str()) == Some("node"));
-    if !node_scope || !(accept_anyone || known(s, &peer) || !ours.is_empty() || already) {
-        return Ok(WireResp::Ok { msg: "request received; it waits for the owner to accept".into() });
-    }
-    let kp = super::identity::load_or_create(s)?;
-    let a = client::accept(s, None, &kp, &x.id, "", my_label, client::my_addrs(s, None), "network")?;
-    s.mark_answer_delivered(&x.id)?;
-    // both asked at once: theirs is the one; ours goes
-    for y in ours {
-        let _ = s.set_exchange_status(&y.id, ExchangeStatus::Revoked, Some("me"));
-    }
-    record(
+    let said = invite::connect_in(
+        &MUNINN,
         s,
-        "network",
-        "net.exchange.auto",
-        format!("connected to {} automatically", a.exchange.title()),
-        serde_json::json!({ "exchange": x.id, "peer": peer }),
-    );
-    match a.answer {
-        Some(t) => Ok(WireResp::Answered { token: t }),
-        None => Ok(WireResp::Ok { msg }),
-    }
+        from,
+        token,
+        my_label,
+        || Ok((super::identity::load_or_create(s)?, client::my_addrs(s, None))),
+        // only plain node connections, from a node known here, one we asked too, or anyone
+        // when the owner said so
+        |f| f.kind == "node" && (accept_anyone || f.known || f.crossing > 0 || f.already),
+    )?;
+    Ok(match said {
+        Said::Answered(token) => WireResp::Answered { token },
+        Said::Ok(msg) => WireResp::Ok { msg },
+        _ => WireResp::Error { msg: "unexpected".into() },
+    })
 }
 
 /// `Wire::Poll`: where one of the asker's offers stands here (only its offerer may ask).
 pub fn poll_in(s: &Store, from: &PeerId, exchange: &str) -> Result<(String, Option<String>)> {
-    let x = s.exchange(exchange)?.ok_or_else(|| Error::invalid("exchange", "unknown request"))?;
-    if x.peer_id.as_deref() != Some(&from.to_string()) || x.role != "answerer" {
-        return Err(Error::invalid("exchange", "unknown request"));
-    }
-    let kind = x.scope.get("kind").and_then(|k| k.as_str()).unwrap_or("");
-    let how = x.scope.get("as").and_then(|k| k.as_str()).unwrap_or("");
-    if kind == "organization" && how == "apply" {
-        let r = crate::org::net::poll(s, from, exchange)?;
-        if r.1.is_some() {
-            s.mark_answer_delivered(&x.id)?;
-        }
-        return Ok(r);
-    }
-    Ok(match x.status {
-        st if st.active() => {
-            s.mark_answer_delivered(&x.id)?;
-            ("connected".into(), x.answer.clone())
-        }
-        ExchangeStatus::Revoked => ("declined".into(), None),
-        _ => ("pending".into(), None),
-    })
+    invite::poll_in(s, from, exchange)
 }
 
 // ---------- keeping things moving ----------
@@ -653,46 +377,19 @@ pub fn poll_in(s: &Store, from: &PeerId, exchange: &str) -> Result<(String, Opti
 /// completes them), and deliver answers of ours that have not reached their offerer.
 /// Returns one line per change. Unreachable peers are skipped until next time.
 pub fn settle(s: &Store, node: &Node, relays: &[String], origin: &str) -> Vec<String> {
-    let mut out = vec![];
     let now = now_ms();
-    let Ok(xs) = s.exchanges() else { return out };
-    for x in xs.iter().filter(|x| x.status == ExchangeStatus::Offered && x.expires_at.is_none_or(|e| e > now)) {
-        let Some(peer) = x.peer_id.as_deref().and_then(|p| p.parse::<PeerId>().ok()) else { continue };
+    let mut out = invite::settle_offers(&MUNINN, s, node, relays, origin, |x| {
         // org applications have their own bookkeeping
-        if let Ok(Some(j)) = s.joined_by_exchange(&x.id) {
-            if j.status == crate::store::MemberStatus::Applied
-                && let Ok(j2) = crate::org::net::sync(s, node, &j, relays, origin)
-                && j2.status != j.status
-            {
-                out.push(format!("{}: {}", j2.name, if j2.status == crate::store::MemberStatus::Member { "approved" } else { j2.status.as_str() }));
-            }
-            continue;
+        let Ok(Some(j)) = s.joined_by_exchange(&x.id) else { return None };
+        let mut v = vec![];
+        if j.status == crate::store::MemberStatus::Applied
+            && let Ok(j2) = crate::org::net::sync(s, node, &j, relays, origin)
+            && j2.status != j.status
+        {
+            v.push(format!("{}: {}", j2.name, if j2.status == crate::store::MemberStatus::Member { "approved" } else { j2.status.as_str() }));
         }
-        let addrs = client::peer_addrs(s, &peer.to_string(), relays);
-        match node.request(peer, &addrs, Wire::Poll { exchange: x.id.clone() }) {
-            Ok(WireResp::Poll { answer: Some(t), .. }) => {
-                if let Ok(Token::Answer(a)) = exchange::parse_token(&t)
-                    && a.peer == peer.to_string()
-                    && let Ok(x) = service::complete_offer(s, &a, &t)
-                {
-                    record(
-                        s,
-                        origin,
-                        "net.exchange.complete",
-                        format!("key exchange with {} complete", x.title()),
-                        serde_json::json!({ "exchange": x.id, "peer": x.peer_id, "auto": true }),
-                    );
-                    out.push(format!("connected: {} ({})", x.title(), purpose(&x)));
-                }
-            }
-            Ok(WireResp::Poll { status, .. })
-                if (status == "declined" || status == "rejected") && s.set_exchange_status(&x.id, ExchangeStatus::Revoked, Some("peer")).is_ok() =>
-            {
-                out.push(format!("declined: {} ({})", x.title(), purpose(x)));
-            }
-            _ => {}
-        }
-    }
+        Some(v)
+    });
     // 2.10: users. Finish node links we asked for, and tell peers whom we act for
     // (again after our card changed: a node linked or revoked).
     if let Ok(xs) = s.exchanges() {
@@ -721,22 +418,6 @@ pub fn settle(s: &Store, node: &Node, relays: &[String], origin: &str) -> Vec<St
             let _ = introduce(s, node, x, relays);
         }
     }
-    if let Ok(xs) = s.undelivered_answers() {
-        for x in xs {
-            let Some(peer) = x.peer_id.as_deref().and_then(|p| p.parse::<PeerId>().ok()) else { continue };
-            let Some(t) = x.answer.clone() else { continue };
-            let addrs = client::peer_addrs(s, &peer.to_string(), relays);
-            match node.request(peer, &addrs, Wire::Answer { token: t }) {
-                Ok(WireResp::Ok { .. }) => {
-                    let _ = s.mark_answer_delivered(&x.id);
-                    out.push(format!("{} got our answer ({})", x.title(), purpose(&x)));
-                }
-                Ok(WireResp::Error { msg }) if msg.contains("already") => {
-                    let _ = s.mark_answer_delivered(&x.id);
-                }
-                _ => {}
-            }
-        }
-    }
+    out.extend(invite::deliver_answers(&MUNINN, s, node, relays));
     out
 }
