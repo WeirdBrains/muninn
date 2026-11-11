@@ -29,8 +29,6 @@ python = [
 ]
 # Running cargo and loading built libraries (desktop platforms).
 native-plugins = ["dep:libloading"]
-# Charts of result views as PNG.
-png = ["dep:png"]
 
 [dependencies]
 thiserror = "2"
@@ -39,7 +37,6 @@ blake3 = "1"
 dirs = "6"
 serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
-png = { version = "0.18", optional = true }
 libloading = { version = "0.8", optional = true }
 # Python: parsed in pure Rust (ruff, pinned) into the vendored python-ast (src/python_ast)
 ruff_python_parser = { version = "=0.0.20", optional = true }

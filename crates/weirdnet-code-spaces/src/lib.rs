@@ -21,7 +21,7 @@
 //!
 //! Features: `math` (default), `polars`, `python` (each adds its language; Python needs no
 //! libpython), `native-plugins` (default: running cargo and loading libraries, so desktop
-//! only), and `png` (charts of result views as PNG).
+//! only). Images of results are not drawn here (see `weirdnet-render`).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 /// The plugin C ABI (version 2 for [`WEIRDNET`]): the SDK's own `abi.rs`. Version 1 has the
@@ -33,8 +33,6 @@ pub mod host;
 pub mod lang;
 #[cfg(feature = "math")]
 pub mod math;
-#[cfg(feature = "png")]
-pub mod png;
 #[cfg(feature = "polars")]
 pub mod polars;
 #[cfg(feature = "python")]

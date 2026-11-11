@@ -4,7 +4,8 @@
 //! host method (`View::to_json` in the SDK). [`ResultView::from_plugin`] is what a host does
 //! with it: parse, check and cut it to the limits below; how it is drawn is the host's own,
 //! with [`ResultView::as_table`], [`ResultView::as_chart`], [`ResultView::text_lines`],
-//! [`sparkline`] and (the `png` feature) [`crate::png::chart`] to start from.
+//! and [`sparkline`] to start from
+//! (drawing images, e.g. with `weirdnet-render`, is the host's too).
 use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

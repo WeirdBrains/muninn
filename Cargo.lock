@@ -2120,6 +2120,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
+name = "font8x8"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "875488b8711a968268c7cf5d139578713097ca4635a76044e8fe8eedf831d07e"
+
+[[package]]
 name = "foreign-types"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4449,6 +4455,7 @@ dependencies = [
  "uuid",
  "weirdnet-code-spaces",
  "weirdnet-keys",
+ "weirdnet-render",
  "weirdnet-rules",
  "weirdnet-storage",
  "weirdnet-themes",
@@ -8889,7 +8896,6 @@ dependencies = [
  "litrs",
  "num-derive",
  "num-traits",
- "png",
  "proc-macro2",
  "quote",
  "regex",
@@ -8931,6 +8937,16 @@ dependencies = [
  "vsss-rs",
  "x25519-dalek 2.0.1",
  "zeroize",
+]
+
+[[package]]
+name = "weirdnet-render"
+version = "0.1.0"
+dependencies = [
+ "font8x8",
+ "png",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
