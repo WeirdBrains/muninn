@@ -139,10 +139,11 @@ assets = [
 strip = "symbols"
 
 [workspace]
-members = ["crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage", "crates/weirdnet-keys", "crates/weirdnet-rules", "crates/weirdnet-code-spaces", "crates/weirdnet-render", "crates/weirdnet-pipelines", "crates/weirdnet-net"]
-# plain `cargo build/test/clippy` at the root covers all of them (crates/weirdnet-plugin, the
-# plugin SDK, is its own workspace like plugin/muninn-plugin: plugins build it standalone)
-default-members = [".", "crates/muninn-core", "crates/muninn-ffi", "crates/weirdnet-themes", "crates/weirdnet-storage", "crates/weirdnet-keys", "crates/weirdnet-rules", "crates/weirdnet-code-spaces", "crates/weirdnet-render", "crates/weirdnet-pipelines", "crates/weirdnet-net"]
+members = ["crates/muninn-core", "crates/muninn-ffi"]
+# plain `cargo build/test/clippy` at the root covers all of them. The Weirdnet crates
+# (weirdnet-themes, -storage, -keys, -rules, -code-spaces, -render, -pipelines, -net and the
+# weirdnet-plugin SDK) come from crates.io; their source is in github.com/WeirdBrains/weirdnet-*.
+default-members = [".", "crates/muninn-core", "crates/muninn-ffi"]
 
 [workspace.package]
 version = "2.24.0"

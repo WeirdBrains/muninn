@@ -1,4 +1,4 @@
-/// Maps a Muninn theme (the same `crates/weirdnet-themes/themes/*.toml` the TUI uses, resolved by Rust)
+/// Maps a Muninn theme (the same weirdnet-themes `themes/*.toml` the TUI uses, resolved by Rust)
 /// to Flutter's [ThemeData] plus the [MuninnColors] extension for Muninn-only roles.
 library;
 

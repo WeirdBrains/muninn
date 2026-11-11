@@ -1,1 +1,0 @@
-use stdpython :: * ; pub fn foo () -> Result < () , PyException > { print (& ("I am testing this.")) ; Ok (()) }

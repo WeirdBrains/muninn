@@ -59,7 +59,7 @@ size, with any data-dir path in the header covered. Retake both halves of a pair
 CI (`.github/workflows/ci.yml`, job `site`) installs Dart in the runner, checks the
 formatting, builds the site and its docs pages, analyzes it, runs `tool/check.sh` and keeps the built page
 as the `site` artifact. `cargo test` (`tests/site.rs`) keeps the page honest without
-Dart: the header art matches the TUI's, the colours match `crates/weirdnet-themes/themes/tokyo-night.toml`,
+Dart: the header art matches the TUI's, the colours match the built-in `tokyo-night` theme of [weirdnet-themes](https://github.com/WeirdBrains/weirdnet-themes),
 every docs page it links exists, every doc has a title and its links to other docs resolve, the hero and the Screenshots section and header link
 are there, and every screenshot the site or the README shows exists. `tool/check.sh` checks the
 same in the built page.

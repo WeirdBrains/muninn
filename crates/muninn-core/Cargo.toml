@@ -37,15 +37,16 @@ secrecy = "0.10"
 hex = "0.4"
 base64 = "0.22"
 ratatui = "0.30"
-weirdnet-themes = { version = "0.1.0", path = "../weirdnet-themes", features = ["ratatui"] }
-weirdnet-storage = { version = "0.1.0", path = "../weirdnet-storage" }
-weirdnet-keys = { version = "0.1.0", path = "../weirdnet-keys" }
-weirdnet-rules = { version = "0.1.0", path = "../weirdnet-rules" }
-# Code spaces (math, Polars, Rust and Python through the vendored python-ast, native plugins)
-weirdnet-code-spaces = { version = "0.1.0", path = "../weirdnet-code-spaces", features = ["math", "polars", "python", "native-plugins"] }
-weirdnet-render = { version = "0.1.0", path = "../weirdnet-render" }
-weirdnet-pipelines = { version = "0.1.0", path = "../weirdnet-pipelines" }
-weirdnet-net = { version = "0.1.0", path = "../weirdnet-net" }
+weirdnet-themes = { version = "0.1.0", features = ["ratatui"] }
+weirdnet-storage = { version = "0.1.0" }
+weirdnet-keys = { version = "0.1.0" }
+weirdnet-rules = { version = "0.1.0" }
+# Code spaces (math, Polars, Rust and Python through the vendored python-ast, native plugins).
+# Every weirdnet-* crate here is the published crates.io release (github.com/WeirdBrains/weirdnet-*).
+weirdnet-code-spaces = { version = "0.1.0", features = ["math", "polars", "python", "native-plugins"] }
+weirdnet-render = { version = "0.1.0" }
+weirdnet-pipelines = { version = "0.1.0" }
+weirdnet-net = { version = "0.1.0" }
 crossterm = "0.29"
 rpassword = "7"
 dirs = "6"

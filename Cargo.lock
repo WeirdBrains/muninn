@@ -8888,6 +8888,8 @@ dependencies = [
 [[package]]
 name = "weirdnet-code-spaces"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c255272c16aff5d77b3b032fb846f0c612e228b6fa52418f5b2e6a5f38d2bb8e"
 dependencies = [
  "anyhow",
  "anyhow-tracing",
@@ -8907,7 +8909,6 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.119",
- "tempfile",
  "thiserror 2.0.21",
  "to_tokenstream",
  "tracing",
@@ -8917,6 +8918,8 @@ dependencies = [
 [[package]]
 name = "weirdnet-keys"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1b44f05a7a1fd01e6d7afd61bf4c8b124a0b31292fc43aac43027bab706bb7e"
 dependencies = [
  "age",
  "argon2",
@@ -8932,7 +8935,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "tempfile",
  "thiserror 2.0.21",
  "toml 0.9.12+spec-1.1.0",
  "uuid",
@@ -8944,6 +8946,8 @@ dependencies = [
 [[package]]
 name = "weirdnet-net"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38b54715817f4f4001e0e1075213e87632ade3968da9da578e97dbdbccd52685"
 dependencies = [
  "base64 0.22.1",
  "futures",
@@ -8963,6 +8967,8 @@ dependencies = [
 [[package]]
 name = "weirdnet-pipelines"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0aa5878abc624d8e851fda650ae4776bde8e1b42cfcd9d6bb1e1992ffd05761"
 dependencies = [
  "serde",
  "serde_json",
@@ -8972,6 +8978,8 @@ dependencies = [
 [[package]]
 name = "weirdnet-render"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0a70851ce2328bad1d89e04da341a6e03134526abf1a77f43312969e6e8cd2c"
 dependencies = [
  "font8x8",
  "png",
@@ -8982,9 +8990,10 @@ dependencies = [
 [[package]]
 name = "weirdnet-rules"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11ddc00986aa04c4bc6026425af5c619d4aba01c3bb18595a1f7af204744e779"
 dependencies = [
  "chrono",
- "chrono-tz",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -8993,6 +9002,8 @@ dependencies = [
 [[package]]
 name = "weirdnet-storage"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e7f9c6b42abf074593b380012ebe23ddc6e82f7d5a9b6880ae3710620602fc2"
 dependencies = [
  "base64 0.22.1",
  "hex",
@@ -9000,7 +9011,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "tempfile",
  "thiserror 2.0.21",
  "zeroize",
 ]
@@ -9008,10 +9018,11 @@ dependencies = [
 [[package]]
 name = "weirdnet-themes"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d7cfcc397c71d1b97036356ef6e0626b26a5ec7bde92c3dc8e6b08731aa6827"
 dependencies = [
  "ratatui",
  "serde",
- "tempfile",
  "terminal-light",
  "thiserror 2.0.21",
  "toml 0.9.12+spec-1.1.0",
