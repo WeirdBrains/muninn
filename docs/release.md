@@ -4,12 +4,17 @@ Releases are built, checked and published locally. A GitHub Actions workflow
 (`.github/workflows/release.yml`) can build the same files, but it is not how current
 releases are made.
 
-1. `scripts/release.sh X.Y.Z "Summary" "Changelog bullet" ...` bumps the version,
-   regenerates man pages, adds the `CHANGELOG.md` entry, commits `release: vX.Y.Z` and
-   creates the annotated tag `vX.Y.Z`. It also bumps `pkgver` in both Arch PKGBUILDs,
-   `version` in the Homebrew formula and cask (`packaging/homebrew/`) and moves the
-   winget template (`packaging/winget/`) to the new version. It never pushes. Run the
-   full test suite, then `git push origin main --follow-tags`.
+1. `python3 scripts/weirdnet_release.py [--patch|--major|--version X.Y.Z] "Summary" "Changelog bullet" ...`
+   (the shared WeirdBrains release script, vendored from weirdnet-project-helpers and configured
+   by `release.toml`; MINOR by default, `--dry-run` first) bumps the version, regenerates man
+   pages, adds the `CHANGELOG.md` entry, runs the man and packaging tests and the full quality
+   bar (fmt, clippy, tests), commits `release: vX.Y.Z`, creates the annotated tag `vX.Y.Z`
+   (`vX.Y.Z: Summary`) and pushes `main` and that tag in one atomic push (`--no-push` keeps them
+   local). It also bumps `pkgver` in both Arch PKGBUILDs, `version` in the Homebrew formula and
+   cask (`packaging/homebrew/`), the other pinned files listed in `release.toml`, and moves the
+   winget template (`packaging/winget/`) to the new version. Then it publishes `muninn-plugin`
+   to crates.io if its version isn't there yet (asking first). Don't edit the vendored copy:
+   change weirdnet-project-helpers and re-vendor it.
 2. Build the 17 files from the tag:
 
 | Built on | Files |
@@ -38,9 +43,11 @@ releases are made.
    recipe, which stays local-only):
 
    ```sh
-   scripts/publish-taur.sh --dry-run X.Y.Z   # build and check the recipe archive
-   scripts/publish-taur.sh X.Y.Z             # then upload it
+   python3 scripts/weirdnet_release.py taur X.Y.Z --dry-run   # build and check the recipe archive
+   python3 scripts/weirdnet_release.py taur X.Y.Z             # then upload it
    ```
+
+   Both run `scripts/publish-taur.sh` (`[[taur.packages]]` in `release.toml`).
 
    Run it only after the GitHub release is published: it refuses a draft release. It
    downloads the release's packaging tarball (or takes `dist/muninn-X.Y.Z-packaging.tar.gz`
@@ -57,8 +64,10 @@ releases are made.
 The release is named `Muninn vX.Y.Z` and its notes are the version's `CHANGELOG.md`
 section (`scripts/release-notes.sh X.Y.Z`). Write each bullet as the feature plus how to
 use it (the command or key), e.g. ``Import a whole folder: `mnnn ingest path <DIR>` …``.
-`release.sh` puts bullets under `### Added`, or `### Fixed` / `### Changed` when they
-start with `Fixed: ` / `Changed: `.
+The release script puts bullets under `### Added`, or `### Fixed` / `### Changed` when they
+start with `Fixed: ` / `Changed: `. The first message is the summary (tag message only).
+`python3 scripts/weirdnet_release.py assets X.Y.Z` checks the release has every platform file
+listed in `release.toml`.
 
 To rewrite the notes of already-published releases from `CHANGELOG.md` (allowed for
 immutable releases; only assets and tags are locked) and mark the highest tag Latest:

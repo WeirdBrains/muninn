@@ -68,8 +68,11 @@
   chart layers, import as a popup with a folder browser.
 
 ## Releases
-- Cut releases locally with `scripts/release.sh` (commit + annotated tag), then push with
-  `git push origin main --follow-tags`.
+- Cut releases with the shared WeirdBrains release script, vendored as
+  `scripts/weirdnet_release.py` and configured by `release.toml`:
+  `python3 scripts/weirdnet_release.py "Summary" "Bullet" ...` (`--dry-run` first). It bumps,
+  tests, commits, tags and pushes `main` with the tag. Don't edit the vendored copy; change
+  weirdnet-project-helpers and re-vendor it.
   Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds all platform
   binaries and packages and publishes the GitHub Release. See `docs/release.md`.
 - Packages always ship prebuilt binaries; installing must never need Rust.

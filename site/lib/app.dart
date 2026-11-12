@@ -38,7 +38,7 @@ Component pair((String, Shot, Shot) p, {bool lazy = true}) {
   ]);
 }
 
-/// The released version (scripts/release.sh bumps it; tests/site.rs checks it).
+/// The released version (scripts/weirdnet_release.py bumps it; tests/site.rs checks it).
 const version = '2.24.0';
 
 /// The whole site: one page, no client-side code.

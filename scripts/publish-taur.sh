@@ -2,7 +2,7 @@
 # Publish muninn-bin (the prebuilt TUI/CLI Arch package) to TAUR after a GitHub release exists.
 # Usage: scripts/publish-taur.sh [--dry-run] [--out PATH] [VERSION] [PACKAGING_TAR_OR_DIR]
 #
-# This is a post-release step, not part of scripts/release.sh (which only bumps, commits
+# This is a post-release step, not part of the release cut (scripts/weirdnet_release.py, which bumps, commits
 # and tags, before checksums exist). VERSION defaults to [workspace.package] via
 # scripts/version.sh. The optional path is muninn-<ver>-packaging.tar.gz, or a
 # dist/packaging directory that already contains arch/PKGBUILD from fill-sums.py.

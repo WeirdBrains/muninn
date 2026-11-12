@@ -5,7 +5,7 @@ installer (`muninn-<ver>-<arch>-windows-setup.exe`, see `packaging/windows/`), f
 x64 and arm64. Package name stays **Muninn**; this id is the TUI/CLI (`mnnn`),
 separate from the Flutter app's MSIX/Store identity `WeirdBrains.Muninn`.
 
-`scripts/release.sh` moves the template to the new version; `scripts/fill-sums.py`
+`scripts/weirdnet_release.py` (the `move` entry in `release.toml`) moves the template to the new version; `scripts/fill-sums.py`
 writes the filled-in manifests to
 `<dist>/packaging/winget/manifests/w/WeirdBrains/muninn/tui/<ver>`.
 Check and submit:

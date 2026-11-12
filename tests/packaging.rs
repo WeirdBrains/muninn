@@ -99,7 +99,7 @@ fn the_winget_manifests_use_the_inno_setup_installer() {
 
 #[test]
 fn every_packaging_template_pins_the_workspace_version() {
-    // One place: [workspace.package] version; scripts/release.sh moves every pin below with it.
+    // One place: [workspace.package] version; release.toml (the shared release script) moves every pin below with it.
     let ver = env!("CARGO_PKG_VERSION");
     let cargo: toml::Value = toml::from_str(&read("Cargo.toml")).unwrap();
     assert_eq!(cargo["workspace"]["package"]["version"].as_str(), Some(ver));
@@ -112,7 +112,7 @@ fn every_packaging_template_pins_the_workspace_version() {
         .map(|e| e.unwrap().file_name().into_string().unwrap())
         .collect();
     assert_eq!(winget, [ver], "one winget template directory, named for the version");
-    let release = read("scripts/release.sh");
+    let release = read("release.toml");
     for p in [
         "packaging/arch/PKGBUILD",
         "packaging/arch/muninn-bin/PKGBUILD",
@@ -122,7 +122,7 @@ fn every_packaging_template_pins_the_workspace_version() {
         "site/lib/app.dart",
         "docs/install.md",
     ] {
-        assert!(release.contains(p), "scripts/release.sh does not bump {p}");
+        assert!(release.contains(&format!("\"{p}\"")), "release.toml does not bump {p}");
     }
 }
 
@@ -136,13 +136,13 @@ fn cross_windows_sh_packages_from_cargo_target_dir() {
 }
 
 #[test]
-fn release_sh_is_safe_in_a_shared_checkout() {
-    let sh = read("scripts/release.sh");
-    for bad in ["git add -A\n", "git add .", "commit -a", "commit -qa", "git stash", "git reset", "git clean", "push"] {
-        assert!(!sh.lines().filter(|l| !l.trim_start().starts_with('#')).any(|l| l.contains(bad.trim_end())), "release.sh must not run `{bad}`");
-    }
-    assert!(sh.contains("cargo test -q -p muninn-core --lib man"), "the man staleness test is in muninn-core");
-    assert!(sh.contains("CARGO_BUILD_JOBS"));
+fn release_config_runs_the_man_and_packaging_checks() {
+    let cfg = read("release.toml");
+    assert!(cfg.contains("cargo test -q --locked -p muninn-core --lib man"), "the man staleness test is in muninn-core");
+    assert!(cfg.contains("cargo test -q --locked --test packaging"));
+    assert!(cfg.contains("CARGO_BUILD_JOBS"));
+    assert!(cfg.contains(r#"stage = ["man"]"#), "only the regenerated man pages are staged beyond the version files");
+    assert!(read("scripts/weirdnet_release.py").contains("__version__ = \""), "the vendored shared release script is present");
     for s in ["scripts/dist.sh", "scripts/windows-setup.sh", "scripts/macos-app.sh"] {
         assert!(read(s).contains("scripts/version.sh"), "{s} should read the version with scripts/version.sh");
     }

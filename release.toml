@@ -1,0 +1,109 @@
+# Muninn release config for weirdnet-project-helpers (scripts/weirdnet_release.py).
+# Usage: python3 scripts/weirdnet_release.py [--patch|--version X.Y.Z] "Summary" "Bullet" "Fixed: bullet" ...
+helpers = "0.1.1"
+project = "muninn"
+require_message = true
+tag_message = "{tag}: {title}"
+next = [
+  "the v* tag runs .github/workflows/release.yml; or build the 17 files locally (docs/release.md)",
+  "python3 scripts/weirdnet_release.py assets {version}   # every platform file is on the release",
+  "python3 scripts/weirdnet_release.py taur {version} --dry-run, then without --dry-run (scripts/publish-taur.sh)",
+]
+
+[env]
+CARGO_TARGET_DIR = "/mnt/ext1/cargo-target"
+CARGO_BUILD_JOBS = "8"
+
+[[files]]                       # the one place: [workspace.package], plus the root package and members
+kind = "cargo-workspace"
+path = "Cargo.toml"
+primary = true
+
+[[files]]
+kind = "cargo-lock"
+path = "Cargo.lock"
+
+[[files]]                       # every file that pins the version (release file names and URLs)
+kind = "replace"
+paths = [
+  "packaging/arch/PKGBUILD",
+  "packaging/arch/muninn-bin/PKGBUILD",
+  "packaging/homebrew/Formula/muninn.rb",
+  "packaging/homebrew/Casks/muninn.rb",
+  "packaging/homebrew/Casks/muninn-app.rb",
+  "site/lib/app.dart",
+  "docs/install.md",
+  "docs/deploy-relay.md",
+  "packaging/windows/muninn.iss",
+]
+
+[[files]]                       # the winget template directory is named for the version
+kind = "move"
+from = "packaging/winget/manifests/w/WeirdBrains/muninn/tui/{old}"
+to = "packaging/winget/manifests/w/WeirdBrains/muninn/tui/{version}"
+
+[changelog]
+path = "CHANGELOG.md"
+links = "https://github.com/WeirdBrains/muninn"   # keeps the [Unreleased]/[X.Y.Z] compare links
+first_message_is_title = true   # "Summary" goes in the tag message; the other messages are bullets
+
+[hooks]
+post_bump = ["rm -f man/*.1 && cargo run -q --locked -- man --out man >/dev/null"]
+stage = ["man"]
+
+[checks]                        # the man staleness and packaging pin tests, then the quality bar
+commands = [
+  "cargo test -q --locked -p muninn-core --lib man",
+  "cargo test -q --locked --test packaging",
+  "cargo fmt --check",
+  "cargo clippy --locked --all-targets -- -D warnings",
+  "cargo test -q --locked",
+]
+
+[crates]
+publish = ["plugin/muninn-plugin"]   # the weirdnet-* crates release from their own repos
+
+[taur]
+org = "WeirdBrains"
+
+[[taur.packages]]               # project publisher: downloads the packaging tarball, fixes $CARCH, checks .SRCINFO
+name = "muninn-bin"
+command = "scripts/publish-taur.sh {version}"
+
+[[platforms]]
+os = "linux"
+arch = ["x86_64", "aarch64"]
+formats = ["tar.gz", "deb", "rpm", "pkg.tar.zst"]
+channels = ["github", "taur"]
+assets = ["muninn-{version}-x86_64-unknown-linux-gnu.tar.gz", "muninn-{version}-aarch64-unknown-linux-gnu.tar.gz",
+          "muninn_{version}-1_amd64.deb", "muninn_{version}-1_arm64.deb", "muninn-{version}-1.x86_64.rpm",
+          "muninn-{version}-1.aarch64.rpm", "muninn-bin-{version}-1-x86_64.pkg.tar.zst", "muninn-bin-{version}-1-aarch64.pkg.tar.zst"]
+
+[[platforms]]
+os = "macos"
+arch = ["x86_64", "aarch64"]
+formats = ["tar.gz", "dmg", "app", "brew-formula", "brew-cask"]
+channels = ["github", "homebrew"]
+assets = ["muninn-{version}-x86_64-apple-darwin.tar.gz", "muninn-{version}-aarch64-apple-darwin.tar.gz", "muninn-{version}-macos.dmg"]
+
+[[platforms]]
+os = "windows"
+arch = ["x86_64", "aarch64"]
+formats = ["zip", "exe", "winget"]
+channels = ["github", "winget"]
+assets = ["muninn-{version}-x86_64-pc-windows-gnullvm.zip", "muninn-{version}-aarch64-pc-windows-gnullvm.zip",
+          "muninn-{version}-x86_64-windows-setup.exe", "muninn-{version}-aarch64-windows-setup.exe"]
+
+[[platforms]]                   # app/ has android/ and ios/ targets; no release build yet
+os = "android"
+arch = ["aarch64", "x86_64"]
+formats = ["apk", "aab"]
+channels = ["github", "apk-sideload", "fdroid", "google-play"]
+assets = []
+
+[[platforms]]
+os = "ios"
+arch = ["aarch64"]
+formats = ["ipa"]
+channels = ["testflight", "app-store", "altstore", "eu-marketplace"]
+assets = []
