@@ -1,6 +1,8 @@
-/// The app shell. Desktop (wide): the big header, then the TUI's menu bar (File, View, Data,
+/// The app shell. Desktop (wide): the big header (a frameless window's custom
+/// title bar, with window controls), then the TUI's menu bar (File, View, Data,
 /// Projects, Net, Orgs, Keys, Theme, Help) and the main view. Phone (narrow): a compact
 /// header, the main view in a safe area and a bottom navigation bar with large targets.
+/// On a desktop window the custom window controls stay visible in the narrow layout too.
 library;
 
 import 'package:flutter/material.dart';
@@ -40,6 +42,9 @@ import 'views/project_extras.dart';
 import 'views/projects.dart';
 import 'workspace.dart';
 import 'tiling_extras.dart';
+import 'window_actions.dart';
+import 'window_chrome.dart';
+import 'window_controls.dart';
 
 /// Widths below this use the phone layout.
 const phoneBreakpoint = 720.0;
@@ -73,56 +78,75 @@ class AppShell extends ConsumerWidget {
           ],
         );
         if (phone) {
+          final chrome = ref.watch(windowChromePolicyProvider);
+          final windowActions = ref.watch(windowActionsProvider);
+          final phoneActions = <Widget>[
+            PopupMenuButton<String>(
+              tooltip: 'File',
+              icon: const Icon(Icons.folder_outlined, size: 28),
+              onSelected: (v) {
+                if (v == 'import') showImportDialog(context, ref);
+                if (v == 'export') showExportDialog(context, ref);
+                if (v == 'prefs') showPreferencesDialog(context, ref);
+                if (v == 'lock') lockStore(ref);
+                if (v == 'backup') showBackupCreate(context, ref);
+                if (v == 'restore') showBackupRestore(context);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'import', child: Text('Import…')),
+                PopupMenuItem(value: 'export', child: Text('Export…')),
+                PopupMenuItem(value: 'prefs', child: Text('Preferences…')),
+                PopupMenuItem(value: 'lock', child: Text('Lock')),
+                PopupMenuItem(value: 'backup', child: Text('Backup…')),
+                PopupMenuItem(value: 'restore', child: Text('Restore backup…')),
+              ],
+            ),
+            IconButton(
+              tooltip: 'Theme',
+              iconSize: 28,
+              icon: const Icon(Icons.palette_outlined),
+              onPressed: () => showThemeSheet(context, ref),
+            ),
+            IconButton(
+              tooltip: 'About Muninn',
+              iconSize: 28,
+              icon: const Icon(Icons.info_outline),
+              onPressed: () => showMuninnAbout(context, ref),
+            ),
+          ];
+          final title = FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: _Brand(compact: compact),
+          );
+          final PreferredSizeWidget appBar = chrome.enabled
+              ? PreferredSize(
+                  preferredSize: Size.fromHeight(compact ? 64 : 96),
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: SizedBox(
+                      height: compact ? 64 : 96,
+                      child: MuninnTitleBar(
+                        policy: chrome,
+                        actions: windowActions,
+                        child: Row(
+                          children: [
+                            Expanded(child: title),
+                            ...phoneActions,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : AppBar(
+                  toolbarHeight: compact ? 64 : 96,
+                  title: title,
+                  actions: phoneActions,
+                );
           return MuninnShortcuts(
             child: Scaffold(
-              appBar: AppBar(
-                toolbarHeight: compact ? 64 : 96,
-                title: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: _Brand(compact: compact),
-                ),
-                actions: [
-                  PopupMenuButton<String>(
-                    tooltip: 'File',
-                    icon: const Icon(Icons.folder_outlined, size: 28),
-                    onSelected: (v) {
-                      if (v == 'import') showImportDialog(context, ref);
-                      if (v == 'export') showExportDialog(context, ref);
-                      if (v == 'prefs') showPreferencesDialog(context, ref);
-                      if (v == 'lock') lockStore(ref);
-                      if (v == 'backup') showBackupCreate(context, ref);
-                      if (v == 'restore') showBackupRestore(context);
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'import', child: Text('Import…')),
-                      PopupMenuItem(value: 'export', child: Text('Export…')),
-                      PopupMenuItem(
-                        value: 'prefs',
-                        child: Text('Preferences…'),
-                      ),
-                      PopupMenuItem(value: 'lock', child: Text('Lock')),
-                      PopupMenuItem(value: 'backup', child: Text('Backup…')),
-                      PopupMenuItem(
-                        value: 'restore',
-                        child: Text('Restore backup…'),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    tooltip: 'Theme',
-                    iconSize: 28,
-                    icon: const Icon(Icons.palette_outlined),
-                    onPressed: () => showThemeSheet(context, ref),
-                  ),
-                  IconButton(
-                    tooltip: 'About Muninn',
-                    iconSize: 28,
-                    icon: const Icon(Icons.info_outline),
-                    onPressed: () => showMuninnAbout(context, ref),
-                  ),
-                ],
-              ),
+              appBar: appBar,
               body: SafeArea(child: body),
               bottomNavigationBar: NavigationBar(
                 selectedIndex: _phoneTabs.indexOf(_phoneTabFor(section)),
@@ -199,15 +223,26 @@ class _Header extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final m = context.muninn;
+    final chrome = ref.watch(windowChromePolicyProvider);
+    final actions = ref.watch(windowActionsProvider);
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+      padding: EdgeInsets.fromLTRB(
+        chrome.enabled && chrome.side == WindowControlSide.left ? 8 : 20,
+        14,
+        chrome.enabled && chrome.side == WindowControlSide.right ? 0 : 20,
+        10,
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [m.bg, Color.lerp(m.bg, m.header, 0.12)!, m.bg],
         ),
         border: Border(bottom: BorderSide(color: m.border)),
       ),
-      child: _Brand(compact: compact),
+      child: MuninnTitleBar(
+        policy: chrome,
+        actions: actions,
+        child: _Brand(compact: compact),
+      ),
     );
   }
 }

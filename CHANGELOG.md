@@ -6,6 +6,9 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+- Flutter desktop app: a frameless window with themed minimize, maximize and close controls (close only under a Linux tiling window manager)
+
 ## [2.24.0] - 2026-11-11
 
 ### Added

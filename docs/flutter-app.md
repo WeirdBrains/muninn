@@ -29,6 +29,10 @@ Users never need Rust: release builds ship the compiled library.
 
 - **Header:** the raven (themed) and the big MUNINN wordmark, as on the website.
   Preferences sets the size to auto, compact or large (`[tui] header`, shared with the TUI).
+  On desktop the window is frameless: custom minimize, maximize/restore and close
+  buttons sit in the header (upper right on Linux and Windows; upper left on macOS,
+  in traffic-light order). Under a Linux tiling window manager only close is shown.
+  The header is draggable; a double-click toggles maximize where maximize is shown.
 - **Desktop menus:** File, View, Data, Projects, Code, Plug, Net, Orgs, Keys, Theme, Help, like the TUI.
   Items the app doesn't have yet open a dialog naming the `mnnn` command or TUI menu.
   File ▸ Import…, Export…, Backup ▸ Create… (Restore stays `mnnn backup restore`), Preferences… and Quit are wired, as is Projects ▸ New project… /
@@ -412,6 +416,11 @@ comes in a later phase (see [sync](sync.md)).
   substitutes the theme's colours and draws them with flutter_svg.
 - Charts get data already downsampled in Rust (`query_bars`, at most `max_points`
   buckets).
+- Desktop window chrome is hidden; `window_manager` 0.6 makes the window frameless
+  and the header draws themed window controls (`app/lib/src/window_chrome.dart`,
+  `window_controls.dart`). Tiling window managers are detected from
+  `XDG_CURRENT_DESKTOP` and compositor variables such as
+  `HYPRLAND_INSTANCE_SIGNATURE`, `SWAYSOCK` and `I3SOCK`.
 
 See [architecture](architecture.md) for the crate layout.
 
