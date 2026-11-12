@@ -4323,7 +4323,7 @@ dependencies = [
 
 [[package]]
 name = "muninn"
-version = "2.24.0"
+version = "2.25.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4390,7 +4390,7 @@ dependencies = [
 
 [[package]]
 name = "muninn-core"
-version = "2.24.0"
+version = "2.25.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -4468,7 +4468,7 @@ dependencies = [
 
 [[package]]
 name = "muninn_ffi"
-version = "2.24.0"
+version = "2.25.0"
 dependencies = [
  "anyhow",
  "flutter_rust_bridge",

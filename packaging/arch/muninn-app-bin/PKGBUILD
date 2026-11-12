@@ -6,7 +6,7 @@
 # code-signed; this package is likewise unsigned. For a local bundle, see
 # ../muninn-app/PKGBUILD (MUNINN_APP_ARCHIVE).
 pkgname=muninn-app-bin
-pkgver=2.24.0
+pkgver=2.25.0
 pkgrel=1
 pkgdesc="Muninn graphical workbench for market data (Flutter desktop), prebuilt"
 arch=('x86_64' 'aarch64')

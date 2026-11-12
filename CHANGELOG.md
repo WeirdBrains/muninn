@@ -6,8 +6,13 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.25.0] - 2026-11-12
+
 ### Added
+
 - Flutter desktop app: a frameless window with themed minimize, maximize and close controls (close only under a Linux tiling window manager)
+- Home: tap a project tile to open Projects with that project selected, or a dataset tile to open it in the first Data workspace
+- Linux, macOS, Windows and Android packages for the Flutter workbench, plus Arch muninn-app-bin on TAUR. The macOS dmg is not notarized; the Windows setup is unsigned; the Windows MSIX is test-certificate signed; the Android APK and AAB are unsigned sideload builds, not Play or F-Droid uploads
 
 ## [2.24.0] - 2026-11-11
 
@@ -657,7 +662,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.24.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.25.0...HEAD
+[2.25.0]: https://github.com/WeirdBrains/muninn/compare/v2.24.0...v2.25.0
 [2.24.0]: https://github.com/WeirdBrains/muninn/compare/v2.23.0...v2.24.0
 [2.23.0]: https://github.com/WeirdBrains/muninn/compare/v2.22.3...v2.23.0
 [2.22.3]: https://github.com/WeirdBrains/muninn/compare/v2.22.0...v2.22.3

@@ -2,7 +2,7 @@
 ; %LOCALAPPDATA%\Programs\Muninn, adds it to the user PATH (removed again on uninstall),
 ; a Start Menu entry that opens mnnn in Windows Terminal (or PowerShell), and an
 ; Add/Remove Programs entry. Built by scripts/windows-setup.sh:
-;   ISCC /DAppVersion=2.24.0 /DArch=x86_64 /DSrcDir=<unzipped release folder> muninn.iss
+;   ISCC /DAppVersion=2.25.0 /DArch=x86_64 /DSrcDir=<unzipped release folder> muninn.iss
 #ifndef AppVersion
   #error Pass /DAppVersion=X.Y.Z (the Cargo.toml version)
 #endif

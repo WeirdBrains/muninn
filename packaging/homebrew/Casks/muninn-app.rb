@@ -18,7 +18,7 @@
 # Conflicts with the TUI cask (weirdbrains/tap/muninn), which also installs Muninn.app.
 # Does not install the mnnn CLI (use the muninn formula for that).
 cask "muninn-app" do
-  version "2.24.0"
+  version "2.25.0"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
 
   url "https://github.com/WeirdBrains/muninn/releases/download/v#{version}/muninn-app-#{version}-universal-apple-darwin.dmg"
