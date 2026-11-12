@@ -205,13 +205,18 @@ void main() {
 
   testWidgets('unlock restores the live [tui.layout]', (t) async {
     final (api, c) = await pump(t, const Size(1280, 800));
-    api.liveLayoutJson = Workspace.single().openCodeResult('mean', area).encode();
+    api.liveLayoutJson = Workspace.single()
+        .openCodeResult('mean', area)
+        .encode();
     c.read(sectionProvider.notifier).state = Section.data;
     await t.pumpAndSettle();
     await unlock(t);
     expect(api.extraCalls, contains('layout-live'));
     expect(c.read(workspaceProvider).focused.frameKey, 'code:mean');
-    expect(find.byKey(const ValueKey('frame-result-code:mean')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('frame-result-code:mean')),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -228,6 +233,10 @@ void main() {
       await ctrlWThen(t, LogicalKeyboardKey.keyV);
       expect(c.read(workspaceProvider).tiles, hasLength(2));
       expect(c.read(workspaceProvider).focus, 2);
+      expect(
+        (c.read(workspaceProvider).root as WsSplit).dir,
+        SplitDir.horizontal,
+      );
       expect(api.extraCalls, contains('layout-save-live'));
       expect(find.byKey(const ValueKey('data-tile-1')), findsOneWidget);
       expect(find.byKey(const ValueKey('data-tile-2')), findsOneWidget);
@@ -250,6 +259,24 @@ void main() {
       expect(find.text('BTC/USD · 5m'), findsNothing);
     },
   );
+
+  testWidgets('Ctrl-w s splits below, matching the TUI', (t) async {
+    final (_, c) = await pump(t, const Size(1280, 800));
+    c.read(sectionProvider.notifier).state = Section.data;
+    await t.pumpAndSettle();
+    await unlock(t);
+    await t.tap(find.text('BTC/USD · 5m'));
+    await t.pumpAndSettle();
+    expect(c.read(workspaceProvider).tiles, hasLength(1));
+
+    await ctrlWThen(t, LogicalKeyboardKey.keyS);
+    final ws = c.read(workspaceProvider);
+    expect(ws.tiles, hasLength(2));
+    expect(ws.focus, 2);
+    expect((ws.root as WsSplit).dir, SplitDir.vertical);
+    expect(find.byKey(const ValueKey('data-tile-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('data-tile-2')), findsOneWidget);
+  });
 
   testWidgets('View menu lists TUI tile actions and not saved layouts', (
     t,

@@ -3,7 +3,7 @@
 Muninn's graphical app, in `app/`. It runs the same Rust code as `mnnn` (through
 `crates/muninn-ffi`), uses the same themes and follows the TUI's menus and views. On
 phones it switches to a phone layout. Status: early: theme switcher, header with the raven,
-the TUI menu bar, a read-only Home, the Data view with charts and the time range,
+the TUI menu bar, Home (tap a project to open it, or a dataset to open it in Data), the Data view with charts and the time range,
 Projects (create, rename, describe, delete, attach and detach series, journals, live searches, reports, code spaces, live pipes, pipelines, rules, reviews, notifications, import/export archives), Net status, peers, start/stop, connect, invites, relays, sharing, settings, connections, key exchanges, search, broadcast, dark shards, MCP, and stored peer messages and live sessions, Orgs list and writes, Keys status and writes, File ▸ Import… / Export…
 (CSV, Parquet, JSON), and File ▸ Preferences….
 
@@ -51,7 +51,7 @@ Users never need Rust: release builds ship the compiled library.
   attach or detach a series, journals, live searches, reports, import/export archives)
   and Data ▸ Sources… / Symbols… writes (add, rename, remove, add symbol)
   open it for writes after the same unlock.
-- **Home:** where the data lives, and the projects and datasets in it.
+- **Home:** where the data lives, and the projects and datasets in it. Tapping a project opens it in Projects (selected, with its series). Tapping a dataset opens it in the Data workspace's first tile, like picking a series in the TUI sidebar.
 - **Data:** the datasets, like the TUI [sidebar](sidebar.md), scoped by the time range.
   On a wide window the sidebar sits next to a tiling workspace of chart and list
   tiles, matching the TUI [tiling](tiling.md) model (binary tree, split / close /
