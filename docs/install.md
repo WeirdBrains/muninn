@@ -8,6 +8,14 @@ Debian 13+, Fedora 40+, Arch; older systems such as Ubuntu 22.04 or Debian 12 ne
 nothing extra (Windows). Downloads are on the GitHub Releases page with a `SHA256SUMS`
 file. Packaging files live in `packaging/`.
 
+The Flutter graphical workbench (`muninn`, not the `mnnn` CLI) also has desktop
+installers, an unsigned Android APK/AAB, and an Arch `muninn-app-bin` recipe.
+Those assets are listed in `docs/flutter-app.md` and `docs/release.md`. Check
+the GitHub release assets — older TUI-only releases do not include them. The
+macOS app dmg is not notarized; the Windows setup is unsigned; the Windows MSIX
+is test-certificate signed; the Android packages are unsigned sideload builds,
+not Play or F-Droid uploads.
+
 Building code spaces is optional and needs extra tools that the packages do not bundle:
 `cargo` (from [rustup](https://rustup.rs)) for math, Polars, Rust and Python; Python is
 translated in process, so no Python install is needed. See
@@ -120,8 +128,10 @@ step 3 under [macOS: dmg](#macos-dmg). Uninstall: `brew uninstall muninn` (or
 
 Each release is built and checked locally, and its files are attached to its page under
 [GitHub Releases](https://github.com/WeirdBrains/muninn/releases). The latest is
-[v2.24.0](https://github.com/WeirdBrains/muninn/releases/tag/v2.24.0). Every release has
-17 files:
+[v2.24.0](https://github.com/WeirdBrains/muninn/releases/tag/v2.24.0). The TUI/CLI packages on this release (v2.24.0 names) are listed below. Releases
+that include the Flutter workbench also attach the desktop, Android and Arch
+app files documented in [docs/flutter-app.md](flutter-app.md).
+
 
 | File (v2.24.0) | For |
 |---|---|

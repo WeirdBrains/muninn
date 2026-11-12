@@ -4,13 +4,13 @@
 Usage: scripts/fill-sums.py [<version>] <dist-dir>
 (the version defaults to [workspace.package] in Cargo.toml, via scripts/version.sh)
 Reads <dist-dir>/SHA256SUMS and writes into <dist-dir>/packaging/:
-  arch/PKGBUILD (muninn-bin), homebrew/Formula/muninn.rb, homebrew/Casks/muninn.rb,
-  homebrew/Casks/muninn-app.rb,
+  arch/PKGBUILD (muninn-bin), arch/muninn-app-bin/PKGBUILD, homebrew/Formula/muninn.rb,
+  homebrew/Casks/muninn.rb, homebrew/Casks/muninn-app.rb,
   winget/manifests/w/WeirdBrains/muninn/tui/<version>/*.yaml (ready for winget-pkgs)
-The Linux and macOS tarballs must be listed (else it fails, naming them). The TUI
-macOS .dmg, the Flutter muninn-app .dmg and the Windows setup.exe are built on
-other machines and may be missing: then that cask or the winget manifests are
-skipped with a warning.
+The TUI Linux and macOS tarballs must be listed (else it fails, naming them). The TUI
+macOS .dmg, the Flutter muninn-app Linux tarballs and .dmg, and the Windows setup.exe
+are built on other machines and may be missing: then that recipe, cask or the winget
+manifests are skipped with a warning.
 """
 import pathlib, re, subprocess, sys
 
@@ -44,12 +44,22 @@ def write(rel, text):
     p.write_text(text)
     print(p)
 
-# Arch
+# Arch: muninn-bin (TUI/CLI). The Linux TUI tarballs are required.
 s = (root / "packaging/arch/muninn-bin/PKGBUILD").read_text()
 s = re.sub(r"^pkgver=.*$", f"pkgver={ver}", s, flags=re.M)
 s = re.sub(r"^sha256sums_x86_64=.*$", f"sha256sums_x86_64=('{sha('x86_64-unknown-linux-gnu')}')", s, flags=re.M)
 s = re.sub(r"^sha256sums_aarch64=.*$", f"sha256sums_aarch64=('{sha('aarch64-unknown-linux-gnu')}')", s, flags=re.M)
 write("arch/PKGBUILD", s)
+
+# Arch: muninn-app-bin (Flutter desktop). Optional until both Linux app tarballs are in SHA256SUMS.
+app_x = optional(f"muninn-app-{ver}-x86_64-unknown-linux-gnu.tar.gz", "the muninn-app-bin PKGBUILD")
+app_a = optional(f"muninn-app-{ver}-aarch64-unknown-linux-gnu.tar.gz", "the muninn-app-bin PKGBUILD") if app_x else None
+if app_x and app_a:
+    s = (root / "packaging/arch/muninn-app-bin/PKGBUILD").read_text()
+    s = re.sub(r"^pkgver=.*$", f"pkgver={ver}", s, flags=re.M)
+    s = re.sub(r"^sha256sums_x86_64=.*$", f"sha256sums_x86_64=('{app_x}')", s, flags=re.M)
+    s = re.sub(r"^sha256sums_aarch64=.*$", f"sha256sums_aarch64=('{app_a}')", s, flags=re.M)
+    write("arch/muninn-app-bin/PKGBUILD", s)
 
 # Homebrew: each url line is followed by its sha256 line
 s = (root / "packaging/homebrew/Formula/muninn.rb").read_text()

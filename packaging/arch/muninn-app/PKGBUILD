@@ -1,7 +1,7 @@
 # Local prebuilt Flutter bundle; no Flutter/Rust build or download during packaging.
-# MUNINN_APP_ARCHIVE=/absolute/path/muninn-app-2.22.0-x86_64-unknown-linux-gnu.tar.gz makepkg
+# MUNINN_APP_ARCHIVE=/absolute/path/muninn-app-2.24.0-x86_64-unknown-linux-gnu.tar.gz makepkg
 pkgname=muninn-app
-pkgver=2.22.0
+pkgver=2.24.0
 pkgrel=1
 pkgdesc='Muninn graphical workbench for market data (Flutter desktop)'
 arch=('x86_64' 'aarch64')

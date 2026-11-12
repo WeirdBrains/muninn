@@ -1,0 +1,41 @@
+# Maintainer: Michael Christenson II <m3talsmith@gmail.com>
+# Binary package: installs the prebuilt Flutter desktop app attached to a
+# published GitHub release (muninn-app-<ver>-<arch>-unknown-linux-gnu.tar.gz
+# from scripts/flutter-dist.sh). No Flutter or Rust needed, but the release
+# must exist and be downloadable (public repo). The upstream tarball is not
+# code-signed; this package is likewise unsigned. For a local bundle, see
+# ../muninn-app/PKGBUILD (MUNINN_APP_ARCHIVE).
+pkgname=muninn-app-bin
+pkgver=2.24.0
+pkgrel=1
+pkgdesc="Muninn graphical workbench for market data (Flutter desktop), prebuilt"
+arch=('x86_64' 'aarch64')
+url="https://github.com/WeirdBrains/muninn"
+license=('BSD-3-Clause')
+depends=('gtk3' 'glib2' 'glibc>=2.39' 'gcc-libs')
+provides=('muninn-app')
+conflicts=('muninn-app')
+options=('!strip' '!debug')
+source_x86_64=("$url/releases/download/v$pkgver/muninn-app-$pkgver-x86_64-unknown-linux-gnu.tar.gz")
+source_aarch64=("$url/releases/download/v$pkgver/muninn-app-$pkgver-aarch64-unknown-linux-gnu.tar.gz")
+# Filled from the release's SHA256SUMS when published (updpkgsums / fill-sums.py).
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+  local bundle="$srcdir/muninn-app-$pkgver-$CARCH-unknown-linux-gnu"
+  test -x "$bundle/muninn"
+  test -d "$bundle/lib"
+  test -d "$bundle/data"
+  install -d "$pkgdir/opt/muninn-app" "$pkgdir/usr/bin"
+  cp -a "$bundle/muninn" "$bundle/lib" "$bundle/data" "$pkgdir/opt/muninn-app/"
+  printf '%s\n' '#!/bin/sh' 'exec /opt/muninn-app/muninn "$@"' > "$pkgdir/usr/bin/muninn"
+  chmod 755 "$pkgdir/usr/bin/muninn"
+  install -Dm644 "$bundle/com.weirdbrains.muninn.desktop" \
+    "$pkgdir/usr/share/applications/muninn-app.desktop"
+  # This icon is included by flutter-dist.sh in the approved bundle assets.
+  install -Dm644 "$bundle/data/flutter_assets/assets/icon/muninn-256.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/com.weirdbrains.muninn.png"
+  install -Dm644 "$bundle/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 -t "$pkgdir/usr/share/doc/$pkgname" "$bundle/README.md" "$bundle/CHANGELOG.md"
+}

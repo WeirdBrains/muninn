@@ -6,7 +6,7 @@ root="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 ver=9.9.9
 bin="$tmp/bin"; mkdir -p "$bin"
-export ASSETS="$tmp/assets" LOG="$tmp/log" DRAFT=false TAUR_VER="1.0.0-1" TAUR_ORG=WeirdBrains
+export ASSETS="$tmp/assets" LOG="$tmp/log" DRAFT=false TAUR_VER="1.0.0-1" TAUR_ORG=WeirdBrains TAUR_NAME=muninn-bin
 # gh: release view --jq .isDraft prints $DRAFT; release download copies from $ASSETS.
 cat > "$bin/gh" <<'SH'
 #!/usr/bin/env bash
@@ -24,7 +24,7 @@ cat > "$bin/taurctl" <<'SH'
 #!/usr/bin/env bash
 echo "TAURCTL $*" >> "$LOG"
 case "$1" in
-  info) printf '{"results":[{"Name":"muninn-bin","Version":"%s","Organization":"%s"}]}\n' "$TAUR_VER" "$TAUR_ORG" ;;
+  info) printf '{"results":[{"Name":"%s","Version":"%s","Organization":"%s"}]}\n' "$TAUR_NAME" "$TAUR_VER" "$TAUR_ORG" ;;
   pkg) cp "$3" "$ASSETS/../uploaded.tar.gz" ;;
   *) exit 3 ;;
 esac
@@ -44,15 +44,24 @@ echo; echo "pkgname = $pkgname"
 SH
 chmod +x "$bin"/*
 
-fixture() { # $1: how to write the PKGBUILD (good, skip, carch, wrongsum)
-  rm -rf "$ASSETS" "$tmp/uploaded.tar.gz"; mkdir -p "$ASSETS" "$tmp/pk/packaging/arch"
-  for a in x86_64 aarch64; do echo "$a binary" > "$tmp/m-$a"; tar -C "$tmp" -czf "$ASSETS/muninn-$ver-$a-unknown-linux-gnu.tar.gz" "m-$a"; done
-  (cd "$ASSETS" && sha256sum muninn-$ver-*-unknown-linux-gnu.tar.gz > SHA256SUMS)
+# $1: how to write the PKGBUILD (good, skip, carch, wrongsum)
+# $2: package name (muninn-bin default, or muninn-app-bin)
+fixture() {
+  local pkg=${2:-muninn-bin} stem pb_src dest_dir dest
+  case "$pkg" in
+    muninn-bin) stem=muninn; pb_src="$root/packaging/arch/muninn-bin/PKGBUILD"; dest_dir="$tmp/pk/packaging/arch"; dest="$dest_dir/PKGBUILD" ;;
+    muninn-app-bin) stem=muninn-app; pb_src="$root/packaging/arch/muninn-app-bin/PKGBUILD"; dest_dir="$tmp/pk/packaging/arch/muninn-app-bin"; dest="$dest_dir/PKGBUILD" ;;
+    *) echo "fixture: unknown package $pkg" >&2; return 2 ;;
+  esac
+  rm -rf "$ASSETS" "$tmp/uploaded.tar.gz" "$tmp/pk"; mkdir -p "$ASSETS" "$dest_dir"
+  for a in x86_64 aarch64; do echo "$a binary" > "$tmp/m-$a"; tar -C "$tmp" -czf "$ASSETS/$stem-$ver-$a-unknown-linux-gnu.tar.gz" "m-$a"; done
+  (cd "$ASSETS" && sha256sum "$stem-$ver-"*-unknown-linux-gnu.tar.gz > SHA256SUMS)
   local x a; x=$(sed -n 's/ .*x86_64.*//p' "$ASSETS/SHA256SUMS"); a=$(sed -n 's/ .*aarch64.*//p' "$ASSETS/SHA256SUMS")
   case $1 in skip) x=SKIP ;; wrongsum) a=$x ;; esac
   sed -e "s/^pkgver=.*/pkgver=$ver/" -e "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$x')/" \
-      -e "s/^sha256sums_aarch64=.*/sha256sums_aarch64=('$a')/" "$root/packaging/arch/muninn-bin/PKGBUILD" > "$tmp/pk/packaging/arch/PKGBUILD"
-  [[ $1 == carch ]] && sed -i 's/-x86_64-unknown/-$CARCH-unknown/' "$tmp/pk/packaging/arch/PKGBUILD"
+      -e "s/^sha256sums_aarch64=.*/sha256sums_aarch64=('$a')/" "$pb_src" > "$dest"
+  [[ $1 == carch ]] && sed -i "s/-x86_64-unknown/-\$CARCH-unknown/" "$dest"
+  # The packaging tarball always uses the muninn-<ver>-packaging.tar.gz name.
   tar -C "$tmp/pk" -czf "$ASSETS/muninn-$ver-packaging.tar.gz" packaging
   : > "$LOG"
 }
@@ -112,4 +121,30 @@ if ! run --dry-run "$ver" && grep -q "do not match the release's SHA256SUMS" "$t
 fixture good
 if run --dry-run --out "$tmp/l.tar.gz" "$ver" "$ASSETS/muninn-$ver-packaging.tar.gz" && ! grep -q "packaging.tar.gz --dir" "$LOG"; then
   ok "local packaging tarball: used without downloading it"; else bad "local tarball"; fi
+
+# muninn-app-bin: same publisher, Flutter Linux tarball names and recipe path.
+TAUR_NAME=muninn-app-bin
+fixture good muninn-app-bin
+if run --package muninn-app-bin --dry-run --out "$tmp/app-dry.tar.gz" "$ver" && [[ -f "$tmp/app-dry.tar.gz" ]] && ! grep -q "TAURCTL" "$LOG"; then
+  list=$(tar -tzf "$tmp/app-dry.tar.gz" | LC_ALL=C sort | tr '\n' ' ')
+  if [[ "$list" == "muninn-app-bin/.SRCINFO muninn-app-bin/PKGBUILD " ]] && tar -xzOf "$tmp/app-dry.tar.gz" muninn-app-bin/.SRCINFO | grep -q "source_aarch64 = .*/v$ver/muninn-app-$ver-aarch64-unknown-linux-gnu.tar.gz"; then
+    ok "app dry-run: recipe archive with literal aarch64 muninn-app tarball"
+  else bad "app dry-run archive: $list"; fi
+else bad "app dry-run"; fi
+
+fixture good muninn-app-bin
+if run --package muninn-app-bin "$ver" && grep -q "^TAURCTL pkg upload .*/muninn-app-bin-$ver-1.src.tar.gz --org WeirdBrains -y$" "$LOG" && [[ -f "$tmp/uploaded.tar.gz" ]]; then
+  ok "app upload: taurctl pkg upload ARCHIVE --org WeirdBrains -y"
+else bad "app upload"; fi
+
+fixture good muninn-app-bin; TAUR_VER="$ver-1"
+if run --package muninn-app-bin "$ver" && grep -q "already has muninn-app-bin $ver-1" "$tmp/out" && ! grep -q "pkg upload" "$LOG"; then
+  ok "app same version on TAUR: no upload"
+else bad "app same version"; fi
+TAUR_VER="1.0.0-1"
+
+fixture carch muninn-app-bin
+if run --package muninn-app-bin --dry-run --out "$tmp/app-c.tar.gz" "$ver" && tar -xzOf "$tmp/app-c.tar.gz" muninn-app-bin/.SRCINFO | grep -q "source_x86_64 = .*-x86_64-unknown"; then
+  ok "app \$CARCH source rewritten to the literal arch"; else bad "app carch"; fi
+
 exit $fail

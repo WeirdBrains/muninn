@@ -5,9 +5,9 @@ project = "muninn"
 require_message = true
 tag_message = "{tag}: {title}"
 next = [
-  "the v* tag runs .github/workflows/release.yml; or build the 17 files locally (docs/release.md)",
+  "build every asset in release.toml locally (docs/release.md); do not rely on .github/workflows/release.yml alone — it still only builds the TUI/CLI files",
   "python3 scripts/weirdnet_release.py assets {version}   # every platform file is on the release",
-  "python3 scripts/weirdnet_release.py taur {version} --dry-run, then without --dry-run (scripts/publish-taur.sh)",
+  "python3 scripts/weirdnet_release.py taur {version} --dry-run, then without --dry-run (muninn-bin and muninn-app-bin via scripts/publish-taur.sh)",
 ]
 
 [env]
@@ -28,6 +28,8 @@ kind = "replace"
 paths = [
   "packaging/arch/PKGBUILD",
   "packaging/arch/muninn-bin/PKGBUILD",
+  "packaging/arch/muninn-app/PKGBUILD",
+  "packaging/arch/muninn-app-bin/PKGBUILD",
   "packaging/homebrew/Formula/muninn.rb",
   "packaging/homebrew/Casks/muninn.rb",
   "packaging/homebrew/Casks/muninn-app.rb",
@@ -68,7 +70,11 @@ org = "WeirdBrains"
 
 [[taur.packages]]               # project publisher: downloads the packaging tarball, fixes $CARCH, checks .SRCINFO
 name = "muninn-bin"
-command = "scripts/publish-taur.sh {version}"
+command = "scripts/publish-taur.sh --package muninn-bin {version}"
+
+[[taur.packages]]
+name = "muninn-app-bin"
+command = "scripts/publish-taur.sh --package muninn-app-bin {version}"
 
 [[platforms]]
 os = "linux"
@@ -77,33 +83,41 @@ formats = ["tar.gz", "deb", "rpm", "pkg.tar.zst"]
 channels = ["github", "taur"]
 assets = ["muninn-{version}-x86_64-unknown-linux-gnu.tar.gz", "muninn-{version}-aarch64-unknown-linux-gnu.tar.gz",
           "muninn_{version}-1_amd64.deb", "muninn_{version}-1_arm64.deb", "muninn-{version}-1.x86_64.rpm",
-          "muninn-{version}-1.aarch64.rpm", "muninn-bin-{version}-1-x86_64.pkg.tar.zst", "muninn-bin-{version}-1-aarch64.pkg.tar.zst"]
+          "muninn-{version}-1.aarch64.rpm", "muninn-bin-{version}-1-x86_64.pkg.tar.zst", "muninn-bin-{version}-1-aarch64.pkg.tar.zst",
+          "muninn-app-{version}-x86_64-unknown-linux-gnu.tar.gz", "muninn-app-{version}-aarch64-unknown-linux-gnu.tar.gz",
+          "muninn-app_{version}-1_amd64.deb", "muninn-app_{version}-1_arm64.deb", "muninn-app-{version}-1.x86_64.rpm",
+          "muninn-app-{version}-1.aarch64.rpm", "muninn-app-bin-{version}-1-x86_64.pkg.tar.zst", "muninn-app-bin-{version}-1-aarch64.pkg.tar.zst"]
 
 [[platforms]]
 os = "macos"
 arch = ["x86_64", "aarch64"]
 formats = ["tar.gz", "dmg", "app", "brew-formula", "brew-cask"]
 channels = ["github", "homebrew"]
-assets = ["muninn-{version}-x86_64-apple-darwin.tar.gz", "muninn-{version}-aarch64-apple-darwin.tar.gz", "muninn-{version}-macos.dmg"]
+assets = ["muninn-{version}-x86_64-apple-darwin.tar.gz", "muninn-{version}-aarch64-apple-darwin.tar.gz", "muninn-{version}-macos.dmg",
+          "muninn-app-{version}-universal-apple-darwin.dmg"]
+# muninn-app dmg is not notarized (see the Homebrew cask caveats and docs/release.md).
 
 [[platforms]]
 os = "windows"
 arch = ["x86_64", "aarch64"]
+# helpers 0.1.1 has no "msix" format token; the unsigned/test-cert Flutter MSIX is still a required asset.
+# Flutter Windows (flutter-dist.ps1) is x86_64-only; TUI zip/setup cover both arches.
+arch_note = "Flutter Windows zip/setup/msix are x86_64 only and unsigned (setup) or test-cert signed (msix); TUI covers aarch64"
 formats = ["zip", "exe", "winget"]
 channels = ["github", "winget"]
 assets = ["muninn-{version}-x86_64-pc-windows-gnullvm.zip", "muninn-{version}-aarch64-pc-windows-gnullvm.zip",
-          "muninn-{version}-x86_64-windows-setup.exe", "muninn-{version}-aarch64-windows-setup.exe"]
+          "muninn-{version}-x86_64-windows-setup.exe", "muninn-{version}-aarch64-windows-setup.exe",
+          "muninn-app-{version}-x86_64-pc-windows-msvc.zip", "muninn-app-{version}-x86_64-windows-setup.exe",
+          "muninn-app-{version}-x86_64.msix"]
 
-[[platforms]]                   # app/ has android/ and ios/ targets; no release build yet
+[[platforms]]
 os = "android"
-arch = ["aarch64", "x86_64"]
+arch = ["aarch64"]
+arch_note = "unsigned release APK/AAB for sideload and GitHub, not a Play or F-Droid upload; x86_64 emulator APKs are not attached"
 formats = ["apk", "aab"]
-channels = ["github", "apk-sideload", "fdroid", "google-play"]
-assets = []
+channels = ["github", "apk-sideload"]
+assets = ["muninn-app-{version}-arm64-v8a-release.apk", "muninn-app-{version}-release.aab"]
 
 [[platforms]]
 os = "ios"
-arch = ["aarch64"]
-formats = ["ipa"]
-channels = ["testflight", "app-store", "altstore", "eu-marketplace"]
-assets = []
+opt_out = "A distributable ipa needs an Apple Developer signing identity and provisioning profile on Michael's Mac. The committed iOS project uses Automatic signing with 'iPhone Developer' and has no DEVELOPMENT_TEAM or profile, so GitHub releases cannot carry a sideload, AltStore, TestFlight or App Store ipa until that is set up."

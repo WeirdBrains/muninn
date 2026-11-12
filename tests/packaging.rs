@@ -103,7 +103,12 @@ fn every_packaging_template_pins_the_workspace_version() {
     let ver = env!("CARGO_PKG_VERSION");
     let cargo: toml::Value = toml::from_str(&read("Cargo.toml")).unwrap();
     assert_eq!(cargo["workspace"]["package"]["version"].as_str(), Some(ver));
-    for p in ["packaging/arch/PKGBUILD", "packaging/arch/muninn-bin/PKGBUILD"] {
+    for p in [
+        "packaging/arch/PKGBUILD",
+        "packaging/arch/muninn-bin/PKGBUILD",
+        "packaging/arch/muninn-app/PKGBUILD",
+        "packaging/arch/muninn-app-bin/PKGBUILD",
+    ] {
         assert!(read(p).lines().any(|l| l == format!("pkgver={ver}")), "{p} should have pkgver={ver}");
     }
     assert!(read("site/lib/app.dart").contains(&format!("const version = '{ver}';")));
@@ -116,6 +121,8 @@ fn every_packaging_template_pins_the_workspace_version() {
     for p in [
         "packaging/arch/PKGBUILD",
         "packaging/arch/muninn-bin/PKGBUILD",
+        "packaging/arch/muninn-app/PKGBUILD",
+        "packaging/arch/muninn-app-bin/PKGBUILD",
         "packaging/homebrew/Formula/muninn.rb",
         "packaging/homebrew/Casks/muninn.rb",
         "packaging/homebrew/Casks/muninn-app.rb",
@@ -179,8 +186,10 @@ fn fill_sums_skips_missing_dmg_and_setup_exes_but_not_tarballs() {
     assert!(err.contains("macos.dmg is not in SHA256SUMS; skipping the Homebrew cask"), "{err}");
     assert!(err.contains("universal-apple-darwin.dmg is not in SHA256SUMS; skipping the Homebrew muninn-app cask"), "{err}");
     assert!(err.contains("windows-setup.exe is not in SHA256SUMS; skipping the winget manifests"), "{err}");
+    assert!(err.contains("muninn-app-9.9.9-x86_64-unknown-linux-gnu.tar.gz is not in SHA256SUMS; skipping the muninn-app-bin PKGBUILD"), "{err}");
     let out = dist.path().join("packaging");
     assert!(out.join("arch/PKGBUILD").exists() && out.join("homebrew/Formula/muninn.rb").exists());
+    assert!(!out.join("arch/muninn-app-bin/PKGBUILD").exists());
     assert!(!out.join("homebrew/Casks/muninn.rb").exists());
     assert!(!out.join("homebrew/Casks/muninn-app.rb").exists());
     assert!(!out.join(format!("winget/manifests/w/WeirdBrains/muninn/tui/{ver}")).exists());
@@ -190,6 +199,8 @@ fn fill_sums_skips_missing_dmg_and_setup_exes_but_not_tarballs() {
         format!("muninn-{ver}-x86_64-windows-setup.exe"),
         format!("muninn-{ver}-aarch64-windows-setup.exe"),
         format!("muninn-app-{ver}-universal-apple-darwin.dmg"),
+        format!("muninn-app-{ver}-x86_64-unknown-linux-gnu.tar.gz"),
+        format!("muninn-app-{ver}-aarch64-unknown-linux-gnu.tar.gz"),
     ];
     names.extend(extra.iter().map(String::as_str));
     sums(&names);
@@ -197,6 +208,14 @@ fn fill_sums_skips_missing_dmg_and_setup_exes_but_not_tarballs() {
     assert!(o.status.success() && !String::from_utf8_lossy(&o.stderr).contains("warning"), "{}", String::from_utf8_lossy(&o.stderr));
     assert!(out.join("homebrew/Casks/muninn.rb").exists());
     assert!(out.join("homebrew/Casks/muninn-app.rb").exists());
+    let app_pb = std::fs::read_to_string(out.join("arch/muninn-app-bin/PKGBUILD")).unwrap();
+    assert!(app_pb.contains(&format!("pkgver={ver}")), "{app_pb}");
+    assert!(app_pb.contains(r#"source_x86_64=("$url/releases/download/v$pkgver/muninn-app-$pkgver-x86_64-unknown-linux-gnu.tar.gz")"#), "{app_pb}");
+    assert!(
+        !app_pb.lines().any(|l| l.starts_with("source_") && l.contains("$CARCH")),
+        "filled muninn-app-bin source_* must not use $CARCH: {app_pb}"
+    );
+
     let inst =
         std::fs::read_to_string(out.join(format!("winget/manifests/w/WeirdBrains/muninn/tui/{ver}/WeirdBrains.muninn.tui.installer.yaml"))).unwrap();
     assert!(inst.contains(&format!("{:064X}", 6)) && inst.contains(&format!("{:064X}", 7)), "{inst}");
@@ -225,4 +244,32 @@ fn muninn_bin_pkgbuild_source_urls_are_host_independent() {
         "publish-taur.sh must not push git or make releases"
     );
     assert!(read(".github/workflows/ci.yml").contains("packaging/arch/test-publish-taur.sh"));
+}
+
+#[test]
+fn muninn_app_bin_pkgbuild_source_urls_are_host_independent() {
+    let pb = read("packaging/arch/muninn-app-bin/PKGBUILD");
+    assert!(pb.contains(r#"source_x86_64=("$url/releases/download/v$pkgver/muninn-app-$pkgver-x86_64-unknown-linux-gnu.tar.gz")"#), "{pb}");
+    assert!(pb.contains(r#"source_aarch64=("$url/releases/download/v$pkgver/muninn-app-$pkgver-aarch64-unknown-linux-gnu.tar.gz")"#), "{pb}");
+    assert!(!pb.lines().any(|l| l.starts_with("source_") && l.contains("$CARCH")), "source_* arrays must not use $CARCH");
+    let sh = read("scripts/publish-taur.sh");
+    for needle in ["--package", "muninn-app-bin", "muninn-app-"] {
+        assert!(sh.contains(needle), "scripts/publish-taur.sh should contain {needle}");
+    }
+    let cfg = read("release.toml");
+    assert!(cfg.contains("name = \"muninn-app-bin\""), "release.toml should list [[taur.packages]] muninn-app-bin");
+    assert!(
+        cfg.contains("muninn-app-{version}-x86_64-unknown-linux-gnu.tar.gz")
+            && cfg.contains("muninn-app-{version}-universal-apple-darwin.dmg")
+            && cfg.contains("muninn-app-{version}-x86_64-pc-windows-msvc.zip")
+            && cfg.contains("muninn-app-{version}-x86_64-windows-setup.exe")
+            && cfg.contains("muninn-app-{version}-x86_64.msix")
+            && cfg.contains("muninn-app-{version}-arm64-v8a-release.apk")
+            && cfg.contains("muninn-app-{version}-release.aab"),
+        "release.toml should list Flutter desktop and Android assets"
+    );
+    assert!(
+        cfg.contains("opt_out = \"A distributable ipa needs an Apple Developer signing identity"),
+        "iOS should be opted out with a signing reason"
+    );
 }

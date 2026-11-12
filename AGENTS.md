@@ -73,8 +73,10 @@
   `python3 scripts/weirdnet_release.py "Summary" "Bullet" ...` (`--dry-run` first). It bumps,
   tests, commits, tags and pushes `main` with the tag. Don't edit the vendored copy; change
   weirdnet-project-helpers and re-vendor it.
-  Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds all platform
-  binaries and packages and publishes the GitHub Release. See `docs/release.md`.
+  `.github/workflows/release.yml` builds the TUI/CLI Linux and Windows packages
+  only. A complete release (including Flutter desktop, Android, and Arch
+  `muninn-app-bin`) is assembled locally per `docs/release.md` and published with
+  every `release.toml` asset present, because GitHub release assets are immutable.
 - Packages always ship prebuilt binaries; installing must never need Rust.
 
 ## Communication style

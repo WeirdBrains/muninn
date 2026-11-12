@@ -2,6 +2,11 @@
 # Also runnable by hand for an existing tag: gh workflow run release.yml --ref main -f tag=vX.Y.Z
 # See docs/release.md.
 name: Release
+# This workflow builds the TUI/CLI Linux and Windows assets only. Flutter
+# desktop (Linux/macOS/Windows), Android APK/AAB and the muninn-app-bin
+# Arch package are built on local machines (docs/release.md) and must be
+# in dist/ before the GitHub release is published — assets are immutable.
+# Do not treat a successful run of this workflow as a complete release.
 
 on:
   push:

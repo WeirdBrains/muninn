@@ -543,10 +543,28 @@ $env:CARGO_TARGET_DIR = 'C:\Users\...\.cache\muninn-flutter-windows-cargo'
 .\scripts\flutter-dist.ps1
 ```
 
-Still planned: Apple notarization, iOS / TestFlight, a signed Play upload /
-testing track, Windows code-signing / Store listing, then store listings. An
-arm64 release APK can be built locally (see below). Builds can later be attached
-to GitHub releases once those recipes exist; this script does not cut a tag.
+Still planned: Apple notarization, iOS / TestFlight (see the iOS opt-out below),
+a signed Play upload / testing track, Windows code-signing / Store listing, then
+store listings. Desktop, Android and Arch recipes are wired in `release.toml`;
+attach the files below to a GitHub release only after they are all in `dist/`
+(`docs/release.md`). This script does not cut a tag.
+
+Release asset names (unsigned or test-signed where noted):
+
+- Linux (alien-blue, `scripts/flutter-dist.sh`): `muninn-app-<ver>-{x86_64,aarch64}-unknown-linux-gnu.tar.gz`,
+  `muninn-app_<ver>-1_{amd64,arm64}.deb`, `muninn-app-<ver>-1.{x86_64,aarch64}.rpm`,
+  plus `muninn-app-bin-<ver>-1-{x86_64,aarch64}.pkg.tar.zst` from the
+  `packaging/arch/muninn-app-bin` recipe (TAUR package `muninn-app-bin`).
+- macOS (Michael's Mac, `scripts/flutter-dist.sh`): `muninn-app-<ver>-universal-apple-darwin.dmg`
+  (**not notarized**).
+- Windows (WIN-R0LRC6FBTOM, `scripts/flutter-dist.ps1`): `muninn-app-<ver>-x86_64-pc-windows-msvc.zip`,
+  **unsigned** `muninn-app-<ver>-x86_64-windows-setup.exe`, **test-certificate**
+  `muninn-app-<ver>-x86_64.msix`. Flutter Windows is x86_64-only.
+- Android (Michael's Mac or alien-blue): rename the unsigned release artifacts to
+  `muninn-app-<ver>-arm64-v8a-release.apk` and `muninn-app-<ver>-release.aab`.
+- iOS: not shipped. A distributable ipa needs an Apple Developer signing identity
+  and provisioning profile on Michael's Mac. The committed project uses Automatic
+  signing with `iPhone Developer` and has no `DEVELOPMENT_TEAM`.
 
 ## Icons
 
@@ -587,9 +605,12 @@ git checkout ios/Runner.xcodeproj/project.pbxproj   # the tool rewrites a settin
   so `sdkmanager` runs. Pending licenses can be accepted non-interactively with
   `yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses`. Then:
   `cd app && flutter build apk --release --target-platform android-arm64`
-  writes `app/build/app/outputs/flutter-apk/app-release.apk`. Native Assets compile
-  into `app/.dart_tool/hooks_runner` (clear that and `app/build` after copying the
-  APK). This is an eyeball artifact, not a Play upload.
+  writes `app/build/app/outputs/flutter-apk/app-release.apk`. `flutter build appbundle --release`
+  writes `app/build/app/outputs/bundle/release/app-release.aab`. Copy and rename them
+  into `dist/` as `muninn-app-<ver>-arm64-v8a-release.apk` and
+  `muninn-app-<ver>-release.aab`. Native Assets compile into `app/.dart_tool/hooks_runner`
+  (clear that and `app/build` after copying the artifacts). These are unsigned
+  sideload / GitHub artifacts, not a Play upload.
 
 ## Tests
 
