@@ -23,6 +23,11 @@ primary = true
 kind = "cargo-lock"
 path = "Cargo.lock"
 
+[[files]]                       # Flutter app version / build number (FLUTTER_BUILD_NAME+NUMBER)
+kind = "pubspec"
+path = "app/pubspec.yaml"
+build = "keep"                  # keep +N and bump the version; do not increment the build number
+
 [[files]]                       # every file that pins the version (release file names and URLs)
 kind = "replace"
 paths = [

@@ -112,6 +112,10 @@ fn every_packaging_template_pins_the_workspace_version() {
         assert!(read(p).lines().any(|l| l == format!("pkgver={ver}")), "{p} should have pkgver={ver}");
     }
     assert!(read("site/lib/app.dart").contains(&format!("const version = '{ver}';")));
+    assert!(
+        read("app/pubspec.yaml").lines().any(|l| l == format!("version: {ver}+1")),
+        "app/pubspec.yaml should be version: {ver}+1 so Flutter embeds FLUTTER_BUILD_NAME={ver}"
+    );
     let winget: Vec<_> = std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("packaging/winget/manifests/w/WeirdBrains/muninn/tui"))
         .unwrap()
         .map(|e| e.unwrap().file_name().into_string().unwrap())
@@ -128,9 +132,11 @@ fn every_packaging_template_pins_the_workspace_version() {
         "packaging/homebrew/Casks/muninn-app.rb",
         "site/lib/app.dart",
         "docs/install.md",
+        "app/pubspec.yaml",
     ] {
         assert!(release.contains(&format!("\"{p}\"")), "release.toml does not bump {p}");
     }
+    assert!(release.contains("kind = \"pubspec\""), "release.toml should bump app/pubspec.yaml as kind = pubspec");
 }
 
 #[test]
