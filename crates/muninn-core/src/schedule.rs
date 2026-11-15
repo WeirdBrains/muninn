@@ -543,14 +543,23 @@ pub fn describe(s: &ScheduleDef) -> Vec<String> {
 pub struct SetRun {
     pub ran: Vec<String>,
     pub failed: Vec<String>,
+    /// Rules whose `on` or `if` did not fit the action (`NAME: why`); not failures.
+    pub skipped: Vec<String>,
     pub messages: Vec<String>,
 }
 
-/// Run each enabled rule of a rule set, in order, for action `a`.
+/// Run each enabled rule of a rule set, in order, for action `a`. A rule runs only when its
+/// `on` matches the action and its `if` conditions hold ([`crate::rules::member_skip`]);
+/// otherwise it is skipped, which is not a failure.
 pub fn run_ruleset(store: &Store, set_id: &str, a: &crate::store::ActionRecord) -> Result<SetRun> {
     let mut out = SetRun::default();
     for r in store.ruleset_rules(set_id)? {
         if !r.enabled {
+            continue;
+        }
+        if let Some(why) = crate::rules::member_skip(store, &r, a) {
+            out.messages.push(format!("skipped {}: {why}", r.name));
+            out.skipped.push(format!("{}: {why}", r.name));
             continue;
         }
         let res = crate::rules::run(store, &r, a);
@@ -911,7 +920,7 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
         if live.ruleset_ran == 0 {
             let _ = store.record_action(
                 &NewAction::new("connector.run", ORIGIN, format!("connector schedule {} run #{} ({msg})", s.name, r.id)).params(json!({
-                    "schedule": s.id, "name": s.name, "run": r.id, "connector": plugin_id,
+                    "schedule": s.id, "name": s.name, "run": r.id, "connector": plugin_id, "ruleset": s.ruleset_id,
                     "stored": live.stored, "bytes": live.bytes, "inserted": live.inserted, "error": msg
                 })),
             );

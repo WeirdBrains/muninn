@@ -176,11 +176,44 @@ fn connector_run_is_a_rule_event() {
     let e = Env::new();
     let ev = e.ok(&["rule", "events", "connector.run"]);
     assert!(ev.contains("schedule, name, run, connector, ruleset, stored, bytes, inserted"), "{ev}");
-    e.ok(&["rule", "create", "Gap alarm", "--on", "connector.run", "--if", "inserted = 0", "--then", "status no new data from {name}"]);
+    e.ok(&["ruleset", "create", "feed-alarms"]);
+    e.ok(&[
+        "rule",
+        "create",
+        "Gap alarm",
+        "--ruleset",
+        "feed-alarms",
+        "--on",
+        "connector.run",
+        "--if",
+        "inserted = 0",
+        "--then",
+        "status no new data from {name}",
+    ]);
     let show = e.ok(&["rule", "show", "Gap alarm"]);
     assert!(show.contains("connector.run") && show.contains("inserted = 0"), "{show}");
     let o = e.run(&["rule", "create", "Bad", "--on", "connector.runs", "--then", "status x"]);
     assert!(!o.status.success() && err(&o).contains("matches no action kind"), "{}", err(&o));
+}
+
+#[test]
+fn rule_set_members_are_skipped_when_their_on_or_if_does_not_fit() {
+    let e = Env::new();
+    e.ok(&["ruleset", "create", "Morning"]);
+    e.ok(&["rule", "create", "Always", "--ruleset", "Morning", "--then", "status always ran"]);
+    e.ok(&["rule", "create", "Manual only", "--ruleset", "Morning", "--if", "manual = true", "--then", "status manual ran"]);
+    e.ok(&["rule", "create", "Never", "--ruleset", "Morning", "--if", "manual = false", "--then", "status never ran"]);
+    e.ok(&["rule", "create", "Import", "--ruleset", "Morning", "--on", "import", "--then", "status import ran"]);
+    let o = e.run(&["ruleset", "run", "Morning"]);
+    let both = format!("{}{}", String::from_utf8_lossy(&o.stdout), err(&o));
+    assert!(o.status.success(), "{both}");
+    assert!(both.contains("always ran") && both.contains("manual ran"), "{both}");
+    assert!(!both.contains("never ran") && !both.contains("import ran"), "{both}");
+    assert!(
+        both.contains("skipped Never: if manual = false does not hold") && both.contains("skipped Import: on import does not match schedule"),
+        "{both}"
+    );
+    assert!(both.contains("ran 2 rule(s), skipped 2"), "{both}");
 }
 
 #[test]

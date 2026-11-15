@@ -510,8 +510,9 @@ pub fn ruleset_run(ruleset: String) -> anyhow::Result<Vec<String>> {
     let res = schedule::run_ruleset(&store, &r.id, &a)?;
     let mut lines = res.messages;
     lines.push(format!(
-        "ran {} rule(s){}",
+        "ran {} rule(s){}{}",
         res.ran.len(),
+        if res.skipped.is_empty() { String::new() } else { format!(", skipped {}", res.skipped.len()) },
         if res.failed.is_empty() { String::new() } else { format!(", failed: {}", res.failed.join(", ")) }
     ));
     if !res.failed.is_empty() {

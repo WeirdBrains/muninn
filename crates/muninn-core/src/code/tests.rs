@@ -484,6 +484,27 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
         .unwrap();
     let set = s.create_ruleset("after", "", "standalone", None).unwrap();
     s.add_ruleset_rule(&set.id, &rule.id, None).unwrap();
+    // rule-set rules honour their `on` and `if`: only the ones that fit the connector.run action run
+    let cond = |c: &str| crate::rules::parse_condition(c).unwrap();
+    let status = |text: &str| vec![Then::Status { text: text.into() }];
+    for (name, on, when) in [
+        ("has-data", vec!["connector.run"], vec![cond("inserted > 0")]),
+        ("gap-alarm", vec!["connector.run"], vec![cond("inserted = 0")]),
+        ("other-schedule", vec!["connector.run"], vec![cond("name = nope")]),
+        ("implicit", vec!["schedule"], vec![]),
+        ("wrong-kind", vec!["import"], vec![]),
+        ("any-trigger", vec!["*"], vec![cond("stored = 1")]),
+    ] {
+        let r = s
+            .create_rule(&NewRule {
+                name: name.into(),
+                spec: RuleSpec { on: on.into_iter().map(String::from).collect(), when, then: status(name), ..Default::default() },
+                enabled: true,
+                ..Default::default()
+            })
+            .unwrap();
+        s.add_ruleset_rule(&set.id, &r.id, None).unwrap();
+    }
     let feed = approved_space(&s, "feed", SpaceKind::IngestConnector, BARS_CONNECTOR);
     let live = Live {
         schedule_id: "sched".into(),
@@ -513,7 +534,13 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
     assert_eq!((live.stored, live.piped, live.inserted, live.ruleset_ran), (1, 1, 2, 1));
     assert_eq!(s.count_records(&bars).unwrap() - before, 2);
     let (_, rows) = run_view(&info).unwrap().leaves()[0].as_table();
-    assert_eq!(rows[0], vec!["2", "1"]);
+    assert_eq!(rows[0], vec!["2", "4"], "touch, has-data, implicit and any-trigger ran");
+    let runs = |n: &str| s.find_rule(n).unwrap().runs;
+    assert_eq!(["touch", "has-data", "implicit", "any-trigger"].map(runs), [1, 1, 1, 1]);
+    assert_eq!(["gap-alarm", "other-schedule", "wrong-kind"].map(runs), [0, 0, 0], "skipped, not failed");
+    // the connector.run action carries the fields rules and conditions use
+    let a = s.actions_of_kind("connector.run").unwrap();
+    assert_eq!((a.len(), &a[0].params["schedule"], &a[0].params["inserted"], &a[0].params["stored"]), (1, &json!("sched"), &json!(2), &json!(1)));
     // the guard is gone: code still can't start code outside a space's main calling
     assert!(!spaces::nested_ok());
 }

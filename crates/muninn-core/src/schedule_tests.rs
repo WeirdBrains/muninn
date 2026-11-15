@@ -321,3 +321,42 @@ fn connector_skip_message_names_pipe_and_ruleset() {
     let msg = format!("plugin did not call {}", missing.join(" or "));
     assert_eq!(msg, "plugin did not call pipe or run_ruleset");
 }
+
+#[test]
+fn rule_set_members_run_only_when_their_on_and_if_fit() {
+    let (st, s) = setup();
+    let set_id = s.ruleset_id.clone().unwrap();
+    let mk = |name: &str, on: &[&str], cond: Option<&str>| {
+        let spec = RuleSpec {
+            on: on.iter().map(|x| x.to_string()).collect(),
+            when: cond.map(|c| vec![crate::rules::parse_condition(c).unwrap()]).unwrap_or_default(),
+            then: vec![Then::Status { text: name.into() }],
+            // an old rule with its own schedule has no `on`: it takes the set's trigger
+            schedule: on.is_empty().then_some(crate::store::Schedule::Every(3_600_000)),
+            ..Default::default()
+        };
+        let r = st.create_rule(&NewRule { name: name.into(), spec, enabled: true, ..Default::default() }).unwrap();
+        st.add_ruleset_rule(&set_id, &r.id, None).unwrap();
+    };
+    mk("no-on", &[], None);
+    mk("if-holds", &["schedule"], Some("name = every hour"));
+    mk("if-fails", &["schedule"], Some("name = other"));
+    mk("wildcard", &["*"], Some("attempt = 1"));
+    mk("wrong-on", &["import"], None);
+    mk("wrong-on-and-if", &["journal.*"], Some("name = every hour"));
+    // a rule outside the set does not react to the set's `schedule` action
+    let out = RuleSpec { on: vec!["schedule".into()], then: vec![Then::Status { text: "out".into() }], ..Default::default() };
+    st.create_rule(&NewRule { name: "outside".into(), spec: out, enabled: true, ..Default::default() }).unwrap();
+    let r = run_now(&st, &s, "cli", T0).unwrap();
+    assert_eq!(r.status, "success", "{:?}", r.error);
+    let runs = |n: &str| st.find_rule(n).unwrap().runs;
+    assert_eq!(["say", "no-on", "if-holds", "wildcard"].map(runs), [1, 1, 1, 1]);
+    assert_eq!(["if-fails", "wrong-on", "wrong-on-and-if", "outside"].map(runs), [0, 0, 0, 0]);
+    // the run reports what it skipped, and the skips are not failures
+    assert_eq!(r.ruleset_ran, 4);
+    assert!(r.warnings.iter().any(|w| w.starts_with("skipped if-fails: if name = other does not hold")), "{:?}", r.warnings);
+    assert!(r.warnings.iter().any(|w| w.starts_with("skipped wrong-on: on import does not match schedule")), "{:?}", r.warnings);
+    let a = st.actions_of_kind("schedule").unwrap().pop().unwrap();
+    let res = run_ruleset(&st, &set_id, &a).unwrap();
+    assert_eq!((res.ran.len(), res.skipped.len(), res.failed.len()), (4, 3, 0));
+}

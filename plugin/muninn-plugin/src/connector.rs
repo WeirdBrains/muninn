@@ -37,6 +37,8 @@ pub struct Piped {
 pub struct RulesetRun {
     pub rules_run: usize,
     pub errors: Vec<String>,
+    /// Rules of the set that were skipped (`NAME: why`): their `on` or `if` did not fit.
+    pub skipped: Vec<String>,
 }
 
 /// An HTTP request for [`Host::fetch`].
@@ -148,6 +150,13 @@ impl Host {
             rules_run: n(&r, "rules_run"),
             errors: r
                 .get("errors")
+                .and_then(Json::as_array)
+                .unwrap_or(&[])
+                .iter()
+                .map(|e| e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string()))
+                .collect(),
+            skipped: r
+                .get("skipped")
                 .and_then(Json::as_array)
                 .unwrap_or(&[])
                 .iter()

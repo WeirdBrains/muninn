@@ -431,7 +431,7 @@ fn live_ruleset(store: &Store, req: &Value) -> Result<Value> {
     if !res.failed.is_empty() {
         return Err(Error::invalid("run_ruleset", format!("failed: {}", res.failed.join(", "))));
     }
-    Ok(json!({ "rules_run": res.ran.len(), "errors": [] }))
+    Ok(json!({ "rules_run": res.ran.len(), "errors": [], "skipped": res.skipped }))
 }
 
 fn fetch(req: &Value) -> Result<Value> {

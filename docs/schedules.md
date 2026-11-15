@@ -88,8 +88,10 @@ Each pass:
    30 s, 1 min, 2 min, … (at most an hour), never at or after ends_at.
 
 A rule set run records a `schedule` action (`schedule`, `name`, `run`, `due`, `attempt`,
-`ruleset`) and runs the set's enabled rules on it. It fails when the set is removed or
-disabled, or a rule fails. Failures record `schedule.fail`.
+`ruleset`) and runs the set's enabled rules on it. A rule whose `on` does not match
+`schedule` or whose `if` does not hold for those params is skipped (named in the run's
+warnings), not failed; see [rules](rules.md#rule-sets-and-schedules-225). It fails when the
+set is removed or disabled, or a rule fails. Failures record `schedule.fail`.
 
 `schedule enable` picks the next slot from now (an ended schedule needs a new
 `--ends-at` or `--no-end` first). `run-now` runs once outside the timing.

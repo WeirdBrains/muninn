@@ -134,6 +134,22 @@ A schedule's run records a `schedule` action (`schedule`, `name`, `run`, `rulese
 runs the set's enabled rules in order on it. Only the set's rules run: a `--on schedule`
 rule outside the set does not fire.
 
+A member runs only when the action fits it, and is **skipped** (reported, not a failure)
+when it does not:
+
+- its `--on` matches the action's kind. No `--on` takes the set's own trigger; the
+  `schedule` that `rule create --ruleset` stores also covers a connector schedule's
+  `connector.run`. A rule that names another kind (`--on import`) never runs from a set.
+- its `--if` conditions hold for the action's params (`name`, `run`, `inserted`, … ;
+  `rule events schedule` and `rule events connector.run` list them). `--related` does not apply.
+
+```
+mnnn rule create "Gap alarm" --ruleset Feed --on connector.run --if "inserted = 0" --then "status no new data"
+mnnn ruleset run Morning      # "skipped Gap alarm: if inserted = 0 does not hold ..." in its output
+```
+
+Skips are listed in the run's warnings (`schedule runs NAME`) and in `ruleset run`.
+
 `rule create --every`/`--cron` still work but are deprecated: they make rule set
 `NAME (scheduled)` and a schedule `NAME` (this node's zone) and say so. 2.25 moved older
 scheduled rules the same way on first open, and each project's rules into a rule set

@@ -27,7 +27,7 @@ mnnn spaces run feed --connector-dry-run --option url=https://example.com/data.c
 | `host.option(name) -> Option<String>` | `options` | a schedule option (a step's own options come first) |
 | `host.store_raw(name, format, &[u8]) -> Result<String>` | `store_raw` · `{name, format, bytes_base64}` → `{id}` | one raw item into the run's source, never parsed |
 | `host.pipe() -> Result<Piped>` | `pipe` · `null` → `{inserted, sinks}` | the schedule's pipeline over this run's items |
-| `host.run_ruleset(Option<&str>) -> Result<RulesetRun>` | `run_ruleset` · `{ruleset_id?}` → `{rules_run, errors}` | records `connector.run`, runs the rule set (default: the schedule's) |
+| `host.run_ruleset(Option<&str>) -> Result<RulesetRun>` | `run_ruleset` · `{ruleset_id?}` → `{rules_run, errors, skipped}` | records `connector.run`, runs the rule set (default: the schedule's); a rule whose `on` or `if` does not fit the action is skipped, not run |
 | `host.fetch(&Request) -> Result<Response>` | `fetch` · `{method, url, headers, body_base64?}` → `{status, headers, body_base64}` | HTTP with Muninn's client (user agent, 30 s timeout, 64 MB) |
 | `host.state_get(key) -> Result<Option<Json>>` | `state_get` · `{key}` → `{value}` | a small per-schedule cursor |
 | `host.state_set(key, value) -> Result<()>` | `state_set` · `{key, value}` | set it (`Json::Null` removes); kept when the run succeeds |
@@ -35,7 +35,7 @@ mnnn spaces run feed --connector-dry-run --option url=https://example.com/data.c
 Types: `Context { schedule_id, run_id, ruleset_id, source, pipeline: Option<String>,
 last_success_at: Option<i64>, options: Vec<(String, String)>, dry_run: bool }`,
 `Piped { inserted: usize, sinks: Vec<Json> }`, `RulesetRun { rules_run: usize, errors:
-Vec<String> }`, `Request::get(url)` / `Request::post(url, body)` `.header(k, v)`, and
+Vec<String>, skipped: Vec<String> }`, `Request::get(url)` / `Request::post(url, body)` `.header(k, v)`, and
 `Response { status: u16, headers, body: Vec<u8> }` with `.text()`, `.json()`,
 `.header(name)`. Bytes cross the JSON ABI as base64 (`connector::b64_encode/decode`).
 

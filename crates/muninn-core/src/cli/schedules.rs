@@ -143,8 +143,9 @@ pub fn ruleset(ctx: &Ctx, cmd: RulesetCommand) -> anyhow::Result<()> {
                     ctx.io.info(m);
                 }
                 ctx.io.info(format!(
-                    "ran {} rule(s){}",
+                    "ran {} rule(s){}{}",
                     res.ran.len(),
+                    if res.skipped.is_empty() { String::new() } else { format!(", skipped {}", res.skipped.len()) },
                     if res.failed.is_empty() { String::new() } else { format!(", failed: {}", res.failed.join(", ")) }
                 ));
             }

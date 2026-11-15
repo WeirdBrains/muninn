@@ -29,6 +29,9 @@ pub use weirdnet_rules::engine::{Check, CondCheck, MAX_DEPTH, MAX_RUNS, RunResul
 pub use weirdnet_rules::schedule::{Cron, on_text, schedule_text};
 pub use weirdnet_rules::syntax::{condition_text, quote, split_list};
 
+/// The action a connector schedule's `host.run_ruleset` records.
+pub const CONNECTOR_RUN: &str = "connector.run";
+
 /// Origin of actions taken by rules.
 pub const ORIGIN: &str = "rule";
 
@@ -923,6 +926,32 @@ pub fn check(store: &Store, r: &Rule, a: &ActionRecord) -> Check {
     eng::check(&Host(store), r, a)
 }
 
+/// Why a rule-set member does not apply to the action its set was run on (`None`: it does).
+///
+/// A set's rule applies when its `on` matches the action's kind (no `on`: the set's own
+/// trigger, so any) and its `if` conditions hold for the action's params. `schedule`, the
+/// `on` that `rule create --ruleset` stores, is the set's trigger too, so it also covers a
+/// connector schedule's `connector.run`. `--related` does not apply to set members.
+pub fn member_skip(store: &Store, r: &Rule, a: &ActionRecord) -> Option<String> {
+    let on = &r.spec.on;
+    let hit = on.is_empty()
+        || on.iter().any(|p| {
+            weirdnet_rules::syntax::matches_kind(p, &a.kind) || (a.kind == CONNECTOR_RUN && weirdnet_rules::syntax::matches_kind(p, SCHEDULE))
+        });
+    if !hit {
+        return Some(format!("on {} does not match {}", on.join(", "), a.kind));
+    }
+    // the engine decides the conditions; `on` was settled above
+    let mut m = r.clone();
+    m.spec.on = vec![a.kind.clone()];
+    m.spec.related = false;
+    let c = check(store, &m, a);
+    c.conditions.iter().find(|c| !c.ok).map(|c| match &c.actual {
+        Some(v) => format!("if {} does not hold (it is {v})", c.condition),
+        None => format!("if {} does not hold (no such field)", c.condition),
+    })
+}
+
 // ---------------------------------------------------------------------------- templates
 
 /// Fill `{kind} {summary} {origin} {author} {action} {rule} {date} {time} {now}` and
@@ -1449,6 +1478,11 @@ pub(crate) fn after_action(store: &Store, id: i64) {
         return;
     }
     let Ok(Some(a)) = store.action(id) else { return };
+    // a rule set's own trigger (`schedule` / `connector.run` naming its `ruleset`) is not
+    // broadcast: `schedule::run_ruleset` runs the set's rules, those whose `on` and `if` fit
+    if (a.kind == SCHEDULE || a.kind == CONNECTOR_RUN) && a.params.get("ruleset").is_some_and(|v| !v.is_null()) {
+        return;
+    }
     eng::dispatch(&Host(store), &a);
 }
 
