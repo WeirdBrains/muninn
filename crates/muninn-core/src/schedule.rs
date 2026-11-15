@@ -848,7 +848,7 @@ fn execute(store: &Store, s: &ScheduleDef, run_id: i64, holder: &str, now: i64) 
     Ok(r)
 }
 
-/// Connector schedules (2.26): run the ingest-connector space with a live host context.
+/// Connector schedules: run the ingest-connector space with a live host context.
 fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i64) -> Result<(Option<i64>, i64, Vec<String>)> {
     use crate::code::connector::{self, Live};
     use crate::store::SpaceKind;

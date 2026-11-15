@@ -1,7 +1,7 @@
 # Schedules and the scheduler (2.25)
 
 A **schedule** runs a target on time. In 2.25 the target is a [rule set](rules.md#rule-sets-and-schedules-225);
-from 2.26 it can also be an ingest connector ([connectors.md](connectors.md)).
+it can also be an ingest connector ([connectors.md](connectors.md)).
 
 ```
 mnnn schedule add NAME [RUN_EVERY] --ruleset SET [--cron "M H D Mo W"]

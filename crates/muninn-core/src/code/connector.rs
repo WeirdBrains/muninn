@@ -2,7 +2,7 @@
 //! `store_raw`, `pipe`, `run_ruleset`, `fetch`, `state_get` and `state_set`.
 //!
 //! They answer only inside a connector run: a dry run (`mnnn spaces run NAME
-//! --connector-dry-run`) or a live schedule run (v2.26). Main only (not members).
+//! --connector-dry-run`) or a live schedule run. Main only (not members).
 use crate::error::{Error, Result};
 use crate::store::{NewAction, NewSourceData, Store};
 use base64::Engine as _;

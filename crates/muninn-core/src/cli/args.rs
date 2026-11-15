@@ -100,7 +100,7 @@ pub enum Command {
     /// Rule sets: rules run together, in order (a schedule runs one; a project's rules are one).
     #[command(subcommand, alias = "rulesets")]
     Ruleset(RulesetCommand),
-    /// Schedules: run a rule set (or, from 2.26, an ingest connector) at start_at, every
+    /// Schedules: run a rule set (or an ingest connector) at start_at, every
     /// interval or at cron times, until ends_at.
     #[command(subcommand, alias = "schedules", after_long_help = SCHEDULE_NOTES)]
     Schedule(ScheduleCommand),

@@ -2,7 +2,7 @@
 //! see `docs/connectors.md`). A connector gathers data, stores it raw
 //! ([`Host::store_raw`]), pipes it into its model ([`Host::pipe`]) and runs its rule set
 //! ([`Host::run_ruleset`]). Only main calls these, and only in a connector run: the
-//! scheduler (v2.26) or `mnnn spaces run NAME --connector-dry-run`, which records the
+//! scheduler or `mnnn spaces run NAME --connector-dry-run`, which records the
 //! calls instead of storing, piping or running rules.
 use crate::{Error, Host, Json, Result};
 

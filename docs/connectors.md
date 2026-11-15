@@ -5,10 +5,10 @@ main gathers data (usually over HTTP), stores each piece **raw**, pipes this run
 items through a [pipeline](pipelines.md) into a model, then runs a rule set. Muninn does
 none of that for it: the run's status is what the connector returns.
 
-The SDK side (`muninn-plugin` 1.3) is ready now. The scheduler that runs connectors on a
-schedule (`start_at` / `run_every` / `ends_at`) arrives in v2.26; until then a connector
-runs as a **dry run** (below). Outside a connector run the methods fail with
-"available in v2.26 … or in a dry run".
+The scheduler runs connectors on a schedule (`start_at` / `run_every` / `ends_at`; see
+[Schedules](#schedules), since 2.23.0), and `mnnn spaces run NAME --connector-dry-run`
+tries one without storing anything ([Dry runs](#dry-runs)). Outside a connector run the
+methods fail with "… runs from a schedule or in a dry run".
 
 ## Start one
 
@@ -73,7 +73,7 @@ This is the template (`mnnn code create NAME --template ingest-connector`):
 //   mnnn spaces create NAME --kind ingest-connector --main THIS
 // Try it without storing anything:
 //   mnnn spaces run NAME --connector-dry-run --option url=https://example.com/data.csv
-// The scheduler (v2.26) runs it with a real context.
+// The scheduler runs it with a real context.
 use muninn_plugin::prelude::*;
 
 pub fn run(host: &Host) -> Result<View> {
@@ -111,7 +111,7 @@ pub fn run(host: &Host) -> Result<View> {
 // ends with: muninn_plugin::plugin!(run, kind = "ingest-connector");
 ```
 
-## Schedules (2.26)
+## Schedules
 
 ```
 mnnn schedule add NAME 15m --plugin FEED --source SRC [--pipeline PL] [--connector-ruleset R] [--option k=v]
