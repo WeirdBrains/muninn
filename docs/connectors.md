@@ -49,7 +49,9 @@ for you.
 `mnnn spaces run NAME --connector-dry-run` runs an ingest-connector space with an
 in-memory context: `store_raw`, `pipe` and `run_ruleset` are **recorded, not done**
 (nothing is stored, piped or run; `pipe` answers `inserted: 0`), `state_*` use an
-in-memory map, and `fetch` is real. Afterwards it lists every call. Context flags:
+in-memory map, and `fetch` is real. The space is approved first (asking, as for any run),
+then its main runs, its view is printed, and afterwards every call is listed. A connector
+takes no `--input`. Context flags:
 
 | flag | sets |
 |------|------|

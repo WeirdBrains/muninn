@@ -241,12 +241,28 @@ pub fn run(ctx: &Ctx, cmd: SpacesCommand) -> anyhow::Result<()> {
                 let (k, v) = kv(o)?;
                 d.state.insert(k, serde_json::from_str(&v).unwrap_or(json!(v)));
             }
-            let src = match &input {
-                Some(i) => code::pipe::Source::parse(i)?,
-                None => code::pipe::Source::Space(s.name.clone()),
-            };
-            let steps = if input.is_some() { vec![code::pipe::Step::Space(s.name.clone())] } else { vec![] };
-            let (out, d) = code::connector::dry_run(d, || super::code::run_pipe(ctx, &store, &src, &steps, &[], json, rows));
+            if input.is_some() {
+                anyhow::bail!("{} is an ingest connector: it takes no --input (it gathers its own data)", s.name);
+            }
+            ensure_approved(ctx, &store, &s)?;
+            let env = code::CodeEnv::for_store(&store)?;
+            let quiet = ctx.global.quiet;
+            let (info, d) = code::connector::dry_run_space(&store, &env, "cli", &s, d, &mut |l| {
+                if !quiet {
+                    eprintln!("{l}")
+                }
+            });
+            let out = info.map_err(anyhow::Error::from).and_then(|info| {
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&info)?);
+                } else {
+                    super::code::print_run(&info, rows);
+                }
+                match (info.status.as_str(), &info.error) {
+                    ("ok", _) => Ok(()),
+                    (_, e) => Err(anyhow!("{}: {}", s.name, e.clone().unwrap_or_else(|| info.status.clone()))),
+                }
+            });
             if json {
                 println!("{}", serde_json::to_string(&json!({ "connector_dry_run": d }))?);
             } else {

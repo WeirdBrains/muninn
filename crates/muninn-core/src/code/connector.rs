@@ -137,6 +137,19 @@ pub fn dry_run<T>(d: DryRun, f: impl FnOnce() -> T) -> (T, DryRun) {
     (out, d)
 }
 
+/// Dry-run an ingest-connector space: its main runs with `d` as the connector context, its
+/// host calls recorded (nothing stored, piped or run). The space must be approved.
+pub fn dry_run_space(
+    store: &Store,
+    env: &crate::code::CodeEnv,
+    origin: &str,
+    s: &crate::store::Space,
+    d: DryRun,
+    log: &mut dyn FnMut(&str),
+) -> (Result<crate::store::RunInfo>, DryRun) {
+    dry_run(d, || crate::code::spaces::run_connector(store, env, origin, s, "connector dry run", log))
+}
+
 /// Run `f` as a live connector schedule run.
 pub fn live_run<T>(live: Live, f: impl FnOnce() -> T) -> (T, Live) {
     let prev = LIVE.with(|x| x.borrow_mut().replace(live));

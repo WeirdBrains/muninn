@@ -3,7 +3,7 @@
 use super::*;
 use crate::model::{Bar, Duration, Symbol};
 use crate::store::{Design, Field, FieldType, RecordQuery};
-use serde_json::json;
+use serde_json::{Value, json};
 
 fn store() -> Store {
     let mut s = Store::open_in_memory().unwrap();
@@ -365,4 +365,69 @@ fn the_connector_template_runs_in_a_dry_run() {
     assert_eq!(rows[0], vec!["dry-1", "13", "0", "0", "true"]);
     // nothing was stored
     assert!(s.sources().unwrap().iter().all(|x| x.name != "feed"));
+}
+
+/// A connector main that stores two raw bar rows, then pipes and runs the rule set when
+/// the context has them.
+const BARS_CONNECTOR: &str = r#"
+use muninn_plugin::prelude::*;
+
+pub fn run(host: &Host) -> Result<View> {
+    let ctx = host.context()?;
+    let rows = "{\"ts\":1704067200000,\"o\":1,\"h\":2,\"l\":0.5,\"c\":1.5,\"v\":3}\n{\"ts\":1704067500000,\"o\":1.5,\"h\":2,\"l\":1,\"c\":1.8,\"v\":4}\n";
+    host.store_raw("page-1", "ndjson", rows.as_bytes())?;
+    let mut inserted = 0usize;
+    let mut rules = 0usize;
+    if ctx.pipeline.is_some() {
+        inserted = host.pipe()?.inserted;
+    }
+    if ctx.ruleset_id.is_some() {
+        rules = host.run_ruleset(None)?.rules_run;
+    }
+    Ok(View::table("Connector run", &["inserted", "rules run"]).row(vec![inserted.into(), rules.into()]))
+}
+"#;
+
+const TOUCH: &str = r#"
+use muninn_plugin::prelude::*;
+
+pub fn run(_host: &Host) -> Result<View> {
+    Ok(View::table("Touched", &["n"]).row(vec![1.0.into()]))
+}
+"#;
+
+fn approved_space(s: &Store, name: &str, kind: crate::store::SpaceKind, src: &str) -> crate::store::Space {
+    let c = create(s, "cli", name, "", Lang::Rust, src, CodeInput::default()).unwrap();
+    let sp = spaces::create(s, "cli", name, "", kind, &c).unwrap();
+    spaces::approve(s, "cli", &sp, true).unwrap();
+    s.space(&sp.id).unwrap().unwrap()
+}
+
+#[test]
+fn a_connector_space_dry_runs_through_the_space_runner() {
+    if !have_cargo() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let env = CodeEnv::new(dir.path());
+    let s = store();
+    let c = create(&s, "cli", "feed", "", Lang::Rust, BARS_CONNECTOR, CodeInput::default()).unwrap();
+    let sp = spaces::create(&s, "cli", "feed", "", crate::store::SpaceKind::IngestConnector, &c).unwrap();
+    let dry = || connector::DryRun::new("feed", None, Some("p1".into()), Some("rs1".into()), serde_json::Map::new());
+    // not approved yet: asks first
+    let (r, _) = connector::dry_run_space(&s, &env, "cli", &sp, dry(), &mut |_| {});
+    assert!(matches!(r, Err(Error::NeedsConfirmation(_))), "{r:?}");
+    spaces::approve(&s, "cli", &sp, true).unwrap();
+    let sp = s.space(&sp.id).unwrap().unwrap();
+    let (info, d) = connector::dry_run_space(&s, &env, "cli", &sp, dry(), &mut |_| {});
+    let info = info.unwrap();
+    assert_eq!(info.status, "ok", "{info:?}");
+    let m: Vec<&str> = d.calls.iter().map(|c| c.method.as_str()).collect();
+    assert_eq!(m, ["store_raw", "pipe", "run_ruleset"], "{:?}", d.calls);
+    assert_eq!((d.stored, d.bytes), (1, 110));
+    assert!(!connector::active());
+    // only connectors run this way
+    let a = approved_space(&s, "plain", crate::store::SpaceKind::Analysis, TOUCH);
+    let (r, _) = connector::dry_run_space(&s, &env, "cli", &a, dry(), &mut |_| {});
+    assert!(r.unwrap_err().to_string().contains("not an ingest connector"));
 }

@@ -175,3 +175,43 @@ fn code_spaces_have_a_scope() {
     assert!(e.ok(&["code", "list", "--scope", "global"]).contains("no code spaces"));
     assert!(!e.run(&["code", "list", "--scope", "galaxy"]).status.success());
 }
+
+#[test]
+fn an_ingest_connector_space_runs_in_a_dry_run() {
+    let mut probe = std::process::Command::new("cargo");
+    if probe.arg("--version").output().map(|o| !o.status.success()).unwrap_or(true) {
+        eprintln!("skipped: no cargo");
+        return;
+    }
+    let e = Env::new();
+    let src = r#"
+use muninn_plugin::prelude::*;
+
+pub fn run(host: &Host) -> Result<View> {
+    let id = host.store_raw("page-1", "csv", b"a,b\n1,2\n")?;
+    host.state_set("since", 7i64)?;
+    Ok(View::table("Connector run", &["item"]).row(vec![id.as_str().into()]))
+}
+"#;
+    e.ok(&["code", "create", "feed", "--lang", "rust", "--source", src]);
+    e.ok(&["spaces", "create", "feedsp", "--kind", "ingest-connector", "--main", "feed"]);
+    e.ok(&["-y", "spaces", "approve", "feedsp"]);
+    let o = e.run(&["spaces", "run", "feedsp", "--connector-dry-run"]);
+    let out = String::from_utf8_lossy(&o.stdout).to_string();
+    assert!(o.status.success(), "{}\n{out}", err(&o));
+    assert!(out.contains("dry-1"), "the run's view: {out}");
+    assert!(out.contains("connector dry run: 2 call(s), 1 item(s), 8 byte(s)"), "{out}");
+    assert!(out.contains("store_raw page-1 (csv, 8 bytes)") && out.contains("state_set since = 7"), "{out}");
+    let o = e.run(&["spaces", "run", "feedsp", "--connector-dry-run", "--json", "--state", "since=3"]);
+    assert!(o.status.success(), "{}", err(&o));
+    let out = String::from_utf8_lossy(&o.stdout).to_string();
+    let last = out.lines().last().unwrap();
+    let j: serde_json::Value = serde_json::from_str(last).unwrap();
+    assert_eq!(j["connector_dry_run"]["stored"], 1, "{last}");
+    assert_eq!(j["connector_dry_run"]["calls"][1]["method"], "state_set", "{last}");
+    // nothing was stored
+    assert!(!e.ok(&["sources", "list"]).contains("feedsp"));
+    // a connector takes no input
+    let o = e.run(&["spaces", "run", "feedsp", "--connector-dry-run", "--input", "journal:x"]);
+    assert!(!o.status.success() && err(&o).contains("takes no --input"), "{}", err(&o));
+}
