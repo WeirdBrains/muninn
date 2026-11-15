@@ -35,6 +35,16 @@ pub(crate) fn paths(home: Option<String>) -> anyhow::Result<Paths> {
     Ok(Paths::resolve(home.map(PathBuf::from), None)?)
 }
 
+/// Refuse to start a new store in an implicit home that is a macOS App Sandbox container
+/// (the app would silently make a second, empty database). An explicit home is never refused.
+pub(crate) fn refuse_sandboxed_default(home: Option<&str>) -> anyhow::Result<()> {
+    let explicit = home.is_some_and(|h| !h.is_empty()) || std::env::var("MUNINN_HOME").is_ok_and(|h| !h.is_empty());
+    match Paths::sandboxed_default_home(explicit) {
+        Some(why) => Err(anyhow::anyhow!(why)),
+        None => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

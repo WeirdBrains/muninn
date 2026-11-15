@@ -22,6 +22,14 @@ impl Paths {
         Ok(Self { home, db })
     }
 
+    /// Why a default `~/.muninn` must not be created here, if it must not: a macOS App Sandbox
+    /// (`APP_SANDBOX_CONTAINER_ID` set) makes the home directory a private container, so a
+    /// database made there is not the one `mnnn` uses. `explicit_home` is true when a home was
+    /// given (flag, `MUNINN_HOME`); an explicit home is always trusted.
+    pub fn sandboxed_default_home(explicit_home: bool) -> Option<String> {
+        sandbox_refusal(explicit_home, std::env::var("APP_SANDBOX_CONTAINER_ID").ok().as_deref())
+    }
+
     pub fn storage_dir(&self) -> PathBuf {
         self.home.join("storage")
     }
@@ -130,6 +138,16 @@ impl crate::crypto::keyring::EncryptedDatabase for Paths {
     }
 }
 
+fn sandbox_refusal(explicit_home: bool, container_id: Option<&str>) -> Option<String> {
+    let id = container_id.filter(|i| !i.is_empty())?;
+    if explicit_home {
+        return None;
+    }
+    Some(format!(
+        "this app runs in a macOS App Sandbox container ({id}), so `~` is not your real home and a new database here would not be the one `mnnn` uses. Set MUNINN_HOME (or pass a home) to the data folder you want, or use a build without the App Sandbox"
+    ))
+}
+
 /// Muninn's side-file extension for private writes (backups skip it).
 pub const SIDE_EXT: &str = "tmp-muninn";
 
@@ -152,6 +170,15 @@ pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_sandbox_container_refuses_only_the_implicit_home() {
+        assert!(sandbox_refusal(false, None).is_none());
+        assert!(sandbox_refusal(false, Some("")).is_none());
+        assert!(sandbox_refusal(true, Some("com.example.app")).is_none());
+        let why = sandbox_refusal(false, Some("com.example.app")).unwrap();
+        assert!(why.contains("App Sandbox") && why.contains("com.example.app") && why.contains("MUNINN_HOME"));
+    }
 
     #[test]
     fn layout_and_permissions() {

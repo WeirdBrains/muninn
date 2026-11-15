@@ -8,7 +8,7 @@
 //! Uses the same [`paths`] as the store (`unlock`, `data_dir_info`): the `home` the
 //! app already resolved. On desktop that is `MUNINN_HOME` or `~/.muninn`; on a phone
 //! it is the platform-secure app sandbox, not a desktop-style `~/.muninn`.
-use super::info::paths;
+use super::info::{paths, refuse_sandboxed_default};
 use muninn_core::crypto::{
     self,
     keyring::{self, Envelope, ExportItem},
@@ -138,6 +138,7 @@ pub fn keys_init(home: Option<String>, password: String) -> anyhow::Result<Revea
     if password.is_empty() {
         return Err(anyhow::anyhow!("the password must not be empty"));
     }
+    refuse_sandboxed_default(home.as_deref())?;
     let paths = paths(home)?;
     let out = keyring::init(&paths, &SecretString::from(password))?;
     Ok(put_reveal(
