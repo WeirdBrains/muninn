@@ -152,3 +152,19 @@ mnnn pipeline run btc -y
 
 Run it again after more files arrive: the `model:bars` leaf adds only bars that are not
 there yet.
+
+## From an ingest connector
+
+A scheduled [ingest connector](connectors.md#the-pipeline-start-it-with--) pipes through
+`host.pipe()`, which runs the schedule's pipeline over **only that run's raw items**. Start
+that pipeline with a `-` node: it receives them as a frame (columns `text name format locator
+received_at item source`; `received_at` is epoch milliseconds, UTC). A `source:NAME` first
+node would re-read every item ever stored there on every run.
+
+```
+mnnn pipeline create candles --node src=- --node p=space:parse-ndjson \
+  --node 'b=space:to-bars?duration=5m&rejects=fail' --node m=model:bars --edge 'src>p>b>m'
+```
+
+A leaf model that already has a row (bars keep their id) does not take it again: the
+connector's `inserted` counts only the new records, `landed` all the rows given.

@@ -14,7 +14,7 @@ pub struct Context {
     pub ruleset_id: Option<String>,
     /// The source raw items go into (its name).
     pub source: Option<String>,
-    /// The pipeline [`Host::pipe`] runs (its name).
+    /// The pipeline [`Host::pipe`] runs (its id in a scheduled run, as given in a dry run).
     pub pipeline: Option<String>,
     /// Epoch ms (UTC) of the schedule's last successful run.
     pub last_success_at: Option<i64>,
