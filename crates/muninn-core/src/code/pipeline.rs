@@ -225,6 +225,27 @@ fn missing(s: &Store, n: &Node) -> Option<Error> {
 /// Run a pipeline: nodes in order, each once; `stdin` is the frame for `-` sources. A node
 /// that fails stops the nodes downstream of it (`skipped`); the others still run.
 pub fn run(store: &Store, env: &CodeEnv, origin: &str, p: &Pipeline, stdin: Option<Value>, log: &mut dyn FnMut(&str)) -> Result<PipelineRun> {
+    run_counted(store, env, origin, p, stdin, log).map(|(r, _)| r)
+}
+
+/// What one model sink stored in a run: `landed` counts every row the sink was given;
+/// `stored.new` only the records that were not there before.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SinkCount {
+    pub model: String,
+    pub landed: usize,
+    pub stored: pipe::Stored,
+}
+
+/// [`run`], and per model sink how many rows were new (in the order of `PipelineRun::landed`).
+pub fn run_counted(
+    store: &Store,
+    env: &CodeEnv,
+    origin: &str,
+    p: &Pipeline,
+    stdin: Option<Value>,
+    log: &mut dyn FnMut(&str),
+) -> Result<(PipelineRun, Vec<SinkCount>)> {
     if p.draft {
         return Err(Error::invalid(
             "pipeline",
@@ -242,14 +263,15 @@ pub fn run(store: &Store, env: &CodeEnv, origin: &str, p: &Pipeline, stdin: Opti
     store.note_action(
         &NewAction::new("pipe.start", origin, format!("pipeline {}", p.name)).params(json!({ "token": token, "plan": plan, "pipeline": p.name, "views": g.nodes.iter().filter(|n| matches!(n.kind, NodeKind::View { .. })).map(|n| format!("view:{}/{}", p.name, n.id)).collect::<Vec<_>>() })),
     );
-    let mut host = RunHost { store, env, origin, pipeline: &p.name, stdin: stdin.as_ref(), log, token: &token, plan: &plan };
+    let mut host = RunHost { store, env, origin, pipeline: &p.name, stdin: stdin.as_ref(), log, token: &token, plan: &plan, counts: vec![] };
     let out = wp::execute(&p.name, g, &mut host)?;
+    let counts = std::mem::take(&mut host.counts);
     let landed: Vec<String> = out.landed.iter().map(|(m, n)| format!("model:{m} → {n} records")).collect();
     store.note_action(
         &NewAction::new("pipe.run", origin, format!("pipeline {} {}", p.name, if out.ok() { "ran" } else { "ran with errors" }))
             .params(json!({ "token": token, "pipeline": p.name, "hops": plan, "saved": landed, "nodes": out.nodes })),
     );
-    Ok(out)
+    Ok((out, counts))
 }
 
 /// What a pipeline's nodes do in Muninn: read sources, run code spaces (approved ones only:
@@ -263,13 +285,15 @@ struct RunHost<'a> {
     log: &'a mut dyn FnMut(&str),
     token: &'a str,
     plan: &'a [String],
+    /// Per model sink, as it lands (see [`SinkCount`]).
+    counts: Vec<SinkCount>,
 }
 
 impl wp::Host<NodeKind> for RunHost<'_> {
     type Error = Error;
 
     fn output(&mut self, n: &Node, inputs: &[(String, Value)]) -> Result<Value> {
-        node_out(self.store, self.env, self.origin, self.pipeline, n, inputs, self.stdin, &mut *self.log)
+        node_out(self.store, self.env, self.origin, self.pipeline, n, inputs, self.stdin, &mut *self.log, &mut self.counts)
     }
 
     fn tee(&mut self, n: &Node, tee: &str, f: &Value) -> Result<String> {
@@ -322,6 +346,7 @@ fn node_out(
     ups: &[(String, Value)],
     stdin: Option<&Value>,
     log: &mut dyn FnMut(&str),
+    counts: &mut Vec<SinkCount>,
 ) -> Result<Value> {
     let all = || union(&format!("pipeline:{pipeline}:{}", n.id), &ups.iter().map(|(_, f)| f).collect::<Vec<_>>());
     match &n.kind {
@@ -355,7 +380,9 @@ fn node_out(
         NodeKind::Filter { search } => Ok(pipe::search_filter(&all(), &store.find_live_search(search)?.spec)),
         NodeKind::Sink { model } => {
             let f = all();
-            let made = pipe::save(store, origin, &Sink::Model(model.clone()), &f, None, &format!("pipeline {pipeline}"))?;
+            let (made, stored) = pipe::save_counted(store, origin, &Sink::Model(model.clone()), &f, None, &format!("pipeline {pipeline}"))?;
+            let landed = f.get("ids").and_then(Value::as_array).map_or(0, Vec::len);
+            counts.push(SinkCount { model: model.clone(), landed, stored: stored.unwrap_or(pipe::Stored { new: landed as u64, duplicate: 0 }) });
             log(&format!("{}: {made}", n.id));
             Ok(f)
         }

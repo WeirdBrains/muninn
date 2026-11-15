@@ -887,6 +887,7 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
         stored: 0,
         bytes: 0,
         inserted: 0,
+        landed: 0,
         piped: 0,
         ruleset_ran: 0,
         warnings: vec![],
@@ -921,7 +922,7 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
             let _ = store.record_action(
                 &NewAction::new("connector.run", ORIGIN, format!("connector schedule {} run #{} ({msg})", s.name, r.id)).params(json!({
                     "schedule": s.id, "name": s.name, "run": r.id, "connector": plugin_id, "ruleset": s.ruleset_id,
-                    "stored": live.stored, "bytes": live.bytes, "inserted": live.inserted, "error": msg
+                    "stored": live.stored, "bytes": live.bytes, "inserted": live.inserted, "landed": live.landed, "error": msg
                 })),
             );
         }

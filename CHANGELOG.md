@@ -12,6 +12,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Fixed
 
+- A connector's `host.pipe()` and `connector.run` count only new records as `inserted` (a re-run over stored data says 0); every row given to the sinks is the new `landed`
 - Rules in a rule set run only when their `on` matches and their `if` holds (otherwise skipped, not failed); matching rules no longer run twice
 - `mnnn spaces run NAME --connector-dry-run` runs the connector (it always failed with "connectors run only from a schedule")
 - A connector's `host.pipe()` and `host.run_ruleset()` work when the pipeline has `space:` steps or the rule set has `run-space` rules

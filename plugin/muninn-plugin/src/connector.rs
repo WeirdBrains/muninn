@@ -27,7 +27,10 @@ pub struct Context {
 /// What [`Host::pipe`] did.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Piped {
+    /// Records the pipeline stored that were new: a re-run over data already stored is 0.
     pub inserted: usize,
+    /// Every row the pipeline's sinks were given, new or already there.
+    pub landed: usize,
     /// Each model sink: `{"model", "inserted"}`.
     pub sinks: Vec<Json>,
 }
@@ -136,7 +139,7 @@ impl Host {
     /// Run the schedule's pipeline over this run's raw items.
     pub fn pipe(&self) -> Result<Piped> {
         let r = self.call("pipe", &Json::Null)?;
-        Ok(Piped { inserted: n(&r, "inserted"), sinks: r.get("sinks").and_then(Json::as_array).unwrap_or(&[]).to_vec() })
+        Ok(Piped { inserted: n(&r, "inserted"), landed: n(&r, "landed"), sinks: r.get("sinks").and_then(Json::as_array).unwrap_or(&[]).to_vec() })
     }
 
     /// Record `connector.run` and run a rule set (`None`: the schedule's).

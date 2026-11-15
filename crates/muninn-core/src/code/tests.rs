@@ -506,10 +506,10 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
         s.add_ruleset_rule(&set.id, &r.id, None).unwrap();
     }
     let feed = approved_space(&s, "feed", SpaceKind::IngestConnector, BARS_CONNECTOR);
-    let live = Live {
+    let mk_live = |run_id: i64| Live {
         schedule_id: "sched".into(),
         schedule_name: "tv".into(),
-        run_id: 1,
+        run_id,
         plugin_id: feed.id.clone(),
         source_id: tv.id.clone(),
         source_name: tv.name.clone(),
@@ -520,6 +520,7 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
         stored: 0,
         bytes: 0,
         inserted: 0,
+        landed: 0,
         piped: 0,
         ruleset_ran: 0,
         warnings: vec![],
@@ -527,11 +528,11 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
     };
     let bars = s.find_model("bars").unwrap();
     let before = s.count_records(&bars).unwrap();
-    let (info, live) = connector::live_run(live, || spaces::run_connector(&s, &env, "scheduler", &feed, "test", &mut |_| {}));
+    let (info, live) = connector::live_run(mk_live(1), || spaces::run_connector(&s, &env, "scheduler", &feed, "test", &mut |_| {}));
     let info = info.unwrap();
     assert_eq!(info.status, "ok", "{info:?} {:?}", live.warnings);
     assert!(live.warnings.is_empty(), "{:?}", live.warnings);
-    assert_eq!((live.stored, live.piped, live.inserted, live.ruleset_ran), (1, 1, 2, 1));
+    assert_eq!((live.stored, live.piped, live.inserted, live.landed), (1, 1, 2, 2));
     assert_eq!(s.count_records(&bars).unwrap() - before, 2);
     let (_, rows) = run_view(&info).unwrap().leaves()[0].as_table();
     assert_eq!(rows[0], vec!["2", "4"], "touch, has-data, implicit and any-trigger ran");
@@ -541,6 +542,17 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
     // the connector.run action carries the fields rules and conditions use
     let a = s.actions_of_kind("connector.run").unwrap();
     assert_eq!((a.len(), &a[0].params["schedule"], &a[0].params["inserted"], &a[0].params["stored"]), (1, &json!("sched"), &json!(2), &json!(1)));
+    // the same data again: `inserted` counts new records only (0), `landed` every row given (2)
+    let (info, live2) = connector::live_run(mk_live(2), || spaces::run_connector(&s, &env, "scheduler", &feed, "test", &mut |_| {}));
+    let info = info.unwrap();
+    assert_eq!(info.status, "ok", "{:?}", live2.warnings);
+    assert_eq!(run_view(&info).unwrap().leaves()[0].as_table().1[0][0], "0", "host.pipe() says 0 inserted");
+    assert_eq!((live2.piped, live2.inserted, live2.landed), (1, 0, 2));
+    assert_eq!(s.count_records(&bars).unwrap() - before, 2, "no bar was added twice");
+    let a = s.actions_of_kind("connector.run").unwrap();
+    assert_eq!((&a[1].params["inserted"], &a[1].params["landed"]), (&json!(0), &json!(2)));
+    // so the gap alarm fires and "has-data" is skipped, this time
+    assert_eq!(["has-data", "gap-alarm"].map(runs), [1, 1]);
     // the guard is gone: code still can't start code outside a space's main calling
     assert!(!spaces::nested_ok());
 }

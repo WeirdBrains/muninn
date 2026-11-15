@@ -92,7 +92,10 @@ pub struct Live {
     pub last_success_at: Option<i64>,
     pub stored: i64,
     pub bytes: i64,
+    /// Records the pipeline stored that were new (not rows it found already there).
     pub inserted: i64,
+    /// Every row the pipeline's sinks were given, new or not.
+    pub landed: i64,
     pub piped: i64,
     pub ruleset_ran: i64,
     pub warnings: Vec<String>,
@@ -255,13 +258,13 @@ fn dry_call(method: &str, req: &Value) -> Result<Value> {
             "pipe" => {
                 let pipeline = d.context["pipeline"].clone();
                 d.calls.push(Call { method: "pipe".into(), params: json!({ "pipeline": pipeline, "items": d.stored }) });
-                Ok(json!({ "inserted": 0, "sinks": [], "dry_run": true }))
+                Ok(json!({ "inserted": 0, "landed": 0, "duplicates": 0, "sinks": [], "dry_run": true }))
             }
             "run_ruleset" => {
                 let id = req.get("ruleset_id").cloned().filter(|v| !v.is_null()).unwrap_or_else(|| d.context["ruleset_id"].clone());
                 d.calls.push(Call {
                     method: "run_ruleset".into(),
-                    params: json!({ "ruleset_id": id, "action": { "kind": "connector.run", "stored": d.stored, "bytes": d.bytes, "inserted": 0 } }),
+                    params: json!({ "ruleset_id": id, "action": { "kind": "connector.run", "stored": d.stored, "bytes": d.bytes, "inserted": 0, "landed": 0 } }),
                 });
                 Ok(json!({ "rules_run": 0, "errors": [], "dry_run": true }))
             }
@@ -358,9 +361,13 @@ fn live_pipe(store: &Store) -> Result<Value> {
     let frame = crate::code::pipe::data_frame_items(store, &src.name, &items)?;
     // the connector's main is calling: the pipeline's `space:` steps may run inside it
     let _calling = super::spaces::MainCalling::enter();
-    let result = match crate::code::pipeline::run(store, &env, crate::schedule::ORIGIN, &pipeline, Some(frame), &mut |_| {}) {
-        Ok(r) => {
-            let inserted: usize = r.landed.iter().map(|(_, n)| *n).sum();
+    let result = match crate::code::pipeline::run_counted(store, &env, crate::schedule::ORIGIN, &pipeline, Some(frame), &mut |_| {}) {
+        Ok((r, counts)) => {
+            // `landed` is every row the sinks were given; `inserted` only the new records
+            // (bars already in the model, e.g. from a re-run over the same data, are not)
+            let landed: usize = r.landed.iter().map(|(_, n)| *n).sum();
+            let inserted: usize =
+                r.landed.iter().enumerate().map(|(i, (m, n))| counts.get(i).filter(|c| c.model == *m).map_or(*n, |c| c.stored.new as usize)).sum();
             let sinks: Vec<String> = r.landed.iter().map(|(m, n)| format!("{m}:{n}")).collect();
             if !r.ok() {
                 let err = r
@@ -377,8 +384,9 @@ fn live_pipe(store: &Store) -> Result<Value> {
                 let l = b.as_mut().expect("live");
                 l.piped += 1;
                 l.inserted += inserted as i64;
+                l.landed += landed as i64;
             });
-            json!({ "inserted": inserted, "sinks": sinks })
+            json!({ "inserted": inserted, "landed": landed, "duplicates": landed.saturating_sub(inserted), "sinks": sinks })
         }
         Err(e) => {
             LIVE.with(|x| x.borrow_mut().as_mut().expect("live").warnings.push(format!("pipe: {e}")));
@@ -389,7 +397,7 @@ fn live_pipe(store: &Store) -> Result<Value> {
 }
 
 fn live_ruleset(store: &Store, req: &Value) -> Result<Value> {
-    let (ruleset_id, schedule_id, schedule_name, run_id, stored, bytes, inserted, plugin_id) = LIVE.with(|x| {
+    let (ruleset_id, schedule_id, schedule_name, run_id, stored, bytes, inserted, landed, plugin_id) = LIVE.with(|x| {
         let l = x.borrow();
         let l = l.as_ref().expect("live");
         (
@@ -400,6 +408,7 @@ fn live_ruleset(store: &Store, req: &Value) -> Result<Value> {
             l.stored,
             l.bytes,
             l.inserted,
+            l.landed,
             l.plugin_id.clone(),
         )
     });
@@ -409,7 +418,7 @@ fn live_ruleset(store: &Store, req: &Value) -> Result<Value> {
     let set = store.ruleset(&rid)?.ok_or_else(|| Error::invalid("run_ruleset", "its rule set was removed".to_string()))?;
     let params = json!({
         "schedule": schedule_id, "name": schedule_name, "run": run_id, "connector": plugin_id,
-        "ruleset": set.id, "stored": stored, "bytes": bytes, "inserted": inserted
+        "ruleset": set.id, "stored": stored, "bytes": bytes, "inserted": inserted, "landed": landed
     });
     let aid = store.record_action(
         &NewAction::new("connector.run", crate::schedule::ORIGIN, format!("connector schedule {schedule_name} run #{run_id}")).params(params),

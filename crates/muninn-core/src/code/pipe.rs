@@ -612,8 +612,31 @@ fn run_hops(
 
 /// Save a frame (a side branch of a pipe): a journal entry or new records.
 pub fn save(store: &Store, origin: &str, sink: &Sink, f: &Value, last: Option<(&CodeSpace, &RunInfo)>, hops: &str) -> Result<String> {
+    save_counted(store, origin, sink, f, last, hops).map(|(made, _)| made)
+}
+
+/// What a model sink did with a frame's rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Stored {
+    /// Records that were not there before.
+    pub new: u64,
+    /// Rows that were already there (bars keep their id, so a re-run adds none).
+    pub duplicate: u64,
+}
+
+/// [`save`], and for a model sink how many rows were new.
+pub fn save_counted(
+    store: &Store,
+    origin: &str,
+    sink: &Sink,
+    f: &Value,
+    last: Option<(&CodeSpace, &RunInfo)>,
+    hops: &str,
+) -> Result<(String, Option<Stored>)> {
     let last = last.map(|(c, i)| (c.clone(), i.clone()));
-    deliver(store, origin, sink, f, last.as_ref(), hops)
+    let mut counts = None;
+    let made = deliver_inner(store, origin, sink, f, last.as_ref(), hops, &mut counts)?;
+    Ok((made, counts))
 }
 
 /// A journal by name, made when there is none.
@@ -637,6 +660,18 @@ fn unique_journal(store: &Store, name: &str) -> Result<String> {
 }
 
 fn deliver(store: &Store, origin: &str, sink: &Sink, f: &Value, last: Option<&(CodeSpace, RunInfo)>, hops: &str) -> Result<String> {
+    deliver_inner(store, origin, sink, f, last, hops, &mut None)
+}
+
+fn deliver_inner(
+    store: &Store,
+    origin: &str,
+    sink: &Sink,
+    f: &Value,
+    last: Option<&(CodeSpace, RunInfo)>,
+    hops: &str,
+    counts: &mut Option<Stored>,
+) -> Result<String> {
     match sink {
         Sink::Journal(n) => {
             let j = store.find_journal(n)?;
@@ -697,6 +732,7 @@ fn deliver(store: &Store, origin: &str, sink: &Sink, f: &Value, last: Option<&(C
                 &NewAction::new("record.create", origin, format!("pipe {new} new bars into bars ({dup} already there)"))
                     .params(json!({ "model": "bars", "count": new, "duplicate": dup, "pipe": hops })),
             );
+            *counts = Some(Stored { new, duplicate: dup });
             Ok(format!("{new} new bars, {dup} already there"))
         }
         Sink::Model(n) => {
@@ -718,6 +754,7 @@ fn deliver(store: &Store, origin: &str, sink: &Sink, f: &Value, last: Option<&(C
                 &NewAction::new("record.create", origin, format!("pipe {made} records into {}", m.name))
                     .params(json!({ "model": m.id, "count": made, "pipe": hops })),
             );
+            *counts = Some(Stored { new: made as u64, duplicate: 0 });
             Ok(format!("{made} records"))
         }
     }

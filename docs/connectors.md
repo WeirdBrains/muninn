@@ -26,7 +26,7 @@ mnnn spaces run feed --connector-dry-run --option url=https://example.com/data.c
 | `host.context() -> Result<Context>` | `context` · `null` → `{schedule_id, run_id, ruleset_id, source, pipeline, last_success_at, options, dry_run}` | what this run is for |
 | `host.option(name) -> Option<String>` | `options` | a schedule option (a step's own options come first) |
 | `host.store_raw(name, format, &[u8]) -> Result<String>` | `store_raw` · `{name, format, bytes_base64}` → `{id}` | one raw item into the run's source, never parsed |
-| `host.pipe() -> Result<Piped>` | `pipe` · `null` → `{inserted, sinks}` | the schedule's pipeline over this run's items |
+| `host.pipe() -> Result<Piped>` | `pipe` · `null` → `{inserted, landed, duplicates, sinks}` | the schedule's pipeline over this run's items; `inserted` counts **new** records only (a re-run over data already stored says 0), `landed` every row the sinks were given |
 | `host.run_ruleset(Option<&str>) -> Result<RulesetRun>` | `run_ruleset` · `{ruleset_id?}` → `{rules_run, errors, skipped}` | records `connector.run`, runs the rule set (default: the schedule's); a rule whose `on` or `if` does not fit the action is skipped, not run |
 | `host.fetch(&Request) -> Result<Response>` | `fetch` · `{method, url, headers, body_base64?}` → `{status, headers, body_base64}` | HTTP with Muninn's client (user agent, 30 s timeout, 64 MB) |
 | `host.state_get(key) -> Result<Option<Json>>` | `state_get` · `{key}` → `{value}` | a small per-schedule cursor |
@@ -34,7 +34,7 @@ mnnn spaces run feed --connector-dry-run --option url=https://example.com/data.c
 
 Types: `Context { schedule_id, run_id, ruleset_id, source, pipeline: Option<String>,
 last_success_at: Option<i64>, options: Vec<(String, String)>, dry_run: bool }`,
-`Piped { inserted: usize, sinks: Vec<Json> }`, `RulesetRun { rules_run: usize, errors:
+`Piped { inserted: usize, landed: usize, sinks: Vec<Json> }`, `RulesetRun { rules_run: usize, errors:
 Vec<String>, skipped: Vec<String> }`, `Request::get(url)` / `Request::post(url, body)` `.header(k, v)`, and
 `Response { status: u16, headers, body: Vec<u8> }` with `.text()`, `.json()`,
 `.header(name)`. Bytes cross the JSON ABI as base64 (`connector::b64_encode/decode`).
@@ -48,7 +48,7 @@ for you.
 
 `mnnn spaces run NAME --connector-dry-run` runs an ingest-connector space with an
 in-memory context: `store_raw`, `pipe` and `run_ruleset` are **recorded, not done**
-(nothing is stored, piped or run; `pipe` answers `inserted: 0`), `state_*` use an
+(nothing is stored, piped or run; `pipe` answers `inserted: 0, landed: 0`), `state_*` use an
 in-memory map, and `fetch` is real. The space is approved first (asking, as for any run),
 then its main runs, its view is printed, and afterwards every call is listed. A connector
 takes no `--input`. Context flags:
@@ -132,8 +132,9 @@ model:bars`) and the rule set `run-space` rules: they run inside the connector's
 
 `host.run_ruleset` records a `connector.run` action and runs the schedule's rule set on it.
 It is a rule event like any other (`mnnn rule events connector.run`), with the fields
-`schedule`, `name` (the schedule's), `run`, `connector`, `ruleset`, `stored`, `bytes` and
-`inserted`, so a rule can name it with `--on` and test those fields with `--if`:
+`schedule`, `name` (the schedule's), `run`, `connector`, `ruleset`, `stored`, `bytes`,
+`inserted` (new records; the same as `Piped.inserted` summed over the run's `pipe` calls) and
+`landed` (every row the pipeline gave its sinks), so a rule can name it with `--on` and test those fields with `--if`:
 
 ```sh
 mnnn ruleset create feed-alarms
