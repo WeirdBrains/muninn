@@ -279,3 +279,13 @@ fn muninn_app_bin_pkgbuild_source_urls_are_host_independent() {
         "iOS should be opted out with a signing reason"
     );
 }
+
+#[test]
+fn the_macos_app_is_not_sandboxed() {
+    // The App Sandbox makes `~` the app's private container, so the app would keep a second,
+    // empty database instead of the shared `~/.muninn` (WEI-18).
+    for f in ["app/macos/Runner/Release.entitlements", "app/macos/Runner/DebugProfile.entitlements"] {
+        let plist = read(f);
+        assert!(!plist.contains("<key>com.apple.security.app-sandbox</key>"), "{f} must not enable the App Sandbox");
+    }
+}

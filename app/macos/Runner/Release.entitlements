@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.app-sandbox</key>
-	<true/>
+	<!-- No App Sandbox: the app shares ~/.muninn with mnnn, and the sandbox would make ~ a
+	     private container (tests/packaging.rs guards this). -->
 </dict>
 </plist>

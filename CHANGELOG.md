@@ -12,6 +12,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - A connector's `host.pipe()` and `host.run_ruleset()` work when the pipeline has `space:` steps or the rule set has `run-space` rules
 - `to-bars` stores each row at its own `period` column (seconds or `5m`/`1h`/`1d`) when no `duration` is given; a row without a usable period is rejected
 - Docs and messages no longer say connector schedules arrive in 2.26; they shipped in 2.23.0
+- macOS app: turned the App Sandbox off so it opens the shared `~/.muninn` like `mnnn` (2.25.0 kept a separate database in its container; see docs/flutter-app.md)
 
 ## [2.25.0] - 2026-11-12
 

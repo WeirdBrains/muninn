@@ -396,11 +396,32 @@ When the Data chart is showing:
 
 ## Data
 
-Desktop shares the TUI's data dir: `MUNINN_HOME`, else `~/.muninn`. On a phone the
+Desktop shares the TUI's data dir: `MUNINN_HOME`, else `~/.muninn`, so `mnnn` and the app
+open the same store (Home shows the folder in use). The desktop app is not sandboxed for
+this reason: the macOS App Sandbox would make `~` a private container
+(`~/Library/Containers/com.weirdbrains.muninn/Data`). If the app ever finds itself in one
+without `MUNINN_HOME`, **Keys ▸ Initialize** refuses with an error naming the cause instead of
+starting a second, empty store. On a phone the
 database, keys (the envelope and service keys), preferences and themes live in the
 platform-secure app sandbox — the same data dir the store already uses — not a
 desktop-style `~/.muninn`. Sync with a desktop node over the existing network
 comes in a later phase (see [sync](sync.md)).
+
+### Started the macOS app on 2.25.0?
+
+2.25.0 shipped with the macOS App Sandbox on, so the app kept its data in
+`~/Library/Containers/com.weirdbrains.muninn/Data/.muninn` instead of `~/.muninn`. Nothing
+was lost and nothing is migrated automatically. To read, export or back it up with the
+TUI/CLI, point `mnnn` at that folder:
+
+```sh
+mnnn --home ~/Library/Containers/com.weirdbrains.muninn/Data/.muninn status
+mnnn --home ~/Library/Containers/com.weirdbrains.muninn/Data/.muninn backup create
+```
+
+Later releases open `~/.muninn` (or `MUNINN_HOME`). To keep using the container's data, set
+`MUNINN_HOME` to that folder before launching the app. Back it up first; see
+[backup and recovery](backup-recovery.md).
 
 ## How it fits together
 
