@@ -403,6 +403,11 @@ fn approved_space(s: &Store, name: &str, kind: crate::store::SpaceKind, src: &st
     s.space(&sp.id).unwrap().unwrap()
 }
 
+fn builtin_space(s: &Store, name: &str) {
+    let (sp, _) = parsers::install_space(s, "cli", parsers::builtin(name).unwrap()).unwrap();
+    spaces::approve(s, "cli", &sp, true).unwrap();
+}
+
 #[test]
 fn a_connector_space_dry_runs_through_the_space_runner() {
     if !have_cargo() {
@@ -430,4 +435,85 @@ fn a_connector_space_dry_runs_through_the_space_runner() {
     let a = approved_space(&s, "plain", crate::store::SpaceKind::Analysis, TOUCH);
     let (r, _) = connector::dry_run_space(&s, &env, "cli", &a, dry(), &mut |_| {});
     assert!(r.unwrap_err().to_string().contains("not an ingest connector"));
+}
+
+/// A live connector run whose pipeline has code-space steps (parse-ndjson, to-bars) and
+/// whose rule set has a `run-space` rule: both used to fail with "was started while
+/// another code space runs".
+#[test]
+fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
+    use crate::code::connector::Live;
+    use crate::code::pipeline::Graph;
+    use crate::store::{NewRule, RuleSpec, SpaceKind, Then};
+    if !have_cargo() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let env = CodeEnv::new(dir.path());
+    // `host.pipe()` builds its own env from the store's home
+    struct Home(Option<std::path::PathBuf>);
+    impl Drop for Home {
+        fn drop(&mut self) {
+            replace_home(self.0.as_deref());
+        }
+    }
+    let _home = Home(replace_home(Some(dir.path())));
+    let s = store();
+    let tv = s.add_source("tv", "ndjson", None).unwrap();
+    for n in ["parse-ndjson", "to-bars"] {
+        builtin_space(&s, n);
+    }
+    let g = Graph::parse(
+        &["src=-", "p=space:parse-ndjson", "b=space:to-bars?symbol=SOL/USDT&duration=5m&source=tv", "m=model:bars"].map(String::from),
+        &["src>p>b>m".to_string()],
+    )
+    .unwrap();
+    let pl = s.create_pipeline("tv-bars", "", &g).unwrap();
+    let touch = approved_space(&s, "touch", SpaceKind::Analysis, TOUCH);
+    let rule = s
+        .create_rule(&NewRule {
+            name: "touch".into(),
+            spec: RuleSpec {
+                on: vec!["connector.run".into()],
+                then: vec![Then::RunSpace { space: touch.id.clone(), input: Some("action".into()) }],
+                ..Default::default()
+            },
+            enabled: true,
+            ..Default::default()
+        })
+        .unwrap();
+    let set = s.create_ruleset("after", "", "standalone", None).unwrap();
+    s.add_ruleset_rule(&set.id, &rule.id, None).unwrap();
+    let feed = approved_space(&s, "feed", SpaceKind::IngestConnector, BARS_CONNECTOR);
+    let live = Live {
+        schedule_id: "sched".into(),
+        schedule_name: "tv".into(),
+        run_id: 1,
+        plugin_id: feed.id.clone(),
+        source_id: tv.id.clone(),
+        source_name: tv.name.clone(),
+        pipeline_id: Some(pl.id.clone()),
+        ruleset_id: Some(set.id.clone()),
+        options: serde_json::Map::new(),
+        last_success_at: None,
+        stored: 0,
+        bytes: 0,
+        inserted: 0,
+        piped: 0,
+        ruleset_ran: 0,
+        warnings: vec![],
+        state: serde_json::Map::new(),
+    };
+    let bars = s.find_model("bars").unwrap();
+    let before = s.count_records(&bars).unwrap();
+    let (info, live) = connector::live_run(live, || spaces::run_connector(&s, &env, "scheduler", &feed, "test", &mut |_| {}));
+    let info = info.unwrap();
+    assert_eq!(info.status, "ok", "{info:?} {:?}", live.warnings);
+    assert!(live.warnings.is_empty(), "{:?}", live.warnings);
+    assert_eq!((live.stored, live.piped, live.inserted, live.ruleset_ran), (1, 1, 2, 1));
+    assert_eq!(s.count_records(&bars).unwrap() - before, 2);
+    let (_, rows) = run_view(&info).unwrap().leaves()[0].as_table();
+    assert_eq!(rows[0], vec!["2", "1"]);
+    // the guard is gone: code still can't start code outside a space's main calling
+    assert!(!spaces::nested_ok());
 }

@@ -356,6 +356,8 @@ fn live_pipe(store: &Store) -> Result<Value> {
     let src = store.source_by_name(&source_name)?.ok_or_else(|| Error::invalid("pipe", format!("source `{source_name}` is gone")))?;
     let items = store.source_data_for_run(&src.id, run_id)?;
     let frame = crate::code::pipe::data_frame_items(store, &src.name, &items)?;
+    // the connector's main is calling: the pipeline's `space:` steps may run inside it
+    let _calling = super::spaces::MainCalling::enter();
     let result = match crate::code::pipeline::run(store, &env, crate::schedule::ORIGIN, &pipeline, Some(frame), &mut |_| {}) {
         Ok(r) => {
             let inserted: usize = r.landed.iter().map(|(_, n)| *n).sum();
@@ -413,7 +415,11 @@ fn live_ruleset(store: &Store, req: &Value) -> Result<Value> {
         &NewAction::new("connector.run", crate::schedule::ORIGIN, format!("connector schedule {schedule_name} run #{run_id}")).params(params),
     )?;
     let a = store.action(aid)?.ok_or_else(|| Error::invalid("action", "gone".to_string()))?;
-    let res = crate::schedule::run_ruleset(store, &set.id, &a)?;
+    // the connector's main is calling: `run-space` rules may run inside it
+    let calling = super::spaces::MainCalling::enter();
+    let res = crate::schedule::run_ruleset(store, &set.id, &a);
+    drop(calling);
+    let res = res?;
     LIVE.with(|x| {
         let mut b = x.borrow_mut();
         let l = b.as_mut().expect("live");

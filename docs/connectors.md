@@ -123,3 +123,7 @@ When the schedule runs, the connector's main gets a live context (`host.context`
 If the schedule has a pipeline or rule set and the plugin never calls `pipe` /
 `run_ruleset`, the run is `failed` (`plugin did not call …`); raw items stay for a
 re-pipe. Removing a plugin that a schedule uses is refused.
+
+The pipeline may have `space:` steps (`source:feed > space:parse-ndjson > space:to-bars >
+model:bars`) and the rule set `run-space` rules: they run inside the connector's `pipe` /
+`run_ruleset` call, as a main calling. Members still can't call these methods.

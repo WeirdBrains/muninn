@@ -290,6 +290,30 @@ impl Drop for Calling {
     }
 }
 
+/// Marks the running main (the top frame) as calling while held, so the spaces it starts
+/// (a connector's `host.pipe()` / `host.run_ruleset()` running `space:` steps and
+/// `run-space` rules) may nest. Restores the frame's earlier state on drop; a member's
+/// frame is refused, so members still can't start code.
+pub(crate) struct MainCalling(Option<bool>);
+
+impl MainCalling {
+    pub(crate) fn enter() -> Self {
+        MainCalling(STACK.with(|st| st.borrow_mut().last_mut().filter(|f| !f.in_member).map(|f| std::mem::replace(&mut f.calling, true))))
+    }
+}
+
+impl Drop for MainCalling {
+    fn drop(&mut self) {
+        if let Some(prev) = self.0 {
+            STACK.with(|st| {
+                if let Some(f) = st.borrow_mut().last_mut() {
+                    f.calling = prev;
+                }
+            });
+        }
+    }
+}
+
 /// `host.call(alias, input)`: main runs a member over a frame; its output frame back.
 pub fn host_call(store: &Store, req: &Value) -> Result<Value> {
     let s = top_may_call()?;

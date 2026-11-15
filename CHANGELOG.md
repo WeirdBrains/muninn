@@ -9,6 +9,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ### Fixed
 
 - `mnnn spaces run NAME --connector-dry-run` runs the connector (it always failed with "connectors run only from a schedule")
+- A connector's `host.pipe()` and `host.run_ruleset()` work when the pipeline has `space:` steps or the rule set has `run-space` rules
 
 ## [2.25.0] - 2026-11-12
 
