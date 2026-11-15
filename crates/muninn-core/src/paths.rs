@@ -25,8 +25,12 @@ impl Paths {
     /// Why a default `~/.muninn` must not be created here, if it must not: a macOS App Sandbox
     /// (`APP_SANDBOX_CONTAINER_ID` set) makes the home directory a private container, so a
     /// database made there is not the one `mnnn` uses. `explicit_home` is true when a home was
-    /// given (flag, `MUNINN_HOME`); an explicit home is always trusted.
+    /// given (flag, `MUNINN_HOME`); an explicit home is always trusted. macOS only: phones
+    /// keep their data in the app container on purpose.
     pub fn sandboxed_default_home(explicit_home: bool) -> Option<String> {
+        if !cfg!(target_os = "macos") {
+            return None;
+        }
         sandbox_refusal(explicit_home, std::env::var("APP_SANDBOX_CONTAINER_ID").ok().as_deref())
     }
 
