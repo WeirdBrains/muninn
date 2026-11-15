@@ -263,7 +263,9 @@ fn templates_edit_build_preview_and_announced_sites() {
     e.ok(&["org", "create", "Comet Lab"]);
     let d = e.dir.path();
     // edit in $EDITOR: a new name starts from the built-in look
-    std::fs::write(d.join("ed.sh"), "#!/bin/sh\nsed -i 's/Published with Muninn/Made by comets/' \"$1\"\n").unwrap();
+    // portable across GNU and BSD sed (macOS `sed -i` needs a suffix argument)
+    std::fs::write(d.join("ed.sh"), "#!/bin/sh\nsed 's/Published with Muninn/Made by comets/' \"$1\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\"\n")
+        .unwrap();
     let edit = |args: &[&str]| {
         let o = e.cmd().env("EDITOR", format!("sh {}", d.join("ed.sh").display())).args(args).output().unwrap();
         assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
