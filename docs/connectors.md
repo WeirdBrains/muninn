@@ -292,7 +292,7 @@ mnnn code parsers --install
 mnnn pipeline create candles --node src=- --node p=space:parse-ndjson \
     --node 'b=space:to-bars?duration=5m&rejects=fail' --node m=model:bars --edge 'src>p>b>m'
 mnnn ruleset create candle-alarms
-mnnn rule create "Gap alarm" --ruleset candle-alarms --on connector.run --if "inserted = 0" \
+mnnn rule create "Gap alarm" --ruleset candle-alarms --on connector.run --if "landed = 0" \
     --then 'notify "{name}: no new candles" level=warn'
 mnnn schedule add candles 5m --plugin candles --source candles-src --pipeline candles \
     --connector-ruleset candle-alarms --option symbols=BTCUSDT,ETHUSDT
@@ -311,6 +311,12 @@ mnnn schedule state candles       # BTCUSDT = 1700000400000, ETHUSDT = ...
   name. Bars have a fixed id, so a re-run (or a cursor moved back) adds nothing: `inserted`
   is 0 while `landed` counts the rows given.
 - **A quiet run** (nothing new closed) stores nothing; `pipe()` and `run_ruleset()` are still
-  called, so the gap alarm can say so.
+  called, so the gap alarm can say so. The alarm tests `landed = 0`, not `inserted = 0`: the
+  retry after a failed run re-lands bars already stored (`inserted` 0, `landed` > 0), which is
+  not a gap.
 - Change what it fetches without losing the cursors: `mnnn schedule edit candles --option
   symbols=BTCUSDT,ETHUSDT,SOLUSDT` (a new symbol starts without a cursor).
+
+A complete, tested version for Coinbase and Kraken (which answer from the US, where Binance
+does not), with raw-JSON parsers, an idempotent installer, offline parser tests and a macOS
+launch agent for the scheduler, is in the repository at `examples/connectors/exchange-bars/`.

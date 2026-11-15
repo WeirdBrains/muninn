@@ -6,6 +6,14 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+
+- `examples/connectors/exchange-bars`: closed 5-minute bars from Coinbase and Kraken, with installer, parser tests and a macOS launch agent for the scheduler
+
+### Fixed
+
+- Connector docs: the candle example's gap alarm tests `landed = 0`, so the retry after a failed run does not alarm
+
 ## [2.26.0] - 2026-11-15
 
 ### Added

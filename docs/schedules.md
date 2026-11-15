@@ -72,6 +72,11 @@ The TUI (about once a minute, unless an org host runs here), a running org host
 (every minute) and `mnnn scheduler run|tick` run the scheduler. Only one runs at a time:
 it holds a **lease** (30 s, renewed each pass); others stand by.
 
+To keep a scheduler running without a terminal, run `mnnn --non-interactive scheduler run`
+from a service manager with `MUNINN_PASSWORD` in its environment. A macOS launch agent that
+reads the password from the login Keychain is in the repository at
+`examples/connectors/exchange-bars/launchd/` (see that folder's README).
+
 Each pass:
 
 1. **Abandoned runs**: a `running` run without a heartbeat for 2 minutes fails

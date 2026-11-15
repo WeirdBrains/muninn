@@ -1,0 +1,23 @@
+#!/bin/sh
+# Muninn scheduler for the launch agent com.weirdbrains.muninn.scheduler.
+# Reads the Muninn password from the login Keychain (item "muninn-scheduler"), so it is never in a file,
+# then runs `mnnn scheduler run` until stopped. One scheduler holds the lease at a time; others stand by.
+#
+# Store or change the password:  security add-generic-password -a "$USER" -s muninn-scheduler -U -w
+# Remove it:                     security delete-generic-password -a "$USER" -s muninn-scheduler
+set -eu
+
+MNNN="${MNNN:-$HOME/.local/bin/mnnn}"
+# cargo is needed when a code space has to be rebuilt (e.g. after an mnnn update changes the SDK)
+PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH
+
+if ! MUNINN_PASSWORD="$(/usr/bin/security find-generic-password -a "$USER" -s muninn-scheduler -w 2>/dev/null)"; then
+  echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') muninn-scheduler: no Keychain item 'muninn-scheduler'; add it with:" >&2
+  echo "  security add-generic-password -a \"\$USER\" -s muninn-scheduler -U -w" >&2
+  exit 78 # EX_CONFIG
+fi
+export MUNINN_PASSWORD
+
+echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') muninn-scheduler: starting $("$MNNN" --version)"
+exec "$MNNN" --non-interactive scheduler run
