@@ -408,6 +408,17 @@ pub fn run(host: &Host) -> Result<View> {
 }
 "#;
 
+/// A connector that found nothing new: it stores nothing, still pipes and runs its rules.
+const QUIET_CONNECTOR: &str = r#"
+use muninn_plugin::prelude::*;
+
+pub fn run(host: &Host) -> Result<View> {
+    let piped = host.pipe()?;
+    let rules = host.run_ruleset(None)?;
+    Ok(View::table("Quiet", &["inserted", "landed", "rules run"]).row(vec![piped.inserted.into(), piped.landed.into(), rules.rules_run.into()]))
+}
+"#;
+
 const TOUCH: &str = r#"
 use muninn_plugin::prelude::*;
 
@@ -567,6 +578,15 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
     assert_eq!((&a[1].params["inserted"], &a[1].params["landed"]), (&json!(0), &json!(2)));
     // so the gap alarm fires and "has-data" is skipped, this time
     assert_eq!(["has-data", "gap-alarm"].map(runs), [1, 1]);
+    // a run that stored nothing pipes nothing (no parser sees an empty frame) and still counts
+    // as piped; its rules run, and the gap alarm fires
+    let quiet = approved_space(&s, "quiet", SpaceKind::IngestConnector, QUIET_CONNECTOR);
+    let (info, live3) = connector::live_run(mk_live(3), || spaces::run_connector(&s, &env, "scheduler", &quiet, "test", &mut |_| {}));
+    let info = info.unwrap();
+    assert_eq!(info.status, "ok", "{info:?} {:?}", live3.warnings);
+    assert_eq!((live3.stored, live3.piped, live3.inserted, live3.landed), (0, 1, 0, 0));
+    assert_eq!(run_view(&info).unwrap().leaves()[0].as_table().1[0], vec!["0", "0", "3"]); // touch, gap-alarm, implicit
+    assert_eq!(["has-data", "gap-alarm"].map(runs), [1, 2]);
     // the guard is gone: code still can't start code outside a space's main calling
     assert!(!spaces::nested_ok());
 }
@@ -579,6 +599,7 @@ pub fn run(host: &Host) -> Result<View> {
     let n = host.state_get("n")?.and_then(|v| v.as_i64()).unwrap_or(0) + 1;
     host.state_set("n", n)?;
     host.state_set("last", "ok")?;
+    host.log(format!("run {n}"));
     if host.option("fail").is_some() {
         return Err(Error::new("boom"));
     }
@@ -614,12 +635,17 @@ fn connector_state_is_kept_only_when_the_run_succeeds() {
     crate::schedule::apply_timing(&mut def, &crate::schedule::Timing { run_every: Some("1h".into()), ..Default::default() }, now).unwrap();
     let mut def = s.save_schedule(&def).unwrap();
     let n = |s: &Store, def: &crate::store::ScheduleDef| connector::load_state(s, &def.id).unwrap().get("n").cloned();
-    assert_eq!(crate::schedule::run_now(&s, &def, "t", now).unwrap().status, "success");
+    let r = crate::schedule::run_now(&s, &def, "t", now).unwrap();
+    assert_eq!(r.status, "success");
     assert_eq!(n(&s, &def), Some(json!(1)));
+    // `host.log` lines are kept with the run (`schedule runs NAME --json`: warnings)
+    assert_eq!(r.warnings, ["log: run 1"]);
+    assert_eq!(s.schedule_runs(&def.id).unwrap()[0].warnings, ["log: run 1"]);
     // the connector fails: its state changes are dropped
     def.options.insert("fail".into(), json!("1"));
     let r = crate::schedule::run_now(&s, &def, "t", now).unwrap();
     assert_eq!((r.status.as_str(), n(&s, &def)), ("failed", Some(json!(1))), "{:?}", r.error);
+    assert_eq!(r.warnings, ["log: run 2"], "a failed run's log is kept too");
     // it never calls the rule set it was given: failed, state untouched
     def.options.clear();
     def.ruleset_id = Some(set.id.clone());

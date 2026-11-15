@@ -14,6 +14,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Fixed
 
+- A connector's `host.log` lines were dropped in scheduled runs; they are kept as `log: …` warnings of the run, shown by `schedule runs`
+- A connector run that stored nothing no longer fails in `host.pipe()` (the parser refused the empty frame); it pipes nothing, so a quiet run can still fire a gap alarm
 - A connector schedule's state is saved only when the run succeeds, as documented (a failed run used to move it); removing a schedule removes its state
 - A connector's `host.pipe()` and `connector.run` count only new records as `inserted` (a re-run over stored data says 0); every row given to the sinks is the new `landed`
 - Rules in a rule set run only when their `on` matches and their `if` holds (otherwise skipped, not failed); matching rules no longer run twice

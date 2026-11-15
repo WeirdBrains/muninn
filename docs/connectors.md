@@ -26,9 +26,10 @@ mnnn spaces run feed --connector-dry-run --option url=https://example.com/data.c
 | `host.context() -> Result<Context>` | `context` · `null` → `{schedule_id, run_id, ruleset_id, source, pipeline, last_success_at, options, dry_run}` | what this run is for |
 | `host.option(name) -> Option<String>` | `options` | a schedule option (a step's own options come first) |
 | `host.store_raw(name, format, &[u8]) -> Result<String>` | `store_raw` · `{name, format, bytes_base64}` → `{id}` | one raw item into the run's source, never parsed |
-| `host.pipe() -> Result<Piped>` | `pipe` · `null` → `{inserted, landed, duplicates, sinks}` | the schedule's pipeline over this run's items; `inserted` counts **new** records only (a re-run over data already stored says 0), `landed` every row the sinks were given |
+| `host.pipe() -> Result<Piped>` | `pipe` · `null` → `{inserted, landed, duplicates, sinks}` | the schedule's pipeline over this run's items; `inserted` counts **new** records only (a re-run over data already stored says 0), `landed` every row the sinks were given; a run that stored nothing pipes nothing (a parser would refuse an empty frame) and answers `inserted: 0, landed: 0, empty: true`, still counting as piped |
 | `host.run_ruleset(Option<&str>) -> Result<RulesetRun>` | `run_ruleset` · `{ruleset_id?}` → `{rules_run, errors, skipped}` | records `connector.run`, runs the rule set (default: the schedule's); a rule whose `on` or `if` does not fit the action is skipped, not run |
 | `host.fetch(&Request) -> Result<Response>` | `fetch` · `{method, url, headers, body_base64?}` → `{status, headers, body_base64}` | HTTP with Muninn's client (user agent, 30 s timeout, 64 MB) |
+| `host.log(text)` | `log` · `{text}` | a line for the run: in a scheduled run it is kept as a `log: …` warning of the run (`mnnn schedule runs NAME`, `--json`), failed runs too |
 | `host.state_get(key) -> Result<Option<Json>>` | `state_get` · `{key}` → `{value}` | a small per-schedule cursor |
 | `host.state_set(key, value) -> Result<()>` | `state_set` · `{key, value}` | set it (`Json::Null` removes); kept only when the run succeeds (a failed run, or one that never called a configured `pipe` / `run_ruleset`, leaves the old state). Read or reset it with [`mnnn schedule state`](schedules.md#a-connector-schedules-state) |
 

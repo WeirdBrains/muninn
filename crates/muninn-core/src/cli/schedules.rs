@@ -512,6 +512,9 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
             } else {
                 for r in runs {
                     println!("{}", run_line(&r, s.tz.as_deref()));
+                    for w in &r.warnings {
+                        println!("    {w}");
+                    }
                 }
             }
         }

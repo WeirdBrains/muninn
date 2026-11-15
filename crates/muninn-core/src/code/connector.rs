@@ -358,6 +358,12 @@ fn live_pipe(store: &Store) -> Result<Value> {
     // only this run's raw items: build a frame and run the pipeline with a synthetic stdin
     let src = store.source_by_name(&source_name)?.ok_or_else(|| Error::invalid("pipe", format!("source `{source_name}` is gone")))?;
     let items = store.source_data_for_run(&src.id, run_id)?;
+    if items.is_empty() {
+        // a run that stored nothing has nothing to pipe (a parser would refuse an empty frame):
+        // it counts as piped, so the connector and a gap alarm (`inserted = 0`) see a quiet run
+        LIVE.with(|x| x.borrow_mut().as_mut().expect("live").piped += 1);
+        return Ok(json!({ "inserted": 0, "landed": 0, "duplicates": 0, "sinks": [], "empty": true }));
+    }
     let frame = crate::code::pipe::data_frame_items(store, &src.name, &items)?;
     // the connector's main is calling: the pipeline's `space:` steps may run inside it
     let _calling = super::spaces::MainCalling::enter();

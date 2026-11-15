@@ -214,6 +214,13 @@ fn rule_set_members_are_skipped_when_their_on_or_if_does_not_fit() {
         "{both}"
     );
     assert!(both.contains("ran 2 rule(s), skipped 2"), "{both}");
+    // a schedule run lists its skips with the run, as warnings; they are not failures
+    e.ok(&["schedule", "add", "morning", "1d", "--ruleset", "Morning"]);
+    e.ok(&["schedule", "run-now", "morning"]);
+    let runs = e.ok(&["schedule", "runs", "morning"]);
+    assert!(runs.contains("success") && runs.contains("    skipped Never: if manual = false does not hold"), "{runs}");
+    let j = e.ok(&["schedule", "runs", "morning", "--json"]);
+    assert!(j.contains("skipped Import: on import does not match schedule"), "{j}");
 }
 
 #[test]

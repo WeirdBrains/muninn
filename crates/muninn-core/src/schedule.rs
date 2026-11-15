@@ -897,6 +897,8 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
     let (info, live) =
         connector::live_run(live, || crate::code::spaces::run_connector(store, &env, ORIGIN, &space, &format!("schedule:{}", s.name), &mut |_| {}));
     let info = info?;
+    // what the connector said with `host.log` (and its result's notes): kept with the run
+    r.warnings.extend(info.logs.iter().map(|l| format!("log: {l}")));
     r.stored = live.stored;
     r.bytes = live.bytes;
     r.inserted = live.inserted;

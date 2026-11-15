@@ -96,6 +96,11 @@ A rule set run records a `schedule` action (`schedule`, `name`, `run`, `due`, `a
 warnings), not failed; see [rules](rules.md#rule-sets-and-schedules-225). It fails when the
 set is removed or disabled, or a rule fails. Failures record `schedule.fail`.
 
+A run's **warnings** (`schedule runs NAME`, one indented line each; `--json`: `warnings`)
+hold what it has to say besides its status: rules skipped because their `on` or `if` did
+not fit, a rule set that failed, and a connector's `host.log` lines (`log: …`, kept for
+failed runs too).
+
 `schedule enable` picks the next slot from now (an ended schedule needs a new
 `--ends-at` or `--no-end` first). `run-now` runs once outside the timing.
 
