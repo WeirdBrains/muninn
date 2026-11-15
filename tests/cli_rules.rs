@@ -172,6 +172,18 @@ fn scheduled_rules_become_rule_sets_with_schedules() {
 }
 
 #[test]
+fn connector_run_is_a_rule_event() {
+    let e = Env::new();
+    let ev = e.ok(&["rule", "events", "connector.run"]);
+    assert!(ev.contains("schedule, name, run, connector, ruleset, stored, bytes, inserted"), "{ev}");
+    e.ok(&["rule", "create", "Gap alarm", "--on", "connector.run", "--if", "inserted = 0", "--then", "status no new data from {name}"]);
+    let show = e.ok(&["rule", "show", "Gap alarm"]);
+    assert!(show.contains("connector.run") && show.contains("inserted = 0"), "{show}");
+    let o = e.run(&["rule", "create", "Bad", "--on", "connector.runs", "--then", "status x"]);
+    assert!(!o.status.success() && err(&o).contains("matches no action kind"), "{}", err(&o));
+}
+
+#[test]
 fn rule_edit_every_migrates_onto_a_schedule() {
     let e = Env::new();
     e.ok(&["journal", "new", "Log"]);

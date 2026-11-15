@@ -6,6 +6,10 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Added
+
+- `connector.run` is a rule event: `rule create --on connector.run --if "inserted = 0"` works and `rule events` lists its fields
+
 ### Fixed
 
 - `mnnn spaces run NAME --connector-dry-run` runs the connector (it always failed with "connectors run only from a schedule")

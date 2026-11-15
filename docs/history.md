@@ -97,6 +97,7 @@ entry, because they never ask for the password.
 | `code.create`, `code.edit`, `code.remove`, `code.approve` | CLI, TUI | the [code space](code-spaces.md) and what changed (a removal keeps its source) |
 | `code.build` | CLI, TUI, rules | the code space and its build key (cached builds are not recorded) |
 | `code.run` | CLI, TUI, rules | the code space, its input, status, writes, duration and error; the model and record changes it made follow it |
+| `connector.run` | scheduler | a connector schedule's run, when it called `host.run_ruleset` (or never did, with an `error`): the schedule, run, connector, rule set and what was stored; the rule set's rules react to it ([connectors](connectors.md#rules-react-to-connectorrun)) |
 | `net.node.start`, `net.node.stop`, `net.config` | CLI, TUI | the [node](network.md), its addresses or settings |
 | `net.exchange.create`, `net.exchange.incoming`, `net.exchange.accept`, `net.exchange.complete`, `net.exchange.verify`, `net.exchange.revoke`, `net.exchange.restore` | CLI, TUI, node | the [key exchange](key-exchanges.md) and peer (never keys) |
 | `net.share`, `net.unshare`, `net.serve`, `net.fetch`, `net.import`, `net.search` | CLI, TUI, node | what was shared, served to or fetched from which peer |

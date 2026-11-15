@@ -177,6 +177,21 @@ pub const EVENTS: &[Event] = &[
         fields: &["rule: rule id", "name: rule name", "schedule: every … or cron …"],
     },
     Event {
+        kind: "connector.run",
+        about: "a connector schedule's run called `host.run_ruleset` (the rule set's rules react to it)",
+        fields: &[
+            "schedule: schedule id",
+            "name: schedule name",
+            "run: run number",
+            "connector: connector (code space) id",
+            "ruleset: rule set id",
+            "stored: raw items stored this run",
+            "bytes: bytes stored this run",
+            "inserted: records the pipeline stored this run",
+            "error: why the run failed (when run_ruleset was never called)",
+        ],
+    },
+    Event {
         kind: "notify",
         about: "a notification (e.g. a certificate expiring or a renewal failing)",
         fields: &[
@@ -1909,6 +1924,7 @@ mod tests {
             "net.exchange.complete",
             "net.share",
             "net.shard.hold",
+            "connector.run",
             "model.create",
             "model.edit",
             "model.apply",

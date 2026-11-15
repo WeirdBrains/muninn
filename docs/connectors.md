@@ -127,3 +127,17 @@ re-pipe. Removing a plugin that a schedule uses is refused.
 The pipeline may have `space:` steps (`source:feed > space:parse-ndjson > space:to-bars >
 model:bars`) and the rule set `run-space` rules: they run inside the connector's `pipe` /
 `run_ruleset` call, as a main calling. Members still can't call these methods.
+
+## Rules react to `connector.run`
+
+`host.run_ruleset` records a `connector.run` action and runs the schedule's rule set on it.
+It is a rule event like any other (`mnnn rule events connector.run`), with the fields
+`schedule`, `name` (the schedule's), `run`, `connector`, `ruleset`, `stored`, `bytes` and
+`inserted`, so a rule can name it with `--on` and test those fields with `--if`:
+
+```sh
+mnnn ruleset create feed-alarms
+mnnn rule create "Gap alarm" --ruleset feed-alarms --on connector.run --if "inserted = 0" \
+    --then "notify \"{name}: nothing new\" body=\"run {run} stored {stored} items\" level=warn"
+mnnn schedule add feed 15m --plugin feed --source feed --connector-ruleset feed-alarms
+```
