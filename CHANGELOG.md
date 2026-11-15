@@ -8,6 +8,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Added
 
+- `mnnn schedule edit` changes a connector schedule's options (`--option`, `--unset-option`, `--clear-options`), connector, source, pipeline and rule set without losing its id or state
 - `mnnn schedule state NAME [--set KEY=JSON] [--clear [KEY]] [--json]` reads, sets and resets a connector schedule's saved state
 - `connector.run` is a rule event: `rule create --on connector.run --if "inserted = 0"` works and `rule events` lists its fields
 

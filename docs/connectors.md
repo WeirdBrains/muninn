@@ -115,7 +115,12 @@ pub fn run(host: &Host) -> Result<View> {
 
 ```
 mnnn schedule add NAME 15m --plugin FEED --source SRC [--pipeline PL] [--connector-ruleset R] [--option k=v]
+mnnn schedule edit NAME --option k=v --unset-option k2     # same schedule: id, runs and state stay
+mnnn schedule state NAME [--set KEY=JSON] [--clear [KEY]]  # read or reset its cursor
 ```
+
+[Schedules](schedules.md#editing-a-connector-schedule) has the rest of `edit` (target flags)
+and `state`.
 
 When the schedule runs, the connector's main gets a live context (`host.context`,
 `store_raw` → `source_data` with this run's id, `pipe` over those items only,

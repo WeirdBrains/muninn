@@ -4597,8 +4597,33 @@ pub enum ScheduleCommand {
         /// A new interval (1h, once); clears --cron.
         #[arg(long)]
         every: Option<String>,
+        /// The rule set to run (a connector's `host.run_ruleset` runs it).
         #[arg(long)]
         ruleset: Option<String>,
+        /// Connector schedules: stop running a rule set.
+        #[arg(long, conflicts_with = "ruleset")]
+        no_ruleset: bool,
+        /// Connector schedules: another ingest connector.
+        #[arg(long)]
+        plugin: Option<String>,
+        /// Connector schedules: another source for the raw items.
+        #[arg(long)]
+        source: Option<String>,
+        /// Connector schedules: the pipeline `host.pipe` runs.
+        #[arg(long, conflicts_with = "no_pipeline")]
+        pipeline: Option<String>,
+        /// Connector schedules: run no pipeline.
+        #[arg(long)]
+        no_pipeline: bool,
+        /// Connector schedules: set or replace an option (`key=value`, repeatable). The id and the state stay.
+        #[arg(long = "option", value_name = "KEY=VALUE")]
+        options: Vec<String>,
+        /// Connector schedules: remove an option (repeatable).
+        #[arg(long = "unset-option", value_name = "KEY")]
+        unset_options: Vec<String>,
+        /// Connector schedules: remove every option (before any --option).
+        #[arg(long)]
+        clear_options: bool,
         #[command(flatten)]
         timing: TimingArgs,
         #[command(flatten)]

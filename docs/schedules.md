@@ -11,6 +11,8 @@ mnnn schedule add NAME [RUN_EVERY] --ruleset SET [--cron "M H D Mo W"]
 mnnn schedule parse [RUN_EVERY] [same timing flags] [--json]   # what it means; makes nothing
 mnnn schedule list | show NAME | runs NAME [--limit N] [--json]
 mnnn schedule edit NAME [--every I] [--ruleset SET] [timing / policy flags] [--no-end]
+                    [--plugin FEED] [--source SRC] [--pipeline PL | --no-pipeline] [--no-ruleset]   # connector schedules
+                    [--option KEY=VALUE]... [--unset-option KEY]... [--clear-options]
 mnnn schedule enable NAME | disable NAME | remove NAME | run-now NAME
 mnnn schedule state NAME [--json] [--clear [KEY]] [--set KEY=JSON]...   # a connector's saved cursor
 mnnn scheduler tick [--json]       # one pass (cron, a systemd timer)
@@ -96,6 +98,23 @@ set is removed or disabled, or a rule fails. Failures record `schedule.fail`.
 
 `schedule enable` picks the next slot from now (an ended schedule needs a new
 `--ends-at` or `--no-end` first). `run-now` runs once outside the timing.
+
+## Editing a connector schedule
+
+`schedule edit` changes a connector schedule in place: it keeps its id, so its runs and its
+[state](#a-connector-schedules-state) stay.
+
+```
+mnnn schedule edit feed --option symbols=BTC,ETH --option closed=true   # set, or replace, options
+mnnn schedule edit feed --unset-option closed                            # an error when it is not set
+mnnn schedule edit feed --clear-options --option url=https://example.com/v2   # clear first, then set
+mnnn schedule edit feed --plugin feed-v2 --source feed-src --pipeline candles   # swap the target
+mnnn schedule edit feed --no-pipeline --no-ruleset                       # stop running one
+```
+
+`--ruleset` is the rule set the connector's `host.run_ruleset` runs (names, ids and id prefixes
+work). The options are text, as `host.option` reads them. The connector flags are refused on a
+schedule that runs a rule set. The new settings are printed after the edit.
 
 ## A connector schedule's state
 

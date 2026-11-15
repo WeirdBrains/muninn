@@ -238,6 +238,16 @@ fn print_schedule(store: &Store, s: &ScheduleDef) -> anyhow::Result<()> {
     for l in schedule::describe(s) {
         println!("  {l}");
     }
+    if s.target_kind == "connector" {
+        let pipeline = s.pipeline_id.as_deref().and_then(|id| store.pipeline(id).ok().flatten()).map_or("none".into(), |p| p.name);
+        let set = s.ruleset_id.as_deref().and_then(|id| store.ruleset(id).ok().flatten()).map_or("none".into(), |r| r.name);
+        println!("  pipeline {pipeline}, rule set {set}");
+        if !s.options.is_empty() {
+            let opts: Vec<String> =
+                s.options.iter().map(|(k, v)| format!("{k}={}", v.as_str().map_or_else(|| v.to_string(), str::to_string))).collect();
+            println!("  options {}", opts.join(", "));
+        }
+    }
     println!("  overlap {}, catch up {}, {} attempt(s)", s.overlap, s.catch_up, s.max_attempts);
     Ok(())
 }
@@ -294,8 +304,8 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
                     let rset = connector_ruleset.map(|n| store.find_ruleset(&n)).transpose()?;
                     let mut opts = serde_json::Map::new();
                     for o in options {
-                        let (k, v) = o.split_once('=').ok_or_else(|| anyhow::anyhow!("--option KEY=VALUE"))?;
-                        opts.insert(k.trim().into(), json!(v));
+                        let (k, v) = schedule::parse_option(&o)?;
+                        opts.insert(k, v);
                     }
                     s.target_kind = "connector".into();
                     s.plugin_id = Some(space.id.clone());
@@ -379,14 +389,29 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
                 }
             }
         }
-        ScheduleCommand::Edit { schedule: key, name, every, ruleset, timing: t, policy: p, no_end } => {
+        ScheduleCommand::Edit {
+            schedule: key,
+            name,
+            every,
+            ruleset,
+            no_ruleset,
+            plugin,
+            source,
+            pipeline,
+            no_pipeline,
+            options,
+            unset_options,
+            clear_options,
+            timing: t,
+            policy: p,
+            no_end,
+        } => {
             let mut s = store.find_schedule(&key)?;
             if let Some(n) = name {
                 s.name = n;
             }
-            if let Some(r) = ruleset {
-                s.ruleset_id = Some(store.find_ruleset(&r)?.id);
-            }
+            let target = schedule::TargetEdit { ruleset, no_ruleset, plugin, source, pipeline, no_pipeline, options, unset_options, clear_options };
+            schedule::apply_target_edit(&store, &mut s, &target)?;
             policy(&mut s, &p)?;
             if no_end {
                 s.ends_at = None;

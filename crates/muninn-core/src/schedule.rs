@@ -932,6 +932,121 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
     Ok((None, live.ruleset_ran, vec![]))
 }
 
+/// Changes to what a schedule runs (`schedule edit`): the connector, its source, pipeline,
+/// rule set and options. The schedule keeps its id, so its runs and its state stay.
+#[derive(Debug, Clone, Default)]
+pub struct TargetEdit {
+    /// The rule set (an id, a prefix or a name): a rule set schedule's, or a connector's `host.run_ruleset`.
+    pub ruleset: Option<String>,
+    /// Connector schedules: stop running a rule set.
+    pub no_ruleset: bool,
+    pub plugin: Option<String>,
+    pub source: Option<String>,
+    pub pipeline: Option<String>,
+    pub no_pipeline: bool,
+    /// `KEY=VALUE`: set or replace an option.
+    pub options: Vec<String>,
+    pub unset_options: Vec<String>,
+    /// Drop every option first (then `options` apply).
+    pub clear_options: bool,
+}
+
+impl TargetEdit {
+    pub fn is_empty(&self) -> bool {
+        self.ruleset.is_none()
+            && !self.no_ruleset
+            && self.plugin.is_none()
+            && self.source.is_none()
+            && self.pipeline.is_none()
+            && !self.no_pipeline
+            && self.options.is_empty()
+            && self.unset_options.is_empty()
+            && !self.clear_options
+    }
+}
+
+/// Parse `KEY=VALUE` (a schedule option; the value is text).
+pub fn parse_option(text: &str) -> Result<(String, Value)> {
+    let (k, v) = text.split_once('=').ok_or_else(|| Error::invalid("option", format!("`{text}`: give KEY=VALUE")))?;
+    let k = k.trim();
+    if k.is_empty() {
+        return Err(Error::invalid("option", format!("`{text}`: the key is empty")));
+    }
+    Ok((k.to_string(), json!(v)))
+}
+
+/// Apply [`TargetEdit`] to `s` (not saved). Connector-only changes are refused on a rule set
+/// schedule; an unknown name is refused; removing an option that is not set is refused
+/// (it is probably a typo).
+pub fn apply_target_edit(store: &Store, s: &mut ScheduleDef, e: &TargetEdit) -> Result<()> {
+    let connector = s.target_kind == "connector";
+    let only_connector = e.plugin.is_some()
+        || e.source.is_some()
+        || e.pipeline.is_some()
+        || e.no_pipeline
+        || e.no_ruleset
+        || !e.options.is_empty()
+        || !e.unset_options.is_empty()
+        || e.clear_options;
+    if only_connector && !connector {
+        return Err(Error::invalid(
+            "schedule",
+            format!(
+                "{} runs a rule set; --plugin, --source, --pipeline, --no-pipeline, --no-ruleset and the option flags are for connector schedules",
+                s.name
+            ),
+        ));
+    }
+    if e.ruleset.is_some() && e.no_ruleset {
+        return Err(Error::invalid("schedule", "--ruleset and --no-ruleset together".to_string()));
+    }
+    if e.pipeline.is_some() && e.no_pipeline {
+        return Err(Error::invalid("schedule", "--pipeline and --no-pipeline together".to_string()));
+    }
+    if let Some(r) = &e.ruleset {
+        s.ruleset_id = Some(store.find_ruleset(r)?.id);
+    }
+    if e.no_ruleset {
+        s.ruleset_id = None;
+    }
+    if let Some(p) = &e.plugin {
+        let space = store.find_space(p)?;
+        if space.kind != crate::store::SpaceKind::IngestConnector {
+            return Err(Error::invalid(
+                "schedule",
+                format!("{} is a {} space; connector schedules need kind ingest-connector", space.name, space.kind),
+            ));
+        }
+        s.plugin_id = Some(space.id);
+    }
+    if let Some(n) = &e.source {
+        s.source_id = Some(store.source_by_name(n)?.ok_or_else(|| Error::invalid("schedule", format!("no source `{n}` (`mnnn sources list`)")))?.id);
+    }
+    if let Some(p) = &e.pipeline {
+        s.pipeline_id = Some(store.find_pipeline(p)?.id);
+    }
+    if e.no_pipeline {
+        s.pipeline_id = None;
+    }
+    if e.clear_options {
+        s.options.clear();
+    }
+    for k in &e.unset_options {
+        if s.options.remove(k.trim()).is_none() {
+            let keys: Vec<&str> = s.options.keys().map(String::as_str).collect();
+            return Err(Error::invalid(
+                "option",
+                format!("{} has no option `{k}` ({})", s.name, if keys.is_empty() { "none set".into() } else { keys.join(", ") }),
+            ));
+        }
+    }
+    for o in &e.options {
+        let (k, v) = parse_option(o)?;
+        s.options.insert(k, v);
+    }
+    Ok(())
+}
+
 /// What `schedule state --clear` removes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StateClear {

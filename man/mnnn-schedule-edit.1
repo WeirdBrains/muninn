@@ -8,7 +8,7 @@ mnnn\-schedule\-edit \- Change a schedule\*(Aqs timing, rule set or policy
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBmnnn schedule edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-every\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-ruleset\fR] [\fB\-\-start\-at\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-ends\-at\fR] [\fB\-\-log\-file\fR] [\fB\-\-for\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-cron\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-tz\fR] [\fB\-\-past\fR] [\fB\-\-transport\fR] [\fB\-\-overlap\fR] [\fB\-\-catch\-up\fR] [\fB\-\-max\-attempts\fR] [\fB\-\-no\-end\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISCHEDULE\fR> 
+\fBmnnn schedule edit\fR [\fB\-\-home\fR] [\fB\-\-name\fR] [\fB\-\-db\fR] [\fB\-\-every\fR] [\fB\-\-non\-interactive\fR] [\fB\-\-ruleset\fR] [\fB\-\-no\-ruleset\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-\-log\-file\fR] [\fB\-\-plugin\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-source\fR] [\fB\-\-pipeline\fR] [\fB\-y\fR|\fB\-\-yes\fR] [\fB\-\-no\-pipeline\fR] [\fB\-\-theme\-mode\fR] [\fB\-\-option\fR] [\fB\-\-transport\fR] [\fB\-\-unset\-option\fR] [\fB\-\-clear\-options\fR] [\fB\-\-start\-at\fR] [\fB\-\-ends\-at\fR] [\fB\-\-for\fR] [\fB\-\-cron\fR] [\fB\-\-tz\fR] [\fB\-\-past\fR] [\fB\-\-overlap\fR] [\fB\-\-catch\-up\fR] [\fB\-\-max\-attempts\fR] [\fB\-\-no\-end\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fISCHEDULE\fR> 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -42,16 +42,13 @@ May also be specified with the \fBMUNINN_NON_INTERACTIVE\fR environment variable
 .RE
 .TP
 \fB\-\-ruleset\fR \fI<RULESET>\fR
-
+The rule set to run (a connector\*(Aqs `host.run_ruleset` runs it)
 .TP
-\fB\-\-start\-at\fR \fI<DATE>\fR
-Start: GNU date style ("tomorrow 9am", "2026\-12\-01 08:00")
+\fB\-\-no\-ruleset\fR
+Connector schedules: stop running a rule set
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 More output (repeatable)
-.TP
-\fB\-\-ends\-at\fR \fI<DATE>\fR
-End: no run starts at or after it
 .TP
 \fB\-\-log\-file\fR \fI<PATH>\fR
 Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.log)
@@ -59,8 +56,8 @@ Write logs to this file instead of stderr (the TUI defaults to <home>/logs/tui.l
 May also be specified with the \fBMUNINN_LOG_FILE\fR environment variable. 
 .RE
 .TP
-\fB\-\-for\fR \fI<INTERVAL>\fR
-End this long after the start (2 weeks, 30d)
+\fB\-\-plugin\fR \fI<PLUGIN>\fR
+Connector schedules: another ingest connector
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Print nothing but errors and requested data
@@ -68,14 +65,20 @@ Print nothing but errors and requested data
 May also be specified with the \fBMUNINN_QUIET\fR environment variable. 
 .RE
 .TP
-\fB\-\-cron\fR \fI<CRON>\fR
-Cron times instead of run_every: "0 9 * * 1\-5"
+\fB\-\-source\fR \fI<SOURCE>\fR
+Connector schedules: another source for the raw items
+.TP
+\fB\-\-pipeline\fR \fI<PIPELINE>\fR
+Connector schedules: the pipeline `host.pipe` runs
 .TP
 \fB\-y\fR, \fB\-\-yes\fR
 Answer yes to every confirmation
 .RS
 May also be specified with the \fBMUNINN_YES\fR environment variable. 
 .RE
+.TP
+\fB\-\-no\-pipeline\fR
+Connector schedules: run no pipeline
 .TP
 \fB\-\-theme\-mode\fR \fI<THEME_MODE>\fR
 Override the theme mode for this run
@@ -95,6 +98,30 @@ system
 May also be specified with the \fBMUNINN_THEME_MODE\fR environment variable. 
 .RE
 .TP
+\fB\-\-option\fR \fI<KEY=VALUE>\fR
+Connector schedules: set or replace an option (`key=value`, repeatable). The id and the state stay
+.TP
+\fB\-\-transport\fR \fI<stream|poll>\fR
+How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
+.TP
+\fB\-\-unset\-option\fR \fI<KEY>\fR
+Connector schedules: remove an option (repeatable)
+.TP
+\fB\-\-clear\-options\fR
+Connector schedules: remove every option (before any \-\-option)
+.TP
+\fB\-\-start\-at\fR \fI<DATE>\fR
+Start: GNU date style ("tomorrow 9am", "2026\-12\-01 08:00")
+.TP
+\fB\-\-ends\-at\fR \fI<DATE>\fR
+End: no run starts at or after it
+.TP
+\fB\-\-for\fR \fI<INTERVAL>\fR
+End this long after the start (2 weeks, 30d)
+.TP
+\fB\-\-cron\fR \fI<CRON>\fR
+Cron times instead of run_every: "0 9 * * 1\-5"
+.TP
 \fB\-\-tz\fR \fI<TZ>\fR
 Zone for dates, months and cron (default UTC; `local` for this node\*(Aqs)
 .TP
@@ -108,9 +135,6 @@ A past \-\-start\-at: `next\-interval` moves it to the next slot (without asking
 .IP \(bu 2
 next\-interval
 .RE
-.TP
-\fB\-\-transport\fR \fI<stream|poll>\fR
-How live collaboration reaches peers: `stream` (gRPC streams, the default) or `poll` (requests over the peer connection; for containers). Overrides MUNINN_COLLAB_TRANSPORT and the `net config \-\-collab\-transport` setting
 .TP
 \fB\-\-overlap\fR \fI<OVERLAP>\fR
 A run still going when the next is due: skip it or queue one

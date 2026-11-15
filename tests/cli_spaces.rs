@@ -316,6 +316,58 @@ fn schedule_state_shows_sets_and_clears_a_connectors_cursor() {
     assert!(!o.status.success() && err(&o).contains("not a connector schedule"), "{}", err(&o));
 }
 
+#[test]
+fn schedule_edit_changes_connector_options_and_keeps_the_id_and_state() {
+    let e = Env::new();
+    connector_schedule(&e);
+    let id = |e: &Env| json(&e.ok(&["schedule", "show", "feed", "--json"]))["schedule"]["id"].clone();
+    let opts = |e: &Env| json(&e.ok(&["schedule", "show", "feed", "--json"]))["schedule"]["options"].clone();
+    let before = id(&e);
+    e.ok(&["schedule", "state", "feed", "--set", "since=42"]);
+    // set, add and replace in one edit; the text of a value may hold `=`
+    let out =
+        e.ok(&["schedule", "edit", "feed", "--option", "url=https://example.com/b?x=1", "--option", "symbols=BTC,ETH", "--option", "closed=true"]);
+    assert!(out.contains("options") && out.contains("symbols=BTC,ETH"), "{out}");
+    assert_eq!(opts(&e), serde_json::json!({ "url": "https://example.com/b?x=1", "symbols": "BTC,ETH", "closed": "true" }));
+    e.ok(&["schedule", "edit", "feed", "--unset-option", "closed", "--option", "symbols=SOL"]);
+    assert_eq!(opts(&e), serde_json::json!({ "url": "https://example.com/b?x=1", "symbols": "SOL" }));
+    // the same schedule: its id and its state
+    assert_eq!(id(&e), before);
+    assert_eq!(json(&e.ok(&["schedule", "state", "feed", "--json"])), serde_json::json!({ "since": 42 }));
+    // an unset option that is not there is a typo; so is a bad pair
+    let o = e.run(&["schedule", "edit", "feed", "--unset-option", "nope"]);
+    assert!(!o.status.success() && err(&o).contains("has no option `nope`"), "{}", err(&o));
+    let o = e.run(&["schedule", "edit", "feed", "--option", "novalue"]);
+    assert!(!o.status.success() && err(&o).contains("KEY=VALUE"), "{}", err(&o));
+    // --clear-options first, then the --options; a rename keeps the state too
+    e.ok(&["schedule", "edit", "feed", "--clear-options", "--option", "url=u2", "--name", "feed2"]);
+    assert_eq!(json(&e.ok(&["schedule", "show", "feed2", "--json"]))["schedule"]["options"], serde_json::json!({ "url": "u2" }));
+    assert_eq!(json(&e.ok(&["schedule", "state", "feed2", "--json"])), serde_json::json!({ "since": 42 }));
+    // the target: pipeline off (it was none), rule set on and off, another source
+    e.ok(&["ruleset", "create", "alarms"]);
+    e.ok(&["sources", "add", "other-src"]);
+    let out = e.ok(&["schedule", "edit", "feed2", "--ruleset", "alarms", "--source", "other-src"]);
+    assert!(out.contains("rule set alarms"), "{out}");
+    let show = json(&e.ok(&["schedule", "show", "feed2", "--json"]));
+    assert!(show["schedule"]["ruleset_id"].is_string() && show["schedule"]["source_id"].is_string(), "{show}");
+    e.ok(&["schedule", "edit", "feed2", "--no-ruleset", "--no-pipeline"]);
+    assert!(json(&e.ok(&["schedule", "show", "feed2", "--json"]))["schedule"]["ruleset_id"].is_null());
+    let o = e.run(&["schedule", "edit", "feed2", "--source", "nope"]);
+    assert!(!o.status.success() && err(&o).contains("no source `nope`"), "{}", err(&o));
+    // another connector; only connectors
+    e.ok(&["code", "create", "feed-b", "--template", "ingest-connector"]);
+    e.ok(&["spaces", "create", "feedsp-b", "--kind", "ingest-connector", "--main", "feed-b"]);
+    e.ok(&["spaces", "create", "plainsp", "--kind", "analysis", "--main", "feed-b"]);
+    e.ok(&["schedule", "edit", "feed2", "--plugin", "feedsp-b"]);
+    assert_eq!(json(&e.ok(&["schedule", "show", "feed2", "--json"]))["schedule"]["id"], before);
+    let o = e.run(&["schedule", "edit", "feed2", "--plugin", "plainsp"]);
+    assert!(!o.status.success() && err(&o).contains("need kind ingest-connector"), "{}", err(&o));
+    // rule set schedules take none of it
+    e.ok(&["schedule", "add", "plain", "1h", "--ruleset", "alarms"]);
+    let o = e.run(&["schedule", "edit", "plain", "--option", "a=b"]);
+    assert!(!o.status.success() && err(&o).contains("for connector schedules"), "{}", err(&o));
+}
+
 /// `top`'s main imports space `inner`; where `inner` already exists (a different one), it
 /// lands as `inner-imported` and `top`'s main follows it.
 fn top_and_inner(e: &Env) {
