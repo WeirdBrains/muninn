@@ -12,6 +12,7 @@ mnnn schedule parse [RUN_EVERY] [same timing flags] [--json]   # what it means; 
 mnnn schedule list | show NAME | runs NAME [--limit N] [--json]
 mnnn schedule edit NAME [--every I] [--ruleset SET] [timing / policy flags] [--no-end]
 mnnn schedule enable NAME | disable NAME | remove NAME | run-now NAME
+mnnn schedule state NAME [--json] [--clear [KEY]] [--set KEY=JSON]...   # a connector's saved cursor
 mnnn scheduler tick [--json]       # one pass (cron, a systemd timer)
 mnnn scheduler run [--every 15]    # keep running
 mnnn scheduler status [--json]
@@ -95,6 +96,28 @@ set is removed or disabled, or a rule fails. Failures record `schedule.fail`.
 
 `schedule enable` picks the next slot from now (an ended schedule needs a new
 `--ends-at` or `--no-end` first). `run-now` runs once outside the timing.
+
+## A connector schedule's state
+
+An [ingest connector](connectors.md) keeps a small cursor between runs with
+`host.state_get` / `host.state_set`. It lives in the setting `schedule.state.<schedule id>`,
+so renaming or editing the schedule keeps it, and removing the schedule removes it.
+**It moves only when the run succeeds**: a run that fails (the connector returns an error,
+or never calls the `pipe` / `run_ruleset` it was given) leaves it where it was, so the
+retry starts from the old cursor.
+
+```
+mnnn schedule state feed                      # key = JSON per line (--json: one object)
+mnnn schedule state feed --set since=1700000000000 --set 'BTC/USDT={"last":5}'
+mnnn schedule state feed --clear since        # one key (an error when it is not there)
+mnnn schedule state feed --clear              # all of it
+mnnn schedule state feed --clear --set since=0   # reset, then seed
+```
+
+`--set` values are JSON (`null` removes the key; text needs quotes: `note='"hi"'`).
+`--clear` runs before `--set`; give NAME first (`--clear` takes an optional key).
+Changes are refused while a run of the schedule is going, and for schedules that run a
+rule set (they keep none). Each change is a `schedule.state` action.
 
 ## TUI
 

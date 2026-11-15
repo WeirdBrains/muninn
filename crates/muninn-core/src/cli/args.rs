@@ -4632,6 +4632,18 @@ pub enum ScheduleCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Show or change a connector schedule's saved state (the cursor `host.state_set` keeps).
+    State {
+        schedule: String,
+        /// Remove one key, or all state when no key is given (done before any --set).
+        #[arg(long, value_name = "KEY", num_args = 0..=1)]
+        clear: Option<Option<String>>,
+        /// Set a key to a JSON value, e.g. `since=1700000000000` or `last={"BTC":5}`; `null` removes it (repeatable).
+        #[arg(long = "set", value_name = "KEY=JSON")]
+        set: Vec<String>,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]

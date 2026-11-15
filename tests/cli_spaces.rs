@@ -276,6 +276,46 @@ fn connector_template_and_dry_run_flags() {
     assert!(!e.run(&["spaces", "run", "feedsp", "--pipeline", "p"]).status.success());
 }
 
+/// A connector schedule `feed` (never run here) over the connector template.
+fn connector_schedule(e: &Env) {
+    e.ok(&["sources", "add", "feed-src"]);
+    e.ok(&["code", "create", "feed", "--template", "ingest-connector"]);
+    e.ok(&["spaces", "create", "feedsp", "--kind", "ingest-connector", "--main", "feed"]);
+    e.ok(&["schedule", "add", "feed", "1h", "--plugin", "feedsp", "--source", "feed-src", "--option", "url=https://example.com/a"]);
+}
+
+#[test]
+fn schedule_state_shows_sets_and_clears_a_connectors_cursor() {
+    let e = Env::new();
+    connector_schedule(&e);
+    let o = e.run(&["schedule", "state", "feed"]);
+    assert!(o.status.success() && String::from_utf8_lossy(&o.stdout).contains("has no state"), "{o:?}");
+    assert_eq!(json(&e.ok(&["schedule", "state", "feed", "--json"])), serde_json::json!({}));
+    let out =
+        e.ok(&["schedule", "state", "feed", "--set", "since=1700000000000", "--set", "BTC/USDT={\"last\":5}", "--set", "note=\"hi\"", "--json"]);
+    assert_eq!(json(&out), serde_json::json!({ "since": 1700000000000i64, "BTC/USDT": { "last": 5 }, "note": "hi" }));
+    // it reads back (text and json), a key goes, null removes, then all
+    let text = e.ok(&["schedule", "state", "feed"]);
+    assert!(text.contains("since = 1700000000000") && text.contains("BTC/USDT = {\"last\":5}"), "{text}");
+    e.ok(&["schedule", "state", "feed", "--clear", "note"]);
+    e.ok(&["schedule", "state", "feed", "--set", "since=null"]);
+    assert_eq!(json(&e.ok(&["schedule", "state", "feed", "--json"])), serde_json::json!({ "BTC/USDT": { "last": 5 } }));
+    let o = e.run(&["schedule", "state", "feed", "--clear", "nope"]);
+    assert!(!o.status.success() && err(&o).contains("no key `nope`"), "{}", err(&o));
+    // --clear before --set: reset and seed in one go
+    let out = e.ok(&["schedule", "state", "feed", "--clear", "--set", "since=5", "--json"]);
+    assert_eq!(json(&out), serde_json::json!({ "since": 5 }));
+    e.ok(&["schedule", "state", "feed", "--clear"]);
+    assert_eq!(json(&e.ok(&["schedule", "state", "feed", "--json"])), serde_json::json!({}));
+    // the value has to be JSON; rule set schedules keep no state
+    let o = e.run(&["schedule", "state", "feed", "--set", "k=text"]);
+    assert!(!o.status.success() && err(&o).contains("not JSON"), "{}", err(&o));
+    e.ok(&["ruleset", "create", "rs"]);
+    e.ok(&["schedule", "add", "plain", "1h", "--ruleset", "rs"]);
+    let o = e.run(&["schedule", "state", "plain"]);
+    assert!(!o.status.success() && err(&o).contains("not a connector schedule"), "{}", err(&o));
+}
+
 /// `top`'s main imports space `inner`; where `inner` already exists (a different one), it
 /// lands as `inner-imported` and `top`'s main follows it.
 fn top_and_inner(e: &Env) {

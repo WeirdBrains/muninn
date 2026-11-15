@@ -25,6 +25,26 @@ fn store() -> Store {
     s
 }
 
+/// The code home is process-wide: tests that point it at a temp dir take turns.
+struct HomeGuard {
+    prev: Option<std::path::PathBuf>,
+    _turn: std::sync::MutexGuard<'static, ()>,
+}
+
+impl HomeGuard {
+    fn new(home: &std::path::Path) -> Self {
+        static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+        HomeGuard { prev: replace_home(Some(home)), _turn: turn }
+    }
+}
+
+impl Drop for HomeGuard {
+    fn drop(&mut self) {
+        replace_home(self.prev.as_deref());
+    }
+}
+
 fn have_cargo() -> bool {
     let ok = cargo().is_ok();
     if !ok {
@@ -451,13 +471,7 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
     let dir = tempfile::tempdir().unwrap();
     let env = CodeEnv::new(dir.path());
     // `host.pipe()` builds its own env from the store's home
-    struct Home(Option<std::path::PathBuf>);
-    impl Drop for Home {
-        fn drop(&mut self) {
-            replace_home(self.0.as_deref());
-        }
-    }
-    let _home = Home(replace_home(Some(dir.path())));
+    let _home = HomeGuard::new(dir.path());
     let s = store();
     let tv = s.add_source("tv", "ndjson", None).unwrap();
     for n in ["parse-ndjson", "to-bars"] {
@@ -555,6 +569,132 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
     assert_eq!(["has-data", "gap-alarm"].map(runs), [1, 1]);
     // the guard is gone: code still can't start code outside a space's main calling
     assert!(!spaces::nested_ok());
+}
+
+/// A connector that counts its runs in state and fails when the schedule says `fail`.
+const COUNTER_CONNECTOR: &str = r#"
+use muninn_plugin::prelude::*;
+
+pub fn run(host: &Host) -> Result<View> {
+    let n = host.state_get("n")?.and_then(|v| v.as_i64()).unwrap_or(0) + 1;
+    host.state_set("n", n)?;
+    host.state_set("last", "ok")?;
+    if host.option("fail").is_some() {
+        return Err(Error::new("boom"));
+    }
+    Ok(View::table("Counter", &["n"]).row(vec![(n as usize).into()]))
+}
+"#;
+
+/// A connector schedule's state moves only when its run succeeds: a failing run, or one
+/// that never called a pipe or rule set it was given, leaves the cursor where it was.
+#[test]
+fn connector_state_is_kept_only_when_the_run_succeeds() {
+    if !have_cargo() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let _home = HomeGuard::new(dir.path());
+    let s = store();
+    let src = s.add_source("feed-src", "ndjson", None).unwrap();
+    let feed = approved_space(&s, "feed", crate::store::SpaceKind::IngestConnector, COUNTER_CONNECTOR);
+    let set = s.create_ruleset("never-run", "", "standalone", None).unwrap();
+    let mut def = crate::store::ScheduleDef {
+        name: "counter".into(),
+        target_kind: "connector".into(),
+        plugin_id: Some(feed.id.clone()),
+        source_id: Some(src.id.clone()),
+        overlap: "skip".into(),
+        catch_up: "once".into(),
+        max_attempts: 1,
+        enabled: true,
+        ..Default::default()
+    };
+    let now = crate::store::now_ms();
+    crate::schedule::apply_timing(&mut def, &crate::schedule::Timing { run_every: Some("1h".into()), ..Default::default() }, now).unwrap();
+    let mut def = s.save_schedule(&def).unwrap();
+    let n = |s: &Store, def: &crate::store::ScheduleDef| connector::load_state(s, &def.id).unwrap().get("n").cloned();
+    assert_eq!(crate::schedule::run_now(&s, &def, "t", now).unwrap().status, "success");
+    assert_eq!(n(&s, &def), Some(json!(1)));
+    // the connector fails: its state changes are dropped
+    def.options.insert("fail".into(), json!("1"));
+    let r = crate::schedule::run_now(&s, &def, "t", now).unwrap();
+    assert_eq!((r.status.as_str(), n(&s, &def)), ("failed", Some(json!(1))), "{:?}", r.error);
+    // it never calls the rule set it was given: failed, state untouched
+    def.options.clear();
+    def.ruleset_id = Some(set.id.clone());
+    let r = crate::schedule::run_now(&s, &def, "t", now).unwrap();
+    assert_eq!((r.status.as_str(), n(&s, &def)), ("failed", Some(json!(1))), "{:?}", r.error);
+    assert!(r.error.unwrap().contains("did not call run_ruleset"));
+    // without the rule set it succeeds and the cursor moves on from where it was
+    def.ruleset_id = None;
+    assert_eq!(crate::schedule::run_now(&s, &def, "t", now).unwrap().status, "success");
+    assert_eq!(n(&s, &def), Some(json!(2)));
+}
+
+#[test]
+fn connector_state_is_shown_set_and_cleared() {
+    use crate::schedule::*;
+    use crate::store::{ScheduleDef, ScheduleRun};
+    const T0: i64 = 1_794_319_200_000;
+    let st = store();
+    let rule_set_schedule = ScheduleDef {
+        name: "rs".into(),
+        target_kind: "ruleset".into(),
+        overlap: "skip".into(),
+        catch_up: "once".into(),
+        max_attempts: 1,
+        enabled: true,
+        ..Default::default()
+    };
+    let rs = st
+        .save_schedule(&{
+            let mut x = rule_set_schedule;
+            x.ruleset_id = Some(st.create_ruleset("r", "", "standalone", None).unwrap().id);
+            apply_timing(&mut x, &Timing { run_every: Some("1h".into()), ..Default::default() }, T0).unwrap();
+            x
+        })
+        .unwrap();
+    let src = st.add_source("feed", "ndjson", None).unwrap();
+    let feed = approved_space(&st, "feed", crate::store::SpaceKind::IngestConnector, COUNTER_CONNECTOR);
+    let mut c =
+        ScheduleDef { name: "feed".into(), target_kind: "connector".into(), plugin_id: Some(feed.id.clone()), source_id: Some(src.id), ..rs.clone() };
+    c.id = String::new();
+    c.ruleset_id = None;
+    apply_timing(&mut c, &Timing { run_every: Some("15m".into()), ..Default::default() }, T0).unwrap();
+    let c = st.save_schedule(&c).unwrap();
+    assert!(connector_state(&st, &c).unwrap().is_empty());
+    let set = |k: &str, v: &str| parse_state_pair(&format!("{k}={v}")).unwrap();
+    let state = edit_connector_state(&st, &c, None, &[set("BTC/USDT", "1700000000000"), set("note", "\"hi\""), set("cur", "{\"a\":[1,2]}")]).unwrap();
+    assert_eq!(state.len(), 3);
+    // a later read (and a run's load) sees it, under the schedule's id
+    assert_eq!(connector::load_state(&st, &c.id).unwrap()["cur"]["a"][1], 2);
+    // renaming keeps the id, so the state stays
+    let mut renamed = c.clone();
+    renamed.name = "feed2".into();
+    let renamed = st.save_schedule(&renamed).unwrap();
+    assert_eq!((renamed.id.as_str(), connector_state(&st, &renamed).unwrap().len()), (c.id.as_str(), 3));
+    // null removes; one key; a missing key is an error; then all
+    let state = edit_connector_state(&st, &c, None, &[set("note", "null")]).unwrap();
+    assert!(!state.contains_key("note"));
+    let state = edit_connector_state(&st, &c, Some(&StateClear::Key("cur".into())), &[]).unwrap();
+    assert_eq!(state.keys().collect::<Vec<_>>(), ["BTC/USDT"]);
+    assert!(edit_connector_state(&st, &c, Some(&StateClear::Key("nope".into())), &[]).unwrap_err().to_string().contains("no key `nope`"));
+    // clear first, then set
+    let state = edit_connector_state(&st, &c, Some(&StateClear::All), &[set("since", "5")]).unwrap();
+    assert_eq!(serde_json::to_value(&state).unwrap(), json!({ "since": 5 }));
+    // bad input
+    assert!(parse_state_pair("novalue").is_err() && parse_state_pair("=1").is_err());
+    assert!(parse_state_pair("k=text").unwrap_err().to_string().contains("not JSON"));
+    // not while a run is going
+    let id =
+        st.insert_run(&ScheduleRun { schedule_id: c.id.clone(), status: "pending".into(), timestamp: T0, attempt: 1, ..Default::default() }).unwrap();
+    st.claim_run(id, "h", T0).unwrap();
+    assert!(edit_connector_state(&st, &c, Some(&StateClear::All), &[]).unwrap_err().to_string().contains("is running"));
+    // rule set schedules have none; removing a schedule drops its state
+    assert!(connector_state(&st, &rs).is_err());
+    st.remove_schedule(&c.id).unwrap();
+    assert!(st.setting(&connector::state_key(&c.id)).unwrap().is_none());
 }
 
 /// Rows (`ts` ms, `close`, `period`) as a frame; a `None` period is a null cell.

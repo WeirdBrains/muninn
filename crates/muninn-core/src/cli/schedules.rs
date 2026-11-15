@@ -451,6 +451,32 @@ pub fn schedule(ctx: &Ctx, cmd: ScheduleCommand) -> anyhow::Result<()> {
                 bail!("run #{} failed", r.id);
             }
         }
+        ScheduleCommand::State { schedule: key, clear, set, json } => {
+            let s = store.find_schedule(&key)?;
+            let clear = clear.map(|k| k.filter(|k| !k.is_empty()).map_or(schedule::StateClear::All, schedule::StateClear::Key));
+            let pairs = set.iter().map(|x| schedule::parse_state_pair(x)).collect::<crate::Result<Vec<_>>>()?;
+            let state = if clear.is_some() || !pairs.is_empty() {
+                let st = schedule::edit_connector_state(&store, &s, clear.as_ref(), &pairs)?;
+                record(
+                    &store,
+                    "schedule.state",
+                    format!("change state of schedule {}", s.name),
+                    json!({ "schedule": s.id, "name": s.name, "cleared": clear.as_ref().map(|c| match c { schedule::StateClear::All => json!(true), schedule::StateClear::Key(k) => json!(k) }), "set": pairs.iter().map(|(k, _)| k).collect::<Vec<_>>() }),
+                );
+                st
+            } else {
+                schedule::connector_state(&store, &s)?
+            };
+            if json {
+                println!("{}", serde_json::to_string_pretty(&state)?);
+            } else if state.is_empty() {
+                ctx.io.info(format!("schedule {} has no state", s.name));
+            } else {
+                for (k, v) in &state {
+                    println!("{k} = {v}");
+                }
+            }
+        }
         ScheduleCommand::Runs { schedule: key, limit, json } => {
             let s = store.find_schedule(&key)?;
             let runs: Vec<_> = store.schedule_runs(&s.id)?.into_iter().rev().take(limit).collect();

@@ -30,7 +30,7 @@ mnnn spaces run feed --connector-dry-run --option url=https://example.com/data.c
 | `host.run_ruleset(Option<&str>) -> Result<RulesetRun>` | `run_ruleset` · `{ruleset_id?}` → `{rules_run, errors, skipped}` | records `connector.run`, runs the rule set (default: the schedule's); a rule whose `on` or `if` does not fit the action is skipped, not run |
 | `host.fetch(&Request) -> Result<Response>` | `fetch` · `{method, url, headers, body_base64?}` → `{status, headers, body_base64}` | HTTP with Muninn's client (user agent, 30 s timeout, 64 MB) |
 | `host.state_get(key) -> Result<Option<Json>>` | `state_get` · `{key}` → `{value}` | a small per-schedule cursor |
-| `host.state_set(key, value) -> Result<()>` | `state_set` · `{key, value}` | set it (`Json::Null` removes); kept when the run succeeds |
+| `host.state_set(key, value) -> Result<()>` | `state_set` · `{key, value}` | set it (`Json::Null` removes); kept only when the run succeeds (a failed run, or one that never called a configured `pipe` / `run_ruleset`, leaves the old state). Read or reset it with [`mnnn schedule state`](schedules.md#a-connector-schedules-state) |
 
 Types: `Context { schedule_id, run_id, ruleset_id, source, pipeline: Option<String>,
 last_success_at: Option<i64>, options: Vec<(String, String)>, dry_run: bool }`,

@@ -455,6 +455,8 @@ impl Store {
 
     pub fn remove_schedule(&self, id: &str) -> Result<()> {
         self.conn.execute("DELETE FROM schedules WHERE id = ?1", [id])?;
+        // a connector schedule's cursor goes with it
+        self.set_setting(&crate::code::connector::state_key(id), None)?;
         Ok(())
     }
 

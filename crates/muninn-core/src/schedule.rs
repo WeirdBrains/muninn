@@ -897,7 +897,6 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
     let (info, live) =
         connector::live_run(live, || crate::code::spaces::run_connector(store, &env, ORIGIN, &space, &format!("schedule:{}", s.name), &mut |_| {}));
     let info = info?;
-    let _ = connector::save_state(store, &s.id, &live.state);
     r.stored = live.stored;
     r.bytes = live.bytes;
     r.inserted = live.inserted;
@@ -928,7 +927,76 @@ fn connector_target(store: &Store, s: &ScheduleDef, r: &mut ScheduleRun, _now: i
         }
         return Err(Error::invalid("connector", msg));
     }
+    // the cursor moves only when the whole run succeeded: a failed run (and its retry) starts from the old one
+    connector::save_state(store, &s.id, &live.state)?;
     Ok((None, live.ruleset_ran, vec![]))
+}
+
+/// What `schedule state --clear` removes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateClear {
+    /// Every key.
+    All,
+    /// One key.
+    Key(String),
+}
+
+/// A connector schedule's state: the keys `host.state_set` left (empty before its first success).
+pub fn connector_state(store: &Store, s: &ScheduleDef) -> Result<serde_json::Map<String, Value>> {
+    if s.target_kind != "connector" {
+        return Err(Error::invalid("schedule", format!("{} is not a connector schedule; only those keep state", s.name)));
+    }
+    crate::code::connector::load_state(store, &s.id)
+}
+
+/// Parse `KEY=JSON` (`since=1700000000000`, `cursor={"BTC":5}`, `note="text"`).
+pub fn parse_state_pair(text: &str) -> Result<(String, Value)> {
+    let (k, v) = text.split_once('=').ok_or_else(|| Error::invalid("state", format!("`{text}`: give KEY=JSON")))?;
+    let k = k.trim();
+    if k.is_empty() {
+        return Err(Error::invalid("state", format!("`{text}`: the key is empty")));
+    }
+    let v = serde_json::from_str(v.trim())
+        .map_err(|e| Error::invalid("state", format!("{k}: the value is not JSON ({e}); text needs quotes, e.g. {k}='\"text\"'")))?;
+    Ok((k.to_string(), v))
+}
+
+/// Edit a connector schedule's state: first `clear`, then each `set` (`null` removes a key).
+/// Returns the state after. Refused while a run of the schedule is going (it would save its
+/// own copy over the change); the schedule keeps its id, so a run later reads what is set here.
+pub fn edit_connector_state(
+    store: &Store,
+    s: &ScheduleDef,
+    clear: Option<&StateClear>,
+    set: &[(String, Value)],
+) -> Result<serde_json::Map<String, Value>> {
+    let mut state = connector_state(store, s)?;
+    if store.open_runs()?.iter().any(|r| r.schedule_id == s.id && r.status == "running") {
+        return Err(Error::invalid("state", format!("{} is running; change its state when the run is over", s.name)));
+    }
+    match clear {
+        Some(StateClear::All) => state.clear(),
+        Some(StateClear::Key(k)) if !state.contains_key(k) => {
+            let keys: Vec<&str> = state.keys().map(String::as_str).collect();
+            return Err(Error::invalid(
+                "state",
+                format!("{} has no key `{k}` ({})", s.name, if keys.is_empty() { "no state".into() } else { keys.join(", ") }),
+            ));
+        }
+        Some(StateClear::Key(k)) => {
+            state.remove(k);
+        }
+        None => {}
+    }
+    for (k, v) in set {
+        if v.is_null() {
+            state.remove(k);
+        } else {
+            state.insert(k.clone(), v.clone());
+        }
+    }
+    crate::code::connector::save_state(store, &s.id, &state)?;
+    Ok(state)
 }
 
 /// Enable or disable `s` (saved). Enabling picks the next slot from now (a run_every

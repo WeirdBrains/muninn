@@ -8,10 +8,12 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Added
 
+- `mnnn schedule state NAME [--set KEY=JSON] [--clear [KEY]] [--json]` reads, sets and resets a connector schedule's saved state
 - `connector.run` is a rule event: `rule create --on connector.run --if "inserted = 0"` works and `rule events` lists its fields
 
 ### Fixed
 
+- A connector schedule's state is saved only when the run succeeds, as documented (a failed run used to move it); removing a schedule removes its state
 - A connector's `host.pipe()` and `connector.run` count only new records as `inserted` (a re-run over stored data says 0); every row given to the sinks is the new `landed`
 - Rules in a rule set run only when their `on` matches and their `if` holds (otherwise skipped, not failed); matching rules no longer run twice
 - `mnnn spaces run NAME --connector-dry-run` runs the connector (it always failed with "connectors run only from a schedule")
