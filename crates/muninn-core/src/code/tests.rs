@@ -517,3 +517,79 @@ fn a_live_connector_run_pipes_and_runs_rules_through_code_spaces() {
     // the guard is gone: code still can't start code outside a space's main calling
     assert!(!spaces::nested_ok());
 }
+
+/// Rows (`ts` ms, `close`, `period`) as a frame; a `None` period is a null cell.
+fn bar_rows(rows: &[(i64, Option<Value>)], with_period: bool) -> Value {
+    let mut cols = json!({
+        "timestamp": rows.iter().map(|r| json!(r.0)).collect::<Vec<_>>(),
+        "close": rows.iter().map(|_| json!(10.0)).collect::<Vec<_>>(),
+    });
+    let mut fields = vec![json!({ "name": "timestamp", "type": "real" }), json!({ "name": "close", "type": "real" })];
+    if with_period {
+        cols["period"] = Value::Array(rows.iter().map(|r| r.1.clone().unwrap_or(Value::Null)).collect());
+        fields.push(json!({ "name": "period", "type": "text" }));
+    }
+    json!({ "model": "t", "fields": fields, "ids": (0..rows.len()).map(|i| i.to_string()).collect::<Vec<_>>(), "columns": cols, "groups": [] })
+}
+
+/// to-bars over `frame`: the Bars rows (source, symbol, period, timestamp…) and the Rejected rows.
+fn to_bars_rows(frame: Value, opts: &str) -> (Vec<Vec<String>>, Vec<Vec<String>>) {
+    let dir = tempfile::tempdir().unwrap();
+    let env = CodeEnv::new(dir.path());
+    let s = store();
+    builtin_space(&s, "to-bars");
+    let step = pipe::Step::Space(format!("to-bars?symbol=SOL/USDT{opts}"));
+    let p = pipe::run(&s, &env, "cli", &pipe::Source::Frame(frame), &[step], &[], &mut |_| {}).unwrap();
+    let info = &p.runs[0].1;
+    assert_eq!(info.status, "ok", "{info:?}");
+    let v = run_view(info).unwrap();
+    let leaves = v.leaves();
+    let bars = leaves[0].as_table().1;
+    let rejected = leaves.get(1).map(|l| l.as_table().1).unwrap_or_default();
+    (bars, rejected)
+}
+
+#[test]
+fn to_bars_takes_each_rows_own_period_column() {
+    if !have_cargo() {
+        return;
+    }
+    let t0 = 1_704_067_200_000i64; // 2024-01-01 00:00 UTC
+    let n = |x: f64| Some(json!(x));
+    let t = |x: &str| Some(json!(x));
+    // 1m and 5m bars mixed: seconds as a number, `5m` and `300` as text
+    let (bars, rejected) =
+        to_bars_rows(bar_rows(&[(t0, n(60.0)), (t0 + 60_000, t("1m")), (t0 + 300_000, t("5m")), (t0 + 600_000, t("300"))], true), "");
+    assert!(rejected.is_empty(), "{rejected:?}");
+    let periods: Vec<&str> = bars.iter().map(|r| r[2].as_str()).collect();
+    assert_eq!(periods, ["60", "60", "300", "300"], "{bars:?}");
+    // a 5m row off the 5m grid is rejected by its own length (a 1m row there is fine)
+    let (bars, rejected) = to_bars_rows(bar_rows(&[(t0 + 60_000, n(60.0)), (t0 + 60_000, t("5m"))], true), "");
+    assert_eq!((bars.len(), rejected.len()), (1, 1), "{bars:?} {rejected:?}");
+    assert!(rejected[0][1].contains("not aligned to 300"), "{rejected:?}");
+    // a missing or unreadable period is rejected with a reason, whatever `check` says
+    let (bars, rejected) =
+        to_bars_rows(bar_rows(&[(t0, n(60.0)), (t0 + 60_000, None), (t0 + 120_000, t("soon")), (t0 + 180_000, n(-5.0))], true), "&check=false");
+    assert_eq!(bars.len(), 1, "{bars:?}");
+    let rows: Vec<&str> = rejected.iter().map(|r| r[0].as_str()).collect();
+    assert_eq!(rows, ["2", "3", "4"]);
+    assert!(rejected.iter().all(|r| r[1].contains("period is missing or not a duration")), "{rejected:?}");
+    // the duration option still wins over a period column
+    let (bars, _) = to_bars_rows(bar_rows(&[(t0, t("1h")), (t0 + 300_000, t("1h"))], true), "&duration=5m");
+    assert_eq!(bars.iter().map(|r| r[2].as_str()).collect::<Vec<_>>(), ["300", "300"]);
+}
+
+#[test]
+fn to_bars_without_a_period_column_keeps_the_most_common_step() {
+    if !have_cargo() {
+        return;
+    }
+    let t0 = 1_704_067_200_000i64;
+    let rows: Vec<(i64, Option<Value>)> = (0..4).map(|i| (t0 + i * 300_000, None)).collect();
+    let (bars, rejected) = to_bars_rows(bar_rows(&rows, false), "");
+    assert!(rejected.is_empty(), "{rejected:?}");
+    assert_eq!(bars.iter().map(|r| r[2].as_str()).collect::<Vec<_>>(), ["300"; 4]);
+    // an explicit duration still checks alignment: only the row on the hour is kept
+    let (bars, rejected) = to_bars_rows(bar_rows(&rows, false), "&duration=1h");
+    assert_eq!((bars.len(), rejected.len()), (1, 3));
+}

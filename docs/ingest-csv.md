@@ -52,7 +52,7 @@ mnnn pipe source:binance code:parse-csv 'code:to-bars?symbol=BTC/USDT&duration=5
 | | `skip_rows` | `0` | lines skipped before the header |
 | to-bars | `symbol` | a `symbol` (or `base`+`quote`) column | `BTC/USDT`, the pair for every row |
 | | `source` | a `source`/`_source` column, else `pipeline` | the bars' source |
-| | `duration` | a `period` column, else the most common step | `5m`, `1h`, `1d` or seconds |
+| | `duration` | a `period` column (each row at its own length), else the most common step | `5m`, `1h`, `1d` or seconds |
 | | `map` | by column name | `map=ts:timestamp,px:close` |
 | | `rejects` | pass the good rows | `fail`: stop when any row is rejected |
 | | `drop_zero_volume` | keep and flag | `true`: reject volume-0 bars |
@@ -62,7 +62,10 @@ to-bars finds columns by name (`timestamp`/`ts`/`time`/`date`/`open_time`, `open
 `high`, `low`, `close`, `volume`/`vol`), reads epoch s/ms/µs/ns or date text (UTC unless
 an offset is given) and checks `high >= max(open, close)`, `low <= min(open, close)`,
 `volume >= 0` and alignment to the duration. Rejected rows are its second output table,
-`Rejected` (row, reason); they never reach the bars. The `model:bars` leaf adds only bars
+`Rejected` (row, reason); they never reach the bars. With a `period` column and no
+`duration` option each row keeps its own length (seconds as a number or text, or `5m`,
+`1h`, `1d`), so one batch can mix 1m and 5m bars and alignment is checked per row; a row
+whose period is missing or unreadable is rejected. Give `duration` to override the column. The `model:bars` leaf adds only bars
 not there yet, so a pipeline can run again after more data arrives.
 
 ## Old flags

@@ -62,7 +62,7 @@ templates (Rust, through the SDK), not as code in Muninn:
 | `parse-csv` | raw text → rows: CSV with a header line, quotes as usual, numbers as numbers; options `delimiter`, `quote`, `header=false`, `skip_rows` |
 | `parse-json` | raw text → rows: a JSON array of objects (or one object, or arrays as `column_N`); option `records=data.items` |
 | `parse-ndjson` | raw text → rows: one JSON object a line |
-| `to-bars` | rows → price bars (`source symbol period timestamp open high low close volume flags`), checked; options `symbol`, `source`, `duration`, `map`, `rejects=fail`, `drop_zero_volume`, `check=false`; rejected rows are a second `Rejected` table |
+| `to-bars` | rows → price bars (`source symbol period timestamp open high low close volume flags`), checked; options `symbol`, `source`, `duration` (else a `period` column, each row at its own length, else the most common step), `map`, `rejects=fail`, `drop_zero_volume`, `check=false`; rejected rows are a second `Rejected` table |
 
 Each stored item (`source:NAME`) is parsed on its own, and rows keep `_name` and
 `_source` (which file, which source). A `model:bars` save takes to-bars' rows and adds

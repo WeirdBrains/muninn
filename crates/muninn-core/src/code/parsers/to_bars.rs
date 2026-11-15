@@ -6,8 +6,9 @@
 // Options (`code:to-bars?symbol=BTC/USDT&duration=5m`):
 //   symbol    BASE/QUOTE for every row (else a `symbol` column, or `base` and `quote`)
 //   source    the bars' source (else a `source` or `_source` column, else `pipeline`)
-//   duration  bar length: 5m, 1h, 1d, 300 (seconds) (else a `period` column, else the
-//             most common step between timestamps)
+//   duration  bar length: 5m, 1h, 1d, 300 (seconds) (else a `period` column, each row at
+//             its own length (seconds or 5m/1h/1d text; a row without a usable period is
+//             rejected), else the most common step between timestamps)
 //   map       column names: `map=ts:timestamp,px:close` (fields: timestamp, open, high,
 //             low, close, volume)
 //   rejects   `fail`: stop the run when any row is rejected (default: pass the good ones)
@@ -143,8 +144,24 @@ pub fn run(host: &Host) -> Result<View> {
             None => vec!["pipeline".to_string(); f.len()],
         },
     };
+    // no duration option and a `period` column: every row at its own length
+    let period_col = if opt("duration").is_none() { find(&f, &["period"]) } else { None };
+    let row_dur: Option<Vec<Option<f64>>> = match &period_col {
+        Some(c) => Some(
+            f.column(c)?
+                .iter()
+                .map(|v| match v {
+                    Json::Num(n) => (n.is_finite() && *n > 0.0).then_some(*n),
+                    Json::Str(s) => duration_secs(s),
+                    _ => None,
+                })
+                .collect(),
+        ),
+        None => None,
+    };
     let dur: f64 = match opt("duration") {
         Some(d) => duration_secs(&d).ok_or_else(|| Error::new(format!("duration: `{d}` (e.g. 5m, 1h, 1d or seconds)")))?,
+        None if row_dur.is_some() => 0.0,
         None => {
             // most common step between consecutive timestamps
             let mut v: Vec<i64> = t.iter().flatten().copied().collect();
@@ -172,9 +189,14 @@ pub fn run(host: &Host) -> Result<View> {
     for i in 0..f.len() {
         let n = |c: &[Json]| c[i].as_f64().filter(|x| x.is_finite());
         let (o, h, l, c, v) = (n(&open), n(&high), n(&low), n(&close), n(&vol).or(Some(0.0)));
+        let d = match &row_dur {
+            Some(r) => r[i],
+            None => Some(dur),
+        };
         let reason = match (t[i], &symbol[i], o, h, l, c, v) {
             (None, ..) => Some("timestamp is not a time".to_string()),
             (_, None, ..) => Some("no symbol".into()),
+            _ if d.is_none() => Some("period is missing or not a duration (5m, 1h, 1d or seconds)".into()),
             (_, _, None, ..) | (_, _, _, None, ..) | (_, _, _, _, None, ..) | (_, _, _, _, _, None, _) => Some("missing or non-numeric price".into()),
             (Some(ts), _, Some(o), Some(h), Some(l), Some(c), Some(v)) if check => {
                 if h < o.max(c) || l > o.min(c) || h < l {
@@ -183,8 +205,8 @@ pub fn run(host: &Host) -> Result<View> {
                     Some("negative volume".into())
                 } else if v == 0.0 && drop_zero {
                     Some("zero volume".into())
-                } else if dur <= 86_400.0 && ts.rem_euclid((dur * 1000.0) as i64) != 0 {
-                    Some(format!("timestamp not aligned to {dur}s bars"))
+                } else if d.is_some_and(|d| d <= 86_400.0 && ts.rem_euclid((d * 1000.0) as i64) != 0) {
+                    Some(format!("timestamp not aligned to {}s bars", d.unwrap_or(0.0)))
                 } else {
                     None
                 }
@@ -202,7 +224,7 @@ pub fn run(host: &Host) -> Result<View> {
                 view = view.row(vec![
                     Json::Str(source[i].clone()),
                     Json::Str(symbol[i].clone().unwrap_or_default()),
-                    dur.into(),
+                    d.unwrap_or(dur).into(),
                     (t[i].unwrap_or(0) as f64).into(),
                     o.unwrap_or(0.0).into(),
                     h.unwrap_or(0.0).into(),
@@ -214,7 +236,11 @@ pub fn run(host: &Host) -> Result<View> {
             }
         }
     }
-    host.log(format!("{good} bars from {ts} and {price} ({dur}s), {bad} rejected"));
+    let len = match &period_col {
+        Some(c) => format!("each at its {c}"),
+        None => format!("{dur}s"),
+    };
+    host.log(format!("{good} bars from {ts} and {price} ({len}), {bad} rejected"));
     if bad > 0 && opt("rejects").is_some_and(|r| r.eq_ignore_ascii_case("fail")) {
         return Err(Error::new(format!("{bad} row(s) rejected and rejects=fail (run without it to see them in the Rejected table)")));
     }

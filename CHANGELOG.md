@@ -10,6 +10,7 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 - `mnnn spaces run NAME --connector-dry-run` runs the connector (it always failed with "connectors run only from a schedule")
 - A connector's `host.pipe()` and `host.run_ruleset()` work when the pipeline has `space:` steps or the rule set has `run-space` rules
+- `to-bars` stores each row at its own `period` column (seconds or `5m`/`1h`/`1d`) when no `duration` is given; a row without a usable period is rejected
 
 ## [2.25.0] - 2026-11-12
 
