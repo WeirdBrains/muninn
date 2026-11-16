@@ -31,7 +31,7 @@ When the site starts or stops it is announced to the org's nodes, your linked no
 - **Self-signed** (default): a new short-lived certificate is made at each start, for
   `localhost`, the bind address and `names`.
 - **ACME / Let's Encrypt**: opt-in with a domain and an email. Muninn's pure-Rust ACME
-  client asks for a `shortlived` certificate (about six days; falls back to the CA's
+  client ([weirdnet-tls](https://github.com/WeirdBrains/weirdnet-tls) since 2.27) asks for a `shortlived` certificate (about six days; falls back to the CA's
   default profile) through the HTTP-01 challenge, answered on `http_port` (80; forward
   port 80 there if needed). It is renewed when a third of its life is left (checked
   every ten minutes while the site runs). The ACME account key and certificates are kept

@@ -24,9 +24,7 @@ use hyper::body::{Frame, Incoming};
 use hyper::header::{self, HeaderMap, HeaderValue};
 use hyper::{Request, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
-use instant_acme::{
-    Account, AccountCredentials, AuthorizationStatus, ChallengeType, HttpClient, Identifier, NewAccount, NewOrder, OrderStatus, RetryPolicy,
-};
+use instant_acme::{AccountCredentials, HttpClient, RetryPolicy};
 use prost::Message;
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
@@ -337,12 +335,13 @@ pub const ACME_TLS_ALPN: &[u8] = b"acme-tls/1";
 struct Resolver {
     default: RwLock<Arc<CertifiedKey>>,
     by_name: RwLock<HashMap<String, Arc<CertifiedKey>>>,
-    alpn: RwLock<HashMap<String, Arc<CertifiedKey>>>,
+    /// TLS-ALPN-01 challenge certificates, published by weirdnet-tls while it validates.
+    acme: Arc<weirdnet_tls::Resolver>,
 }
 
 impl Resolver {
     fn new(c: Arc<CertifiedKey>) -> Resolver {
-        Resolver { default: RwLock::new(c), by_name: RwLock::new(HashMap::new()), alpn: RwLock::new(HashMap::new()) }
+        Resolver { default: RwLock::new(c), by_name: RwLock::new(HashMap::new()), acme: Arc::new(weirdnet_tls::Resolver::new()) }
     }
 }
 
@@ -352,7 +351,7 @@ impl ResolvesServerCert for Resolver {
         let acme = hello.alpn().is_some_and(|mut a| a.any(|p| p == ACME_TLS_ALPN));
         if acme {
             // only ever the challenge certificate on an ACME validation connection
-            return name.and_then(|n| self.alpn.read().ok().and_then(|m| m.get(&n).cloned()));
+            return self.acme.resolve(hello);
         }
         if let Some(n) = &name
             && let Some(c) = self.by_name.read().ok().and_then(|m| m.get(n).cloned())
@@ -361,15 +360,6 @@ impl ResolvesServerCert for Resolver {
         }
         self.default.read().ok().map(|c| c.clone())
     }
-}
-
-/// A TLS-ALPN-01 challenge certificate for `domain` (RFC 8737).
-fn alpn_cert(domain: &str, digest: &[u8]) -> Result<Arc<CertifiedKey>> {
-    let mut p = rcgen::CertificateParams::new(vec![domain.to_string()]).map_err(tls_err)?;
-    p.custom_extensions = vec![rcgen::CustomExtension::new_acme_identifier(digest)];
-    let key = rcgen::KeyPair::generate().map_err(tls_err)?;
-    let cert = p.self_signed(&key).map_err(tls_err)?;
-    certified(&CertPem { chain: cert.pem(), key: key.serialize_pem() })
 }
 
 #[derive(Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
@@ -439,8 +429,8 @@ impl Acme {
 /// Makes the HTTP client ACME talks through (tests give a mock CA; `None`: the real one).
 pub type AcmeHttp = Arc<dyn Fn() -> Box<dyn HttpClient> + Send + Sync>;
 
-/// HTTP-01 tokens being answered: token → key authorization.
-pub type Challenges = Arc<RwLock<HashMap<String, String>>>;
+/// HTTP-01 tokens being answered (weirdnet-tls publishes them while it validates).
+pub type Challenges = Arc<weirdnet_tls::Http01Board>;
 
 #[derive(Serialize, Deserialize)]
 struct StoredAccount {
@@ -451,30 +441,6 @@ struct StoredAccount {
 fn with_store<T>(m: &Mutex<Store>, f: impl FnOnce(&Store) -> Result<T>) -> Result<T> {
     let s = m.lock().map_err(|_| Error::Other("store lock poisoned".into()))?;
     f(&s)
-}
-
-async fn account(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>) -> Result<Account> {
-    let builder = || -> Result<instant_acme::AccountBuilder> {
-        Ok(match http {
-            Some(h) => Account::builder_with_http(h()),
-            None => Account::builder().map_err(acme_err)?,
-        })
-    };
-    let saved = with_store(store, |s| Ok(s.setting(ACCOUNT_SETTING)?.map(Zeroizing::new)))?;
-    if let Some(v) = saved
-        && let Ok(a) = serde_json::from_str::<StoredAccount>(&v)
-        && a.directory == acme.directory
-    {
-        return builder()?.from_credentials(a.credentials).await.map_err(acme_err);
-    }
-    let contact = format!("mailto:{}", acme.email);
-    let (account, credentials) = builder()?
-        .create(&NewAccount { contact: &[&contact], terms_of_service_agreed: true, only_return_existing: false }, acme.directory.clone(), None)
-        .await
-        .map_err(acme_err)?;
-    let v = Zeroizing::new(serde_json::to_string(&StoredAccount { directory: acme.directory.clone(), credentials })?);
-    with_store(store, |s| s.set_setting(ACCOUNT_SETTING, Some(&v)))?;
-    Ok(account)
 }
 
 /// Get the node's certificate for `acme.domain` and keep it in the store.
@@ -491,76 +457,49 @@ async fn obtain(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>, chal
     Ok(c)
 }
 
+/// The ACME account kept for `directory`, if any.
+fn saved_account(store: &Mutex<Store>, directory: &str) -> Result<Option<AccountCredentials>> {
+    let saved = with_store(store, |s| Ok(s.setting(ACCOUNT_SETTING)?.map(Zeroizing::new)))?;
+    Ok(saved.and_then(|v| serde_json::from_str::<StoredAccount>(&v).ok()).filter(|a| a.directory == directory).map(|a| a.credentials))
+}
+
 /// Order a certificate for `acme.domain` (and `acme.extra`) through HTTP-01 (tokens
 /// answered from `challenges` on the ACME HTTP port) or TLS-ALPN-01 (a challenge
-/// certificate served by `resolver` on the site port).
+/// certificate served by `resolver` on the site port). weirdnet-tls places the order; the
+/// account stays under `hosting.acme.account` (registered on first use, kept even when the
+/// order fails) and a profile the CA lacks falls back to its default.
 async fn order_cert(store: &Mutex<Store>, acme: &Acme, http: Option<&AcmeHttp>, challenges: &Challenges, resolver: &Resolver) -> Result<CertPem> {
-    let account = account(store, acme, http).await?;
+    use weirdnet_tls::store as ts;
+    const SET: &str = "muninn";
     let names: Vec<String> = std::iter::once(acme.domain.clone()).chain(acme.extra.iter().cloned()).collect();
-    let ids: Vec<Identifier> = names.iter().map(|n| Identifier::Dns(n.clone())).collect();
-    let mut order = match acme.profile.as_str() {
-        "" => account.new_order(&NewOrder::new(&ids)).await,
-        p => match account.new_order(&NewOrder::new(&ids).profile(p)).await {
-            Ok(o) => Ok(o),
-            // a CA without that profile: take its default
-            Err(_) => account.new_order(&NewOrder::new(&ids)).await,
-        },
+    let mut cfg = weirdnet_tls::AcmeConfig::new(SET, names);
+    cfg.directory = weirdnet_tls::Directory::Custom(acme.directory.clone());
+    cfg.contact = vec![acme.email.clone()];
+    cfg.challenge = if acme.tls_alpn { weirdnet_tls::ChallengeKind::TlsAlpn01 } else { weirdnet_tls::ChallengeKind::Http01 };
+    cfg.profile = (!acme.profile.is_empty()).then(|| acme.profile.clone());
+    cfg.profile_optional = true;
+    cfg.ari = false;
+    cfg.retry = RetryPolicy::new().timeout(Duration::from_secs(120));
+    let mem = Arc::new(ts::MemoryStore::new());
+    let key = ts::account_key(&acme.directory);
+    let had = saved_account(store, &acme.directory)?;
+    if let Some(c) = &had {
+        ts::put_json(&*mem, &key, c).map_err(acme_err)?;
     }
-    .map_err(acme_err)?;
-    let mut tokens = vec![];
-    let mut alpn_names = vec![];
-    let ready = async {
-        let mut auths = order.authorizations();
-        while let Some(a) = auths.next().await {
-            let mut a = a.map_err(acme_err)?;
-            match a.status {
-                AuthorizationStatus::Pending => {}
-                AuthorizationStatus::Valid => continue,
-                other => return Err(acme_err(format!("authorization is {other:?}"))),
-            }
-            let Identifier::Dns(name) = a.identifier().identifier.clone() else { return Err(acme_err("not a DNS identifier")) };
-            if acme.tls_alpn {
-                let mut ch = a.challenge(ChallengeType::TlsAlpn01).ok_or_else(|| acme_err("the CA offers no TLS-ALPN-01 challenge"))?;
-                let c = alpn_cert(&name, ch.key_authorization().digest().as_ref())?;
-                resolver.alpn.write().map_err(|_| acme_err("challenge lock"))?.insert(name.to_ascii_lowercase(), c);
-                alpn_names.push(name.to_ascii_lowercase());
-                ch.set_ready().await.map_err(acme_err)?;
-            } else {
-                let mut ch = a.challenge(ChallengeType::Http01).ok_or_else(|| acme_err("the CA offers no HTTP-01 challenge"))?;
-                let token = ch.token.clone();
-                challenges.write().map_err(|_| acme_err("challenge lock"))?.insert(token.clone(), ch.key_authorization().as_str().to_string());
-                tokens.push(token);
-                ch.set_ready().await.map_err(acme_err)?;
-            }
-        }
-        Ok(())
+    let mut order = weirdnet_tls::Acme::new(cfg, mem.clone(), resolver.acme.clone()).map_err(acme_err)?.with_http01(challenges.clone());
+    if let Some(h) = http.cloned() {
+        order = order.with_http_client(move || h());
     }
-    .await;
-    let status = match ready {
-        Ok(()) => order.poll_ready(&RetryPolicy::new().timeout(Duration::from_secs(120))).await.map_err(acme_err),
-        Err(e) => Err(e),
-    };
-    if let Ok(mut c) = challenges.write() {
-        for t in &tokens {
-            c.remove(t);
-        }
+    let issued = order.issue().await;
+    if had.is_none()
+        && let Some(credentials) = ts::get_json::<AccountCredentials>(&*mem, &key).map_err(acme_err)?
+    {
+        let v = Zeroizing::new(serde_json::to_string(&StoredAccount { directory: acme.directory.clone(), credentials })?);
+        with_store(store, |s| s.set_setting(ACCOUNT_SETTING, Some(&v)))?;
     }
-    if let Ok(mut m) = resolver.alpn.write() {
-        for n in &alpn_names {
-            m.remove(n);
-        }
-    }
-    let status = status?;
-    if status != OrderStatus::Ready {
-        return Err(acme_err(format!("the order is {status:?}")));
-    }
-    let key = rcgen::KeyPair::generate().map_err(tls_err)?;
-    let mut p = rcgen::CertificateParams::new(names).map_err(tls_err)?;
-    p.distinguished_name = rcgen::DistinguishedName::new();
-    let csr = p.serialize_request(&key).map_err(tls_err)?;
-    order.finalize_csr(csr.der()).await.map_err(acme_err)?;
-    let chain = order.poll_certificate(&RetryPolicy::new().timeout(Duration::from_secs(120))).await.map_err(acme_err)?;
-    let c = CertPem { chain, key: key.serialize_pem() };
+    issued.map_err(acme_err)?;
+    let pair = ts::load_cert(&*mem, SET).map_err(acme_err)?.ok_or_else(|| acme_err("the CA gave no certificate"))?;
+    let c = CertPem { chain: pair.chain_pem.clone(), key: pair.key_pem.clone() };
     cert_info(&c, "acme")?;
     Ok(c)
 }
@@ -617,7 +556,7 @@ impl NodeTls {
         let info = cert_info(&pem, source)?;
         Ok(NodeTls {
             resolver: Arc::new(Resolver::new(certified(&pem)?)),
-            challenges: Arc::new(RwLock::new(HashMap::new())),
+            challenges: Arc::new(weirdnet_tls::Http01Board::new()),
             cert: RwLock::new(info),
             acme: if source == "user" { None } else { acme },
             http,
@@ -1182,7 +1121,7 @@ impl Host {
             store: Mutex::new(store),
             replay: Mutex::new(Replay::default()),
             sessions: Mutex::new(Sessions::default()),
-            challenges: Arc::new(RwLock::new(HashMap::new())),
+            challenges: Arc::new(weirdnet_tls::Http01Board::new()),
             resolver,
             cert: RwLock::new(info),
             acme: opts.acme.clone(),
@@ -1342,8 +1281,7 @@ async fn accept_http(listener: TcpListener, challenges: Challenges, mut stop: wa
                 let challenges = challenges.clone();
                 tokio::spawn(async move {
                     let svc = hyper::service::service_fn(move |req: Request<Incoming>| {
-                        let token = req.uri().path().strip_prefix("/.well-known/acme-challenge/").map(str::to_string);
-                        let answer = token.and_then(|t| challenges.read().ok().and_then(|c| c.get(&t).cloned()));
+                        let answer = challenges.answer(req.uri().path());
                         async move {
                             Ok::<_, Infallible>(match answer {
                                 Some(a) => plain(200, "text/plain", a.into_bytes()),

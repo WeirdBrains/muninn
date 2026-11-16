@@ -477,7 +477,7 @@ fn acme_gets_a_short_lived_certificate_through_http_01_and_keeps_it() {
     assert!(x.issuer().to_string().contains("Mock CA"));
     assert_eq!(r.headers["strict-transport-security"], "max-age=86400");
     // the challenge token is gone once used
-    assert!(host.state.challenges.read().unwrap().is_empty());
+    assert!(host.state.challenges.is_empty());
     host.with_store(|s| {
         assert!(s.actions()?.iter().any(|a| a.kind == "org.host.cert"));
         assert!(stored_cert(s, "org.example.test")?.is_some());
@@ -711,7 +711,7 @@ fn org_acme_renews_by_http_01_and_tls_alpn_01_and_backs_off_on_failure() {
         let got = host.renew_orgs().unwrap();
         assert_eq!(got.len(), 1, "alpn={alpn}");
         assert!(leaf_for(host.addr.port(), "org.example.test").0.contains("Mock CA"), "served at once");
-        assert!(host.state.resolver.alpn.read().unwrap().is_empty(), "challenge certificates are gone");
+        assert!(!host.state.resolver.acme.has_alpn("org.example.test"), "challenge certificates are gone");
         host.with_store(|s| {
             let lab = s.find_org("lab")?;
             assert_eq!(tls::status(s, &lab)?.source, "acme");
