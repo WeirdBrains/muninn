@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.27.0] - 2026-11-16
+
 ### Added
 
 - `examples/connectors/exchange-bars`: closed 5-minute bars from Coinbase and Kraken, with installer, parser tests and a macOS launch agent for the scheduler
@@ -13,6 +15,11 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 ### Fixed
 
 - Connector docs: the candle example's gap alarm tests `landed = 0`, so the retry after a failed run does not alarm
+
+### Changed
+
+- Org permissions and rank rules come from weirdnet-access 0.1.1; every role keeps exactly what it could do (`mnnn org role perms`).
+- ACME certificates are ordered through weirdnet-tls 0.2.0; the account, kept certificates, renewal and `mnnn org cert renew` work as before.
 
 ## [2.26.0] - 2026-11-15
 
@@ -692,7 +699,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.26.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.27.0...HEAD
+[2.27.0]: https://github.com/WeirdBrains/muninn/compare/v2.26.0...v2.27.0
 [2.26.0]: https://github.com/WeirdBrains/muninn/compare/v2.25.0...v2.26.0
 [2.25.0]: https://github.com/WeirdBrains/muninn/compare/v2.24.0...v2.25.0
 [2.24.0]: https://github.com/WeirdBrains/muninn/compare/v2.23.0...v2.24.0
