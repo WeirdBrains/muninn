@@ -4453,6 +4453,7 @@ dependencies = [
  "ttf-parser",
  "url",
  "uuid",
+ "weirdnet-access",
  "weirdnet-code-spaces",
  "weirdnet-keys",
  "weirdnet-net",
@@ -8883,6 +8884,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
 dependencies = [
  "rustls-pki-types",
+]
+
+[[package]]
+name = "weirdnet-access"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df40da8a4c26faaabd9375bb4a6603de612df34cd3e3cf42d992e62eeefb1006"
+dependencies = [
+ "serde",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

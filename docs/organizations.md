@@ -44,6 +44,10 @@ Custom roles take any of these permissions (`mnnn org role perms` lists them):
 `projects.manage`, `resources.transfer`, `resources.manage`, `read`, `records.read`,
 `records.write`, `call`, `code.view`, `code.run`, `code.edit`, `code.manage`.
 
+The permission catalog and the rank rules come from
+[weirdnet-access](https://github.com/WeirdBrains/weirdnet-access) (since 2.27): the same
+permissions, implications and rules as before, shared with other Weirdnet apps.
+
 Code permissions are levels for the org's code spaces: `code.view` sees a source, `code.run`
 runs it (code endpoints need it besides the endpoint's own permission), `code.edit` changes
 it and `code.manage` approves, serves and removes it; each includes the ones before it.

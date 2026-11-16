@@ -100,15 +100,50 @@ pub fn default_roles() -> Vec<(&'static str, i64, Vec<String>)> {
 /// Check a permission name (`*` is everything).
 pub fn check_perm(p: &str) -> Result<String> {
     let p = p.trim().to_ascii_lowercase();
-    if p == "*" || PERMS.iter().any(|(n, _)| *n == p) {
-        Ok(p)
-    } else {
-        Err(Error::invalid("permission", format!("`{p}`: one of {}", PERMS.iter().map(|(n, _)| *n).collect::<Vec<_>>().join(", "))))
-    }
+    catalog()
+        .check(&p)
+        .map_err(|_| Error::invalid("permission", format!("`{p}`: one of {}", PERMS.iter().map(|(n, _)| *n).collect::<Vec<_>>().join(", "))))
+}
+
+/// Muninn's permissions in weirdnet-access: the shared core plus [`PERMS`], [`IMPLIES`]
+/// (followed transitively) and [`MANAGING`].
+pub fn catalog() -> &'static weirdnet_access::Catalog {
+    static CATALOG: std::sync::OnceLock<weirdnet_access::Catalog> = std::sync::OnceLock::new();
+    CATALOG.get_or_init(|| {
+        let mut c = weirdnet_access::Catalog::core();
+        for (p, d) in PERMS {
+            if c.get(p).is_none() {
+                c.add(p, d, MANAGING.contains(p)).expect("a valid permission");
+            }
+        }
+        for (k, v) in IMPLIES {
+            c.imply(k, v).expect("implications without cycles");
+        }
+        c
+    })
+}
+
+/// True if any of `perms` gives `perm` (`*`, itself, or through implications).
+fn perms_give(perms: &[String], perm: &str) -> bool {
+    perms.iter().any(|p| catalog().implies_perm(p, perm))
 }
 
 pub fn role_has(r: &Role, perm: &str) -> bool {
-    r.perms.iter().any(|p| p == "*" || p == perm || IMPLIES.iter().any(|(k, v)| k == p && v.contains(&perm)))
+    perms_give(&r.perms, perm)
+}
+
+/// A role as weirdnet-access sees it (for the rank rules).
+fn access_role(r: &Role) -> weirdnet_access::Role {
+    weirdnet_access::Role { id: r.id.clone(), name: r.name.clone(), rank: r.rank, perms: r.perms.clone(), builtin: r.builtin }
+}
+
+/// An actor as weirdnet-access sees it (for the rank rules).
+fn access_actor(a: &Actor) -> weirdnet_access::Actor {
+    match a {
+        Actor::Owner => weirdnet_access::Actor::Owner,
+        Actor::Member { member, role } => weirdnet_access::Actor::Member { user_id: member.id.clone(), role: access_role(role) },
+        Actor::Guest => weirdnet_access::Actor::Guest,
+    }
 }
 
 /// Who is acting.
@@ -155,7 +190,7 @@ pub fn can(s: &Store, org: &Org, a: &Actor, perm: &str) -> bool {
         Actor::Owner => true,
         Actor::Member { member, role } => member.status == MemberStatus::Member && role_has(role, perm),
         Actor::Guest => {
-            if org.access != Access::Open || MANAGING.contains(&perm) {
+            if org.access != Access::Open || catalog().is_managing(perm) {
                 return false;
             }
             guest_role(s, org).is_some_and(|r| role_has(&r, perm))
@@ -238,13 +273,14 @@ pub fn remove(s: &Store, origin: &str, a: &Actor, org: &Org) -> Result<Org> {
 // ---------- roles ----------
 
 pub(crate) fn check_grant(org: &Org, a: &Actor, role: &Role) -> Result<()> {
-    if role.name == OWNER && role.builtin && !matches!(a, Actor::Owner) {
-        return Err(Error::invalid("role", format!("only the owner of {} gives the owner role", org.name)));
-    }
-    if !matches!(a, Actor::Owner) && role.rank >= a.rank() {
-        return Err(Error::invalid("role", format!("{} ranks as high as or above {}", role.name, a.who())));
-    }
-    Ok(())
+    let r = access_role(role);
+    weirdnet_access::roles::check_grant(&access_actor(a), &r).map_err(|_| {
+        if r.is_owner() {
+            Error::invalid("role", format!("only the owner of {} gives the owner role", org.name))
+        } else {
+            Error::invalid("role", format!("{} ranks as high as or above {}", role.name, a.who()))
+        }
+    })
 }
 
 pub fn create_role(s: &Store, origin: &str, a: &Actor, org: &Org, name: &str, rank: i64, perms: &[String]) -> Result<Role> {
@@ -344,17 +380,14 @@ pub fn set_role(s: &Store, origin: &str, a: &Actor, org: &Org, m: &Member, role:
 
 /// May `a` act on member `m` (rank above it)?
 fn over(s: &Store, a: &Actor, m: &Member) -> Result<()> {
-    if matches!(a, Actor::Owner) {
-        if m.role_id.as_deref().and_then(|r| s.role(r).ok().flatten()).is_some_and(|r| r.builtin && r.name == OWNER) {
-            return Err(Error::invalid("member", "that is the owner"));
+    let theirs = m.role_id.as_deref().and_then(|r| s.role(r).ok().flatten()).map(|r| access_role(&r));
+    weirdnet_access::roles::check_over(&access_actor(a), theirs.as_ref()).map_err(|_| {
+        if matches!(a, Actor::Owner) {
+            Error::invalid("member", "that is the owner")
+        } else {
+            Error::invalid("member", format!("{} ranks as high as or above {}", m.title(), a.who()))
         }
-        return Ok(());
-    }
-    let their = m.role_id.as_deref().and_then(|r| s.role(r).ok().flatten()).map(|r| r.rank).unwrap_or(i64::MIN);
-    if their >= a.rank() {
-        return Err(Error::invalid("member", format!("{} ranks as high as or above {}", m.title(), a.who())));
-    }
-    Ok(())
+    })
 }
 
 /// What happens to the resources a kicked member gave the org.
@@ -784,7 +817,7 @@ pub fn served_code(s: &Store, org: &Org) -> Result<Vec<crate::store::CodeSpace>>
 
 /// May this node, a member of a joined org, do something there (by the role it was given)?
 pub fn joined_can(j: &crate::store::Joined, perm: &str) -> bool {
-    j.status == MemberStatus::Member && j.perms.iter().any(|p| p == "*" || p == perm || IMPLIES.iter().any(|(k, v)| k == p && v.contains(&perm)))
+    j.status == MemberStatus::Member && perms_give(&j.perms, perm)
 }
 
 /// Serve (or stop serving) a code space for a joined org on this node (needs `code.manage`

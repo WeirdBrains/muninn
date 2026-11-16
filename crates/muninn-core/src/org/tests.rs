@@ -357,3 +357,57 @@ fn orgs_carry_serve_and_sync_code_spaces() {
     assert_eq!(apply_spaces(&n, &o.id, &list).unwrap()[0].state, "changed");
     assert_eq!(n.find_code_space("dbl").unwrap().source, "y = 3");
 }
+
+/// The table-driven rule Muninn used before weirdnet-access (one implication step).
+fn old_role_has(perms: &[String], perm: &str) -> bool {
+    perms.iter().any(|p| p == "*" || p == perm || IMPLIES.iter().any(|(k, v)| k == p && v.contains(&perm)))
+}
+
+#[test]
+fn weirdnet_access_gives_the_same_permissions_as_before() {
+    let mut names: Vec<&str> = PERMS.iter().map(|(p, _)| *p).collect();
+    names.push("*");
+    let wanted: Vec<&str> = names.iter().copied().chain(["unknown"]).collect();
+    let mut sets: Vec<Vec<String>> = default_roles().into_iter().map(|(_, _, p)| p).collect();
+    sets.push(vec![]);
+    for a in &names {
+        sets.push(vec![a.to_string()]);
+        for b in &names {
+            sets.push(vec![a.to_string(), b.to_string()]);
+        }
+    }
+    for perms in &sets {
+        for w in &wanted {
+            assert_eq!(perms_give(perms, w), old_role_has(perms, w), "{perms:?} gives {w}");
+        }
+    }
+}
+
+#[test]
+fn weirdnet_access_keeps_guests_from_the_same_permissions() {
+    for (p, _) in PERMS {
+        assert_eq!(catalog().is_managing(p), MANAGING.contains(p), "{p}");
+    }
+    assert_eq!(check_perm(" READ ").unwrap(), "read");
+    assert_eq!(check_perm("*").unwrap(), "*");
+    let e = check_perm("bogus").unwrap_err().to_string();
+    assert!(e.contains("`bogus`: one of org.edit, roles.manage, members.list"), "{e}");
+}
+
+#[test]
+fn the_rank_rules_keep_their_messages() {
+    let s = Store::open_in_memory().unwrap();
+    let (o, ben) = org_with_member(&s, "admin");
+    let admin = actor_for(&s, &ben).unwrap();
+    let owner_r = s.find_role(&o.id, "owner").unwrap();
+    let admin_r = s.find_role(&o.id, "admin").unwrap();
+    let user_r = s.find_role(&o.id, "user").unwrap();
+    let owner_m = s.member_by_peer(&o.id, &o.owner_peer).unwrap().unwrap();
+    let err = |r: Result<Member>| r.unwrap_err().to_string();
+    assert!(err(set_role(&s, "cli", &Actor::Owner, &o, &owner_m, &user_r)).contains("that is the owner"));
+    assert!(err(set_role(&s, "cli", &admin, &o, &owner_m, &user_r)).contains("ranks as high as or above ben (admin)"));
+    let carl = s.upsert_member(&o.id, "12D3KooWcarlcarl", "carl", Some(&user_r.id), MemberStatus::Member, None, "", None).unwrap();
+    assert!(err(set_role(&s, "cli", &admin, &o, &carl, &owner_r)).contains("only the owner of Lab gives the owner role"));
+    assert!(err(set_role(&s, "cli", &admin, &o, &carl, &admin_r)).contains("admin ranks as high as or above ben (admin)"));
+    assert!(set_role(&s, "cli", &Actor::Owner, &o, &carl, &admin_r).is_ok());
+}
