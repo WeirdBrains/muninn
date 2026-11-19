@@ -27,6 +27,8 @@ jobs:
         run: packaging/arch/test-build-local.sh
       - name: publish-taur.sh checks sums, .SRCINFO, draft and TAUR state (stubbed)
         run: packaging/arch/test-publish-taur.sh
+      - name: fill-sums.py puts every sum on its real stanza line, no placeholders left
+        run: scripts/test-fill-sums.sh
       - name: release.toml is valid for the vendored shared release script
         run: python3 scripts/weirdnet_release.py validate
 
