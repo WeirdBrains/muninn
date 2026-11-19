@@ -431,9 +431,7 @@ pub fn resources(store: &Store) -> Result<Vec<Value>> {
 
 /// One resource by URI.
 pub fn read(store: &Store, uri: &str) -> Result<Value> {
-    // muninn:// is the scheme up to v2.27; it is still read, never written.
-    let rest =
-        uri.strip_prefix(RES).or_else(|| uri.strip_prefix("muninn://")).ok_or_else(|| Error::invalid("uri", format!("`{uri}`: {RES}KIND/ID")))?;
+    let rest = uri.strip_prefix(RES).ok_or_else(|| Error::invalid("uri", format!("`{uri}`: {RES}KIND/ID")))?;
     let parts: Vec<&str> = rest.split('/').filter(|p| !p.is_empty()).collect();
     let bad = || Error::invalid("uri", format!("`{uri}`: see resources/templates/list"));
     Ok(match parts.as_slice() {
@@ -511,8 +509,8 @@ mod tests {
         assert_eq!(uri, format!("weirdnet-muninn://journal/{}", j.id));
         let back = rpc(&s, &reader.id, "resources/read", json!({ "uri": uri }));
         assert!(back["result"]["contents"][0]["text"].as_str().unwrap().contains("Day 1"));
-        let old = rpc(&s, &reader.id, "resources/read", json!({ "uri": format!("muninn://journal/{}", j.id) }));
-        assert!(old["result"]["contents"][0]["text"].as_str().unwrap().contains("Day 1"), "{old}");
+        // muninn:// (v2.27 and earlier) is refused
+        assert_eq!(rpc(&s, &reader.id, "resources/read", json!({ "uri": format!("muninn://journal/{}", j.id) }))["error"]["code"], INVALID_PARAMS);
         assert_eq!(rpc(&s, &reader.id, "resources/read", json!({ "uri": format!("weirdnet://journal/{}", j.id) }))["error"]["code"], INVALID_PARAMS);
         assert_eq!(rpc(&s, &reader.id, "resources/read", json!({ "uri": "weirdnet-muninn://nope/1" }))["error"]["code"], INVALID_PARAMS);
         assert_eq!(rpc(&s, &reader.id, "nope", json!({}))["error"]["code"], METHOD_NOT_FOUND);

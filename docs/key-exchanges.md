@@ -65,7 +65,7 @@ short code = HKDF(…, info = "…/sas") as ten digits
 fingerprint= first 8 bytes of the transcript, grouped
 ```
 
-Offers travel as `Connect` requests (`/muninn/net/1`): the other node answers at once
+Offers travel as `Connect` requests (`/muninn/net/2`): the other node answers at once
 (`Answered`) or keeps it as a request; the asking node polls for the answer later.
 Older nodes get the offer as before. Each request over an exchange is sealed with its
 key (aad `muninn/net/msg/v1|exchange|from|to`), on top of libp2p's Noise channel.
@@ -78,9 +78,9 @@ review's.
 by hand: `create` (a token), `accept TOKEN`, `verify X CODE`, `list`, `show X
 [--tokens]`, `label`, `revoke`. Tokens `mnnn-x1-offer:` / `mnnn-x1-answer:` and links
 `weirdnet-muninn://join/` / `weirdnet-muninn://answer/` are the same thing in two spellings.
-Links made by v2.27 and earlier (`muninn://join/…`, `muninn://answer/…`) carry the same
-token and are still accepted; Muninn only makes `weirdnet-muninn://` links, and never makes or
-accepts a bare `weirdnet://` link.
+Links of v2.27 and earlier (`muninn://join/…`, `muninn://answer/…`) are no longer read:
+paste the plain `mnnn-x1-…` token from that link, or ask for a new link. Muninn only makes
+and reads `weirdnet-muninn://` links, and never makes or accepts a bare `weirdnet://` link.
 
 ## Backups
 

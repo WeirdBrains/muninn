@@ -206,7 +206,7 @@ and [`packaging/nginx/muninn-mcp.conf`](../packaging/nginx/muninn-mcp.conf).
 wherever Muninn's CLI accepts them.
 
 **Resources** (`resources/list`, `resources/read`; JSON). URIs use `weirdnet-muninn://`;
-the older `muninn://` URIs are still read:
+the older `muninn://` URIs are refused:
 
 | URI | What |
 |---|---|

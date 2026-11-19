@@ -5,14 +5,14 @@
 //! (a wire break), not part of the extraction.
 //!
 //! Links are the exception: they are on Muninn's own app scheme, `weirdnet-muninn://`, as
-//! every first-party Weirdnet app's are. Links from older Muninn (`muninn://join/…`) are still
-//! read ([`LEGACY_LINKS`]) but never made, and bare `weirdnet://` links are never made or read.
+//! every first-party Weirdnet app's are. The `muninn://` links of v2.27.0 and earlier are not
+//! read, and bare `weirdnet://` links are never made or read.
 use weirdnet_net::profile::{Profile, scope_kind};
 use weirdnet_net::{NetError, Result};
 
 pub const MUNINN: Profile = Profile {
     name: "muninn",
-    protocol: "/muninn/net/1",
+    protocol: "/muninn/net/2",
     kad: "/muninn/kad/1",
     relay_key: "/muninn/relay/1",
     identify: "/muninn/id/1",
@@ -34,7 +34,7 @@ pub const MUNINN: Profile = Profile {
     sync_aad: "muninn/sync/v1",
     // Not used by Muninn yet (weirdnet-net 0.2 names and peer records); Muninn's own ids so
     // they never mix with other apps'.
-    names: "/muninn/names/1",
+    names: "/muninn/names/2",
     peer_record: "muninn/peer-record/v1",
     withdrawal: "muninn/withdrawal/v1",
     peer_key: "muninn/peer/",
@@ -42,10 +42,6 @@ pub const MUNINN: Profile = Profile {
     thread: "muninn-net",
     scopes,
 };
-
-/// Muninn's profile with the links of v2.27.0 and earlier (`muninn://join/…`,
-/// `muninn://answer/…`). Only for reading links people already hold; nothing makes them.
-pub const LEGACY_LINKS: Profile = Profile { join_link: "muninn://join/", answer_link: "muninn://answer/", link_mark: "muninn://", ..MUNINN };
 
 /// What an exchange is for: `node` (two nodes), `link` (2.10, a node asking to act for the
 /// answering node's user), `organization` (2.7, a membership: `as` is `apply` or `invite`)

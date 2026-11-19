@@ -1,5 +1,5 @@
-//! What nodes say to each other over `/muninn/net/1` (request-response, CBOR). These are
-//! Muninn's types, carried by weirdnet-net's node; their serialized form is unchanged.
+//! What nodes say to each other over `/muninn/net/2` (request-response, CBOR). These are
+//! Muninn's types, carried by weirdnet-net's node; byte fields go out as CBOR byte strings (weirdnet-net 0.8).
 //!
 //! Only a few things travel in the open: `Hello` (a label and capabilities), offers and
 //! answers (public keys and signatures), org listings and polls for an answer. Everything else is a [`Req`] / [`Resp`] sealed

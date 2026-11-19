@@ -8,8 +8,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ### Changed
 
-- Invite, answer and review links are `weirdnet-muninn://join/…` and `weirdnet-muninn://answer/…`, and MCP resource URIs are `weirdnet-muninn://KIND/ID`; older `muninn://` links and URIs are still accepted, and a bare `weirdnet://` link is refused.
-- The network comes from weirdnet-net 0.7.0; protocol ids, tokens and wire formats are unchanged, so nodes still talk to earlier versions.
+- Breaking: invite, answer and review links are `weirdnet-muninn://join/…` and `weirdnet-muninn://answer/…`, and MCP resource URIs are `weirdnet-muninn://KIND/ID`. The `muninn://` links and URIs of v2.27.0 and earlier are no longer read (use the plain `mnnn-x1-…` token or a new link), and a bare `weirdnet://` link is refused.
+- Breaking: the network comes from weirdnet-net 0.8.0, which sends byte fields as CBOR byte strings (about half the size for large pages). Muninn's request protocol is `/muninn/net/2` and its names protocol `/muninn/names/2`, so this version cannot talk to v2.27.0 and earlier: upgrade every node together.
 
 ## [2.27.0] - 2026-11-16
 

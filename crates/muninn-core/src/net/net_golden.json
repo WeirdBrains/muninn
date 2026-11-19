@@ -127,7 +127,7 @@
         ],
         [
           "muninn://join/abc",
-          true
+          false
         ],
         [
           "weirdnet-muninn://join/abc",

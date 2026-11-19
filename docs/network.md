@@ -15,15 +15,16 @@ item. A node you do not know asks before it is connected.
 The node, key exchanges, invitations, sealed messaging, node identities and user
 certificates come from the `weirdnet-net` crate in this repository (so does the automation that
 delivers, answers, polls and settles requests), run with Muninn's own
-identifiers (`/muninn/net/1`, `mnnn-x1-` tokens), so Muninn nodes talk to
-earlier versions exactly as before. Links are `weirdnet-muninn://join/…` and
+identifiers (`/muninn/net/2`, `mnnn-x1-` tokens). Requests travel as CBOR with byte fields as
+byte strings (weirdnet-net 0.8), so Muninn nodes cannot talk to v2.27 and earlier: upgrade every
+node together. Links are `weirdnet-muninn://join/…` and
 `weirdnet-muninn://answer/…` (Weirdnet reserves bare `weirdnet://`); the older
-`muninn://` links carry the same token and are still accepted. What peers may ask for, and everything they reach, is
+`muninn://` links are not read. What peers may ask for, and everything they reach, is
 decided by Muninn.
 
 Built on libp2p: TCP and QUIC, Noise encryption, Yamux, mDNS on the local network,
 Kademlia for the wide network, identify, ping, AutoNAT, relays (client and server) with
-DCUtR hole punching, and Muninn's own request-response protocol `/muninn/net/1`
+DCUtR hole punching, and Muninn's own request-response protocol `/muninn/net/2`
 (CBOR). The node's identity is an Ed25519 key kept in the encrypted database; its peer
 id (`12D3KooW…`) is how others know it.
 

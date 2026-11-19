@@ -203,7 +203,7 @@ pub fn accept(s: &Store, node: Option<&Node>, kp: &Keypair, key: &str, my_label:
     Ok(Link { status, peer, peer_id: a.exchange.peer_id.clone(), exchange: Some(a.exchange), detail, warning: None })
 }
 
-/// Use an invite link (`weirdnet-muninn://join/…`, an old `muninn://join/…`, or a pasted token): answer it and deliver the
+/// Use an invite link (`weirdnet-muninn://join/…` or a pasted token): answer it and deliver the
 /// answer. When their node cannot be reached now, it is delivered later ([`settle`]) and a
 /// link that finishes it by hand is given too.
 #[allow(clippy::too_many_arguments)]

@@ -2,10 +2,10 @@
 //! ([`MUNINN`]): authenticated X25519 between two node identities, signed offers and
 //! answers, a short code to compare, tokens (`mnnn-x1-offer:` / `mnnn-x1-answer:`) and
 //! links (`weirdnet-muninn://join/…`, `weirdnet-muninn://answer/…`; the `muninn://` links of
-//! v2.27.0 and earlier are still read), and messages sealed under the exchange key. The formats and the derivation are the crate's (see `weirdnet_net::exchange`); the
+//! v2.27.0 and earlier are not read), and messages sealed under the exchange key. The formats and the derivation are the crate's (see `weirdnet_net::exchange`); the
 //! labels are Muninn's, unchanged, so they interoperate with v2.23.0 and earlier nodes. What
 //! each scope grants (orgs, reviews, links) is Muninn's policy.
-use super::profile::{LEGACY_LINKS, MUNINN};
+use super::profile::MUNINN;
 use crate::crypto::{Key32, Sealed};
 use crate::error::Result;
 use libp2p::PeerId;
@@ -95,27 +95,21 @@ pub fn link_or_token(token: &str) -> String {
     link(token).unwrap_or_else(|_| token.to_string())
 }
 
-/// Is this a link of v2.27.0 and earlier (`muninn://`)? They are still read.
-fn legacy(input: &str) -> bool {
-    LEGACY_LINKS.is_token(input) && !MUNINN.is_token(input)
-}
-
-/// A token from a link (current or `muninn://`) or a token (whitespace and line breaks
-/// dropped).
+/// A token from a link (`weirdnet-muninn://`) or a token (whitespace and line breaks
+/// dropped). `muninn://` links are not read.
 pub fn unlink(input: &str) -> String {
-    if legacy(input) { LEGACY_LINKS.unlink(input) } else { MUNINN.unlink(input) }
+    MUNINN.unlink(input)
 }
 
-/// Does this look like a token or a link, current or `muninn://` (rather than an id or a
-/// name)?
+/// Does this look like a token or a link (rather than an id or a name)? `muninn://` does not.
 pub fn is_token(input: &str) -> bool {
-    MUNINN.is_token(input) || legacy(input)
+    MUNINN.is_token(input)
 }
 
-/// Read an offer or answer token, or its link (current or `muninn://`; whitespace and line
-/// breaks are ignored). Bare `weirdnet://` links are refused.
+/// Read an offer or answer token, or its link (`weirdnet-muninn://`; whitespace and line
+/// breaks are ignored). `muninn://` and bare `weirdnet://` links are refused.
 pub fn parse_token(s: &str) -> Result<Token> {
-    Ok(if legacy(s) { LEGACY_LINKS.parse_token(s)? } else { MUNINN.parse_token(s)? })
+    Ok(MUNINN.parse_token(s)?)
 }
 
 /// Seal a message for the other side of an exchange (the exchange and both peer ids are
@@ -139,24 +133,24 @@ mod tests {
         assert_eq!(super::unlink(&l), t);
         assert_eq!(super::unlink(&t), t);
         assert!(super::is_token(&l) && super::is_token(&t) && !super::is_token("ben"));
-        // links from v2.27.0 and earlier are still read, never made
-        let old = "muninn://join/abc_-".to_string();
-        assert!(super::is_token(&old));
-        assert_eq!(super::unlink(&old), t);
-        assert_eq!(super::unlink(" muninn://answer/x\n "), format!("{}x", super::ANSWER_PREFIX));
+        // links from v2.27.0 and earlier (`muninn://`) are not read
+        for old in ["muninn://join/abc_-", " muninn://answer/x\n "] {
+            assert!(!super::is_token(old), "{old}");
+            assert_ne!(super::unlink(old), t);
+            assert!(super::parse_token(old).is_err(), "{old}");
+        }
         // bare weirdnet:// is neither a Muninn link nor accepted
         assert!(!super::is_token("weirdnet://join/abc"));
         assert!(super::parse_token("weirdnet://join/abc").unwrap_err().to_string().contains("reserved"));
     }
 
     #[test]
-    fn old_and_new_links_carry_the_same_offer() {
+    fn links_and_tokens_carry_the_same_offer() {
         let a = Keypair::generate_ed25519();
         let (offer, _) = Offer::new(&a, "anna", vec![], node_scope(), 1_000, DEFAULT_TTL_MS).unwrap();
         let tok = offer.token().unwrap();
         let new = link(&tok).unwrap();
-        let old = new.replacen("weirdnet-muninn://", "muninn://", 1);
-        for l in [&new, &old, &tok] {
+        for l in [&new, &tok] {
             let Token::Offer(o) = parse_token(l).unwrap() else { panic!("{l}") };
             assert_eq!(o, offer);
         }

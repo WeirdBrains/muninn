@@ -22,7 +22,7 @@ fn hkdf_raw(ikm: &[u8; 32], salt: &[u8], info: &[u8]) -> [u8; 32] {
 #[test]
 fn libp2p_protocol_ids() {
     use crate::net::proto::*;
-    assert_eq!(PROTOCOL, "/muninn/net/1");
+    assert_eq!(PROTOCOL, "/muninn/net/2");
     assert_eq!(KAD_PROTOCOL, "/muninn/kad/1");
     assert_eq!(RELAY_KEY, "/muninn/relay/1");
     assert_eq!(IDENTIFY_PROTOCOL, "/muninn/id/1");
