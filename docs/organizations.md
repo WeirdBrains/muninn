@@ -78,7 +78,7 @@ requests are authenticated by that exchange's key.
   the answer; `mnnn org sync` does it at once).
 - **Invite:** `mnnn org member invite ORG [--peer P] [--label L] [--role R]` delivers the
   invitation to that node (it shows in `mnnn net requests` and the TUI), or prints an
-  invite link `muninn://join/…`; the invitee runs `mnnn org join LINK` or
+  invite link `weirdnet-muninn://join/…`; the invitee runs `mnnn org join LINK` or
   `mnnn org join ORG` for one that arrived.
 - **Roles:** `mnnn org member role ORG MEMBER ROLE`.
 - **Kick:** `mnnn org member kick ORG MEMBER [--resources keep|archive|publish]` ends the

@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+### Changed
+
+- Invite, answer and review links are `weirdnet-muninn://join/…` and `weirdnet-muninn://answer/…`, and MCP resource URIs are `weirdnet-muninn://KIND/ID`; older `muninn://` links and URIs are still accepted, and a bare `weirdnet://` link is refused.
+- The network comes from weirdnet-net 0.7.0; protocol ids, tokens and wire formats are unchanged, so nodes still talk to earlier versions.
+
 ## [2.27.0] - 2026-11-16
 
 ### Added

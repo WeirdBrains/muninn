@@ -155,7 +155,7 @@ host signs everyone out. `/o/ORG/sign-out` ends a session early. Sessions cover 
 API calls stay signed requests.
 
 **Invite links.** When the site is being served, `mnnn org member invite` also prints a web
-link, `https://HOST/o/ORG/join#muninn://join/…`. The invite stays in the `#fragment`,
+link, `https://HOST/o/ORG/join#weirdnet-muninn://join/…`. The invite stays in the `#fragment`,
 which browsers never send, so it never reaches the host or its logs. The join page reads
 it in the browser and offers to open it in Muninn, or shows the `mnnn org join` command.
 Accepting the invite starts the key exchange from the invitee's node.

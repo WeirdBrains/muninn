@@ -57,7 +57,7 @@ time they talk, quietly.
 ## Invites
 
 One invite system covers connections, org membership, reviews and node links. An
-invite is a signed, expiring, single-use link (`muninn://join/…`) that holds no secret.
+invite is a signed, expiring, single-use link (`weirdnet-muninn://join/…`) that holds no secret.
 
 | You want to | CLI | TUI |
 |---|---|---|

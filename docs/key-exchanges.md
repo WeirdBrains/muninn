@@ -10,7 +10,7 @@ it stands: *pending*, *requested*, *connected*, *ended* or *failed*.
 | You want to | CLI | TUI |
 |---|---|---|
 | Connect to a node | `mnnn net connect ADDR\|PEER\|NAME` | Net ▸ Nodes, `c` |
-| Invite a node | `mnnn invite create` or `mnnn net invite` (prints `muninn://join/…`) | Net ▸ Invites, `n` |
+| Invite a node | `mnnn invite create` or `mnnn net invite` (prints `weirdnet-muninn://join/…`) | Net ▸ Invites, `n` |
 | Use an invite link | `mnnn invite accept LINK` or `mnnn net connect LINK` | Invites, `p` (paste) |
 | See requests | `mnnn invite list`, `mnnn net requests` | Invites, or Nodes: rows marked *requested* |
 | Accept / decline | `mnnn net accept X`, `mnnn net decline X` | `a` / `d` on a request |
@@ -77,7 +77,10 @@ review's.
 `mnnn net exchange …` (hidden from the command list, but always there) does each step
 by hand: `create` (a token), `accept TOKEN`, `verify X CODE`, `list`, `show X
 [--tokens]`, `label`, `revoke`. Tokens `mnnn-x1-offer:` / `mnnn-x1-answer:` and links
-`muninn://join/` / `muninn://answer/` are the same thing in two spellings.
+`weirdnet-muninn://join/` / `weirdnet-muninn://answer/` are the same thing in two spellings.
+Links made by v2.27 and earlier (`muninn://join/…`, `muninn://answer/…`) carry the same
+token and are still accepted; Muninn only makes `weirdnet-muninn://` links, and never makes or
+accepts a bare `weirdnet://` link.
 
 ## Backups
 

@@ -205,19 +205,20 @@ and [`packaging/nginx/muninn-mcp.conf`](../packaging/nginx/muninn-mcp.conf).
 `tools/list` shows a client only the tools its role allows. Names and ids are accepted
 wherever Muninn's CLI accepts them.
 
-**Resources** (`resources/list`, `resources/read`; JSON):
+**Resources** (`resources/list`, `resources/read`; JSON). URIs use `weirdnet-muninn://`;
+the older `muninn://` URIs are still read:
 
 | URI | What |
 |---|---|
-| `muninn://journal/ID` | a journal and its entries |
-| `muninn://project/ID` | a project and its items |
-| `muninn://model/ID` | a model's design |
-| `muninn://model/ID/records` | its records (first 500) |
-| `muninn://report/ID` | a report and its sections |
-| `muninn://search/ID` | a live search |
-| `muninn://view/ID` | a code space's last result |
-| `muninn://org/ID/resources` | what an org holds |
-| `muninn://org/ID/executables` | what this node serves for an org |
+| `weirdnet-muninn://journal/ID` | a journal and its entries |
+| `weirdnet-muninn://project/ID` | a project and its items |
+| `weirdnet-muninn://model/ID` | a model's design |
+| `weirdnet-muninn://model/ID/records` | its records (first 500) |
+| `weirdnet-muninn://report/ID` | a report and its sections |
+| `weirdnet-muninn://search/ID` | a live search |
+| `weirdnet-muninn://view/ID` | a code space's last result |
+| `weirdnet-muninn://org/ID/resources` | what an org holds |
+| `weirdnet-muninn://org/ID/executables` | what this node serves for an org |
 
 ### What is recorded
 

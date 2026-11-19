@@ -2,7 +2,7 @@
 
 Checks an invite link for this organization before you accept it.
 
-input:  { "link": "muninn://join/…" }
+input:  { "link": "weirdnet-muninn://join/…" }
 output: { "valid": bool, "org": name, "role": role name, "expires": epoch ms,
           "next": "mnnn org join LINK" }
 
