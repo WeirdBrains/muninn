@@ -397,8 +397,8 @@ pub fn find_urls(text: &str) -> Vec<(usize, usize)> {
     let mut out = vec![];
     let mut i = 0;
     while i < chars.len() {
-        let rest: String = chars[i..chars.len().min(i + 10)].iter().collect();
-        let scheme = ["https://", "http://", "muninn://"].iter().find(|s| rest.starts_with(**s));
+        let rest: String = chars[i..chars.len().min(i + 18)].iter().collect();
+        let scheme = ["https://", "http://", "weirdnet-muninn://", "muninn://"].iter().find(|s| rest.starts_with(**s));
         let boundary = i == 0 || !chars[i - 1].is_alphanumeric();
         if let (Some(sc), true) = (scheme, boundary) {
             let mut j = i + sc.len();
@@ -500,7 +500,8 @@ mod url_tests {
         assert_eq!(urls("site: https://lab.example.org:4743/x, ok"), vec!["https://lab.example.org:4743/x"]);
         assert_eq!(urls("(see http://a.b/c)."), vec!["http://a.b/c"]);
         assert_eq!(urls("https://en.wikipedia.org/wiki/A_(b)"), vec!["https://en.wikipedia.org/wiki/A_(b)"]);
-        assert_eq!(urls("join muninn://join/abc│"), vec!["muninn://join/abc"]);
+        assert_eq!(urls("join weirdnet-muninn://join/abc│"), vec!["weirdnet-muninn://join/abc"]);
+        assert_eq!(urls("old muninn://join/abc"), vec!["muninn://join/abc"]);
         assert!(urls("nohttps://x https:// plain").is_empty());
     }
 }

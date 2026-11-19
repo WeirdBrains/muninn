@@ -56,7 +56,7 @@ pub const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "read",
-        about: "Read one resource by its muninn:// URI (see resources/list), e.g. muninn://journal/ID.",
+        about: "Read one resource by its weirdnet-muninn:// URI (see resources/list), e.g. weirdnet-muninn://journal/ID.",
         need: Need::Read,
         schema: || obj(json!({ "uri": { "type": "string" } }), &["uri"]),
     },
@@ -271,7 +271,7 @@ fn call(store: &Store, c: &McpClient, name: &str, a: &Value) -> Result<Value> {
                 format!("write entry {} in {}", e.heading(), j.name),
                 json!({ "journal": j.id, "entry": e.id, "title": e.heading() }),
             );
-            Ok(json!({ "entry": e.id, "journal": j.id, "uri": format!("muninn://journal/{}", j.id) }))
+            Ok(json!({ "entry": e.id, "journal": j.id, "uri": format!("weirdnet-muninn://journal/{}", j.id) }))
         }
         "add_note" => {
             let j = store.find_journal(s(a, "journal")?)?;
@@ -386,21 +386,24 @@ fn views(store: &Store) -> Result<Vec<Value>> {
         .filter_map(|c| {
             let r = c.last_run.as_ref()?;
             let title = crate::code::run_view(r).map(|v| v.title().to_string()).unwrap_or_default();
-            Some(json!({ "code": c.id, "name": c.name, "title": title, "status": r.status, "at": r.at, "uri": format!("muninn://view/{}", c.id) }))
+            Some(json!({ "code": c.id, "name": c.name, "title": title, "status": r.status, "at": r.at, "uri": format!("weirdnet-muninn://view/{}", c.id) }))
         })
         .collect())
 }
 
+/// The resource URI scheme (the Weirdnet app scheme for Muninn; never bare `weirdnet://`).
+pub const RES: &str = "weirdnet-muninn://";
+
 const TEMPLATES: &[(&str, &str, &str)] = &[
-    ("muninn://journal/{id}", "journal", "A journal with its entries"),
-    ("muninn://project/{id}", "project", "A project with its items"),
-    ("muninn://model/{id}", "model", "A model's design"),
-    ("muninn://model/{id}/records", "records", "A model's records (first 500)"),
-    ("muninn://report/{id}", "report", "A report with its sections"),
-    ("muninn://search/{id}", "live search", "A live search's definition"),
-    ("muninn://view/{id}", "view", "A code space's last result"),
-    ("muninn://org/{id}/resources", "org resources", "What an org holds"),
-    ("muninn://org/{id}/executables", "executables", "What this node serves for an org"),
+    ("weirdnet-muninn://journal/{id}", "journal", "A journal with its entries"),
+    ("weirdnet-muninn://project/{id}", "project", "A project with its items"),
+    ("weirdnet-muninn://model/{id}", "model", "A model's design"),
+    ("weirdnet-muninn://model/{id}/records", "records", "A model's records (first 500)"),
+    ("weirdnet-muninn://report/{id}", "report", "A report with its sections"),
+    ("weirdnet-muninn://search/{id}", "live search", "A live search's definition"),
+    ("weirdnet-muninn://view/{id}", "view", "A code space's last result"),
+    ("weirdnet-muninn://org/{id}/resources", "org resources", "What an org holds"),
+    ("weirdnet-muninn://org/{id}/executables", "executables", "What this node serves for an org"),
 ];
 
 fn res(uri: String, name: &str, kind: &str) -> Value {
@@ -410,25 +413,27 @@ fn res(uri: String, name: &str, kind: &str) -> Value {
 /// Every concrete resource (journals, projects, models, reports, searches, views, orgs).
 pub fn resources(store: &Store) -> Result<Vec<Value>> {
     let mut v = vec![];
-    v.extend(store.journals()?.iter().map(|j| res(format!("muninn://journal/{}", j.id), &j.name, "journal")));
-    v.extend(store.projects()?.iter().map(|p| res(format!("muninn://project/{}", p.id), &p.name, "project")));
+    v.extend(store.journals()?.iter().map(|j| res(format!("weirdnet-muninn://journal/{}", j.id), &j.name, "journal")));
+    v.extend(store.projects()?.iter().map(|p| res(format!("weirdnet-muninn://project/{}", p.id), &p.name, "project")));
     for m in store.models()? {
-        v.push(res(format!("muninn://model/{}", m.id), &m.name, "model"));
-        v.push(res(format!("muninn://model/{}/records", m.id), &m.name, "records"));
+        v.push(res(format!("weirdnet-muninn://model/{}", m.id), &m.name, "model"));
+        v.push(res(format!("weirdnet-muninn://model/{}/records", m.id), &m.name, "records"));
     }
-    v.extend(store.reports()?.iter().map(|r| res(format!("muninn://report/{}", r.id), &r.name, "report")));
-    v.extend(store.live_searches()?.iter().map(|s| res(format!("muninn://search/{}", s.id), &s.name, "live search")));
+    v.extend(store.reports()?.iter().map(|r| res(format!("weirdnet-muninn://report/{}", r.id), &r.name, "report")));
+    v.extend(store.live_searches()?.iter().map(|s| res(format!("weirdnet-muninn://search/{}", s.id), &s.name, "live search")));
     v.extend(views(store)?.iter().map(|x| res(x["uri"].as_str().unwrap_or_default().into(), x["name"].as_str().unwrap_or_default(), "view")));
     for o in store.orgs()? {
-        v.push(res(format!("muninn://org/{}/resources", o.id), &o.name, "org resources"));
-        v.push(res(format!("muninn://org/{}/executables", o.id), &o.name, "executables"));
+        v.push(res(format!("weirdnet-muninn://org/{}/resources", o.id), &o.name, "org resources"));
+        v.push(res(format!("weirdnet-muninn://org/{}/executables", o.id), &o.name, "executables"));
     }
     Ok(v)
 }
 
 /// One resource by URI.
 pub fn read(store: &Store, uri: &str) -> Result<Value> {
-    let rest = uri.strip_prefix("muninn://").ok_or_else(|| Error::invalid("uri", format!("`{uri}`: muninn://KIND/ID")))?;
+    // muninn:// is the scheme up to v2.27; it is still read, never written.
+    let rest =
+        uri.strip_prefix(RES).or_else(|| uri.strip_prefix("muninn://")).ok_or_else(|| Error::invalid("uri", format!("`{uri}`: {RES}KIND/ID")))?;
     let parts: Vec<&str> = rest.split('/').filter(|p| !p.is_empty()).collect();
     let bad = || Error::invalid("uri", format!("`{uri}`: see resources/templates/list"));
     Ok(match parts.as_slice() {
@@ -503,10 +508,13 @@ mod tests {
         // resources
         let res = rpc(&s, &reader.id, "resources/list", json!({}));
         let uri = res["result"]["resources"][0]["uri"].as_str().unwrap().to_string();
-        assert_eq!(uri, format!("muninn://journal/{}", j.id));
+        assert_eq!(uri, format!("weirdnet-muninn://journal/{}", j.id));
         let back = rpc(&s, &reader.id, "resources/read", json!({ "uri": uri }));
         assert!(back["result"]["contents"][0]["text"].as_str().unwrap().contains("Day 1"));
-        assert_eq!(rpc(&s, &reader.id, "resources/read", json!({ "uri": "muninn://nope/1" }))["error"]["code"], INVALID_PARAMS);
+        let old = rpc(&s, &reader.id, "resources/read", json!({ "uri": format!("muninn://journal/{}", j.id) }));
+        assert!(old["result"]["contents"][0]["text"].as_str().unwrap().contains("Day 1"), "{old}");
+        assert_eq!(rpc(&s, &reader.id, "resources/read", json!({ "uri": format!("weirdnet://journal/{}", j.id) }))["error"]["code"], INVALID_PARAMS);
+        assert_eq!(rpc(&s, &reader.id, "resources/read", json!({ "uri": "weirdnet-muninn://nope/1" }))["error"]["code"], INVALID_PARAMS);
         assert_eq!(rpc(&s, &reader.id, "nope", json!({}))["error"]["code"], METHOD_NOT_FOUND);
         // revoked: refused at once
         s.revoke_mcp_client(&writer.id, true).unwrap();

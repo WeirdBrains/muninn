@@ -46,7 +46,7 @@ weirdnet-rules = { version = "0.1.0" }
 weirdnet-code-spaces = { version = "0.1.0", features = ["math", "polars", "python", "native-plugins"] }
 weirdnet-render = { version = "0.1.0" }
 weirdnet-pipelines = { version = "0.1.0" }
-weirdnet-net = { version = "0.1.0" }
+weirdnet-net = { version = "0.7.0" }
 weirdnet-access = { version = "0.1.1" }
 crossterm = "0.29"
 rpassword = "7"

@@ -455,7 +455,7 @@ fn exchange_lines(x: &Exchange, shares: &[Share]) -> Vec<String> {
     if x.status == ExchangeStatus::Offered && x.peer_id.is_none() {
         v.push(String::new());
         v.push("Invite link (send it to them; it holds no secret):".into());
-        v.push(exchange::link(&x.offer));
+        v.push(exchange::link_or_token(&x.offer));
     }
     v
 }
@@ -573,7 +573,7 @@ fn finish_ask(app: &mut App, kind: NAsk, v: String) {
                     reload(app);
                     app.refresh_history(true);
                     app.network.sel = app.network.exchanges.iter().position(|x| x.id == c.exchange.id).unwrap_or(0);
-                    app.network.detail = vec!["Invite link (send it to them; it holds no secret):".into(), exchange::link(&c.token)];
+                    app.network.detail = vec!["Invite link (send it to them; it holds no secret):".into(), exchange::link_or_token(&c.token)];
                     ok(app, "invite link made: when they use it, the nodes connect on their own");
                 }
                 Err(e) => err(app, e.to_string()),
@@ -855,7 +855,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             Some(x) if x.status == ExchangeStatus::Incoming => accept(app, x.id),
             _ => err(app, "select a request to accept (p pastes an invite link)"),
         },
-        (Tab::Exchanges, KeyCode::Char('p')) => ask(app, NAsk::Accept, "Paste an invite link (muninn://…)", ""),
+        (Tab::Exchanges, KeyCode::Char('p')) => ask(app, NAsk::Accept, "Paste an invite link (weirdnet-muninn://…)", ""),
         (Tab::Exchanges, KeyCode::Char('d')) => match selected_exchange(app) {
             Some(x) if x.status == ExchangeStatus::Incoming => match auto::decline(&app.store, &x.id, ORIGIN) {
                 Ok(x) => {
@@ -982,7 +982,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
             }
         }
         (Tab::Invites, KeyCode::Char('n')) => ask(app, NAsk::Offer, "Invite link (Enter) or connect to (address, peer id)", ""),
-        (Tab::Invites, KeyCode::Char('p')) => ask(app, NAsk::Accept, "Paste an invite link (muninn://…)", ""),
+        (Tab::Invites, KeyCode::Char('p')) => ask(app, NAsk::Accept, "Paste an invite link (weirdnet-muninn://…)", ""),
         (Tab::Invites, KeyCode::Char('a')) => match selected_invite(app) {
             Some((x, true)) if exchange::scope_kind(&x.scope) == "link" => {
                 let t = x.title();
@@ -1020,7 +1020,7 @@ pub fn on_key(app: &mut App, k: KeyEvent) {
                     x.expires_at.map(|e| format!("expires {}", fmt_ms(e))).unwrap_or_default()
                 )];
                 if !req {
-                    d.push(exchange::link(&x.offer));
+                    d.push(exchange::link_or_token(&x.offer));
                 }
                 app.network.detail = d;
             }

@@ -3437,7 +3437,7 @@ class FakeApi implements MuninnApi {
   Future<NetOverview> netOverview() async => net;
 
   final netCalls = <String>[];
-  String nextInvite = 'muninn://join/testhook';
+  String nextInvite = 'weirdnet-muninn://join/testhook';
   NetInvites invites = const NetInvites();
   NetRelayInfo relays = const NetRelayInfo();
   List<NetShareInfo> shared = [];

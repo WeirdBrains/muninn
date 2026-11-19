@@ -370,6 +370,9 @@ impl NetPrefs {
             external: self.external()?,
             // `net::node::start` puts Muninn's version in
             version: String::new(),
+            // the rest as weirdnet-net 0.1.0 had them (request caps and timeout, relay limits,
+            // discovery on)
+            ..Default::default()
         })
     }
 }

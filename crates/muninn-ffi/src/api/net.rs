@@ -249,7 +249,7 @@ fn invite_info(x: &muninn_core::store::Exchange) -> NetInviteInfo {
         purpose: auto::purpose(x),
         expires_at: x.expires_at,
         created_at: x.created_at,
-        link: net::exchange::link(&x.offer),
+        link: net::exchange::link_or_token(&x.offer),
     }
 }
 
@@ -318,7 +318,7 @@ pub(crate) fn invite_of(store: &Store, home: &Path, label: Option<&str>) -> anyh
     let node = hosted_node();
     let addrs = local::offer_addrs(home, store, node.as_deref());
     let c = client::create(store, node.as_deref(), &kp, label.unwrap_or(""), &my, addrs, None, client::DEFAULT_TTL_MS, &prefs.net.relays, ORIGIN)?;
-    Ok(net::exchange::link(&c.token))
+    Ok(net::exchange::link(&c.token)?)
 }
 
 pub(crate) fn share_of(store: &Store, kind: &str, item: &str, with: &[String]) -> anyhow::Result<String> {
@@ -1383,7 +1383,7 @@ mod tests {
         let s = Store::open_in_memory().unwrap();
         let home = tempfile::tempdir().unwrap();
         let link = invite_of(&s, home.path(), Some("ben")).unwrap();
-        assert!(link.starts_with("muninn://join/"), "{link}");
+        assert!(link.starts_with("weirdnet-muninn://join/"), "{link}");
         assert!(muninn_core::net::exchange::is_token(&muninn_core::net::exchange::unlink(&link)));
         assert!(!link.to_lowercase().contains("secret") && !link.contains("private"), "{link}");
         let inv = invites_of(&s).unwrap();

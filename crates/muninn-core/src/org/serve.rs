@@ -304,7 +304,7 @@ pub const JOIN_JS: &str = r#"(function () {
   history.replaceState(null, "", location.pathname);
   var how = document.getElementById("how"), open = document.getElementById("open"), cmd = document.getElementById("cmd");
   how.textContent = "Accept it from your Muninn node (this starts the key exchange with the organization):";
-  if (t.indexOf("muninn://") === 0) { open.href = t; open.hidden = false; }
+  if (t.indexOf("weirdnet-muninn://") === 0) { open.href = t; open.hidden = false; }
   cmd.textContent = "mnnn org join '" + t.replace(/'/g, "") + "'";
   cmd.hidden = false;
 })();

@@ -33,8 +33,8 @@ fn exchange_tokens_links_and_domains() {
     use crate::net::exchange::*;
     assert_eq!(OFFER_PREFIX, "mnnn-x1-offer:");
     assert_eq!(ANSWER_PREFIX, "mnnn-x1-answer:");
-    assert_eq!(JOIN_LINK, "muninn://join/");
-    assert_eq!(ANSWER_LINK, "muninn://answer/");
+    assert_eq!(JOIN_LINK, "weirdnet-muninn://join/");
+    assert_eq!(ANSWER_LINK, "weirdnet-muninn://answer/");
     assert_eq!(OFFER_DOMAIN, b"muninn/net/offer/v1");
     assert_eq!(ANSWER_DOMAIN, b"muninn/net/answer/v1");
     assert_eq!(TRANSCRIPT_DOMAIN, b"muninn/net/exchange/v1");

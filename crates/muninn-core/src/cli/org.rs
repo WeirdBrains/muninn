@@ -264,7 +264,7 @@ pub fn run(ctx: &Ctx, cmd: OrgCommand) -> anyhow::Result<()> {
                 && !matches!(a.delivered, Some(Ok(_)))
             {
                 ctx.io.note("Their node was not reachable; you are connected once it is (or give them this link):");
-                println!("{}", crate::net::exchange::link(ans));
+                println!("{}", crate::net::exchange::link(ans)?);
             }
             Ok(())
         }
@@ -561,7 +561,7 @@ fn member(ctx: &Ctx, cmd: OrgMemberCommand) -> anyhow::Result<()> {
                         ctx.io.warn(format!("could not reach them ({e})"));
                     }
                     ctx.io.note("Send them this invite link (single use, expires in 7 days; they run `mnnn org join LINK`):");
-                    let link = crate::net::exchange::link(&c.token);
+                    let link = crate::net::exchange::link(&c.token)?;
                     println!("{link}");
                     if o.hosted
                         && let Some(f) = host::running(&ctx.paths.home)

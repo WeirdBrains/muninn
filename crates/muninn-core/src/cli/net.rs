@@ -219,7 +219,7 @@ pub fn run(ctx: &Ctx, cmd: NetCommand) -> anyhow::Result<()> {
                 &relays,
                 ORIGIN,
             )?;
-            let link = net::exchange::link(&c.token);
+            let link = net::exchange::link(&c.token)?;
             if json {
                 println!(
                     "{}",

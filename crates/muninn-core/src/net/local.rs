@@ -280,6 +280,7 @@ pub fn ephemeral(kp: &Keypair, service: Store, label: &str, prefs: &NetPrefs) ->
         label: label.to_string(),
         external: vec![],
         version: String::new(),
+        ..Default::default()
     };
     super::node::start(kp.clone(), cfg, Arc::new(Service::new(service, kp.public().to_peer_id(), label).accept_anyone(prefs.accept_anyone())))
 }

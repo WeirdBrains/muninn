@@ -124,7 +124,7 @@ void main() {
     await t.pumpAndSettle();
     expect(api.netCalls, contains('invite:'));
     expect(find.byKey(const ValueKey('net-invite-link')), findsOneWidget);
-    expect(find.text('muninn://join/testhook'), findsWidgets);
+    expect(find.text('weirdnet-muninn://join/testhook'), findsWidgets);
     expect(find.textContaining('holds no secret'), findsOneWidget);
   });
 

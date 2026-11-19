@@ -500,7 +500,7 @@ pub fn org_join(home: Option<String>, token: String) -> anyhow::Result<String> {
         if let Some(t) = &a.answer
             && !a.delivered.as_ref().is_some_and(|d| d.is_ok())
         {
-            msg.push_str(&format!("; their node was not reachable. Answer: {}", net::exchange::link(t)));
+            msg.push_str(&format!("; their node was not reachable. Answer: {}", net::exchange::link(t)?));
         }
         Ok(msg)
     })

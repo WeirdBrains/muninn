@@ -113,7 +113,7 @@ fn offline_offer_and_sharing_from_the_window() {
     let xs = a.store.exchanges().unwrap();
     assert_eq!(xs.len(), 1);
     assert_eq!(xs[0].status, ExchangeStatus::Offered);
-    assert!(a.network.detail.iter().any(|l| l.starts_with("muninn://join/")), "{:?}", a.network.detail);
+    assert!(a.network.detail.iter().any(|l| l.starts_with("weirdnet-muninn://join/")), "{:?}", a.network.detail);
     assert!(screen_text(&mut a).contains("pending"));
     // an offer is not a channel yet: nothing to verify or share over it
     a.on_key(key(KeyCode::Char('v')));
@@ -152,7 +152,7 @@ fn two_windows_exchange_keys_share_import_search_and_revoke() {
     a.dispatch(Action::NetExchanges);
     a.on_key(key(KeyCode::Char('n')));
     typ(&mut a, "\n");
-    let token = a.network.detail.iter().find(|l| l.starts_with("muninn://join/")).unwrap().clone();
+    let token = a.network.detail.iter().find(|l| l.starts_with("weirdnet-muninn://join/")).unwrap().clone();
     b.dispatch(Action::NetExchanges);
     b.on_key(key(KeyCode::Char('p')));
     typ(&mut b, &format!("{token}\n"));
@@ -356,7 +356,7 @@ fn invites_page_lists_and_withdraws_invites() {
     let text = screen_text(&mut a);
     assert!(text.contains("invite") && text.contains("anyone with the link"), "{text}");
     a.on_key(key(KeyCode::Enter));
-    assert!(a.network.detail.iter().any(|l| l.starts_with("muninn://join/")), "{:?}", a.network.detail);
+    assert!(a.network.detail.iter().any(|l| l.starts_with("weirdnet-muninn://join/")), "{:?}", a.network.detail);
     a.on_key(key(KeyCode::Char('d')));
     assert!(a.network.msg.as_ref().unwrap().1);
     a.on_key(key(KeyCode::Char('r')));

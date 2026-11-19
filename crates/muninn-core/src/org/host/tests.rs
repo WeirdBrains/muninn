@@ -577,7 +577,7 @@ fn a_gated_private_site_lets_members_sign_in_a_browser() {
 fn queries_and_join_links_round_trip() {
     let v = "Muninn exchange=x-ben, ts=1, sig=ab+/=";
     assert_eq!(query_value(&format!("a=1&auth={}", query_escape(v)), "auth").as_deref(), Some(v));
-    assert_eq!(join_url("https://h:1/", "lab", "muninn://join/AB"), "https://h:1/o/lab/join#muninn%3A%2F%2Fjoin%2FAB");
+    assert_eq!(join_url("https://h:1/", "lab", "weirdnet-muninn://join/AB"), "https://h:1/o/lab/join#weirdnet-muninn%3A%2F%2Fjoin%2FAB");
     assert_eq!(session_cookie(Some("a=b; muninn_session=cafe")), Some("cafe"));
 }
 

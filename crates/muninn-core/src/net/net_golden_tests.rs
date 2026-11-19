@@ -231,8 +231,8 @@ fn deterministic() -> Value {
         "offer": {
             "json": serde_json::to_value(&o).unwrap(),
             "token": tok,
-            "link": link(&tok),
-            "unlink": unlink(&format!(" {}\n{} ", &link(&tok)[..30], &link(&tok)[30..])) == tok,
+            "link": link(&tok).unwrap(),
+            "unlink": unlink(&format!(" {}\n{} ", &link(&tok).unwrap()[..30], &link(&tok).unwrap()[30..])) == tok,
             "hash": o.hash().unwrap(),
             "verify": o.verify(2_000).unwrap().to_string(),
             "parsed_equal": matches!(parse_token(&tok).unwrap(), Token::Offer(x) if x == o),
@@ -241,17 +241,17 @@ fn deterministic() -> Value {
         "answer": {
             "json": serde_json::to_value(&ans).unwrap(),
             "token": ans.token().unwrap(),
-            "link": link(&ans.token().unwrap()),
+            "link": link(&ans.token().unwrap()).unwrap(),
             "verify": ans.verify(&o).unwrap().to_string(),
-            "parsed_equal": matches!(parse_token(&link(&ans.token().unwrap())).unwrap(), Token::Answer(x) if x == ans),
+            "parsed_equal": matches!(parse_token(&link(&ans.token().unwrap()).unwrap()).unwrap(), Token::Answer(x) if x == ans),
         },
         "derived": { "key": hex::encode(d.key.0), "short_code": d.short_code, "fingerprint": d.fingerprint, "mitm_differs": mitm.short_code != d.short_code },
         "refused": r,
         "tokens": {
-            "is_token": (["mnnn-x1-offer:abc", "muninn://join/abc", " mnnn-x1-x", "ben", "weirdnet://join/abc"].iter().map(|t| json!([t, is_token(t)])).collect::<Vec<_>>()),
+            "is_token": (["mnnn-x1-offer:abc", "muninn://join/abc", "weirdnet-muninn://join/abc", " mnnn-x1-x", "ben", "weirdnet://join/abc"].iter().map(|t| json!([t, is_token(t)])).collect::<Vec<_>>()),
             "codes": (["1234567890", "12345 67890", "12-34", " 123 "].iter().map(|c| json!([c, normalize_code(c)])).collect::<Vec<_>>()),
             "unlink_plain": unlink("abc def"),
-            "link_plain": link("abc"),
+            "link_plain": link("abc").unwrap(),
         },
         "identity": {
             "peer": pa,

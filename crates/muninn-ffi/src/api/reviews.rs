@@ -312,8 +312,8 @@ pub fn review_invite(review: String, label: String, peer: Option<String>) -> any
     let (_, c) = rnet::invite(&store, node.as_deref(), &kp, &r, &label, peer, &relays(), ORIGIN)?;
     match c.delivered {
         Some(Ok(_)) => Ok("sent; they join with the request title or `mnnn review join`".into()),
-        Some(Err(e)) => Ok(format!("could not reach them ({e}): {}", exchange::link(&c.token))),
-        None => Ok(exchange::link(&c.token)),
+        Some(Err(e)) => Ok(format!("could not reach them ({e}): {}", exchange::link(&c.token)?)),
+        None => Ok(exchange::link(&c.token)?),
     }
 }
 

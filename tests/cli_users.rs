@@ -92,7 +92,7 @@ fn invites_make_untrusted_connections_that_can_be_trusted() {
     b.ok(&["user", "label", "Ben"]);
 
     let link = a.ok(&["invite", "create", "--label", "ben"]);
-    assert!(link.trim().starts_with("muninn://join/"), "{link}");
+    assert!(link.trim().starts_with("weirdnet-muninn://join/"), "{link}");
     let l = json(&a.ok(&["invite", "list", "--json"]));
     assert_eq!(l["invites"][0]["status"], "unused", "{l}");
     let used = b.ok(&["invite", "accept", link.trim()]);

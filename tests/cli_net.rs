@@ -102,7 +102,7 @@ fn connecting_asks_once_and_then_just_works() {
     let c = Env::new();
     c.ok(&["net", "config", "--label", "cleo", "--mdns", "off"]);
     let link = a.ok(&["net", "invite"]);
-    assert!(link.trim().starts_with("muninn://join/"), "{link}");
+    assert!(link.trim().starts_with("weirdnet-muninn://join/"), "{link}");
     let used = c.ok(&["net", "connect", link.trim()]);
     assert!(used.contains("connected"), "{used}");
     let t = Instant::now();

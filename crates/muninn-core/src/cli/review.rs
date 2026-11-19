@@ -121,7 +121,7 @@ fn link(ctx: &Ctx, c: &crate::net::client::Created) {
                 ctx.io.warn(format!("could not reach them ({e})"));
             }
             ctx.io.note("Send them this review link (they run `mnnn review join LINK`; it is good for one reviewer for a week):");
-            println!("{}", crate::net::exchange::link(&c.token));
+            println!("{}", crate::net::exchange::link_or_token(&c.token));
         }
     }
 }
@@ -321,7 +321,7 @@ pub fn run(ctx: &Ctx, cmd: ReviewCommand) -> anyhow::Result<()> {
                 && !matches!(a.delivered, Some(Ok(_)))
             {
                 ctx.io.note("Their node was not reachable; you are connected once it is (or give them this link):");
-                println!("{}", crate::net::exchange::link(ans));
+                println!("{}", crate::net::exchange::link(ans)?);
             }
             Ok(())
         }

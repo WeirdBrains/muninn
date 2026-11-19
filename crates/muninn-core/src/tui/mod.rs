@@ -1306,7 +1306,7 @@ pub fn run(mut app: App) -> crate::Result<()> {
 }
 
 impl App {
-    /// Open the n-th URL on screen in the system's browser (muninn:// links are shown, not opened).
+    /// Open the n-th URL on screen in the system's browser (weirdnet-muninn:// links are shown, not opened).
     pub fn open_url(&mut self, i: usize) {
         let Some((_, url)) = self.urls.get(i).cloned() else { return };
         self.opened = Some(url.clone());

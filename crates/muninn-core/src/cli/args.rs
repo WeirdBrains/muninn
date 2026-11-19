@@ -2246,7 +2246,7 @@ See `mnnn help users`.
 Examples:
   mnnn user show
   mnnn user label \"Ada Lovelace\"
-  mnnn user link muninn://join/…
+  mnnn user link weirdnet-muninn://join/…
   mnnn user approve phone
   mnnn user nodes
   mnnn user revoke phone
@@ -2266,7 +2266,7 @@ Examples:
 ";
 
 pub const INVITE_NOTES: &str = "\
-An invite is a signed, expiring link (`muninn://join/…`) that holds no secret. `create` makes one
+An invite is a signed, expiring link (`weirdnet-muninn://join/…`) that holds no secret. `create` makes one
 to connect (default), to join an org (--org) or to review (--review). The other side uses it
 with `mnnn invite accept LINK`. `list` shows the links you made and the requests waiting for
 you; `revoke` withdraws an unused one.
@@ -2278,7 +2278,7 @@ Examples:
   mnnn invite create --review draft-1
   mnnn invite list
   mnnn invite revoke 3f2a
-  mnnn invite accept muninn://join/…
+  mnnn invite accept weirdnet-muninn://join/…
 ";
 
 #[derive(Debug, Subcommand)]
