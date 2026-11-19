@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 
 ## [Unreleased]
 
+## [2.28.0] - 2026-11-19
+
 ### Changed
 
 - Breaking: invite, answer and review links are `weirdnet-muninn://join/…` and `weirdnet-muninn://answer/…`, and MCP resource URIs are `weirdnet-muninn://KIND/ID`. The `muninn://` links and URIs of v2.27.0 and earlier are no longer read (use the plain `mnnn-x1-…` token or a new link), and a bare `weirdnet://` link is refused.
@@ -704,7 +706,8 @@ project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor = featur
 - Searchable help built from `docs/`, `mnnn help` and man pages.
 - JSON ingest and service ingest from HTTP, Redis, SQLite and Postgres.
 
-[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.27.0...HEAD
+[Unreleased]: https://github.com/WeirdBrains/muninn/compare/v2.28.0...HEAD
+[2.28.0]: https://github.com/WeirdBrains/muninn/compare/v2.27.0...v2.28.0
 [2.27.0]: https://github.com/WeirdBrains/muninn/compare/v2.26.0...v2.27.0
 [2.26.0]: https://github.com/WeirdBrains/muninn/compare/v2.25.0...v2.26.0
 [2.25.0]: https://github.com/WeirdBrains/muninn/compare/v2.24.0...v2.25.0
