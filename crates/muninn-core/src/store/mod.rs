@@ -816,7 +816,7 @@ mod tests {
         assert!(bars.builtin);
         assert_eq!(s.count_records(&bars).unwrap(), 2);
         assert_eq!(s.records(&bars, &Default::default()).unwrap().len(), 2);
-        s.add_author("Michael", None, &[]).unwrap();
+        s.add_author("Grace", None, &[]).unwrap();
         s.record_action(&NewAction::new("filter", "cli", "x")).unwrap();
         drop(s);
         // reopening is a no-op

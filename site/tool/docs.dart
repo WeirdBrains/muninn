@@ -179,6 +179,7 @@ ${body(d, pages)}
 <p class="edit"><a href="$repo/edit/main/docs/${d.path}">Edit this page on GitHub</a></p>
 </main>
 </div>
+<footer class="docs-foot"><p>Muninn is published by <a href="https://weirdbrains.com">Weird Brains</a>.</p></footer>
 </body>
 </html>
 ''';

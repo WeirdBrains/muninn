@@ -128,3 +128,4 @@ figcaption { color: var(--muted); font-size: 0.9rem; margin-top: 0.4rem; }
 @media (max-width: 50rem) {
   .docs-layout { grid-template-columns: minmax(0, 1fr); }
 }
+.docs-foot { text-align: center; padding: 1.5rem 0; }

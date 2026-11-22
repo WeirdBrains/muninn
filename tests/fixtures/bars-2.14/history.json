@@ -3,9 +3,9 @@
     "id": 20,
     "parent": 19,
     "kind": "export",
-    "summary": "export 823 bars to /home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/bars-2.14/bars.csv (csv)",
+    "summary": "export 823 bars to /home/user/muninn/tests/fixtures/bars-2.14/bars.csv (csv)",
     "params": {
-      "out": "/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/bars-2.14/bars.csv",
+      "out": "/home/user/muninn/tests/fixtures/bars-2.14/bars.csv",
       "format": "csv",
       "bars": 823,
       "scope": [],
@@ -139,7 +139,7 @@
       "files_done": 1,
       "files_total": 1,
       "files": [
-        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/unnamed.csv"
+        "/home/user/muninn/tests/fixtures/unnamed.csv"
       ],
       "inserted": 60
     },
@@ -356,7 +356,7 @@
       "files_done": 1,
       "files_total": 1,
       "files": [
-        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/unnamed.csv"
+        "/home/user/muninn/tests/fixtures/unnamed.csv"
       ],
       "inserted": 60
     },
@@ -377,7 +377,7 @@
       "files_done": 1,
       "files_total": 1,
       "files": [
-        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/ETHUSDT_5m.csv"
+        "/home/user/muninn/tests/fixtures/ETHUSDT_5m.csv"
       ],
       "inserted": 300
     },
@@ -398,7 +398,7 @@
       "files_done": 1,
       "files_total": 1,
       "files": [
-        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/BTCUSDT_5m.csv"
+        "/home/user/muninn/tests/fixtures/BTCUSDT_5m.csv"
       ],
       "inserted": 401
     },

@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn record_back_fork_forward() {
         let s = Store::open_in_memory().unwrap();
-        let au = s.add_author("Michael", None, &[]).unwrap();
+        let au = s.add_author("Grace", None, &[]).unwrap();
         let a = act(&s, "a");
         let b = act(&s, "b");
         let c = act(&s, "c");

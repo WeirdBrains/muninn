@@ -1,8 +1,8 @@
 # AGENTS.md — rules for agents working on Muninn
 
 ## Where to work
-- Always work directly on the owner's machine (alien-blue), in
-  `~/Projects/WeirdBrains/muninn`. No cloud agents, no clones elsewhere.
+- Always work directly on the owner's build machine, in the project checkout. No cloud
+  agents, no clones elsewhere.
 - Toolchain: Rust >= 1.99 (edition 2024), cargo on this machine. Prefer bundled/vendored
   crate features over installing system packages; ask before installing anything.
 
@@ -18,7 +18,7 @@
 ## Safety
 - Never touch the real `~/.muninn`. Tests, examples and manual runs use a temp dir via
   `MUNINN_HOME` / `--home`.
-- `~/Projects/kommandosaldat/raw/data` is read-only: never modify, move or write into raw/data.
+- The raw data folder (`MUNINN_RAW_DATA`) is read-only: never modify, move or write into raw/data.
   Reading it for tests, examples and sanity runs is expected.
   Cut small fixtures into `tests/fixtures/`; full-file tests are `#[ignore]` and read
   `MUNINN_RAW_DATA`.

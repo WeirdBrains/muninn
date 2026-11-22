@@ -11,7 +11,7 @@ next = [
 ]
 
 [env]
-CARGO_TARGET_DIR = "/mnt/ext1/cargo-target"
+CARGO_TARGET_DIR = "/var/tmp/cargo-target"
 CARGO_BUILD_JOBS = "8"
 
 [[files]]                       # the one place: [workspace.package], plus the root package and members
@@ -125,4 +125,4 @@ assets = ["muninn-app-{version}-arm64-v8a-release.apk", "muninn-app-{version}-re
 
 [[platforms]]
 os = "ios"
-opt_out = "A distributable ipa needs an Apple Developer signing identity and provisioning profile on Michael's Mac. The committed iOS project uses Automatic signing with 'iPhone Developer' and has no DEVELOPMENT_TEAM or profile, so GitHub releases cannot carry a sideload, AltStore, TestFlight or App Store ipa until that is set up."
+opt_out = "A distributable ipa needs an Apple Developer signing identity and provisioning profile on a Mac. The committed iOS project uses Automatic signing with 'iPhone Developer' and has no DEVELOPMENT_TEAM or profile, so GitHub releases cannot carry a sideload, AltStore, TestFlight or App Store ipa until that is set up."

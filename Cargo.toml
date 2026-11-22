@@ -4,7 +4,7 @@ version.workspace = true
 edition = "2024"
 rust-version = "1.99"
 description = "Data goes in, your magic transforms it (mnnn): ingest, pipelines and encrypted peer-to-peer sharing, in a TUI and CLI."
-authors = ["Michael Christenson II <m3talsmith@gmail.com>"]
+authors = ["Weird Brains LLC <m3talsmith@gmail.com>"]
 license = "BSD-3-Clause"
 repository = "https://github.com/WeirdBrains/muninn"
 homepage = "https://github.com/WeirdBrains/muninn"
@@ -99,8 +99,8 @@ opt-level = 2
 
 # Debian/Ubuntu package: `cargo deb` (see docs/install.md, packaging/debian/README.md)
 [package.metadata.deb]
-maintainer = "Michael Christenson II <m3talsmith@gmail.com>"
-copyright = "2026, Michael Christenson II <m3talsmith@gmail.com>"
+maintainer = "Weird Brains LLC <m3talsmith@gmail.com>"
+copyright = "2026, Weird Brains LLC <m3talsmith@gmail.com>"
 license-file = ["LICENSE", "0"]
 extended-description = """\
 Muninn (mnnn) is a local, encrypted workbench for market data, with a terminal UI and a \

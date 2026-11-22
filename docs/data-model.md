@@ -39,7 +39,7 @@ id = BLAKE3("{timestamp_ms}|{source.name}|{base}/{quote}|{duration_s}")
 
 ```
 mnnn sources list
-mnnn sources add binance --kind file --locator ~/Projects/kommandosaldat/raw/data
+mnnn sources add binance --kind file --locator ~/data/raw
 mnnn sources rename binance binance-spot
 mnnn sources remove binance-spot      # asks for confirmation, -y to skip
 ```

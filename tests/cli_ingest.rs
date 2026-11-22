@@ -111,7 +111,7 @@ fn quiet_prints_nothing() {
     assert_eq!(out, "");
 }
 
-/// Full-file test against the real data: `MUNINN_RAW_DATA=~/Projects/kommandosaldat/raw/data cargo test --release -- --ignored`.
+/// Full-file test against the real data: `MUNINN_RAW_DATA=~/data/raw cargo test --release -- --ignored`.
 #[test]
 #[ignore]
 fn full_file_btc_ingest() {

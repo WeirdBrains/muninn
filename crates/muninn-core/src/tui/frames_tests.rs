@@ -110,7 +110,7 @@ fn feed(a: &App) -> crate::store::pipelines::Pipeline {
     a.store.create_pipeline("feed", "", &g).unwrap()
 }
 
-/// Michael's case: data piped in on the command line, a pipeline with three views, and an
+/// m3talsmith's case: data piped in on the command line, a pipeline with three views, and an
 /// open TUI shows them as three columns, live.
 #[test]
 fn a_pipeline_run_anywhere_opens_its_views_as_three_live_columns() {

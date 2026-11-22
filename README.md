@@ -193,7 +193,7 @@ Ingest stores data as it arrives, byte for byte, in a source. It never asks what
 data is and never makes bars; pipelines you set up decide that.
 
 ```sh
-RAW=~/Projects/kommandosaldat/raw/data
+RAW=~/data/raw
 mnnn ingest csv --path $RAW/BTCUSDT_5m.csv --source binance
 mnnn ingest path $RAW                                 # every file; source "data" (the folder)
 mnnn ingest json --path bars.json --source myfeed
@@ -278,7 +278,7 @@ Feature docs are in `docs/` (also shown by the TUI help). Run `cargo test`; test
 temporary homes and never touch `~/.muninn`. The full-file ingest test:
 
 ```sh
-MUNINN_RAW_DATA=~/Projects/kommandosaldat/raw/data cargo test --release --test cli_ingest -- --ignored
+MUNINN_RAW_DATA=~/data/raw cargo test --release --test cli_ingest -- --ignored
 ```
 
 ## Versioning
@@ -291,5 +291,5 @@ minor version, fixes/docs the patch version, breaking changes the major. See
 
 ## License
 
-BSD 3-Clause, copyright (c) 2026, Weird Brains: see [LICENSE](LICENSE). The bundled
+BSD 3-Clause, copyright (c) 2026, [Weird Brains LLC](https://weirdbrains.com): see [LICENSE](LICENSE). The bundled
 Liberation fonts are under the SIL Open Font License (`assets/fonts/LICENSE-OFL.txt`).

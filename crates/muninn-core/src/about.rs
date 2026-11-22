@@ -10,7 +10,7 @@ pub const PUBLISHER: &str = "WeirdBrains";
 pub const HOMEPAGE: &str = "https://muninn.weirdbrains.com";
 pub const REPOSITORY: &str = "https://github.com/WeirdBrains/muninn";
 pub const LICENSE: &str = "BSD-3-Clause";
-pub const AUTHOR: &str = "Michael Christenson II";
+pub const AUTHOR: &str = "Weird Brains LLC";
 /// As in LICENSE (BSD-3-Clause).
 pub const COPYRIGHT: &str = "Copyright (c) 2026 Weird Brains";
 /// Third-party credits shown in About (bundled fonts and theme palettes).

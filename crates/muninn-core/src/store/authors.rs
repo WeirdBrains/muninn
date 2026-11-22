@@ -248,12 +248,12 @@ mod tests {
         let s = Store::open_in_memory().unwrap();
         assert!(s.current_author().unwrap().is_none());
         let d = parse_details(&["org=Kommandosaldat".into(), "site = https://x".into()]).unwrap();
-        let a = s.add_author("Michael", Some("m@example.com"), &d).unwrap();
+        let a = s.add_author("Grace", Some("m@example.com"), &d).unwrap();
         assert_eq!(s.current_author().unwrap().unwrap().id, a.id, "first author becomes current");
         let b = s.add_author("Ada", None, &[]).unwrap();
         assert_eq!(s.current_author().unwrap().unwrap().id, a.id);
-        assert_eq!(s.authors().unwrap().iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["Ada", "Michael"]);
-        assert_eq!(s.find_author("michael").unwrap().id, a.id);
+        assert_eq!(s.authors().unwrap().iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["Ada", "Grace"]);
+        assert_eq!(s.find_author("grace").unwrap().id, a.id);
         assert_eq!(s.find_author("m@example.com").unwrap().id, a.id);
         assert_eq!(s.find_author(&b.id[..6]).unwrap().id, b.id);
         assert!(s.find_author("nobody").is_err());
