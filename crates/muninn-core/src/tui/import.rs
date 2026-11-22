@@ -369,7 +369,7 @@ pub struct Place {
 }
 
 /// Built-in places: home, ~/Projects, the raw data folder (MUNINN_RAW_DATA or
-/// ~/Projects/kommandosaldat/raw/data), the working folder. Missing folders are left out.
+/// ~/data/raw), the working folder. Missing folders are left out.
 pub fn builtin_places() -> Vec<Place> {
     let mut v = vec![];
     let mut add = |label: &str, path: PathBuf| {
@@ -380,7 +380,7 @@ pub fn builtin_places() -> Vec<Place> {
     if let Some(h) = dirs::home_dir() {
         add("Home", h.clone());
         add("Projects", h.join("Projects"));
-        add("raw/data", std::env::var_os("MUNINN_RAW_DATA").map(PathBuf::from).unwrap_or_else(|| h.join("Projects/kommandosaldat/raw/data")));
+        add("raw/data", std::env::var_os("MUNINN_RAW_DATA").map(PathBuf::from).unwrap_or_else(|| h.join("data/raw")));
     }
     if let Ok(c) = std::env::current_dir() {
         add("Working folder", c);

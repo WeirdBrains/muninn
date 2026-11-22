@@ -125,8 +125,8 @@ The TUI summary shows the run number.
 The left column of the browser, titled **Places (p)**, lists folders you can jump to.
 It has up to three sections:
 
-- **Places**: built-in shortcuts: Home, `~/Projects`, `raw/data` (the kommandosaldat
-  raw data folder, or `$MUNINN_RAW_DATA`) and the folder Muninn was started from. Ones
+- **Places**: built-in shortcuts: Home, `~/Projects`, `raw/data` (`$MUNINN_RAW_DATA`, or
+  `~/data/raw`) and the folder Muninn was started from. Ones
   that don't exist on this machine are left out.
 - **Bookmarks**: folders you bookmarked with `b` (while browsing, `b` bookmarks the
   folder you are in; pressing it again removes the bookmark).

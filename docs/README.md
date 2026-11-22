@@ -87,7 +87,7 @@ help (`?` or F1 in the TUI, `mnnn help <topic>` on the command line).
 ```
 export MUNINN_HOME=/tmp/mnnn-demo          # never touches ~/.muninn
 mnnn keys init                             # write down the words and shards
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance
+mnnn ingest csv --path ~/data/raw/binance_BTCUSDT_5m.csv --source binance
 mnnn code parsers --install                # parse-csv, to-bars, … as code spaces
 mnnn pipe source:binance code:parse-csv 'code:to-bars?symbol=BTC/USDT&duration=5m' --to model:bars -y
 mnnn export --format parquet --out /tmp/btc.parquet --symbol BTC/USDT

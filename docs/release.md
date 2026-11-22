@@ -38,17 +38,17 @@ releases are made.
 
 | Built on | Files |
 |---|---|
-| alien-blue (Linux x86_64, cross-compiling aarch64) | TUI: `cargo build --locked --release -p muninn --target T`, strip, `scripts/dist.sh T`, `cargo deb`, `cargo generate-rpm`: tarballs, `.deb` and `.rpm` for x86_64 and aarch64 |
-| alien-blue, llvm-mingw | TUI: `scripts/cross-windows.sh x86_64 aarch64`: `muninn-<ver>-{x86_64,aarch64}-pc-windows-gnullvm.zip` |
-| Michael's Mac | TUI: `COPYFILE_DISABLE=1`, `scripts/dist.sh` (which runs `xattr -cr` on the staged files before `tar`) for `aarch64-apple-darwin` and `x86_64-apple-darwin` |
-| Windows host with Inno Setup, from Linux (alien-blue) | TUI: `scripts/windows-setup.sh`: `muninn-<ver>-{x86_64,aarch64}-windows-setup.exe` from the zips (`packaging/windows/`) |
-| Michael's Mac | TUI: `scripts/macos-app.sh`, after both darwin tarballs: universal `Muninn.app` in `muninn-<ver>-macos.dmg` |
-| alien-blue (Arch, makepkg) | TUI: `packaging/arch/muninn-bin` built from the local tarballs, `x86_64` and (with `CARCH=aarch64`) `aarch64` |
-| alien-blue | Flutter Linux: `scripts/flutter-dist.sh` → `muninn-app-<ver>-{x86_64,aarch64}-unknown-linux-gnu.tar.gz`, `muninn-app_<ver>-1_{amd64,arm64}.deb`, `muninn-app-<ver>-1.{x86_64,aarch64}.rpm`. Then makepkg `packaging/arch/muninn-app-bin` from the filled recipe (or the tarballs) for `muninn-app-bin-<ver>-1-{x86_64,aarch64}.pkg.tar.zst` |
-| Michael's Mac | Flutter macOS: `scripts/flutter-dist.sh` → `muninn-app-<ver>-universal-apple-darwin.dmg` (not notarized) |
-| WIN-R0LRC6FBTOM (Windows VM, machineId `c4b27d34-b4f9-416b-a44e-b37376c1cf0d`) | Flutter Windows: `scripts/flutter-dist.ps1` → `muninn-app-<ver>-x86_64-pc-windows-msvc.zip`, unsigned `muninn-app-<ver>-x86_64-windows-setup.exe`, test-cert `muninn-app-<ver>-x86_64.msix`. Flutter Windows is x86_64-only. |
-| Michael's Mac or alien-blue | Android (unsigned): `cd app && flutter build apk --release --target-platform android-arm64` and `flutter build appbundle --release`, then rename to `muninn-app-<ver>-arm64-v8a-release.apk` and `muninn-app-<ver>-release.aab` in `dist/` |
-| Michael's Mac | iOS ipa: **not built for the release**. The project has no committed `DEVELOPMENT_TEAM` or provisioning profile (Automatic / `iPhone Developer` only). A distributable sideload, AltStore, TestFlight or App Store ipa waits on a signing identity. `release.toml` opts iOS out for this reason. |
+| Linux build host (Linux x86_64, cross-compiling aarch64) | TUI: `cargo build --locked --release -p muninn --target T`, strip, `scripts/dist.sh T`, `cargo deb`, `cargo generate-rpm`: tarballs, `.deb` and `.rpm` for x86_64 and aarch64 |
+| Linux build host, llvm-mingw | TUI: `scripts/cross-windows.sh x86_64 aarch64`: `muninn-<ver>-{x86_64,aarch64}-pc-windows-gnullvm.zip` |
+| a Mac | TUI: `COPYFILE_DISABLE=1`, `scripts/dist.sh` (which runs `xattr -cr` on the staged files before `tar`) for `aarch64-apple-darwin` and `x86_64-apple-darwin` |
+| Windows host with Inno Setup, from the Linux build host | TUI: `scripts/windows-setup.sh`: `muninn-<ver>-{x86_64,aarch64}-windows-setup.exe` from the zips (`packaging/windows/`) |
+| a Mac | TUI: `scripts/macos-app.sh`, after both darwin tarballs: universal `Muninn.app` in `muninn-<ver>-macos.dmg` |
+| Linux build host (Arch, makepkg) | TUI: `packaging/arch/muninn-bin` built from the local tarballs, `x86_64` and (with `CARCH=aarch64`) `aarch64` |
+| Linux build host | Flutter Linux: `scripts/flutter-dist.sh` → `muninn-app-<ver>-{x86_64,aarch64}-unknown-linux-gnu.tar.gz`, `muninn-app_<ver>-1_{amd64,arm64}.deb`, `muninn-app-<ver>-1.{x86_64,aarch64}.rpm`. Then makepkg `packaging/arch/muninn-app-bin` from the filled recipe (or the tarballs) for `muninn-app-bin-<ver>-1-{x86_64,aarch64}.pkg.tar.zst` |
+| a Mac | Flutter macOS: `scripts/flutter-dist.sh` → `muninn-app-<ver>-universal-apple-darwin.dmg` (not notarized) |
+| Windows build VM | Flutter Windows: `scripts/flutter-dist.ps1` → `muninn-app-<ver>-x86_64-pc-windows-msvc.zip`, unsigned `muninn-app-<ver>-x86_64-windows-setup.exe`, test-cert `muninn-app-<ver>-x86_64.msix`. Flutter Windows is x86_64-only. |
+| a Mac or the Linux build host | Android (unsigned): `cd app && flutter build apk --release --target-platform android-arm64` and `flutter build appbundle --release`, then rename to `muninn-app-<ver>-arm64-v8a-release.apk` and `muninn-app-<ver>-release.aab` in `dist/` |
+| a Mac | iOS ipa: **not built for the release**. The project has no committed `DEVELOPMENT_TEAM` or provisioning profile (Automatic / `iPhone Developer` only). A distributable sideload, AltStore, TestFlight or App Store ipa waits on a signing identity. `release.toml` opts iOS out for this reason. |
 
 3. In `dist/`, run `sha256sum -- * > SHA256SUMS` and `scripts/fill-sums.py X.Y.Z dist`
    (the Arch `muninn-bin` and, when the Flutter Linux tarballs are present,

@@ -106,7 +106,7 @@ Version: ${ver}-1
 Section: utils
 Priority: optional
 Architecture: ${deb_arch}
-Maintainer: Michael Christenson II <m3talsmith@gmail.com>
+Maintainer: Weird Brains LLC <m3talsmith@gmail.com>
 Installed-Size: ${installed}
 Depends: libgtk-3-0, libglib2.0-0, libstdc++6, libgcc-s1, libc6
 Homepage: https://muninn.weirdbrains.com

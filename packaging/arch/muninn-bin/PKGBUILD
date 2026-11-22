@@ -1,4 +1,4 @@
-# Maintainer: Michael Christenson II <m3talsmith@gmail.com>
+# Maintainer: Weird Brains LLC <m3talsmith@gmail.com>
 # Binary package: installs the prebuilt binary attached to a published GitHub release
 # (vX.Y.Z assets from .github/workflows/release.yml). No Rust needed, but the release
 # must exist and be downloadable (public repo); otherwise use ../PKGBUILD or

@@ -15,8 +15,8 @@ made. What the data is, and what becomes of it, is decided by
 ## Example with the raw data
 
 ```
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data        # source: "data", the folder
+mnnn ingest csv --path ~/data/raw/binance_BTCUSDT_5m.csv --source binance
+mnnn ingest csv --path ~/data/raw        # source: "data", the folder
 ```
 
 Then make bars from it with a pipe (or a stored pipeline):

@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(external_host("/ip4/1.2.3.4/tcp/4741").as_deref(), Some("1.2.3.4"));
         assert_eq!(external_host("/dns4/a.example/udp/1").as_deref(), Some("a.example"));
         assert_eq!(external_host("/ip6/::1/tcp/1").as_deref(), Some("[::1]"));
-        assert_eq!(external_host("alien.duckdns.org:4741").as_deref(), Some("alien.duckdns.org"));
+        assert_eq!(external_host("node-a.example.com:4741").as_deref(), Some("node-a.example.com"));
         assert_eq!(external_host("host").as_deref(), Some("host"));
         assert_eq!(external_host("[fe80::1]:9").as_deref(), Some("[fe80::1]"));
         assert_eq!(external_host(" "), None);

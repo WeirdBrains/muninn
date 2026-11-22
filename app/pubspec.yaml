@@ -108,7 +108,7 @@ flutter:
 # Windows MSIX / Microsoft Store (msix package, used by the release CI in a later phase)
 msix_config:
   display_name: Muninn
-  publisher_display_name: WeirdBrains
+  publisher_display_name: Weird Brains LLC
   identity_name: WeirdBrains.Muninn
   msix_version: 2.22.0.0
   logo_path: assets/logo/muninn-raven.png

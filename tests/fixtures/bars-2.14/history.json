@@ -3,9 +3,9 @@
     "id": 20,
     "parent": 19,
     "kind": "export",
-    "summary": "export 823 bars to /home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/bars-2.14/bars.csv (csv)",
+    "summary": "export 823 bars to /home/user/muninn/tests/fixtures/bars-2.14/bars.csv (csv)",
     "params": {
-      "out": "/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/bars-2.14/bars.csv",
+      "out": "/home/user/muninn/tests/fixtures/bars-2.14/bars.csv",
       "format": "csv",
       "bars": 823,
       "scope": [],
@@ -13,8 +13,8 @@
       "to": null
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485089229,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383314043,
     "before": null,
     "after": null
   },
@@ -24,14 +24,14 @@
     "kind": "project.add",
     "summary": "add model bars to project Alpha",
     "params": {
-      "project": "2b16b273f5df4327949be8194933d947",
+      "project": "266879c7e1c449e484dbe2087a0e22a1",
       "item": 2,
       "kind": "model",
       "ref": "bars"
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485089183,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383314009,
     "before": null,
     "after": null
   },
@@ -41,14 +41,14 @@
     "kind": "project.add",
     "summary": "add result BTC/USDT binance 5m to project Alpha",
     "params": {
-      "project": "2b16b273f5df4327949be8194933d947",
+      "project": "266879c7e1c449e484dbe2087a0e22a1",
       "item": 1,
       "kind": "result",
       "ref": "binance:BTC/USDT:5m"
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485089119,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313975,
     "before": null,
     "after": null
   },
@@ -58,12 +58,12 @@
     "kind": "project.create",
     "summary": "create project Alpha",
     "params": {
-      "project": "2b16b273f5df4327949be8194933d947",
+      "project": "266879c7e1c449e484dbe2087a0e22a1",
       "name": "Alpha"
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485089064,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313945,
     "before": null,
     "after": null
   },
@@ -71,19 +71,19 @@
     "id": 16,
     "parent": 15,
     "kind": "record.create",
-    "summary": "create picks record 3a9a6cb0",
+    "summary": "create picks record edbb6c06",
     "params": {
-      "model": "e5b1c43d2dce4a4a834e1241a057903e",
+      "model": "63f355669e0b4b9aa1f86c085a4ca165",
       "name": "picks",
-      "record": "3a9a6cb015fc481abd89f81b9238c0fc",
+      "record": "edbb6c06b1da4862b8483e78b8a6e51d",
       "values": {
         "bar": "cc2b7b436ead734ddd32bf545d5a433df4ae72651a241f2af38d8153f98b8ad6",
         "why": "breakout"
       }
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485089019,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313913,
     "before": null,
     "after": null
   },
@@ -93,7 +93,7 @@
     "kind": "model.apply",
     "summary": "apply model picks v0 → v1 (3 steps)",
     "params": {
-      "model": "e5b1c43d2dce4a4a834e1241a057903e",
+      "model": "63f355669e0b4b9aa1f86c085a4ca165",
       "name": "picks",
       "version": 1,
       "from": 0,
@@ -107,8 +107,8 @@
       "records": 0
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088927,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313845,
     "before": null,
     "after": null
   },
@@ -118,13 +118,13 @@
     "kind": "model.create",
     "summary": "create model picks",
     "params": {
-      "model": "e5b1c43d2dce4a4a834e1241a057903e",
+      "model": "63f355669e0b4b9aa1f86c085a4ca165",
       "name": "picks",
       "version": 0
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088920,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313839,
     "before": null,
     "after": null
   },
@@ -139,13 +139,13 @@
       "files_done": 1,
       "files_total": 1,
       "files": [
-        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/unnamed.csv"
+        "/home/user/muninn/tests/fixtures/unnamed.csv"
       ],
       "inserted": 60
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088854,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313804,
     "before": null,
     "after": null
   },
@@ -166,8 +166,8 @@
       }
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088510,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313770,
     "before": null,
     "after": null
   },
@@ -189,8 +189,8 @@
       }
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088456,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313737,
     "before": null,
     "after": null
   },
@@ -212,8 +212,8 @@
       "records": 763
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088335,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313694,
     "before": null,
     "after": null
   },
@@ -232,8 +232,8 @@
       "draft": true
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088324,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313685,
     "before": null,
     "after": null
   },
@@ -258,8 +258,8 @@
       "records": 763
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088267,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313654,
     "before": null,
     "after": null
   },
@@ -280,8 +280,8 @@
       "draft": true
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088260,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313648,
     "before": null,
     "after": null
   },
@@ -310,8 +310,8 @@
       }
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088202,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313617,
     "before": null,
     "after": null
   },
@@ -340,8 +340,8 @@
       }
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088126,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313581,
     "before": null,
     "after": null
   },
@@ -356,13 +356,13 @@
       "files_done": 1,
       "files_total": 1,
       "files": [
-        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/unnamed.csv"
+        "/home/user/muninn/tests/fixtures/unnamed.csv"
       ],
       "inserted": 60
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485088027,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313547,
     "before": null,
     "after": null
   },
@@ -377,13 +377,13 @@
       "files_done": 1,
       "files_total": 1,
       "files": [
-        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/ETHUSDT_5m.csv"
+        "/home/user/muninn/tests/fixtures/ETHUSDT_5m.csv"
       ],
       "inserted": 300
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485087948,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313512,
     "before": null,
     "after": null
   },
@@ -398,13 +398,13 @@
       "files_done": 1,
       "files_total": 1,
       "files": [
-        "/mnt/ext1/home/m3talsmith/Projects/WeirdBrains/muninn/tests/fixtures/BTCUSDT_5m.csv"
+        "/home/user/muninn/tests/fixtures/BTCUSDT_5m.csv"
       ],
       "inserted": 401
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485087879,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313478,
     "before": null,
     "after": null
   },
@@ -414,12 +414,12 @@
     "kind": "author.add",
     "summary": "add author Ada",
     "params": {
-      "author": "c6d28549c85f47f99ab64a1ce201b9c4",
+      "author": "8c0d10edb18f4cde8a183d983ec90b76",
       "name": "Ada"
     },
     "origin": "cli",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485087822,
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313443,
     "before": null,
     "after": null
   }

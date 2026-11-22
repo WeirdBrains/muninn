@@ -581,19 +581,19 @@ attach the files below to a GitHub release only after they are all in `dist/`
 
 Release asset names (unsigned or test-signed where noted):
 
-- Linux (alien-blue, `scripts/flutter-dist.sh`): `muninn-app-<ver>-{x86_64,aarch64}-unknown-linux-gnu.tar.gz`,
+- Linux (Linux build host, `scripts/flutter-dist.sh`): `muninn-app-<ver>-{x86_64,aarch64}-unknown-linux-gnu.tar.gz`,
   `muninn-app_<ver>-1_{amd64,arm64}.deb`, `muninn-app-<ver>-1.{x86_64,aarch64}.rpm`,
   plus `muninn-app-bin-<ver>-1-{x86_64,aarch64}.pkg.tar.zst` from the
   `packaging/arch/muninn-app-bin` recipe (TAUR package `muninn-app-bin`).
-- macOS (Michael's Mac, `scripts/flutter-dist.sh`): `muninn-app-<ver>-universal-apple-darwin.dmg`
+- macOS (a Mac, `scripts/flutter-dist.sh`): `muninn-app-<ver>-universal-apple-darwin.dmg`
   (**not notarized**).
-- Windows (WIN-R0LRC6FBTOM, `scripts/flutter-dist.ps1`): `muninn-app-<ver>-x86_64-pc-windows-msvc.zip`,
+- Windows (Windows build host, `scripts/flutter-dist.ps1`): `muninn-app-<ver>-x86_64-pc-windows-msvc.zip`,
   **unsigned** `muninn-app-<ver>-x86_64-windows-setup.exe`, **test-certificate**
   `muninn-app-<ver>-x86_64.msix`. Flutter Windows is x86_64-only.
-- Android (Michael's Mac or alien-blue): rename the unsigned release artifacts to
+- Android (a Mac or Linux build host): rename the unsigned release artifacts to
   `muninn-app-<ver>-arm64-v8a-release.apk` and `muninn-app-<ver>-release.aab`.
 - iOS: not shipped. A distributable ipa needs an Apple Developer signing identity
-  and provisioning profile on Michael's Mac. The committed project uses Automatic
+  and provisioning profile on a Mac. The committed project uses Automatic
   signing with `iPhone Developer` and has no `DEVELOPMENT_TEAM`.
 
 ## Icons

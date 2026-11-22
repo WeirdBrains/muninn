@@ -1,4 +1,4 @@
-# Maintainer: Michael Christenson II <m3talsmith@gmail.com>
+# Maintainer: Weird Brains LLC <m3talsmith@gmail.com>
 # Binary package: installs the prebuilt Flutter desktop app attached to a
 # published GitHub release (muninn-app-<ver>-<arch>-unknown-linux-gnu.tar.gz
 # from scripts/flutter-dist.sh). No Flutter or Rust needed, but the release

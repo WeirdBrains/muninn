@@ -63,7 +63,7 @@ A `version` key records the file's format; older files are upgraded on load (2.9
 | `net.collab_bind` | `0.0.0.0` | where the running node's collaboration stream listener binds |
 | `net.collab_port` | `4742` | its TCP port (0 picks one); allow it in the firewall, or forward it, for peers outside your network |
 | `net.collab_advertise` | `[]` | where peers reach the listener from outside (`host:port`), replacing this node's addresses with `collab_port` |
-| `net.external_addresses` | `[]` | how other hosts reach this node from outside: `host`, `host:port` or a multiaddr, e.g. `["alien.duckdns.org:4741"]` after forwarding TCP+UDP 4741 on the router; announced and listed first in invite links (DNS names resolve when dialed) |
+| `net.external_addresses` | `[]` | how other hosts reach this node from outside: `host`, `host:port` or a multiaddr, e.g. `["node-a.example.com:4741"]` after forwarding TCP+UDP 4741 on the router; announced and listed first in invite links (DNS names resolve when dialed) |
 | `hosting.autostart` | `false` | start the [org web server](org-hosting.md) with the node (`mnnn org host autostart on`) |
 | `hosting.bind` | `127.0.0.1` | address [org sites](org-hosting.md) listen on (`0.0.0.0` or `::`: other machines) |
 | `hosting.port` | `8443` | HTTPS port for pages, JSON and gRPC |

@@ -303,7 +303,7 @@ firewalls/routes merely to make a test appear relay-only.
 
 ### Dated probe evidence (November 6, 2026, EST)
 
-Two isolated 2.28.0 clients on the same alien-blue computer authenticated the public
+Two isolated 2.28.0 clients on the same computer authenticated the public
 relay, obtained reservations, and discovered one another before explicit pairing.
 The relay identified itself as 2.20.0 and advertised addresses that differed from
 DNS, including private/loopback addresses. Clients logged repeated

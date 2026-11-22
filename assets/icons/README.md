@@ -12,7 +12,7 @@ at build time by `scripts/icons.sh`; nothing generated is committed.
 | `muninn.icns` (16–1024 px) | `scripts/icons.sh icns`, called by `scripts/macos-app.sh` | `Muninn.app` and the `.dmg` volume icon |
 | any PNG | `scripts/icons.sh png SIZE OUT.png` | e.g. a 1024 px render for the Mac (below) |
 
-Rendering needs `rsvg-convert` or ImageMagick with librsvg (alien-blue has both); packing
+Rendering needs `rsvg-convert` or ImageMagick with librsvg (the build host has both); packing
 the `.ico` needs ImageMagick or Python Pillow. macOS has no SVG renderer that keeps the
 transparent corners (Quick Look fills them white), so for `scripts/macos-app.sh` render a
 PNG on Linux and pass it in:

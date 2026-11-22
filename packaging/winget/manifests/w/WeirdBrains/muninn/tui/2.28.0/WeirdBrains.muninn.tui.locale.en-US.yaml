@@ -2,9 +2,9 @@
 PackageIdentifier: WeirdBrains.muninn.tui
 PackageVersion: 2.28.0
 PackageLocale: en-US
-Publisher: WeirdBrains
+Publisher: Weird Brains LLC
 PublisherUrl: https://github.com/WeirdBrains
-Author: Michael Christenson II
+Author: Weird Brains LLC
 PackageName: Muninn
 PackageUrl: https://muninn.weirdbrains.com
 License: BSD-3-Clause

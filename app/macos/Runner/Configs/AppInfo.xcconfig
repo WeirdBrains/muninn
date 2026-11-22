@@ -11,4 +11,4 @@ PRODUCT_NAME = Muninn
 PRODUCT_BUNDLE_IDENTIFIER = com.weirdbrains.muninn
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 Michael Christenson II (WeirdBrains). BSD-3-Clause.
+PRODUCT_COPYRIGHT = Copyright © 2026 Weird Brains LLC. BSD-3-Clause.

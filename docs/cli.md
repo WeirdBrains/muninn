@@ -75,7 +75,7 @@ command-line usage (clap).
 ## Examples
 
 ```
-mnnn ingest csv --path ~/Projects/kommandosaldat/raw/data/binance_BTCUSDT_5m.csv --source binance -y
+mnnn ingest csv --path ~/data/raw/binance_BTCUSDT_5m.csv --source binance -y
 mnnn -q export --format csv --out - --symbol BTC/USDT --from 2026-10-01 | head
 mnnn sources list
 mnnn author add --name "Ada Lovelace" --email ada@example.org
@@ -115,7 +115,7 @@ See also [TUI](tui.md), [in-app help](help.md).
 ## Importing a whole path
 
 ```sh
-mnnn ingest path ~/Projects/kommandosaldat/raw/data                 # source "data": the folder's name
+mnnn ingest path ~/data/raw                 # source "data": the folder's name
 mnnn ingest path ~/Downloads/export --source coinbase              # set it explicitly
 mnnn ingest path ./exports --no-recursive
 ```

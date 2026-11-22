@@ -10,6 +10,7 @@ const docs = '/docs/';
 const shotWidth = 1464;
 const shotHeight = 890;
 const installDoc = '/docs/install/';
+const weirdBrains = 'https://weirdbrains.com';
 const homepage = 'https://muninn.weirdbrains.com';
 
 typedef Shot = (String, String);
@@ -138,7 +139,9 @@ class App extends StatelessComponent {
           [RawText(ravenMark)],
         ),
         p([
-          Component.text('Muninn $version · published by WeirdBrains · '),
+          Component.text('Muninn $version · published by '),
+          a(href: weirdBrains, [Component.text('Weird Brains')]),
+          Component.text(' · '),
           a(href: homepage, [Component.text('muninn.weirdbrains.com')]),
         ]),
         p([

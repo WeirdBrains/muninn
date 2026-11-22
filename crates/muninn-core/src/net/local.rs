@@ -111,9 +111,9 @@ use weirdnet_net::addr::{docker_bridge as docker, link_local};
 fn link_local_addresses_are_not_offered() {
     assert!(link_local("/ip6/fe80::1/udp/4741/quic-v1"));
     assert!(!link_local("/ip6/fd7a:115c::1/udp/4741/quic-v1"));
-    assert!(!link_local("/ip4/100.75.141.6/tcp/4741"));
+    assert!(!link_local("/ip4/100.64.1.1/tcp/4741"));
     assert!(docker("/ip4/172.17.0.1/tcp/4741") && docker("/ip4/172.18.0.1/udp/4741/quic-v1"));
-    assert!(!docker("/ip4/172.16.0.1/tcp/4741") && !docker("/dns4/alien.example/tcp/4741"));
+    assert!(!docker("/ip4/172.16.0.1/tcp/4741") && !docker("/dns4/node-a.example/tcp/4741"));
 }
 
 /// The node this process runs for the user (`mnnn net start` or the TUI): it keeps

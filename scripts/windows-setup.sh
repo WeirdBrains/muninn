@@ -6,7 +6,7 @@
 #   scripts/windows-setup.sh [x86_64] [aarch64]
 # Environment: DIST (default dist) holds muninn-<ver>-<arch>-pc-windows-gnullvm.zip and
 # receives the setup exes; WIN_SSH (default m3talsmith@127.0.0.1) and WIN_PORT (2222, the
-# dockurr VM on alien-blue); ISCC (default %LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe).
+# dockurr VM on the Linux build host); ISCC (default %LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe).
 # The Windows host needs OpenSSH server and Inno Setup 6.3+ (winget install JRSoftware.InnoSetup).
 set -euo pipefail
 cd "$(dirname "$0")/.."

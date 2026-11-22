@@ -3,7 +3,7 @@
 #   cd packaging/arch && makepkg -si
 # It builds the last *committed* state of the checkout's current branch.
 # For the prebuilt binary from a published GitHub release, use muninn-bin/PKGBUILD.
-# Maintainer: Michael Christenson II <m3talsmith@gmail.com>
+# Maintainer: Weird Brains LLC <m3talsmith@gmail.com>
 pkgname=muninn
 pkgver=2.28.0
 pkgrel=1
