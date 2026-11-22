@@ -510,11 +510,11 @@ mod tests {
         assert_eq!(Mode::parse("").unwrap(), Mode::Stream);
         assert!(Mode::parse("carrier-pigeon").is_err());
         let a: Vec<libp2p::Multiaddr> =
-            ["/ip4/10.0.0.2/tcp/4741", "/ip4/10.0.0.2/udp/4741/quic-v1", "/ip6/::1/tcp/4741", "/dns4/alien.example/tcp/4741"]
+            ["/ip4/10.0.0.2/tcp/4741", "/ip4/10.0.0.2/udp/4741/quic-v1", "/ip6/::1/tcp/4741", "/dns4/node-a.example/tcp/4741"]
                 .iter()
                 .map(|a| a.parse().unwrap())
                 .collect();
-        assert_eq!(candidates(&a, 4742, &[]), ["10.0.0.2:4742", "[::1]:4742", "alien.example:4742"]);
+        assert_eq!(candidates(&a, 4742, &[]), ["10.0.0.2:4742", "[::1]:4742", "node-a.example:4742"]);
         assert_eq!(candidates(&a, 4742, &["pub.example:9000".into()]), ["pub.example:9000"]);
     }
 }

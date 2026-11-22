@@ -398,7 +398,7 @@ Before the launch, next to model design templates. Builds on the `org host cert 
 
 Launch step before the post goes out: a public relay node.
 
-- Deploy a public Muninn relay on a DigitalOcean droplet under Michael's domain: a systemd unit running relay-server mode (`mnnn net relay serve on`), external address set to the domain, firewall open only for the node and relay ports, an ACME certificate for the domain
+- Deploy a public Muninn relay on a DigitalOcean droplet under m3talsmith's domain: a systemd unit running relay-server mode (`mnnn net relay serve on`), external address set to the domain, firewall open only for the node and relay ports, an ACME certificate for the domain
 - Write `docs/deploy-relay.md`: droplet setup, DNS, systemd unit, firewall, ACME, upgrades and logs
 - Plan only for now
 

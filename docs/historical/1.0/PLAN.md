@@ -73,7 +73,7 @@ and `ps`. Secrets are never logged and are redacted in `-v` output.
 | `--insecure` | | false | skip TLS verification (warns) |
 
 Default headers (always sent unless overridden):
-`User-Agent: muninn/<version> (+https://github.com/kommandosaldat/muninn)`,
+`User-Agent: muninn/<version> (+https://github.com/WeirdBrains/muninn)`,
 `Accept: application/json, text/csv;q=0.9`.
 
 **redis** — `mnnn ingest service redis`
@@ -512,7 +512,7 @@ zeroize, secrecy, rand, thiserror, anyhow, tracing, dialoguer (CLI prompts), dir
 
 ## 8. Test data
 
-Source: `~/Projects/kommandosaldat/raw/data` (`BTCUSDT_5m.csv`, `ETHUSDT_5m.csv`;
+Source: `~/data/raw` (`MUNINN_RAW_DATA`) (`BTCUSDT_5m.csv`, `ETHUSDT_5m.csv`;
 header `timestamp_utc,open,high,low,close,volume`, UTC open times, 5m bars from
 2017-08-17, contains gaps and zero-volume bars).
 

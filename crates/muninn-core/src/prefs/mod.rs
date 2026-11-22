@@ -277,7 +277,7 @@ pub struct NetPrefs {
     /// or that we asked first) or `anyone`. Other requests wait for you to accept them.
     pub accept: String,
     /// Where other hosts reach this node from outside: `host`, `host:port` or a multiaddr
-    /// (e.g. `alien.duckdns.org:4741` after forwarding TCP+UDP on the router). Announced and
+    /// (e.g. `node-a.example.com:4741` after forwarding TCP+UDP on the router). Announced and
     /// put first in invite links; DNS names are resolved by whoever dials.
     pub external_addresses: Vec<String>,
     /// How live collaboration reaches peers (2.19): `stream` (gRPC streams, the default) or
@@ -437,13 +437,13 @@ mod tests {
         assert!(p.net.mdns && !p.net.relay_server);
         assert_eq!(p.net.port, 4741);
         let mut n = p.net.clone();
-        n.external_addresses = vec!["alien.duckdns.org".into(), "203.0.113.5:4800".into(), "/dns4/x.example/tcp/9".into()];
+        n.external_addresses = vec!["node-a.example.com".into(), "203.0.113.5:4800".into(), "/dns4/x.example/tcp/9".into()];
         let ext: Vec<String> = n.external().unwrap().iter().map(|a| a.to_string()).collect();
         assert_eq!(
             ext,
             [
-                "/dns4/alien.duckdns.org/tcp/4741",
-                "/dns4/alien.duckdns.org/udp/4741/quic-v1",
+                "/dns4/node-a.example.com/tcp/4741",
+                "/dns4/node-a.example.com/udp/4741/quic-v1",
                 "/ip4/203.0.113.5/tcp/4800",
                 "/ip4/203.0.113.5/udp/4800/quic-v1",
                 "/dns4/x.example/tcp/9"

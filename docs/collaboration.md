@@ -147,7 +147,7 @@ on all interfaces (the peer connection itself uses 4741):
 
 ```sh
 mnnn net config --collab-port 4742 --collab-bind 0.0.0.0
-mnnn net config --collab-advertise alien.duckdns.org:4742   # behind NAT with a port forward
+mnnn net config --collab-advertise node-a.example.com:4742   # behind NAT with a port forward
 ```
 
 Allow TCP 4742 in the host firewall (and forward it on the router for peers outside your

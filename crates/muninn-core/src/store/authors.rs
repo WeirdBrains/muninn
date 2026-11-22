@@ -247,7 +247,7 @@ mod tests {
     fn author_crud_and_current() {
         let s = Store::open_in_memory().unwrap();
         assert!(s.current_author().unwrap().is_none());
-        let d = parse_details(&["org=Kommandosaldat".into(), "site = https://x".into()]).unwrap();
+        let d = parse_details(&["org=Example Co".into(), "site = https://x".into()]).unwrap();
         let a = s.add_author("Grace", Some("m@example.com"), &d).unwrap();
         assert_eq!(s.current_author().unwrap().unwrap().id, a.id, "first author becomes current");
         let b = s.add_author("Ada", None, &[]).unwrap();

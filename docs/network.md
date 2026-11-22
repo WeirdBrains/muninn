@@ -76,10 +76,10 @@ forward TCP and UDP on `net.port` (4741) on the router and allow them in the hos
 
 ```toml
 [net]
-external_addresses = ["alien.duckdns.org:4741"]
+external_addresses = ["node-a.example.com:4741"]
 ```
 
-or `mnnn net config --external alien.duckdns.org:4741` (`--clear-external` removes them).
+or `mnnn net config --external node-a.example.com:4741` (`--clear-external` removes them).
 
 A DNS name (dynamic DNS works) becomes `/dns4/NAME/tcp/PORT` and `/dns4/NAME/udp/PORT/quic-v1`;
 it is announced to peers and put first in invites.
