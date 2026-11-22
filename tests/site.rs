@@ -205,7 +205,8 @@ fn the_site_about_shows_publisher_homepage_version_and_mark() {
     for want in [
         format!("const version = '{ver}';"),
         "const homepage = 'https://muninn.weirdbrains.com';".into(),
-        "published by WeirdBrains".into(),
+        "const weirdBrains = 'https://weirdbrains.com';".into(),
+        "published by '),\n          a(href: weirdBrains, [Component.text('Weird Brains')])".into(),
         "RawText(ravenMark)".into(),
         "BSD 3-Clause".into(),
     ] {
