@@ -1,17 +1,17 @@
 {
   "project": {
-    "id": "2b16b273f5df4327949be8194933d947",
+    "id": "266879c7e1c449e484dbe2087a0e22a1",
     "name": "Alpha",
     "description": "",
-    "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-    "created_at": 1793485089060,
-    "updated_at": 1793485089060
+    "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+    "created_at": 1795383313944,
+    "updated_at": 1795383313944
   },
   "items": [
     {
       "item": {
         "id": 1,
-        "project_id": "2b16b273f5df4327949be8194933d947",
+        "project_id": "266879c7e1c449e484dbe2087a0e22a1",
         "kind": "result",
         "ref_id": "binance:BTC/USDT:5m",
         "payload": {
@@ -22,8 +22,8 @@
           },
           "duration": 300
         },
-        "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-        "added_at": 1793485089110
+        "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+        "added_at": 1795383313973
       },
       "name": "BTC/USDT binance 5m",
       "now": "401 bars now"
@@ -31,12 +31,12 @@
     {
       "item": {
         "id": 2,
-        "project_id": "2b16b273f5df4327949be8194933d947",
+        "project_id": "266879c7e1c449e484dbe2087a0e22a1",
         "kind": "model",
         "ref_id": "bars",
         "payload": {},
-        "author_id": "c6d28549c85f47f99ab64a1ce201b9c4",
-        "added_at": 1793485089174
+        "author_id": "8c0d10edb18f4cde8a183d983ec90b76",
+        "added_at": 1795383314007
       },
       "name": "bars",
       "now": "v2 · 15 fields · 823 records"
